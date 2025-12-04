@@ -201,7 +201,7 @@ const fallbackWait = Math.min(Math.max(attempts * 1_000, RATE_LIMIT_MIN_WAIT_MS)
 ### Synthetic Failure Contract
 **Location**: `src/ai-agent.ts:2593-2645`
 
-- When max turns or context guard exhausts the run without a pending cache, the session synthesizes a `status: 'failure'` final report, logs `agent:failure-report`, and commits it with metadata `{ reason, turns_completed, final_report_attempts, last_stop_reason }`.
+- When max turns or context guard exhausts the run without a pending cache, the session synthesizes a failure final report, logs `agent:failure-report`, and commits it with metadata `{ reason, turns_completed, final_report_attempts, last_stop_reason }`.
 - FIN + `agent:final-report-accepted` (with `source='synthetic'`) ensure headends render an explicit explanation instead of `(no output)`.
 - `recordFinalReportMetrics` captures the synthetic reason so dashboards can alert whenever these spike.
 

@@ -161,7 +161,6 @@ export class AIAgentSession {
       return;
     }
     const payload: PendingFinalReportPayload = {
-      status: value.status,
       format: value.format,
       content: value.content,
       content_json: value.content_json,
@@ -662,9 +661,7 @@ export class AIAgentSession {
           this.log(entry);
         },
         setFinalReport: (p) => {
-          const normalizedStatus: 'success' | 'failure' = p.status;
           this.commitFinalReport({
-            status: normalizedStatus,
             format: p.format as 'json'|'markdown'|'markdown+mermaid'|'slack-block-kit'|'tty'|'pipe'|'sub-agent'|'text',
             content: p.content,
             content_json: p.content_json,
@@ -1402,9 +1399,6 @@ export class AIAgentSession {
         'ai.agent.success': resultShape.success,
         'ai.agent.turn_count': currentTurn,
       });
-      if (typeof resultShape.finalReport?.status === 'string' && resultShape.finalReport.status.length > 0) {
-        span.setAttribute('ai.agent.final_report.status', resultShape.finalReport.status);
-      }
       if (!resultShape.success && typeof resultShape.error === 'string' && resultShape.error.length > 0) {
         span.setStatus({ code: SpanStatusCode.ERROR, message: resultShape.error });
       }

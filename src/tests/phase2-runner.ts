@@ -353,7 +353,7 @@ const validateScenarioResult = (
   if (!session.success) {
     failures.push(`session unsuccessful: ${session.error ?? 'unknown error'}`);
   }
-  if (session.finalReport?.status !== 'success') {
+  if (session.finalReport === undefined) {
     failures.push('final report missing or not successful');
   }
   if (!hasToolInvocation(session.logs, session.conversation, 'agent__final_report')) {

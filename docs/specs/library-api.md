@@ -264,7 +264,6 @@ interface AIAgentResult {
 
   // Optional final report
   finalReport?: {
-    status: 'success' | 'failure' | 'partial';
     format: 'json' | 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'sub-agent' | 'text';
     content?: string;
     content_json?: Record<string, unknown>;
@@ -320,7 +319,7 @@ async function main() {
   if (result.success) {
     console.log('\nSession completed successfully');
     if (result.finalReport) {
-      console.log(`Final report: ${result.finalReport.status}`);
+      console.log(`Final report content: ${result.finalReport?.content ?? ''}`);
     }
   } else {
     console.error(`Session failed: ${result.error}`);

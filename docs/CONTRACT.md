@@ -86,8 +86,8 @@ These rules MUST hold in all cases, regardless of configuration.
 ### Always Return Output
 
 **The application NEVER crashes without returning `AIAgentResult`**
-- Model-provided final report: `success: true`, `finalReport` with `status: 'success'`
-- Synthetic failure (max turns, context overflow): `success: false`, `finalReport` with `status: 'failure'`
+- Model-provided final report: `success: true`, `finalReport` populated with expected format/content
+- Synthetic failure (max turns, context overflow): `success: false`, `finalReport` populated with failure content/metadata
 - Fatal errors (auth, quota): `success: false`, `error` field populated
 
 **Note**: The `status` field is determined by the source of the final report, not by model input. Models do not provide a status field; the system sets it based on whether the report was model-provided (success) or synthetic (failure).
@@ -100,7 +100,7 @@ These rules MUST hold in all cases, regardless of configuration.
 **Exit code 4**: Invalid arguments, configuration errors, or validation failures
 **Exit code 5**: Schema validation failures (e.g., tool schema validation)
 
-Note: Exit codes map to failure categories, not specific error types. Check `result.error` and `result.finalReport.status` for detailed failure reasons.
+Note: Exit codes map to failure categories, not specific error types. Check `result.error` and the presence/content of `result.finalReport` for detailed failure reasons.
 
 ### Context Management Contract
 

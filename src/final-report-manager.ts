@@ -136,17 +136,6 @@ export class FinalReportManager {
   }
 
   /**
-   * Get the status of the committed final report
-   */
-  getStatus(): 'success' | 'failure' | undefined {
-    const status = this.finalReport?.status;
-    if (status === 'success' || status === 'failure') {
-      return status;
-    }
-    return undefined;
-  }
-
-  /**
    * Get the resolved format for this session
    */
   getResolvedFormat(): OutputFormatId | undefined {
@@ -157,17 +146,9 @@ export class FinalReportManager {
    * Commit a final report to the manager
    */
   commit(payload: PendingFinalReportPayload, source: FinalReportSource): void {
-    const ensureMissingPhrase = (content: string | undefined): string | undefined => {
-      if (payload.status !== 'failure') return content;
-      if (typeof content !== 'string') return content;
-      const phrase = 'Session completed without a final report';
-      return content.includes(phrase) ? content : `${phrase}. ${content}`.trim();
-    };
-
     this.finalReport = {
-      status: payload.status,
       format: payload.format,
-      content: ensureMissingPhrase(payload.content),
+      content: payload.content,
       content_json: payload.content_json,
       metadata: payload.metadata,
       ts: Date.now()
@@ -277,9 +258,6 @@ export class FinalReportManager {
     const formatMatch = FINAL_REPORT_FORMAT_VALUES.find((value) => value === formatCandidate);
     if (formatMatch === undefined) return undefined;
 
-    // Model-provided final reports always have status 'success'
-    const normalizedStatus: 'success' | 'failure' = 'success';
-
     let finalContent: string | undefined = contentCandidate;
     if ((finalContent === undefined || finalContent.trim().length === 0) && contentJson !== undefined) {
       try {
@@ -293,7 +271,6 @@ export class FinalReportManager {
     const metadata = isRecord(json.metadata) ? json.metadata : undefined;
 
     const payload: PendingFinalReportPayload = {
-      status: normalizedStatus,
       format: formatMatch,
       content: finalContent,
     };

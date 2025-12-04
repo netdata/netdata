@@ -359,7 +359,6 @@ export class XmlToolTransport {
           };
         }
         parameters = {
-          status: 'success',
           report_format: expectedFormat,
           report_content: unclosedFinal.content,
         };

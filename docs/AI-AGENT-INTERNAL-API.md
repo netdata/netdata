@@ -40,7 +40,7 @@ The library performs no direct I/O (no stdout/stderr/file writes). All output, l
   - `conversation: ConversationMessage[]`
   - `logs: LogEntry[]`
   - `accounting: AccountingEntry[]`
-  - `finalReport?: { status: 'success'|'failure'|'partial'; format: 'json'|'markdown'|'text'; content?: string; content_json?: Record<string, unknown>; metadata?: Record<string, unknown>; ts: number }` – isolated final report returned by the model via `agent_final_report`
+  - `finalReport?: { format: 'json'|'markdown'|'text'|'markdown+mermaid'|'slack-block-kit'|'tty'|'pipe'|'sub-agent'; content?: string; content_json?: Record<string, unknown>; metadata?: Record<string, unknown>; ts: number }` – isolated final report returned by the model via `agent_final_report`
 - `ConversationMessage` – messages in conversation, including tool calls/results
 - `LogEntry` – structured logs
   - `severity: 'VRB' | 'WRN' | 'ERR' | 'TRC' | 'THK' | 'FIN'`

@@ -493,7 +493,7 @@ buildFallbackStep(turn, message): ScenarioTurn {
 4. **Tool validation**: Expected tools must be present (unless allowMissingTools)
 5. **Attempt tracking**: Per scenario:turn:provider key
 6. **Signature preservation**: Removes reasoning without signatures on later turns
-7. **Error recovery**: All errors produce final_report with failure status
+7. **Error recovery**: All errors produce final_report with failure content and mark the session unsuccessful
 
 ## Business Logic Coverage (Verified 2025-11-16)
 

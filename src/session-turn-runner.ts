@@ -879,12 +879,6 @@ export class TurnRunner {
                                 const params = finalReportCall.parameters;
                                 const expectedFormat = this.ctx.resolvedFormat ?? 'text';
 
-                                // =================================================================
-                                // LAYER 1: Transport/Wrapper extraction
-                                // Extract wrapper fields (format) separately from payload
-                                // Status is always 'success' for model-provided final reports
-                                // =================================================================
-                                const normalizedStatus: 'success' | 'failure' = 'success';
                                 const formatParamRaw = params.report_format;
                                 const formatParam = typeof formatParamRaw === 'string' && formatParamRaw.trim().length > 0 ? formatParamRaw.trim() : undefined;
                                 const metadataCandidate = params.metadata;
@@ -1032,7 +1026,6 @@ export class TurnRunner {
                                 // Build clean final report object
                                 // =================================================================
                                 this.commitFinalReport({
-                                    status: normalizedStatus,
                                     format: finalFormat,
                                     content: finalContent,
                                     content_json: contentJson,
@@ -1056,7 +1049,6 @@ export class TurnRunner {
                                     return undefined;
                                 const finalFormat = this.ctx.resolvedFormat ?? 'text';
                                 return {
-                                    status: 'success' as const,
                                     format: (FINAL_REPORT_FORMAT_VALUES.find((value) => value === finalFormat) ?? 'text'),
                                     content: normalizedContent,
                                 };
@@ -1268,13 +1260,8 @@ export class TurnRunner {
                                     lastErrorType = undefined;
                                 }
                             }
-                            const statusCandidate = this.getFinalReportStatus();
-                            const finalReportStatus = statusCandidate === 'success' || statusCandidate === 'failure'
-                                ? statusCandidate
-                                : 'missing';
-                            // Both 'success' and 'failure' are valid final report outcomes
-                            // Only 'missing' (incomplete/malformed) should trigger retry
-                            if (finalReportStatus !== 'missing') {
+                            const committedFinalReport = this.ctx.finalReportManager.getReport();
+                            if (committedFinalReport !== undefined) {
                                 return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn);
                             }
                             const warnEntry = {
@@ -1286,14 +1273,14 @@ export class TurnRunner {
                                 type: 'llm' as const,
                                 remoteIdentifier: 'agent:final-report',
                                 fatal: false,
-                                message: `Final report incomplete (status='${finalReportStatus}'), retrying.`,
+                                message: 'Final report incomplete (missing), retrying.',
                             };
                             this.log(warnEntry);
                             // Track that the model attempted a final_report even though it was incomplete.
                             turnHadFinalReportAttempt = true;
                             collapseRemainingTurns('incomplete_final_report');
                             this.state.llmSyntheticFailures++;
-                            lastError = `final_report_status_${finalReportStatus}`;
+                            lastError = 'final_report_status_missing';
                             lastErrorType = 'invalid_response';
                             if (cycleComplete) {
                                 rateLimitedInCycle = 0;
@@ -1601,7 +1588,6 @@ export class TurnRunner {
             }
             this.logFailureReport(detailedSummary, this.state.currentTurn, failureDetails);
             this.commitFinalReport({
-                status: 'failure',
                 format: fallbackFormat,
                 content: detailedSummary,
                 metadata: {
@@ -1634,7 +1620,6 @@ export class TurnRunner {
             }
             this.logFailureReport(detailedSummary, currentTurn, failureDetails);
             this.commitFinalReport({
-                status: 'failure',
                 format: fallbackFormat,
                 content: detailedSummary,
                 metadata: {
@@ -2089,7 +2074,6 @@ export class TurnRunner {
             callPath: this.ctx.callPath,
             headendId: this.ctx.headendId,
             source,
-            status: fr.status,
             turnsCompleted: currentTurn,
             finalReportAttempts: this.ctx.finalReportManager.finalReportAttempts,
             forcedFinalReason: this.forcedFinalTurnReason,
@@ -2098,8 +2082,7 @@ export class TurnRunner {
         });
         this.emitFinalSummary(logs, accounting);
         // success: true for model-provided reports (status='success'), false for synthetic failures (status='failure')
-        const success = fr.status === 'success';
-        // When status is failure/partial, propagate content as error for display (string or JSON)
+        const success = source !== 'synthetic';
         const error = (() => {
             if (success) return undefined;
             if (typeof fr.content === 'string' && fr.content.length > 0) return fr.content;
@@ -2217,13 +2200,6 @@ export class TurnRunner {
             : provider;
         const modelSegment = metadata?.actualModel ?? model;
         return `${providerSegment}:${modelSegment}`;
-    }
-    private getFinalReportStatus(): 'success' | 'failure' | undefined {
-        const status = this.finalReport?.status;
-        if (status === 'success' || status === 'failure') {
-            return status;
-        }
-        return undefined;
     }
     private buildFinalReportReminder(): string {
         const format = this.ctx.resolvedFormat ?? 'text';

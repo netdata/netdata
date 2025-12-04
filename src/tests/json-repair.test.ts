@@ -48,7 +48,6 @@ describe('json repair pipeline', () => {
     const content = 'hello\nworld';
 
     const res = await provider.execute('agent__final_report', {
-      status: 'success',
       report_format: 'text',
       report_content: content,
     });
@@ -84,7 +83,6 @@ describe('json repair pipeline', () => {
     });
 
     const res = await provider.execute('agent__final_report', {
-      status: 'success',
       report_format: 'json',
       content_json: { data: '{"value":"ok"}' },
       report_content: 'unused',

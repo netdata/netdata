@@ -808,7 +808,6 @@ function makeSuccessResult(content: string): AIAgentResult {
     logs: [],
     accounting: [],
     finalReport: {
-      status: 'success',
       format: 'text',
       content,
       ts: Date.now(),
@@ -1165,7 +1164,7 @@ const BASE_TEST_SCENARIOS: HarnessTest[] = [
     id: DEFAULT_PROMPT_SCENARIO,
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-1 expected success.');
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
       invariant(finalReport !== undefined, 'Final report missing for run-test-1.');
       invariant(finalReport.format === 'markdown', 'Final report format mismatch for run-test-1.');
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Tool execution succeeded'), 'Unexpected final report content for run-test-1.');
@@ -1211,11 +1210,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-2',
     expect: (result) => {
-      // CONTRACT §2: success: false when finalReport.status is 'failure'
-      invariant(!result.success, 'Scenario run-test-2 should have success=false when finalReport.status=failure per CONTRACT.');
-      const finalReport = result.finalReport;
+      invariant(result.success, 'Scenario run-test-2 should now succeed (presence-based final report).');
+      const finalReport = result.finalReport!;
       invariant(finalReport !== undefined, 'Final report missing for run-test-2.');
-      invariant(finalReport.status === 'failure', 'Final report should indicate failure for run-test-2.');
 
       const toolEntries = result.accounting.filter(isToolAccounting);
       const failureEntry = toolEntries.find((entry) => entry.command === 'test__test');
@@ -1230,9 +1227,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     id: 'run-test-3',
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-3 expected success after retry.');
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
       invariant(finalReport !== undefined, 'Final report missing for run-test-3.');
-      invariant(finalReport.status === 'success', 'Final report should indicate success for run-test-3.');
+      invariant(result.success, 'Final report should indicate success for run-test-3.');
 
       const llmEntries = result.accounting.filter(isLlmAccounting);
       invariant(llmEntries.length >= 2, 'LLM retries expected for run-test-3.');
@@ -1292,8 +1289,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       sessionConfig.toolTimeout = 200;
     },
     expect: (result) => {
-      // CONTRACT §2: success: false when finalReport.status is 'failure'
-      invariant(!result.success, 'Scenario run-test-7 should have success=false when finalReport.status=failure per CONTRACT.');
+      invariant(result.success, 'Scenario run-test-7 should complete (presence-based final report).');
       const toolEntries = result.accounting.filter(isToolAccounting);
       const timeoutEntry = toolEntries.find((entry) => entry.command === 'test__test');
       invariant(timeoutEntry !== undefined, 'Expected MCP accounting entry for run-test-7.');
@@ -1317,9 +1313,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     id: 'run-test-9',
     expect: (result) => {
       // CONTRACT §2: success: false when finalReport.status is 'failure'
-      invariant(!result.success, 'Scenario run-test-9 should have success=false when finalReport.status=failure per CONTRACT.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'failure', 'Final report should mark failure for run-test-9.');
+      invariant(result.success, 'Scenario run-test-9 should complete (presence-based final report).');
+      const finalReport = result.finalReport!;
+      invariant(finalReport !== undefined, 'Final report should be present for run-test-9.');
       const log = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Unknown tool requested'));
       invariant(log !== undefined, 'Unknown tool warning log expected for run-test-9.');
     },
@@ -1365,8 +1361,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-12 expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should complete successfully for run-test-12.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should complete successfully for run-test-12.');
       const finalTurnLog = result.logs.find((log) => typeof log.remoteIdentifier === 'string' && log.remoteIdentifier.includes('primary:') && typeof log.message === 'string' && log.message.includes('final turn'));
       invariant(finalTurnLog !== undefined, 'LLM request log should reflect final turn for run-test-12.');
     },
@@ -1422,22 +1418,22 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           const toolEntries = result.accounting.filter(isToolAccounting);
           invariant(toolEntries.length > 0, 'Tool accounting entries expected.');
           invariant(result.success, 'Context guard scenario should complete successfully after enforcing final turn.');
-          const finalReport = result.finalReport;
-          invariant(finalReport?.status === 'success', 'Final report should be successful after context guard trimming.');
+          const finalReport = result.finalReport!;
+          invariant(result.success === true, 'Final report should be successful after context guard trimming.');
         } else {
           const contextWarnings = result.logs.filter((entry) => entry.remoteIdentifier === CONTEXT_REMOTE);
           invariant(contextWarnings.length > 0, 'Context warning log expected when guard proceeds without replacing tool output.');
           invariant(result.success, 'Context guard scenario should complete successfully after enforcing final turn.');
-          const finalReport = result.finalReport;
-          invariant(finalReport?.status === 'success', 'Final report should be successful after forced final turn.');
+          const finalReport = result.finalReport!;
+          invariant(result.success === true, 'Final report should be successful after forced final turn.');
         }
       } else {
         const contextWarning = result.logs.find((entry) => entry.remoteIdentifier === CONTEXT_REMOTE);
         invariant(contextWarning !== undefined, 'Context warning log expected when guard fires before tool execution.');
         const llmEntries = result.accounting.filter(isLlmAccounting);
         invariant(llmEntries.length === 0, 'Preflight guard should abort before issuing LLM requests.');
-        const finalReport = result.finalReport;
-        invariant(finalReport?.status === 'failure', 'Fallback failure final report expected when guard triggers preflight.');
+        const finalReport = result.finalReport!;
+        invariant(!result.success, 'Fallback failure final report expected when guard triggers preflight.');
       }
     },
   },
@@ -1466,9 +1462,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         console.log('context-limit-default finalReport:', JSON.stringify(result.finalReport, null, 2));
         console.log('context-limit-default success:', result.success, 'error:', result.error);
       }
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
       invariant(finalReport !== undefined, 'Final report missing for run-test-context-limit-default.');
-      invariant(finalReport.status === 'success', 'Final report should succeed after default context guard enforcement.');
+      invariant(result.success, 'Final report should succeed after default context guard enforcement.');
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes('context budget enforcement'), 'Final report should explain that context guard enforcement occurred.');
     },
   },
@@ -1529,8 +1525,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(schemaTokens > 0, 'Schema tokens should contribute to preflight guard evaluation.');
       invariant(expectedTokens > limitTokens, `Projected tokens should exceed limit during preflight (expected > ${String(limitTokens)}, got ${String(expectedTokens)}).`);
 
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'failure', 'Fallback failure final report expected for run-test-context-guard-preflight.');
+      const finalReport = result.finalReport!;
+      invariant(!result.success, 'Fallback failure final report expected for run-test-context-guard-preflight.');
     },
   },
   {
@@ -1571,8 +1567,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-context-multi-provider expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should succeed after provider fallback.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should succeed after provider fallback.');
       const warnLog = result.logs.find((entry) =>
         entry.remoteIdentifier === CONTEXT_REMOTE
         && typeof entry.message === 'string'
@@ -1624,8 +1620,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(failedEntry !== undefined && typeof failedEntry.error === 'string' && failedEntry.error.includes('Simulated model failure'), 'Initial LLM attempt should record failure for retry scenario.');
       const finalTurnLog = result.logs.find((entry) => entry.remoteIdentifier === FINAL_TURN_REMOTE);
       invariant(finalTurnLog !== undefined, 'Final turn instruction log expected for retry scenario.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should be successful after retry enforcement.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should be successful after retry enforcement.');
     },
   },
   {
@@ -1651,7 +1647,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-context-trim-log expected success.');
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
 
       if (process.env.CONTEXT_DEBUG === 'true') {
         console.log('context-trim-log logs:', JSON.stringify(result.logs, null, 2));
@@ -1660,7 +1656,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         console.log('context-trim-log finalReport:', JSON.stringify(finalReport, null, 2));
       }
 
-      invariant(finalReport?.status === 'success', 'Final report should indicate success after enforced context guard for run-test-context-trim-log.');
+      invariant(result.success === true, 'Final report should indicate success after enforced context guard for run-test-context-trim-log.');
 
       const toolMessages = result.conversation.filter((message) => message.role === 'tool');
       const trimmedMessage = toolMessages.find((message) => message.toolCallId === 'call-context-trim-log' && message.content === '(no output)');
@@ -1692,8 +1688,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-context-forced-final expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-context-forced-final.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for run-test-context-forced-final.');
 
       const contextWarn = result.logs.find((entry) =>
         entry.remoteIdentifier === CONTEXT_REMOTE
@@ -1766,8 +1762,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-llm-context-metrics expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-llm-context-metrics.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for run-test-llm-context-metrics.');
 
       const requestLogs = result.logs.filter((entry) => entry.type === 'llm' && entry.direction === 'request');
       invariant(requestLogs.length > 0, 'LLM request log expected for run-test-llm-context-metrics.');
@@ -1838,8 +1834,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-tool-log-tokens expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-tool-log-tokens.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for run-test-tool-log-tokens.');
 
       if (process.env.CONTEXT_DEBUG === 'true') {
         console.log('tool-log-tokens logs:', JSON.stringify(result.logs, null, 2));
@@ -1991,8 +1987,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       }
       invariant(expectedTokens > limitTokens, `Projected tokens should exceed limit (expected > ${String(limitTokens)}, got ${String(expectedTokens)}).`);
 
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'failure', 'Final report should indicate failure after exceeding the context limit.');
+      const finalReport = result.finalReport!;
+      invariant(!result.success, 'Final report should indicate failure after exceeding the context limit.');
     },
   },
   {
@@ -2131,8 +2127,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario context_guard__progress_passthrough expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should complete after progress passthrough.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should complete after progress passthrough.');
       if (process.env.CONTEXT_DEBUG === 'true') {
         console.log('progress_passthrough conversation:', JSON.stringify(result.conversation, null, 2));
         console.log('progress_passthrough logs:', JSON.stringify(result.logs, null, 2));
@@ -2176,8 +2172,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario context_guard__batch_passthrough expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should succeed for context_guard__batch_passthrough.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should succeed for context_guard__batch_passthrough.');
       if (process.env.CONTEXT_DEBUG === 'true') {
         console.log('batch_passthrough conversation:', JSON.stringify(result.conversation, null, 2));
         console.log('batch_passthrough logs:', JSON.stringify(result.logs, null, 2));
@@ -2246,8 +2242,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       );
       invariant(toolMessages.length === 0, 'No non-final tool messages should appear when schema alone triggers the guard.');
 
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should still complete successfully after schema-only enforcement.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should still complete successfully after schema-only enforcement.');
     },
   },
   {
@@ -2273,8 +2269,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario context_guard__llm_metrics_logging expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for context_guard__llm_metrics_logging.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for context_guard__llm_metrics_logging.');
 
       const requestLogs = result.logs.filter((entry) => entry.type === 'llm' && entry.direction === 'request');
       invariant(requestLogs.length > 0, 'LLM request logs expected for context_guard__llm_metrics_logging.');
@@ -2323,8 +2319,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario context_guard__forced_final_turn_flow expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for context_guard__forced_final_turn_flow.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for context_guard__forced_final_turn_flow.');
 
       const contextWarn = result.logs.find((entry) =>
         entry.remoteIdentifier === CONTEXT_REMOTE
@@ -2414,8 +2410,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario context_guard__multi_target_provider_selection expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should succeed after provider fallback.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should succeed after provider fallback.');
 
       const warnLog = result.logs.find((entry) =>
         entry.remoteIdentifier === CONTEXT_REMOTE
@@ -2524,13 +2520,13 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-context-token-double-count expected success.');
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
       if (process.env.CONTEXT_DEBUG === 'true') {
         console.log('context-token-double-count logs:', JSON.stringify(result.logs, null, 2));
         console.log('context-token-double-count conversation:', JSON.stringify(result.conversation, null, 2));
         console.log('context-token-double-count accounting:', JSON.stringify(result.accounting, null, 2));
       }
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-context-token-double-count.');
+      invariant(result.success === true, 'Final report should indicate success for run-test-context-token-double-count.');
       const toolIndex = result.logs.findIndex((entry) =>
         entry.type === 'tool'
         && entry.direction === 'response'
@@ -2636,7 +2632,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         && typeof entry.message === 'string'
         && entry.message.includes('post-shrink'));
       invariant(warnLog !== undefined, 'Context guard warning expected for bulk tool scenario.');
-      invariant(result.finalReport?.status === 'success', 'Final report should succeed after bulk trimming.');
+      invariant(result.success === true, 'Final report should succeed after bulk trimming.');
     },
   },
   {
@@ -2666,7 +2662,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success, 'Scenario run-test-context-tokenizer-drift expected success.');
       const contextWarning = result.logs.find((entry) => entry.remoteIdentifier === CONTEXT_REMOTE);
       invariant(contextWarning !== undefined, 'Tokenizer drift scenario should log context guard warning.');
-      invariant(result.finalReport?.status === 'success', 'Final report should succeed despite tokenizer drift.');
+      invariant(result.success === true, 'Final report should succeed despite tokenizer drift.');
     },
   },
   {
@@ -2699,7 +2695,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success, 'Scenario run-test-context-cache-tokens expected success.');
       const guardWarning = result.logs.find((entry) => entry.remoteIdentifier === CONTEXT_REMOTE);
       invariant(guardWarning !== undefined, 'Cache token scenario should log context guard warning.');
-      invariant(result.finalReport?.status === 'success', 'Final report should succeed after cache token reconciliation.');
+      invariant(result.success === true, 'Final report should succeed after cache token reconciliation.');
     },
   },
   {
@@ -2765,8 +2761,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-17 expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-17.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for run-test-17.');
     },
   },
   {
@@ -2894,7 +2890,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     id: 'run-test-120',
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-120 should succeed.');
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
       invariant(finalReport !== undefined, 'Final report missing for run-test-120.');
       const finalContent = finalReport.content ?? '';
       invariant(finalContent.includes('Metadata propagation confirmed'), 'Unexpected final report content for run-test-120.');
@@ -2916,8 +2912,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-25 expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-25.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for run-test-25.');
 
       const toolEntries = result.accounting.filter(isToolAccounting).filter((entry) => entry.command === 'test__test');
       invariant(toolEntries.length === 2, 'Two tool executions expected for run-test-25.');
@@ -3028,8 +3024,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result) => {
       // CONTRACT §2: success: false when finalReport.status is 'failure'
       invariant(!result.success, 'Scenario run-test-26 should have success=false when finalReport.status=failure per CONTRACT.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'failure', 'Final report should indicate failure for run-test-26.');
+      const finalReport = result.finalReport!;
+      invariant(!result.success, 'Final report should indicate failure for run-test-26.');
       const batchMessage = result.conversation.find(
         (message) => message.role === 'tool' && message.toolCallId === 'call-batch-invalid-id'
       );
@@ -3046,8 +3042,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-27 expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-27.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for run-test-27.');
       const batchMessage = result.conversation.find(
         (message) => message.role === 'tool' && message.toolCallId === 'call-batch-unknown-tool'
       );
@@ -3065,8 +3061,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result) => {
       // CONTRACT §2: success: false when finalReport.status is 'failure'
       invariant(!result.success, 'Scenario run-test-28 should have success=false when finalReport.status=failure per CONTRACT.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'failure', 'Final report should indicate failure for run-test-28.');
+      const finalReport = result.finalReport!;
+      invariant(!result.success, 'Final report should indicate failure for run-test-28.');
       const batchMessage = result.conversation.find(
         (message) => message.role === 'tool' && message.toolCallId === 'call-batch-exec-error'
       );
@@ -3097,8 +3093,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-29 expected success after retry.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-29.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for run-test-29.');
       const augmented = result as AIAgentResult & { _firstAttempt?: AIAgentResult };
       const firstAttempt = augmented._firstAttempt;
       invariant(firstAttempt !== undefined && !firstAttempt.success, 'First attempt should fail before retry for run-test-29.');
@@ -3122,8 +3118,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-30 expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-30.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for run-test-30.');
       const thinkingLog = result.logs.find((entry) => entry.severity === 'THK' && entry.remoteIdentifier === 'thinking');
       invariant(thinkingLog !== undefined, 'Thinking log expected for run-test-30.');
     },
@@ -3132,8 +3128,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     id: RUN_TEST_31,
     expect: (result) => {
       invariant(result.success, `Scenario ${RUN_TEST_31} expected success after provider throw.`);
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-31.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for run-test-31.');
       const thrownCandidate = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes(THROW_FAILURE_MESSAGE));
       const thrownLog = expectLlmLogContext(thrownCandidate, RUN_TEST_31, { message: `Thrown failure log expected for ${RUN_TEST_31}.`, severity: 'WRN', remote: PRIMARY_REMOTE });
       const thrownDetails = thrownLog.details;
@@ -3151,8 +3147,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-32 expected success after retry.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success' && finalReport.format === 'json', 'Final report should indicate JSON success for run-test-32.');
+      const finalReport = result.finalReport!;
+      invariant(finalReport !== undefined, 'Final report missing for run-test-32.');
+      invariant(result.success === true && finalReport.format === 'json', 'Final report should indicate JSON success for run-test-32.');
       const toolFailureMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes('final_report(json) requires'));
       invariant(toolFailureMessage !== undefined, 'Final report failure message expected for run-test-32.');
       const llmAttempts = result.accounting.filter(isLlmAccounting).length;
@@ -3167,8 +3164,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result) => {
       // CONTRACT §2: success: false when finalReport.status is 'failure'
       invariant(!result.success, `Scenario ${RUN_TEST_33} should have success=false when finalReport.status=failure per CONTRACT.`);
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'failure', 'Synthesized failure final report expected for run-test-33.');
+      const finalReport = result.finalReport!;
+      invariant(finalReport !== undefined, 'Final report missing for run-test-33.');
+      invariant(!result.success, 'Synthesized failure final report expected for run-test-33.');
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Session completed without a final report'), 'Synthesized content should mention missing final report for run-test-33.');
       const syntheticCandidate = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Synthetic retry: assistant returned content without tool calls and without final_report.'));
       const syntheticLog = expectLlmLogContext(syntheticCandidate, RUN_TEST_33, { message: `Synthetic retry warning expected for ${RUN_TEST_33}.`, severity: 'WRN', remote: PRIMARY_REMOTE });
@@ -3187,8 +3185,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-34 expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-34.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for run-test-34.');
       const progressResult = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes('agent__progress_report'));
       invariant(progressResult !== undefined, 'Batch progress entry expected for run-test-34.');
       const toolMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes(BATCH_PROGRESS_RESPONSE));
@@ -3202,8 +3200,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-35 expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-35.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for run-test-35.');
       const toolMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes(BATCH_STRING_RESULT));
       invariant(toolMessage !== undefined, 'Batch string tool output expected for run-test-35.');
     },
@@ -3216,8 +3214,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result) => {
       // CONTRACT §2: success: false when finalReport.status is 'failure'
       invariant(!result.success, 'Scenario run-test-36 should have success=false when finalReport.status=failure per CONTRACT.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'failure', 'Final report should indicate failure for run-test-36.');
+      const finalReport = result.finalReport!;
+      invariant(!result.success, 'Final report should indicate failure for run-test-36.');
       const failureMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes('empty_batch'));
       invariant(failureMessage !== undefined, 'Empty batch failure message expected for run-test-36.');
       const batchEntry = result.accounting.filter(isToolAccounting).find((entry) => entry.command === 'agent__batch');
@@ -3231,8 +3229,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, `Scenario ${RUN_TEST_37} expected success after rate limit retry.`);
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-37.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for run-test-37.');
       const rateLimitCandidate = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.toLowerCase().includes(RATE_LIMIT_WARNING_TOKEN));
       const rateLimitLog = expectLlmLogContext(rateLimitCandidate, RUN_TEST_37, { message: rateLimitWarningExpected(RUN_TEST_37), severity: 'WRN', remote: PRIMARY_REMOTE });
       invariant(typeof rateLimitLog.message === 'string' && rateLimitLog.message.toLowerCase().includes(RATE_LIMIT_WARNING_TOKEN), rateLimitMessageMismatch(RUN_TEST_37));
@@ -3308,8 +3306,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-42 expected success after model error retry.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-42.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for run-test-42.');
       const failedAttempt = result.accounting.filter(isLlmAccounting).find((entry) => entry.status === 'failed');
       invariant(failedAttempt !== undefined && typeof failedAttempt.error === 'string' && failedAttempt.error.includes('Invalid model request'), 'Model error accounting expected for run-test-42.');
     },
@@ -3354,7 +3352,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-50 expected success.');
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
       invariant(finalReport?.format === SLACK_OUTPUT_FORMAT, 'Slack final report expected for run-test-50.');
       const metadataCandidate = finalReport.metadata;
       const slackCandidate = (metadataCandidate !== undefined && typeof metadataCandidate === 'object' && !Array.isArray(metadataCandidate))
@@ -3378,8 +3376,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result) => {
       // CONTRACT §2: success: false when finalReport.status is 'failure'
       invariant(!result.success, 'Scenario run-test-51 should have success=false when finalReport.status=failure per CONTRACT.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'failure', 'Final report should indicate failure for run-test-51.');
+      const finalReport = result.finalReport!;
+      invariant(!result.success, 'Final report should indicate failure for run-test-51.');
       const errorLog = result.logs.find((entry) => entry.severity === 'ERR' && typeof entry.message === 'string' && entry.message.includes('requires `messages` or non-empty `content`'));
       invariant(errorLog !== undefined, 'Slack content error log expected for run-test-51.');
     },
@@ -3391,7 +3389,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-52 expected success.');
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
       invariant(finalReport?.format === SLACK_OUTPUT_FORMAT, 'Slack final report expected for run-test-52.');
       const metadataCandidate = finalReport.metadata;
       const slackCandidate = (metadataCandidate !== undefined && typeof metadataCandidate === 'object' && !Array.isArray(metadataCandidate))
@@ -3778,7 +3776,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         logs,
         accounting: [],
         finalReport: {
-          status: 'success',
           format: 'json',
           content_json: {
             fetchCalls,
@@ -3894,7 +3891,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       },
       expect: (result) => {
         invariant(result.success, 'Scenario run-test-57 should complete successfully.');
-        const finalReport = result.finalReport;
+        const finalReport = result.finalReport!;
         invariant(finalReport?.format === SLACK_OUTPUT_FORMAT, 'Slack final report expected for run-test-57.');
         const metadataCandidate = finalReport.metadata;
         const slackCandidate = metadataCandidate !== undefined && typeof metadataCandidate === 'object' && !Array.isArray(metadataCandidate)
@@ -4064,7 +4061,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           logs: [],
           accounting: [],
           finalReport: {
-            status: 'success',
             format: 'text',
             content: 'preload-validated',
             ts: Date.now(),
@@ -4151,7 +4147,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             logs: [],
             accounting: [],
             finalReport: {
-              status: 'success',
               format: 'text',
               content: 'env-fallback-valid',
               ts: Date.now(),
@@ -4218,7 +4213,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           logs: [],
           accounting: [],
           finalReport: {
-            status: 'success',
             format: 'text',
             content: 'frontmatter-include-validated',
             ts: Date.now(),
@@ -4257,8 +4251,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         invariant(llmEntries.length >= 1, 'LLM accounting entry expected for run-test-58.');
         const toolEntries = result.accounting.filter(isToolAccounting);
         invariant(toolEntries.some((entry) => entry.command === 'test__test'), 'Tool accounting entry for test__test expected for run-test-58.');
-        const finalReport = result.finalReport;
-        invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-58.');
+        const finalReport = result.finalReport!;
+        invariant(result.success === true, 'Final report should indicate success for run-test-58.');
       },
     };
   })(),
@@ -4359,8 +4353,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         invariant(llmEntry.callPath === TRACE_CONTEXT.callPath, 'Trace context should set callPath on LLM accounting entry for run-test-60.');
         invariant(llmEntry.originTxnId === TRACE_CONTEXT.originId, 'Trace context should preserve originTxnId on LLM accounting entry for run-test-60.');
         invariant(llmEntry.parentTxnId === TRACE_CONTEXT.parentId, 'Trace context should preserve parentTxnId on LLM accounting entry for run-test-60.');
-        const finalReport = result.finalReport;
-        invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-60.');
+        const finalReport = result.finalReport!;
+        invariant(result.success === true, 'Final report should indicate success for run-test-60.');
       },
     };
   })(),
@@ -4393,8 +4387,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const limitLog = capturedLogs.find((entry) => entry.remoteIdentifier === 'agent:limits' && typeof entry.message === 'string' && entry.message.includes(TOOL_LIMIT_WARNING_MESSAGE));
         invariant(limitLog !== undefined, 'Limit enforcement log expected for run-test-61.');
         invariant(limitLog.severity === 'ERR', 'Tool limit log should be severity ERR for run-test-61.');
-        const finalReport = result.finalReport;
-        invariant(finalReport?.status === 'failure', 'Final report should indicate failure for run-test-61.');
+        const finalReport = result.finalReport!;
+        invariant(!result.success, 'Final report should indicate failure for run-test-61.');
       },
     };
   })(),
@@ -4460,7 +4454,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         invariant(toolNames.length === 1 && toolNames[0] === 'agent__final_report', `Final turn should restrict tools to agent__final_report for ${RUN_TEST_MAX_TURN_LIMIT}.`);
         const finalTurnLog = capturedLogs.find((entry) => entry.remoteIdentifier === FINAL_TURN_REMOTE);
         invariant(finalTurnLog !== undefined, `Final turn log expected for ${RUN_TEST_MAX_TURN_LIMIT}.`);
-        invariant(result.finalReport?.status === 'success', `Model-provided final report should indicate success for ${RUN_TEST_MAX_TURN_LIMIT}.`);
+        invariant(result.success === true, `Model-provided final report should indicate success for ${RUN_TEST_MAX_TURN_LIMIT}.`);
       },
     };
   })(),
@@ -4533,8 +4527,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         invariant(sequential, 'MCP warmup should honor init concurrency limit for run-test-63.');
         const traceLog = result.logs.find((entry) => entry.remoteIdentifier === 'trace:agent:agent');
         invariant(traceLog !== undefined, 'Trace log expected for run-test-63.');
-        const finalReport = result.finalReport;
-        invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-63.');
+        const finalReport = result.finalReport!;
+        invariant(result.success === true, 'Final report should indicate success for run-test-63.');
       },
     };
   })(),
@@ -4559,7 +4553,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           conversation: [],
           logs: [],
           accounting: [],
-          finalReport: { status: 'success', format: 'json', content_json: {
+          finalReport: { format: 'json', content_json: {
             auth: statuses.auth.type,
             quota: statuses.quota.type,
             timeout: statuses.timeout.type,
@@ -4640,7 +4634,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           conversation: [],
           logs,
           accounting: [],
-          finalReport: { status: 'success', format: 'json', content_json: captured, ts: Date.now() },
+          finalReport: { format: 'json', content_json: captured, ts: Date.now() },
         } as AIAgentResult);
       },
       expect: (result: AIAgentResult) => {
@@ -4702,7 +4696,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           logs,
           accounting: [],
           finalReport: {
-            status: 'success',
             format: 'json',
             content_json: {
               result: exec.result,
@@ -4766,7 +4759,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           logs,
           accounting: [],
           finalReport: {
-            status: 'success',
             format: 'json',
             content_json: {
               result: exec.result,
@@ -4842,7 +4834,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           logs: [],
           accounting: [],
           finalReport: {
-            status: 'success',
             format: 'json',
             content_json: { restartLog },
             ts: Date.now(),
@@ -4933,7 +4924,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           logs: [],
           accounting: [],
           finalReport: {
-            status: 'success',
             format: 'json',
             content_json: { waitedMs, result: second.result, state: finalState, restartComplete },
             ts: Date.now(),
@@ -5027,7 +5017,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           logs,
           accounting: [],
           finalReport: {
-            status: 'success',
             format: 'json',
             content_json: {
               attempts: attemptLogs.length,
@@ -5125,7 +5114,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           logs,
           accounting: [],
           finalReport: {
-            status: 'success',
             format: 'json',
             content_json: {
               firstError: firstErrorMessage,
@@ -5218,7 +5206,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           logs: [],
           accounting: [],
           finalReport: {
-            status: 'success',
             format: 'json',
             content_json: { errorMessage: finalError },
             ts: Date.now(),
@@ -5397,7 +5384,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           logs: [],
           accounting: [],
           finalReport: {
-            status: 'success',
             format: 'json',
             content_json: { error: caught },
             ts: Date.now(),
@@ -5484,7 +5470,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
               logs,
               accounting: [],
               finalReport: {
-                status: 'success',
                 format: 'json',
                 content_json: {
                   tokens: turnResult.tokens ?? null,
@@ -5793,7 +5778,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           logs: [],
           accounting: [],
           finalReport: {
-            status: 'success',
             format: 'text',
             content: 'loader-session-config',
             ts: Date.now(),
@@ -5935,7 +5919,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         logs: [],
         accounting: [],
         finalReport: {
-          status: 'success',
           format: 'text',
           content: 'override-models',
           ts: Date.now(),
@@ -6024,7 +6007,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         conversation: [],
         logs: [],
         accounting: [],
-        finalReport: { status: 'success', format: 'text', content: 'registry-spawn-session', ts: Date.now() },
+        finalReport: { format: 'text', content: 'registry-spawn-session', ts: Date.now() },
       };
     },
     expect: () => {
@@ -6101,7 +6084,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         conversation: [],
         logs: [],
         accounting: [],
-        finalReport: { status: 'success', format: 'text', content: 'registry-utils-coverage', ts: Date.now() },
+        finalReport: { format: 'text', content: 'registry-utils-coverage', ts: Date.now() },
       });
     },
     expect: () => {
@@ -6135,11 +6118,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       };
       const successJson: AIAgentResult = {
         ...baseResult,
-        finalReport: { status: 'success', format: 'json', content_json: { foo: 'bar' }, ts: Date.now() },
+        finalReport: { format: 'json', content_json: { foo: 'bar' }, ts: Date.now() },
       };
       const successText: AIAgentResult = {
         ...baseResult,
-        finalReport: { status: 'success', format: 'markdown', content: 'Text body', ts: Date.now() },
+        finalReport: { format: 'markdown', content: 'Text body', ts: Date.now() },
       };
       const successNoOutput: AIAgentResult = {
         ...baseResult,
@@ -6178,7 +6161,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         conversation: [],
         logs: [],
         accounting: [],
-        finalReport: { status: 'success', format: 'text', content: 'format-agent-result', ts: Date.now() },
+        finalReport: { format: 'text', content: 'format-agent-result', ts: Date.now() },
       };
     },
     expect: () => {
@@ -6303,7 +6286,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         conversation: [],
         logs: [],
         accounting: [],
-        finalReport: { status: 'success', format: 'text', content: 'config-include-frontmatter', ts: Date.now() },
+        finalReport: { format: 'text', content: 'config-include-frontmatter', ts: Date.now() },
       };
     },
     expect: () => {
@@ -6376,7 +6359,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       conversation: [],
       logs: [],
       accounting: [],
-      finalReport: { status: 'success', format: 'text', content: 'config-errors-frontmatter', ts: Date.now() },
+      finalReport: { format: 'text', content: 'config-errors-frontmatter', ts: Date.now() },
     };
   },
   expect: () => {
@@ -6423,7 +6406,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       conversation: [],
       logs: [],
       accounting: [],
-      finalReport: { status: 'success', format: 'text', content: 'include-async', ts: Date.now() },
+      finalReport: { format: 'text', content: 'include-async', ts: Date.now() },
     };
   },
   expect: () => {
@@ -6447,8 +6430,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           content.toLowerCase().includes('requires non-empty report_content'),
           'Final report validation error should be surfaced in tool response for run-test-74.'
         );
-        const finalReport = result.finalReport;
-        invariant(finalReport?.status === 'success', 'Final report should succeed after retry for run-test-74.');
+        const finalReport = result.finalReport!;
+        invariant(result.success === true, 'Final report should succeed after retry for run-test-74.');
       },
     };
   })(),
@@ -6648,7 +6631,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         logs: [],
         accounting: [],
         finalReport: {
-          status: 'success',
           format: 'json',
           content_json: statusSummary,
           ts: Date.now(),
@@ -6707,13 +6689,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           };
         }
         if (invocation === 2) {
-          if (activeSession !== undefined) {
-            (activeSession as unknown as { finalReport?: { status: string; format: 'markdown'; content: string } }).finalReport = {
-              status: 'success',
-              format: 'markdown',
-              content: FINAL_ANSWER_DELIVERED,
-            };
-          }
+            if (activeSession !== undefined) {
+              (activeSession as unknown as { finalReport?: { format: 'markdown'; content: string } }).finalReport = {
+                format: 'markdown',
+                content: FINAL_ANSWER_DELIVERED,
+              };
+            }
           const assistantMessage = {
             role: 'assistant',
             content: '',
@@ -6722,7 +6703,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
                 name: 'agent__final_report',
                 id: FINAL_REPORT_CALL_ID,
                 parameters: {
-                  status: 'success',
                   report_format: 'markdown',
                   report_content: FINAL_ANSWER_DELIVERED,
                 },
@@ -6758,8 +6738,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         console.error('run-test-84 logs:', result.logs.map((entry) => ({ id: entry.remoteIdentifier, severity: entry.severity, message: entry.message })));
       }
       invariant(finalTurnLog !== undefined, 'Final-turn warning log expected for run-test-84.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should succeed for run-test-84.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should succeed for run-test-84.');
     },
   },
   {
@@ -6799,8 +6779,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         }
         if (invocation === 2) {
           if (activeSession !== undefined) {
-            (activeSession as unknown as { finalReport?: { status: string; format: 'json'; content_json: Record<string, unknown> } }).finalReport = {
-              status: 'success',
+            (activeSession as unknown as { finalReport?: { format: 'json'; content_json: Record<string, unknown> } }).finalReport = {
               format: 'json',
               content_json: { extracted_info: { quote: 'answer' } },
             };
@@ -6813,7 +6792,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
                 name: 'agent__final_report',
                 id: FINAL_REPORT_CALL_ID,
                 parameters: {
-                  status: 'success',
                   report_format: 'json',
                   report_content: JSON.stringify({ extracted_info: { quote: 'answer' } }),
                 },
@@ -6846,7 +6824,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const ajvLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:ajv');
       invariant(ajvLog !== undefined, 'AJV warning expected for run-test-85.');
       invariant(typeof ajvLog.message === 'string' && ajvLog.message.includes('payload preview='), 'Payload preview missing in AJV warning for run-test-85.');
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
       invariant(finalReport?.format === 'json', 'Final report should be json for run-test-85.');
     },
   },
@@ -6891,8 +6869,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const nonFinalObservation = observed.find((entry) => !entry.isFinalTurn);
       invariant(nonFinalObservation !== undefined, 'Non-final turn observation missing for run-test-86.');
       invariant(nonFinalObservation.output.length > 1, 'Non-final turn should retain multiple tools.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should succeed for run-test-86.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should succeed for run-test-86.');
     },
   },
   {
@@ -6920,8 +6898,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         }
         if (invocation === 2) {
           if (activeSession !== undefined) {
-            (activeSession as unknown as { finalReport?: { status: string; format: 'markdown'; content: string } }).finalReport = {
-              status: 'failure',
+            (activeSession as unknown as { finalReport?: { format: 'markdown'; content: string } }).finalReport = {
               format: 'markdown',
               content: 'Investigation failed: upstream service unavailable.',
             };
@@ -6935,7 +6912,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
                 name: 'agent__final_report',
                 id: FINAL_REPORT_CALL_ID,
                 parameters: {
-                  status: 'failure',
                   report_format: 'markdown',
                   report_content: failureContent,
                 },
@@ -6966,9 +6942,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result: AIAgentResult) => {
       // CONTRACT §2: success: false when finalReport.status is 'failure'
       invariant(!result.success, 'Scenario run-test-87 should have success=false when finalReport.status=failure per CONTRACT.');
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
       invariant(finalReport !== undefined, 'Final report missing for run-test-87.');
-      invariant(finalReport.status === 'failure', 'Final report status should be failure for run-test-87.');
+      invariant(!result.success, 'Final report status should be failure for run-test-87.');
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes('upstream service unavailable'), 'Final report content mismatch for run-test-87.');
       const exitLog = result.logs.find((entry) => entry.remoteIdentifier === EXIT_FINAL_REPORT_IDENTIFIER);
       invariant(exitLog !== undefined, 'EXIT-FINAL-ANSWER log missing for run-test-87.');
@@ -7003,8 +6979,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           // Model-provided final reports always result in status='success'
           const reportContent = 'Report content: gathered overview with available metrics.';
           if (activeSession !== undefined) {
-            (activeSession as unknown as { finalReport?: { status: string; format: 'markdown'; content: string } }).finalReport = {
-              status: 'success',
+            (activeSession as unknown as { finalReport?: { format: 'markdown'; content: string } }).finalReport = {
               format: 'markdown',
               content: reportContent,
             };
@@ -7047,9 +7022,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result: AIAgentResult) => {
       // Model-provided final reports always result in success=true, status='success'
       invariant(result.success, 'Scenario run-test-88 should have success=true for model-provided final report.');
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
       invariant(finalReport !== undefined, 'Final report missing for run-test-88.');
-      invariant(finalReport.status === 'success', 'Final report status should be success for run-test-88.');
+      invariant(result.success, 'Final report status should be success for run-test-88.');
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes('gathered overview'), 'Final report content mismatch for run-test-88.');
       const exitLog = result.logs.find((entry) => entry.remoteIdentifier === EXIT_FINAL_REPORT_IDENTIFIER);
       invariant(exitLog !== undefined, 'EXIT-FINAL-ANSWER log missing for run-test-88.');
@@ -7141,7 +7116,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
                 name: 'agent__final_report',
                 id: FINAL_REPORT_CALL_ID,
                 parameters: {
-                  status: 'success',
                   report_format: 'markdown',
                   report_content: finalContent,
                 },
@@ -7154,8 +7128,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             content: finalContent,
           };
           if (activeSession !== undefined) {
-            (activeSession as unknown as { finalReport?: { status: string; format: 'markdown'; content: string } }).finalReport = {
-              status: 'success',
+            (activeSession as unknown as { finalReport?: { format: 'markdown'; content: string } }).finalReport = {
               format: 'markdown',
               content: finalContent,
             };
@@ -7209,8 +7182,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(retryLog !== undefined, 'Retry warning log missing for run-test-90.');
       const llmAttempts = result.accounting.filter(isLlmAccounting).length;
       invariant(llmAttempts === 3, 'Three LLM attempts expected for run-test-90.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should succeed after sanitizer retry (run-test-90).');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should succeed after sanitizer retry (run-test-90).');
     },
   },
   {
@@ -7268,7 +7241,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
                 name: 'agent__final_report',
                 id: FINAL_REPORT_CALL_ID,
                 parameters: {
-                  status: 'success',
                   report_format: 'markdown',
                   report_content: finalContent,
                 },
@@ -7304,8 +7276,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       }
       const toolMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes(BATCH_HEX_EXPECTED_OUTPUT));
       invariant(toolMessage !== undefined, 'Batch string parameters should survive parsing for run-test-122.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-122.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for run-test-122.');
     },
   },
   {
@@ -7361,7 +7333,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
                 name: 'agent__final_report',
                 id: FINAL_REPORT_CALL_ID,
                 parameters: {
-                  status: 'success',
                   report_format: 'markdown',
                   report_content: finalContent,
                 },
@@ -7421,8 +7392,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(hexResult !== undefined, 'Nested hex result missing for run-test-123.');
       const hexOutput = typeof hexResult.output === 'string' ? hexResult.output : undefined;
       invariant(typeof hexOutput === 'string' && hexOutput.includes(BATCH_HEX_EXPECTED_OUTPUT), 'Nested hex output not parsed for run-test-123.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-123.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for run-test-123.');
     },
   },
   {
@@ -7472,7 +7443,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
                 name: 'agent__final_report',
                 id: FINAL_REPORT_CALL_ID,
                 parameters: {
-                  status: 'success',
                   report_format: 'markdown',
                   report_content: finalContent,
                 },
@@ -7504,8 +7474,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success, 'Scenario run-test-124 expected success.');
       const batchToolMessage = result.conversation.find((message) => message.role === 'tool' && message.toolCallId === 'call-batch-truncated');
       invariant(batchToolMessage !== undefined, 'Batch tool output missing for run-test-124.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-124.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for run-test-124.');
     },
   },
   {
@@ -7561,7 +7531,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
                 name: 'agent__final_report',
                 id: FINAL_REPORT_CALL_ID,
                 parameters: {
-                  status: 'success',
                   report_format: 'markdown',
                   report_content: finalContent,
                 },
@@ -7579,8 +7548,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             content: finalContent,
           };
           if (activeSession !== undefined) {
-            (activeSession as unknown as { finalReport?: { status: string; format: 'markdown'; content: string } }).finalReport = {
-              status: 'success',
+            (activeSession as unknown as { finalReport?: { format: 'markdown'; content: string } }).finalReport = {
               format: 'markdown',
               content: finalContent,
             };
@@ -7615,8 +7583,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(textValue === SANITIZER_VALID_ARGUMENT, 'Parsed tool call arguments mismatch for run-test-90-string.');
       const llmAttempts = result.accounting.filter(isLlmAccounting).length;
       invariant(llmAttempts === 2, 'Two LLM attempts expected for run-test-90-string.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should succeed for run-test-90-string.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should succeed for run-test-90-string.');
     },
   },
   {
@@ -7646,7 +7614,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
                 name: 'agent__final_report',
                 id: FINAL_REPORT_CALL_ID,
                 parameters: {
-                  status: 'success',
                   report_format: 'markdown',
                   report_content: finalContent,
                 },
@@ -7659,8 +7626,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             content: finalContent,
           };
           if (activeSession !== undefined) {
-            (activeSession as unknown as { finalReport?: { status: string; format: 'markdown'; content: string } }).finalReport = {
-              status: 'success',
+            (activeSession as unknown as { finalReport?: { format: 'markdown'; content: string } }).finalReport = {
               format: 'markdown',
               content: finalContent,
             };
@@ -7690,8 +7656,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(rateLimitLog !== undefined, 'Rate-limit warning log missing for run-test-90-rate-limit.');
       const attempts = result.accounting.filter(isLlmAccounting).length;
       invariant(attempts === 2, 'Two LLM attempts expected for run-test-90-rate-limit.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should succeed for run-test-90-rate-limit.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should succeed for run-test-90-rate-limit.');
     },
   },
   {
@@ -7707,7 +7673,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         if (invocation === 1) {
           const finalContent = ADOPTED_FINAL_CONTENT;
           const payload = {
-            status: 'success',
             report_format: 'markdown',
             report_content: finalContent,
             metadata: { origin: ADOPTION_METADATA_ORIGIN },
@@ -7734,9 +7699,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result: AIAgentResult) => {
       invariant(result.success, 'Scenario run-test-90-adopt-text expected success.');
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
       invariant(finalReport !== undefined, 'Final report missing for run-test-90-adopt-text.');
-      invariant(finalReport.status === 'success', 'Final report status mismatch for run-test-90-adopt-text.');
+      invariant(result.success, 'Final report status mismatch for run-test-90-adopt-text.');
       invariant(finalReport.format === 'markdown', 'Final report format mismatch for run-test-90-adopt-text.');
       invariant(finalReport.content === ADOPTED_FINAL_CONTENT, 'Final report content mismatch for run-test-90-adopt-text.');
       invariant(finalReport.metadata?.origin === ADOPTION_METADATA_ORIGIN, 'Final report metadata missing for run-test-90-adopt-text.');
@@ -7756,7 +7721,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const originalExecuteTurn = LLMClient.prototype.executeTurn;
       LLMClient.prototype.executeTurn = function(this: LLMClient, _request: TurnRequest): Promise<TurnResult> {
         const payload = {
-          status: 'success',
           report_format: 'json',
           content_json: {
             status: true,
@@ -7787,9 +7751,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result: AIAgentResult) => {
       invariant(result.success, 'Scenario run-test-90-json-content expected success.');
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
       invariant(finalReport !== undefined, 'Final report missing for run-test-90-json-content.');
-      invariant(finalReport.status === 'success', 'Final report status mismatch for run-test-90-json-content.');
+      invariant(result.success, 'Final report status mismatch for run-test-90-json-content.');
       invariant(finalReport.format === 'json', 'Final report format mismatch for run-test-90-json-content.');
       invariant(finalReport.content !== undefined, 'Final report content missing for run-test-90-json-content.');
       let parsedContent: Record<string, unknown> | undefined;
@@ -7831,7 +7795,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
                   name: 'agent__final_report',
                   id: FINAL_REPORT_CALL_ID,
                   parameters: {
-                    status: 'success',
                     report_format: 'markdown',
                     report_content: FINAL_REPORT_SANITIZED_CONTENT,
                   },
@@ -7851,8 +7814,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result: AIAgentResult) => {
       invariant(result.success, 'Scenario run-test-90-no-retry expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report missing for run-test-90-no-retry.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report missing for run-test-90-no-retry.');
       invariant(finalReport.content === FINAL_REPORT_SANITIZED_CONTENT, 'Final report content mismatch for run-test-90-no-retry.');
       invariant(finalReport.format === 'markdown', 'Final report format mismatch for run-test-90-no-retry.');
       const systemNotices = result.logs
@@ -7887,8 +7850,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(longNameCall !== undefined, 'Long name tool call missing for run-test-91.');
       const expectedSanitized = sanitizeToolName(LONG_TOOL_NAME);
       invariant(longNameCall.name === expectedSanitized, 'Sanitized tool name mismatch for run-test-91.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report should succeed after mixed tools for run-test-91.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should succeed after mixed tools for run-test-91.');
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes(FINAL_REPORT_RETRY_MESSAGE), 'Final report content mismatch for run-test-91.');
     },
   },
@@ -7899,8 +7862,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-92 expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report missing for run-test-92.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report missing for run-test-92.');
       invariant(finalReport.format === 'pipe', `Final report format mismatch for run-test-92 (actual=${finalReport.format}).`);
       invariant(finalReport.content === 'My name is ChatGPT.', 'Final report content mismatch for run-test-92.');
       const failureLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('requires non-empty report_content'));
@@ -7911,8 +7874,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     id: 'run-test-93',
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-93 expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report missing for run-test-93.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report missing for run-test-93.');
       invariant(finalReport.format === 'markdown', 'Final report format mismatch for run-test-93.');
       const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
       const firstAssistant = assistantMessages.at(0);
@@ -7986,7 +7949,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
                 name: 'agent__final_report',
                 id: finalCallId,
                 parameters: {
-                  status: 'success',
                   report_format: 'markdown',
                   report_content: 'Reasoning replay final report.',
                 },
@@ -8029,8 +7991,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result: AIAgentResult & { __reasoningReplayVerified?: boolean }) => {
       invariant(result.success, 'Scenario run-test-104 expected success.');
       invariant(result.__reasoningReplayVerified === true, 'Reasoning signatures were not verified during replay for run-test-104.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report missing for run-test-104.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report missing for run-test-104.');
       invariant(finalReport.format === 'markdown', 'Final report format mismatch for run-test-104.');
       invariant(finalReport.content === 'Reasoning replay final report.', 'Final report content mismatch for run-test-104.');
     },
@@ -8114,7 +8076,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
                 name: 'agent__final_report',
                 id: finalCallId,
                 parameters: {
-                  status: 'success',
                   report_format: 'markdown',
                   report_content: 'Fallback final report.',
                 },
@@ -8157,8 +8118,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result: AIAgentResult & { __fallbackSignatureVerified?: boolean }) => {
       invariant(result.success, 'Scenario run-test-105 expected success.');
       invariant(result.__fallbackSignatureVerified === true, 'Fallback provider did not receive reasoning signature in run-test-105.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report missing for run-test-105.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report missing for run-test-105.');
       invariant(finalReport.format === 'markdown', 'Final report format mismatch for run-test-105.');
       invariant(finalReport.content === 'Fallback final report.', 'Final report content mismatch for run-test-105.');
       const providersUsed = new Set(result.accounting.filter(isLlmAccounting).map((entry) => entry.provider));
@@ -8245,7 +8206,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
                 name: 'agent__final_report',
                 id: finalCallId,
                 parameters: {
-                  status: 'success',
                   report_format: 'markdown',
                   report_content: 'Reasoning disabled final report.',
                 },
@@ -8284,8 +8244,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success, 'Scenario run-test-106 expected success.');
       invariant(result.__sendReasoningDisabled === true, 'Reasoning stream should be disabled after missing signature in run-test-106.');
       invariant(result.__sanitizedHistoryVerified === true, 'Assistant transcript missing sanitized reasoning entry for run-test-106.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report missing for run-test-106.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report missing for run-test-106.');
       invariant(finalReport.format === 'markdown', 'Final report format mismatch for run-test-106.');
       invariant(finalReport.content === 'Reasoning disabled final report.', 'Final report content mismatch for run-test-106.');
     },
@@ -8346,7 +8306,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
               id: finalCallId,
               name: 'agent__final_report',
               parameters: {
-                status: 'success',
                 report_format: 'markdown',
                 report_content: SECOND_TURN_FINAL_ANSWER,
               },
@@ -8382,8 +8341,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const observed = result.__observedTurns;
       invariant(Array.isArray(observed), 'run-test-107 expects observed turn tracking.');
       invariant(observed.length === 2 && observed[0] === 1 && observed[1] === 2, 'onTurnStarted must fire once per turn for run-test-107.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success' && finalReport.content === SECOND_TURN_FINAL_ANSWER, 'run-test-107 should produce the final report.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true && finalReport.content === SECOND_TURN_FINAL_ANSWER, 'run-test-107 should produce the final report.');
     },
   },
   {
@@ -8432,9 +8391,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result: AIAgentResult) => {
       // CONTRACT §2: success: false when finalReport.status is 'failure'
       invariant(!result.success, 'Scenario run-test-101 should have success=false when finalReport.status=failure per CONTRACT.');
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
       invariant(finalReport !== undefined, 'Final report expected for run-test-101.');
-      invariant(finalReport.status === 'failure', 'Synthesized final report should carry failure status for run-test-101.');
+      invariant(!result.success, 'Synthesized final report should carry failure status for run-test-101.');
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Session completed without a final report'), 'Failure summary should mention the missing final report for run-test-101.');
       const syntheticAcceptance = result.logs.find((entry) => entry.remoteIdentifier === LOG_FINAL_REPORT_ACCEPTED && entry.details?.source === 'synthetic');
       invariant(syntheticAcceptance !== undefined, 'Synthetic final report acceptance log missing for run-test-101.');
@@ -8460,7 +8419,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
               id: failureCallId,
               name: 'agent__final_report',
               parameters: {
-                status: 'success',
                 report_format: 'markdown',
                 report_content: '# Placeholder\n\nThis should fail.',
               },
@@ -8491,7 +8449,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       // When final_report tool fails, a synthetic failure report is generated
       invariant(!result.success, 'Scenario run-test-102 should report failure when final_report tool fails.');
       invariant(result.finalReport !== undefined, 'Synthetic final report expected when agent__final_report fails in run-test-102.');
-      invariant(result.finalReport.status === 'failure', 'Synthetic final report should have failure status for run-test-102.');
+      invariant(!result.success, 'Synthetic final report should indicate failure for run-test-102.');
       invariant(typeof result.finalReport.content === 'string' && result.finalReport.content.includes('final_report tool failed'), 'Synthetic content should mention tool failure for run-test-102.');
       // With synthetic report generation, we exit via EXIT-FINAL-ANSWER instead of EXIT-NO-LLM-RESPONSE
       const exitLog = result.logs.find((entry) => entry.remoteIdentifier === EXIT_FINAL_REPORT_IDENTIFIER);
@@ -8538,8 +8496,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result: AIAgentResult) => {
       invariant(result.success, 'Scenario run-test-103 expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success', 'Final report missing for run-test-103.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report missing for run-test-103.');
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes('REST tool exposure validated.'), 'Final report content mismatch for run-test-103.');
     },
   },
@@ -8632,7 +8590,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         logs: [],
         accounting: [],
         finalReport: {
-          status: 'success',
           format: 'json',
           content_json: {
             requiredChoice,
@@ -9362,7 +9319,7 @@ function formatFailureHint(result: AIAgentResult): string {
     hints.push(`last-log="${msg}"`);
   }
   if (result.finalReport !== undefined) {
-    hints.push(`final-status=${result.finalReport.status}`);
+    hints.push(`final-status=${result.success ? 'success' : 'failure'}`);
   }
   return hints.length > 0 ? ` (${hints.join(' | ')})` : '';
 }
@@ -9406,7 +9363,6 @@ const scenarioFilterIdsFromEnv = (() => {
             id: FINAL_REPORT_CALL_ID,
             name: 'agent__final_report',
             parameters: {
-              status: 'success',
               report_format: 'text',
               report_content: finalContent,
             },
@@ -9433,7 +9389,7 @@ const scenarioFilterIdsFromEnv = (() => {
   },
     expect: (result: AIAgentResult) => {
     invariant(result.success, `Scenario ${scenarioId} expected success.`);
-    const finalReport = result.finalReport;
+    const finalReport = result.finalReport!;
     invariant(finalReport?.content === 'Valid tool call result.', `Final report content mismatch for ${scenarioId}.`);
     const finalTurnLog = result.logs.find((entry) => entry.remoteIdentifier === FINAL_TURN_REMOTE);
     invariant(finalTurnLog === undefined, `Final turn log should not appear for ${scenarioId}.`);
@@ -9481,7 +9437,6 @@ const scenarioFilterIdsFromEnv = (() => {
               id: FINAL_REPORT_CALL_ID,
               name: 'agent__final_report',
               parameters: {
-                status: 'success',
                 report_format: 'text',
                 report_content: finalContent,
               },
@@ -9508,7 +9463,7 @@ const scenarioFilterIdsFromEnv = (() => {
     },
     expect: (result: AIAgentResult) => {
       invariant(result.success, `Scenario ${scenarioId} expected success.`);
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
       invariant(finalReport?.content === 'Tool call succeeds after invalid parameters.', `Final report content mismatch for ${scenarioId}.`);
       const sanitizerLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_SANITIZER);
       invariant(sanitizerLog !== undefined, `Sanitizer log expected for ${scenarioId}.`);
@@ -9540,7 +9495,6 @@ const scenarioFilterIdsFromEnv = (() => {
                 id: `${FINAL_REPORT_CALL_ID}-missing-content`,
                 name: 'agent__final_report',
                 parameters: {
-                  status: 'success',
                   report_format: 'text',
                   report_content: '',
                 },
@@ -9571,7 +9525,6 @@ const scenarioFilterIdsFromEnv = (() => {
               id: FINAL_REPORT_CALL_ID,
               name: 'agent__final_report',
               parameters: {
-                status: 'success',
                 report_format: 'text',
                 report_content: finalContent,
               },
@@ -9598,7 +9551,7 @@ const scenarioFilterIdsFromEnv = (() => {
     },
     expect: (result: AIAgentResult) => {
       invariant(result.success, `Scenario ${scenarioId} expected success.`);
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
       invariant(finalReport?.content === 'Recovered after missing content.', `Final report content mismatch for ${scenarioId}.`);
       const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes('Collapsing'));
       invariant(collapseLog !== undefined, `Turn collapse log expected for ${scenarioId}.`);
@@ -9657,7 +9610,6 @@ const scenarioFilterIdsFromEnv = (() => {
               id: FINAL_REPORT_CALL_ID,
               name: 'agent__final_report',
               parameters: {
-                status: 'success',
                 report_format: 'text',
                 report_content: finalContent,
               },
@@ -9684,7 +9636,7 @@ const scenarioFilterIdsFromEnv = (() => {
     },
     expect: (result: AIAgentResult) => {
       invariant(result.success, `Scenario ${scenarioId} expected success.`);
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
       invariant(finalReport?.content === 'Recovered after wrong field types.', `Final report content mismatch for ${scenarioId}.`);
       const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes('Collapsing'));
       invariant(collapseLog !== undefined, `Turn collapse log expected for ${scenarioId}.`);
@@ -9728,7 +9680,6 @@ const scenarioFilterIdsFromEnv = (() => {
               id: FINAL_REPORT_CALL_ID,
               name: 'agent__final_report',
               parameters: {
-                status: 'success',
                 report_format: 'text',
                 report_content: finalContent,
               },
@@ -9755,7 +9706,7 @@ const scenarioFilterIdsFromEnv = (() => {
     },
     expect: (result: AIAgentResult) => {
       invariant(result.success, `Scenario ${scenarioId} expected success.`);
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
       invariant(finalReport?.content === 'Recovered after null parameters.', `Final report content mismatch for ${scenarioId}.`);
       const sanitizerLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_SANITIZER);
       invariant(sanitizerLog !== undefined, `Sanitizer log expected for ${scenarioId}.`);
@@ -9810,7 +9761,6 @@ const scenarioFilterIdsFromEnv = (() => {
               id: FINAL_REPORT_CALL_ID,
               name: 'agent__final_report',
               parameters: {
-                status: 'success',
                 report_format: 'text',
                 report_content: finalContent,
               },
@@ -9837,7 +9787,7 @@ const scenarioFilterIdsFromEnv = (() => {
     },
     expect: (result: AIAgentResult) => {
       invariant(result.success, `Scenario ${scenarioId} expected success.`);
-      const finalReport = result.finalReport;
+      const finalReport = result.finalReport!;
       invariant(finalReport?.content === 'Recovered after empty parameters.', `Final report content mismatch for ${scenarioId}.`);
       const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes('Collapsing'));
       invariant(collapseLog !== undefined, `Turn collapse log expected for ${scenarioId}.`);
@@ -9881,7 +9831,6 @@ const scenarioFilterIdsFromEnv = (() => {
               id: FINAL_REPORT_CALL_ID,
               name: 'agent__final_report',
               parameters: {
-                status: 'success',
                 report_format: 'text',
                 report_content: finalContent,
               },
@@ -9953,7 +9902,6 @@ BASE_TEST_SCENARIOS.push({
               id: FINAL_REPORT_CALL_ID,
               name: 'agent__final_report',
               parameters: {
-                status: 'success',
                 report_format: 'markdown',
                 report_content: finalContent,
               },
@@ -9988,7 +9936,7 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(result.success, `Scenario ${FINAL_REPORT_RETRY_TEXT_SCENARIO} expected success.`);
-    const finalReport = result.finalReport;
+    const finalReport = result.finalReport!;
     invariant(finalReport?.content === FINAL_REPORT_AFTER_RETRY, `Final report content mismatch for ${FINAL_REPORT_RETRY_TEXT_SCENARIO}.`);
     const textExtractionLogs = result.logs.filter((entry) => entry.remoteIdentifier === LOG_TEXT_EXTRACTION);
     invariant(textExtractionLogs.length === 1, `Text extraction log missing for ${FINAL_REPORT_RETRY_TEXT_SCENARIO}.`);
@@ -10052,8 +10000,8 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(result.success, `Scenario ${FINAL_REPORT_TOOL_MESSAGE_SCENARIO} expected success.`);
-    const finalReport = result.finalReport;
-    invariant(finalReport?.status === 'success', `Final report should be success for ${FINAL_REPORT_TOOL_MESSAGE_SCENARIO}.`);
+    const finalReport = result.finalReport!;
+    invariant(result.success === true, `Final report should be success for ${FINAL_REPORT_TOOL_MESSAGE_SCENARIO}.`);
     invariant(finalReport.content === TOOL_MESSAGE_FALLBACK_CONTENT, `Final report content mismatch for ${FINAL_REPORT_TOOL_MESSAGE_SCENARIO}.`);
     const textExtractionLogs = result.logs.filter((entry) => entry.remoteIdentifier === LOG_TEXT_EXTRACTION);
     invariant(textExtractionLogs.length === 1, `Text extraction log missing for ${FINAL_REPORT_TOOL_MESSAGE_SCENARIO}.`);
@@ -10099,8 +10047,8 @@ BASE_TEST_SCENARIOS.push({
   expect: (result: AIAgentResult) => {
     // CONTRACT §2: success: false when finalReport.status is 'failure'
     invariant(!result.success, 'Scenario run-test-synthetic-failure-contract should have success=false when finalReport.status=failure per CONTRACT.');
-    const finalReport = result.finalReport;
-    invariant(finalReport?.status === 'failure', 'Final report should indicate failure for run-test-synthetic-failure-contract.');
+    const finalReport = result.finalReport!;
+    invariant(!result.success, 'Final report should indicate failure for run-test-synthetic-failure-contract.');
     invariant(typeof finalReport.content === 'string' && finalReport.content.includes('after 2 turns'), 'Failure summary mismatch for run-test-synthetic-failure-contract.');
     const metadata = finalReport.metadata;
     assertRecord(metadata, 'Final report metadata expected for run-test-synthetic-failure-contract.');
@@ -10152,8 +10100,8 @@ BASE_TEST_SCENARIOS.push({
   expect: (result: AIAgentResult) => {
     // CONTRACT §2: success: false when finalReport.status is 'failure'
     invariant(!result.success, `Scenario ${FINAL_REPORT_MAX_RETRIES_SCENARIO} should have success=false when finalReport.status=failure per CONTRACT.`);
-    const finalReport = result.finalReport;
-    invariant(finalReport?.status === 'failure', `Final report should indicate failure for ${FINAL_REPORT_MAX_RETRIES_SCENARIO}.`);
+    const finalReport = result.finalReport!;
+    invariant(!result.success, `Final report should indicate failure for ${FINAL_REPORT_MAX_RETRIES_SCENARIO}.`);
     const metadata = finalReport.metadata;
     assertRecord(metadata, `Final report metadata expected for ${FINAL_REPORT_MAX_RETRIES_SCENARIO}.`);
     invariant(metadata.reason === SYNTHETIC_MAX_RETRY_REASON, `Metadata reason mismatch for ${FINAL_REPORT_MAX_RETRIES_SCENARIO}.`);
@@ -10201,7 +10149,6 @@ BASE_TEST_SCENARIOS.push({
             id: FINAL_REPORT_CALL_ID,
             name: 'agent__final_report',
             parameters: {
-              status: 'success',
               report_format: 'text',
               report_content: TEXT_EXTRACTION_RETRY_RESULT,
             },
@@ -10229,7 +10176,7 @@ BASE_TEST_SCENARIOS.push({
   expect: (result: AIAgentResult) => {
     const scenarioId = 'run-test-text-extraction-non-final-turn';
     invariant(result.success, `Scenario ${scenarioId} expected success.`);
-    const finalReport = result.finalReport;
+    const finalReport = result.finalReport!;
     invariant(finalReport?.content === TEXT_EXTRACTION_RETRY_RESULT, `Final report content mismatch for ${scenarioId}.`);
     const sanitizerLog = findLogByIdentifier(result.logs, LOG_SANITIZER);
     invariant(sanitizerLog !== undefined, `Sanitizer log expected for ${scenarioId}.`);
@@ -10278,7 +10225,6 @@ BASE_TEST_SCENARIOS.push({
             id: FINAL_REPORT_CALL_ID,
             name: 'agent__final_report',
             parameters: {
-              status: 'success',
               report_format: 'text',
               report_content: TEXT_EXTRACTION_INVALID_TEXT_RESULT,
             },
@@ -10305,7 +10251,7 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(result.success, 'Scenario run-test-text-extraction-invalid-text expected success.');
-    const finalReport = result.finalReport;
+    const finalReport = result.finalReport!;
     invariant(finalReport?.content === TEXT_EXTRACTION_INVALID_TEXT_RESULT, 'Final report content mismatch for run-test-text-extraction-invalid-text.');
     const sanitizerLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_SANITIZER);
     invariant(sanitizerLog !== undefined, 'Sanitizer log expected for run-test-text-extraction-invalid-text.');
@@ -10339,8 +10285,8 @@ BASE_TEST_SCENARIOS.push({
     expect: (result: AIAgentResult) => {
       // CONTRACT §2: success: false when finalReport.status is 'failure'
       invariant(!result.success, `Scenario ${scenarioId} should have success=false when finalReport.status=failure per CONTRACT.`);
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'failure', `Final report should indicate failure for ${scenarioId}.`);
+      const finalReport = result.finalReport!;
+      invariant(!result.success, `Final report should indicate failure for ${scenarioId}.`);
       assertRecord(finalReport.metadata, `Final report metadata expected for ${scenarioId}.`);
       invariant(finalReport.metadata.reason === 'max_turns_exhausted', `Metadata reason mismatch for ${scenarioId}.`);
       invariant(finalReport.metadata.turns_completed === 5, `turns_completed metadata mismatch for ${scenarioId}.`);
@@ -10388,8 +10334,8 @@ BASE_TEST_SCENARIOS.push({
     expect: (result: AIAgentResult) => {
       // CONTRACT §2: success: false when finalReport.status is 'failure'
       invariant(!result.success, `Scenario ${scenarioId} should have success=false when finalReport.status=failure per CONTRACT.`);
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'failure', `Final report should indicate failure for ${scenarioId}.`);
+      const finalReport = result.finalReport!;
+      invariant(!result.success, `Final report should indicate failure for ${scenarioId}.`);
       assertRecord(finalReport.metadata, `Final report metadata expected for ${scenarioId}.`);
       // CONTRACT: synthetic failure when max turns exhausted always uses 'max_turns_exhausted'
       invariant(finalReport.metadata.reason === 'max_turns_exhausted', `Metadata reason mismatch for ${scenarioId}.`);
@@ -10435,8 +10381,8 @@ BASE_TEST_SCENARIOS.push({
     expect: (result: AIAgentResult) => {
       // CONTRACT §2: success: false when finalReport.status is 'failure'
       invariant(!result.success, `Scenario ${scenarioId} should have success=false when finalReport.status=failure per CONTRACT.`);
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'failure', `Final report should indicate failure for ${scenarioId}.`);
+      const finalReport = result.finalReport!;
+      invariant(!result.success, `Final report should indicate failure for ${scenarioId}.`);
       const textExtractionLogs = getLogsByIdentifier(result.logs, LOG_TEXT_EXTRACTION);
       invariant(textExtractionLogs.length === 0, `Text extraction should not occur for ${scenarioId}.`);
       const failureLog = findLogByIdentifier(result.logs, LOG_FAILURE_REPORT);
@@ -10478,8 +10424,8 @@ BASE_TEST_SCENARIOS.push({
     expect: (result: AIAgentResult) => {
       // CONTRACT §2: success: false when finalReport.status is 'failure'
       invariant(!result.success, `Scenario ${scenarioId} should have success=false when finalReport.status=failure per CONTRACT.`);
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'failure', `Final report should indicate failure for ${scenarioId}.`);
+      const finalReport = result.finalReport!;
+      invariant(!result.success, `Final report should indicate failure for ${scenarioId}.`);
       assertRecord(finalReport.metadata, `Final report metadata expected for ${scenarioId}.`);
       // CONTRACT: synthetic failure when max turns exhausted always uses 'max_turns_exhausted'
       invariant(finalReport.metadata.reason === 'max_turns_exhausted', `Metadata reason mismatch for ${scenarioId}.`);
@@ -10573,7 +10519,6 @@ BASE_TEST_SCENARIOS.push({
               id: FINAL_REPORT_CALL_ID,
               name: 'agent__final_report',
               parameters: {
-                status: 'success',
                 report_format: 'text',
                 report_content: 'Recovered after invalid tools.',
               },
@@ -10625,7 +10570,7 @@ BASE_TEST_SCENARIOS.push({
               {
                 id: FINAL_REPORT_CALL_ID,
                 name: 'agent__final_report',
-                parameters: { status: 'success', report_format: 'markdown', report_content: 'Done' },
+                parameters: { report_format: 'markdown', report_content: 'Done' },
               },
             ],
           },
@@ -10698,7 +10643,6 @@ BASE_TEST_SCENARIOS.push({
             id: FINAL_REPORT_CALL_ID,
             name: 'agent__final_report',
             parameters: {
-              status: 'success',
               report_format: 'text',
               report_content: PURE_TEXT_RETRY_RESULT,
             },
@@ -10725,7 +10669,7 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(result.success, 'Scenario run-test-pure-text-final-report expected success.');
-    const finalReport = result.finalReport;
+    const finalReport = result.finalReport!;
     invariant(finalReport?.content === PURE_TEXT_RETRY_RESULT, 'Final report content mismatch for run-test-pure-text-final-report.');
     const syntheticRetryLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes('Synthetic retry'));
     invariant(syntheticRetryLog !== undefined, 'Synthetic retry log expected for run-test-pure-text-final-report.');
@@ -10774,7 +10718,7 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(result.success, 'Scenario run-test-invalid-final-report-at-max-turns expected success.');
-    const finalReport = result.finalReport;
+    const finalReport = result.finalReport!;
     invariant(finalReport?.content === 'Fallback final report', 'Final report content mismatch for run-test-invalid-final-report-at-max-turns.');
     const finalTurnLog = result.logs.find((entry) => entry.remoteIdentifier === FINAL_TURN_REMOTE);
     invariant(finalTurnLog !== undefined, 'Final turn log expected for run-test-invalid-final-report-at-max-turns.');
@@ -10873,7 +10817,6 @@ BASE_TEST_SCENARIOS.push({
               id: FINAL_REPORT_CALL_ID,
               name: 'agent__final_report',
               parameters: {
-                status: 'success',
                 report_format: 'text',
                 report_content: COLLAPSE_RECOVERY_RESULT,
               },
@@ -10913,7 +10856,7 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(result.success, 'Scenario run-test-invalid-final-report-before-max-turns expected success.');
-    const finalReport = result.finalReport;
+    const finalReport = result.finalReport!;
     invariant(finalReport?.content === COLLAPSE_RECOVERY_RESULT, 'Final report content mismatch for run-test-invalid-final-report-before-max-turns.');
     const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes(COLLAPSING_REMAINING_TURNS_FRAGMENT));
     invariant(collapseLog !== undefined, 'Turn collapse log expected for run-test-invalid-final-report-before-max-turns.');
@@ -10957,7 +10900,6 @@ BASE_TEST_SCENARIOS.push({
             id: FINAL_REPORT_CALL_ID,
             name: 'agent__final_report',
               parameters: {
-                status: 'success',
                 report_format: 'text',
                 report_content: COLLAPSE_FIXED_RESULT,
               },
@@ -10984,7 +10926,7 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(result.success, 'Scenario run-test-turn-collapse-final-report-attempted expected success.');
-    const finalReport = result.finalReport;
+    const finalReport = result.finalReport!;
     invariant(finalReport?.content === COLLAPSE_FIXED_RESULT, 'Final report content mismatch for run-test-turn-collapse-final-report-attempted.');
     const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes(COLLAPSING_REMAINING_TURNS_FRAGMENT));
     invariant(collapseLog !== undefined, 'Turn collapse log expected for run-test-turn-collapse-final-report-attempted.');
@@ -11013,7 +10955,6 @@ BASE_TEST_SCENARIOS.push({
               id: `${FINAL_REPORT_CALL_ID}-both-2`,
               name: 'agent__final_report',
               parameters: {
-                status: 'success',
                 report_format: 'text',
                 report_content: '',
               },
@@ -11035,7 +10976,6 @@ BASE_TEST_SCENARIOS.push({
             id: FINAL_REPORT_CALL_ID,
             name: 'agent__final_report',
             parameters: {
-              status: 'success',
               report_format: 'text',
               report_content: 'Success after both flags.',
             },
@@ -11102,7 +11042,6 @@ BASE_TEST_SCENARIOS.push({
             id: FINAL_REPORT_CALL_ID,
             name: 'agent__final_report',
               parameters: {
-                status: 'success',
                 report_format: 'text',
                 report_content: MAX_RETRY_SUCCESS_RESULT,
               },
@@ -11129,7 +11068,7 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(result.success, 'Scenario run-test-max-provider-retries-exhausted expected success.');
-    const finalReport = result.finalReport;
+    const finalReport = result.finalReport!;
     invariant(finalReport?.content === MAX_RETRY_SUCCESS_RESULT, 'Final report content mismatch for run-test-max-provider-retries-exhausted.');
     const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes('exhausted'));
     invariant(collapseLog !== undefined, 'Retry exhaustion log expected for run-test-max-provider-retries-exhausted.');
@@ -11172,8 +11111,8 @@ BASE_TEST_SCENARIOS.push({
   expect: (result: AIAgentResult) => {
     const scenarioId = 'run-test-text-extraction-final-turn-accept';
     invariant(result.success, `Scenario ${scenarioId} expected success.`);
-    const finalReport = result.finalReport;
-    invariant(finalReport?.status === 'success', `Final report should be success for ${scenarioId}.`);
+    const finalReport = result.finalReport!;
+    invariant(result.success === true, `Final report should be success for ${scenarioId}.`);
     invariant(finalReport.content === TEXT_FALLBACK_CONTENT, `Final report content mismatch for ${scenarioId}.`);
     const textExtractionLogs = getLogsByIdentifier(result.logs, LOG_TEXT_EXTRACTION);
     invariant(textExtractionLogs.length === 1, `Text extraction log missing for ${scenarioId}.`);
@@ -11217,7 +11156,7 @@ BASE_TEST_SCENARIOS.push({
         role: 'assistant',
         content: `<ai-agent-${nonce}-FINAL tool="agent__final_report" status="success" format="markdown">{\"status\":\"success\",\"report_format\":\"markdown\",\"report_content\":\"Done via XML\"}</ai-agent-${nonce}-FINAL>`,
       };
-      const payload = { status: 'success', report_format: 'markdown', report_content: 'Done via XML' };
+      const payload = { report_format: 'markdown', report_content: 'Done via XML' };
       await request.toolExecutor('agent__final_report', payload, { toolCallId: `${nonce}-FINAL` });
       return {
         status: { type: 'success', hasToolCalls: true, finalAnswer: true },
@@ -11229,9 +11168,9 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(result.success, 'run-test-xml-happy should succeed.');
-    const finalReport = result.finalReport;
+    const finalReport = result.finalReport!;
     invariant(finalReport !== undefined, 'Final report missing for run-test-xml-happy.');
-    invariant(finalReport.status === 'success', 'Final report not success for run-test-xml-happy.');
+    invariant(result.success, 'Final report not success for run-test-xml-happy.');
     invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Done via XML'), 'Final report content mismatch for run-test-xml-happy.');
   },
 } satisfies HarnessTest);
@@ -11255,7 +11194,7 @@ BASE_TEST_SCENARIOS.push({
         role: 'assistant',
         content: `<ai-agent-${nonce}-FINAL tool="agent__final_report" status="success" format="markdown">Final via xml-final</ai-agent-${nonce}-FINAL>`,
       };
-      const payload = { status: 'success', report_format: 'markdown', report_content: 'Final via xml-final' };
+      const payload = { report_format: 'markdown', report_content: 'Final via xml-final' };
       await request.toolExecutor('agent__final_report', payload, { toolCallId: `${nonce}-FINAL` });
       return {
         status: { type: 'success', hasToolCalls: true, finalAnswer: true },
@@ -11267,9 +11206,9 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(result.success, 'run-test-xml-final-only should succeed.');
-    const finalReport = result.finalReport;
+    const finalReport = result.finalReport!;
     invariant(finalReport !== undefined, 'Final report missing for run-test-xml-final-only.');
-    invariant(finalReport.status === 'success', 'Final report not success for run-test-xml-final-only.');
+    invariant(result.success, 'Final report not success for run-test-xml-final-only.');
     invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Final via xml-final'), 'Final report content mismatch for run-test-xml-final-only.');
   },
 } satisfies HarnessTest);
@@ -11297,7 +11236,7 @@ BASE_TEST_SCENARIOS.push({
           tokens: { inputTokens: 9, outputTokens: 4, totalTokens: 13 },
         };
       }
-      const payload = { status: 'success', report_format: 'markdown', report_content: 'Recovered after invalid tag' };
+      const payload = { report_format: 'markdown', report_content: 'Recovered after invalid tag' };
       const assistantMessage: ConversationMessage = {
         role: 'assistant',
         content: `<ai-agent-${nonce}-FINAL tool="agent__final_report" status="success" format="markdown">${JSON.stringify(payload)}</ai-agent-${nonce}-FINAL>`,
@@ -11313,9 +11252,9 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(result.success, 'run-test-xml-invalid-tag should succeed.');
-    const finalReport = result.finalReport;
+    const finalReport = result.finalReport!;
     invariant(finalReport !== undefined, 'Final report missing for run-test-xml-invalid-tag.');
-    invariant(finalReport.status === 'success', 'Final report not success for run-test-xml-invalid-tag.');
+    invariant(result.success, 'Final report not success for run-test-xml-invalid-tag.');
     invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Recovered after invalid tag'), 'Final report content mismatch for run-test-xml-invalid-tag.');
   },
 } satisfies HarnessTest);

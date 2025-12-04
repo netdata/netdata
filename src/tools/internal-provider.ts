@@ -39,7 +39,7 @@ interface InternalToolProviderOptions {
   maxToolCallsPerTurn: number;
   updateStatus: (text: string) => void;
   setTitle: (title: string, emoji?: string) => void;
-  setFinalReport: (payload: { status: 'success'|'failure'; format: string; content?: string; content_json?: Record<string, unknown>; metadata?: Record<string, unknown>; messages?: unknown[] }) => void;
+  setFinalReport: (payload: { format: string; content?: string; content_json?: Record<string, unknown>; metadata?: Record<string, unknown>; messages?: unknown[] }) => void;
   logError: (message: string) => void;
   orchestrator: ToolsOrchestrator;
   getCurrentTurn: () => number;
@@ -470,9 +470,6 @@ export class InternalToolProvider extends ToolProvider {
       return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
     }
     if (name === 'agent__final_report') {
-      // Read status from parameters if provided, defaulting to 'success' for normal agent completions
-      const rawStatus = typeof parameters.status === 'string' ? parameters.status : 'success';
-      const status: 'success' | 'failure' = rawStatus === 'failure' ? 'failure' : 'success';
       const requestedFormat = typeof parameters.report_format === 'string' ? parameters.report_format : (typeof parameters.format === 'string' ? parameters.format : undefined);
       if (requestedFormat !== undefined && requestedFormat !== this.formatId) {
         this.opts.logError(`agent__final_report: received report_format='${requestedFormat}', expected '${this.formatId}'. Proceeding with expected format.`);
@@ -700,7 +697,7 @@ export class InternalToolProvider extends ToolProvider {
         const slackExisting: Record<string, unknown> = (slackVal !== undefined && slackVal !== null && typeof slackVal === 'object' && !Array.isArray(slackVal)) ? (slackVal as Record<string, unknown>) : {};
         const metaSlack: Record<string, unknown> = { ...slackExisting, messages: normalizedMessages };
         const mergedMeta: Record<string, unknown> = { ...metaBase, slack: metaSlack };
-        this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata: mergedMeta });
+        this.opts.setFinalReport({ format: this.formatId, content, content_json: contentJson, metadata: mergedMeta });
         return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
       }
 
@@ -784,7 +781,7 @@ export class InternalToolProvider extends ToolProvider {
           contentJson = target;
         }
         const mergedMeta = { ...metadata };
-        this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata: mergedMeta });
+        this.opts.setFinalReport({ format: this.formatId, content, content_json: contentJson, metadata: mergedMeta });
         return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
       }
 
@@ -793,7 +790,7 @@ export class InternalToolProvider extends ToolProvider {
         throw new Error('agent__final_report requires non-empty report_content field.');
       }
       const mergedMeta = { ...metadata };
-      this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata: mergedMeta });
+      this.opts.setFinalReport({ format: this.formatId, content, content_json: contentJson, metadata: mergedMeta });
       return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
     }
     if (this.opts.enableBatch && name === 'agent__batch') {

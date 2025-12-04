@@ -117,7 +117,6 @@ export interface FinalReportMetricsRecord {
   callPath?: string;
   headendId?: string;
   source: 'tool-call' | 'text-fallback' | 'tool-message' | 'synthetic';
-  status: 'success' | 'failure';
   turnsCompleted: number;
   finalReportAttempts: number;
   forcedFinalReason?: 'context' | 'max_turns';
@@ -686,7 +685,7 @@ class OtelMetricsRecorder implements TelemetryRecorder {
 
     this.finalReport = {
       outcomes: this.meter.createCounter('ai_agent_final_report_total', {
-        description: 'Final reports emitted grouped by source/status',
+        description: 'Final reports emitted grouped by source',
       }),
       attempts: this.meter.createCounter('ai_agent_final_report_attempts_total', {
         description: 'Final-report attempts observed before acceptance',
@@ -837,7 +836,6 @@ class OtelMetricsRecorder implements TelemetryRecorder {
       call_path: record.callPath ?? 'unknown',
       headend: record.headendId ?? 'cli',
       source: record.source,
-      status: record.status,
       forced_final_reason: record.forcedFinalReason ?? 'none',
     };
     if (record.syntheticReason !== undefined && record.syntheticReason.length > 0) {

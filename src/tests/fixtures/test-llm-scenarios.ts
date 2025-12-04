@@ -2284,7 +2284,6 @@ const SCENARIOS: ScenarioDefinition[] = [
               callId: 'call-slack-messages',
               assistantText: 'Sending rich Slack content.',
               arguments: {
-                status: 'success',
                 report_format: SLACK_BLOCK_KIT_FORMAT,
                 messages: [
                   'Primary message with *formatting*',
@@ -2448,7 +2447,6 @@ const SCENARIOS: ScenarioDefinition[] = [
               callId: 'call-slack-run-test-57',
               assistantText: 'Submitting Slack styled final report.',
               arguments: {
-                status: 'success',
                 report_format: SLACK_BLOCK_KIT_FORMAT,
                 messages: [
                   'Primary summary with _structured_ content.',

@@ -1,7 +1,7 @@
 # final_report Tool
 
 ## TL;DR
-Mandatory tool for agent to deliver final answer. Captures status, format, encoding, content, optional JSON payload, and metadata. Terminates session execution. `report_content` may be `raw` or `base64`; `content_json` is schema-validated with a light repair loop for stringified nested JSON. In XML transport (`tooling.transport=xml|xml-final`) the model must call `agent__final_report` via the XML slot in XML-NEXT. In `xml`, provider tool definitions are hidden and native tool_calls are ignored; in `xml-final`, provider tools remain native but the final report still must be sent via the XML tag.
+Mandatory tool for agent to deliver final answer. Captures format, encoding, content, optional JSON payload, and metadata. Terminates session execution. `report_content` may be `raw` or `base64`; `content_json` is schema-validated with a light repair loop for stringified nested JSON. In XML transport (`tooling.transport=xml|xml-final`) the model must call `agent__final_report` via the XML slot in XML-NEXT. In `xml`, provider tool definitions are hidden and native tool_calls are ignored; in `xml-final`, provider tools remain native but the final report still must be sent via the XML tag.
 
 ## Source Files
 - `src/tools/internal-provider.ts` - Tool definition and handler
@@ -23,11 +23,6 @@ Mandatory tool for agent to deliver final answer. Captures status, format, encod
 {
   "type": "object",
   "properties": {
-    "status": {
-      "type": "string",
-      "enum": ["success", "failure", "partial"],
-      "description": "Task completion status"
-    },
     "report_format": {
       "type": "string",
       "const": "<format>",
@@ -46,7 +41,7 @@ Mandatory tool for agent to deliver final answer. Captures status, format, encod
 #### JSON Format
 ```json
 {
-  "required": ["status", "report_format", "content_json"],
+  "required": ["report_format", "content_json"],
   "properties": {
     "content_json": {
       "type": "object",
@@ -59,7 +54,7 @@ Mandatory tool for agent to deliver final answer. Captures status, format, encod
 #### Slack Block Kit Format
 ```json
 {
-  "required": ["status", "report_format", "messages"],
+  "required": ["report_format", "messages"],
   "properties": {
     "messages": {
       "type": "array",
@@ -72,7 +67,7 @@ Mandatory tool for agent to deliver final answer. Captures status, format, encod
 #### Other Formats (markdown, tty, pipe, text, sub-agent)
 ```json
 {
-  "required": ["status", "report_format", "report_content", "encoding"],
+  "required": ["report_format", "report_content", "encoding"],
   "properties": {
     "encoding": {
       "type": "string",
@@ -88,14 +83,6 @@ Mandatory tool for agent to deliver final answer. Captures status, format, encod
 ```
 
 **Important**: `report_format` is always required and enforced via `const` keyword to match session format.
-
-## Status Values
-
-| Status | Meaning |
-|--------|---------|
-| `success` | Task completed successfully |
-| `failure` | Task could not be completed |
-| `partial` | Partial completion, some issues |
 
 ## Format Values
 
@@ -134,9 +121,7 @@ if (name === 'agent__final_report') {
 
 ```typescript
 setFinalReport: (p) => {
-  const normalizedStatus = p.status;
   this.finalReport = {
-    status: normalizedStatus,
     format: p.format,
     content: p.content,
     content_json: p.content_json,
@@ -175,7 +160,6 @@ if (fr.format === 'json' && schema !== undefined && fr.content_json !== undefine
 **Session State** (`src/ai-agent.ts:189-197`):
 ```typescript
 private finalReport?: {
-  status: 'success' | 'failure' | 'partial';
   format: FormatType;
   content?: string;
   content_json?: Record<string, unknown>;
@@ -190,7 +174,6 @@ private finalReport?: {
 interface AIAgentResult {
   // ...
   finalReport?: {
-    status: 'success' | 'failure' | 'partial';
     format: string;
     content?: string;
     content_json?: Record<string, unknown>;
@@ -203,15 +186,14 @@ interface AIAgentResult {
 ## Adoption Strategies
 
 ### XML Transport
-- When `tooling.transport` is `xml` or `xml-final`, `agent__final_report` must be emitted inside `<ai-agent-NONCE-FINAL tool="agent__final_report" status="..." format="...">payload</ai-agent-NONCE-FINAL>` matching the session nonce.
-- The `status` and `format` attributes are extracted from the XML tag (wrapper layer), while the tag content becomes the raw payload.
+- When `tooling.transport` is `xml` or `xml-final`, `agent__final_report` must be emitted inside `<ai-agent-NONCE-FINAL tool="agent__final_report" format="...">payload</ai-agent-NONCE-FINAL>` matching the session nonce.
+- The `format` attribute is extracted from the XML tag (wrapper layer), while the tag content becomes the raw payload.
 - Progress shares the XML channel only in `xml`; in `xml-final`, progress follows tools transport (native tool_calls).
 
 ### 3-Layer Processing Architecture
 Final report processing uses a 3-layer architecture to cleanly separate transport concerns from payload content:
 
 1. **Layer 1 (Transport/Wrapper Extraction)**:
-   - Extract `status` from XML tag attribute or tool params
    - Extract `report_format` from XML tag attribute or tool params
    - Extract raw payload from `_rawPayload` (XML) or content fields (native)
    - Extract optional `metadata` from params
@@ -223,7 +205,7 @@ Final report processing uses a 3-layer architecture to cleanly separate transpor
    - Text formats (`text`, `markdown`, `markdown+mermaid`, `tty`, `pipe`): Use raw payload directly as text content.
 
 3. **Layer 3 (Final Report Construction)**:
-   - Build clean final report object with: status, format, content, content_json (for json format), metadata
+   - Build clean final report object with: format, content, content_json (for json format), metadata
    - Wrapper fields never pollute payload content
 
 This separation ensures user schema fields (e.g., a `status` field in their JSON schema) are never overwritten by transport-level metadata.
@@ -258,7 +240,6 @@ When adoption from call fails:
 adoptFromToolMessage() {
   const toolMessage = sanitizedMessages.find(msg => msg.role === 'tool');
   this.finalReport = {
-    status: 'success',
     format: sessionFormat,
     content: toolMessage.content,
     ts: Date.now()

@@ -637,7 +637,6 @@ export interface AIAgentResult {
   }[];
   // Isolated final report returned by the model via agent_final_report, when available
   finalReport?: {
-    status: 'success' | 'failure';
     // Allow all known output formats plus legacy 'text'
     format: 'json' | 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'sub-agent' | 'text';
     content?: string;
