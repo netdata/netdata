@@ -352,6 +352,7 @@ export class OpenAICompletionsHeadend implements Headend {
       };
       writeSseChunk(res, roleChunk);
     };
+    let reasoningEmitted = false;
     const emitReasoning = (text: string): void => {
       if (!streamed || text.length === 0) return;
       emitAssistantRole();
@@ -369,6 +370,7 @@ export class OpenAICompletionsHeadend implements Headend {
         ],
       };
       writeSseChunk(res, chunk);
+      reasoningEmitted = true;
     };
     const computeTotals = (): { tokensIn: number; tokensOut: number; tokensCacheRead: number; tokensCacheWrite: number; tools: number; costUsd: number } => {
       let tokensIn = 0;
@@ -815,7 +817,11 @@ export class OpenAICompletionsHeadend implements Headend {
           writeSseChunk(res, contentChunk);
         }
         ensureSummary(usageSnapshot);
-        flushReasoning();
+        // Avoid re-emitting reasoning if we already streamed it live
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime flag, varies per session
+        if (!reasoningEmitted) {
+          flushReasoning();
+        }
         const finalChunk: Record<string, unknown> = {
           id: responseId,
           object: CHAT_CHUNK_OBJECT,
