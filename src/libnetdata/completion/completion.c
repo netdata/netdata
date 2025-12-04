@@ -36,33 +36,33 @@ ALWAYS_INLINE void completion_wait_for(struct completion *p)
 
 ALWAYS_INLINE bool completion_timedwait_for(struct completion *p, uint64_t timeout_s)
 {
-    timeout_s *= NSEC_PER_SEC;
+    uint64_t timeout_ns = timeout_s * NSEC_PER_SEC;
+    if (timeout_ns == 0) timeout_ns = 1;
 
-    uint64_t start_time = uv_hrtime();
+    uint64_t deadline_ns = uv_hrtime() + timeout_ns;
     bool result = true;
 
     netdata_mutex_lock(&p->mutex);
-    while (!p->completed) {
-        int rc = netdata_cond_timedwait(&p->cond, &p->mutex, timeout_s);
+    while (!p->completed && result) {
+        uint64_t current_time_ns = uv_hrtime();
 
-        if (rc == 0) {
-            result = true;
-            break;
-        } else if (rc == UV_ETIMEDOUT) {
+        // Check if we've already exceeded the deadline
+        if (current_time_ns >= deadline_ns) {
             result = false;
             break;
         }
 
-        /*
-         * handle spurious wakeups
-        */
+        uint64_t remaining_timeout_ns = deadline_ns - current_time_ns;
 
-        uint64_t elapsed = uv_hrtime() - start_time;
-        if (elapsed >= timeout_s) {
+        int rc = netdata_cond_timedwait(&p->cond, &p->mutex, remaining_timeout_ns);
+
+        if (rc == UV_ETIMEDOUT)
             result = false;
-            break;
-        }
-        timeout_s -= elapsed;
+
+        // Condition was signaled (or spurious wakeup).
+        // The loop condition `!p->completed` will be re-evaluated.
+        // If p->completed is true, the loop exits.
+        // If p->completed is false (spurious wakeup), the loop continues with a new remaining_timeout_ns.
     }
     netdata_mutex_unlock(&p->mutex);
 
