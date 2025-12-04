@@ -2118,7 +2118,9 @@ try_build_install() {
   fi
 
   if [ "${DRY_RUN}" -ne 1 ]; then
-    cd "$(find "${tmpdir}" -mindepth 1 -maxdepth 1 -type d -name netdata-)" || fatal "Cannot change directory to netdata source tree" F0006
+    netdata_src_dir="$(find "${tmpdir}" -mindepth 1 -maxdepth 1 -type d -name 'netdata-*' | head -n 1)"
+    [ -z "${netdata_src_dir}" ] && fatal "Cannot find netdata source directory in ${tmpdir}" F0006
+    cd "${netdata_src_dir}" || fatal "Cannot change directory to netdata source tree" F0006
   fi
 
   if [ -x netdata-installer.sh ] || [ "${DRY_RUN}" -eq 1 ]; then
@@ -2179,7 +2181,7 @@ prepare_offline_install_source() {
         fi
       fi
 
-      if ! find . -name '*.gz.run'; then
+      if [ -z "$(find . -name '*.gz.run')" ]; then
         fatal "Did not actually download any static installer archives, cannot continue. ${BADNET_MSG}." F0516
       fi
 
