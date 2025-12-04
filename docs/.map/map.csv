@@ -1,5 +1,5 @@
 custom_edit_url,sidebar_label,learn_status,learn_rel_path,keywords,description
-https://github.com/netdata/netdata/edit/master/docs/welcome-to-netdata.md,Welcome to Netdata,Published,Welcome to Netdata,["test","keyword","kekw","multi word"],
+https://github.com/netdata/netdata/edit/master/docs/welcome-to-netdata.md,Welcome to Netdata,Published,Welcome to Netdata,"["test","keyword","kekw","multi word"]",
 https://github.com/netdata/netdata/edit/master/docs/netdata-enterprise-evaluation-corrected.md,Enterprise Evaluation Guide,Published,Welcome to Netdata,,
 https://github.com/netdata/netdata/edit/master/docs/realtime-monitoring.md,Real-time Monitoring,Published,Welcome to Netdata,,
 https://github.com/netdata/netdata/edit/master/docs/scalability.md,Scalability,Published,Welcome to Netdata,,
