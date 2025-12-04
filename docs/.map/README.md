@@ -29,13 +29,14 @@ All docs must be mapped in the [map.csv](https://github.com/netdata/netdata/blob
 | **sidebar\_label**    | The label shown in the sidebar.                                               | To make a category: the **overview** page’s `sidebar_label` **must match** `learn_rel_path` (lowercase). <br>👉 Every folder must have an overview page. |
 | **learn\_status**     | `Published` or `Unpublished`.                                                 | If `Unpublished`, see [Unpublishing Files](#unpublishing-files).                                                                                         |
 | **learn\_rel\_path**  | The location path on Learn.                                                   | Use **uppercase letters** and **spaces**. Example: `Netdata Agent/Installation/Linux`. <br>👉 Every level requires an overview page.                     |
+| **keywords** | The keywords for the file. Double quoted array-style like `"[first keyword,second]"` | Keywords are searchable by our search implementation. For a keyword `Super keyword`, `super` will bring it up, as well as `keyword`, due to the nature of our search. Also, for a `testing` keyword, a search for `test` will also bring it up. 
 | **description**       | Legacy metadata description.                                                  | Rarely used today.                                                                                                                                       |
 
 Example row in `map.csv`:
 
 ```csv
 custom_edit_url,sidebar_label,learn_status,learn_rel_path,description
-https://github.com/netdata/netdata/edit/master/docs/installation/linux.md,Linux,Published,"Netdata Agent/Installation/Linux","How to install Netdata Agent on Linux"
+https://github.com/netdata/netdata/edit/master/docs/installation/linux.md,Linux,Published,"Netdata Agent/Installation/Linux","[install]","How to install Netdata Agent on Linux"
 ```
 
 ### 2. Test the Changes
