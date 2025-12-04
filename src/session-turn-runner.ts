@@ -46,7 +46,7 @@ import {
 } from './llm-messages.js';
 import { addSpanAttributes, addSpanEvent, recordContextGuardMetrics, recordFinalReportMetrics, recordLlmMetrics, recordRetryCollapseMetrics, runWithSpan } from './telemetry/index.js';
 import { processLeakedToolCalls } from './tool-call-fallback.js';
-import { estimateMessagesBytes, formatToolRequestCompact, parseJsonValueDetailed, sanitizeToolName, warn } from './utils.js';
+import { estimateMessagesBytes, formatToolRequestCompact, parseJsonValueDetailed, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
 import { XmlFinalReportFilter } from './xml-transport.js';
 
 /**
@@ -1102,29 +1102,42 @@ export class TurnRunner {
                             }
                         }
                         // Synthetic error: success with content but no tools and no final_report
-                        if (this.finalReport === undefined) {
-                            if (!turnResult.status.finalAnswer && !sanitizedHasToolCalls && sanitizedHasText) {
-                                const syntheticMessage = 'Synthetic retry: assistant returned content without tool calls and without final_report.';
-                                const providerWarnEntry = {
-                                    timestamp: Date.now(),
-                                    severity: 'WRN' as const,
-                                    turn: currentTurn,
-                                    subturn: 0,
-                                    direction: 'response' as const,
-                                    type: 'llm' as const,
-                                    remoteIdentifier: `${provider}:${model}`,
-                                    fatal: false,
-                                    message: syntheticMessage,
-                                };
-                                this.log(providerWarnEntry);
-                                const orchestratorWarnEntry = {
-                                    ...providerWarnEntry,
-                                    remoteIdentifier: REMOTE_ORCHESTRATOR,
-                                };
-                                this.log(orchestratorWarnEntry);
-                                if (isFinalTurn && !finalTurnRetryWarnLogged) {
-                                    const agentWarn = {
-                                        timestamp: Date.now(),
+                                if (this.finalReport === undefined) {
+                                    if (!turnResult.status.finalAnswer && !sanitizedHasToolCalls && sanitizedHasText) {
+                                        const syntheticMessage = 'Synthetic retry: assistant returned content without tool calls and without final_report.';
+                                        const assistantPreview = (() => {
+                                            const textBlocks = sanitizedMessages
+                                                .filter((msg): msg is ConversationMessage & { content: string } => msg.role === 'assistant' && typeof msg.content === 'string')
+                                                .map((msg) => msg.content.trim())
+                                                .filter((t) => t.length > 0);
+                                            if (textBlocks.length === 0) return undefined;
+                                            return truncateUtf8WithNotice(textBlocks.join('\n'), 2000);
+                                        })();
+                                        const orchestratorWarnEntry = {
+                                            timestamp: Date.now(),
+                                            severity: 'WRN' as const,
+                                            turn: currentTurn,
+                                            subturn: 0,
+                                            direction: 'response' as const,
+                                            type: 'llm' as const,
+                                            remoteIdentifier: REMOTE_ORCHESTRATOR,
+                                            fatal: false,
+                                            message: syntheticMessage,
+                                            details: {
+                                                provider,
+                                                model,
+                                                finish_reason: turnResult.stopReason ?? (turnResult.status as { finishReason?: string }).finishReason,
+                                                tool_calls: Array.isArray(turnResult.toolCalls) ? turnResult.toolCalls.length : 0,
+                                                has_text: sanitizedHasText,
+                                                has_tool_calls: sanitizedHasToolCalls,
+                                                assistant_preview: assistantPreview,
+                                                raw_response: turnResult.response,
+                                            },
+                                        } as LogEntry;
+                                        this.log(orchestratorWarnEntry);
+                                        if (isFinalTurn && !finalTurnRetryWarnLogged) {
+                                            const agentWarn = {
+                                                timestamp: Date.now(),
                                         severity: 'WRN' as const,
                                         turn: currentTurn,
                                         subturn: 0,
