@@ -575,7 +575,7 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
                     break;
 
                 // Make sure index is valid for this file
-                if (page_entry_in_journal->extent_index > extent_entries) {
+                if (page_entry_in_journal->extent_index >= extent_entries) {
                     nd_log_limit_static_thread_var(erl, 60, 0);
                     nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
                                  "DBENGINE: Invalid extent index in journalfile %u",
