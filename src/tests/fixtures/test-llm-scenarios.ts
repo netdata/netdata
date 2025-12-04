@@ -4465,6 +4465,47 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
     ],
   },
+  {
+    id: 'run-test-invalid-response-clears-after-success',
+    description: 'Early invalid responses in a turn are cleared once a tool-call attempt succeeds.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        failuresBeforeSuccess: 2,
+        failureStatus: 'invalid_response',
+        failureMessage: 'Simulated empty response.',
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Calling tool after prior invalid responses.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-invalid-clear-1',
+              assistantText: 'Proceeding with real tool call.',
+              arguments: {
+                text: TOOL_ARGUMENT_SUCCESS,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Final report after clearing invalid state.',
+          reportContent: `${RESULT_HEADING}Invalid responses were cleared after successful tool call.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
   // -------------------------------------------------------------------------
   // Leaked tool extraction scenarios (fallback for <tools> / <tool_call> etc.)
   // -------------------------------------------------------------------------

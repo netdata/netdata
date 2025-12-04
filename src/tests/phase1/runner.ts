@@ -318,8 +318,8 @@ const THRESHOLD_BUFFER_TOKENS = 8;
 const THRESHOLD_MAX_OUTPUT_TOKENS = 32;
 const THRESHOLD_CONTEXT_WINDOW_BELOW = 980;
 // Tuned so projected tokens land exactly at the limit given current prompt/instruction length.
-// limit = contextWindow - buffer - maxOutput = 854 - 8 - 32 = 814 (matches projected)
-const THRESHOLD_CONTEXT_WINDOW_EQUAL = 854;
+// limit = contextWindow - buffer - maxOutput = 861 - 8 - 32 = 821 (matches projected)
+const THRESHOLD_CONTEXT_WINDOW_EQUAL = 861;
 // Tuned so projected tokens exceed the limit with current prompt length.
 const THRESHOLD_CONTEXT_WINDOW_ABOVE = 726;
 const PREFLIGHT_CONTEXT_WINDOW = 80;
