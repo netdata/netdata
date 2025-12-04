@@ -1,6 +1,6 @@
+import type { OutputFormatId } from './formats.js';
 import type { ToolCall } from './types.js';
 
-import { describeFormatParameter, getFormatSchema, type OutputFormatId } from './formats.js';
 import {
   PROGRESS_TOOL_INSTRUCTIONS_BRIEF,
   PROGRESS_TOOL_WORKFLOW_LINE,
@@ -119,7 +119,7 @@ export function buildToolCallFromParsed(slot: ParsedXmlSlot, toolCallId: string)
 }
 
 export function renderXmlNext(payload: XmlNextPayload): string {
-  const { nonce, turn, maxTurns, tools, slotTemplates, progressSlot, finalReportSlot, mode, expectedFinalFormat, finalSchema } = payload;
+  const { nonce, turn, maxTurns, tools, slotTemplates, progressSlot, mode } = payload;
   const toolList = tools.filter((t) => t.name !== 'agent__final_report' && t.name !== 'agent__progress_report');
   const lines: string[] = [];
   lines.push('# System Notice');
@@ -162,71 +162,6 @@ export function renderXmlNext(payload: XmlNextPayload): string {
       lines.push('```');
       lines.push('');
     }
-  }
-
-  // For xml-final mode: system prompt has full instructions, just provide NONCE
-  // For xml mode: full instructions here since system prompt has nothing
-  if (mode === 'xml-final') {
-    // Minimal: just the NONCE and example tag for final report
-    lines.push('## Final Report');
-    lines.push(`When ready, use this tag (see system prompt for format details):`);
-    lines.push('```');
-    lines.push(`<ai-agent-${finalReportSlot.slotId} tool="agent__final_report" format="${expectedFinalFormat}">`);
-    lines.push('[Your final report here]');
-    lines.push(`</ai-agent-${finalReportSlot.slotId}>`);
-    lines.push('```');
-    lines.push('');
-  } else {
-    // Full instructions for xml mode
-    const isTextFormat = expectedFinalFormat === 'text';
-    const formatDescription = isTextFormat ? 'Plain text output.' : describeFormatParameter(expectedFinalFormat);
-    // Get format schema: user-provided for json, built-in for other structured formats
-    const formatSchema: Record<string, unknown> | undefined = (() => {
-      if (expectedFinalFormat === 'json') return finalSchema;
-      if (isTextFormat) return undefined;
-      return getFormatSchema(expectedFinalFormat);
-    })();
-
-    lines.push('## Final Report');
-    lines.push(`**Format: ${expectedFinalFormat}** — ${formatDescription}`);
-    lines.push('');
-    lines.push('Once your task is complete, provide your final report/answer using this output:');
-    lines.push('');
-    if (expectedFinalFormat === 'json' && finalSchema !== undefined) {
-      // For JSON format: show the user's schema directly (format is already in XML attribute)
-      lines.push('Your response must be a JSON object matching this schema:');
-      lines.push('```json');
-      lines.push(JSON.stringify(finalSchema, null, 2));
-      lines.push('```');
-      lines.push('');
-      lines.push('Wrap your JSON in these XML tags:');
-    } else if (formatSchema !== undefined) {
-      // For other structured formats (slack-block-kit): show the format schema
-      lines.push('Your response must be a JSON object matching this schema:');
-      lines.push('```json');
-      lines.push(JSON.stringify(formatSchema, null, 2));
-      lines.push('```');
-      lines.push('');
-      lines.push('Wrap your JSON in these XML tags:');
-    }
-    lines.push('```');
-    lines.push(`<ai-agent-${finalReportSlot.slotId} tool="agent__final_report" format="${expectedFinalFormat}">`);
-    if (expectedFinalFormat === 'json' || formatSchema !== undefined) {
-      lines.push('{ ... your JSON here ... }');
-    } else {
-      lines.push(`[Your final report/answer here]`);
-    }
-    lines.push(`</ai-agent-${finalReportSlot.slotId}>`);
-    lines.push('```');
-    lines.push('');
-
-    lines.push('**CRITICAL: Final Report Checklist**');
-    lines.push('When ready to provide your final report, iterate through the following checklist:');
-    lines.push('- [ ] The opening XML tag MUST be first in your response');
-    lines.push('- [ ] Your report content/payload matches the expected format');
-    lines.push('- [ ] Your output MUST end with the closing XML tag');
-    lines.push('- [ ] Your entire report is between the opening and closing XML tags, not outside them');
-    lines.push('The above checklist is mandatory for all final reports. Failure to comply with this checklist will result in rejection of your final report.');
   }
 
   lines.push('## Mandatory Workflow');

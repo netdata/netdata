@@ -9,32 +9,29 @@ interface OutputFormat {
   inputSchema?: Record<string, unknown>;
 }
 
-// Slack Block Kit schema - shared between native tool and xml-final modes
+// Slack Block Kit schema for xml-final guidance: payload must be the messages array (no wrapper)
 const SLACK_BLOCK_KIT_SCHEMA: Record<string, unknown> = {
-  type: 'object',
-  required: ['report_format', 'messages'],
-  properties: {
-    report_format: { type: 'string', const: 'slack-block-kit' },
-    messages: {
-      type: 'array',
-      minItems: 1,
-      description: 'Array of Slack messages, each containing blocks',
-      items: {
-        type: 'object',
-        required: ['blocks'],
-        properties: {
-          blocks: {
-            type: 'array',
-            description: 'Slack Block Kit blocks: section, header, divider, context',
-            items: {
-              type: 'object',
-              description: 'Block types: section (mrkdwn text ≤2900 chars), header (plain_text ≤150), divider, context (mrkdwn ≤2000)'
-            }
-          }
+  type: 'array',
+  minItems: 1,
+  maxItems: 20,
+  description: 'Array of Slack messages (no wrapper object). Each message must contain Block Kit blocks.',
+  items: {
+    type: 'object',
+    required: ['blocks'],
+    additionalProperties: true,
+    properties: {
+      blocks: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 50,
+        description: 'Slack Block Kit blocks: section, header, divider, context',
+        items: {
+          type: 'object',
+          additionalProperties: true,
+          description: 'Block types: section (mrkdwn ≤2900 chars), header (plain_text ≤150), divider, context (mrkdwn ≤2000)',
         }
       }
-    },
-    metadata: { type: 'object' }
+    }
   }
 };
 

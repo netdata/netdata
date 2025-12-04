@@ -11,7 +11,7 @@ type AjvErrorObject = ErrorObject<string, Record<string, unknown>>;
 type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
 const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
 
-import { describeFormatParameter, formatPromptValue, getFormatSchema } from '../formats.js';
+import { describeFormatParameter, formatPromptValue } from '../formats.js';
 import {
   FINAL_REPORT_FIELDS_JSON,
   FINAL_REPORT_FIELDS_SLACK,
@@ -284,10 +284,25 @@ export class InternalToolProvider extends ToolProvider {
       return `\n**Your response must be a JSON object matching this schema:**\n\`\`\`json\n${JSON.stringify(this.opts.expectedJsonSchema, null, 2)}\n\`\`\`\n`;
     }
     if (this.formatId === SLACK_BLOCK_KIT_FORMAT) {
-      const schema = getFormatSchema(SLACK_BLOCK_KIT_FORMAT);
-      if (schema !== undefined) {
-        return `\n**Your response must be a JSON object matching this schema:**\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\`\n`;
-      }
+      // For XML mode: show messages array schema directly (no wrapper - format is in XML attribute)
+      // The LLM should output just the messages array [...] inside the XML tags
+      const messagesArraySchema = {
+        type: 'array',
+        description: 'Array of Slack messages (output this array directly, not wrapped in an object)',
+        minItems: 1,
+        items: {
+          type: 'object',
+          required: ['blocks'],
+          properties: {
+            blocks: {
+              type: 'array',
+              description: 'Slack Block Kit blocks: section (mrkdwn ≤2900), header (plain_text ≤150), divider, context (mrkdwn ≤2000)',
+              items: { type: 'object' }
+            }
+          }
+        }
+      };
+      return `\n**Your response must be a JSON array (the messages array directly, NOT wrapped in an object):**\n\`\`\`json\n${JSON.stringify(messagesArraySchema, null, 2)}\n\`\`\`\n`;
     }
     return '';
   }

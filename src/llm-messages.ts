@@ -353,7 +353,14 @@ export const finalReportXmlInstructions = (
   sessionNonce?: string
 ): string => {
   const slotId = sessionNonce !== undefined ? `${sessionNonce}-FINAL` : 'NONCE-FINAL';
-  const exampleContent = formatId === 'json' || formatId === 'slack-block-kit' ? '{ ... your JSON here ... }' : '[Your final report/answer here]';
+  // For slack-block-kit: show array example (messages array directly, no wrapper)
+  // For json: show object example
+  // For text formats: show text placeholder
+  const exampleContent = formatId === 'slack-block-kit'
+    ? '[ { "blocks": [ ... ] } ]'
+    : formatId === 'json'
+      ? '{ ... your JSON here ... }'
+      : '[Your final report/answer here]';
   return `#### agent__final_report - How to Deliver Your Final Answer
 
 **Format: ${formatId}** — ${formatDescription}

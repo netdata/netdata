@@ -959,6 +959,26 @@ export class TurnRunner {
                                 } else if (expectedFormat === SLACK_BLOCK_KIT_FORMAT) {
                                     // SLACK-BLOCK-KIT: Parse JSON, expect messages array
                                     // Source: rawPayload (XML) > messages (native)
+                                    const coerceMessages = (value: unknown): unknown[] | undefined => {
+                                        const isArray = (v: unknown): v is unknown[] => Array.isArray(v);
+                                        if (isArray(value)) return value;
+                                        if (typeof value === 'string') {
+                                            const trimmed = value.trim();
+                                            if (trimmed.length === 0) return undefined;
+                                            const parsed = parseJsonValueDetailed(trimmed).value;
+                                            if (isArray(parsed)) return parsed;
+                                            if (parsed !== null && typeof parsed === 'object') {
+                                                const msgs = (parsed as { messages?: unknown }).messages;
+                                                if (isArray(msgs)) return msgs;
+                                            }
+                                        }
+                                        if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+                                            const msgs = (value as { messages?: unknown }).messages;
+                                            if (isArray(msgs)) return msgs;
+                                        }
+                                        return undefined;
+                                    };
+
                                     let messagesArray: unknown[] | undefined;
                                     if (rawPayload !== undefined) {
                                         // XML transport: parse JSON from raw payload
@@ -985,10 +1005,10 @@ export class TurnRunner {
                                                 });
                                             }
                                         }
-                                    } else {
-                                        // Native transport: use messages param directly
-                                        messagesArray = messagesParam;
                                     }
+
+                                    // Native transport: coerce messages param (array or JSON string)
+                                    messagesArray ??= coerceMessages(messagesParam);
                                     if (messagesArray === undefined || messagesArray.length === 0) {
                                         this.addTurnFailure(FINAL_REPORT_SLACK_MESSAGES_MISSING);
                                         this.logFinalReportDump(currentTurn, params, 'expected messages array', rawContent);

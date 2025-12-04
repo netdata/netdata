@@ -103,7 +103,7 @@ Mandatory tool for agent to deliver final answer. Captures status, format, encod
 - `json` - Structured JSON output (validated against schema if provided)
 - `markdown` - Markdown formatted text
 - `markdown+mermaid` - Markdown with Mermaid diagrams
-- `slack-block-kit` - Slack Block Kit payload (messages array)
+ - `slack-block-kit` - Slack Block Kit payload (messages array)
 - `tty` - Terminal-optimized text with ANSI color codes
 - `pipe` - Plain text for piping
 - `sub-agent` - Internal agent-to-agent exchange format (opaque blob, no validation)
@@ -219,7 +219,7 @@ Final report processing uses a 3-layer architecture to cleanly separate transpor
 2. **Layer 2 (Format-Specific Processing)**:
    - `sub-agent`: Opaque blob passthrough—no validation, no JSON parsing. Whatever the model returns is passed through unchanged.
    - `json`: Parse JSON from raw payload, validate structure. If parsing fails, reject and retry.
-   - `slack-block-kit`: Parse JSON, expect messages array. Supports both `[...]` array and `{messages: [...]}` object formats.
+   - `slack-block-kit`: Parse JSON, expect the messages array directly (`[...]`). Legacy `{messages: [...]}` wrappers are tolerated for backwards compatibility but not instructed.
    - Text formats (`text`, `markdown`, `markdown+mermaid`, `tty`, `pipe`): Use raw payload directly as text content.
 
 3. **Layer 3 (Final Report Construction)**:
