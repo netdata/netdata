@@ -21,7 +21,7 @@ import type { SessionNode, SessionTreeBuilder } from './session-tree.js';
 import type { SubAgentRegistry } from './subagent-registry.js';
 import type { LeakedToolFallbackResult } from './tool-call-fallback.js';
 import type { ToolsOrchestrator } from './tools/tools.js';
-import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, Configuration, ConversationMessage, LogDetailValue, LogEntry, MCPTool, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, ToolCall, TurnResult, TurnRetryDirective, TurnStatus } from './types.js';
+import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, CallbackMeta, Configuration, ConversationMessage, LogDetailValue, LogEntry, MCPTool, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, ToolCall, TurnResult, TurnRetryDirective, TurnStatus } from './types.js';
 import type { XmlToolTransport } from './xml-transport.js';
 
 import { FINAL_REPORT_FORMAT_VALUES, FINAL_REPORT_SOURCE_TEXT_FALLBACK, FINAL_REPORT_SOURCE_TOOL_MESSAGE } from './final-report-manager.js';
@@ -93,8 +93,8 @@ export interface TurnRunnerCallbacks {
   onAccounting: (entry: AccountingEntry) => void;
   onOpTree: (tree: SessionNode) => void;
   onTurnStarted?: (turn: number) => void;
-  onOutput?: (chunk: string) => void;
-  onThinking?: (chunk: string) => void;
+  onOutput?: (chunk: string, meta?: CallbackMeta) => void;
+  onThinking?: (chunk: string, meta?: CallbackMeta) => void;
   setCurrentTurn: (turn: number) => void;
   setMasterLlmStartLogged: () => void;
   isMasterLlmStartLogged: () => boolean;
@@ -1998,9 +1998,21 @@ export class TurnRunner {
                     return undefined;
                 })();
                 if (finalOutput !== undefined) {
-                    this.callbacks.onOutput(finalOutput);
+                    this.callbacks.onOutput(finalOutput, {
+                        agentId: this.ctx.agentId,
+                        callPath: this.ctx.callPath,
+                        sessionId: this.ctx.txnId,
+                        parentId: this.ctx.parentTxnId,
+                        originId: this.ctx.originTxnId,
+                    });
                     if (!finalOutput.endsWith('\n')) {
-                        this.callbacks.onOutput('\n');
+                        this.callbacks.onOutput('\n', {
+                            agentId: this.ctx.agentId,
+                            callPath: this.ctx.callPath,
+                            sessionId: this.ctx.txnId,
+                            parentId: this.ctx.parentTxnId,
+                            originId: this.ctx.originTxnId,
+                        });
                     }
                 }
             }
@@ -2533,6 +2545,13 @@ export class TurnRunner {
         reasoningLevel: ReasoningLevel | undefined,
         reasoningValue: ProviderReasoningValue | undefined
     ): Promise<TurnResult & { shownThinking: boolean; incompleteFinalReportDetected: boolean }> {
+        const callbackMeta = {
+            agentId: this.ctx.agentId,
+            callPath: this.ctx.callPath,
+            sessionId: this.ctx.txnId,
+            parentId: this.ctx.parentTxnId,
+            originId: this.ctx.originTxnId,
+        };
         const pendingSelection = this.state.pendingToolSelection;
         this.state.pendingToolSelection = undefined;
         const selection = pendingSelection ?? this.selectToolsForTurn(provider, isFinalTurn);
@@ -2717,14 +2736,14 @@ export class TurnRunner {
                     if (xmlFilter !== undefined) {
                         const filtered = xmlFilter.process(chunk);
                         if (filtered.length > 0) {
-                            this.callbacks.onOutput(filtered);
+                            this.callbacks.onOutput(filtered, callbackMeta);
                             // Only mark as streamed if we actually emitted content (and are inside the tag)
                             if (xmlFilter.hasStreamedContent) {
                                 this.finalReportStreamed = true;
                             }
                         }
                     } else {
-                        this.callbacks.onOutput(chunk);
+                        this.callbacks.onOutput(chunk, callbackMeta);
                     }
                 }
                 else if (type === 'thinking') {
@@ -2748,7 +2767,7 @@ export class TurnRunner {
                         shownThinking = true;
                     }
                     if (isRootSession) {
-                        this.callbacks.onThinking?.(chunk);
+                        this.callbacks.onThinking?.(chunk, callbackMeta);
                     }
                     try {
                         const opId = this.callbacks.getCurrentLlmOpId();
@@ -2821,16 +2840,22 @@ export class TurnRunner {
         catch (e) {
             throw e;
         }
-        finally {
-            if (xmlFilter !== undefined && this.callbacks.onOutput !== undefined) {
-                const left = xmlFilter.flush();
-                if (left.length > 0) {
-                    this.callbacks.onOutput(left);
-                    if (xmlFilter.hasStreamedContent) {
-                        this.finalReportStreamed = true;
+            finally {
+                if (xmlFilter !== undefined && this.callbacks.onOutput !== undefined) {
+                    const left = xmlFilter.flush();
+                    if (left.length > 0) {
+                        this.callbacks.onOutput(left, {
+                            agentId: this.ctx.agentId,
+                            callPath: this.ctx.callPath,
+                            sessionId: this.ctx.txnId,
+                            parentId: this.ctx.parentTxnId,
+                            originId: this.ctx.originTxnId,
+                        });
+                        if (xmlFilter.hasStreamedContent) {
+                            this.finalReportStreamed = true;
+                        }
                     }
                 }
-            }
         }
     }
     mergePendingRetryMessages(conversation: ConversationMessage[]): ConversationMessage[] {

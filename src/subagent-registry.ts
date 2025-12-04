@@ -244,8 +244,8 @@ export class SubAgentRegistry {
           } catch { /* ignore */ }
           orig.onLog?.(cloned);
         },
-        onOutput: (t) => { orig.onOutput?.(t); },
-        onThinking: (_t) => { /* Suppress sub-agent reasoning for external consumers */ },
+        onOutput: (t) => { orig.onOutput?.(t, { agentId: childAgentPath, callPath: childTrace.callPath, sessionId: childTrace.selfId, parentId: childTrace.parentId, originId: childTrace.originId }); },
+        onThinking: (t) => { orig.onThinking?.(t, { agentId: childAgentPath, callPath: childTrace.callPath, sessionId: childTrace.selfId, parentId: childTrace.parentId, originId: childTrace.originId }); },
         onTurnStarted: (_turn) => { /* Sub-agent turns should not affect parent */ },
         onAccounting: (a) => { orig.onAccounting?.(a); },
         onProgress: (event) => { orig.onProgress?.(event); },

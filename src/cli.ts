@@ -9,7 +9,7 @@ import type { LoadAgentOptions } from './agent-loader.js';
 import type { FrontmatterOptions } from './frontmatter.js';
 import type { McpTransportSpec } from './headends/mcp-headend.js';
 import type { Headend, HeadendLogSink } from './headends/types.js';
-import type { LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage, Configuration, MCPTool, ProviderReasoningValue, ReasoningLevel, TelemetryLogExtra, TelemetryLogFormat, TelemetryTraceSampler } from './types.js';
+import type { AccountingEntry, AIAgentCallbacks, CallbackMeta, Configuration, ConversationMessage, LogEntry, MCPTool, ProviderReasoningValue, ReasoningLevel, TelemetryLogExtra, TelemetryLogFormat, TelemetryTraceSampler } from './types.js';
 import type { CommanderError } from 'commander';
 
 import { AgentRegistry } from './agent-registry.js';
@@ -1797,7 +1797,12 @@ program
       const effectiveTraceMCP = options.traceMcp === true;
       const effectiveTraceSdk = options.traceSdk === true;
       const effectiveVerbose = options.verbose === true;
-      const callbacks = createCallbacks({ traceLlm: effectiveTraceLLM, traceMcp: effectiveTraceMCP, traceSdk: effectiveTraceSdk, verbose: effectiveVerbose }, loaded.config.persistence, accountingFile);
+      const callbacks = createCallbacks(
+        { traceLlm: effectiveTraceLLM, traceMcp: effectiveTraceMCP, traceSdk: effectiveTraceSdk, verbose: effectiveVerbose },
+        loaded.config.persistence,
+        accountingFile,
+        loaded.id,
+      );
 
       if (options.dryRun === true) {
         await exitAndShutdown(0, 'dry run complete: configuration and MCP servers validated', 'EXIT-DRY-RUN');
@@ -2024,7 +2029,8 @@ function expandPrompt(str: string, vars: Record<string, string>): string {
 function createCallbacks(
   options: Record<string, unknown>,
   persistence?: { sessionsDir?: string; billingFile?: string },
-  accountingFile?: string
+  accountingFile?: string,
+  masterAgentId?: string
 ): AIAgentCallbacks {
   const colorize = (text: string, colorCode: string): string => {
     return process.stderr.isTTY ? `${colorCode}${text}[0m` : text;
@@ -2071,12 +2077,14 @@ function createCallbacks(
         lastCharWasNewline = false;
       }
     },
-    onOutput: (text: string) => {
+    onOutput: (text: string, meta?: CallbackMeta) => {
+      if (typeof masterAgentId === 'string' && meta?.agentId !== undefined && meta.agentId !== masterAgentId) return;
       if (options.verbose === true) {
         try { process.stderr.write(text); } catch { /* ignore */ }
       }
     },
-    onThinking: (text: string) => {
+    onThinking: (text: string, meta?: CallbackMeta) => {
+      if (typeof masterAgentId === 'string' && meta?.agentId !== undefined && meta.agentId !== masterAgentId) return;
       // Suppress thinking output in non-TTY mode to prevent interleaving with logfmt/json logs
       if (!process.stderr.isTTY) return;
       const colored = colorize(text, '\x1b[2;37m');

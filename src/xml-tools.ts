@@ -1,10 +1,7 @@
 import type { OutputFormatId } from './formats.js';
 import type { ToolCall } from './types.js';
 
-import {
-  PROGRESS_TOOL_INSTRUCTIONS_BRIEF,
-  PROGRESS_TOOL_WORKFLOW_LINE,
-} from './llm-messages.js';
+import { renderXmlNextTemplate, renderXmlPastTemplate } from './llm-messages.js';
 import { truncateUtf8WithNotice } from './utils.js';
 
 export interface XmlSlotTemplate {
@@ -118,84 +115,19 @@ export function buildToolCallFromParsed(slot: ParsedXmlSlot, toolCallId: string)
 }
 
 export function renderXmlNext(payload: XmlNextPayload): string {
-  const { nonce, turn, maxTurns, tools, slotTemplates, progressSlot, mode } = payload;
-  const toolList = tools.filter((t) => t.name !== 'agent__final_report' && t.name !== 'agent__progress_report');
-  const lines: string[] = [];
-  lines.push('# System Notice');
-  lines.push('');
-  lines.push(`This is turn No ${String(turn)}${maxTurns !== undefined ? ` of ${String(maxTurns)}` : ''}.`);
-  lines.push('');
-
-  if (mode === 'xml') {
-      lines.push('## Available Tools for this Turn');
-    if (toolList.length > 0) {
-      const slotIds = slotTemplates
-        .filter((s) => s.tools.some((t) => toolList.map((tt) => tt.name).includes(t)))
-        .map((s) => s.slotId);
-      lines.push('Replace XXXX with one of the available slot numbers and include your JSON body inside the tag.');
-      lines.push(`Slots available: ${slotIds.join(', ')}`);
-      lines.push('');
-      toolList.forEach((t) => {
-        const exampleSlot = `${nonce}-XXXX`;
-        lines.push(`- tool \`${t.name}\`, schema:`);
-        lines.push('```');
-        lines.push(`<ai-agent-${exampleSlot} tool="${t.name}">`);
-        lines.push(JSON.stringify(t.schema ?? {}, null, 2));
-        lines.push(`</ai-agent-${exampleSlot}>`);
-        lines.push('```');
-        lines.push('');
-      });
-    } else {
-      lines.push('No tools are available for this turn. You MUST provide your final report now.');
-      lines.push('');
-    }
-
-    if (progressSlot !== undefined) {
-      lines.push('## Progress Updates');
-      lines.push(PROGRESS_TOOL_INSTRUCTIONS_BRIEF);
-      lines.push('');
-      lines.push('```');
-      lines.push(`<ai-agent-${progressSlot.slotId} tool="agent__progress_report">`);
-      lines.push(`Found X, now searching for Y`);
-      lines.push(`</ai-agent-${progressSlot.slotId}>`);
-      lines.push('```');
-      lines.push('');
-    }
-  }
-
-  lines.push('## Mandatory Workflow');
-  if (toolList.length > 0) {
-    lines.push('You MUST now either:');
-    lines.push(`- ${PROGRESS_TOOL_WORKFLOW_LINE}`);
-    lines.push('- OR provide your final report');
-  }
-  else {
-    lines.push('You MUST now provide your final report');
-    lines.push('1. Include the opening tag `<ai-agent-*` with the correct slot ID and tool name');
-    lines.push('2. Include your final report/answer matching the expected format');
-    lines.push('3. Include the closing tag `</ai-agent-*` with the correct slot ID');
-  }
-
-  return lines.join('\n');
+  return renderXmlNextTemplate(payload);
 }
 
 export function renderXmlPast(past: XmlPastPayload): string {
-  const lines: string[] = [];
-  lines.push('# System Notice');
-  lines.push('');
-  lines.push('## Previous Turn Tool Responses');
-  lines.push('');
-  past.entries.forEach((entry) => {
-    const duration = entry.durationMs !== undefined ? ` duration="${(entry.durationMs / 1000).toFixed(2)}s"` : '';
-    lines.push(`<ai-agent-${entry.slotId} tool="${entry.tool}" status="${entry.status}"${duration}>`);
-    lines.push('<request>');
-    lines.push(truncateUtf8WithNotice(entry.request, 4096));
-    lines.push('</request>');
-    lines.push('<response>');
-    lines.push(truncateUtf8WithNotice(entry.response, 4096));
-    lines.push('</response>');
-    lines.push(`</ai-agent-${entry.slotId}>`);
-    lines.push('');
-  });
-  return lines.join('\n');
+  const truncated = {
+    entries: past.entries.map((entry) => ({
+      slotId: entry.slotId,
+      tool: entry.tool,
+      status: entry.status,
+      durationText: entry.durationMs !== undefined ? ` duration="${(entry.durationMs / 1000).toFixed(2)}s"` : undefined,
+      request: truncateUtf8WithNotice(entry.request, 4096),
+      response: truncateUtf8WithNotice(entry.response, 4096),
+    })),
+  };
+  return renderXmlPastTemplate(truncated);
 }

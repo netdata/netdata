@@ -31,7 +31,7 @@
  * Where isFinalTurn = (currentTurn >= maxTurns - 1) || forcedFinalTurn
  */
 export const MAX_TURNS_FINAL_MESSAGE =
-  'Maximum number of turns/steps reached. You MUST NOW provide your final report. Do NOT attempt to call any other tool. Read carefully the final report instructions and provide your final report/answer now.';
+  'Maximum number of turns/steps reached. You **MUST NOW** provide your final report/answer. Do NOT attempt to call any other tool. Read carefully the final report/answer instructions and provide your final report/answer based on the information already gathered. If the information is insufficient, provide the best possible answer based on what you have and note the limitation in your final report/answer.';
 
 /**
  * Injected when context window limit is reached.
@@ -42,7 +42,7 @@ export const MAX_TURNS_FINAL_MESSAGE =
  * Where forcedFinalTurn is set when context budget is exhausted
  */
 export const CONTEXT_FINAL_MESSAGE =
-  'The conversation reached the context window limit. You MUST NOW provide your final report. Do NOT attempt to call any other tool. Read carefully the final report instructions and provide your final report/answer based on the information already gathered. If the information is insufficient, provide the best possible answer based on what you have and note the limitation in the final report.';
+  'The conversation reached the context window limit. You **MUST NOW** provide your final report/answer. Do NOT attempt to call any other tool. Read carefully the final report/answer instructions and provide your final report/answer based on the information already gathered. If the information is insufficient, provide the best possible answer based on what you have and note the limitation in your final report/answer.';
 
 /**
  * Nudge to use tools instead of plain text.
@@ -63,8 +63,8 @@ export const toolReminderMessage = (excludeProgress: string, finalReportTool: st
  * (final turn reached, but response has no final report)
  */
 export const FINAL_TURN_NOTICE =
-  'System notice: this is the final turn. You MUST NOW provide your final report. Do NOT attempt to call any other tool. Read carefully the final report instructions and provide your final report/answer now.';
-
+  'System notice: this is the final turn. You **MUST NOW** provide your final report/answer. Do NOT attempt to call any other tool. Read carefully the final report/answer instructions and provide your final report/answer based on the information already gathered. If the information is insufficient, provide the best possible answer based on what you have and note the limitation in your final report/answer.';
+  
 // =============================================================================
 // TURN FAILURE MESSAGES
 // Sent to LLM via TURN-FAILED: prefix when validation fails
@@ -130,7 +130,7 @@ export const FINAL_REPORT_SLACK_MESSAGES_MISSING =
  *       assistantForAdoption.content, not reasoning blocks)
  */
 export const TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT =
-  'No tools called, no final report/answer provided, but unexpected content is present.\n- If you believe you called tools, the system did not detect any tool calls. This usually means tool calls were not recognized at all and the leaked to your output.\n- If you believe you provided a final report/answer, it was not detected either. Ensure the final report is correctly formatted as instructed.\nRetry now: pay attention to the required syntax for tool calls and final report';
+  'No progress made in this turn: No tools called, no final report/answer provided, but unexpected content is present in your output.\n- If you believe you called tools, the system did not detect any tool calls. This usually means tool calls were not recognized at all and they leaked to your output.\n- If you believe you provided a final report/answer, it was not detected either. Ensure the final report is correctly formatted as instructed.\nRetry NOW: pay attention to the required syntax for tool calls and your final report/answer. Try again NOW';
 
 /**
  * When tool call parameters are malformed.
@@ -158,7 +158,7 @@ export const TOOL_CALL_MALFORMED =
  * NOTE: Reasoning-only responses skip this check (hasReasoning === true bypasses)
  */
 export const emptyResponseRetryNotice = (finalReportTool: string): string =>
-  `System notice: No progress made in this turn: no tools called and no final report/answer provided. To progress you MUST call tools or provide a final report/answer (${finalReportTool}). Review carefully the provided instructions and tools (if any), decide your next action(s), and follow the instructions precisely to progress. If you believe you called tools or provided a final report, it did not work: ensure the tool calls and final report are correctly formatted as per the instructions. Try again now.`;
+  `System notice: No progress made in this turn: no tools called and no final report/answer provided. To progress you MUST call tools or provide a final report/answer (${finalReportTool}). Review carefully the provided instructions and tools (if any), decide your next action(s), and follow the instructions precisely to progress. If you believe you called tools or provided a final report, it did not work: ensure the tool calls and final report are correctly formatted as per the instructions. Try again NOW.`;
 
 // =============================================================================
 // FINAL REPORT REMINDER
@@ -226,7 +226,7 @@ export const TOOL_NO_OUTPUT = '(tool failed: context window budget exceeded)';
  * CONDITION: XML mode && final_report tag found && JSON.parse(payload) fails
  */
 export const XML_FINAL_REPORT_NOT_JSON =
-  'final-report payload is not valid JSON. Provide the correct JSON object according to the final-report schema.';
+  'final-report payload is not valid JSON. Provide the correct JSON object according to the final-report/answer instructions and schema.';
 
 /**
  * Tool payload is not valid JSON (XML mode).
@@ -289,8 +289,8 @@ Use this tool to update the user on your overall progress and next steps.
 - This tool is OPTIONAL — only call it when you have something meaningful to report
 - ONLY call progress_report when you are ALSO calling other tools in the same turn
 - NEVER call progress_report standalone (if you have no other tools to call, skip it entirely)
-- NEVER combine progress_report with agent__final_report
-- At most ONE progress_report per turn
+- NEVER combine progress_report with your final report/answer
+- NEVER call more than one progress_report per turn
 - Keep messages concise (max 15-20 words), no formatting or newlines
 
 **Good examples:**
@@ -322,6 +322,100 @@ export const PROGRESS_TOOL_BATCH_RULES = `- Include at most one progress_report 
 export const PROGRESS_TOOL_WORKFLOW_LINE =
   'Call one or more tools to collect data or perform actions (optionally include progress_report to update the user)';
 
+// XML System Notices (moved from xml-tools.ts to keep all LLM-facing strings here)
+export interface XmlNextTemplatePayload {
+  nonce: string;
+  turn: number;
+  maxTurns?: number;
+  tools: { name: string; schema?: Record<string, unknown> }[];
+  slotTemplates: { slotId: string; tools: string[] }[];
+  progressSlot?: { slotId: string };
+  mode: 'xml' | 'xml-final';
+}
+
+export interface XmlPastTemplateEntry {
+  slotId: string;
+  tool: string;
+  status: 'ok' | 'failed';
+  durationText?: string;
+  request: string;
+  response: string;
+}
+
+export interface XmlPastTemplatePayload {
+  entries: XmlPastTemplateEntry[];
+}
+
+export const renderXmlNextTemplate = (payload: XmlNextTemplatePayload): string => {
+  const { nonce, turn, maxTurns, tools, slotTemplates, progressSlot, mode } = payload;
+  const toolList = tools.filter((t) => t.name !== 'agent__final_report' && t.name !== 'agent__progress_report');
+  const lines: string[] = [];
+  lines.push('# System Notice');
+  lines.push('');
+  lines.push(`This is turn No ${String(turn)}${maxTurns !== undefined ? ` of ${String(maxTurns)}` : ''}.`);
+  lines.push('');
+
+  if (mode === 'xml') {
+    lines.push('## Available Tools for this Turn');
+    if (toolList.length > 0) {
+      const slotIds = slotTemplates
+        .filter((s) => s.tools.some((t) => toolList.map((tt) => tt.name).includes(t)))
+        .map((s) => s.slotId);
+      lines.push('Replace XXXX with one of the available slot numbers and include your JSON body inside the tag.');
+      lines.push(`Slots available: ${slotIds.join(', ')}`);
+      lines.push('');
+      toolList.forEach((t) => {
+        const exampleSlot = `${nonce}-XXXX`;
+        lines.push(`- tool \`${t.name}\`, schema:`);
+        lines.push('```');
+        lines.push(`<ai-agent-${exampleSlot} tool="${t.name}">`);
+        lines.push(JSON.stringify(t.schema ?? {}, null, 2));
+        lines.push(`</ai-agent-${exampleSlot}>`);
+        lines.push('```');
+        lines.push('');
+      });
+    } else {
+      lines.push('No tools are available for this turn.');
+      lines.push('');
+    }
+
+    if (progressSlot !== undefined) {
+      lines.push('## Progress Updates');
+      lines.push(PROGRESS_TOOL_INSTRUCTIONS_BRIEF);
+      lines.push('');
+      lines.push('```');
+      lines.push(`<ai-agent-${progressSlot.slotId} tool="agent__progress_report">`);
+      lines.push('Found X, now searching for Y');
+      lines.push(`</ai-agent-${progressSlot.slotId}>`);
+      lines.push('```');
+      lines.push('');
+    }
+  }
+
+  return lines.join('\n');
+};
+
+export const renderXmlPastTemplate = (past: XmlPastTemplatePayload): string => {
+  const lines: string[] = [];
+  lines.push('# System Notice');
+  lines.push('');
+  lines.push('## Previous Turn Tool Responses');
+  lines.push('');
+  past.entries.forEach((entry) => {
+    const duration = entry.durationText !== undefined ? ` ${entry.durationText}` : '';
+    lines.push(`<ai-agent-${entry.slotId} tool="${entry.tool}" status="${entry.status}"${duration}>`);
+    lines.push('<request>');
+    lines.push(entry.request);
+    lines.push('</request>');
+    lines.push('<response>');
+    lines.push(entry.response);
+    lines.push('</response>');
+    lines.push(`</ai-agent-${entry.slotId}>`);
+    lines.push('');
+  });
+  return lines.join('\n');
+};
+
 // =============================================================================
 // FINAL REPORT INSTRUCTIONS
 // Single source of truth for agent__final_report guidance.
@@ -335,12 +429,16 @@ export const PROGRESS_TOOL_WORKFLOW_LINE =
 export const finalReportToolInstructions = (
   _formatId: string,
   formatFields: string
-): string => `#### agent__final_report - How to Deliver Your Final Answer
-- You MUST call 'agent__final_report' to provide your final answer to the user. All the content of your final report MUST be delivered using this tool.
-- Required fields:
+): string => `## How to Deliver Your Final Report/Answer to the User
+
+When your task is complete you MUST call the 'agent__final_report' tool to provide your final answer to the user.
+All the content of your final report MUST be delivered using this tool.
+
+Required fields:
 ${formatFields}
-- Include optional \`metadata\` only when explicitly relevant.
-- **CRITICAL:** The content of your final report MUST be delivered using this tool ONLY, not as part of your regular output.`;
+
+Include optional \`metadata\` only when explicitly relevant.
+**CRITICAL:** The content of your final report MUST be delivered using this tool ONLY, not as part of your regular output.`;
 
 /**
  * XML-based final_report instructions (for xml-final mode).
@@ -361,21 +459,23 @@ export const finalReportXmlInstructions = (
     : formatId === 'json'
       ? '{ ... your JSON here ... }'
       : '[Your final report/answer here]';
-  return `#### agent__final_report - How to Deliver Your Final Answer
+  return `
 
-**Format: ${formatId}** — ${formatDescription}
+## How to Deliver Your Final Report/Answer to the User
 
-Once your task is complete, provide your final report/answer using XML tags.
-${schemaBlock}
-**Example:**
+When your task is complete you MUST provide your final report/answer using XML tags as described below.
+
 \`\`\`
 <ai-agent-${slotId} tool="agent__final_report" format="${formatId}">
 ${exampleContent}
 </ai-agent-${slotId}>
 \`\`\`
 
-**CRITICAL: Final Report Checklist**
-When ready to provide your final report, verify:
+**Final Report/Answer Format**
+${formatId}** — ${formatDescription}
+${schemaBlock}
+
+**Final Report/Answer Checklist**
 - [ ] The opening XML tag \`<ai-agent-${slotId}\` MUST be first in your response
 - [ ] Your report content/payload matches the expected format (${formatId})
 - [ ] Your output MUST end with the closing XML tag \`</ai-agent-${slotId}>\`

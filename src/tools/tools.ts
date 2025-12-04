@@ -1075,7 +1075,7 @@ export class ToolsOrchestrator {
     if (external.length === 0 && internal === undefined) {
       return '';
     }
-    const sections: string[] = ['## Available Tools'];
+    const sections: string[] = ['## AVAILABLE TOOLS'];
     if (external.length > 0) {
       sections.push('### External Tools');
       sections.push(external.join('\n\n'));

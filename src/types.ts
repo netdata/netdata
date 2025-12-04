@@ -532,11 +532,19 @@ export interface AccountingFlushPayload {
   entries: AccountingEntry[];
 }
 
+export interface CallbackMeta {
+  agentId?: string;
+  callPath?: string;
+  sessionId?: string;
+  parentId?: string;
+  originId?: string;
+}
+
 // Session configuration and callbacks
 export interface AIAgentCallbacks {
   onLog?: (entry: LogEntry) => void;
-  onOutput?: (text: string) => void;
-  onThinking?: (text: string) => void;
+  onOutput?: (text: string, meta?: CallbackMeta) => void;
+  onThinking?: (text: string, meta?: CallbackMeta) => void;
   onTurnStarted?: (turn: number) => void;
   onAccounting?: (entry: AccountingEntry) => void;
   onSessionSnapshot?: (payload: SessionSnapshotPayload) => void | Promise<void>;

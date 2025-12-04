@@ -4,7 +4,7 @@ import path from 'node:path';
 import { URL } from 'node:url';
 
 import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
-import type { AccountingEntry, AIAgentCallbacks, LLMAccountingEntry, LogDetailValue, LogEntry, ProgressEvent, ProgressMetrics } from '../types.js';
+import type { AccountingEntry, AIAgentCallbacks, CallbackMeta, LLMAccountingEntry, LogDetailValue, LogEntry, ProgressEvent, ProgressMetrics } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 import type { Socket } from 'node:net';
 
@@ -687,9 +687,8 @@ export class AnthropicCompletionsHeadend implements Headend {
     const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
 
     const callbacks: AIAgentCallbacks = {
-      onOutput: (chunk, meta) => {
-        const agentId = meta?.agentId ?? agent.id;
-        if (agentId !== agent.id) return;
+      onOutput: (chunk, meta?: CallbackMeta) => {
+        if (meta?.agentId !== undefined && meta.agentId !== agent.id) return;
         output += chunk;
         if (streamed) {
           if (thinkingBlockOpen) closeThinkingBlock();
@@ -704,9 +703,8 @@ export class AnthropicCompletionsHeadend implements Headend {
           }
         }
       },
-      onThinking: (chunk, meta) => {
-        const agentId = meta?.agentId ?? agent.id;
-        if (agentId !== agent.id) return;
+      onThinking: (chunk, meta?: CallbackMeta) => {
+        if (meta?.agentId !== undefined && meta.agentId !== agent.id) return;
         if (chunk.length === 0) return;
         reasoning += chunk;
         // Don't call ensureHeader here - wait for progress event with txnId

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { URL } from 'node:url';
 
 import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
-import type { AccountingEntry, AIAgentCallbacks, LLMAccountingEntry, LogDetailValue, LogEntry, ProgressEvent, ProgressMetrics } from '../types.js';
+import type { AccountingEntry, AIAgentCallbacks, CallbackMeta, LLMAccountingEntry, LogDetailValue, LogEntry, ProgressEvent, ProgressMetrics } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 import type { Socket } from 'node:net';
 
@@ -698,10 +698,8 @@ export class OpenAICompletionsHeadend implements Headend {
     const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
 
     const baseCallbacks: AIAgentCallbacks = {
-      onOutput: (chunk, meta) => {
-        // Drop sub-agent output in streaming mode; only surface root agent
-        const agentId = meta?.agentId ?? agent.id;
-        if (agentId !== agent.id) return;
+      onOutput: (chunk, meta?: CallbackMeta) => {
+        if (meta?.agentId !== undefined && meta.agentId !== agent.id) return;
         output += chunk;
         if (streamed) {
           emitAssistantRole();
@@ -724,9 +722,8 @@ export class OpenAICompletionsHeadend implements Headend {
           }
         }
       },
-      onThinking: (chunk, meta) => {
-        const agentId = meta?.agentId ?? agent.id;
-        if (agentId !== agent.id) return;
+      onThinking: (chunk, meta?: CallbackMeta) => {
+        if (meta?.agentId !== undefined && meta.agentId !== agent.id) return;
         if (chunk.length === 0) return;
         // Don't call ensureHeader here - wait for progress event with txnId
         // Header will be created when thinking is flushed or progress event arrives
