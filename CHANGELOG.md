@@ -48,6 +48,11 @@
 - Mark vkalintiris as CODEOWNER for Rust code. ([#21385](https://github.com/netdata/netdata/issues/21385))
 - Update home-tab.md ([#21386](https://github.com/netdata/netdata/issues/21386))
 - Remove retention check during datafile initialization ([#21387](https://github.com/netdata/netdata/issues/21387))
+- Replace dots with slashes in OTEL metric families for hierarchical grouping ([#21371](https://github.com/netdata/netdata/issues/21371))
+- Create ingest dry run check ([#21152](https://github.com/netdata/netdata/issues/21152))
+- Ci: add concurrency to check-markdown.yml ([#21393](https://github.com/netdata/netdata/issues/21393))
+- Use systemd-tmpfiles to handle required directories at runtime when possible. ([#21243](https://github.com/netdata/netdata/issues/21243))
+- Improve check for DBENGINE max datafile size allowed ([#21390](https://github.com/netdata/netdata/issues/21390))
 
 ## [2.8.0] - 2025-11-19
 
