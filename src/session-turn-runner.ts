@@ -2917,7 +2917,10 @@ export class TurnRunner {
         // Set currentCtxTokens to expected BEFORE the request, so tool budget reservation
         // knows about this turn's consumption. Will be overwritten with actual after response.
         // Schema is already in currentCtxTokens after first turn (via cache_write/cache_read).
+        // IMPORTANT: Also zero out pending/new to avoid double-counting on retry if turn fails.
         this.currentCtxTokens = metricsForRequest.ctxTokens + metricsForRequest.newTokens;
+        this.pendingCtxTokens = 0;
+        this.newCtxTokens = 0;
         const turnMetadata: {
             attempt: number;
             maxAttempts: number;
