@@ -1,8 +1,8 @@
 # [[ entry.meta.name ]]
 
-{% if entry.keywords %}
+[% if entry.keywords %]
 Keywords: [[ entry.keywords | join(',  ') ]]
-{% endif %}
+[% endif %]
 
 [[ entry.overview.notification_description ]]
 [% if entry.overview.notification_limitations %]

@@ -3,9 +3,9 @@
 Plugin: [[ entry.meta.plugin_name ]]
 Module: [[ entry.meta.module_name ]]
 
-{% if entry.meta.keywords %}
+[% if entry.meta.keywords %]
 Keywords: [[ entry.meta.keywords | join(',  ') ]]
-{% endif %}
+[% endif %]
 
 ## Overview
 
