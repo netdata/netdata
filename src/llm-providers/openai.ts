@@ -48,8 +48,10 @@ export class OpenAIProvider extends BaseLLMProvider {
       const finalMessages = this.buildFinalTurnMessages(messages, request.isFinalTurn);
 
       const providerOptions = (() => {
-        const base: Record<string, unknown> = { openai: { toolChoice: 'required' } };
+        const resolvedToolChoice = this.resolveToolChoice(request);
+        const base: Record<string, unknown> = { openai: {} };
         const o = (base.openai as Record<string, unknown>);
+        if (resolvedToolChoice !== undefined) o.toolChoice = resolvedToolChoice;
         if (typeof request.maxOutputTokens === 'number' && Number.isFinite(request.maxOutputTokens)) o.maxTokens = Math.trunc(request.maxOutputTokens);
         if (typeof request.repeatPenalty === 'number' && Number.isFinite(request.repeatPenalty)) o.frequencyPenalty = request.repeatPenalty;
         if (request.reasoningValue !== undefined && request.reasoningValue !== null) {

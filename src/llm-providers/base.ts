@@ -107,7 +107,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
   }
 
   protected shouldForceToolChoice(_request: TurnRequest): boolean {
-    return true;
+    return false;
   }
 
   protected resolveToolChoice(request: TurnRequest): 'auto' | 'required' | undefined {
