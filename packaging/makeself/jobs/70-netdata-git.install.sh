@@ -28,12 +28,16 @@ export RUSTFLAGS="-C target-feature=+crt-static"
 
 case "${BUILDARCH}" in
     armv6l)
-        export NETDATA_CMAKE_OPTIONS="-DSTATIC_BUILD=On -DENABLE_LIBBACKTRACE=On"
-        export INSTALLER_ARGS="--disable-plugin-systemd-journal --disable-plugin-otel"
+        export NETDATA_CMAKE_OPTIONS="-DSTATIC_BUILD=On -DENABLE_LIBBACKTRACE=On -DENABLE_NETDATA_INTERNAL_JOURNAL_FILE_READER=Off"
+        export INSTALLER_ARGS="--disable-plugin-otel"
+        ;;
+    armv7l)
+        export NETDATA_CMAKE_OPTIONS="-DSTATIC_BUILD=On -DENABLE_LIBBACKTRACE=On -DENABLE_NETDATA_INTERNAL_JOURNAL_FILE_READER=Off"
+        export INSTALLER_ARGS="--enable-plugin-otel"
         ;;
     *)
         export NETDATA_CMAKE_OPTIONS="-DSTATIC_BUILD=On -DENABLE_LIBBACKTRACE=On"
-        export INSTALLER_ARGS="--enable-plugin-systemd-journal --internal-systemd-journal --enable-plugin-otel"
+        export INSTALLER_ARGS="--enable-plugin-otel"
         ;;
 esac
 
