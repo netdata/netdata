@@ -37,7 +37,7 @@ func (sc *scalarCollector) collect(prof *ddsnmp.Profile, stats *ddsnmp.Collectio
 
 	if len(missingOIDs) > 0 {
 		sc.log.Debugf("scalar metrics missing OIDs: %v", missingOIDs)
-		stats.Errors.MissingOIDs += len(missingOIDs)
+		stats.Errors.MissingOIDs += int64(len(missingOIDs))
 	}
 
 	if len(oids) == 0 {
@@ -84,7 +84,7 @@ func (sc *scalarCollector) getScalarValues(oids []string, stats *ddsnmp.Collecti
 	maxOids := sc.snmpClient.MaxOids()
 
 	for chunk := range slices.Chunk(oids, maxOids) {
-		stats.SNMP.GetOIDs += len(chunk)
+		stats.SNMP.GetOIDs += int64(len(chunk))
 		stats.SNMP.GetRequests++
 
 		result, err := sc.snmpClient.Get(chunk)

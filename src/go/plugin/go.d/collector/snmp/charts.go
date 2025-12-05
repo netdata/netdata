@@ -190,6 +190,8 @@ func (c *Collector) removeProfileTableMetricChart(key string) {
 	}
 }
 
+func (c *Collector) addProfileStatsCharts(name string) {}
+
 func (c *Collector) chartBaseLabels() map[string]string {
 	si := c.sysInfo
 

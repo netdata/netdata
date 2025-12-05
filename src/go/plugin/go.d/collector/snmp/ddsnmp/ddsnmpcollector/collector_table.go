@@ -289,7 +289,7 @@ func (tc *tableCollector) processWalkResults(walkResults []tableWalkResult, stat
 		metrics = append(metrics, tableMetrics...)
 		tablesSeen[result.tableOID] = true
 	}
-	stats.Metrics.Tables = len(tablesSeen)
+	stats.Metrics.Tables = int64(len(tablesSeen))
 
 	if len(metrics) == 0 && len(errs) > 0 {
 		return nil, errors.Join(errs...)
@@ -337,7 +337,7 @@ func (tc *tableCollector) processTableResult(result tableWalkResult, walkedData 
 			tableNameToOID: tableNameToOID,
 		}
 		metrics, err := tc.processTableData(ctx, stats)
-		stats.Metrics.Rows += len(ctx.rows)
+		stats.Metrics.Rows += int64(len(ctx.rows))
 		return metrics, err
 	}
 
@@ -367,7 +367,7 @@ func (tc *tableCollector) tryCollectFromCache(cfg ddprofiledefinition.MetricsCon
 		return nil
 	}
 
-	stats.Metrics.Rows += len(cachedOIDs)
+	stats.Metrics.Rows += int64(len(cachedOIDs))
 	tc.log.Debugf("Successfully collected table %s using cache", cfg.Table.Name)
 	return metrics
 }
@@ -583,7 +583,7 @@ func (tc *tableCollector) snmpWalk(oid string, stats *ddsnmp.CollectionStats) (m
 		return nil, err
 	}
 
-	stats.SNMP.WalkPDUs += len(resp)
+	stats.SNMP.WalkPDUs += int64(len(resp))
 
 	for _, pdu := range resp {
 		if isPduWithData(pdu) {
@@ -605,7 +605,7 @@ func (tc *tableCollector) snmpGet(oids []string, stats *ddsnmp.CollectionStats) 
 
 	for chunk := range slices.Chunk(oids, tc.snmpClient.MaxOids()) {
 		stats.SNMP.GetRequests++
-		stats.SNMP.GetOIDs += len(chunk)
+		stats.SNMP.GetOIDs += int64(len(chunk))
 
 		result, err := tc.snmpClient.Get(chunk)
 		if err != nil {
