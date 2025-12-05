@@ -36,7 +36,7 @@ Example row in `map.csv`:
 
 ```csv
 custom_edit_url,sidebar_label,learn_status,learn_rel_path,keywords,description
-https://github.com/netdata/netdata/edit/master/docs/installation/linux.md,Linux,Published,"Netdata Agent/Installation/Linux","[install]","How to install Netdata Agent on Linux"
+https://github.com/netdata/netdata/edit/master/docs/installation/linux.md,Linux,Published,"Netdata Agent/Installation/Linux","install,linux","How to install Netdata Agent on Linux"
 ```
 
 ### 2. Test the Changes
