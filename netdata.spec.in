@@ -3137,7 +3137,6 @@ Requires(pre): %{name}-user >= %{version}
 %defattr(0750,root,netdata,0750)
 # CAP_DAC_READ_SEARCH required for reading journal files.
 %caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/journal-viewer-plugin
-%config(noreplace) %{_libdir}/%{name}/conf.d/journal-viewer.yml
 
 %if 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 %package plugin-systemd-units
