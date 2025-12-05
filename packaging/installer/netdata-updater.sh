@@ -1163,19 +1163,6 @@ update_binpkg() {
   # shellcheck disable=SC2086
   env ${env} ${pm_cmd} ${upgrade_subcmd} ${pkg_install_opts} netdata >&3 2>&3 || fatal "Failed to update Netdata package." U000F
 
-  if ${pkg_installed_check} systemd > /dev/null 2>&1; then
-    if [ "${NETDATA_NO_SYSTEMD_JOURNAL}" -eq 0 ]; then
-      if ! ${pkg_installed_check} netdata-plugin-systemd-journal > /dev/null 2>&1; then
-        env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} netdata-plugin-systemd-journal >&3 2>&3
-
-        if [ -n "${mark_auto_cmd}" ]; then
-          # shellcheck disable=SC2086
-          env ${env} ${mark_auto_cmd} netdata-plugin-systemd-journal >&3 2>&3
-        fi
-      fi
-    fi
-  fi
-
   current_version="$(get_current_version)"
   latest_version="$(get_latest_version)"
 
