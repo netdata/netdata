@@ -1789,11 +1789,6 @@ try_package_install() {
 
   if ! check_special_native_deps; then
     warning "Could not find secondary dependencies for ${DISTRO} on ${SYSARCH}."
-    if [ -z "${NO_CLEANUP}" ]; then
-      progress "Attempting to uninstall repository configuration package."
-      # shellcheck disable=SC2086
-      run_as_root env ${env} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
-    fi
     return 2
   fi
 
