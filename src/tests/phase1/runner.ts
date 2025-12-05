@@ -318,12 +318,10 @@ const SESSIONS_SUBDIR = 'sessions';
 const BILLING_FILENAME = 'billing.jsonl';
 const THRESHOLD_BUFFER_TOKENS = 8;
 const THRESHOLD_MAX_OUTPUT_TOKENS = 32;
-const THRESHOLD_CONTEXT_WINDOW_BELOW = 980;
-// Tuned so projected tokens land exactly at the limit given current prompt/instruction length.
-// limit = contextWindow - buffer - maxOutput = 861 - 8 - 32 = 821 (matches projected)
-const THRESHOLD_CONTEXT_WINDOW_EQUAL = 861;
-// Tuned so projected tokens exceed the limit with current prompt length.
-const THRESHOLD_CONTEXT_WINDOW_ABOVE = 726;
+// Prompt + instructions currently estimate to ~556 tokens (ctx + new, schema excluded from projection).
+const THRESHOLD_CONTEXT_WINDOW_BELOW = 620; // limit = 620 - 8 - 32 = 580 (> projected)
+const THRESHOLD_CONTEXT_WINDOW_EQUAL = 596; // limit = 556 (matches projected)
+const THRESHOLD_CONTEXT_WINDOW_ABOVE = 580; // limit = 540 (< projected)
 const PREFLIGHT_CONTEXT_WINDOW = 80;
 const PREFLIGHT_BUFFER_TOKENS = 8;
 const PREFLIGHT_MAX_OUTPUT_TOKENS = 16;
@@ -1772,7 +1770,15 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         console.log('llm-context-metrics accounting:', JSON.stringify(result.accounting, null, 2));
         console.log('llm-context-metrics conversation:', JSON.stringify(result.conversation, null, 2));
       }
-      const metricsLog = requestLogs.slice().reverse().find((entry) => typeof entry.message === 'string' && entry.message.includes('[tokens: ctx '));
+      const metricsLog = requestLogs.slice().reverse().find((entry) =>
+        entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`
+        && logHasDetail(entry, 'ctx_tokens')
+        && logHasDetail(entry, 'new_tokens')
+        && logHasDetail(entry, 'schema_tokens')
+        && logHasDetail(entry, 'expected_tokens')
+        && logHasDetail(entry, 'context_window')
+        && logHasDetail(entry, 'context_pct')
+      );
       invariant(metricsLog !== undefined, 'Context metrics request log missing for run-test-llm-context-metrics.');
       invariant(metricsLog.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`, 'Unexpected remoteIdentifier for context metrics request log.');
 
@@ -1783,7 +1789,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const schemaTokens = expectLogDetailNumber(metricsLog, 'schema_tokens', 'schema_tokens detail missing for run-test-llm-context-metrics.');
       invariant(schemaTokens > 0, 'schema_tokens should be positive for run-test-llm-context-metrics.');
       const expectedTokens = expectLogDetailNumber(metricsLog, 'expected_tokens', 'expected_tokens detail missing for run-test-llm-context-metrics.');
-      invariant(expectedTokens === ctxTokens + newTokens + schemaTokens, 'expected_tokens should equal ctx + new + schema for run-test-llm-context-metrics.');
+      invariant(expectedTokens === ctxTokens + newTokens, 'expected_tokens should equal ctx + new for run-test-llm-context-metrics.');
       const contextWindow = expectLogDetailNumber(metricsLog, 'context_window', 'context_window detail missing for run-test-llm-context-metrics.');
       invariant(contextWindow === 2048, 'context_window detail should match configured window for run-test-llm-context-metrics.');
       const contextPct = expectLogDetailNumber(metricsLog, 'context_pct', 'context_pct detail missing for run-test-llm-context-metrics.');
@@ -2272,7 +2278,15 @@ if (process.env.CONTEXT_DEBUG === 'true') {
 
       const requestLogs = result.logs.filter((entry) => entry.type === 'llm' && entry.direction === 'request');
       invariant(requestLogs.length > 0, 'LLM request logs expected for context_guard__llm_metrics_logging.');
-      const metricsLog = requestLogs.find((entry) => typeof entry.message === 'string' && entry.message.includes('[tokens: ctx '));
+      const metricsLog = requestLogs.find((entry) =>
+        entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`
+        && logHasDetail(entry, 'ctx_tokens')
+        && logHasDetail(entry, 'new_tokens')
+        && logHasDetail(entry, 'schema_tokens')
+        && logHasDetail(entry, 'expected_tokens')
+        && logHasDetail(entry, 'context_window')
+        && logHasDetail(entry, 'context_pct')
+      );
       invariant(metricsLog !== undefined, 'Context metrics request log missing for context_guard__llm_metrics_logging.');
       invariant(metricsLog.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`, 'Unexpected remoteIdentifier for context metrics request log.');
 
@@ -2286,7 +2300,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const schemaTokens = expectLogDetailNumber(metricsLog, 'schema_tokens', 'schema_tokens detail missing for context_guard__llm_metrics_logging.');
       invariant(schemaTokens > 0, 'schema_tokens should be positive for context_guard__llm_metrics_logging.');
       const expectedTokens = expectLogDetailNumber(metricsLog, 'expected_tokens', 'expected_tokens detail missing for context_guard__llm_metrics_logging.');
-      invariant(expectedTokens === ctxTokens + newTokens + schemaTokens, 'expected_tokens should equal ctx + new + schema for context_guard__llm_metrics_logging.');
+      invariant(expectedTokens === ctxTokens + newTokens, 'expected_tokens should equal ctx + new for context_guard__llm_metrics_logging.');
       const contextWindow = expectLogDetailNumber(metricsLog, 'context_window', 'context_window detail missing for context_guard__llm_metrics_logging.');
       invariant(contextWindow === 2048, 'context_window detail should match configured window for context_guard__llm_metrics_logging.');
       const contextPct = expectLogDetailNumber(metricsLog, 'context_pct', 'context_pct detail missing for context_guard__llm_metrics_logging.');
@@ -2466,7 +2480,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const newTokens = expectLogDetailNumber(firstRequestLog, 'new_tokens', 'new_tokens detail missing for context_guard__init_counters_from_history.');
       const expectedTokens = expectLogDetailNumber(firstRequestLog, 'expected_tokens', 'expected_tokens detail missing for context_guard__init_counters_from_history.');
 
-      invariant(expectedTokens === ctxTokens + schemaTokens + newTokens, 'expected_tokens should equal ctx + schema + new for context_guard__init_counters_from_history.');
+      invariant(schemaTokens >= 0, 'schema_tokens should be non-negative for context_guard__init_counters_from_history.');
+      invariant(expectedTokens === ctxTokens + newTokens, 'expected_tokens should equal ctx + new for context_guard__init_counters_from_history.');
       invariant(ctxTokens === 0, 'ctx_tokens should be zero before the first LLM attempt for context_guard__init_counters_from_history.');
 
       const firstUserIndex = result.conversation.findIndex((message) => message.role === 'user');
@@ -2586,7 +2601,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       } else {
         invariant(Math.abs(newTokens - toolTokens) <= newTokenTolerance, `Pending context tokens should equal tool token estimate (expected ~${String(toolTokens)}, got ${String(newTokens)}).`);
       }
-      invariant(expectedAfter === ctxAfter + schemaAfter + newTokens, 'expected_tokens should equal ctx + schema + new for run-test-context-token-double-count.');
+      invariant(schemaAfter >= 0, 'schema_tokens should be non-negative for run-test-context-token-double-count.');
+      invariant(expectedAfter === ctxAfter + newTokens, 'expected_tokens should equal ctx + new for run-test-context-token-double-count.');
 
     },
   },
