@@ -227,7 +227,8 @@ export class SessionToolExecutor {
             managed.result.length > 0
               ? managed.result
               : TOOL_NO_OUTPUT;
-          const toolOutput = this.applyToolResponseCap !== undefined
+          // Batch tool is a container - inner tools already get capped individually, don't cap the container
+          const toolOutput = (this.applyToolResponseCap !== undefined && !isBatchTool)
             ? this.applyToolResponseCap(uncappedToolOutput, { server: providerLabel, tool: effectiveToolName, turn, subturn: subturnCounter })
             : uncappedToolOutput;
           const callId =

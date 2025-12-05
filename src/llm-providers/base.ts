@@ -1336,17 +1336,30 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       }
     } catch (e) { try { warn(`fetch finalization failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
     
+    // Capture ALL stream errors (not just closed stream) so we can provide better diagnostics
+    // when NoOutputGeneratedError is thrown. The SDK's default onError just logs to console.
+    // Declared outside try so it's accessible in catch block.
+    let capturedStreamError: Error | undefined;
+    const captureStreamError = (error: unknown): void => {
+      // Keep the first error (usually the root cause)
+      if (capturedStreamError !== undefined) return;
+      if (error instanceof Error) {
+        capturedStreamError = error;
+      } else {
+        // Serialize objects properly - SDK passes { error: ... } wrapper
+        try {
+          capturedStreamError = new Error(JSON.stringify(error));
+        } catch {
+          capturedStreamError = new Error(String(error));
+        }
+      }
+    };
+
     try {
       let stopReason: string | undefined;
-      
+
       const toolChoice = this.resolveToolChoice(request);
       this.traceSdkPayload(request, 'request', messages);
-      let suppressedClosedStreamError: Error | undefined;
-      const captureClosedStreamError = (error: unknown): void => {
-        if (BaseLLMProvider.isClosedStreamControllerError(error)) {
-          suppressedClosedStreamError = error instanceof Error ? error : new Error(String(error));
-        }
-      };
       const result = streamText({
         model,
         messages,
@@ -1360,8 +1373,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         ...(request.repeatPenalty !== null ? { frequencyPenalty: request.repeatPenalty } : {}),
         providerOptions: providerOptions as never,
         abortSignal: controller.signal,
-        onError: (err) => { captureClosedStreamError(err); },
-        onAbort: (err) => { captureClosedStreamError(err); },
+        onError: (err) => { captureStreamError(err); },
+        onAbort: (err) => { captureStreamError(err); },
       });
 
       // Drain both text and reasoning streams with real-time callbacks
@@ -1418,7 +1431,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         try {
           return await promise;
         } catch (err) {
-          captureClosedStreamError(err);
+          captureStreamError(err);
           if (BaseLLMProvider.isClosedStreamControllerError(err)) return undefined;
           throw err;
         }
@@ -1492,8 +1505,9 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       } catch { /* ignore metadata errors */ }
       const latencyMs = Date.now() - startTime;
 
-      if (suppressedClosedStreamError !== undefined) {
-        warn(`streamText closed controller recovered: ${suppressedClosedStreamError.message}`);
+      // Log if we captured a stream error that was recovered from (closed controller, etc.)
+      if (capturedStreamError !== undefined && BaseLLMProvider.isClosedStreamControllerError(capturedStreamError)) {
+        warn(`streamText closed controller recovered: ${capturedStreamError.message}`);
       }
 
       // Debug: log the raw response structure
@@ -1618,7 +1632,23 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     } catch (error) {
       const timedOut = didTimeout();
       clearIdle();
-      let failure = this.mapError(error);
+      // If we caught NoOutputGeneratedError but have a captured stream error, use that for better diagnostics
+      // The SDK throws NoOutputGeneratedError without preserving the underlying provider error
+      let errorForMapping = error;
+      if (capturedStreamError !== undefined) {
+        // Attach the captured error as cause so mapError can extract HTTP status, provider message, etc.
+        const enhancedError = new Error(
+          `${error instanceof Error ? error.message : String(error)} [underlying: ${capturedStreamError.message}]`
+        );
+        (enhancedError as { cause?: unknown }).cause = capturedStreamError;
+        (enhancedError as { name?: string }).name = error instanceof Error ? error.name : 'Error';
+        // Copy any additional properties from original error
+        if (error instanceof Error) {
+          Object.assign(enhancedError, error);
+        }
+        errorForMapping = enhancedError;
+      }
+      let failure = this.mapError(errorForMapping);
       if (timedOut) {
         failure = { type: 'timeout', message: 'Streaming timed out while waiting for the next chunk.' };
       }

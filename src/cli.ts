@@ -1983,6 +1983,7 @@ function buildPromptVariables(maxTurns: number): Record<string, string> {
   const now = new Date();
   return {
     DATETIME: formatRFC3339Local(now),
+    TIMESTAMP: String(Math.floor(now.getTime() / 1000)),
     DAY: now.toLocaleDateString(undefined, { weekday: 'long' }),
     TIMEZONE: detectTimezone(),
     MAX_TURNS: String(maxTurns),

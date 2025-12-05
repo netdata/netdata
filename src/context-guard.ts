@@ -60,7 +60,7 @@ export interface ContextGuardConfig {
 
 export class ContextGuard {
   static readonly DEFAULT_CONTEXT_WINDOW_TOKENS = 131072;
-  static readonly DEFAULT_CONTEXT_BUFFER_TOKENS = 256;
+  static readonly DEFAULT_CONTEXT_BUFFER_TOKENS = 8192;
 
   private readonly targets: TargetContextConfig[];
   private readonly defaultContextWindow: number;
@@ -401,6 +401,8 @@ export class ContextGuard {
             }
             return { ok: false as const, tokens, reason: 'token_budget_exceeded' };
           }
+          // Accumulate tokens so subsequent tool reservations see the updated context
+          this.newCtxTokens += tokens;
           return { ok: true as const, tokens };
         });
       },
