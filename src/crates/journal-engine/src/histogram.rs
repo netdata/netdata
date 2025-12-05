@@ -514,7 +514,7 @@ impl HistogramEngine {
 
         // Create iterator to fetch/compute file indexes
         let bucket_duration = bucket_requests.first().unwrap().duration();
-        let source_timestamp_field = FieldName::new_unchecked("__REALTIME_TIMESTAMP");
+        let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
         let time_budget = Duration::from_secs(10); // TODO: Make configurable
 
         // Build file index keys
