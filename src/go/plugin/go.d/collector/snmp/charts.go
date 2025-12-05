@@ -66,6 +66,115 @@ func (c *Collector) addPingCharts() {
 	}
 }
 
+var (
+	profileStatsChartsTmpl = module.Charts{
+		profileStatsTimingsChartTmpl.Copy(),
+		profileStatsSnmpChartTmpl.Copy(),
+		profileStatsMetricsChartTmpl.Copy(),
+		profileStatsTableCacheChartTmpl.Copy(),
+		profileStatsErrorsChartTmpl.Copy(),
+	}
+
+	profileStatsTimingsChartTmpl = module.Chart{
+		ID:       "snmp_device_prof_%s_stats_timings",
+		Title:    "SNMP profile collection timings",
+		Units:    "milliseconds",
+		Fam:      "Internal/Stats",
+		Ctx:      "snmp.device_prof_stats_timings",
+		Priority: prioProfileChart,
+		Dims: module.Dims{
+			{ID: "snmp_device_prof_%s_stats_timings_scalar", Name: "scalar"},
+			{ID: "snmp_device_prof_%s_stats_timings_table", Name: "table"},
+			{ID: "snmp_device_prof_%s_stats_timings_virtual", Name: "virtual"},
+		},
+	}
+
+	profileStatsSnmpChartTmpl = module.Chart{
+		ID:       "snmp_device_prof_%s_stats_snmp",
+		Title:    "SNMP profile operations",
+		Units:    "operations",
+		Fam:      "Internal/Stats",
+		Ctx:      "snmp.device_prof_stats_snmp",
+		Priority: prioProfileChart,
+		Dims: module.Dims{
+			{ID: "snmp_device_prof_%s_stats_snmp_get_requests", Name: "get_requests"},
+			{ID: "snmp_device_prof_%s_stats_snmp_get_oids", Name: "get_oids"},
+			{ID: "snmp_device_prof_%s_stats_snmp_walk_requests", Name: "walk_requests"},
+			{ID: "snmp_device_prof_%s_stats_snmp_walk_pdus", Name: "walk_pdus"},
+			{ID: "snmp_device_prof_%s_stats_snmp_tables_walked", Name: "tables_walked"},
+			{ID: "snmp_device_prof_%s_stats_snmp_tables_cached", Name: "tables_cached"},
+		},
+	}
+
+	profileStatsMetricsChartTmpl = module.Chart{
+		ID:       "snmp_device_prof_%s_stats_metrics",
+		Title:    "SNMP profile metric counts",
+		Units:    "metrics",
+		Fam:      "Internal/Stats",
+		Ctx:      "snmp.device_prof_stats_metrics",
+		Priority: prioProfileChart,
+		Dims: module.Dims{
+			{ID: "snmp_device_prof_%s_stats_metrics_scalar", Name: "scalar"},
+			{ID: "snmp_device_prof_%s_stats_metrics_table", Name: "table"},
+			{ID: "snmp_device_prof_%s_stats_metrics_virtual", Name: "virtual"},
+			{ID: "snmp_device_prof_%s_stats_metrics_tables", Name: "tables"},
+			{ID: "snmp_device_prof_%s_stats_metrics_rows", Name: "rows"},
+		},
+	}
+
+	profileStatsTableCacheChartTmpl = module.Chart{
+		ID:       "snmp_device_prof_%s_stats_table_cache",
+		Title:    "SNMP profile table cache",
+		Units:    "tables",
+		Fam:      "Internal/Stats",
+		Ctx:      "snmp.device_prof_stats_table_cache",
+		Priority: prioProfileChart,
+		Dims: module.Dims{
+			{ID: "snmp_device_prof_%s_stats_table_cache_hits", Name: "hits"},
+			{ID: "snmp_device_prof_%s_stats_table_cache_misses", Name: "misses"},
+		},
+	}
+
+	profileStatsErrorsChartTmpl = module.Chart{
+		ID:       "snmp_device_prof_%s_stats_errors",
+		Title:    "SNMP profile errors",
+		Units:    "errors",
+		Fam:      "Internal/Stats",
+		Ctx:      "snmp.device_prof_stats_errors",
+		Priority: prioProfileChart,
+		Dims: module.Dims{
+			{ID: "snmp_device_prof_%s_stats_errors_snmp", Name: "snmp"},
+			{ID: "snmp_device_prof_%s_stats_errors_processing_scalar", Name: "processing_scalar"},
+			{ID: "snmp_device_prof_%s_stats_errors_processing_table", Name: "processing_table"},
+		},
+	}
+)
+
+func (c *Collector) addProfileStatsCharts(name string) {
+	if name == "" {
+		return
+	}
+
+	charts := profileStatsChartsTmpl.Copy()
+
+	labels := c.chartBaseLabels()
+	labels["profile"] = name
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, name)
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, name)
+		}
+		for k, v := range labels {
+			chart.Labels = append(chart.Labels, module.Label{Key: k, Value: v})
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add profile stats charts for %s: %v", name, err)
+	}
+}
+
 func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
 	if m.Name == "" {
 		return
@@ -189,8 +298,6 @@ func (c *Collector) removeProfileTableMetricChart(key string) {
 		chart.MarkNotCreated()
 	}
 }
-
-func (c *Collector) addProfileStatsCharts(name string) {}
 
 func (c *Collector) chartBaseLabels() map[string]string {
 	si := c.sysInfo
