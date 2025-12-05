@@ -193,8 +193,17 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL)
         GIT_TAG f3b91559efca32c6b54837866ef35ba98ff5b2ca # stable/v0.5
     )
     FetchContent_MakeAvailable(Corrosion)
-    corrosion_import_crate(MANIFEST_PATH src/crates/Cargo.toml
-                           CRATES otel-plugin journal-viewer-plugin)
+
+    if(ENABLE_NETDATA_JOURNAL_FILE_READER AND ENABLE_PLUGIN_OTEL)
+        corrosion_import_crate(MANIFEST_PATH src/crates/Cargo.toml
+                               CRATES journal-viewer-plugin otel-plugin)
+    elseif(ENABLE_NETDATA_JOURNAL_FILE_READER)
+        corrosion_import_crate(MANIFEST_PATH src/crates/Cargo.toml
+                               CRATES journal-viewer-plugin)
+    elseif(ENABLE_PLUGIN_OTEL)
+        corrosion_import_crate(MANIFEST_PATH src/crates/Cargo.toml
+                               CRATES otel-plugin)
+    endif()
 endif()
 
 option(ENABLE_MIMALLOC "Enable mimalloc allocator" OFF)
