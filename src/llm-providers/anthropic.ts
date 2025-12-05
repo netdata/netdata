@@ -168,7 +168,7 @@ export class AnthropicProvider extends BaseLLMProvider {
     return super.shouldForceToolChoice(request);
   }
 
-  public override shouldDisableReasoning(context: { conversation: ConversationMessage[]; currentTurn: number; expectSignature: boolean }): { disable: boolean; normalized: ConversationMessage[] } {
+  public override shouldDisableReasoning(context: { conversation: ConversationMessage[]; currentTurn: number; attempt: number; expectSignature: boolean }): { disable: boolean; normalized: ConversationMessage[] } {
     if (context.currentTurn <= 1 || !context.expectSignature) {
       return { disable: false, normalized: context.conversation };
     }

@@ -102,7 +102,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     return false;
   }
 
-  public shouldDisableReasoning(_context: { conversation: ConversationMessage[]; currentTurn: number; expectSignature: boolean }): { disable: boolean; normalized: ConversationMessage[] } {
+  public shouldDisableReasoning(_context: { conversation: ConversationMessage[]; currentTurn: number; attempt: number; expectSignature: boolean }): { disable: boolean; normalized: ConversationMessage[] } {
     return { disable: false, normalized: _context.conversation };
   }
 

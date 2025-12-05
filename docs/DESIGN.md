@@ -103,6 +103,7 @@ interface ToolResult {
    - Receives `TurnResult` with clear status
    - Makes decisions on retries/provider switching based on status
    - Calls **mcp-client.ts** for tool execution when needed
+   - A turn is successful only when an accepted/valid final report is produced or at least one non-progress/batch tool is executed; otherwise it fails and does not advance. Retry exhaustion fails the session immediately with one ERR log and a synthetic session report.
 
 2. **llm-client.ts** handles single turns:
    - Uses **llm-providers/** for provider-specific operations

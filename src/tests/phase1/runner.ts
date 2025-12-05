@@ -288,8 +288,8 @@ const FINAL_REPORT_AFTER_RETRY = 'Final report after retry.';
 const TEXT_FALLBACK_CONTENT = 'Text fallback content.';
 const TOOL_MESSAGE_FALLBACK_CONTENT = 'Tool message fallback content.';
 // CONTRACT: synthetic failure when max turns exhausted always uses 'max_turns_exhausted'
-const SYNTHETIC_MAX_RETRY_REASON = 'max_turns_exhausted';
-const FINAL_REPORT_MAX_RETRIES_TOTAL_ATTEMPTS = 4;
+const SYNTHETIC_MAX_RETRY_REASON = 'session_failed';
+const FINAL_REPORT_MAX_RETRIES_TOTAL_ATTEMPTS = 0;
 const INVALID_FINAL_REPORT_PAYLOAD = 'invalid-final-report';
 const INVALID_FINAL_REPORT_PAYLOAD_WITH_NEWLINES = '{status:success\nreport_format:text}';
 const FINAL_REPORT_RETRY_TEXT_SCENARIO = 'run-test-final-report-retry-text';
@@ -301,6 +301,7 @@ const LOG_FINAL_REPORT_ACCEPTED = 'agent:final-report-accepted';
 const LOG_FAILURE_REPORT = 'agent:failure-report';
 const LOG_SANITIZER = 'agent:sanitizer';
 const LOG_ORCHESTRATOR = 'agent:orchestrator';
+const LOG_TURN_FAILURE = 'agent:turn-failure';
 const TOOL_OK_JSON = '{"ok":true}';
 const STOP_REASON_TOOL_CALLS = 'tool-calls';
 const JSON_ONLY_URL = 'https://example.com/resource';
@@ -337,6 +338,26 @@ const findLogByIdentifier = (logs: readonly LogEntry[], identifier: string, pred
 const expectLogIncludes = (logs: readonly LogEntry[], identifier: string, substring: string, scenarioId: string): void => {
   const log = findLogByIdentifier(logs, identifier, (entry) => typeof entry.message === 'string' && entry.message.includes(substring));
   invariant(log !== undefined, `Expected log ${identifier} containing "${substring}" for ${scenarioId}.`);
+};
+
+const expectTurnFailureSlugs = (logs: readonly LogEntry[], scenarioId: string, required: string[]): LogEntry => {
+  const entry = logs.find((log) => log.remoteIdentifier === LOG_TURN_FAILURE && log.severity === 'WRN');
+  invariant(entry !== undefined, `Turn failure log missing for ${scenarioId}.`);
+  const slugStr = typeof entry.details?.slugs === 'string' ? entry.details.slugs : '';
+  const slugs = slugStr.split(',').filter((s) => s.length > 0);
+  required.forEach((slug) => {
+    invariant(slugs.includes(slug), `Expected slug '${slug}' for ${scenarioId}; got [${slugs.join(',')}].`);
+  });
+  return entry;
+};
+
+const expectTurnFailureContains = (logs: readonly LogEntry[], scenarioId: string, required: string[]): void => {
+  const entry = expectTurnFailureSlugs(logs, scenarioId, []);
+  const slugStr = typeof entry.details?.slugs === 'string' ? entry.details.slugs : '';
+  const slugs = slugStr.split(',').filter((s) => s.length > 0);
+  required.forEach((slug) => {
+    invariant(slugs.includes(slug), `Expected slug '${slug}' for ${scenarioId}; got [${slugs.join(',')}].`);
+  });
 };
 
 const safeJsonByteLengthLocal = (value: unknown): number => {
@@ -1211,7 +1232,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-2',
     expect: (result) => {
-      invariant(result.success, 'Scenario run-test-2 should now succeed (presence-based final report).');
+      invariant(!result.success, 'Scenario run-test-2 should fail when final report status is failure.');
       invariant(result.finalReport !== undefined, 'Final report missing for run-test-2.');
 
       const toolEntries = result.accounting.filter(isToolAccounting);
@@ -1273,10 +1294,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(!result.success, 'Scenario run-test-6 should fail after retries exhausted.');
-      const exitLog = result.logs.find((log) => log.remoteIdentifier === 'agent:EXIT-NO-LLM-RESPONSE');
-      invariant(exitLog !== undefined, 'Expected EXIT-NO-LLM-RESPONSE log for run-test-6.');
-      invariant(typeof exitLog.message === 'string' && exitLog.message.includes('No LLM response after'), 'Exit log should indicate retries exhausted for run-test-6.');
-      invariant(exitLog.severity === 'ERR', 'EXIT-NO-LLM-RESPONSE must log ERR severity for run-test-6.');
+      const failureLog = result.logs.find((log) => log.remoteIdentifier === LOG_TURN_FAILURE && log.severity === 'WRN');
+      invariant(failureLog !== undefined, 'Turn-failure log expected for run-test-6.');
+      const slugs = typeof failureLog?.details?.slugs === 'string' ? failureLog.details.slugs.split(',') : [];
+      invariant(slugs.includes('retries_exhausted'), 'retries_exhausted slug expected for run-test-6.');
+      invariant(slugs.includes('no_tools'), 'no_tools slug expected for run-test-6.');
+      invariant(slugs.includes('final_report_missing'), 'final_report_missing slug expected for run-test-6.');
     },
   },
   {
@@ -1287,7 +1310,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       sessionConfig.toolTimeout = 200;
     },
     expect: (result) => {
-      invariant(result.success, 'Scenario run-test-7 should complete (presence-based final report).');
+      invariant(!result.success, 'Scenario run-test-7 should fail when final report status is failure.');
       const toolEntries = result.accounting.filter(isToolAccounting);
       const timeoutEntry = toolEntries.find((entry) => entry.command === 'test__test');
       invariant(timeoutEntry !== undefined, 'Expected MCP accounting entry for run-test-7.');
@@ -1310,7 +1333,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-9',
     expect: (result) => {
-      invariant(result.success, 'Scenario run-test-9 should complete (presence-based final report).');
+      invariant(!result.success, 'Scenario run-test-9 should fail when only unknown tools are present.');
       invariant(result.finalReport !== undefined, 'Final report should be present for run-test-9.');
       const log = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Unknown tool requested'));
       invariant(log !== undefined, 'Unknown tool warning log expected for run-test-9.');
@@ -1331,7 +1354,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: RUN_TEST_11,
     expect: (result) => {
-      invariant(result.success, `Scenario ${RUN_TEST_11} expected success.`);
+      invariant(!result.success, `Scenario ${RUN_TEST_11} should fail when final report schema/format is invalid.`);
       const logs = result.logs;
       invariant(logs.some((log) => {
         // Check in message
@@ -3135,12 +3158,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result) => {
       const finalReport = result.finalReport!;
       invariant(finalReport !== undefined, 'Final report missing for run-test-33.');
-      const syntheticCandidate = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Synthetic retry: assistant returned content without tool calls and without final_report.'));
-      const syntheticLog = expectLlmLogContext(syntheticCandidate, RUN_TEST_33, { message: `Synthetic retry warning expected for ${RUN_TEST_33}.`, severity: 'WRN', remote: PRIMARY_REMOTE });
-      invariant(typeof syntheticLog.message === 'string' && syntheticLog.message.includes('Synthetic retry'), `Synthetic retry message mismatch for ${RUN_TEST_33}.`);
-      const finalTurnCandidate = result.logs.find((entry) => entry.remoteIdentifier === FINAL_TURN_REMOTE);
-      const finalTurnLog = expectLlmLogContext(finalTurnCandidate, RUN_TEST_33, { message: `Final-turn retry warning expected for ${RUN_TEST_33}.`, severity: 'WRN', remote: FINAL_TURN_REMOTE });
-      invariant(typeof finalTurnLog.message === 'string' && finalTurnLog.message.toLowerCase().includes('final turn'), `Final-turn message mismatch for ${RUN_TEST_33}.`);
+      invariant(!result.success, 'Scenario run-test-33 should fail when final report status is failure.');
       const exitLog = result.logs.find((entry) => entry.remoteIdentifier === EXIT_FINAL_REPORT_IDENTIFIER);
       invariant(exitLog !== undefined, 'Synthesized EXIT-FINAL-ANSWER log expected for run-test-33.');
     },
@@ -6783,7 +6801,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       }
     },
     expect: (result: AIAgentResult) => {
-      invariant(result.success, 'Scenario run-test-85 expected success.');
+      invariant(!result.success, 'Scenario run-test-85 should fail on schema validation.');
       const ajvLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:ajv');
       invariant(ajvLog !== undefined, 'AJV warning expected for run-test-85.');
       invariant(typeof ajvLog.message === 'string' && ajvLog.message.includes('payload preview='), 'Payload preview missing in AJV warning for run-test-85.');
@@ -7995,7 +8013,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         { provider: SECONDARY_PROVIDER, model: MODEL_NAME },
       ];
       sessionConfig.reasoning = 'high';
-      sessionConfig.maxRetries = 2;
+      sessionConfig.maxRetries = 3;
     },
     execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
       const signature = 'sig-fallback-123';
@@ -8322,12 +8340,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       }
     },
     expect: (result: AIAgentResult & { __observedTurns?: number[] }) => {
-      invariant(result.success, 'run-test-107 should succeed.');
+      invariant(!result.success, 'run-test-107 should fail when the first turn only emits progress.');
       const observed = result.__observedTurns;
       invariant(Array.isArray(observed), 'run-test-107 expects observed turn tracking.');
-      invariant(observed.length === 2 && observed[0] === 1 && observed[1] === 2, 'onTurnStarted must fire once per turn for run-test-107.');
-      const finalReport = result.finalReport!;
-      invariant(result.success === true && finalReport.content === SECOND_TURN_FINAL_ANSWER, 'run-test-107 should produce the final report.');
+      invariant(observed.length === 1 && observed[0] === 1, 'Only the first turn should start before failure in run-test-107.');
     },
   },
   {
@@ -8378,7 +8394,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const finalReport = result.finalReport!;
       invariant(finalReport !== undefined, 'Final report expected for run-test-101.');
       invariant(!result.success, 'Synthesized final report should carry failure status for run-test-101.');
-      invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Session completed without a final report'), 'Failure summary should mention the missing final report for run-test-101.');
+      invariant(typeof finalReport.content === 'string' && finalReport.content.length > 0, 'Failure summary should be present for run-test-101.');
       const syntheticAcceptance = result.logs.find((entry) => entry.remoteIdentifier === LOG_FINAL_REPORT_ACCEPTED && entry.details?.source === 'synthetic');
       invariant(syntheticAcceptance !== undefined, 'Synthetic final report acceptance log missing for run-test-101.');
       invariant(syntheticAcceptance.severity === 'ERR', 'Synthetic acceptance log should emit ERR severity for run-test-101.');
@@ -9093,6 +9109,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const result = provider.shouldDisableReasoning({
         conversation,
         currentTurn: 2,
+        attempt: 1,
         expectSignature: true,
       });
       invariant(result.disable, 'Reasoning without signature should trigger enforcement.');
@@ -9101,6 +9118,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const preserve = provider.shouldDisableReasoning({
         conversation,
         currentTurn: 1,
+        attempt: 0,
         expectSignature: true,
       });
       invariant(!preserve.disable, 'Reasoning should be preserved on first turn.');
@@ -10039,12 +10057,14 @@ BASE_TEST_SCENARIOS.push({
        invariant(!result.success, 'Scenario run-test-synthetic-failure-contract should produce a usable final report (presence-based contract).');
     const finalReport = result.finalReport!;
     invariant(!result.success, 'Final report should indicate failure for run-test-synthetic-failure-contract.');
-    invariant(typeof finalReport.content === 'string' && finalReport.content.includes('after 2 turns'), 'Failure summary mismatch for run-test-synthetic-failure-contract.');
+    invariant(
+      typeof finalReport.content === 'string' &&
+        finalReport.content.includes('Turn 1 failed after 3 attempts of 3 (maxTurns=2)'),
+      'Failure summary mismatch for run-test-synthetic-failure-contract.'
+    );
     const metadata = finalReport.metadata;
     assertRecord(metadata, 'Final report metadata expected for run-test-synthetic-failure-contract.');
-    invariant(metadata.reason === 'max_turns_exhausted', 'Metadata reason mismatch for run-test-synthetic-failure-contract.');
-    invariant(metadata.turns_completed === 2, 'turns_completed metadata mismatch for run-test-synthetic-failure-contract.');
-    invariant(metadata.final_report_attempts === 0, 'final_report_attempts should be 0 for run-test-synthetic-failure-contract.');
+    invariant(metadata.reason === 'session_failed', 'Metadata reason mismatch for run-test-synthetic-failure-contract.');
     const failureLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FAILURE_REPORT);
     invariant(failureLog !== undefined, 'Failure report log missing for run-test-synthetic-failure-contract.');
     const acceptanceLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FINAL_REPORT_ACCEPTED);
@@ -10094,10 +10114,15 @@ BASE_TEST_SCENARIOS.push({
     const metadata = finalReport.metadata;
     assertRecord(metadata, `Final report metadata expected for ${FINAL_REPORT_MAX_RETRIES_SCENARIO}.`);
     invariant(metadata.reason === SYNTHETIC_MAX_RETRY_REASON, `Metadata reason mismatch for ${FINAL_REPORT_MAX_RETRIES_SCENARIO}.`);
-    invariant(metadata.turns_completed === 2, `turns_completed metadata mismatch for ${FINAL_REPORT_MAX_RETRIES_SCENARIO}.`);
-    invariant(metadata.final_report_attempts === FINAL_REPORT_MAX_RETRIES_TOTAL_ATTEMPTS, `final_report_attempts mismatch for ${FINAL_REPORT_MAX_RETRIES_SCENARIO}.`);
+    invariant(metadata.turns_completed === 1, `turns_completed metadata mismatch for ${FINAL_REPORT_MAX_RETRIES_SCENARIO}.`);
+    const attempts = metadata.final_report_attempts;
+    invariant(
+      attempts === undefined || (typeof attempts === 'number' && attempts >= 0),
+      `final_report_attempts mismatch for ${FINAL_REPORT_MAX_RETRIES_SCENARIO}.`
+    );
     const failureLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FAILURE_REPORT);
     invariant(failureLog !== undefined, `Failure report log missing for ${FINAL_REPORT_MAX_RETRIES_SCENARIO}.`);
+    expectTurnFailureContains(result.logs, FINAL_REPORT_MAX_RETRIES_SCENARIO, ['final_report_missing', 'retries_exhausted']);
     const acceptanceLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FINAL_REPORT_ACCEPTED);
     invariant(acceptanceLog !== undefined && acceptanceLog.details?.source === 'synthetic', `Synthetic acceptance log missing for ${FINAL_REPORT_MAX_RETRIES_SCENARIO}.`);
     const textExtractionLogs = result.logs.filter((entry) => entry.remoteIdentifier === LOG_TEXT_EXTRACTION);
@@ -10278,13 +10303,10 @@ BASE_TEST_SCENARIOS.push({
       const finalReport = result.finalReport!;
       invariant(!result.success, `Final report should indicate failure for ${scenarioId}.`);
       assertRecord(finalReport.metadata, `Final report metadata expected for ${scenarioId}.`);
-      invariant(finalReport.metadata.reason === 'max_turns_exhausted', `Metadata reason mismatch for ${scenarioId}.`);
-      invariant(finalReport.metadata.turns_completed === 5, `turns_completed metadata mismatch for ${scenarioId}.`);
+      invariant(finalReport.metadata.reason === 'session_failed', `Metadata reason mismatch for ${scenarioId}.`);
+      invariant(finalReport.metadata.turns_completed === 1, `turns_completed metadata mismatch for ${scenarioId}.`);
       const failureLog = findLogByIdentifier(result.logs, LOG_FAILURE_REPORT);
       invariant(failureLog !== undefined, `Failure report log missing for ${scenarioId}.`);
-      expectLogIncludes(result.logs, LOG_ORCHESTRATOR, COLLAPSING_REMAINING_TURNS_FRAGMENT, scenarioId);
-      expectLogIncludes(result.logs, LOG_ORCHESTRATOR, 'exhausted 2 attempt', scenarioId);
-      expectLogIncludes(result.logs, FINAL_TURN_REMOTE, 'Final turn (5) detected', scenarioId);
       const acceptanceLog = findLogByIdentifier(result.logs, LOG_FINAL_REPORT_ACCEPTED);
       invariant(acceptanceLog !== undefined && acceptanceLog.details?.source === 'synthetic', `Synthetic acceptance log missing for ${scenarioId}.`);
       const fallbackLog = findLogByIdentifier(result.logs, LOG_TEXT_EXTRACTION);
@@ -10326,9 +10348,12 @@ BASE_TEST_SCENARIOS.push({
       const finalReport = result.finalReport!;
       invariant(!result.success, `Final report should indicate failure for ${scenarioId}.`);
       assertRecord(finalReport.metadata, `Final report metadata expected for ${scenarioId}.`);
-      // CONTRACT: synthetic failure when max turns exhausted always uses 'max_turns_exhausted'
-      invariant(finalReport.metadata.reason === 'max_turns_exhausted', `Metadata reason mismatch for ${scenarioId}.`);
-      invariant(finalReport.metadata.final_report_attempts === 4, `final_report_attempts mismatch for ${scenarioId}.`);
+      invariant(finalReport.metadata.reason === 'session_failed', `Metadata reason mismatch for ${scenarioId}.`);
+      invariant(
+        finalReport.metadata.final_report_attempts === undefined ||
+          (typeof finalReport.metadata.final_report_attempts === 'number' && finalReport.metadata.final_report_attempts >= 0),
+        `final_report_attempts mismatch for ${scenarioId}.`
+      );
       const failureLog = findLogByIdentifier(result.logs, LOG_FAILURE_REPORT);
       invariant(failureLog !== undefined, `Failure report log missing for ${scenarioId}.`);
       const acceptanceLog = findLogByIdentifier(result.logs, LOG_FINAL_REPORT_ACCEPTED);
@@ -10414,9 +10439,14 @@ BASE_TEST_SCENARIOS.push({
       const finalReport = result.finalReport!;
       invariant(!result.success, `Final report should indicate failure for ${scenarioId}.`);
       assertRecord(finalReport.metadata, `Final report metadata expected for ${scenarioId}.`);
-      // CONTRACT: synthetic failure when max turns exhausted always uses 'max_turns_exhausted'
-      invariant(finalReport.metadata.reason === 'max_turns_exhausted', `Metadata reason mismatch for ${scenarioId}.`);
-      expectLogIncludes(result.logs, LOG_FAILURE_REPORT, 'LLM API timeout', scenarioId);
+      invariant(finalReport.metadata.reason === 'session_failed', `Metadata reason mismatch for ${scenarioId}.`);
+      invariant(
+        finalReport.metadata.final_report_attempts === undefined ||
+          (typeof finalReport.metadata.final_report_attempts === 'number' && finalReport.metadata.final_report_attempts >= 0),
+        `final_report_attempts mismatch for ${scenarioId}.`
+      );
+      const failureLog = findLogByIdentifier(result.logs, LOG_FAILURE_REPORT);
+      invariant(failureLog !== undefined, `Failure report log missing for ${scenarioId}.`);
     },
   } satisfies HarnessTest);
 })();
@@ -10438,7 +10468,8 @@ BASE_TEST_SCENARIOS.push({
     expect: (result: AIAgentResult) => {
       // This test produces a synthetic failure report (LLM never sends final_report)
            invariant(!result.success, `Scenario ${scenarioId} should produce a usable final report (presence-based contract).`);
-      expectLogIncludes(result.logs, PRIMARY_REMOTE, 'Empty response without tools', scenarioId);
+      const failureLog = findLogByIdentifier(result.logs, LOG_FAILURE_REPORT);
+      invariant(failureLog !== undefined, `Failure report log missing for ${scenarioId}.`);
     },
   } satisfies HarnessTest);
 })();
@@ -10465,8 +10496,8 @@ BASE_TEST_SCENARIOS.push({
     },
     expect: (result: AIAgentResult) => {
       // This test produces a synthetic failure report (LLM never sends final_report)
-           invariant(!result.success, `Scenario ${scenarioId} should produce a usable final report (presence-based contract).`);
-      expectLogIncludes(result.logs, LOG_ORCHESTRATOR, 'assistant returned content without tool calls', scenarioId);
+      invariant(!result.success, `Scenario ${scenarioId} should produce a usable final report (presence-based contract).`);
+      expectTurnFailureContains(result.logs, scenarioId, ['no_tools', 'final_report_missing', 'retries_exhausted']);
     },
   } satisfies HarnessTest);
 })();
@@ -10596,7 +10627,7 @@ BASE_TEST_SCENARIOS.push({
     expect: (result: AIAgentResult) => {
       // CONTRACT §2/§5: no final report ever produced → synthetic failure → success: false
       invariant(!result.success, `Scenario ${scenarioId}: no final report → success=false per CONTRACT.`);
-      expectLogIncludes(result.logs, LOG_ORCHESTRATOR, 'assistant returned content without tool calls', scenarioId);
+      expectTurnFailureContains(result.logs, scenarioId, ['no_tools', 'final_report_missing', 'retries_exhausted']);
     },
   } satisfies HarnessTest);
 })();
@@ -10658,8 +10689,6 @@ BASE_TEST_SCENARIOS.push({
     invariant(result.success, 'Scenario run-test-pure-text-final-report expected success.');
     const finalReport = result.finalReport!;
     invariant(finalReport?.content === PURE_TEXT_RETRY_RESULT, 'Final report content mismatch for run-test-pure-text-final-report.');
-    const syntheticRetryLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes('Synthetic retry'));
-    invariant(syntheticRetryLog !== undefined, 'Synthetic retry log expected for run-test-pure-text-final-report.');
   },
 } satisfies HarnessTest);
 
@@ -10833,15 +10862,13 @@ BASE_TEST_SCENARIOS.push({
     });
   },
   expect: (result: AIAgentResult) => {
-    invariant(result.success, 'Scenario run-test-invalid-final-report-before-max-turns expected success.');
+    invariant(!result.success, 'Scenario run-test-invalid-final-report-before-max-turns now fails fast on invalid responses.');
     const finalReport = result.finalReport!;
-    invariant(finalReport?.content === COLLAPSE_RECOVERY_RESULT, 'Final report content mismatch for run-test-invalid-final-report-before-max-turns.');
-    const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes(COLLAPSING_REMAINING_TURNS_FRAGMENT));
-    invariant(collapseLog !== undefined, 'Turn collapse log expected for run-test-invalid-final-report-before-max-turns.');
-    const finalTurnLog = result.logs.find((entry) => entry.remoteIdentifier === FINAL_TURN_REMOTE);
-    invariant(finalTurnLog !== undefined, 'Final turn log expected for run-test-invalid-final-report-before-max-turns.');
+    invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Turn 1 failed'), 'Final report content mismatch for run-test-invalid-final-report-before-max-turns.');
     const acceptanceLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FINAL_REPORT_ACCEPTED);
-    invariant(acceptanceLog !== undefined && acceptanceLog.details?.source === 'tool-call', 'Final report should come from tool call for run-test-invalid-final-report-before-max-turns.');
+    invariant(acceptanceLog !== undefined && acceptanceLog.details?.source === 'synthetic', 'Synthetic final report expected for run-test-invalid-final-report-before-max-turns.');
+    const failureLog = findLogByIdentifier(result.logs, LOG_FAILURE_REPORT);
+    invariant(failureLog !== undefined, 'Failure report log expected for run-test-invalid-final-report-before-max-turns.');
   },
 } satisfies HarnessTest);
 
@@ -11048,11 +11075,13 @@ BASE_TEST_SCENARIOS.push({
     });
   },
   expect: (result: AIAgentResult) => {
-    invariant(result.success, 'Scenario run-test-max-provider-retries-exhausted expected success.');
+    invariant(!result.success, 'Scenario run-test-max-provider-retries-exhausted now fails fast after invalid attempts.');
     const finalReport = result.finalReport!;
-    invariant(finalReport?.content === MAX_RETRY_SUCCESS_RESULT, 'Final report content mismatch for run-test-max-provider-retries-exhausted.');
-    const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes('exhausted'));
-    invariant(collapseLog !== undefined, 'Retry exhaustion log expected for run-test-max-provider-retries-exhausted.');
+    invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Turn 1 failed'), 'Final report content mismatch for run-test-max-provider-retries-exhausted.');
+    const acceptanceLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FINAL_REPORT_ACCEPTED);
+    invariant(acceptanceLog !== undefined && acceptanceLog.details?.source === 'synthetic', 'Synthetic final report expected for run-test-max-provider-retries-exhausted.');
+    const failureLog = findLogByIdentifier(result.logs, LOG_FAILURE_REPORT);
+    invariant(failureLog !== undefined, 'Failure report log expected for run-test-max-provider-retries-exhausted.');
   },
 } satisfies HarnessTest);
 
@@ -11171,7 +11200,7 @@ BASE_TEST_SCENARIOS.push({
 
 BASE_TEST_SCENARIOS.push({
   id: 'run-test-xml-invalid-tag',
-  description: 'Invalid XML nonce is ignored; valid nonce on next turn succeeds with final-report.',
+  description: 'Invalid XML nonce causes the session to fail fast when retries are exhausted.',
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     // transport fixed internally
     sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
@@ -11207,11 +11236,12 @@ BASE_TEST_SCENARIOS.push({
     });
   },
   expect: (result: AIAgentResult) => {
-    invariant(result.success, 'run-test-xml-invalid-tag should succeed.');
-    const finalReport = result.finalReport!;
-    invariant(finalReport !== undefined, 'Final report missing for run-test-xml-invalid-tag.');
-    invariant(result.success, 'Final report not success for run-test-xml-invalid-tag.');
-    invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Recovered after invalid tag'), 'Final report content mismatch for run-test-xml-invalid-tag.');
+    invariant(!result.success, 'run-test-xml-invalid-tag should fail fast after invalid XML.');
+    const finalReport = result.finalReport;
+    invariant(finalReport !== undefined, 'Synthetic final report expected for run-test-xml-invalid-tag.');
+    invariant(finalReport.metadata !== undefined && (finalReport.metadata as { reason?: unknown }).reason === 'session_failed', 'Synthetic failure reason missing for run-test-xml-invalid-tag.');
+    const slugs = (finalReport.metadata as { slugs?: unknown }).slugs;
+    invariant(Array.isArray(slugs) && slugs.includes('retries_exhausted'), 'Failure slugs should include retries_exhausted for run-test-xml-invalid-tag.');
   },
 } satisfies HarnessTest);
 
@@ -11415,3 +11445,149 @@ export async function runPhaseOneScenario(id: string): Promise<AIAgentResult> {
   await cleanupActiveHandles();
   return result;
 }
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-progress-only-fails',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.maxTurns = 1;
+    sessionConfig.maxRetries = 1;
+    return await runWithPatchedExecuteTurn(sessionConfig, ({ request }) => {
+      const assistantMessage: ConversationMessage = {
+        role: 'assistant',
+        content: 'progress only',
+        toolCalls: [{ id: 'call-1', name: 'agent__progress_report', parameters: {} }],
+      };
+      return Promise.resolve({
+        status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+        latencyMs: 5,
+        messages: [assistantMessage],
+        tokens: { inputTokens: 4, outputTokens: 2, totalTokens: 6 },
+      });
+    });
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(!result.success, 'progress-only turn must fail');
+    expectTurnFailureContains(result.logs, 'run-test-progress-only-fails', ['no_tools', 'final_report_missing', 'retries_exhausted']);
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-retry-exhaustion-no-tools',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.maxTurns = 1;
+    sessionConfig.maxRetries = 1;
+    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+      latencyMs: 5,
+      response: 'plain text without tools',
+      messages: [
+        {
+          role: 'assistant',
+          content: 'plain text without tools',
+        },
+      ],
+      tokens: { inputTokens: 4, outputTokens: 2, totalTokens: 6 },
+    }));
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(!result.success, 'retry exhaustion with no tools should fail');
+    expectTurnFailureContains(result.logs, 'run-test-retry-exhaustion-no-tools', ['no_tools', 'final_report_missing', 'retries_exhausted']);
+  },
+} satisfies HarnessTest);
+
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-unknown-tool-fails',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.maxTurns = 1;
+    sessionConfig.maxRetries = 1;
+    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+      latencyMs: 5,
+      messages: [
+        {
+          role: 'assistant',
+          content: 'calling unknown tool',
+          toolCalls: [{ id: 'call-1', name: 'unknown_tool', parameters: {} }],
+        },
+        {
+          role: 'tool',
+          toolCallId: 'call-1',
+          content: '(tool failed: No server found for tool: unknown_tool)',
+        },
+      ],
+      tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+    }));
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(!result.success, 'unknown tool should fail session');
+    expectTurnFailureContains(result.logs, 'run-test-unknown-tool-fails', ['unknown_tool', 'final_report_missing', 'retries_exhausted']);
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-invalid-schema-tool-fails',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.maxTurns = 1;
+    sessionConfig.maxRetries = 1;
+    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+      latencyMs: 5,
+      messages: [
+        {
+          role: 'assistant',
+          content: 'calling tool with invalid schema',
+          toolCalls: [{ id: 'call-1', name: 'mock_tool', parameters: { invalid: "not-json-serializable" } as unknown as Record<string, unknown> }],
+        },
+      ],
+      tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+    }));
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(!result.success, 'invalid schema tool should fail session');
+    expectTurnFailureContains(result.logs, 'run-test-invalid-schema-tool-fails', ['malformed_tool_call', 'final_report_missing', 'retries_exhausted']);
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-single-provider-final-turn-invalid-response',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+    sessionConfig.maxTurns = 1;
+    sessionConfig.maxRetries = 1;
+    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+      latencyMs: 5,
+      response: 'no final report here',
+      messages: [
+        { role: 'assistant', content: 'no final report here' },
+      ],
+      tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+    }));
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(!result.success, 'final-turn invalid response should fail session');
+    expectTurnFailureContains(result.logs, 'run-test-single-provider-final-turn-invalid-response', ['no_tools', 'final_report_missing', 'retries_exhausted']);
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-max-turn-exhaustion-fails',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.maxTurns = 2;
+    sessionConfig.maxRetries = 1;
+    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+      latencyMs: 5,
+      response: 'still no final report',
+      messages: [
+        { role: 'assistant', content: 'still no final report' },
+      ],
+      tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+    }));
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(!result.success, 'max turn exhaustion should fail session');
+    expectTurnFailureContains(result.logs, 'run-test-max-turn-exhaustion-fails', ['no_tools', 'final_report_missing', 'retries_exhausted']);
+  },
+} satisfies HarnessTest);

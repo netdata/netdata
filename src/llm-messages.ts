@@ -352,9 +352,6 @@ export const renderXmlNextTemplate = (payload: XmlNextTemplatePayload): string =
   lines.push('');
   lines.push(`This is turn No ${String(turn)}${maxTurns !== undefined ? ` of ${String(maxTurns)}` : ''}.`);
   lines.push('');
-  lines.push('Final report must be returned via XML using the provided nonce and FINAL slot.');
-  lines.push(`Tag pattern: <ai-agent-${nonce}-FINAL tool="agent__final_report" status="success|failure|partial" format="...">...content...</ai-agent-${nonce}-FINAL>`);
-  lines.push('');
 
   return lines.join('\n');
 };

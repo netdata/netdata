@@ -127,6 +127,7 @@ Error handling and timeouts
 - MCP tool timeouts: per‑call with `toolTimeout` (default 10s). Timeouts throw `Tool execution timed out`, counted as a failed tool result recorded in history/accounting; never retried.
 - LLM timeout: provider/network level via fetch and AI SDK retry settings; we do not wrap with an extra timer to avoid interrupting internal stream machinery.
 - Tool failure (`isError: true` from MCP): treated as a failed tool result but still added to message history for LLM self‑correction.
+- Turn/session success/failure: a turn succeeds only if an accepted/valid final report is produced or at least one non-progress/batch tool is executed; progress/batch still return responses but do not satisfy success. Retry exhaustion fails the session immediately (single ERR + synthetic session report). Each failed turn emits one WRN with slugged reasons and full response (capped ~128 KB). Collapse logic may only shrink `maxTurns`.
 
 Security, tracing, and headers
 

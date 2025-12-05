@@ -75,6 +75,12 @@ export interface TurnResult {
   providerMetadata?: ProviderTurnMetadata;
   retry?: TurnRetryDirective;
   responseBytes?: number;
+  executionStats?: {
+    executedTools: number;
+    executedNonProgressBatchTools: number;
+    executedProgressBatchTools: number;
+    unknownToolEncountered?: boolean;
+  };
 }
 
 export type ToolStatus =

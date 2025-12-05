@@ -869,7 +869,7 @@ export class LLMClient {
     return provider.shouldAutoEnableReasoningStream(level, options);
   }
 
-  shouldDisableReasoning(providerName: string, context: { conversation: ConversationMessage[]; currentTurn: number; expectSignature: boolean }): { disable: boolean; normalized: ConversationMessage[] } {
+  shouldDisableReasoning(providerName: string, context: { conversation: ConversationMessage[]; currentTurn: number; attempt: number; expectSignature: boolean }): { disable: boolean; normalized: ConversationMessage[] } {
     const provider = this.providers.get(providerName);
     if (provider === undefined) {
       return { disable: false, normalized: context.conversation };

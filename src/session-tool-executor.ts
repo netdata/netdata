@@ -26,6 +26,10 @@ export interface ToolExecutionState {
   incompleteFinalReportDetected: boolean;
   toolLimitExceeded: boolean;
   finalReportToolFailed: boolean;
+  executedTools: number;
+  executedNonProgressBatchTools: number;
+  executedProgressBatchTools: number;
+  unknownToolEncountered: boolean;
 }
 
 export interface SessionContext {
@@ -91,6 +95,7 @@ export class SessionToolExecutor {
       const isFinalReportTool =
         normalizedToolName === this.sessionContext.finalReportToolName ||
         normalizedToolName === 'final_report';
+      const isProgressTool = normalizedToolName === 'agent__progress_report';
 
       const recordXmlEntry = (
         status: 'ok' | 'failed',
@@ -180,7 +185,15 @@ export class SessionToolExecutor {
         const orchestrator = this.toolsOrchestrator;
         // eslint-disable-next-line @typescript-eslint/prefer-optional-chain
         if (orchestrator !== undefined && orchestrator.hasTool(effectiveToolName)) {
+          // Count attempts only for known tools
           const isBatchTool = effectiveToolName === 'agent__batch';
+          state.executedTools += 1;
+          if (isProgressTool || isBatchTool) {
+            state.executedProgressBatchTools += 1;
+          }
+          else {
+            state.executedNonProgressBatchTools += 1;
+          }
           const isSubAgentTool = this.subAgents?.hasTool(effectiveToolName) === true;
           
           const managed = await orchestrator.executeWithManagement(
@@ -487,6 +500,7 @@ export class SessionToolExecutor {
             message: msg,
           };
           this.log(warn);
+          state.unknownToolEncountered = true;
           addSpanEvent('tool.call.unknown', {
             'ai.tool.name': effectiveToolName,
           });

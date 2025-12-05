@@ -125,6 +125,7 @@ interface TurnRunnerState {
   finalReportToolFailedEver: boolean;
   finalReportToolFailedThisTurn: boolean;
   toolLimitExceeded: boolean;
+  droppedInvalidToolCalls: number;
   plannedSubturns: Map<number, number>;
   finalTurnEntryLogged: boolean;
   childConversations: {
@@ -138,6 +139,8 @@ interface TurnRunnerState {
   llmAttempts: number;
   llmSyntheticFailures: number;
   lastFinalReportStatus?: string;
+  finalReportInvalidFormat: boolean;
+  finalReportSchemaFailed: boolean;
   pendingToolSelection?: { availableTools: MCPTool[]; allowedToolNames: Set<string>; toolsForTurn: MCPTool[] };
   currentCtxTokens?: number;
   pendingCtxTokens?: number;
@@ -154,7 +157,6 @@ const REMOTE_CONTEXT = 'agent:context';
 const REMOTE_ORCHESTRATOR = 'agent:orchestrator';
 const REMOTE_SANITIZER = 'agent:sanitizer';
 const REMOTE_FAILURE_REPORT = 'agent:failure-report';
-const NO_TOOLS_NO_REPORT_MESSAGE = 'assistant returned content without tool calls and without final_report';
 const FINAL_REPORT_TOOL = 'agent__final_report';
 const SLACK_BLOCK_KIT_FORMAT = 'slack-block-kit';
 const FINAL_REPORT_TOOL_ALIASES = new Set(['agent__final_report', 'agent-final-report']);
@@ -186,6 +188,7 @@ export class TurnRunner {
             finalReportToolFailedEver: false,
             finalReportToolFailedThisTurn: false,
             toolLimitExceeded: false,
+            droppedInvalidToolCalls: 0,
             plannedSubturns: new Map<number, number>(),
             finalTurnEntryLogged: false,
             childConversations: [],
@@ -193,6 +196,8 @@ export class TurnRunner {
             llmAttempts: 0,
             llmSyntheticFailures: 0,
             lastFinalReportStatus: undefined,
+            finalReportInvalidFormat: false,
+            finalReportSchemaFailed: false,
         };
     }
     /**
@@ -214,6 +219,8 @@ export class TurnRunner {
         this.state.logs = [...initialLogs];
         this.state.accounting = [...initialAccounting];
         this.state.currentTurn = startTurn;
+        this.state.finalReportInvalidFormat = false;
+        this.state.finalReportSchemaFailed = false;
         // Use the passed childConversations array reference if provided, otherwise use the empty one from state
         if (childConversations !== undefined) {
             this.state.childConversations = childConversations;
@@ -243,7 +250,6 @@ export class TurnRunner {
         }
         // Track the last turn where we showed thinking header
         let lastShownThinkingHeaderTurn = -1;
-        const finalTurnRetryMessage = 'Final turn did not produce final_report; retrying with next provider/model in this turn.';
         let maxTurns = this.state.maxTurns;
         const maxRetries = this.ctx.sessionConfig.maxRetries ?? 3;
         const pairs = this.ctx.sessionConfig.targets;
@@ -292,10 +298,10 @@ export class TurnRunner {
                 warn(`beginTurn/onOpTree failed: ${e instanceof Error ? e.message : String(e)}`);
             }
             this.ctx.llmClient.setTurn(currentTurn, 0);
-            let lastError;
-            let lastErrorType;
-            let turnSuccessful = false;
-            let finalTurnRetryWarnLogged = false;
+            let lastError: string | undefined;
+            let lastErrorType: string | undefined;
+        let turnSuccessful = false;
+        let lastTurnResult: (TurnResult & { shownThinking?: boolean; incompleteFinalReportDetected?: boolean }) | undefined;
             let turnHadFinalReportAttempt = false;
             let collapseLoggedThisTurn = false;
             const collapseRemainingTurns = (reason: 'incomplete_final_report' | 'final_report_attempt'): void => {
@@ -369,8 +375,22 @@ export class TurnRunner {
                     this.callbacks.setMasterLlmStartLogged();
                 }
                 const pair = pairs[pairCursor % pairs.length];
-                pairCursor += 1;
                 const { provider, model } = pair;
+                const logAttemptFailure = (): void => {
+                    const failureInfo = this.buildTurnFailureInfo({
+                        turn: currentTurn,
+                        provider,
+                        model,
+                        lastError: typeof lastError === 'string' ? lastError : (lastErrorType ?? 'unknown'),
+                        lastErrorType,
+                        lastTurnResult,
+                        attempts,
+                        maxRetries,
+                        maxTurns,
+                        isFinalTurn: currentTurn === maxTurns,
+                    });
+                    this.logTurnFailure(failureInfo);
+                };
                 // Note: cycleIndex/cycleComplete tracking removed during extraction - may need to be reinstated
                 let forcedFinalTurn = this.forcedFinalTurnReason !== undefined;
                 let isFinalTurn = forcedFinalTurn || currentTurn === maxTurns;
@@ -570,7 +590,9 @@ export class TurnRunner {
                     }
                 }
                     const turnResult = await this.executeSingleTurn(attemptConversation, provider, model, isFinalTurn, currentTurn, logs, accounting, lastShownThinkingHeaderTurn, attempts, maxRetries, sessionReasoningLevel, sessionReasoningValue ?? undefined);
+                    lastTurnResult = turnResult;
                     const { messages: sanitizedMessages, dropped: droppedInvalidToolCalls, finalReportAttempted } = this.sanitizeTurnMessages(turnResult.messages, { turn: currentTurn, provider, model, stopReason: turnResult.stopReason });
+                    this.state.droppedInvalidToolCalls = droppedInvalidToolCalls;
                     // Mark turnResult with finalReportAttempted flag but defer collapseRemainingTurns
                     // until we know if the final report was actually accepted (done later in the flow)
                     if (finalReportAttempted) {
@@ -837,6 +859,16 @@ export class TurnRunner {
                                         }
                                     }
                                     this.state.toolFailureMessages.delete(failureCallId);
+                                }
+                            }
+                            // Fallback: if any failed tool call co-exists with an assistant-issued final_report call,
+                            // mark the final report tool as failed even if the toolCallId mapping was lost.
+                            if (!this.state.finalReportToolFailedEver) {
+                                const assistantWithCall = sanitizedMessages.find((msg) => msg.role === 'assistant' && Array.isArray(msg.toolCalls));
+                                const hasFinalReportCall = assistantWithCall?.toolCalls?.some((tc) => sanitizeToolName(tc.name) === FINAL_REPORT_TOOL) ?? false;
+                                if (hasFinalReportCall) {
+                                    this.state.finalReportToolFailedThisTurn = true;
+                                    this.state.finalReportToolFailedEver = true;
                                 }
                             }
                             const finalReportFailurePresent = sanitizedMessages.some((msg) => msg.role === 'tool' &&
@@ -1206,53 +1238,11 @@ export class TurnRunner {
                         }
                         // Synthetic error: success with content but no tools and no final_report
                         if (this.finalReport === undefined) {
-                            if (!sanitizedHasToolCalls && sanitizedHasText) {
-                                const syntheticMessage = 'Synthetic retry: assistant returned content without tool calls and without final_report.';
-                                this.logNoToolsNoReport({
-                                    turn: currentTurn,
-                                    remoteId: this.composeRemoteIdentifier(provider, model, turnResult.providerMetadata),
-                                    severity: 'WRN',
-                                    fatal: false,
-                                    message: syntheticMessage,
-                                    provider,
-                                    model,
-                                    turnResult,
-                                    sanitizedMessages,
-                                    sanitizedHasText,
-                                    sanitizedHasToolCalls,
-                                });
-                                this.logNoToolsNoReport({
-                                    turn: currentTurn,
-                                    remoteId: REMOTE_ORCHESTRATOR,
-                                    severity: 'WRN',
-                                    fatal: false,
-                                    message: syntheticMessage,
-                                    provider,
-                                    model,
-                                    turnResult,
-                                    sanitizedMessages,
-                                    sanitizedHasText,
-                                    sanitizedHasToolCalls,
-                                });
-                                if (isFinalTurn && !finalTurnRetryWarnLogged) {
-                                    const agentWarn = {
-                                        timestamp: Date.now(),
-                                        severity: 'WRN' as const,
-                                        turn: currentTurn,
-                                        subturn: 0,
-                                        direction: 'response' as const,
-                                        type: 'llm' as const,
-                                        remoteIdentifier: REMOTE_FINAL_TURN,
-                                        fatal: false,
-                                        message: finalTurnRetryMessage
-                                    };
-                                    this.log(agentWarn);
-                                    finalTurnRetryWarnLogged = true;
-                                }
-                                lastError = 'invalid_response: content_without_tools_or_final';
-                                lastErrorType = 'invalid_response';
-                                this.addTurnFailure(TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT);
-                            }
+                        if (!sanitizedHasToolCalls && sanitizedHasText) {
+                            lastError = 'invalid_response: content_without_tools_or_final';
+                            lastErrorType = 'invalid_response';
+                            this.addTurnFailure(TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT);
+                        }
                         }
                         // CONTRACT: Empty response without tool calls must NOT be added to conversation
                         // Check BEFORE pushing to conversation
@@ -1260,46 +1250,10 @@ export class TurnRunner {
                             (turnResult.response === undefined || turnResult.response.trim().length === 0);
                         if (isEmptyWithoutTools && turnResult.hasReasoning !== true) {
                             // Log warning and retry this turn on another provider/model
-                            const remoteId = REMOTE_ORCHESTRATOR;
-                            this.logNoToolsNoReport({
-                                turn: currentTurn,
-                                remoteId: remoteId,
-                                severity: 'WRN',
-                                fatal: false,
-                                message: 'Assistant returned content without tool calls and without final_report (empty/whitespace); retrying with next provider/model in this turn.',
-                                provider,
-                                model,
-                                turnResult,
-                                sanitizedMessages,
-                                sanitizedHasText,
-                                sanitizedHasToolCalls,
-                            });
                             this.state.llmSyntheticFailures++;
-                            const providerRemoteId = this.composeRemoteIdentifier(provider, model, turnResult.providerMetadata);
-                            this.log({
-                                timestamp: Date.now(),
-                                severity: 'WRN' as const,
-                                turn: currentTurn,
-                                subturn: 0,
-                                direction: 'response' as const,
-                                type: 'llm' as const,
-                                remoteIdentifier: providerRemoteId,
-                                fatal: false,
-                                message: 'Empty response without tools; retrying with next provider/model in this turn.',
-                            });
-                            this.log({
-                                timestamp: Date.now(),
-                                severity: 'WRN' as const,
-                                turn: currentTurn,
-                                subturn: 0,
-                                direction: 'response' as const,
-                                type: 'llm' as const,
-                                remoteIdentifier: REMOTE_ORCHESTRATOR,
-                                fatal: false,
-                                message: NO_TOOLS_NO_REPORT_MESSAGE,
-                            });
                             lastError = 'invalid_response: empty_without_tools';
                             lastErrorType = 'invalid_response';
+                            logAttemptFailure();
                             if (cycleComplete) {
                                 rateLimitedInCycle = 0;
                                 maxRateLimitWaitMs = 0;
@@ -1347,15 +1301,8 @@ export class TurnRunner {
                             }
                         }
                         const finalReportReady = this.finalReport !== undefined;
-                        const attemptHasValidToolPath = sanitizedHasToolCalls && droppedInvalidToolCalls === 0 && !toolFailureDetected;
-                        if (!finalReportReady && this.state.finalReportToolFailedThisTurn) {
-                            lastError = 'invalid_response: final_report_tool_failed';
-                            lastErrorType = 'invalid_response';
-                        }
-                        if (attemptHasValidToolPath || finalReportReady) {
-                            lastError = undefined;
-                            lastErrorType = undefined;
-                        }
+        const executionStats = turnResult.executionStats ?? { executedTools: 0, executedNonProgressBatchTools: 0, executedProgressBatchTools: 0, unknownToolEncountered: false };
+        const hasNonProgressTools = executionStats.executedNonProgressBatchTools > 0;
                         // Add new messages to conversation (skipped above for empty responses per CONTRACT)
                         conversation.push(...sanitizedMessages);
                         if (this.state.turnFailureReasons.length > 0) {
@@ -1364,80 +1311,55 @@ export class TurnRunner {
                             this.state.turnFailureReasons = [];
                         }
                         // If we encountered an invalid response and still have retries in this turn, retry
-                        if (!finalReportReady && lastErrorType === 'invalid_response' && attempts < maxRetries) {
+                        if (!finalReportReady && !hasNonProgressTools && lastErrorType === 'invalid_response' && attempts < maxRetries) {
                             // Collapse turns on retry if a final report was attempted but rejected
                             if (turnHadFinalReportAttempt && currentTurn < maxTurns) {
                                 collapseRemainingTurns('final_report_attempt');
                             }
+                            logAttemptFailure();
                             continue;
                         }
                         // Check for retryFlags from turnResult (incompleteFinalReportDetected comes from tool execution)
                         const retryFlags = turnResult as { incompleteFinalReportDetected?: boolean; finalReportAttempted?: boolean };
+                        const incompleteFinalReportDetected = retryFlags.incompleteFinalReportDetected === true;
                         const finalReportAttemptFlag = turnHadFinalReportAttempt || retryFlags.finalReportAttempted === true;
                         // If final report is already accepted, skip collapse and finalize immediately
                         if (finalReportReady) {
                             return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn);
                         }
                         // Only collapse remaining turns if final report is NOT ready
-                        if (retryFlags.incompleteFinalReportDetected === true && currentTurn < maxTurns) {
+                        if (incompleteFinalReportDetected && currentTurn < maxTurns) {
                             collapseRemainingTurns('incomplete_final_report');
                         }
                         else if (finalReportAttemptFlag && currentTurn < maxTurns) {
                             collapseRemainingTurns('final_report_attempt');
                         }
+                        // Determine turn success based on tool execution or accepted final report
+                        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                        if (finalReportReady || hasNonProgressTools) {
+                            turnSuccessful = true;
+                            break;
+                        }
+
                         // Note: empty response check moved earlier (before conversation.push) per CONTRACT
                         // No final report yet
                         if (isFinalTurn) {
-                            const metadata = turnResult.providerMetadata;
-                            const remoteId = this.composeRemoteIdentifier(provider, model, metadata);
-                            const warnEntry = {
-                                timestamp: Date.now(),
-                                severity: 'WRN' as const,
-                                turn: currentTurn,
-                                subturn: 0,
-                                direction: 'response' as const,
-                                type: 'llm' as const,
-                                remoteIdentifier: remoteId,
-                                fatal: false,
-                                message: finalTurnRetryMessage
-                            };
-                            this.log(warnEntry);
-                            if (!finalTurnRetryWarnLogged) {
-                                const agentWarn = {
-                                    timestamp: Date.now(),
-                                    severity: 'WRN' as const,
-                                    turn: currentTurn,
-                                    subturn: 0,
-                                    direction: 'response' as const,
-                                    type: 'llm' as const,
-                                    remoteIdentifier: REMOTE_FINAL_TURN,
-                                    fatal: false,
-                                    message: finalTurnRetryMessage
-                                };
-                                this.log(agentWarn);
-                                finalTurnRetryWarnLogged = true;
-                            }
                             lastError = 'invalid_response: final_turn_no_final_answer';
                             lastErrorType = 'invalid_response';
+                            logAttemptFailure();
                             if (cycleComplete) {
                                 rateLimitedInCycle = 0;
                                 maxRateLimitWaitMs = 0;
                             }
                             this.pushSystemRetryMessage(conversation, FINAL_TURN_NOTICE);
                             this.pushSystemRetryMessage(conversation, this.buildFinalReportReminder());
-                            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- pairs length can be 1 in single-provider sessions
-                            if (isFinalTurn && pairs.length === 1) {
-                                turnSuccessful = true;
-                                break;
-                            }
                             continue;
                         }
-                        // Non-final turns
-                        if (lastErrorType === 'invalid_response') {
-                            continue;
-                        }
-                        turnSuccessful = true;
-                        break;
+                        // Non-final turns: require non-progress tools for success
+                        lastError = 'invalid_response: no_tools';
+                        lastErrorType = 'invalid_response';
+                        logAttemptFailure();
+                        continue;
                     }
                     else {
                         // Handle non-success status (rate_limit, auth_error, etc.)
@@ -1448,20 +1370,22 @@ export class TurnRunner {
                         const directive = this.buildFallbackRetryDirective({ status: turnResult.status, remoteId, attempt: attempts });
                         if (directive !== undefined) {
                             if (directive.action === RETRY_ACTION_SKIP_PROVIDER) {
-                                const skipEntry = {
-                                    timestamp: Date.now(),
-                                    severity: 'WRN' as const,
-                                    turn: currentTurn,
-                                    subturn: 0,
+                            const skipEntry = {
+                                timestamp: Date.now(),
+                                severity: 'WRN' as const,
+                                turn: currentTurn,
+                                subturn: 0,
                                     direction: 'response' as const,
                                     type: 'llm' as const,
                                     remoteIdentifier: remoteId,
                                     fatal: false,
-                                    message: directive.logMessage ?? `Skipping provider ${remoteId}`,
-                                };
-                                this.log(skipEntry);
-                                // Skip this provider and continue to next
-                                continue;
+                                message: directive.logMessage ?? `Skipping provider ${remoteId}`,
+                            };
+                            this.log(skipEntry);
+                            logAttemptFailure();
+                            pairCursor += 1;
+                            // Skip this provider and continue to next
+                            continue;
                             }
                             if (directive.action === 'retry') {
                                 // Special handling for rate_limit: track across cycle
@@ -1526,6 +1450,7 @@ export class TurnRunner {
                                         rateLimitedInCycle = 0;
                                         maxRateLimitWaitMs = 0;
                                     }
+                                    logAttemptFailure();
                                     continue;
                                 }
                                 // Non-rate-limit retry handling
@@ -1547,6 +1472,7 @@ export class TurnRunner {
                                 if (directive.systemMessage !== undefined) {
                                     this.pushSystemRetryMessage(conversation, directive.systemMessage);
                                 }
+                                logAttemptFailure();
                                 continue;
                             }
                         }
@@ -1559,75 +1485,46 @@ export class TurnRunner {
                     lastError = msg;
                     lastErrorType = 'error';
                 }
+
+                // If this attempt failed and we're about to retry (no earlier continue), emit the per-attempt failure log now.
+                if (!turnSuccessful && attempts < maxRetries) {
+                    logAttemptFailure();
+                }
             }
-            // If final_report tool failed, allow the turn to complete so synthetic failure can be generated later
-            if (!turnSuccessful && this.state.finalReportToolFailedThisTurn) {
-                turnSuccessful = true;
-            }
-            // Check if all attempts failed for this turn (retry exhaustion)
+            // Check if all attempts failed for this turn (retry exhaustion) → session failure
             if (!turnSuccessful) {
-                const isInvalidResponse = lastErrorType === 'invalid_response' || (typeof lastError === 'string' && lastError.startsWith('invalid_response'));
-                const isLlmError = lastErrorType === 'network_error' || lastErrorType === 'timeout';
-                // For invalid_response errors: fail the session once attempts are exhausted to avoid runaway retries
-                if (isInvalidResponse) {
-                    const errReason = `Turn ${String(currentTurn)} exhausted ${String(maxRetries)} attempt${maxRetries === 1 ? '' : 's'} with invalid responses; continuing.`;
-                    const warnEntry = {
-                        timestamp: Date.now(),
-                        severity: 'WRN' as const,
-                        turn: currentTurn,
-                        subturn: 0,
-                        direction: 'response' as const,
-                        type: 'llm' as const,
-                        remoteIdentifier: REMOTE_ORCHESTRATOR,
-                        fatal: false,
-                        message: errReason,
-                        details: { last_error: (lastError ?? lastErrorType) ?? 'unknown' }
-                    };
-                    this.log(warnEntry);
-                    continue;
-                }
-                else if (isLlmError && currentTurn === maxTurns) {
-                    // On final turn with LLM errors (network_error, timeout), allow synthetic report generation
-                    // Let loop exit naturally - synthetic report will be generated after the loop
-                }
-                else {
-                    // All attempts failed for this turn - return failure immediately
-                    const exitCode = (lastError?.includes('auth') === true) ? 'EXIT-AUTH-FAILURE' :
-                        (lastError?.includes('quota') === true) ? 'EXIT-QUOTA-EXCEEDED' :
-                            (lastError?.includes('timeout') === true) ? 'EXIT-INACTIVITY-TIMEOUT' :
-                                'EXIT-NO-LLM-RESPONSE';
-                    const reason = `No LLM response after ${String(maxRetries)} retries across ${String(pairs.length)} provider/model pairs: ${lastError ?? 'All targets failed'}`;
-                    this.logExit(exitCode, reason, currentTurn);
-                    this.emitFinalSummary(logs, accounting);
-                    return {
-                        success: false,
-                        error: lastError ?? 'All provider/model targets failed',
-                        conversation,
-                        logs,
-                        accounting,
-                        childConversations: this.state.childConversations
-                    };
-                }
+                const failureInfo = this.buildTurnFailureInfo({
+                    turn: currentTurn,
+                    provider: pairs[(attempts - 1) % pairs.length]?.provider ?? 'unknown',
+                    model: pairs[(attempts - 1) % pairs.length]?.model ?? 'unknown',
+                    lastError: typeof lastError === 'string' ? lastError : (lastErrorType ?? 'unknown'),
+                    lastErrorType,
+                    lastTurnResult,
+                    attempts,
+                    maxRetries,
+                    maxTurns,
+                    isFinalTurn: currentTurn === maxTurns,
+                });
+                this.logTurnFailure(failureInfo);
+                return this.finalizeSessionFailure(conversation, logs, accounting, failureInfo, currentTurn);
             }
-            // End of retry loop - close turn if successful
-            if (turnSuccessful) {
-                try {
-                    const lastAssistant = (() => {
-                        try {
-                            return [...conversation].filter((m) => m.role === 'assistant').pop();
-                        }
-                        catch {
-                            return undefined;
-                        }
-                    })();
-                    const assistantText = typeof lastAssistant?.content === 'string' ? lastAssistant.content : undefined;
-                    const attrs = (typeof assistantText === 'string' && assistantText.length > 0) ? { assistant: { content: assistantText } } : {};
-                    this.ctx.opTree.endTurn(currentTurn, attrs);
-                    this.callbacks.onOpTree(this.ctx.opTree.getSession());
-                }
-                catch (e) {
-                    warn(`endTurn/onOpTree failed: ${e instanceof Error ? e.message : String(e)}`);
-                }
+            // End of retry loop - close turn if successful (turnSuccessful guaranteed here)
+            try {
+                const lastAssistant = (() => {
+                    try {
+                        return [...conversation].filter((m) => m.role === 'assistant').pop();
+                    }
+                    catch {
+                        return undefined;
+                    }
+                })();
+                const assistantText = typeof lastAssistant?.content === 'string' ? lastAssistant.content : undefined;
+                const attrs = (typeof assistantText === 'string' && assistantText.length > 0) ? { assistant: { content: assistantText } } : {};
+                this.ctx.opTree.endTurn(currentTurn, attrs);
+                this.callbacks.onOpTree(this.ctx.opTree.getSession());
+            }
+            catch (e) {
+                warn(`endTurn/onOpTree failed: ${e instanceof Error ? e.message : String(e)}`);
             }
             // Preserve lastError for post-loop access
             this.state.lastTurnError = typeof lastError === 'string' ? lastError : undefined;
@@ -1753,7 +1650,7 @@ export class TurnRunner {
     private logFailureReport(reason: string, turn: number, details?: Record<string, LogDetailValue>): void {
         const entry: LogEntry = {
             timestamp: Date.now(),
-            severity: 'ERR',
+            severity: 'WRN',
             turn,
             subturn: 0,
             direction: 'response' as const,
@@ -1953,88 +1850,138 @@ export class TurnRunner {
         }
     }
 
-  private logNoToolsNoReport(opts: {
+
+  private buildTurnFailureInfo(params: {
     turn: number;
-    remoteId: string;
-    severity?: LogEntry['severity'];
-    fatal?: boolean;
-    message: string;
     provider: string;
     model: string;
-    turnResult: TurnResult;
-    sanitizedMessages: ConversationMessage[];
-    sanitizedHasText: boolean;
-    sanitizedHasToolCalls: boolean;
-  }): void {
-    const {
-      turn,
-      remoteId,
-      severity = 'WRN',
-      fatal = false,
-      message,
-      provider,
-      model,
-      turnResult,
-      sanitizedMessages,
-      sanitizedHasText,
-      sanitizedHasToolCalls,
-    } = opts;
+    lastError: string;
+    lastErrorType?: string;
+    lastTurnResult?: TurnResult;
+    attempts: number;
+    maxRetries: number;
+    maxTurns: number;
+    isFinalTurn: boolean;
+  }): { turn: number; slugs: string[]; provider: string; model: string; message: string; rawResponse?: string; rawResponseTruncated?: boolean } {
+    const { turn, provider, model, lastError, lastErrorType, lastTurnResult, attempts, maxRetries, maxTurns, isFinalTurn } = params;
+    const slugs = new Set<string>();
+    slugs.add('retries_exhausted');
+    if (isFinalTurn) slugs.add('final_turn');
+    if (this.state.toolLimitExceeded) slugs.add('tool_limit');
+    if (this.forcedFinalTurnReason === 'context') slugs.add('context_guard');
+    const stats = lastTurnResult?.executionStats ?? { executedTools: 0, executedNonProgressBatchTools: 0, executedProgressBatchTools: 0, unknownToolEncountered: false };
+    const hasNonProgressTools = stats.executedNonProgressBatchTools > 0;
+    const hadToolCalls = (lastTurnResult?.messages ?? []).some((m) => {
+        const toolCalls = (m as { toolCalls?: unknown }).toolCalls;
+        return Array.isArray(toolCalls) && toolCalls.length > 0;
+    });
+    if (!hasNonProgressTools) slugs.add('no_tools');
+    if (this.finalReport === undefined) slugs.add('final_report_missing');
+    const responseText = typeof lastTurnResult?.response === 'string' ? lastTurnResult.response.trim() : '';
+    if (responseText.length === 0) slugs.add('empty_response');
+    if (lastTurnResult?.hasReasoning === true && (responseText.length === 0)) slugs.add('reasoning_only');
+    if (responseText.length > 0 && !hasNonProgressTools && this.finalReport === undefined) slugs.add('text_only');
+    if (lastErrorType === 'invalid_response') slugs.add('invalid_response');
+    if (lastErrorType === 'rate_limit') slugs.add('rate_limited');
+    if (lastErrorType === 'timeout') slugs.add('provider_timeout');
+    if (lastErrorType === 'network_error') slugs.add('provider_network_error');
+    if (lastErrorType === 'auth_error') slugs.add('auth_error');
+    if (lastErrorType === 'quota_exceeded') slugs.add('quota_exceeded');
+    if (lastErrorType === 'model_error') slugs.add('provider_error');
+    // Tool error slugs inferred from toolFailureMessages/trimmed ids
+    if (this.state.toolFailureMessages.size > 0 || this.state.toolFailureFallbacks.length > 0) slugs.add('tool_exec_failed');
+    const anyUnknown = (lastTurnResult?.executionStats?.unknownToolEncountered === true) || (lastTurnResult?.messages ?? []).some((m) => m.role === 'tool' && typeof m.content === 'string' && m.content.includes('No server found for tool'));
+    if (anyUnknown) slugs.add('unknown_tool');
+    if (this.state.trimmedToolCallIds.size > 0 || this.state.droppedInvalidToolCalls > 0 || (hadToolCalls && stats.executedTools === 0)) slugs.add('malformed_tool_call');
+    if (this.state.finalReportToolFailedEver) {
+        slugs.add('final_report_tool_failed');
+    }
 
-    const assistantPreview = (() => {
-      const textBlocks = sanitizedMessages
-        .filter((msg): msg is ConversationMessage & { content: string } => msg.role === 'assistant' && typeof msg.content === 'string')
-        .map((msg) => msg.content.trim())
-        .filter((t) => t.length > 0);
-      if (textBlocks.length === 0) return undefined;
-      return textBlocks.join('\n');
-    })();
+    if (this.state.finalReportInvalidFormat) {
+        slugs.add('final_report_invalid_format');
+    }
+    if (this.state.finalReportSchemaFailed) {
+        slugs.add('final_report_schema_fail');
+    }
+    if (this.state.lastFinalReportStatus === 'failure') {
+        slugs.add('final_report_status_failure');
+    }
 
-    const contentBytes = sanitizedMessages
-      .filter((msg): msg is ConversationMessage & { content: string } => msg.role === 'assistant' && typeof msg.content === 'string')
-      .map((msg) => Buffer.byteLength(msg.content, 'utf8'))
-      .reduce((acc, n) => acc + n, 0);
+    const rawResponseLimit = 131072; // ~128KB cap
+    const rawResponse = typeof lastTurnResult?.response === 'string' ? lastTurnResult.response : undefined;
+    let truncated = false;
+    let clippedResponse: string | undefined = rawResponse;
+    if (rawResponse !== undefined && Buffer.byteLength(rawResponse, 'utf8') > rawResponseLimit) {
+      const buf = Buffer.from(rawResponse, 'utf8');
+      clippedResponse = buf.subarray(0, rawResponseLimit).toString('utf8');
+      truncated = true;
+    }
+    const msg = `Turn ${String(turn)} failed after ${String(attempts)} attempt${attempts === 1 ? '' : 's'} of ${String(maxRetries)} (maxTurns=${String(maxTurns)}); last_error=${lastError}`;
+    return { turn, slugs: [...slugs], provider, model, message: msg, rawResponse: clippedResponse, rawResponseTruncated: truncated };
+  }
 
-    const reasoningBytes = sanitizedMessages
-      .filter((msg): msg is ConversationMessage & { reasoning?: string } => msg.role === 'assistant' && typeof (msg as { reasoning?: unknown }).reasoning === 'string')
-      .map((msg) => Buffer.byteLength((msg as { reasoning: string }).reasoning, 'utf8'))
-      .reduce((acc, n) => acc + n, 0);
+  private isReasoningGuard(value: unknown): value is { disable: boolean; normalized: ConversationMessage[] } {
+    if (value === null || typeof value !== 'object') return false;
+    const disable = (value as { disable?: unknown }).disable;
+    const normalized = (value as { normalized?: unknown }).normalized;
+    return typeof disable === 'boolean' && Array.isArray(normalized);
+  }
 
-    const responseBytes = typeof turnResult.response === 'string' ? Buffer.byteLength(turnResult.response, 'utf8') : 0;
-
-    const enrichedMessageParts: string[] = [message];
-    if (contentBytes > 0) enrichedMessageParts.push(`content_bytes=${String(contentBytes)}`);
-    if (reasoningBytes > 0) enrichedMessageParts.push(`reasoning_bytes=${String(reasoningBytes)}`);
-    if (responseBytes > 0) enrichedMessageParts.push(`response_bytes=${String(responseBytes)}`);
-    if (assistantPreview !== undefined) enrichedMessageParts.push(`preview="${assistantPreview}"`);
-
-    const warnEntry: LogEntry = {
+  private logTurnFailure(info: { turn: number; slugs: string[]; provider: string; model: string; message: string; rawResponse?: string; rawResponseTruncated?: boolean }): void {
+    const entry: LogEntry = {
       timestamp: Date.now(),
-      severity,
-      turn,
+      severity: 'WRN',
+      turn: info.turn,
       subturn: 0,
       direction: 'response',
       type: 'llm',
-      remoteIdentifier: remoteId,
-      fatal,
-      message: enrichedMessageParts.join(' | '),
+      remoteIdentifier: 'agent:turn-failure',
+      fatal: false,
+      message: `${info.message} [slugs=${info.slugs.join(',')}]`,
       details: {
-        provider,
-        model,
-        finish_reason: (turnResult.stopReason ?? (turnResult.status as { finishReason?: string }).finishReason) ?? '',
-        tool_calls: Array.isArray(turnResult.toolCalls) ? turnResult.toolCalls.length : 0,
-        has_text: sanitizedHasText,
-        has_tool_calls: sanitizedHasToolCalls,
-        has_reasoning: Boolean(turnResult.hasReasoning),
-        assistant_preview: assistantPreview ?? '',
-        content_bytes: contentBytes,
-        reasoning_bytes: reasoningBytes,
-        response_bytes: responseBytes,
-        raw_response: typeof turnResult.response === 'string' ? turnResult.response : '',
+        provider: info.provider,
+        model: info.model,
+        slugs: info.slugs.join(','),
+        raw_response_truncated: Boolean(info.rawResponseTruncated),
+        raw_response: info.rawResponse ?? '',
       },
     };
-    this.log(warnEntry);
+    this.log(entry);
+  }
+
+  private finalizeSessionFailure(
+    conversation: ConversationMessage[],
+    logs: LogEntry[],
+    accounting: AccountingEntry[],
+    failureInfo: { slugs: string[]; message: string; rawResponse?: string; rawResponseTruncated?: boolean },
+    currentTurn: number
+  ): AIAgentResult {
+    const toolFailureNote = this.state.finalReportToolFailedEver ? ' The final_report tool failed.' : '';
+    const summary = `${failureInfo.message}; slugs=${failureInfo.slugs.join(',')}.${toolFailureNote}`;
+    this.logFailureReport(summary, currentTurn, {
+        reason: 'session_failed',
+        slugs: failureInfo.slugs.join(','),
+        raw_response_truncated: failureInfo.rawResponseTruncated ?? false,
+        turns_completed: currentTurn,
+        final_report_attempts: this.ctx.finalReportManager.finalReportAttempts,
+    });
+    const fallbackFormat = this.ctx.resolvedFormat ?? 'text';
+    this.commitFinalReport({
+      format: fallbackFormat,
+      content: summary,
+      metadata: {
+        reason: 'session_failed',
+        slugs: failureInfo.slugs,
+        raw_response_truncated: failureInfo.rawResponseTruncated ?? false,
+        turns_completed: currentTurn,
+        final_report_attempts: this.ctx.finalReportManager.finalReportAttempts,
+      },
+    }, 'synthetic');
+    return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn, { sessionFailed: true, failureSlugs: failureInfo.slugs });
   }
     private commitFinalReport(payload: PendingFinalReportPayload, source: FinalReportSource): void {
+        this.state.finalReportInvalidFormat = false;
+        this.state.finalReportSchemaFailed = false;
         const statusValueRaw = payload.metadata !== undefined && typeof payload.metadata === 'object'
             ? (payload.metadata as { status?: unknown }).status
             : undefined;
@@ -2081,10 +2028,19 @@ export class TurnRunner {
         this.emitFinalSummary(logs, accounting);
         return { success: true, conversation, logs, accounting, childConversations: this.state.childConversations };
     }
-    private finalizeWithCurrentFinalReport(conversation: ConversationMessage[], logs: LogEntry[], accounting: AccountingEntry[], currentTurn: number): AIAgentResult {
+    private finalizeWithCurrentFinalReport(conversation: ConversationMessage[], logs: LogEntry[], accounting: AccountingEntry[], currentTurn: number, options?: { sessionFailed?: boolean; failureSlugs?: string[] }): AIAgentResult {
         const fr = this.finalReport;
         if (fr === undefined) {
             throw new Error('finalizeWithCurrentFinalReport called without final report');
+        }
+        const statusMeta = (() => {
+            const metaStatus = fr.metadata !== undefined && typeof (fr.metadata as { status?: unknown }).status === 'string'
+                ? ((fr.metadata as { status: string }).status.trim().toLowerCase())
+                : undefined;
+            return metaStatus;
+        })();
+        if (this.state.lastFinalReportStatus === undefined && statusMeta !== undefined) {
+            this.state.lastFinalReportStatus = statusMeta;
         }
         // Validate structured formats before streaming/marking success
         if (fr.format === SLACK_BLOCK_KIT_FORMAT) {
@@ -2142,6 +2098,9 @@ export class TurnRunner {
                     fatal: false,
                     message: 'final_report(slack-block-kit) requires `messages` or non-empty `content`'
                 });
+                this.state.lastFinalReportStatus = 'failure';
+                this.state.finalReportInvalidFormat = true;
+                this.state.toolFailureMessages.set('final_report_invalid_format', 'slack_block_kit_missing_messages');
                 const syntheticContent = 'Slack final report missing messages array.';
                 this.commitFinalReport({
                     format: 'text',
@@ -2171,6 +2130,9 @@ export class TurnRunner {
                     message: errMsg
                 };
                 this.log(errLog);
+                this.state.lastFinalReportStatus = 'failure';
+                this.state.finalReportSchemaFailed = true;
+                this.state.toolFailureMessages.set('final_report_schema', errMsg);
             }
         }
         if (this.ctx.sessionConfig.renderTarget !== 'sub-agent' && this.callbacks.onOutput !== undefined) {
@@ -2225,7 +2187,11 @@ export class TurnRunner {
         const exitMessage = this.forcedFinalTurnReason === 'context'
             ? `Final report received after context guard triggered (${FINAL_REPORT_TOOL}), session complete`
             : `Final report received (${FINAL_REPORT_TOOL}), session complete`;
-        this.logExit(exitCode, exitMessage, currentTurn, { fatal: false });
+        const validationFailed = this.state.finalReportInvalidFormat || this.state.finalReportSchemaFailed || statusMeta === 'failure' || this.state.lastFinalReportStatus === 'failure';
+        const computedSuccess = (options?.sessionFailed === true)
+            ? false
+            : (source !== 'synthetic' && !this.state.toolLimitExceeded && !validationFailed);
+        this.logExit(exitCode, exitMessage, currentTurn, { fatal: !computedSuccess, severity: computedSuccess ? 'VRB' : 'ERR' });
         const metadataRecord = fr.metadata;
         const metadataReason = typeof metadataRecord?.reason === 'string' ? metadataRecord.reason : undefined;
         recordFinalReportMetrics({
@@ -2241,10 +2207,7 @@ export class TurnRunner {
         });
         this.emitFinalSummary(logs, accounting);
         // Success contract: model-provided final reports succeed unless explicitly marked failure; synthetic reports are failures.
-        const statusFailure = this.state.lastFinalReportStatus === 'failure';
-        const success = source !== 'synthetic' &&
-            !this.state.toolLimitExceeded &&
-            (!statusFailure || this.state.finalReportToolFailedEver);
+        const success = computedSuccess;
         const error = (() => {
             if (success) return undefined;
             if (typeof fr.content === 'string' && fr.content.length > 0) return fr.content;
@@ -2449,6 +2412,16 @@ export class TurnRunner {
                 systemMessage: `System notice: ${remoteId} experienced a transient ${prettyType} (${reason}). Retrying shortly.`,
             };
         }
+        if (status.type === 'model_error') {
+            const retryable = status.retryable;
+            if (retryable)
+                return undefined;
+            return {
+                action: RETRY_ACTION_SKIP_PROVIDER,
+                logMessage: `Non-retryable model error from ${remoteId}; skipping provider.`,
+                systemMessage: `System notice: ${remoteId} returned a non-retryable model error (${status.message}). Switching to the next configured provider.`,
+            };
+        }
         return undefined;
     }
     private async sleepWithAbort(ms: number): Promise<'completed' | 'aborted_cancel' | 'aborted_stop'> {
@@ -2521,6 +2494,10 @@ export class TurnRunner {
             incompleteFinalReportDetected: false,
             toolLimitExceeded: false,
             finalReportToolFailed: false,
+            executedTools: 0,
+            executedNonProgressBatchTools: 0,
+            executedProgressBatchTools: 0,
+            unknownToolEncountered: false,
         };
 
         // Create tool executor for fallback execution
@@ -2785,11 +2762,15 @@ export class TurnRunner {
         const { toolsForTurn, availableTools, allowedToolNames } = selection;
         let disableReasoningForTurn = false;
         this.schemaCtxTokens = 0;
-        const reasoningGuard = this.ctx.llmClient.shouldDisableReasoning(provider, {
+        const rawReasoningGuard = this.ctx.llmClient.shouldDisableReasoning(provider, {
             conversation,
             currentTurn,
+            attempt,
             expectSignature: true,
         });
+        const reasoningGuard = this.isReasoningGuard(rawReasoningGuard)
+            ? rawReasoningGuard
+            : { disable: false, normalized: conversation };
         if (reasoningGuard.disable) {
             conversation = reasoningGuard.normalized;
             disableReasoningForTurn = true;
@@ -2798,6 +2779,7 @@ export class TurnRunner {
         let shownThinking = false;
         this.state.toolFailureMessages.clear();
         this.state.toolFailureFallbacks.length = 0;
+        this.state.droppedInvalidToolCalls = 0;
         const executionState: ToolExecutionState = {
             toolFailureMessages: this.state.toolFailureMessages,
             toolFailureFallbacks: this.state.toolFailureFallbacks,
@@ -2805,7 +2787,11 @@ export class TurnRunner {
             turnHasSuccessfulToolOutput: false,
             incompleteFinalReportDetected: false,
             toolLimitExceeded: this.state.toolLimitExceeded,
-            finalReportToolFailed: false
+            finalReportToolFailed: false,
+            executedTools: 0,
+            executedNonProgressBatchTools: 0,
+            executedProgressBatchTools: 0,
+            unknownToolEncountered: false,
         };
         const baseExecutor = this.ctx.sessionExecutor.createExecutor(currentTurn, provider, executionState, allowedToolNames);
         let incompleteFinalReportDetected = false;
@@ -3067,7 +3053,17 @@ export class TurnRunner {
             if (result.status.type !== 'success') {
                 addSpanAttributes({ 'ai.llm.status': result.status.type });
             }
-            return { ...result, shownThinking, incompleteFinalReportDetected };
+            return {
+                ...result,
+                shownThinking,
+                incompleteFinalReportDetected,
+                executionStats: {
+                    executedTools: executionState.executedTools,
+                    executedNonProgressBatchTools: executionState.executedNonProgressBatchTools,
+                    executedProgressBatchTools: executionState.executedProgressBatchTools,
+                    unknownToolEncountered: executionState.unknownToolEncountered,
+                }
+            };
         }
         catch (e) {
             throw e;

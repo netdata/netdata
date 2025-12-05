@@ -278,6 +278,9 @@ Notes:
 - **Error Messages**: If a tool can't be executed and no response message is received, generate an explanatory error message
 - **Parallel Execution**: Tools run concurrently but results are ordered correctly
 - **Performance Tracking**: Include latency and request/response size accounting for each tool execution
+- Progress (`agent__progress_report`) and batch wrapper (`agent__batch`) always return a response but do **not** satisfy turn success criteria.
+- Turn success requires either (a) an accepted/valid final report, or (b) at least one executed non-progress/batch tool call. Turns advance only when successful.
+- Failed turns emit exactly one WRN log with slugged reasons and the full LLM response (capped ~128 KB). Retry exhaustion fails the session immediately with a single ERR log and a synthetic session report. Collapse logic may only shrink `maxTurns`, never increase it.
 <!-- Tool limits are now handled by the provider/SDK; no app-level limit option. -->
 
 #### Tool Response Size Cap

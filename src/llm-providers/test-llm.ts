@@ -35,8 +35,8 @@ export class TestLLMProvider extends BaseLLMProvider {
     super();
   }
 
-  public override shouldDisableReasoning(context: { conversation: ConversationMessage[]; currentTurn: number; expectSignature: boolean }): { disable: boolean; normalized: ConversationMessage[] } {
-    if (context.currentTurn <= 1 || !context.expectSignature) {
+  public override shouldDisableReasoning(context: { conversation: ConversationMessage[]; currentTurn: number; attempt: number; expectSignature: boolean }): { disable: boolean; normalized: ConversationMessage[] } {
+    if ((context.currentTurn <= 1 && context.attempt <= 1) || !context.expectSignature) {
       return { disable: false, normalized: context.conversation };
     }
     let missing = false;
