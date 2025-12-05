@@ -248,6 +248,7 @@ jobs:
           build-args: |
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             EXTRA_INSTALL_OPTS=${{ needs.file-check.outputs.skip-go }}
+            BUILD_ARCH=${{ matrix.arch }}
             BUILD_VERSION=test
             BUILD_DATE=${{ github.event.repository.updated_at }}
       - name: Test Image
@@ -369,6 +370,7 @@ jobs:
           outputs: type=image,name=netdata/netdata,push-by-digest=true,name-canonical=true,push=true
           build-args: |
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
+            BUILD_ARCH=${{ matrix.arch }}
             BUILD_VERSION=${{ github.event.inputs.version }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
       - name: Export Digest
@@ -526,6 +528,7 @@ jobs:
           cache-from: type=local,src=/tmp/build-cache
           build-args: |
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
+            BUILD_ARCH=${{ matrix.arch }}
             BUILD_VERSION=${{ github.event.inputs.version }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
           outputs: type=image,name=quay.io/netdata/netdata,push-by-digest=true,name-canonical=true,push=true
@@ -685,6 +688,7 @@ jobs:
           cache-from: type=local,src=/tmp/build-cache
           build-args: |
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
+            BUILD_ARCH=${{ matrix.arch }}
             BUILD_VERSION=${{ github.event.inputs.version }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
           outputs: type=image,name=ghcr.io/netdata/netdata,push-by-digest=true,name-canonical=true,push=true
