@@ -195,7 +195,7 @@ endmeta-->
             learn_rel_path = generate_category_from_name(
                 integration["meta"]["categories"][0].split("."), categories
             )
-            keywords = integration["meta"]["keywords"] if "keywords" in integration["meta"] else None
+            keywords = integration["keywords"] if "keywords" in integration else None
 
             md = f"""<!--startmeta
 meta_yaml: "{meta_yaml}"
@@ -222,7 +222,7 @@ endmeta-->
             learn_rel_path = generate_category_from_name(
                 integration["meta"]["categories"][0].split("."), categories
             )
-            keywords = integration["meta"]["keywords"] if "keywords" in integration["meta"] else None
+            keywords = integration["keywords"] if "keywords" in integration else None
 
             md = f"""<!--startmeta
 meta_yaml: "{meta_yaml}"
@@ -249,7 +249,7 @@ endmeta-->
             learn_rel_path = generate_category_from_name(
                 integration["meta"]["categories"][0].split("."), categories
             )
-            keywords = integration["meta"]["keywords"] if "keywords" in integration["meta"] else None
+            keywords = integration["keywords"] if "keywords" in integration else None
 
             md = f"""<!--startmeta
 meta_yaml: "{meta_yaml}"
@@ -276,7 +276,7 @@ endmeta-->
             learn_rel_path = generate_category_from_name(
                 integration["meta"]["categories"][0].split("."), categories
             )
-            keywords = integration["meta"]["keywords"] if "keywords" in integration["meta"] else None
+            keywords = integration["keywords"] if "keywords" in integration else None
 
             md = f"""<!--startmeta
 meta_yaml: "{meta_yaml}"
@@ -301,7 +301,7 @@ endmeta-->
             learn_rel_path = generate_category_from_name(
                 integration["meta"]["categories"][0].split("."), categories
             )
-            keywords = integration["meta"]["keywords"] if "keywords" in integration["meta"] else None
+            keywords = integration["keywords"] if "keywords" in integration else None
 
             md = f"""<!--startmeta
 meta_yaml: "{meta_yaml}"
