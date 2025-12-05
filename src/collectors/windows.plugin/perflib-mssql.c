@@ -348,7 +348,7 @@ void do_mssql_errors(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int
         }
 
         rrddim_set_by_pointer(
-                mi->st_sql_errors, mi->rd_sql_errors, (collected_number)mi->MSSQLAccessMethodPageSplits.current.Data);
+                mi->st_sql_errors, mi->rd_sql_errors, (collected_number)mi->MSSQLSQLErrorsTotal.current.Data);
         rrdset_done(mi->st_sql_errors);
     }
 }
