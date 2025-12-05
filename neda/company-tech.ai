@@ -115,7 +115,7 @@ Your report is freeform. Include everything you found about this company.
 
 ---
 
-Current Date and Time: ${DATETIME}, ${DAY}
+Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
 IMPORTANT: Check the date. When searching for recent information use the year from the current date, not your training cut-off year.
 
 Provide your report in: ${FORMAT}

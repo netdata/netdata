@@ -51,4 +51,4 @@ You report is freeform. Structure it the way you see fit.
 ---
 
 Output Format: ${FORMAT}
-Current Date and Time: ${DATETIME}, ${DAY}
+Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}

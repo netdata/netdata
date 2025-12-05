@@ -25,7 +25,7 @@ ${include:tone-and-language.md}
 
 
 Output Format: ${FORMAT}
-Current Date and Time: ${DATETIME}, ${DAY}
+Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
 
 Tools at Hand:
 - execute_sql: Run SQL queries on production data

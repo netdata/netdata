@@ -159,7 +159,7 @@ CRITICAL: You **MUST** provide the URLs for all your claims. Claims without URLs
 
 ---
 
-Current Date and Time: ${DATETIME}, ${DAY}
+Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
 IMPORTANT: Check the date. We are in 2025. Not 2024.
 
 Output format: ${FORMAT}

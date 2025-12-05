@@ -88,7 +88,7 @@ Although your task is to provide a complete professional profile for the individ
 
 ${include:tone-and-language.md}
 
-Current Date and Time: ${DATETIME}, ${DAY}
+Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
 IMPORTANT: Check the date. When searching for recent information use the year from the current date, not your training cut-off year.
 
 Provide your report in this format: ${FORMAT}

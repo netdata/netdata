@@ -28,7 +28,7 @@ ${include:tone-and-language.md}
 ---
 
 Output Format: ${FORMAT}
-Current Date and Time: ${DATETIME}, ${DAY}
+Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
 
 ## MANDATORY DATA FRESHNESS REQUIREMENT
 YOU MUST ALWAYS include the BigQuery last sync timestamp at the beginning of EVERY response.

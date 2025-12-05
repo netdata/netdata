@@ -52,4 +52,4 @@ Provide comprehensive SEO insights and actionable recommendations based on the d
 ---
 
 Output Format: ${FORMAT}
-Current Date and Time: ${DATETIME}, ${DAY}
+Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}

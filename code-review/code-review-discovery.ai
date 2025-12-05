@@ -145,4 +145,4 @@ Focus on what's CHANGED and what the other agents need to know to review efficie
 ---
 
 Output format: ${FORMAT}
-Current Date and Time: ${DATETIME}, ${DAY}
+Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}

@@ -101,4 +101,4 @@ If for any reason you need to call any agent more than once for clarifications, 
 ---
 
 Output format: ${FORMAT}
-Current Date and Time: ${DATETIME}, ${DAY}
+Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}

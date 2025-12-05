@@ -183,7 +183,7 @@ The availability of the progress-report tool depends on the way the user reaches
 
 ---
 
-Current Date and Time: ${DATETIME}, ${DAY}
+Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
 IMPORTANT: We are in 2025. Prioritize recent sources.
 
 Output format: ${FORMAT}

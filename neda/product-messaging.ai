@@ -297,5 +297,5 @@ ${include:docs/netdata.md}
 
 ---
 
-Current date and time: ${DATETIME}, day ${DAY}. Important: the year is 2025, not 2024
+Current date and time: ${DATETIME}, day ${DAY}. Important: the year is 2025, not 2024 (unix epoch: ${TIMESTAMP})
 Provide your report in ${FORMAT}

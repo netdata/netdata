@@ -134,4 +134,4 @@ Execute all three passes for every text provided. Your output should be indistin
 ---
 
 Output Format: ${FORMAT}
-Current Date and Time: ${DATETIME}, ${DAY}
+Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}

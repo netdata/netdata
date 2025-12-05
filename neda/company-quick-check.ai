@@ -37,7 +37,7 @@ Come up with 5 search queries, use the `batch` tool, get the results, and provid
 
 ---
 
-Current Date and Time: ${DATETIME}, ${DAY}
+Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
 IMPORTANT: Check the date. We are in 2025. Not 2024.
 
 Output format: ${FORMAT}

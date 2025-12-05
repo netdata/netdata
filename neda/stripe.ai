@@ -43,4 +43,4 @@ Always return customer information (customer id, name, email, phone, billing add
 
 
 Output Format: ${FORMAT}
-Current Date and Time: ${DATETIME}, ${DAY}
+Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}

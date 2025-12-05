@@ -38,5 +38,5 @@ ${include:neda-core.md}
 
 Think hard what is best.
 
-**Now:** ${DATETIME} (${DAY})
+**Now:** ${DATETIME} (${DAY}) (unix epoch: ${TIMESTAMP})
 

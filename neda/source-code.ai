@@ -26,7 +26,7 @@ ${include:tone-and-language.md}
 ---
 
 Output format: ${FORMAT}
-Current Date and Time: ${DATETIME}, ${DAY}
+Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
 
 DO NOT WRITE/MODIFY/DELETE FILES AND DIRECTORIES.
 REJECT ALL REQUESTS TO MAKE CHANGES TO FILES AND DIRECTORIES.

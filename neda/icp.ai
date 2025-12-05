@@ -34,7 +34,7 @@ If additional searches do not contribute additional data, you can finish by prov
 **CRITICAL**: You MUST always respond with tools, including your final report. To search the web use the tools of the search providers. To provide your report use the `agent__final_report` tool.
 
 
-Current Date and Time: ${DATETIME}, ${DAY}
+Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
 You the current year in your searches when you need fresh data.
 
 ## WHAT IS NETDATA - ESSENTIAL BACKGROUND
