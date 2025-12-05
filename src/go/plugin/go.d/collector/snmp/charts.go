@@ -16,6 +16,12 @@ const (
 	prioProfileChart = module.Priority + iota
 	prioPingRtt
 	prioPingStdDev
+
+	prioInternalStatsTimings
+	prioInternalStatsSnmpOps
+	prioInternalStatsMetrics
+	prioInternalStatsTableCache
+	prioInternalStatsErrors
 )
 
 var (
@@ -81,7 +87,7 @@ var (
 		Units:    "milliseconds",
 		Fam:      "Internal/Stats",
 		Ctx:      "snmp.device_prof_stats_timings",
-		Priority: prioProfileChart,
+		Priority: prioInternalStatsTimings,
 		Dims: module.Dims{
 			{ID: "snmp_device_prof_%s_stats_timings_scalar", Name: "scalar"},
 			{ID: "snmp_device_prof_%s_stats_timings_table", Name: "table"},
@@ -95,7 +101,7 @@ var (
 		Units:    "operations",
 		Fam:      "Internal/Stats",
 		Ctx:      "snmp.device_prof_stats_snmp",
-		Priority: prioProfileChart,
+		Priority: prioInternalStatsSnmpOps,
 		Dims: module.Dims{
 			{ID: "snmp_device_prof_%s_stats_snmp_get_requests", Name: "get_requests"},
 			{ID: "snmp_device_prof_%s_stats_snmp_get_oids", Name: "get_oids"},
@@ -112,7 +118,7 @@ var (
 		Units:    "metrics",
 		Fam:      "Internal/Stats",
 		Ctx:      "snmp.device_prof_stats_metrics",
-		Priority: prioProfileChart,
+		Priority: prioInternalStatsMetrics,
 		Dims: module.Dims{
 			{ID: "snmp_device_prof_%s_stats_metrics_scalar", Name: "scalar"},
 			{ID: "snmp_device_prof_%s_stats_metrics_table", Name: "table"},
@@ -128,7 +134,7 @@ var (
 		Units:    "tables",
 		Fam:      "Internal/Stats",
 		Ctx:      "snmp.device_prof_stats_table_cache",
-		Priority: prioProfileChart,
+		Priority: prioInternalStatsTableCache,
 		Dims: module.Dims{
 			{ID: "snmp_device_prof_%s_stats_table_cache_hits", Name: "hits"},
 			{ID: "snmp_device_prof_%s_stats_table_cache_misses", Name: "misses"},
@@ -141,7 +147,7 @@ var (
 		Units:    "errors",
 		Fam:      "Internal/Stats",
 		Ctx:      "snmp.device_prof_stats_errors",
-		Priority: prioProfileChart,
+		Priority: prioInternalStatsErrors,
 		Dims: module.Dims{
 			{ID: "snmp_device_prof_%s_stats_errors_snmp", Name: "snmp"},
 			{ID: "snmp_device_prof_%s_stats_errors_processing_scalar", Name: "processing_scalar"},
