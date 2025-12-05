@@ -1,7 +1,7 @@
 /**
  * XmlToolTransport - Manages XML-based tool calling protocol for AI agent sessions.
  *
- * This class encapsulates all state and logic for the XML tool transport modes ('xml' and 'xml-final').
+ * This class encapsulates all state and logic for the XML final-report transport.
  * It handles:
  * - Turn lifecycle (resetting state between turns)
  * - Building XML-NEXT and XML-PAST prompt messages
@@ -166,7 +166,6 @@ export class XmlToolTransport {
       tools: [],
       slotTemplates,
       progressSlot: undefined,
-      mode: 'xml-final',
       expectedFinalFormat: (config.resolvedFormat ?? 'markdown') as XmlNextPayload['expectedFinalFormat'],
       finalSchema: config.resolvedFormat === 'json' ? config.expectedJsonSchema : undefined,
     });
@@ -185,7 +184,7 @@ export class XmlToolTransport {
     this.slots = slotTemplates;
     this.allowedTools = allowedToolNames;
 
-    // xml-final mode does not send past entries
+    // xml-final transport does not send past entries
     const pastMessage: ConversationMessage | undefined = undefined;
 
     return {
@@ -478,18 +477,14 @@ export class XmlToolTransport {
   }
 
   /**
-   * Check if native tool calls should be ignored (xml mode only).
+   * Native tool calls are always honored and merged with XML final-report parsing.
    */
-  shouldIgnoreNativeToolCalls(): boolean {
-    return false;
-  }
+  shouldIgnoreNativeToolCalls(): boolean { return false; }
 
   /**
-   * Check if native tool calls should be merged with XML (xml-final mode).
+   * Native tool calls are always merged (single xml-final transport).
    */
-  shouldMergeNativeToolCalls(): boolean {
-    return true;
-  }
+  shouldMergeNativeToolCalls(): boolean { return true; }
 }
 
 /**

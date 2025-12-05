@@ -72,14 +72,12 @@ describe('XML streaming parser', () => {
       tools: [{ name: 'agent__final_report' }, { name: 'agent__progress_report' }, { name: 'mock_tool', schema: { type: 'object' } }],
       slotTemplates: [{ slotId: `${NONCE}-FINAL`, tools: ['agent__final_report'] }],
       progressSlot: undefined,
-      mode: 'xml-final',
       expectedFinalFormat: 'markdown',
       finalSchema: undefined,
     });
-    // xml-final mode: XML-NEXT should not include final-report instructions or schemas
-    expect(xml).not.toContain('agent__final_report');
-    expect(xml).not.toContain('## Final Report');
-    // Should NOT contain tool schemas for non-final tools in xml-final mode
+    // xml-final: XML-NEXT describes the final-report tag with nonce and omits non-final tool schemas
+    expect(xml).toContain(`${NONCE}-FINAL`);
+    expect(xml).toContain('agent__final_report');
     expect(xml).not.toContain('mock_tool');
   });
 });

@@ -10,16 +10,16 @@
 - **Process-level shutdown**: `ShutdownController` (src/shutdown-controller.ts) owns a shared `AbortSignal` and `stopRef`. CLI/headend mode registers cleanup tasks (headend manager, Slack headend, shared MCP registry, telemetry) with this controller. The first `SIGINT`/`SIGTERM` flips the `stopRef`, aborts the shared signal, and awaits each registered task (headends stop accepting work, Slack sessions are marked `stopping`, shared MCP transports are closed). A watchdog forces exit if cleanup stalls; a second signal skips the graceful path and calls `exitWith(...)` immediately.
 - **Reasoning management**: Frontmatter/CLI `reasoning` now accepts `none|minimal|low|medium|high|default|unset`. `none` **or** `unset` disables reasoning (sets `reasoningValue = null`), while omitting the key (or writing `default`) lets the global fallback (`defaults.reasoning` or `--default-reasoning`) decide. These settings plus `reasoningTokens` feed `ProviderReasoningMapping` before each turn. Anthropic-style thinking streams arrive via `onThinking` and surface as `THK` log entries plus grey stderr text. Every LLM turn also triggers `onTurnStarted(turnIndex)` so headends can render numbered turn headers even when no reasoning/progress chunks arrive.
 - **Context-window guard**: `AIAgentSession` tracks `currentCtxTokens`, `pendingCtxTokens`, `newCtxTokens`, and `schemaCtxTokens`. If projected totals exceed provider limits it enters “forced final turn” mode: tool calls disabled, final user nudge injected, and `logExit('EXIT-TOKEN-LIMIT', ...)` recorded.
-- **System prompt composition**: `agent-loader` flattens `.ai` content (resolves `include:`), strips frontmatter, then `applyFormat` injects `${FORMAT}` description. Runtime appends the native tool instruction block; XML-NEXT is used only for the xml-final final-report slot. Schemas ride in XML-NEXT for the final report, not in the system prompt.
+- **System prompt composition**: `agent-loader` flattens `.ai` content (resolves `include:`), strips frontmatter, then `applyFormat` injects `${FORMAT}` description. Runtime appends the native tool instruction block; XML-NEXT is used only for the XML final-report slot. Schemas ride in XML-NEXT for the final report, not in the system prompt.
 - **Injected user messages**:
   - If `maxTurns` is reached, the session appends the hardcoded "You are not allowed to run any more tools…" user message and disables tools for the concluding turn.
   - For forced-final context situations, a user message states “Maximum number of turns/steps reached…” before invoking `agent__final_report`.
 - **Internal tools**: `agent__final_report` is always available; the LLM must call it exactly once to conclude. `agent__batch` enables parallel tool execution for models without native parallel support (see below). Sub-agents register as `agent__<toolName>`. REST imports register as `rest__<toolName>`.
-- **XML transport (fixed to xml-final)**:
-  - Provider tools stay native (tool_calls) but the final report must be wrapped in the XML tag. XML-NEXT reminds the model to call tools natively; progress slot suppressed; XML-PAST omitted.
-  - Final report can be raw markdown/text inside the tag; JSON payloads still work but are optional.
+- **XML transport (single path)**:
+  - Provider tools stay native (tool_calls) but the final report must be wrapped in the XML tag. XML-NEXT only communicates nonce + final slot; progress slot suppressed; XML-PAST omitted.
+  - Final report content lives inside the XML tag; structured JSON still works via `content_json`, otherwise treat as markdown/text.
   - Accounting uses `source: xml`; final-report `command: agent__final_report_xml`; orchestration/budgets unchanged.
-  - Transport CLI override removed; xml-final is mandatory.
+  - Transport is not configurable; XML-final is always used.
 - **Parallel tool execution with `agent__batch`**: When LLM models don't support native parallel tool calls, use `agent__batch` to execute multiple tools in a single request. Each call requires an `id` (string or number), exact `tool` name, and `parameters` object matching that tool's schema. The batch tool returns structured results with per-call status, output, timing, and error details. Restrictions: `agent__progress_report` is allowed in batch, but `agent__final_report` and nested `agent__batch` calls are blocked. The batch tool bypasses queue limits to prevent deadlocks. Implementation: `src/tools/internal-provider.ts:632-776`.
 - **Logging & tracing**:
   - `LogEntry.severity` set includes `VRB` (verbose flow), `WRN`, `ERR`, `TRC` (trace dumps), `THK` (thinking stream headers), `FIN` (summary). CLI renders them via `log-sink-tty` with ANSI colors; headends forward logs to their sinks.
@@ -39,11 +39,11 @@
 - [ ] Provide final-report instructions so the LLM knows when to call `agent__final_report`.
 
 ### Final Report Expectations (Read Carefully)
-- **Always end with `agent__final_report`**: The orchestrator accepts only one final report tool call per session. Plain-text answers are ignored unless forced into a fallback path.
-- **Fallback cache ≠ success**: If you emit valid JSON in text (instead of calling the tool), the agent caches it but still retries. Only on the *forced final turn* (max turns or context guard) will that cached payload be accepted—logged as `agent:fallback-report` and attributed to you as a soft failure.
-- **Malformed calls shrink your budget**: Whenever you send `agent__final_report` with invalid parameters (missing status/format/content) the orchestrator logs `agent:orchestrator Collapsing remaining turns...` and reduces `maxTurns` to `currentTurn + 1`. Persistently malformed payloads therefore eliminate future tool turns.
-- **Synthetic failures trigger alerts**: If you refuse to send a valid tool call, the session emits `agent:failure-report` and surfaces a synthetic `status: failure` final report. Telemetry labels (`source='synthetic'`, `reason='max_turns_exhausted'|...)`) notify on-call teams. Do **not** rely on this path.
-- **What you should do**: Always call `agent__final_report` with `status`, `report_format`, `encoding` (`raw` or `base64`), `report_content`, and (when applicable) `content_json` that matches the schema. Treat text extraction as an emergency fallback only.
+- **Always end with `agent__final_report` via XML**: The orchestrator accepts only one final report per session. Plain-text answers are **not** accepted; missing or malformed XML final reports cause retries and can end as synthetic failures.
+- **No text fallback**: The runner no longer accepts cached/plain text as a final report. If the XML tag is missing or empty, the turn fails and the session either retries or emits a synthetic failure on the last turn.
+- **Malformed calls shrink your budget**: Invalid parameters (missing status/format/content) trigger TURN-FAILED feedback and can collapse remaining turns. Fix payloads immediately to avoid losing tool turns.
+- **Synthetic failures trigger alerts**: If you never send a valid XML final report, the session emits `agent:failure-report` and surfaces a synthetic `status: failure` final report with `source='synthetic'`. Do **not** rely on this path.
+- **What you should do**: Always emit `<ai-agent-${nonce}-FINAL tool="agent__final_report" status="success" format="${FORMAT}">...</ai-agent-${nonce}-FINAL>` with `content_json` when JSON is expected or `report_content`/`messages` for text/slack formats.
 - [ ] Decide whether to expose tool instructions (default: appended automatically once).
 - [ ] Enable tracing/verbose flags when debugging provider/tool failures.
 

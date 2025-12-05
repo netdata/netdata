@@ -2683,22 +2683,13 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: [TOOL_NAME],
         response: {
-          kind: 'tool-call',
-          assistantText: 'Attempting additional research instead of final report.',
-          toolCalls: [
-            {
-              toolName: TOOL_NAME,
-              callId: 'max-turn-call-2',
-              assistantText: 'Continuing research on final turn.',
-              arguments: {
-                text: 'max-turn-follow-up',
-              },
-            },
-          ],
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Final turn reached; providing mandatory report.',
+          reportContent: `${RESULT_HEADING}Max turns reached; summarizing with available information.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
           tokenUsage: DEFAULT_TOKEN_USAGE,
-          finishReason: TOOL_FINISH_REASON,
         },
       },
     ],

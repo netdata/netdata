@@ -450,8 +450,12 @@ export class InternalToolProvider extends ToolProvider {
     }
     if (name === 'agent__final_report') {
       const requestedFormat = typeof parameters.report_format === 'string' ? parameters.report_format : (typeof parameters.format === 'string' ? parameters.format : undefined);
+      const statusParamRaw = typeof parameters.status === 'string' ? parameters.status : undefined;
+      const statusParam = statusParamRaw !== undefined ? statusParamRaw.trim().toLowerCase() : undefined;
       if (requestedFormat !== undefined && requestedFormat !== this.formatId) {
-        this.opts.logError(`agent__final_report: received report_format='${requestedFormat}', expected '${this.formatId}'. Proceeding with expected format.`);
+        const msg = `agent__final_report: received report_format='${requestedFormat}', expected '${this.formatId}'.`;
+        this.opts.logError(msg);
+        throw new Error(msg);
       }
       let content = typeof parameters.report_content === 'string' ? parameters.report_content : (typeof parameters.content === 'string' ? parameters.content : undefined);
       let contentJson = (parameters.content_json !== null && typeof parameters.content_json === 'object' && !Array.isArray(parameters.content_json)) ? (parameters.content_json as Record<string, unknown>) : undefined;
@@ -675,9 +679,26 @@ export class InternalToolProvider extends ToolProvider {
         const slackVal = (metaBase as Record<string, unknown> & { slack?: unknown }).slack;
         const slackExisting: Record<string, unknown> = (slackVal !== undefined && slackVal !== null && typeof slackVal === 'object' && !Array.isArray(slackVal)) ? (slackVal as Record<string, unknown>) : {};
         const metaSlack: Record<string, unknown> = { ...slackExisting, messages: normalizedMessages };
-        const mergedMeta: Record<string, unknown> = { ...metaBase, slack: metaSlack };
+        const mergedMeta: Record<string, unknown> = {
+          ...metaBase,
+          ...(statusParam !== undefined ? { status: statusParam } : {}),
+          slack: metaSlack
+        };
         this.opts.setFinalReport({ format: this.formatId, content, content_json: contentJson, metadata: mergedMeta });
         return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
+      }
+
+      if (this.formatId === 'json' && contentJson === undefined && typeof content === 'string') {
+        try {
+          const parsed = JSON.parse(content) as unknown;
+          if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            contentJson = parsed as Record<string, unknown>;
+            // Normalize string content to the reparsed JSON representation for downstream previews
+            content = JSON.stringify(parsed);
+          }
+        } catch {
+          // leave contentJson undefined; downstream validation will handle the failure
+        }
       }
 
       if (this.formatId === 'json') {
@@ -759,7 +780,10 @@ export class InternalToolProvider extends ToolProvider {
           }
           contentJson = target;
         }
-        const mergedMeta = { ...metadata };
+        const mergedMeta = {
+          ...metadata,
+          ...(statusParam !== undefined ? { status: statusParam } : {})
+        };
         this.opts.setFinalReport({ format: this.formatId, content, content_json: contentJson, metadata: mergedMeta });
         return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
       }
@@ -768,7 +792,10 @@ export class InternalToolProvider extends ToolProvider {
         this.opts.logError('agent__final_report requires non-empty report_content field.');
         throw new Error('agent__final_report requires non-empty report_content field.');
       }
-      const mergedMeta = { ...metadata };
+      const mergedMeta = {
+        ...metadata,
+        ...(statusParam !== undefined ? { status: statusParam } : {})
+      };
       this.opts.setFinalReport({ format: this.formatId, content, content_json: contentJson, metadata: mergedMeta });
       return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
     }

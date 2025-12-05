@@ -20,7 +20,7 @@ import { parseJsonRecord } from './utils.js';
 // Reusable type definitions
 export type FinalReportPayload = NonNullable<AIAgentResult['finalReport']>;
 export type PendingFinalReportPayload = Omit<FinalReportPayload, 'ts'>;
-export type FinalReportSource = 'tool-call' | 'synthetic';
+export type FinalReportSource = 'tool-call' | 'tool-message' | 'synthetic';
 
 export const FINAL_REPORT_FORMAT_VALUES = ['json', 'markdown', 'markdown+mermaid', 'slack-block-kit', 'tty', 'pipe', 'sub-agent', 'text'] as const satisfies readonly FinalReportPayload['format'][];
 

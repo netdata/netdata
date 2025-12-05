@@ -186,9 +186,9 @@ interface AIAgentResult {
 ## Adoption Strategies
 
 ### XML Transport
-- When `tooling.transport` is `xml` or `xml-final`, `agent__final_report` must be emitted inside `<ai-agent-NONCE-FINAL tool="agent__final_report" format="...">payload</ai-agent-NONCE-FINAL>` matching the session nonce.
+- Transport is fixed to XML-final: `agent__final_report` must be emitted inside `<ai-agent-NONCE-FINAL tool="agent__final_report" format="...">payload</ai-agent-NONCE-FINAL>` matching the session nonce.
 - The `format` attribute is extracted from the XML tag (wrapper layer), while the tag content becomes the raw payload.
-- Progress shares the XML channel only in `xml`; in `xml-final`, progress follows tools transport (native tool_calls).
+- Progress always follows native tool_calls; only the final report travels via XML.
 
 ### 3-Layer Processing Architecture
 Final report processing uses a 3-layer architecture to cleanly separate transport concerns from payload content:

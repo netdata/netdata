@@ -1,35 +1,29 @@
 # XML Tool Transport
 
 ## TL;DR
-XML transport is fixed to xml-final: native tool_calls remain for regular tools, while the final report must be sent over XML. Each turn advertises XML-NEXT (nonce, slots, schemas, final-report slot; progress slot omitted). Tags are parsed by substring; valid tags map to existing tools with the same orchestrator, budgets, and accounting. CLI override for transport has been removed.
-
-## Modes
-- `native` (default): provider sees tools; standard tool_calls.
-- `xml`: provider tool list hidden; model must call tools via XML tags. Progress uses XML.
-- `xml-final`: provider tools stay native (tool_calls); only final-report travels via XML tag. Progress follows tools transport (native).
+XML transport is fixed to xml-final: native tool_calls remain for regular tools, while the final report must be sent over XML. Each turn advertises XML-NEXT (nonce, final slot, optional schema; progress slot omitted). Tags are parsed by substring; valid tags map to existing tools with the same orchestrator, budgets, and accounting. CLI override for transport has been removed.
 
 ## Turn Messages
-- **XML-NEXT (ephemeral)**: user notice with nonce, tool schemas, slot templates, progress slot (xml only), final-report slot; counts toward context like any user message. In `xml-final`, XML-NEXT also reminds the model that non-final tools must be called via native tool_calls.
-- **XML-PAST (permanent)**: prior turn tool results (slot, tool, status, duration, request/response); suppressed in xml-final; bounded to last turn.
+- **XML-NEXT (ephemeral)**: user notice with nonce, final-report slot, and optional schema; counts toward context like any user message. It reminds the model that non-final tools must be called via native tool_calls.
+- **XML-PAST**: suppressed; native tool results stay in the normal transcript.
 
 ## Slots & Validation
 - Nonce per session: `ai-agent-<8hex>` (fixed across all turns).
-- Slots: `NONCE-0001...` up to `maxToolCallsPerTurn` for regular tools (incrementing across turns); dedicated `NONCE-FINAL` slot; `NONCE-PROGRESS` for xml mode only.
-- Valid tag: matching nonce, declared slot, allowed tool, non-empty content. Others ignored. In `xml-final`, allowed tools via XML are restricted to `agent__final_report`; non-final tools must use native tool_calls; progress uses native tool_calls.
+- Slots: dedicated `NONCE-FINAL` slot for the final report.
+- Valid tag: matching nonce, declared slot, allowed tool, non-empty content. Allowed tools via XML are restricted to `agent__final_report`; non-final tools must use native tool_calls; progress uses native tool_calls.
 - Status enum for final-report: `success|failure|partial` (extracted from XML tag attributes); payload format must match the agent's expected format.
 
 ## Execution Flow
-1) Build XML-NEXT/PAST each turn; toolChoice is only forced when tools are present. In `xml`, provider tool definitions are hidden; in `xml-final`, provider tool definitions remain visible for native tool_calls.
-2) Model emits XML tags; parser extracts tags into toolCalls. Native tool_calls are ignored in `xml` but **preserved** in `xml-final` (merged with the parsed XML final-report).
+1) Build XML-NEXT each turn; provider tool definitions remain visible for native tool_calls.
+2) Model emits XML tag for final report; parser extracts tag into toolCalls. Native tool_calls are preserved and merged with the parsed XML final-report.
 3) Orchestrator executes tools unchanged (`source: xml` in accounting); final-report uses `agent__final_report`.
-4) Tool responses recorded into XML-PAST for next turn (xml only); final-report ends session (no response message).
+4) Final-report ends session (no response message).
 
 ## Progress
-- In `xml` mode: shares XML transport via `NONCE-PROGRESS` slot.
-- In `xml-final` mode: follows tools transport (native tool_calls), not suppressed.
+- Progress follows native tool_calls; there is no XML progress slot.
 
 ## Context Guard
-- Schemas/slots contribute via XML-NEXT text; provider tools list omitted so schemaCtxTokens=0 in xml modes; guard still runs on messages/tool outputs.
+- XML-NEXT contributes context tokens for nonce/final slot and any final-report schema; guard still runs on messages/tool outputs.
 
 ## Error Handling
 - Invalid/mismatched tags: ignored.
@@ -54,10 +48,8 @@ This separation ensures wrapper fields (transport metadata) never pollute the pa
 
 ## Test Requirements (planned)
 - Parser chunking/nonce/slot/tool validation
-- XML-NEXT/PAST rendering (xml vs xml-final)
+- XML-NEXT rendering (nonce + final slot)
 - Final-report precedence in XML
-- Progress via XML (xml only) and native in xml-final
-- Native tool_calls ignored in xml but preserved in xml-final; non-final XML tags rejected in xml-final
 - Accounting `source: xml`
-- Phase 1 harness scenarios covering: xml happy path, xml-final hybrid (native tools + XML final), invalid tag/nonce ignored, and XML-PAST rotation across turns
+- Phase 1 harness scenarios covering: native tools + XML final-report, invalid tag/nonce ignored
 - 3-layer final report processing for each format type

@@ -25,6 +25,7 @@ export interface ToolExecutionState {
   turnHasSuccessfulToolOutput: boolean;
   incompleteFinalReportDetected: boolean;
   toolLimitExceeded: boolean;
+  finalReportToolFailed: boolean;
 }
 
 export interface SessionContext {
@@ -500,6 +501,7 @@ export class SessionToolExecutor {
         });
 
         if (isFinalReportTool) {
+          state.finalReportToolFailed = true;
           const serialized = (() => {
             try {
               return JSON.stringify(parameters);

@@ -1,5 +1,7 @@
 # TODO: Major Codebase Cleanup - Simplify Tools & Transport
 
+> NOTE (2025-12-05): Transport cleanup to a single xml-final path is now complete. The transport-related items below are kept for historical context; batch redesign items remain future work.
+
 ## TL;DR
 
 Major simplification of ai-agent architecture:

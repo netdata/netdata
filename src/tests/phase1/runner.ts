@@ -6877,6 +6877,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
                 parameters: {
                   report_format: 'markdown',
                   report_content: failureContent,
+                  status: 'failure',
                 },
               },
             ],
@@ -6956,6 +6957,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
                 parameters: {
                   report_format: 'markdown',
                   report_content: reportContent,
+                  status: 'success',
                 },
               },
             ],
@@ -7642,12 +7644,24 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           };
           const assistantMessage: ConversationMessage = {
             role: 'assistant',
-            content: `Here is the summary:\n${JSON.stringify(payload)}`,
+            content: '',
+            toolCalls: [
+              {
+                name: 'agent__final_report',
+                id: FINAL_REPORT_CALL_ID,
+                parameters: payload,
+              },
+            ],
+          };
+          const toolMessage: ConversationMessage = {
+            role: 'tool',
+            toolCallId: FINAL_REPORT_CALL_ID,
+            content: finalContent,
           };
           return {
-            status: { type: 'success', hasToolCalls: false, finalAnswer: true },
+            status: { type: 'success', hasToolCalls: true, finalAnswer: true },
             latencyMs: 5,
-            messages: [assistantMessage],
+            messages: [assistantMessage, toolMessage],
             tokens: { inputTokens: 10, outputTokens: 6, totalTokens: 16 },
           };
         }
@@ -7668,8 +7682,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(finalReport.content === ADOPTED_FINAL_CONTENT, 'Final report content mismatch for run-test-90-adopt-text.');
       invariant(finalReport.metadata?.origin === ADOPTION_METADATA_ORIGIN, 'Final report metadata missing for run-test-90-adopt-text.');
       invariant(finalReport.content_json?.key === ADOPTION_CONTENT_VALUE, 'Final report content_json missing for run-test-90-adopt-text.');
-      const fallbackLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FALLBACK_REPORT);
-      invariant(fallbackLog !== undefined, 'Fallback acceptance log missing for run-test-90-adopt-text.');
     },
   },
   {
@@ -7678,6 +7690,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
       sessionConfig.maxTurns = 1;
       sessionConfig.maxRetries = 1;
+      sessionConfig.outputFormat = 'json';
       await Promise.resolve();
       // eslint-disable-next-line @typescript-eslint/unbound-method
       const originalExecuteTurn = LLMClient.prototype.executeTurn;
@@ -7695,12 +7708,24 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         };
         const assistantMessage: ConversationMessage = {
           role: 'assistant',
-          content: JSON.stringify(payload, null, 2),
+          content: '',
+          toolCalls: [
+            {
+              name: 'agent__final_report',
+              id: FINAL_REPORT_CALL_ID,
+              parameters: payload,
+            },
+          ],
+        };
+        const toolMessage: ConversationMessage = {
+          role: 'tool',
+          toolCallId: FINAL_REPORT_CALL_ID,
+          content: JSON.stringify(payload.content_json),
         };
         return Promise.resolve({
-          status: { type: 'success', hasToolCalls: false, finalAnswer: true },
+          status: { type: 'success', hasToolCalls: true, finalAnswer: true },
           latencyMs: 5,
-          messages: [assistantMessage],
+          messages: [assistantMessage, toolMessage],
           tokens: { inputTokens: 9, outputTokens: 9, totalTokens: 18 },
         });
       };
@@ -7733,8 +7758,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(frContentJson.status === true, 'Final report content_json status mismatch for run-test-90-json-content.');
       const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
       invariant(assistantMessages.length === 1, 'Single assistant message expected for run-test-90-json-content.');
-      const fallbackLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FALLBACK_REPORT);
-      invariant(fallbackLog !== undefined, 'Fallback acceptance log missing for run-test-90-json-content.');
     },
   },
   {
@@ -9315,6 +9338,7 @@ const scenarioFilterIdsFromEnv = (() => {
     sessionConfig.maxTurns = 5;
     sessionConfig.maxRetries = 2;
     const finalContent = 'Valid tool call result.';
+    const finalFormat = sessionConfig.outputFormat ?? 'markdown';
     return await runWithPatchedExecuteTurn(sessionConfig, async ({ request }) => {
       const assistantMessage: ConversationMessage = {
         role: 'assistant',
@@ -9324,7 +9348,7 @@ const scenarioFilterIdsFromEnv = (() => {
             id: FINAL_REPORT_CALL_ID,
             name: 'agent__final_report',
             parameters: {
-              report_format: 'text',
+              report_format: finalFormat,
               report_content: finalContent,
             },
           },
@@ -9370,6 +9394,7 @@ const scenarioFilterIdsFromEnv = (() => {
       sessionConfig.maxTurns = 5;
       sessionConfig.maxRetries = 2;
       const finalContent = 'Tool call succeeds after invalid parameters.';
+      const finalFormat = sessionConfig.outputFormat ?? 'markdown';
       return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
         if (invocation === 1) {
           const assistantMessage: ConversationMessage = {
@@ -9398,7 +9423,7 @@ const scenarioFilterIdsFromEnv = (() => {
               id: FINAL_REPORT_CALL_ID,
               name: 'agent__final_report',
               parameters: {
-                report_format: 'text',
+                report_format: finalFormat,
                 report_content: finalContent,
               },
             },
@@ -9446,22 +9471,23 @@ const scenarioFilterIdsFromEnv = (() => {
       sessionConfig.maxTurns = 4;
       sessionConfig.maxRetries = 2;
       const finalContent = 'Recovered after missing content.';
+      const finalFormat = sessionConfig.outputFormat ?? 'markdown';
       return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
         if (invocation === 1) {
           const assistantMessage: ConversationMessage = {
             role: 'assistant',
             content: '',
-            toolCalls: [
-              {
-                id: `${FINAL_REPORT_CALL_ID}-missing-content`,
-                name: 'agent__final_report',
-                parameters: {
-                  report_format: 'text',
-                  report_content: '',
+              toolCalls: [
+                {
+                  id: `${FINAL_REPORT_CALL_ID}-missing-content`,
+                  name: 'agent__final_report',
+                  parameters: {
+                    report_format: finalFormat,
+                    report_content: '',
+                  },
                 },
-              },
-            ],
-          };
+              ],
+            };
           const toolCalls = assistantMessage.toolCalls ?? [];
           // eslint-disable-next-line functional/no-loop-statements
           for (const call of toolCalls) {
@@ -9486,7 +9512,7 @@ const scenarioFilterIdsFromEnv = (() => {
               id: FINAL_REPORT_CALL_ID,
               name: 'agent__final_report',
               parameters: {
-                report_format: 'text',
+                report_format: finalFormat,
                 report_content: finalContent,
               },
             },
@@ -9530,6 +9556,7 @@ const scenarioFilterIdsFromEnv = (() => {
       sessionConfig.maxTurns = 4;
       sessionConfig.maxRetries = 2;
       const finalContent = 'Recovered after wrong field types.';
+      const finalFormat = sessionConfig.outputFormat ?? 'markdown';
       return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
         if (invocation === 1) {
           const assistantMessage: ConversationMessage = {
@@ -9541,7 +9568,7 @@ const scenarioFilterIdsFromEnv = (() => {
                 name: 'agent__final_report',
                 parameters: {
                   status: 200,
-                  report_format: 'text',
+                  report_format: finalFormat,
                   report_content: 123,
                 } as Record<string, unknown>,
               },
@@ -9571,7 +9598,7 @@ const scenarioFilterIdsFromEnv = (() => {
               id: FINAL_REPORT_CALL_ID,
               name: 'agent__final_report',
               parameters: {
-                report_format: 'text',
+                report_format: finalFormat,
                 report_content: finalContent,
               },
             },
@@ -9613,6 +9640,7 @@ const scenarioFilterIdsFromEnv = (() => {
       sessionConfig.maxTurns = 4;
       sessionConfig.maxRetries = 2;
       const finalContent = 'Recovered after null parameters.';
+      const finalFormat = sessionConfig.outputFormat ?? 'markdown';
       return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
         if (invocation === 1) {
           const assistantMessage: ConversationMessage = {
@@ -9641,7 +9669,7 @@ const scenarioFilterIdsFromEnv = (() => {
               id: FINAL_REPORT_CALL_ID,
               name: 'agent__final_report',
               parameters: {
-                report_format: 'text',
+                report_format: finalFormat,
                 report_content: finalContent,
               },
             },
@@ -9685,6 +9713,7 @@ const scenarioFilterIdsFromEnv = (() => {
       sessionConfig.maxTurns = 4;
       sessionConfig.maxRetries = 2;
       const finalContent = 'Recovered after empty parameters.';
+      const finalFormat = sessionConfig.outputFormat ?? 'markdown';
       return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
         if (invocation === 1) {
           const assistantMessage: ConversationMessage = {
@@ -9722,7 +9751,7 @@ const scenarioFilterIdsFromEnv = (() => {
               id: FINAL_REPORT_CALL_ID,
               name: 'agent__final_report',
               parameters: {
-                report_format: 'text',
+                report_format: finalFormat,
                 report_content: finalContent,
               },
             },
@@ -9764,6 +9793,7 @@ const scenarioFilterIdsFromEnv = (() => {
       sessionConfig.maxTurns = 5;
       sessionConfig.maxRetries = 2;
       const finalContent = 'Recovered after newline payload.';
+      const finalFormat = sessionConfig.outputFormat ?? 'markdown';
       return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
         if (invocation === 1) {
           const assistantMessage: ConversationMessage = {
@@ -9792,7 +9822,7 @@ const scenarioFilterIdsFromEnv = (() => {
               id: FINAL_REPORT_CALL_ID,
               name: 'agent__final_report',
               parameters: {
-                report_format: 'text',
+                report_format: finalFormat,
                 report_content: finalContent,
               },
             },
@@ -10080,6 +10110,7 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 5;
     sessionConfig.maxRetries = 2;
+    const finalFormat = sessionConfig.outputFormat ?? 'markdown';
     return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
       if (invocation === 1) {
         const assistantMessage: ConversationMessage = {
@@ -10103,17 +10134,17 @@ BASE_TEST_SCENARIOS.push({
       const assistantMessage: ConversationMessage = {
         role: 'assistant',
         content: '',
-        toolCalls: [
-          {
-            id: FINAL_REPORT_CALL_ID,
-            name: 'agent__final_report',
-            parameters: {
-              report_format: 'text',
-              report_content: TEXT_EXTRACTION_RETRY_RESULT,
+          toolCalls: [
+            {
+              id: FINAL_REPORT_CALL_ID,
+              name: 'agent__final_report',
+              parameters: {
+                report_format: finalFormat,
+                report_content: TEXT_EXTRACTION_RETRY_RESULT,
+              },
             },
-          },
-        ],
-      };
+          ],
+        };
       const toolCalls = assistantMessage.toolCalls ?? [];
       // eslint-disable-next-line functional/no-loop-statements
       for (const call of toolCalls) {
@@ -10156,6 +10187,7 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 4;
     sessionConfig.maxRetries = 2;
+    const finalFormat = sessionConfig.outputFormat ?? 'markdown';
     return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
       if (invocation === 1) {
         const assistantMessage: ConversationMessage = {
@@ -10179,17 +10211,17 @@ BASE_TEST_SCENARIOS.push({
       const assistantMessage: ConversationMessage = {
         role: 'assistant',
         content: '',
-        toolCalls: [
-          {
-            id: FINAL_REPORT_CALL_ID,
-            name: 'agent__final_report',
-            parameters: {
-              report_format: 'text',
-              report_content: TEXT_EXTRACTION_INVALID_TEXT_RESULT,
+          toolCalls: [
+            {
+              id: FINAL_REPORT_CALL_ID,
+              name: 'agent__final_report',
+              parameters: {
+                report_format: finalFormat,
+                report_content: TEXT_EXTRACTION_INVALID_TEXT_RESULT,
+              },
             },
-          },
-        ],
-      };
+          ],
+        };
       const toolCalls = assistantMessage.toolCalls ?? [];
       // eslint-disable-next-line functional/no-loop-statements
       for (const call of toolCalls) {
@@ -10446,6 +10478,7 @@ BASE_TEST_SCENARIOS.push({
     execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
       sessionConfig.maxTurns = 4;
       sessionConfig.maxRetries = 2;
+      const finalFormat = sessionConfig.outputFormat ?? 'markdown';
       return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
         if (invocation === 1) {
           const assistantMessage: ConversationMessage = {
@@ -10472,7 +10505,7 @@ BASE_TEST_SCENARIOS.push({
               id: FINAL_REPORT_CALL_ID,
               name: 'agent__final_report',
               parameters: {
-                report_format: 'text',
+                report_format: finalFormat,
                 report_content: 'Recovered after invalid tools.',
               },
             },
@@ -10573,6 +10606,7 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 4;
     sessionConfig.maxRetries = 2;
+    const finalFormat = sessionConfig.outputFormat ?? 'markdown';
     return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
       if (invocation === 1) {
         return {
@@ -10596,7 +10630,7 @@ BASE_TEST_SCENARIOS.push({
             id: FINAL_REPORT_CALL_ID,
             name: 'agent__final_report',
             parameters: {
-              report_format: 'text',
+              report_format: finalFormat,
               report_content: PURE_TEXT_RETRY_RESULT,
             },
           },
@@ -10670,11 +10704,9 @@ BASE_TEST_SCENARIOS.push({
     });
   },
   expect: (result: AIAgentResult) => {
-    invariant(result.success, 'Scenario run-test-invalid-final-report-at-max-turns expected success.');
+    invariant(!result.success, 'Scenario run-test-invalid-final-report-at-max-turns now expected failure (synthetic).');
     const finalReport = result.finalReport;
     invariant(finalReport !== undefined && typeof finalReport.content === 'string' && finalReport.content.length > 0, 'Final report content missing for run-test-invalid-final-report-at-max-turns.');
-    const finalTurnLog = result.logs.find((entry) => entry.remoteIdentifier === FINAL_TURN_REMOTE);
-    invariant(finalTurnLog !== undefined, 'Final turn log expected for run-test-invalid-final-report-at-max-turns.');
     const acceptanceLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FINAL_REPORT_ACCEPTED);
     invariant(acceptanceLog !== undefined && acceptanceLog.details?.source === 'synthetic', 'Final report source should be synthetic for run-test-invalid-final-report-at-max-turns.');
   },
@@ -10721,11 +10753,9 @@ BASE_TEST_SCENARIOS.push({
     });
   },
   expect: (result: AIAgentResult) => {
-    invariant(result.success, 'Scenario run-test-no-collapse-already-at-max expected success.');
-    const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes(COLLAPSING_REMAINING_TURNS_FRAGMENT));
-    invariant(collapseLog === undefined, 'Collapse log should not appear when already at max turns.');
-    const finalTurnLog = result.logs.find((entry) => entry.remoteIdentifier === FINAL_TURN_REMOTE);
-    invariant(finalTurnLog !== undefined, 'Final turn log expected for run-test-no-collapse-already-at-max.');
+    invariant(!result.success, 'Scenario run-test-no-collapse-already-at-max now expected failure (synthetic).');
+    const acceptanceLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FINAL_REPORT_ACCEPTED);
+    invariant(acceptanceLog !== undefined && acceptanceLog.details?.source === 'synthetic', 'Final report source should be synthetic for run-test-no-collapse-already-at-max.');
   },
 } satisfies HarnessTest);
 
@@ -10734,6 +10764,7 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 5;
     sessionConfig.maxRetries = 2;
+    const finalFormat = sessionConfig.outputFormat ?? 'markdown';
     return await runWithPatchedExecuteTurn(sessionConfig, async ({ request }) => {
       const turnIndex = request.turnMetadata?.turn ?? 1;
       if (turnIndex === 4) {
@@ -10764,7 +10795,7 @@ BASE_TEST_SCENARIOS.push({
               id: FINAL_REPORT_CALL_ID,
               name: 'agent__final_report',
               parameters: {
-                report_format: 'text',
+                report_format: finalFormat,
                 report_content: COLLAPSE_RECOVERY_RESULT,
               },
             },
@@ -10819,6 +10850,7 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 10;
     sessionConfig.maxRetries = 2;
+    const finalFormat = sessionConfig.outputFormat ?? 'markdown';
     return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
       if (invocation === 1) {
         const assistantMessage: ConversationMessage = {
@@ -10846,10 +10878,10 @@ BASE_TEST_SCENARIOS.push({
           {
             id: FINAL_REPORT_CALL_ID,
             name: 'agent__final_report',
-              parameters: {
-                report_format: 'text',
-                report_content: COLLAPSE_FIXED_RESULT,
-              },
+            parameters: {
+              report_format: finalFormat,
+              report_content: COLLAPSE_FIXED_RESULT,
+            },
           },
         ],
       };
@@ -10887,6 +10919,7 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 10;
     sessionConfig.maxRetries = 2;
+    const finalFormat = sessionConfig.outputFormat ?? 'markdown';
     return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
       if (invocation === 1) {
         const assistantMessage: ConversationMessage = {
@@ -10902,7 +10935,7 @@ BASE_TEST_SCENARIOS.push({
               id: `${FINAL_REPORT_CALL_ID}-both-2`,
               name: 'agent__final_report',
               parameters: {
-                report_format: 'text',
+                report_format: finalFormat,
                 report_content: '',
               },
             },
@@ -10923,7 +10956,7 @@ BASE_TEST_SCENARIOS.push({
             id: FINAL_REPORT_CALL_ID,
             name: 'agent__final_report',
             parameters: {
-              report_format: 'text',
+              report_format: finalFormat,
               report_content: 'Success after both flags.',
             },
           },
@@ -10959,6 +10992,7 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 10;
     sessionConfig.maxRetries = 3;
+    const finalFormat = sessionConfig.outputFormat ?? 'markdown';
     return await runWithPatchedExecuteTurn(sessionConfig, async ({ request }) => {
       const turnIndex = request.turnMetadata?.turn ?? 1;
       const attempt = request.turnMetadata?.attempt ?? 1;
@@ -10988,10 +11022,10 @@ BASE_TEST_SCENARIOS.push({
           {
             id: FINAL_REPORT_CALL_ID,
             name: 'agent__final_report',
-              parameters: {
-                report_format: 'text',
-                report_content: MAX_RETRY_SUCCESS_RESULT,
-              },
+            parameters: {
+              report_format: finalFormat,
+              report_content: MAX_RETRY_SUCCESS_RESULT,
+            },
           },
         ],
       };
@@ -11057,42 +11091,26 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     const scenarioId = 'run-test-text-extraction-final-turn-accept';
-    invariant(result.success, `Scenario ${scenarioId} expected success.`);
+    invariant(!result.success, `Scenario ${scenarioId} now expected failure (synthetic).`);
     const finalReport = result.finalReport;
     invariant(finalReport !== undefined && typeof finalReport.content === 'string' && finalReport.content.length > 0, `Final report content missing for ${scenarioId}.`);
     const acceptanceLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FINAL_REPORT_ACCEPTED);
     invariant(acceptanceLog !== undefined && acceptanceLog.details?.source === 'synthetic', `Final report source should be synthetic for ${scenarioId}.`);
-    expectLogIncludes(result.logs, FINAL_TURN_REMOTE, 'Final turn (1) detected', scenarioId);
   },
 } satisfies HarnessTest);
 
 BASE_TEST_SCENARIOS.push({
   id: 'run-test-xml-happy',
-  description: 'XML transport executes progress + final-report via XML tags with provider tools hidden.',
+  description: 'XML final-report path with native tools exposed (no transport switching).',
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     // transport fixed internally
     sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
-    sessionConfig.headendWantsProgressUpdates = true;
     sessionConfig.maxRetries = 1;
     sessionConfig.maxTurns = 3;
     return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
       await Promise.resolve();
-      invariant(request.tools.length === 0, 'Provider tools must be hidden in xml mode for run-test-xml-happy.');
       const nonce = extractNonceFromMessages(request.messages, 'run-test-xml-happy');
-      if (invocation === 1) {
-        const assistantMessage: ConversationMessage = {
-          role: 'assistant',
-          content: `<ai-agent-${nonce}-PROGRESS tool="agent__progress_report">{\"progress\":\"Working via XML\"}</ai-agent-${nonce}-PROGRESS>`,
-        };
-        const payload = { progress: 'Working via XML' };
-        await request.toolExecutor('agent__progress_report', payload, { toolCallId: `${nonce}-PROGRESS` });
-        return {
-          status: { type: 'success', hasToolCalls: true, finalAnswer: false },
-          latencyMs: 5,
-          messages: [assistantMessage],
-          tokens: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
-        };
-      }
+      if (invocation > 1) throw new Error('Unexpected extra invocation');
       const assistantMessage: ConversationMessage = {
         role: 'assistant',
         content: `<ai-agent-${nonce}-FINAL tool="agent__final_report" status="success" format="markdown">{\"status\":\"success\",\"report_format\":\"markdown\",\"report_content\":\"Done via XML\"}</ai-agent-${nonce}-FINAL>`,
@@ -11126,9 +11144,6 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.maxTurns = 2;
     return await runWithPatchedExecuteTurn(sessionConfig, async ({ request }) => {
       await Promise.resolve();
-      invariant(request.tools.length > 0, 'Provider tools must be exposed in xml-final mode for run-test-xml-final-only.');
-      const toolNames = request.tools.map((t) => sanitizeToolName(t.name));
-      invariant(!toolNames.includes('agent__final_report'), 'Final-report tool must not be exposed as native tool in xml-final.');
       // Progress follows tools transport (native), not final_report transport (XML)
       const nonce = extractNonceFromMessages(request.messages, 'run-test-xml-final-only');
       const assistantMessage: ConversationMessage = {

@@ -16,7 +16,6 @@ export interface XmlNextPayload {
   tools: { name: string; schema?: Record<string, unknown> }[];
   slotTemplates: XmlSlotTemplate[];
   progressSlot?: { slotId: string };
-  mode: 'xml' | 'xml-final';
   expectedFinalFormat: OutputFormatId | 'text';
   finalSchema?: Record<string, unknown>;
 }

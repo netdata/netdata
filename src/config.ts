@@ -27,12 +27,6 @@ const computeDefaultQueueConcurrency = (): number => {
 
 export const DEFAULT_QUEUE_CONCURRENCY = computeDefaultQueueConcurrency();
 
-// Transport modes for tool handling
-// - native: current behavior (LLM tool calls)
-// - xml: tools invoked via XML tags (all tools)
-// - xml-final: only final-report (plus optional progress) via XML tags
-const ToolTransportEnum = z.enum(['native', 'xml', 'xml-final']);
-
 /**
  * Create a Zod schema for nullable numeric parameters that accept special "unset" strings.
  * Accepts: number | 'none' | 'off' | 'unset' | 'default' | 'null' | null
@@ -224,11 +218,6 @@ const TelemetryTraceSchema = z.object({
   ratio: z.number().min(0).max(1).optional(),
 }).optional();
 
-const ToolingConfigSchema = z.object({
-  transport: ToolTransportEnum.optional(),
-  // future: per-mode toggles (e.g., progress slot enable) can live here
-}).optional();
-
 const TelemetryLogFormatSchema = z.enum(['journald', 'logfmt', 'json', 'none']);
 
 const TelemetryLogExtraSchema = z.enum(['otlp']);
@@ -294,7 +283,6 @@ const ConfigurationSchema = z.object({
       formats: FormatsConfigSchema.optional(),
     })
     .optional(),
-  tooling: ToolingConfigSchema.optional(),
   telemetry: TelemetrySchema,
   slack: SlackConfigSchema.optional(),
   api: ApiConfigSchema.optional(),

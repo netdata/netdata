@@ -14,7 +14,7 @@
  * - SYSTEM_NOTICES: Provider state notices (rate limits, auth, quotas)
  * - FINAL_REPORT_REMINDER: Guidance for calling final_report
  * - TOOL_RESULTS: Messages returned as tool execution results
- * - XML_PROTOCOL: Errors for XML tool transport mode (via TURN-FAILED)
+ * - XML_PROTOCOL: Errors for the XML final-report transport (via TURN-FAILED)
  */
 
 // =============================================================================
@@ -330,7 +330,6 @@ export interface XmlNextTemplatePayload {
   tools: { name: string; schema?: Record<string, unknown> }[];
   slotTemplates: { slotId: string; tools: string[] }[];
   progressSlot?: { slotId: string };
-  mode: 'xml' | 'xml-final';
 }
 
 export interface XmlPastTemplateEntry {
@@ -347,50 +346,15 @@ export interface XmlPastTemplatePayload {
 }
 
 export const renderXmlNextTemplate = (payload: XmlNextTemplatePayload): string => {
-  const { nonce, turn, maxTurns, tools, slotTemplates, progressSlot, mode } = payload;
-  const toolList = tools.filter((t) => t.name !== 'agent__final_report' && t.name !== 'agent__progress_report');
+  const { nonce, turn, maxTurns } = payload;
   const lines: string[] = [];
   lines.push('# System Notice');
   lines.push('');
   lines.push(`This is turn No ${String(turn)}${maxTurns !== undefined ? ` of ${String(maxTurns)}` : ''}.`);
   lines.push('');
-
-  if (mode === 'xml') {
-    lines.push('## Available Tools for this Turn');
-    if (toolList.length > 0) {
-      const slotIds = slotTemplates
-        .filter((s) => s.tools.some((t) => toolList.map((tt) => tt.name).includes(t)))
-        .map((s) => s.slotId);
-      lines.push('Replace XXXX with one of the available slot numbers and include your JSON body inside the tag.');
-      lines.push(`Slots available: ${slotIds.join(', ')}`);
-      lines.push('');
-      toolList.forEach((t) => {
-        const exampleSlot = `${nonce}-XXXX`;
-        lines.push(`- tool \`${t.name}\`, schema:`);
-        lines.push('```');
-        lines.push(`<ai-agent-${exampleSlot} tool="${t.name}">`);
-        lines.push(JSON.stringify(t.schema ?? {}, null, 2));
-        lines.push(`</ai-agent-${exampleSlot}>`);
-        lines.push('```');
-        lines.push('');
-      });
-    } else {
-      lines.push('No tools are available for this turn.');
-      lines.push('');
-    }
-
-    if (progressSlot !== undefined) {
-      lines.push('## Progress Updates');
-      lines.push(PROGRESS_TOOL_INSTRUCTIONS_BRIEF);
-      lines.push('');
-      lines.push('```');
-      lines.push(`<ai-agent-${progressSlot.slotId} tool="agent__progress_report">`);
-      lines.push('Found X, now searching for Y');
-      lines.push(`</ai-agent-${progressSlot.slotId}>`);
-      lines.push('```');
-      lines.push('');
-    }
-  }
+  lines.push('Final report must be returned via XML using the provided nonce and FINAL slot.');
+  lines.push(`Tag pattern: <ai-agent-${nonce}-FINAL tool="agent__final_report" status="success|failure|partial" format="...">...content...</ai-agent-${nonce}-FINAL>`);
+  lines.push('');
 
   return lines.join('\n');
 };

@@ -1880,7 +1880,13 @@ export class AIAgentSession {
 
   private resolveToolChoice(provider: string, model: string, toolsCount: number): ToolChoiceMode | undefined {
     if (toolsCount === 0) return undefined;
-    return 'auto';
+    const providerConfig = this.sessionConfig.config.providers[provider] as (Configuration['providers'][string] | undefined);
+    if (providerConfig === undefined) return undefined;
+    const modelChoice = providerConfig.models?.[model]?.toolChoice;
+    if (modelChoice === 'auto' || modelChoice === 'required') return modelChoice;
+    const providerChoice = providerConfig.toolChoice;
+    if (providerChoice === 'auto' || providerChoice === 'required') return providerChoice;
+    return undefined;
   }
 
   private resolveReasoningValue(provider: string, model: string, level: ReasoningLevel, maxOutputTokens: number | undefined): ProviderReasoningValue | null | undefined {
