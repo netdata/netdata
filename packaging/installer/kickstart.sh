@@ -1787,6 +1787,11 @@ try_package_install() {
     fi
   fi
 
+  if ! check_special_native_deps; then
+    warning "Could not find secondary dependencies for ${DISTRO} on ${SYSARCH}."
+    return 2
+  fi
+
   # shellcheck disable=SC2086
   if ! run_as_root env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} "${tmpdir}/${repoconfig_file}"; then
     warning "Failed to install repository configuration package."
@@ -1806,16 +1811,6 @@ try_package_install() {
     cleanup
     trap - EXIT
     exit 0
-  fi
-
-  if ! check_special_native_deps; then
-    warning "Could not find secondary dependencies for ${DISTRO} on ${SYSARCH}."
-    if [ -z "${NO_CLEANUP}" ]; then
-      progress "Attempting to uninstall repository configuration package."
-      # shellcheck disable=SC2086
-      run_as_root env ${env} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
-    fi
-    return 2
   fi
 
   if ! netdata_avail_check "${DISTRO_COMPAT_NAME}"; then
