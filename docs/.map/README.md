@@ -11,31 +11,31 @@ Publishing documentation to [Learn](https://github.com/netdata/learn) involves a
 
 ### Quick Checklist
 
-| Step  | Action                                                                                  | Output                                                         |
-|-------|-----------------------------------------------------------------------------------------|----------------------------------------------------------------|
-| **1** | Edit `map.csv` alongside your doc changes. Fill in all 4 columns (description can be left empty) correctly.             | Docs mapped with proper sidebar labels, paths, and edit links. |
-| **2** | Test locally with the `ingest.py` script. Optionally run a full local Learn deployment. | Confirms no broken links or build errors.                      |
-| **3** | Merge the Docs PR (requires approval).                                                  | Docs + `map.csv` merged into the repo.                         |
-| **4** | Inspect the automatic Learn ingest PR. Check files + deploy preview.                    | Verified preview of Learn with changes.                        |
-| **5** | Merge the Learn ingest PR.                                                              | Docs officially live on Learn.                                 |
+| Step  | Action                                                                                                      | Output                                                         |
+|-------|-------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------|
+| **1** | Edit `map.csv` alongside your doc changes. Fill in all 4 columns (description can be left empty) correctly. | Docs mapped with proper sidebar labels, paths, and edit links. |
+| **2** | Test locally with the `ingest.py` script. Optionally run a full local Learn deployment.                     | Confirms no broken links or build errors.                      |
+| **3** | Merge the Docs PR (requires approval).                                                                      | Docs + `map.csv` merged into the repo.                         |
+| **4** | Inspect the automatic Learn ingest PR. Check files + deploy preview.                                        | Verified preview of Learn with changes.                        |
+| **5** | Merge the Learn ingest PR.                                                                                  | Docs officially live on Learn.                                 |
 
 ### 1. Edit `map.csv`
 
 All docs must be mapped in the [map.csv](https://github.com/netdata/netdata/blob/master/docs/.map/map.csv) file. Each row has five columns:
 
-| Column                | Purpose                                                                       | Notes                                                                                                                                                    |
-|-----------------------|-------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **custom\_edit\_url** | Full GitHub **Edit** link for the file. Used for the "Edit this page" button. | Must use the full link (supports repos beyond `netdata/netdata`).                                                                                        |
-| **sidebar\_label**    | The label shown in the sidebar.                                               | To make a category: the **overview** page’s `sidebar_label` **must match** `learn_rel_path` (lowercase). <br>👉 Every folder must have an overview page. |
-| **learn\_status**     | `Published` or `Unpublished`.                                                 | If `Unpublished`, see [Unpublishing Files](#unpublishing-files).                                                                                         |
-| **learn\_rel\_path**  | The location path on Learn.                                                   | Use **uppercase letters** and **spaces**. Example: `Netdata Agent/Installation/Linux`. <br>👉 Every level requires an overview page.                     |
-| **keywords** | The keywords for the file. Double quoted array-style like `"[first keyword,second]"` | Keywords are searchable by our search implementation. For a keyword `Super keyword`, `super` will bring it up, as well as `keyword`, due to the nature of our search. Also, for a `testing` keyword, a search for `test` will also bring it up. 
-| **description**       | Legacy metadata description.                                                  | Rarely used today.                                                                                                                                       |
+| Column                | Purpose                                                                                 | Notes                                                                                                                                                                                                                                           |
+|-----------------------|-----------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **custom\_edit\_url** | Full GitHub **Edit** link for the file. Used for the "Edit this page" button.           | Must use the full link (supports repos beyond `netdata/netdata`).                                                                                                                                                                               |
+| **sidebar\_label**    | The label shown in the sidebar.                                                         | To make a category: the **overview** page’s `sidebar_label` **must match** `learn_rel_path` (lowercase). <br>👉 Every folder must have an overview page.                                                                                        |
+| **learn\_status**     | `Published` or `Unpublished`.                                                           | If `Unpublished`, see [Unpublishing Files](#unpublishing-files).                                                                                                                                                                                |
+| **learn\_rel\_path**  | The location path on Learn.                                                             | Use **uppercase letters** and **spaces**. Example: `Netdata Agent/Installation/Linux`. <br>👉 Every level requires an overview page.                                                                                                            |
+| **keywords**          | The keywords for the file. Double quoted, comma-separated like `"first keyword,second"` | Keywords are searchable by our search implementation. For a keyword `Super keyword`, `super` will bring it up, as well as `keyword`, due to the nature of our search. Also, for a `testing` keyword, a search for `test` will also bring it up. |
+| **description**       | Legacy metadata description.                                                            | Rarely used today.                                                                                                                                                                                                                              |
 
 Example row in `map.csv`:
 
 ```csv
-custom_edit_url,sidebar_label,learn_status,learn_rel_path,description
+custom_edit_url,sidebar_label,learn_status,learn_rel_path,keywords,description
 https://github.com/netdata/netdata/edit/master/docs/installation/linux.md,Linux,Published,"Netdata Agent/Installation/Linux","[install]","How to install Netdata Agent on Linux"
 ```
 
