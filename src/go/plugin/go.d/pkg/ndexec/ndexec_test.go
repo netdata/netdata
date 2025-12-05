@@ -99,7 +99,7 @@ exec "$@"
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			out, _, err := r.run(nil, tt.timeout, tt.helperPath, "RunTest", tt.argv...)
+			out, _, _, err := r.run(nil, tt.timeout, "", tt.helperPath, "RunTest", nil, tt.argv...)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -118,4 +118,54 @@ exec "$@"
 			}
 		})
 	}
+}
+
+func TestRunUnprivilegedWithOptionsCmdWorkingDir(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses sh scripts")
+	}
+
+	tmp := t.TempDir()
+	workdir := filepath.Join(tmp, "subdir")
+	require.NoError(t, os.Mkdir(workdir, 0o755))
+	script := filepath.Join(tmp, "pwd.sh")
+	require.NoError(t, os.WriteFile(script, []byte("#!/bin/sh\npwd\n"), 0o755))
+
+	helper := filepath.Join(tmp, "helper.sh")
+	require.NoError(t, os.WriteFile(helper, []byte("#!/bin/sh\nexec \"$@\"\n"), 0o755))
+
+	orig := defaultRunner.ndRunPath
+	defaultRunner.ndRunPath = helper
+	defer func() { defaultRunner.ndRunPath = orig }()
+
+	opts := RunOptions{Dir: workdir}
+	out, cmd, err := RunUnprivilegedWithOptionsCmd(nil, time.Second, opts, script)
+	require.NoError(t, err)
+	assert.Contains(t, cmd, script)
+	assert.Equal(t, workdir+"\n", string(out))
+}
+
+func TestRunUnprivilegedWithOptionsUsage(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses sh scripts")
+	}
+
+	tmp := t.TempDir()
+	script := filepath.Join(tmp, "noop.sh")
+	require.NoError(t, os.WriteFile(script, []byte("#!/bin/sh\nprintf foo"), 0o755))
+
+	helper := filepath.Join(tmp, "helper.sh")
+	require.NoError(t, os.WriteFile(helper, []byte("#!/bin/sh\nexec \"$@\"\n"), 0o755))
+
+	orig := defaultRunner.ndRunPath
+	defaultRunner.ndRunPath = helper
+	defer func() { defaultRunner.ndRunPath = orig }()
+
+	opts := RunOptions{}
+	out, cmd, usage, err := RunUnprivilegedWithOptionsUsage(nil, time.Second, opts, script)
+	require.NoError(t, err)
+	assert.Contains(t, cmd, script)
+	assert.Equal(t, "foo", string(out))
+	assert.True(t, usage.User >= 0)
+	assert.True(t, usage.System >= 0)
 }

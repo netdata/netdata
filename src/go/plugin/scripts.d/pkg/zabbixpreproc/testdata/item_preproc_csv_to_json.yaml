@@ -1,0 +1,517 @@
+---
+test case: 'missing second parameter'
+in:
+  csv: ''
+  params: ''
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'missing third parameter'
+in:
+  csv: ''
+  params: "\n"
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'invalid first parameter'
+in:
+  csv: ''
+  params: ",.\n\n0"
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'invalid second parameter'
+in:
+  csv: ''
+  params: "\n,.\n0"
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'empty input (1)'
+in:
+  csv: ''
+  params: "\n\n1"
+out:
+  result: '[]'
+  return: 'SUCCEED'
+---
+test case: 'empty input (2)'
+in:
+  csv: ''
+  params: "\n\n0"
+out:
+  result: '[]'
+  return: 'SUCCEED'
+---
+test case: 'single char (1)'
+in:
+  csv: 'A'
+  params: ",\n\n1"
+out:
+  result: '[]'
+  return: 'SUCCEED'
+---
+test case: 'single char (2)'
+in:
+  csv: 'A'
+  params: ",\n\n0"
+out:
+  result: '[{"1":"A"}]'
+  return: 'SUCCEED'
+---
+test case: 'single UTF8 4-bytes character (1)'
+in:
+  csv: '😂'
+  params: ",\n\n1"
+out:
+  result: '[]'
+  return: 'SUCCEED'
+---
+test case: 'single UTF8 4-bytes character (2)'
+in:
+  csv: '😂'
+  params: ",\n\n0"
+out:
+  result: '[{"1":"😂"}]'
+  return: 'SUCCEED'
+---
+test case: 'empty line (1)'
+in:
+  csv: "\n"
+  params: ",\n\n1"
+out:
+  result: '[{"":""}]'
+  return: 'SUCCEED'
+---
+test case: 'empty line (2)'
+in:
+  csv: "\n"
+  params: ",\n\n0"
+out:
+  result: '[{},{}]'
+  return: 'SUCCEED'
+---
+test case: 'multiple empty lines (1)'
+in:
+  csv: "\n\n\n"
+  params: ",\n\n1"
+out:
+  result: '[{"":""},{"":""},{"":""}]'
+  return: 'SUCCEED'
+---
+test case: 'multiple empty lines (2)'
+in:
+  csv: "\n\n\n"
+  params: ",\n\n0"
+out:
+  result: '[{},{},{},{}]'
+  return: 'SUCCEED'
+---
+test case: 'single column (1)'
+in:
+  csv: |
+      nr
+      1
+      2
+  params: "\n\n1"
+out:
+  result: '[{"nr":"1"},{"nr":"2"},{"nr":""}]'
+  return: 'SUCCEED'
+---
+test case: 'single column (2)'
+in:
+  csv: |
+      nr
+      1
+      2
+  params: "\n\n0"
+out:
+  result: '[{"1":"nr"},{"1":"1"},{"1":"2"},{}]'
+  return: 'SUCCEED'
+---
+test case: 'single line (1)'
+in:
+  csv: "a,b,c"
+  params: "\n\n1"
+out:
+  result: '[]'
+  return: 'SUCCEED'
+---
+test case: 'single line (2)'
+in:
+  csv: "a,b,c"
+  params: "\n\n0"
+out:
+  result: '[{"1":"a","2":"b","3":"c"}]'
+  return: 'SUCCEED'
+---
+test case: 'no trailing line break (1)'
+in:
+  csv: "nr,\"name\",addr\n\"1\",abc,xyz\n\"2\",\"cba\",zyx"
+  params: "\n\"\n1"
+out:
+  result: '[{"nr":"1","name":"abc","addr":"xyz"},{"nr":"2","name":"cba","addr":"zyx"}]'
+  return: 'SUCCEED'
+---
+test case: 'no trailing line break (2)'
+in:
+  csv: "nr,\"name\",addr\n\"1\",abc,xyz\n\"2\",\"cba\","
+  params: "\n\"\n1"
+out:
+  result: '[{"nr":"1","name":"abc","addr":"xyz"},{"nr":"2","name":"cba","addr":""}]'
+  return: 'SUCCEED'
+---
+test case: 'no trailing line break (3)'
+in:
+  csv: "nr,\"name\",addr\n\"1\",abc,xyz\n\"2\",\"cba\",\"zyx\""
+  params: "\n\"\n1"
+out:
+  result: '[{"nr":"1","name":"abc","addr":"xyz"},{"nr":"2","name":"cba","addr":"zyx"}]'
+  return: 'SUCCEED'
+---
+test case: 'empty fields (1)'
+in:
+  csv: ",,"
+  params: "\n\n1"
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'empty fields (2)'
+in:
+  csv: ",,"
+  params: "\n\n0"
+out:
+  result: '[{"1":"","2":"","3":""}]'
+  return: 'SUCCEED'
+---
+test case: 'empty fields (3)'
+in:
+  csv: "a,b,c\n,,"
+  params: "\n\n1"
+out:
+  result: '[{"a":"","b":"","c":""}]'
+  return: 'SUCCEED'
+---
+test case: 'delimiter in quoted field'
+in:
+  csv: '`fld,1`,`fld,2`'
+  params: "\n`\n0"
+out:
+  result: '[{"1":"fld,1","2":"fld,2"}]'
+  return: 'SUCCEED'
+---
+test case: 'quotation character in unquoted field'
+in:
+  csv: 'fld`1,fld`2'
+  params: "\n`\n0"
+out:
+  result: '[{"1":"fld`1","2":"fld`2"}]'
+  return: 'SUCCEED'
+---
+test case: 'quotation character in unquoted field (2)'
+in:
+  csv: ' `fld`1` , `fld`2` '
+  params: "\n`\n0"
+out:
+  result: '[{"1":" `fld`1` ","2":" `fld`2` "}]'
+  return: 'SUCCEED'
+---
+test case: 'escaped quotation character'
+in:
+  csv: '`fld``1`,`fld``2`'
+  params: "\n`\n0"
+out:
+  result: '[{"1":"fld`1","2":"fld`2"}]'
+  return: 'SUCCEED'
+---
+test case: 'delimiter set in sep line'
+in:
+  csv: |-
+    sEp=.
+    col1,.;col2,.;
+    fld1,.;fld2,.;
+  params: "\n\n1"
+out:
+  result: '[{"col1,":"fld1,",";col2,":";fld2,",";":";"}]'
+  return: 'SUCCEED'
+---
+test case: 'cr/nl line breaks'
+in:
+  csv: "Sep=.\r\nname.addr\r\nabc.xyz\r\n\r\nfld1.fld2\r\n\r\n\r\nfld3.fld4\r\n"
+  params: "\n\n1"
+out:
+  result: '[{"name":"abc","addr":"xyz"},{"name":"","addr":""},{"name":"fld1","addr":"fld2"},{"name":"","addr":""},{"name":"","addr":""},{"name":"fld3","addr":"fld4"},{"name":"","addr":""}]'
+  return: 'SUCCEED'
+---
+test case: 'various length rows'
+in:
+  csv: |-
+    fld1,fld2,fld3
+    fld1,fld2,fld3,fld4
+    fld1,fld2
+    fld1,fld2,fld3,fld4,fld5
+  params: "\n\n0"
+out:
+  result: '[{"1":"fld1","2":"fld2","3":"fld3"},{"1":"fld1","2":"fld2","3":"fld3","4":"fld4"},{"1":"fld1","2":"fld2"},{"1":"fld1","2":"fld2","3":"fld3","4":"fld4","5":"fld5"}]'
+  return: 'SUCCEED'
+---
+test case: 'equal delimiter and quotation characters'
+in:
+  csv: |-
+    ,fld1,,fld2
+  params: ",\n,\n0"
+out:
+  result: '[{"1":"","2":"fld1","3":"","4":"fld2"}]'
+  return: 'SUCCEED'
+---
+test case: 'UTF8 2-byte delimiter'
+in:
+  csv: |-
+    col1фcol2
+    fld1фfld2
+  params: "ф\n\n1"
+out:
+  result: '[{"col1":"fld1","col2":"fld2"}]'
+  return: 'SUCCEED'
+---
+test case: 'UTF8 3-byte delimiter set in sep line'
+in:
+  csv: |-
+    sep=ꢂ
+    col1ꢂcol2
+    fld1ꢂfld2
+  params: "\n\n1"
+out:
+  result: '[{"col1":"fld1","col2":"fld2"}]'
+  return: 'SUCCEED'
+---
+test case: 'UTF8 4-byte delimiter'
+in:
+  csv: |-
+    col1😀col2
+    fld1😀fld2
+  params: "😀\n\n1"
+out:
+  result: '[{"col1":"fld1","col2":"fld2"}]'
+  return: 'SUCCEED'
+---
+test case: 'UTF8 2-byte quotation character'
+in:
+  csv: |-
+    ыcol1ы,ыcol,2ы
+    ыfld1ы,ыfld,2ы
+  params: "\nы\n1"
+out:
+  result: '[{"col1":"fld1","col,2":"fld,2"}]'
+  return: 'SUCCEED'
+---
+test case: 'UTF8 3-byte quotation character'
+in:
+  csv: |-
+    ꢂcol1ꢂ,ꢂcol,2ꢂ
+    ꢂfld1ꢂ,ꢂfld,2ꢂ
+  params: "\nꢂ\n1"
+out:
+  result: '[{"col1":"fld1","col,2":"fld,2"}]'
+  return: 'SUCCEED'
+---
+test case: 'UTF8 multi-byte delimiter and quotation characters'
+in:
+  csv: |-
+    😀col1😀ꢂ😀col2😀ꢂ😀😀
+    fld1ꢂ😀fld2😀ꢂ
+  params: "ꢂ\n😀\n1"
+out:
+  result: '[{"col1":"fld1","col2":"fld2","":""}]'
+  return: 'SUCCEED'
+---
+test case: 'delimiter set to space'
+in:
+  csv: |-
+    col1 col2 `col 3` 
+    fld1 fld2 `fld 3` 
+  params: " \n`\n1"
+out:
+  result: '[{"col1":"fld1","col2":"fld2","col 3":"fld 3","":""}]'
+  return: 'SUCCEED'
+---
+test case: 'quotation character set to space'
+in:
+  csv: |-
+    col1, col2 ,col 3
+     fld1 ,fld2, fld  3 
+  params: "\n \n1"
+out:
+  result: '[{"col1":"fld1","col2":"fld2","col 3":"fld 3"}]'
+  return: 'SUCCEED'
+---
+test case: 'sep line only (1)'
+in:
+  csv: 'sep=.'
+  params: "\n\n1"
+out:
+  result: '[]'
+  return: 'SUCCEED'
+---
+test case: 'sep line only (2)'
+in:
+  csv: 'sep=.'
+  params: "\n\n0"
+out:
+  result: '[]'
+  return: 'SUCCEED'
+---
+test case: 'sep line only (3)'
+in:
+  csv: "sep=.\n"
+  params: "\n\n1"
+out:
+  result: '[]'
+  return: 'SUCCEED'
+---
+test case: 'sep line only (4)'
+in:
+  csv: 'sep=.'
+  params: "\n\n0"
+out:
+  result: '[]'
+  return: 'SUCCEED'
+---
+test case: 'unsupported sep line (1)'
+in:
+  csv: |-
+    sep=.;
+    fld1,fld2
+  params: "\n\n0"
+out:
+  result: '[{"1":"sep=.;"},{"1":"fld1","2":"fld2"}]'
+  return: 'SUCCEED'
+---
+test case: 'unsupported sep line (2)'
+in:
+  csv: |-
+    sep=
+    fld1,fld2
+  params: "\n\n0"
+out:
+  result: '[{"1":"sep="},{"1":"fld1","2":"fld2"}]'
+  return: 'SUCCEED'
+---
+test case: 'duplicated column names (1)'
+in:
+  csv: |-
+    col1,col1
+    fld1,fld2
+  params: "\n\n1"
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'duplicated column names (2)'
+in:
+  csv: |-
+    ,
+    fld1,fld2
+  params: "\n\n1"
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'more fields in data row than in header'
+in:
+  csv: |-
+    col1,col1
+    fld1,fld2,fld3
+  params: "\n\n1"
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'unclosed quoted field'
+in:
+  csv: 'col1,"col1'
+  params: "\n\"\n0"
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'unclosed quoted field (UTF8-2)'
+in:
+  csv: 'col1,ыcol1'
+  params: "\nы\n0"
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'unclosed quoted field (UTF8-3)'
+in:
+  csv: 'col1,ꢂcol1'
+  params: "\nꢂ\n0"
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'unclosed quoted field (UTF8-4)'
+in:
+  csv: 'col1,😀col1'
+  params: "\n😀\n0"
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'escaped quotation character in unclosed quoted field (UTF8-3)'
+in:
+  csv: 'col1,ꢂcol1ꢂꢂ'
+  params: "\nꢂ\n0"
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'missing delimiter or line break after quoted field'
+in:
+  csv: 'col1,"col1" '
+  params: "\n\"\n0"
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'unsupported line break'
+in:
+  csv: "col1,col1\n\rfld1,fld2"
+  params: "\n\n0"
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'CSV sample input (1)'
+in:
+  csv: |
+    sEp=.
+    ;c`2;`;```;😀ꢂыa;col.5;`col6`;col7
+    fld.1;`fld.2`;f`3;`;```;;``;aыꢂ😀
+    
+    ``;fld2`ы;fld3ꢂ`;`😀`;;``
+    
+    
+    ;c`2;`;```;😀ꢂыa;col.5;`col6`;col7
+  params: ";\n`\n1"
+out:
+  result: '[{"":"fld.1","c`2":"fld.2",";`":"f`3","😀ꢂыa":";`","col.5":"","col6":"","col7":"aыꢂ😀"},{"":"","c`2":"",";`":"","😀ꢂыa":"","col.5":"","col6":"","col7":""},{"":"","c`2":"fld2`ы",";`":"fld3ꢂ`","😀ꢂыa":"😀","col.5":"","col6":"","col7":""},{"":"","c`2":"",";`":"","😀ꢂыa":"","col.5":"","col6":"","col7":""},{"":"","c`2":"",";`":"","😀ꢂыa":"","col.5":"","col6":"","col7":""},{"":"","c`2":"c`2",";`":";`","😀ꢂыa":"😀ꢂыa","col.5":"col.5","col6":"col6","col7":"col7"},{"":"","c`2":"",";`":"","😀ꢂыa":"","col.5":"","col6":"","col7":""}]'
+  return: 'SUCCEED'
+---
+test case: 'CSV sample input (2)'
+in:
+  csv: |-
+    sEp=.
+    col1,.;col2,.;
+    fld1,.;fld2,.;
+  params: ";\n\n1"
+out:
+  result: '[{"col1,.":"fld1,.","col2,.":"fld2,.","":""}]'
+  return: 'SUCCEED'
+...

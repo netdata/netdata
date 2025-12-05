@@ -1,0 +1,4630 @@
+---
+test case: string(10) * 10
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 10
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 10
+out:
+  return: SUCCEED
+  value: 100
+---
+test case: string(10x) * 10
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 10x
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 10
+out:
+  return: FAIL
+---
+test case: string(10) * abc
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 10
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: abc
+out:
+  return: FAIL
+---
+test case: string(1.5) * 3
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 1.5
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 3
+out:
+  return: SUCCEED
+  value: 4.5
+---
+test case: uint64(1.5) * 3
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_UINT64
+    time: 2017-10-29 03:15:00 +03:00
+    data: 1.5
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 3
+out:
+  return: SUCCEED
+  value: 3
+---
+test case: uint64(3) * 1.5
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_UINT64
+    time: 2017-10-29 03:15:00 +03:00
+    data: 3
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 1.5
+out:
+  return: SUCCEED
+  value: 4
+---
+test case: float(1.5) * 3
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_FLOAT
+    time: 2017-10-29 03:15:00 +03:00
+    data: 1.5
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 3
+out:
+  return: SUCCEED
+  value: 4.5
+---
+test case: float(3) * 1.5
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_FLOAT
+    time: 2017-10-29 03:15:00 +03:00
+    data: 3
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 1.5
+out:
+  return: SUCCEED
+  value: 4.5
+---
+test case: rtrim(01abc01, 01)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 01abc01
+  step:
+    type: ZBX_PREPROC_RTRIM
+    params: 01
+out:
+  return: SUCCEED
+  value: 01abc
+---
+test case: rtrim(01abc01, abc)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 01abc01
+  step:
+    type: ZBX_PREPROC_RTRIM
+    params: abc
+out:
+  return: SUCCEED
+  value: 01abc01
+---
+test case: ltrim(01abc01, 01)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 01abc01
+  step:
+    type: ZBX_PREPROC_LTRIM
+    params: 01
+out:
+  return: SUCCEED
+  value: abc01
+---
+test case: ltrim(01abc01, abc)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 01abc01
+  step:
+    type: ZBX_PREPROC_LTRIM
+    params: abc
+out:
+  return: SUCCEED
+  value: 01abc01
+---
+test case: trim(01abc01, 01)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 01abc01
+  step:
+    type: ZBX_PREPROC_TRIM
+    params: 01
+out:
+  return: SUCCEED
+  value: abc
+---
+test case: trim(01abc01, abc)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 01abc01
+  step:
+    type: ZBX_PREPROC_TRIM
+    params: abc
+out:
+  return: SUCCEED
+  value: 01abc01
+---
+test case: trim(\\s, abc)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "\\ abc \\"
+  step:
+    type: ZBX_PREPROC_TRIM
+    params: "\\\\s"
+out:
+  return: SUCCEED
+  value: "abc"
+---
+test case: regsub("test 123 number", "([0-9]+", 1)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: test 123 number
+  step:
+    type: ZBX_PREPROC_REGSUB
+    params: "([0-9]+\n\\1"
+out:
+  return: FAIL
+---
+test case: regsub("test 123 number", "([0-9]+)", \1)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: test 123 number
+  step:
+    type: ZBX_PREPROC_REGSUB
+    params: "([0-9]+)\n\\1"
+out:
+  return: SUCCEED
+  value: 123
+---
+test case: regsub("test 123 number", "([0-9]+)", x\1y)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: test 123 number
+  step:
+    type: ZBX_PREPROC_REGSUB
+    params: "([0-9]+)\nx\\1y"
+out:
+  return: SUCCEED
+  value: x123y
+---
+test case: regsub("test 123 number", "([0-9]+)", )
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: test 123 number
+  step:
+    type: ZBX_PREPROC_REGSUB
+    params: "([0-9]+)"
+out:
+  return: FAIL
+---
+test case: regsub("test abc number", "([0-9]+)", \1)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: test abc number
+  step:
+    type: ZBX_PREPROC_REGSUB
+    params: "([0-9]+)\n\\1"
+out:
+  return: FAIL
+---
+test case: regsub("", "([0-9]+)", \1)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 
+  step:
+    type: ZBX_PREPROC_REGSUB
+    params: "([0-9]+)\n\\1"
+out:
+  return: FAIL
+---
+test case: regsub("", "^$", ok)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: ""
+  step:
+    type: ZBX_PREPROC_REGSUB
+    params: "^$\nok"
+out:
+  return: SUCCEED
+  value: ok
+---
+test case: bool2dec()
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: ""
+  step:
+    type: ZBX_PREPROC_BOOL2DEC
+out:
+  return: FAIL
+---
+test case: bool2dec(abc)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "abc"
+  step:
+    type: ZBX_PREPROC_BOOL2DEC
+out:
+  return: FAIL
+---
+test case: bool2dec(1)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "1"
+  step:
+    type: ZBX_PREPROC_BOOL2DEC
+out:
+  return: SUCCEED
+  value: 1
+---
+test case: bool2dec(0)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "0"
+  step:
+    type: ZBX_PREPROC_BOOL2DEC
+out:
+  return: SUCCEED
+  value: 0
+---
+test case: bool2dec(true)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "true"
+  step:
+    type: ZBX_PREPROC_BOOL2DEC
+out:
+  return: SUCCEED
+  value: 1
+---
+test case: bool2dec(t)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "t"
+  step:
+    type: ZBX_PREPROC_BOOL2DEC
+out:
+  return: SUCCEED
+  value: 1
+---
+test case: bool2dec(yes)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "yes"
+  step:
+    type: ZBX_PREPROC_BOOL2DEC
+out:
+  return: SUCCEED
+  value: 1
+---
+test case: bool2dec(y)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "y"
+  step:
+    type: ZBX_PREPROC_BOOL2DEC
+out:
+  return: SUCCEED
+  value: 1
+---
+test case: bool2dec(ok)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "ok"
+  step:
+    type: ZBX_PREPROC_BOOL2DEC
+out:
+  return: SUCCEED
+  value: 1
+---
+test case: bool2dec(on)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "on"
+  step:
+    type: ZBX_PREPROC_BOOL2DEC
+out:
+  return: SUCCEED
+  value: 1
+---
+test case: bool2dec(false)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "false"
+  step:
+    type: ZBX_PREPROC_BOOL2DEC
+out:
+  return: SUCCEED
+  value: 0
+---
+test case: bool2dec(f)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "f"
+  step:
+    type: ZBX_PREPROC_BOOL2DEC
+out:
+  return: SUCCEED
+  value: 0
+---
+test case: bool2dec(no)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "no"
+  step:
+    type: ZBX_PREPROC_BOOL2DEC
+out:
+  return: SUCCEED
+  value: 0
+---
+test case: bool2dec(n)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "n"
+  step:
+    type: ZBX_PREPROC_BOOL2DEC
+out:
+  return: SUCCEED
+  value: 0
+---
+test case: bool2dec(err)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "err"
+  step:
+    type: ZBX_PREPROC_BOOL2DEC
+out:
+  return: SUCCEED
+  value: 0
+---
+test case: bool2dec(off)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "off"
+  step:
+    type: ZBX_PREPROC_BOOL2DEC
+out:
+  return: SUCCEED
+  value: 0
+---
+test case: oct2dec(0)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 0
+  step:
+    type: ZBX_PREPROC_OCT2DEC
+out:
+  return: SUCCEED
+  value: 0
+---
+test case: oct2dec(7)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 7
+  step:
+    type: ZBX_PREPROC_OCT2DEC
+out:
+  return: SUCCEED
+  value: 7
+---
+test case: oct2dec(10)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 10
+  step:
+    type: ZBX_PREPROC_OCT2DEC
+out:
+  return: SUCCEED
+  value: 8
+---
+test case: oct2dec(8)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 8
+  step:
+    type: ZBX_PREPROC_OCT2DEC
+out:
+  return: FAIL
+---
+test case: hex2dec(F)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: F
+  step:
+    type: ZBX_PREPROC_HEX2DEC
+out:
+  return: SUCCEED
+  value: 15
+---
+test case: hex2dec(a)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: a
+  step:
+    type: ZBX_PREPROC_HEX2DEC
+out:
+  return: SUCCEED
+  value: 10
+---
+test case: hex2dec(10)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 10
+  step:
+    type: ZBX_PREPROC_HEX2DEC
+out:
+  return: SUCCEED
+  value: 16
+---
+test case: hex2dec(g)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: g
+  step:
+    type: ZBX_PREPROC_HEX2DEC
+out:
+  return: FAIL
+---
+test case: hex2dec(ff ff)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: ff ff
+  step:
+    type: ZBX_PREPROC_HEX2DEC
+out:
+  return: SUCCEED
+  value: 65535
+---
+test case: deltavalue(5, 10)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 10
+  history:
+    variant: ZBX_VARIANT_UI64
+    time: 2017-10-29 03:14:00 +03:00
+    data: 5
+  step:
+    type: ZBX_PREPROC_DELTA_VALUE
+out:
+  return: SUCCEED
+  value: 5
+  history:
+    data: 10
+    time: 2017-10-29 03:15:00 +03:00
+---
+test case: deltavalue(-4.5, 5.5)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 5.5
+  history:
+    variant: ZBX_VARIANT_DBL
+    time: 2017-10-29 03:14:00 +03:00
+    data: -4.5
+  step:
+    type: ZBX_PREPROC_DELTA_VALUE
+out:
+  return: SUCCEED
+  value: 10
+  history:
+    time: 2017-10-29 03:15:00 +03:00
+    data: 5.5
+---
+test case: deltavalue(10, 10)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 10
+  history:
+    variant: ZBX_VARIANT_UI64
+    time: 2017-10-29 03:14:00 +03:00
+    data: 10
+  step:
+    type: ZBX_PREPROC_DELTA_VALUE
+out:
+  return: SUCCEED
+  value: 0
+  history:
+    time: 2017-10-29 03:15:00 +03:00
+    data: 10
+---
+test case: deltavalue(10, 9)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 0
+  history:
+    variant: ZBX_VARIANT_UI64
+    time: 2017-10-29 03:14:00 +03:00
+    data: 10
+  step:
+    type: ZBX_PREPROC_DELTA_VALUE
+out:
+  return: SUCCEED
+  history:
+    time: 2017-10-29 03:15:00 +03:00
+    data: 0
+---
+test case: deltavalue(0, 1.5)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 1.5
+  history:
+    variant: ZBX_VARIANT_DBL
+    time: 2017-10-29 03:14:00 +03:00
+    data: 0
+  step:
+    type: ZBX_PREPROC_DELTA_VALUE
+out:
+  return: SUCCEED
+  value: 1.5
+  history:
+    time: 2017-10-29 03:15:00 +03:00
+    data: 1.5
+---
+test case: deltaspeed(2, 1, 10s)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 1
+  history:
+    variant: ZBX_VARIANT_UI64
+    time: 2017-10-29 03:14:50 +03:00
+    data: 2
+  step:
+    type: ZBX_PREPROC_DELTA_SPEED
+out:
+  return: SUCCEED
+  history:
+    time: 2017-10-29 03:15:00 +03:00
+    data: 1
+---
+test case: deltaspeed(1, 2, -10s)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 2
+  history:
+    variant: ZBX_VARIANT_UI64
+    time: 2017-10-29 03:15:10 +03:00
+    data: 1
+  step:
+    type: ZBX_PREPROC_DELTA_SPEED
+out:
+  return: SUCCEED
+  history:
+    time: 2017-10-29 03:15:00 +03:00
+    data: 2
+---
+test case: deltaspeed(1, 2, 10s)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_FLOAT
+    time: 2017-10-29 03:15:00 +03:00
+    data: 2
+  history:
+    variant: ZBX_VARIANT_UI64
+    time: 2017-10-29 03:14:50 +03:00
+    data: 1
+  step:
+    type: ZBX_PREPROC_DELTA_SPEED
+out:
+  return: SUCCEED
+  value: 0.1
+  history:
+    time: 2017-10-29 03:15:00 +03:00
+    data: 2
+---
+test case: deltaspeed(2, 3, 10s)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_UINT64
+    time: 2017-10-29 03:15:00 +03:00
+    data: 3
+  history:
+    variant: ZBX_VARIANT_UI64
+    time: 2017-10-29 03:14:50 +03:00
+    data: 2
+  step:
+    type: ZBX_PREPROC_DELTA_SPEED
+out:
+  return: SUCCEED
+  value: 0
+  history:
+    time: 2017-10-29 03:15:00 +03:00
+    data: 3
+---
+test case: deltaspeed(2, 3, 1s)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_UINT64
+    time: 2017-10-29 03:15:00 +03:00
+    data: 3
+  history:
+    variant: ZBX_VARIANT_UI64
+    time: 2017-10-29 03:14:59 +03:00
+    data: 2
+  step:
+    type: ZBX_PREPROC_DELTA_SPEED
+out:
+  return: SUCCEED
+  value: 1
+  history:
+    time: 2017-10-29 03:15:00 +03:00
+    data: 3
+---
+test case: xpath1
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: ""
+  step:
+    type: ZBX_PREPROC_XPATH
+    params: ""
+out:
+  return: FAIL
+---
+test case: xpath2
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: <a/>
+  step:
+    type: ZBX_PREPROC_XPATH
+    params: ""
+out:
+  return: FAIL
+---
+test case: xpath3
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: <a/>
+  step:
+    type: ZBX_PREPROC_XPATH
+    params: |-
+      /a["]
+out:
+  return: FAIL
+---
+test case: xpath4
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: <a/>
+  step:
+    type: ZBX_PREPROC_XPATH
+    params: 1 div 0
+out:
+  return: FAIL
+---
+test case: xpath5
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: <a/>
+  step:
+    type: ZBX_PREPROC_XPATH
+    params: -a
+out:
+  return: FAIL
+---
+test case: xpath6
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: <a/>
+  step:
+    type: ZBX_PREPROC_XPATH
+    params: /b
+out:
+  return: SUCCEED
+  value: ""
+---
+test case: xpath7
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: <a/>
+  step:
+    type: ZBX_PREPROC_XPATH
+    params: 3 div 2
+out:
+  return: SUCCEED
+  value: 1.5
+---
+test case: xpath8
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: <a/>
+  step:
+    type: ZBX_PREPROC_XPATH
+    params: /a
+out:
+  return: SUCCEED
+  value: <a/>
+---
+test case: xpath9
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: <a>1</a>
+  step:
+    type: ZBX_PREPROC_XPATH
+    params: /a/text()
+out:
+  return: SUCCEED
+  value: 1
+---
+test case: xpath10
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: <a>1</a>
+  step:
+    type: ZBX_PREPROC_XPATH
+    params: string(/a)
+out:
+  return: SUCCEED
+  value: 1
+---
+test case: xpath11
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: <a b="10">1</a>
+  step:
+    type: ZBX_PREPROC_XPATH
+    params: string(/a/@b)
+out:
+  return: SUCCEED
+  value: 10
+---
+test case: xpath12
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: <a><b x="1"/><c x="2"/><d x="1"/></a>
+  step:
+    type: ZBX_PREPROC_XPATH
+    params: //*[@x="1"]
+out:
+  return: SUCCEED
+  value: <b x="1"/><d x="1"/>
+---
+test case: jsonpath1
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: abc
+  step:
+    type: ZBX_PREPROC_JSONPATH
+    params: 
+out:
+  return: FAIL
+---
+test case: jsonpath2
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |-
+      {"a":{"b":[1, 2, 3]}}
+  step:
+    type: ZBX_PREPROC_JSONPATH
+    params: $abc
+out:
+  return: FAIL
+---
+test case: jsonpath3
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |-
+      {"a":{"b":[1, 2, 3]}}
+  step:
+    type: ZBX_PREPROC_JSONPATH
+    params: $.abc
+out:
+  return: FAIL
+---
+test case: jsonpath4
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |- 
+      {"a":{"b":[1, 2, 3]}}
+  step:
+    type: ZBX_PREPROC_JSONPATH
+    params: $.a
+out:
+  return: SUCCEED
+  value: |-
+    {"b":[1,2,3]}
+---
+test case: jsonpath5
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |- 
+      {"a":{"b":[1, 2, 3]}}
+  step:
+    type: ZBX_PREPROC_JSONPATH
+    params: $.a['b']
+out:
+  return: SUCCEED
+  value: |-
+    [1,2,3]
+---
+test case: jsonpath6
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |- 
+      {"a":{"b":[1, 2, 3]}}
+  step:
+    type: ZBX_PREPROC_JSONPATH
+    params: $.a['b'][1]
+out:
+  return: SUCCEED
+  value: 2
+---
+test case: jsonpath7
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |- 
+      {"a":{"b c":["one", "two", "three"]}}
+  step:
+    type: ZBX_PREPROC_JSONPATH
+    params: $.a['b c']
+out:
+  return: SUCCEED
+  value: '["one","two","three"]'
+---
+test case: jsonpath8
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |- 
+      {"a":{"b c":["one", "two \"2\"", 3]}}
+  step:
+    type: ZBX_PREPROC_JSONPATH
+    params: $.a['b c'][1]
+out:
+  return: SUCCEED
+  value: two "2"
+---
+test case: jsonpath9
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |- 
+      {"a":{"b c":["one", "two \"2\"", 3]}}
+  step:
+    type: ZBX_PREPROC_JSONPATH
+    params: $.a['b c'][2]
+out:
+  return: SUCCEED
+  value: 3
+---
+test case: jsonpath10
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |- 
+      {"a":{"b":[1, 2, 3]}}
+  step:
+    type: ZBX_PREPROC_JSONPATH
+    params: $.a['b'][3]
+out:
+  return: FAIL
+---
+test case: jsonpath11
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |- 
+      {"a":{"b":[1, 2, 3]}}
+  step:
+    type: ZBX_PREPROC_JSONPATH
+    params: $.a['b'][
+out:
+  return: FAIL
+---
+test case: jsonpath12
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |- 
+      {"a":{"b":[1, 2, 3]}}
+  step:
+    type: ZBX_PREPROC_JSONPATH
+    params: $.a['b][3]
+out:
+  return: FAIL
+---
+test case: jsonpath13
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |- 
+      {"a":{"\ud800": 1}}
+  step:
+    type: ZBX_PREPROC_JSONPATH
+    params: $.a
+out:
+  return: FAIL
+---
+test case: validate_range(1, 5, 10)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 1
+  step:
+    type: ZBX_PREPROC_VALIDATE_RANGE
+    params: |-
+      5
+      10
+out:
+  return: FAIL
+---
+test case: validate_range(5, 5, 10)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 5
+  step:
+    type: ZBX_PREPROC_VALIDATE_RANGE
+    params: |-
+      5
+      10
+out:
+  return: SUCCEED
+  value: 5
+---
+test case: validate_range(10, 5, 10)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 10
+  step:
+    type: ZBX_PREPROC_VALIDATE_RANGE
+    params: |-
+      5
+      10
+out:
+  return: SUCCEED
+  value: 10
+---
+test case: validate_range(10.1, 5, 10)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 10.1
+  step:
+    type: ZBX_PREPROC_VALIDATE_RANGE
+    params: |-
+      5
+      10
+out:
+  return: FAIL
+---
+test case: validate_regex(abc 123 xyz, ([0-9+))
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: abc 123 xyz
+  step:
+    type: ZBX_PREPROC_VALIDATE_REGEX
+    params: ([0-9+)
+out:
+  return: FAIL
+---
+test case: validate_regex(abc opq xyz, ([0-9]+))
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: abc opq xyz
+  step:
+    type: ZBX_PREPROC_VALIDATE_REGEX
+    params: ([0-9]+)
+out:
+  return: FAIL
+---
+test case: validate_regex(abc 123 xyz, ([0-9]+))
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: abc 123 xyz
+  step:
+    type: ZBX_PREPROC_VALIDATE_REGEX
+    params: ([0-9]+)
+out:
+  return: SUCCEED
+  value: abc 123 xyz
+---
+test case: validate_regex(abc 123 xyz, ([0-9+))
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: abc 123 xyz
+  step:
+    type: ZBX_PREPROC_VALIDATE_NOT_REGEX
+    params: ([0-9+)
+out:
+  return: FAIL
+---
+test case: validate_regex(abc opq xyz, ([0-9]+))
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: abc opq xyz
+  step:
+    type: ZBX_PREPROC_VALIDATE_NOT_REGEX
+    params: ([0-9]+)
+out:
+  return: SUCCEED
+  value: abc opq xyz
+---
+test case: validate_regex(abc 123 xyz, ([0-9]+))
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: abc 123 xyz
+  step:
+    type: ZBX_PREPROC_VALIDATE_NOT_REGEX
+    params: ([0-9]+)
+out:
+  return: FAIL
+---
+test case: string(10) * 10 (discard)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: x
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 10
+    error_handler: ZBX_PREPROC_FAIL_DISCARD_VALUE
+out:
+  return: SUCCEED
+---
+test case: string(10) * 10 (set value)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: x
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 10
+    error_handler: ZBX_PREPROC_FAIL_SET_VALUE
+    error_handler_params: invalid
+out:
+  return: SUCCEED
+  value: invalid
+---
+test case: string(10) * 10 (set error)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: x
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 10
+    error_handler: ZBX_PREPROC_FAIL_SET_ERROR
+    error_handler_params: custom error
+out:
+  return: FAIL
+  error: custom error
+---
+test case: jsonerror(x, $.error)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: x
+  step:
+    type: ZBX_PREPROC_ERROR_FIELD_JSON
+    params: $.error
+out:
+  return: SUCCEED
+  value: x
+---
+test case: jsonerror({"error":"error message"}, $error)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |-
+      {"error":"error message"}
+  step:
+    type: ZBX_PREPROC_ERROR_FIELD_JSON
+    params: $error
+out:
+  return: FAIL
+---
+test case: jsonerror({"data":"123"}, $.error)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |-
+      {"data":"123"}
+  step:
+    type: ZBX_PREPROC_ERROR_FIELD_JSON
+    params: $.error
+out:
+  return: SUCCEED
+  value: |-
+    {"data":"123"}
+---
+test case: jsonerror({"error":"error message"}, $.error)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |-
+      {"error":"error message"}
+  step:
+    type: ZBX_PREPROC_ERROR_FIELD_JSON
+    params: $.error
+out:
+  return: FAIL
+  error: error message
+---
+test case: xmlerror(x, //error)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: x
+  step:
+    type: ZBX_PREPROC_ERROR_FIELD_XML
+    params: //error
+out:
+  return: SUCCEED
+  value: x
+---
+test case: xmlerror(<a><error>custom error</error></a>, "//text(")
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: <a><error>custom error</error></a>
+  step:
+    type: ZBX_PREPROC_ERROR_FIELD_XML
+    params: //text(
+out:
+  return: FAIL
+---
+test case: xmlerror(<a><error>custom error</error></a>, "//error/text()")
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: <a><error>custom error</error></a>
+  step:
+    type: ZBX_PREPROC_ERROR_FIELD_XML
+    params: //error/text()
+out:
+  return: FAIL
+  error: custom error
+---
+test case: xmlerror(<a><value>1</value></a>, "//error/text()")
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: <a><value>1</value></a>
+  step:
+    type: ZBX_PREPROC_ERROR_FIELD_XML
+    params: //error/text()
+out:
+  return: SUCCEED
+  value: <a><value>1</value></a>
+---
+test case: regexerror("error:123, "error:([0-9+)")
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: error:123
+  step:
+    type: ZBX_PREPROC_ERROR_FIELD_REGEX
+    params: ([0-9+)
+out:
+  return: FAIL
+---
+test case: regexerror("error:123, "error:([0-9]+)")
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: error:123
+  step:
+    type: ZBX_PREPROC_ERROR_FIELD_REGEX
+    params: |- 
+      error:([0-9]+)
+      \1
+out:
+  return: FAIL
+  error: 123
+---
+test case: regexerror("value:123, "error:([0-9]+)")
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: value:123
+  step:
+    type: ZBX_PREPROC_ERROR_FIELD_REGEX
+    params: |- 
+      error:([0-9]+)
+      \1
+out:
+  return: SUCCEED
+  value: value:123
+---
+test case: throttle(1, 123)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 123
+  history:
+    variant: ZBX_VARIANT_STR
+    time: 2017-10-29 03:14:00 +03:00
+    data: 1
+  step:
+    type: ZBX_PREPROC_THROTTLE_VALUE
+out:
+  return: SUCCEED
+  value: 123
+  history:
+    time: 2017-10-29 03:15:00 +03:00
+    data: 123
+---
+test case: throttle(, 123)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 123
+  step:
+    type: ZBX_PREPROC_THROTTLE_VALUE
+out:
+  return: SUCCEED
+  value: 123
+  history:
+    time: 2017-10-29 03:15:00 +03:00
+    data: 123
+---
+test case: throttle(123, 123)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 123
+  history:
+    variant: ZBX_VARIANT_STR
+    time: 2017-10-29 03:14:00 +03:00
+    data: 123
+  step:
+    type: ZBX_PREPROC_THROTTLE_VALUE
+out:
+  return: SUCCEED
+  history:
+    time: 2017-10-29 03:14:00 +03:00
+    data: 123
+---
+test case: throttle_timed(, abc)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: abc
+  step:
+    type: ZBX_PREPROC_THROTTLE_TIMED_VALUE
+    params: 1m
+out:
+  return: SUCCEED
+  value: abc
+  history:
+    time: 2017-10-29 03:15:00 +03:00
+    data: abc
+---
+test case: throttle_timed(xyz, abc)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: abc
+  history:
+    variant: ZBX_VARIANT_STR
+    time: 2017-10-29 03:14:30 +03:00
+    data: xyz
+  step:
+    type: ZBX_PREPROC_THROTTLE_TIMED_VALUE
+    params: 1m
+out:
+  return: SUCCEED
+  value: abc
+  history:
+    time: 2017-10-29 03:15:00 +03:00
+    data: abc
+---
+test case: throttle_timed(abc, abc, 30s)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: abc
+  history:
+    variant: ZBX_VARIANT_STR
+    time: 2017-10-29 03:14:30 +03:00
+    data: abc
+  step:
+    type: ZBX_PREPROC_THROTTLE_TIMED_VALUE
+    params: 1m
+out:
+  return: SUCCEED
+  history:
+    time: 2017-10-29 03:14:30 +03:00
+    data: abc
+---
+test case: throttle_timed(abc, abc, 1m)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: abc
+  history:
+    variant: ZBX_VARIANT_STR
+    time: 2017-10-29 03:14:00 +03:00
+    data: abc
+  step:
+    type: ZBX_PREPROC_THROTTLE_TIMED_VALUE
+    params: 1m
+out:
+  return: SUCCEED
+  value: abc
+  history:
+    time: 2017-10-29 03:15:00 +03:00
+    data: abc
+---
+test case: float(1.5e0) * 1
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_FLOAT
+    time: 2017-10-29 03:15:00 +03:00
+    data: 1.5e0
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 1
+out:
+  return: SUCCEED
+  value: 1.5
+---
+test case: float(1) * 1.5e0
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_FLOAT
+    time: 2017-10-29 03:15:00 +03:00
+    data: 1
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 1.5e0
+out:
+  return: SUCCEED
+  value: 1.5
+---
+test case: float(1.5e0) * 1.5e0
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_FLOAT
+    time: 2017-10-29 03:15:00 +03:00
+    data: 1.5e0
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 1.5e0
+out:
+  return: SUCCEED
+  value: 2.25
+---
+test case: float(1.5e1) * 1
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_FLOAT
+    time: 2017-10-29 03:15:00 +03:00
+    data: 1.5e1
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 1
+out:
+  return: SUCCEED
+  value: 15
+---
+test case: float(1) * 1.5e1
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_FLOAT
+    time: 2017-10-29 03:15:00 +03:00
+    data: 1
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 1.5e1
+out:
+  return: SUCCEED
+  value: 15
+---
+test case: float(1.5e1) * 1.5e1
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_FLOAT
+    time: 2017-10-29 03:15:00 +03:00
+    data: 1.5e1
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 1.5e1
+out:
+  return: SUCCEED
+  value: 225
+---
+test case: float(1.5e10) * 1
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_FLOAT
+    time: 2017-10-29 03:15:00 +03:00
+    data: 1.5e10
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 1
+out:
+  return: SUCCEED
+  value: 15000000000
+---
+test case: float(1) * 1.5e10
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_FLOAT
+    time: 2017-10-29 03:15:00 +03:00
+    data: 1
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 1.5e10
+out:
+  return: SUCCEED
+  value: 15000000000
+---
+test case: float(1.5e10) * 1.5e10
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_FLOAT
+    time: 2017-10-29 03:15:00 +03:00
+    data: 1.5e10
+  step:
+    type: ZBX_PREPROC_MULTIPLIER
+    params: 1.5e10
+out:
+  return: SUCCEED
+  value: 225000000000000000000
+---
+test case: prometheus_getmetric1 
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      # HELP cpu_usage_system Telegraf collected metric
+      # TYPE cpu_usage_system gauge
+      cpu_usage_system{cpu="cpu-total",host="host1"} 1.1940298507220641
+      cpu_usage_system{cpu="cpu0",host="host1"} 1.1940298507220641
+      cpu_usage_system{cpu="cpu1",host="host1"} 1.1340298507220641
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_PATTERN
+    params: "cpu_usage_system{cpu=\"cpu-total\",host=~\".*\"}\nvalue\n"
+out:
+  return: SUCCEED
+  value: 1.1940298507220641
+---
+test case: prometheus_getmetric2
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: metric_without_timestamp_and_labels 12.47
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_PATTERN
+    params: "metric_without_timestamp_and_labels\nvalue\n"
+out:
+  return: SUCCEED
+  value: 12.47
+---
+test case: prometheus_getmetric3
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      # HELP cpu_usage_system Telegraf collected metric
+      # TYPE cpu_usage_system gauge
+      cpu_usage_system{cpu="cpu-total",host="host1"} 1.1940298507220641
+      cpu_usage_system{cpu="cpu0",host="host1"} 1.1940298507220641
+      cpu_usage_system{cpu="cpu1",host="host1"} 1.1340298507220641
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_PATTERN
+    params: "{cpu=\"cpu0\",__name__=\"cpu_usage_system\"}\nvalue\n"
+out:
+  return: SUCCEED
+  value: 1.1940298507220641
+---
+test case: prometheus_getmetric4
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      # HELP http_requests_total The total number of HTTP requests.
+      # TYPE http_requests_total counter
+      http_requests_total{method="post",code="200"} 1027 1395066363000
+      http_requests_total{method="post",code="400"}    3 1395066363000
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_PATTERN
+    params: "http_requests_total{code=\"200\"}\nvalue\n"
+out:
+  return: SUCCEED
+  value: 1027
+---
+test case: prometheus_getmetric5
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      # HELP cpu_usage_system Telegraf collected metric
+      # TYPE cpu_usage_system gauge
+      cpu_usage_system{cpu="cpu1",host="host1"} 1.1340298507220641
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_PATTERN
+    params: "\nvalue\n"
+out:
+  return: SUCCEED
+  value: 1.1340298507220641
+---
+test case: prometheus_getmetric6
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      # HELP cpu_usage_system Telegraf collected metric
+      # TYPE cpu_usage_system gauge
+      cpu_usage_system{cpu="cpu1",host="host1"} 1.1340298507220641
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_PATTERN
+    params: "cpu_usage_system\nvalue\n"
+out:
+  return: SUCCEED
+  value: 1.1340298507220641
+---
+test case: prometheus_getmetric7
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      # HELP cpu_usage_system Telegraf collected metric
+      # TYPE cpu_usage_system gauge
+      cpu_usage_system{cpu="cpu-total",host="host1"} 1.1940298507220641
+      cpu_usage_system{cpu="cpu0",host="host2"} 1.1940298507220641
+      cpu_usage_system{cpu="cpu1",host="host3"} 1.1340298507220641
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_PATTERN
+    params: "cpu_usage_system{cpu=\"cpu0\"} == 1.1940298507220641\nlabel\nhost"
+out:
+  return: SUCCEED
+  value: host2
+---
+test case: prometheus_getmetric8
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: >
+      AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz:_0123456789{
+      AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz_0123456789="anything"} 123123123
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_PATTERN
+    params: |-
+      AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz:_0123456789 == 123123123
+      label
+      AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz_0123456789
+out:
+  return: SUCCEED
+  value: anything
+---
+test case: prometheus_getmetric9
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      # HELP cpu_usage_system Telegraf collected metric
+      # TYPE cpu_usage_system gauge
+      cpu_usage_system{cpu="cpu-total",host="host1"} 1.1940298507220641
+      cpu_usage_system{cpu="cpu0",host="host2"} 1.1940298507220641
+      cpu_usage_system{cpu="cpu1",host="host3"} 1.1340298507220641
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_PATTERN
+    params: |-
+      cpu_usage_system{cpu="cpu0"} == 1.1940298507220641
+      label
+      host
+out:
+  return: SUCCEED
+  value: host2
+---
+test case: prometheus_getmetric10
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      # HELP cpu_usage_system Telegraf collected metric
+      # TYPE cpu_usage_system gauge
+      cpu_usage_system{cpu="cpu-total",host="host1"} 1.1940298507220641
+      cpu_usage_system{cpu="cpu0",host="host2"} 1.1940298507220641
+      cpu_usage_system{cpu="cpu1",host="host,3"} 1.1340298507220641
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_PATTERN
+    params: |-
+      cpu_usage_system{cpu="cpu1"}
+      label
+      host
+out:
+  return: SUCCEED
+  value: host,3
+---
+test case: prometheus_getmetric11
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      # HELP cpu_usage_system Telegraf collected metric
+      # TYPE cpu_usage_system gauge
+      cpu_usage_system{cpu="cpu-total"} 1.1940298507220641
+      cpu_usage_system{cpu="cpu0"} 1.1940298507220641
+      cpu_usage_system{cpu="cpu1"} 1.1340298507220641
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_PATTERN
+    params: |-
+      cpu_usage_system{cpu="cpu-total"}
+      gpu
+    error_handler: ZBX_PREPROC_FAIL_SET_ERROR
+    error_handler_params: custom error
+out:
+  return: FAIL
+  error: custom error
+---
+test case: prometheus_getmetric12
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      # HELP cpu_usage_system Telegraf collected metric
+      # TYPE cpu_usage_system gauge
+      cpu_usage_system{cpu="cpu-total"} 1.1940298507220641
+      cpu_usage_system{cpu="cpu0"} 1.1940298507220641
+      cpu_usage_system{cpu="cpu1"} 1.1340298507220641
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_PATTERN
+    params: |-
+      cpu_usage_system{cpu="cpu"}
+      \value
+    error_handler: ZBX_PREPROC_FAIL_SET_ERROR
+    error_handler_params: custom error
+out:
+  return: FAIL
+  error: custom error
+---
+test case: prometheus_getmetric13
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      wmi_service_state{name="dhcp",state="continue pending"} 0
+      wmi_service_state{name="dhcp",state="continue pending"} 1
+      wmi_service_state{name="dhcp",state="pause pending"} 1
+      wmi_service_state{name="dhcp",state="paused"} 1
+      wmi_service_state{name="dhcp",state="running"} 1
+      wmi_service_state{name="dhcp",state="start pending"} 1
+      wmi_service_state{name="dhcp",state="stop pending"} 1
+      wmi_service_state{name="dhcp",state="stopped"} 1
+      wmi_service_state{name="dhcp",state="unknown"} 1
+      wmi_service_state{name="dhcp",state="continue pending"} 1
+      wmi_service_state{name="dhcp",state="pause pending"} 1
+      wmi_service_state{name="dhcp",state="paused"} 1
+      wmi_service_state{name="dhcp",state="running"} 1
+      wmi_service_state{name="dhcp",state="start pending"} 1
+      wmi_service_state{name="dhcp",state="stop pending"} 1
+      wmi_service_state{name="dhcp",state="stopped"} 1
+      wmi_service_state{name="dhcp",state="unknown"} 1
+      wmi_service_state{name="dhcp",state="unknown"} 0
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_PATTERN
+    params: |-
+      wmi_service_state == 1
+      \value
+    error_handler: ZBX_PREPROC_FAIL_SET_ERROR
+    error_handler_params: custom error
+out:
+  return: FAIL
+  error: custom error
+---
+test case: prometheus_to_json1
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      # HELP cpu_usage_system Telegraf collected metric
+      # TYPE cpu_usage_system gauge
+      cpu_usage_system{cpu="cpu-total"} 1.1940298507220641
+      cpu_usage_system{cpu="cpu0"} 1.1940298507220641
+      cpu_usage_system{cpu="cpu1"} 1.1340298507220641
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_TO_JSON
+    params: cpu_usage_system
+out:
+  return: SUCCEED
+  value: '[{"name":"cpu_usage_system","value":"1.1940298507220641","line_raw":"cpu_usage_system{cpu=\"cpu-total\"} 1.1940298507220641","labels":{"cpu":"cpu-total"},"type":"gauge","help":"Telegraf collected metric"},{"name":"cpu_usage_system","value":"1.1940298507220641","line_raw":"cpu_usage_system{cpu=\"cpu0\"} 1.1940298507220641","labels":{"cpu":"cpu0"},"type":"gauge","help":"Telegraf collected metric"},{"name":"cpu_usage_system","value":"1.1340298507220641","line_raw":"cpu_usage_system{cpu=\"cpu1\"} 1.1340298507220641","labels":{"cpu":"cpu1"},"type":"gauge","help":"Telegraf collected metric"}]'
+---
+test case: prometheus_to_json2
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      # HELP wmi_os_timezone OperatingSystem.LocalDateTime
+      # TYPE wmi_os_timezone gauge
+      wmi_os_timezone{timezone="MSK"} 1
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_TO_JSON
+    params: wmi_os_timezone
+out:
+  return: SUCCEED
+  value: '[{"name":"wmi_os_timezone","value":"1","line_raw":"wmi_os_timezone{timezone=\"MSK\"} 1","labels":{"timezone":"MSK"},"type":"gauge","help":"OperatingSystem.LocalDateTime"}]'
+---
+test case: prometheus_to_json3
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      random_date{year="2019",month="february",day="02/12/2019"} 1
+      random_date{year="2019",month="march",day="03/07/2019"} 2
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_TO_JSON
+    params: random_date{year="2019",day=~"^([0-2][0-9]|(3)[0-1])(\\/)(((0)[0-9])|((1)[0-2]))(\\/)\\d{4}$"}
+out:
+  return: SUCCEED
+  value: '[{"name":"random_date","value":"1","line_raw":"random_date{year=\"2019\",month=\"february\",day=\"02/12/2019\"} 1","labels":{"year":"2019","month":"february","day":"02/12/2019"},"type":"untyped"},{"name":"random_date","value":"2","line_raw":"random_date{year=\"2019\",month=\"march\",day=\"03/07/2019\"} 2","labels":{"year":"2019","month":"march","day":"03/07/2019"},"type":"untyped"}]'
+---
+test case: prometheus_to_json4
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: metric_without_timestamp_and_labels 12.47
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_TO_JSON
+    params: metric_without_timestamp_and_labels
+out:
+  return: SUCCEED
+  value: '[{"name":"metric_without_timestamp_and_labels","value":"12.47","line_raw":"metric_without_timestamp_and_labels 12.47","type":"untyped"}]'
+---
+test case: prometheus_to_json5
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: wmi_os_timezone{timezone} 1
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_TO_JSON
+    params: wmi_os_timezone
+    error_handler: ZBX_PREPROC_FAIL_SET_ERROR
+    error_handler_params: custom error
+out:
+  return: FAIL
+  error: custom error
+---
+test case: csv_to_json1
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      sep=.
+      A.B.C
+      1.2.3
+  step:
+    type: ZBX_PREPROC_CSV_TO_JSON
+    params: "\n\n1"
+out:
+  return: SUCCEED
+  value: '[{"A":"1","B":"2","C":"3"},{"A":"","B":"","C":""}]'
+---
+test case: csv_to_json2
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      sep=.
+      A.`B.``B`.C
+      1.`2`.`3.`
+  step:
+    type: ZBX_PREPROC_CSV_TO_JSON
+    params: "\n`\n1"
+out:
+  return: SUCCEED
+  value: '[{"A":"1","B.`B":"2","C":"3."},{"A":"","B.`B":"","C":""}]'
+---
+test case: csv_to_json3
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: 1,2,3
+  step:
+    type: ZBX_PREPROC_CSV_TO_JSON
+    params: "\n\n0"
+out:
+  return: SUCCEED
+  value: '[{"1":"1","2":"2","3":"3"}]'
+---
+test case: csv_to_json4
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      A,B,C
+      1,2,3,4
+  step:
+    type: ZBX_PREPROC_PROMETHEUS_TO_JSON
+    params: "\n\n1"
+    error_handler: ZBX_PREPROC_FAIL_SET_ERROR
+    error_handler_params: custom error
+out:
+  return: FAIL
+  error: custom error
+---
+test case: replace a to b
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: a
+  step:
+    type: ZBX_PREPROC_STR_REPLACE
+    params: "a\nb"
+out:
+  return: SUCCEED
+  value: b
+---
+test case: replace a to bbb
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: a1a2a3a
+  step:
+    type: ZBX_PREPROC_STR_REPLACE
+    params: "a\nbbb"
+out:
+  return: SUCCEED
+  value: bbb1bbb2bbb3bbb
+---
+test case: replace a to a
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: a
+  step:
+    type: ZBX_PREPROC_STR_REPLACE
+    params: "a\na"
+out:
+  return: SUCCEED
+  value: a
+---
+test case: replace a to nothing
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: a
+  step:
+    type: ZBX_PREPROC_STR_REPLACE
+    params: "a\n"
+out:
+  return: SUCCEED
+  value: ""
+---
+test case: replace a to nothing in between
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: abac
+  step:
+    type: ZBX_PREPROC_STR_REPLACE
+    params: "a\n"
+out:
+  return: SUCCEED
+  value: "bc"
+---
+test case: replace non printable characters
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "\n\r	 "
+  step:
+    type: ZBX_PREPROC_STR_REPLACE
+    params: "\\n\\r\\t\\s\nOK"
+out:
+  return: SUCCEED
+  value: "OK"
+---
+test case: replace non printable characters mixed
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "\n1\r2	3 4"
+  step:
+    type: ZBX_PREPROC_STR_REPLACE
+    params: "\\n1\\r2\\t3\\s4\nOK"
+out:
+  return: SUCCEED
+  value: "OK"
+---
+test case: replace non printable characters 2
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "\n\r	 "
+  step:
+    type: ZBX_PREPROC_STR_REPLACE
+    params: "\\n\\r	 \nOK"
+out:
+  return: SUCCEED
+  value: "OK"
+---
+test case: replace non printable characters in both search and replace
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "\n\r	 "
+  step:
+    type: ZBX_PREPROC_STR_REPLACE
+    params: "\\n\\r\\t\\s\n\\n\\r\\tOK\\s"
+out:
+  return: SUCCEED
+  value: "\n\r\tOK "
+---
+test case: replace \
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "\\"
+  step:
+    type: ZBX_PREPROC_STR_REPLACE
+    params: "\\\nOK"
+out:
+  return: SUCCEED
+  value: "OK"
+---
+test case: replace 2 characters "\t" to OK
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "\\t"
+  step:
+    type: ZBX_PREPROC_STR_REPLACE
+    params: "\\\\t\nOK"
+out:
+  return: SUCCEED
+  value: "OK"
+---
+test case: Missing second parameter
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "a"
+  step:
+    type: ZBX_PREPROC_STR_REPLACE
+    params: "OK"
+out:
+  return: FAIL
+  value: "a"
+---
+test case: Missing first parameter
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "a"
+  step:
+    type: ZBX_PREPROC_STR_REPLACE
+    params: "\nOK"
+out:
+  return: FAIL
+  value: "a"
+---
+test case: Single slash in search
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "\\"
+  step:
+    type: ZBX_PREPROC_STR_REPLACE
+    params: "\\\nOK"
+out:
+  return: SUCCEED
+  value: "OK"
+---
+test case: Single slash in replace
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "OK"
+  step:
+    type: ZBX_PREPROC_STR_REPLACE
+    params: "OK\n\\"
+out:
+  return: SUCCEED
+  value: "\\"
+---
+test case: No match
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "O K"
+  step:
+    type: ZBX_PREPROC_STR_REPLACE
+    params: "OK\ntest"
+out:
+  return: SUCCEED
+  value: "O K"
+---
+test case: SNMP walk to value - bad data
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      aaa
+      bbb
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: FAIL
+---
+test case: SNMP walk to value - bad param
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 71 71
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+out:
+  return: FAIL
+---
+test case: SNMP walk to value - string
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "AAA"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: 'AAA'
+---
+test case: SNMP walk to value - NULL
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = NULL
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: 'NULL'
+---
+test case: SNMP walk to value - Arbitrary number
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = 123
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: 123
+---
+test case: SNMP walk to value - INTEGER
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = INTEGER: 123
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: 123
+---
+test case: SNMP walk to value - IpAddress
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = IpAddress: 127.0.0.1
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: '127.0.0.1'
+---
+test case: SNMP walk to value - Hex-STRING
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 71 71 AA
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: '71 71 AA'
+---
+test case: SNMP walk to value - Hex-STRING (multiline)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 71 71 
+      AA BB CC 
+      DD
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: '71 71 AA BB CC DD'
+---
+test case: SNMP walk to value - Hex-STRING (multiline) - space on the last line
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 71 71 
+      AA BB CC 
+      DD 
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: '71 71 AA BB CC DD'
+---
+test case: SNMP walk to value - Hex-STRING (multiline) - with succeeding string
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 71 71 
+      AA BB CC 
+      DD
+      .1.3.6.1.2 = Hex-STRING: 74 65 73 74 20 D1 91
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: '71 71 AA BB CC DD'
+---
+test case: SNMP walk to value - Hex-STRING - to UTF8
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 74 65 73 74 20 D1 91
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      1
+out:
+  return: SUCCEED
+  value: 'test ё'
+---
+test case: SNMP walk to value - Hex-STRING - to UTF8 (null terminated)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 74 65 73 74 20 D1 91 00
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      1
+out:
+  return: SUCCEED
+  value: 'test ё'
+---
+test case: SNMP walk to value - Hex-STRING - to UTF8 - invalid hex string
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 74 65 X3 74 20 D1 91
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      1
+out:
+  return: FAIL
+---
+test case: SNMP walk to value - Hex-STRING - to UTF8 - invalid hex string (2)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 74 65 74 20 D1 9
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      1
+out:
+  return: FAIL
+---
+test case: SNMP walk to value - Hex-STRING - to UTF8 - invalid sequence
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 74 65 73 74 20 D1 91 FF
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      1
+out:
+  return: SUCCEED
+  value: 'test ё?'
+---
+test case: SNMP walk to value - Hex-STRING - to MAC
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 74 65 73 74 20 D1
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      2
+out:
+  return: SUCCEED
+  value: '74:65:73:74:20:D1'
+---
+test case: SNMP walk to value - Hex-STRING - to MAC - invalid hex string
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 74 65 73 74 XX
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      2
+out:
+  return: FAIL
+---
+test case: SNMP walk to value - BITS to integer - 1
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = BITS: FE EE 15 15
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      3
+out:
+  return: SUCCEED
+  value: '353758974'
+---
+test case: SNMP walk to value - BITS to integer - 2
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = BITS: 01
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      3
+out:
+  return: SUCCEED
+  value: '1'
+---
+test case: SNMP walk to value - BITS to integer - 3
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = BITS: 00 00 00
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      3
+out:
+  return: SUCCEED
+  value: '0'
+---
+test case: SNMP walk to value - BITS to integer - 4
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = BITS: 01 02 03 04 05 06 07 08 09 10
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      3
+out:
+  return: SUCCEED
+  value: '578437695752307201'
+---
+test case: SNMP walk to value - BITS to integer - 5
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = BITS: 01 02 03 04 05 06 07 08
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      3
+out:
+  return: SUCCEED
+  value: '578437695752307201'
+---
+test case: SNMP walk to value - BITS to integer - 6
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = BITS: 01 02 03 04 05 06 07 0
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      3
+out:
+  return: FAIL
+---
+test case: SNMP walk to value - BITS to integer - 7
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = BITS: QW 11
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      3
+out:
+  return: FAIL
+---
+test case: SNMP walk to value - Opaque wrapped type
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Opaque: Float: 0.460000
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: 0.460000
+---
+test case: SNMP walk to value - Counter32
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Counter32: 12345678
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: 12345678
+---
+test case: SNMP walk to value - STRING with newline
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "line1
+      line2"
+      .1.3.6.2.1 = STRING: "line2
+      line3"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: |-
+    line1
+    line2
+---
+test case: SNMP walk to value - unquoted STRING with newline
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: line1
+      line2
+      .1.3.6.2.1 = STRING: line2
+      line3
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: |-
+    line1
+    line2
+---
+test case: SNMP walk to value - unquoted STRING with newline and empty string
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: line1
+      
+      .1.3.6.2.1 = STRING: line2
+      line3
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: "line1\n"
+---
+test case: SNMP walk to value - quoted STRING with quoted substring
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "foo
+      \"bar\"
+      baz"
+      .1.3.6.2.1 = STRING: line2
+      line3
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: |-
+    foo
+    "bar"
+    baz
+---
+test case: SNMP walk to value - quoted STRING with broken quoting
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "foo
+      \
+      .1.3.6.2.1 = STRING: line2
+      line3
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: FAIL
+---
+test case: SNMP walk to value - backslashes in quoted string
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "foo\\bar\\baz"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: foo\bar\baz
+---
+test case: SNMP walk to value - backslashes in unquoted string
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: foo\bar\baz
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: foo\bar\baz
+---
+test case: SNMP walk to value - Empty type
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = ""
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      .1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: ''
+---
+test case: SNMP walk to value - OID without prepending dot
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = 123
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      1.3.6.1.1
+      0
+out:
+  return: SUCCEED
+  value: 123
+---
+test case: SNMP walk to value - MIB translation 1
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.2.1.2.2.1.2 = 20
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      IF-MIB::ifDescr
+      1
+  netsnmp_required: y
+out:
+  return: SUCCEED
+  value: 20
+---
+test case: SNMP walk to value - MIB translation 2
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.2.1.1.1 = 20
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+    params: |-
+      SNMPv2-MIB::sysDescr
+      0
+  netsnmp_required: y
+out:
+  return: SUCCEED
+  value: 20
+---
+test case: SNMP walk to value - bad param
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      71 71
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_VALUE
+out:
+  return: FAIL
+---
+test case: SNMP get to value - Hex-STRING - to UTF8
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      74 65 73 74 20 D1 91
+  step:
+    type: ZBX_PREPROC_SNMP_GET_VALUE
+    params: '1'
+out:
+  return: SUCCEED
+  value: 'test ё'
+---
+test case: SNMP get to value - Hex-STRING - to UTF8 (null terminated)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      74 65 73 74 20 D1 91 00
+  step:
+    type: ZBX_PREPROC_SNMP_GET_VALUE
+    params: '1'
+out:
+  return: SUCCEED
+  value: 'test ё'
+---
+test case: SNMP get to value - Hex-STRING - to UTF8 - invalid hex string
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      74 65 X3 74 20 D1 91
+  step:
+    type: ZBX_PREPROC_SNMP_GET_VALUE
+    params: '1'
+out:
+  return: FAIL
+---
+test case: SNMP get to value - Hex-STRING - to UTF8 - invalid hex string (2)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      74 65 74 20 D1 9
+  step:
+    type: ZBX_PREPROC_SNMP_GET_VALUE
+    params: '1'
+out:
+  return: FAIL
+---
+test case: SNMP get to value - Hex-STRING - to UTF8 - invalid sequence
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      74 65 73 74 20 D1 91 FF
+  step:
+    type: ZBX_PREPROC_SNMP_GET_VALUE
+    params: '1'
+out:
+  return: SUCCEED
+  value: 'test ё?'
+---
+test case: SNMP get to value - Hex-STRING - to MAC
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      74 65 73 74 20 D1
+  step:
+    type: ZBX_PREPROC_SNMP_GET_VALUE
+    params: '2'
+out:
+  return: SUCCEED
+  value: '74:65:73:74:20:D1'
+---
+test case: SNMP get to value - Hex-STRING - to MAC - invalid hex string
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      74 65 73 74 XX
+  step:
+    type: ZBX_PREPROC_SNMP_GET_VALUE
+    params: '2'
+out:
+  return: FAIL
+---
+test case: SNMP get to value - BITS to integer - 1
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      FE EE 15 15
+  step:
+    type: ZBX_PREPROC_SNMP_GET_VALUE
+    params: '3'
+out:
+  return: SUCCEED
+  value: '353758974'
+---
+test case: SNMP get to value - BITS to integer - 2
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      01
+  step:
+    type: ZBX_PREPROC_SNMP_GET_VALUE
+    params: '3'
+out:
+  return: SUCCEED
+  value: '1'
+---
+test case: SNMP get to value - BITS to integer - 3
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      00 00 00
+  step:
+    type: ZBX_PREPROC_SNMP_GET_VALUE
+    params: '3'
+out:
+  return: SUCCEED
+  value: '0'
+---
+test case: SNMP get to value - BITS to integer - 4
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      01 02 03 04 05 06 07 08 09 10
+  step:
+    type: ZBX_PREPROC_SNMP_GET_VALUE
+    params: '3'
+out:
+  return: SUCCEED
+  value: '578437695752307201'
+---
+test case: SNMP get to value - BITS to integer - 5
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      01 02 03 04 05 06 07 08
+  step:
+    type: ZBX_PREPROC_SNMP_GET_VALUE
+    params: '3'
+out:
+  return: SUCCEED
+  value: '578437695752307201'
+---
+test case: SNMP get to value - BITS to integer - 6
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      01 02 03 04 05 06 07 0
+  step:
+    type: ZBX_PREPROC_SNMP_GET_VALUE
+    params: '3'
+out:
+  return: FAIL
+---
+test case: SNMP get to value - BITS to integer - 7
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .QW 11
+  step:
+    type: ZBX_PREPROC_SNMP_GET_VALUE
+    params: '3'
+out:
+  return: FAIL
+---
+test case: SNMP walk to JSON - bad data
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      bad data
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      AAA
+      .1.3.6.1
+      0
+      BBB
+      .1.3.6.2
+      0
+out:
+  return: FAIL
+---
+test case: SNMP walk to JSON - no data
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = 123
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      BBB
+      .1.3.6.2
+      0
+out:
+  return: FAIL
+---
+test case: SNMP walk to JSON - Empty snmp data
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+out:
+  return: SUCCEED
+  value: '[]'
+---
+test case: SNMP walk to JSON - Empty snmp data and empty params
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+out:
+  return: SUCCEED
+  value: '[]'
+---
+test case: SNMP walk to JSON - STRING type
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "xxx"
+      .1.3.6.1.2 = STRING: "yyy"
+      .1.3.6.2.1 = STRING: "aaa"
+      .1.3.6.2.2 = STRING: "bbb"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"yyy","MACRO2":"bbb"},{"{#SNMPINDEX}":"1","MACRO1":"xxx","MACRO2":"aaa"}]'
+---
+test case: SNMP walk to JSON - Counter/Gauge types
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Counter32: 32
+      .1.3.6.1.2 = Counter64: 64
+      .1.3.6.2.1 = Gauge32: 32
+      .1.3.6.2.2 = Counter64: 64
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"64","MACRO2":"64"},{"{#SNMPINDEX}":"1","MACRO1":"32","MACRO2":"32"}]'
+---
+test case: SNMP walk to JSON - NULL
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = NULL
+      .1.3.6.1.2 = Counter64: 64
+      .1.3.6.2.1 = Gauge32: 32
+      .1.3.6.2.2 = NULL
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"64","MACRO2":null},{"{#SNMPINDEX}":"1","MACRO1":null,"MACRO2":"32"}]'
+---
+test case: SNMP walk to JSON - Empty type
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "aaa"
+      .1.3.6.1.2 = Counter64: 64
+      .1.3.6.2.1 = ""
+      .1.3.6.2.2 = Counter64: 64
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"64","MACRO2":"64"},{"{#SNMPINDEX}":"1","MACRO1":"aaa","MACRO2":""}]'
+---
+test case: SNMP walk to JSON - Empty type
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = 123
+      .1.3.6.1.2 = 456
+      .1.3.6.2.1 = ""
+      .1.3.6.2.2 = Counter64: 64
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"456","MACRO2":"64"},{"{#SNMPINDEX}":"1","MACRO1":"123","MACRO2":""}]'
+---
+test case: SNMP walk to JSON - Integer/Timetick
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = 1000
+      .1.3.6.1.2 = 2000
+      .1.3.6.2.1 = 3000
+      .1.3.6.2.2 = 4000
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"2000","MACRO2":"4000"},{"{#SNMPINDEX}":"1","MACRO1":"1000","MACRO2":"3000"}]'
+---
+test case: SNMP walk to JSON - IpAddress
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = IpAddress: 10.0.0.0
+      .1.3.6.1.2 = IpAddress: 172.16.0.0
+      .1.3.6.2.1 = IpAddress: 10.255.255.255
+      .1.3.6.2.2 = IpAddress: 172.31.255.255
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"172.16.0.0","MACRO2":"172.31.255.255"},{"{#SNMPINDEX}":"1","MACRO1":"10.0.0.0","MACRO2":"10.255.255.255"}]'
+---
+test case: SNMP walk to JSON - STRING type with newline
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "x
+      xx
+      "
+      .1.3.6.1.2 = STRING: "y
+      yy"
+      .1.3.6.2.1 = STRING: "
+      aaa"
+      .1.3.6.2.2 = STRING: "bbb
+      "
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"y\nyy","MACRO2":"bbb\n"},{"{#SNMPINDEX}":"1","MACRO1":"x\nxx\n","MACRO2":"\naaa"}]'
+---
+test case: SNMP walk to JSON - Opaque wrapped type
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Opaque: Float: 0.110000
+      .1.3.6.1.2 = Opaque: STRING: "hello1.2"
+      .1.3.6.2.1 = Opaque: Float: 0.210000
+      .1.3.6.2.2 = Opaque: Unsigned32: 220000
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"hello1.2","MACRO2":"220000"},{"{#SNMPINDEX}":"1","MACRO1":"0.110000","MACRO2":"0.210000"}]'
+---
+test case: SNMP walk to JSON - OID is wanted without prepending dot - 1
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = 1000
+      .1.3.6.1.2 = 2000
+      .1.3.6.2.1 = 3000
+      .1.3.6.2.2 = 4000
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      1.3.6.1
+      0
+      MACRO2
+      1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"2000","MACRO2":"4000"},{"{#SNMPINDEX}":"1","MACRO1":"1000","MACRO2":"3000"}]'
+---
+test case: SNMP walk to JSON - OID is wanted without prepending dot - 2
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = 1000
+      .1.3.6.1.2 = 2000
+      .1.3.6.2.1 = 3000
+      .1.3.6.2.2 = 4000
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"2000","MACRO2":"4000"},{"{#SNMPINDEX}":"1","MACRO1":"1000","MACRO2":"3000"}]'
+---
+test case: SNMP walk to JSON - MIB translation 1
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.2.1.2.2.1.2.1 = 20
+      .1.3.6.1.2.1.2.2.1.2.2 = 30
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      IFDESCR
+      IF-MIB::ifDescr
+      0
+  netsnmp_required: y
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","IFDESCR":"30"},{"{#SNMPINDEX}":"1","IFDESCR":"20"}]'
+---
+test case: SNMP walk to JSON - No more variables 1
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = 123
+      .1.3.6.1.2 = 456
+      .1.3.6.2.1 = STRING: "TEST"
+      .1.3.6.2.2 = Counter64: 64
+      .1.3.6.3.1 = No more variables left in this MIB View (It is past the end of the MIB tree)
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"456","MACRO2":"64"},{"{#SNMPINDEX}":"1","MACRO1":"123","MACRO2":"TEST"}]'
+---
+test case: SNMP walk to JSON - No more variables 2
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = 123
+      .1.3.6.1.2 = 456
+      .1.3.6.2.1 = STRING: "TEST"
+      .1.3.6.2.2 = Counter64: 64
+      .1.3.6.3.1 = No more variables left in this MIB View (It is past the end of the MIB tree)
+      .1.3.7.1.1 = 123
+      .1.3.7.1.2 = 456
+      .1.3.7.2.1 = STRING: "TEST"
+      .1.3.7.2.2 = Counter64: 64
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"456","MACRO2":"64"},{"{#SNMPINDEX}":"1","MACRO1":"123","MACRO2":"TEST"}]'
+---
+test case: SNMP walk to JSON - Duplicate OIDs
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = 11
+      .1.3.6.1.2 = 12
+      .1.3.6.2.1 = 21
+      .1.3.6.2.2 = 22
+      .1.3.6.1.1 = 11
+      .1.3.6.1.2 = 12
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"12","MACRO2":"22"},{"{#SNMPINDEX}":"1","MACRO1":"11","MACRO2":"21"}]'
+---
+test case: SNMP walk to JSON - Hex-STRING type - unchanged
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: AA BE FF
+      .1.3.6.1.2 = Hex-STRING: FF FF
+      .1.3.6.2.1 = Hex-STRING: DD CD
+      .1.3.6.2.2 = Hex-STRING: 99 A5 F1
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"FF FF","MACRO2":"99 A5 F1"},{"{#SNMPINDEX}":"1","MACRO1":"AA BE FF","MACRO2":"DD CD"}]'
+---
+test case: SNMP walk to JSON - Hex-STRING type - to UTF8
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 74 65 73 74 20 D1 8B
+      .1.3.6.1.2 = Hex-STRING: 74 65 73 74 20 D1 84
+      .1.3.6.2.1 = Hex-STRING: D1 91
+      .1.3.6.2.2 = Hex-STRING: EA 9A 85
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      1
+      MACRO2
+      .1.3.6.2
+      1
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"test ф","MACRO2":"ꚅ"},{"{#SNMPINDEX}":"1","MACRO1":"test ы","MACRO2":"ё"}]'
+---
+test case: SNMP walk to JSON - Hex-STRING type - to UTF8 - invalid sequence
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 74 65 73 74 20 FF FF
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      1
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"1","MACRO1":"test ??"}]'
+---
+test case: SNMP walk to JSON - Hex-STRING type - to UTF8 - invalid hex string
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 74 65 73 74 20 D1 8B XX
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      1
+out:
+  return: FAIL
+---
+test case: SNMP walk to JSON - Hex-STRING type - to UTF8 - null terminated
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 74 65 73 74 00
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      1
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"1","MACRO1":"test"}]'
+---
+test case: SNMP walk to JSON - Hex-STRING type - to MAC
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 74 65 73 74 20 D1
+      .1.3.6.1.2 = Hex-STRING: FF FF FF FF FF FF
+      .1.3.6.2.1 = Hex-STRING: 00 00 00 00 00 00
+      .1.3.6.2.2 = Hex-STRING: EA 9A 85 11 22 33
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      2
+      MACRO2
+      .1.3.6.2
+      2
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"FF:FF:FF:FF:FF:FF","MACRO2":"EA:9A:85:11:22:33"},{"{#SNMPINDEX}":"1","MACRO1":"74:65:73:74:20:D1","MACRO2":"00:00:00:00:00:00"}]'
+---
+test case: SNMP walk to JSON - Hex-STRING type - to MAC - invalid MAC, invalid hex string
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 74 65 73 74 20 XX
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      2
+out:
+  return: FAIL
+---
+test case: SNMP walk to JSON - Hex-STRING type - mixed 'treat-as' values
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: D1 8B
+      .1.3.6.1.2 = Hex-STRING: D1 91
+      .1.3.6.2.1 = Hex-STRING: 00 00 00 00 00 00
+      .1.3.6.2.2 = Hex-STRING: EA 9A 85 11 22 33
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      1
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"ё","MACRO2":"EA 9A 85 11 22 33"},{"{#SNMPINDEX}":"1","MACRO1":"ы","MACRO2":"00 00 00 00 00 00"}]'
+---
+test case: SNMP walk to value - Hex-STRING (multiline)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 71 71 
+      AA BB CC 
+      DD
+      .1.3.6.1.2 = Hex-STRING: D1 91
+      .1.3.6.2.1 = Hex-STRING: 00 00 00 00 00 00
+      .1.3.6.2.2 = Hex-STRING: EA 9A 85 11 22 33
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"D1 91","MACRO2":"EA 9A 85 11 22 33"},{"{#SNMPINDEX}":"1","MACRO1":"71 71 AA BB CC DD","MACRO2":"00 00 00 00 00 00"}]'
+---
+test case: SNMP walk to value - Hex-STRING (multiline) - to MAC
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 71 71 
+      AA BB CC 
+      DD
+      .1.3.6.1.2 = Hex-STRING: D1 91
+      .1.3.6.2.1 = Hex-STRING: 00 00 00 00 00 00
+      .1.3.6.2.2 = Hex-STRING: EA 9A 85 11 22 33
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      2
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"D1:91","MACRO2":"EA 9A 85 11 22 33"},{"{#SNMPINDEX}":"1","MACRO1":"71:71:AA:BB:CC:DD","MACRO2":"00 00 00 00 00 00"}]'
+---
+test case: SNMP walk to value - Hex-STRING (multiline) - space on the last line
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = Hex-STRING: 71 71 
+      AA BB CC 
+      DD 
+      .1.3.6.1.2 = Hex-STRING: D1 91
+      .1.3.6.2.1 = Hex-STRING: 00 00 00 00 00 00
+      .1.3.6.2.2 = Hex-STRING: EA 9A 85 11 22 33
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"D1 91","MACRO2":"EA 9A 85 11 22 33"},{"{#SNMPINDEX}":"1","MACRO1":"71 71 AA BB CC DD","MACRO2":"00 00 00 00 00 00"}]'
+---
+test case: SNMP walk to JSON - BITS - unchanged
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = BITS: 09 08 07
+      .1.3.6.1.2 = BITS: 55 66
+      .1.3.6.2.1 = BITS: 01 02
+      .1.3.6.2.2 = BITS: 99 10 20
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"55 66","MACRO2":"99 10 20"},{"{#SNMPINDEX}":"1","MACRO1":"09 08 07","MACRO2":"01 02"}]'
+---
+test case: SNMP walk to JSON - BITS - unchanged
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = BITS: 09 08 07
+      .1.3.6.1.2 = BITS: 55 66
+      .1.3.6.2.1 = BITS: 01 02
+      .1.3.6.2.2 = BITS: 99 10 20
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      3
+      MACRO2
+      .1.3.6.2
+      3
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"26197","MACRO2":"2101401"},{"{#SNMPINDEX}":"1","MACRO1":"460809","MACRO2":"513"}]'
+---
+test case: SNMP walk to JSON - suppressed output of chosen oids that are longer than prefix 1 - prefix without dot
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "xxx"
+      .1.3.6.1.2 = STRING: "yyy"
+      .1.3.6.10.1 = STRING: "no"
+      .1.3.6.11.2 = STRING: "no"
+      .1.3.6.2.1 = STRING: "aaa"
+      .1.3.6.2.2 = STRING: "bbb"
+      .1.3.6.20.1 = STRING: "no"
+      .1.3.6.20.2 = STRING: "no"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      1.3.6.1
+      0
+      MACRO2
+      1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"yyy","MACRO2":"bbb"},{"{#SNMPINDEX}":"1","MACRO1":"xxx","MACRO2":"aaa"}]'
+---
+test case: SNMP walk to JSON - suppressed output of chosen oids that are longer than prefix 1
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "xxx"
+      .1.3.6.1.2 = STRING: "yyy"
+      .1.3.6.10.1 = STRING: "no"
+      .1.3.6.11.2 = STRING: "no"
+      .1.3.6.2.1 = STRING: "aaa"
+      .1.3.6.2.2 = STRING: "bbb"
+      .1.3.6.20.1 = STRING: "no"
+      .1.3.6.20.2 = STRING: "no"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"yyy","MACRO2":"bbb"},{"{#SNMPINDEX}":"1","MACRO1":"xxx","MACRO2":"aaa"}]'
+---
+test case: SNMP walk to JSON - suppressed output of chosen oids that are longer than prefix 2 - prefix without dot
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "xxx"
+      .1.3.6.1.2 = STRING: "yyy"
+      .1.3.6.101.1 = STRING: "no"
+      .1.3.6.12123.2 = STRING: "no"
+      .1.3.6.2.1 = STRING: "aaa"
+      .1.3.6.2.2 = STRING: "bbb"
+      .1.3.6.20123.1 = STRING: "no"
+      .1.3.6.21123.2 = STRING: "no"
+      .1.3.6.3.1 = STRING: "no"
+      .1.3.6.333.1 = STRING: "no"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      1.3.6.1
+      0
+      MACRO2
+      1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"yyy","MACRO2":"bbb"},{"{#SNMPINDEX}":"1","MACRO1":"xxx","MACRO2":"aaa"}]'
+---
+test case: SNMP walk to JSON - suppressed output of chosen oids that are longer than prefix 2
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "xxx"
+      .1.3.6.1.2 = STRING: "yyy"
+      .1.3.6.101.1 = STRING: "no"
+      .1.3.6.12123.2 = STRING: "no"
+      .1.3.6.2.1 = STRING: "aaa"
+      .1.3.6.2.2 = STRING: "bbb"
+      .1.3.6.20123.1 = STRING: "no"
+      .1.3.6.21123.2 = STRING: "no"
+      .1.3.6.3.1 = STRING: "no"
+      .1.3.6.333.1 = STRING: "no"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"yyy","MACRO2":"bbb"},{"{#SNMPINDEX}":"1","MACRO1":"xxx","MACRO2":"aaa"}]'
+---
+test case: SNMP walk to JSON - suppressed output of chosen oids that are longer than prefix 3 (dot at the end of param)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "xxx"
+      .1.3.6.1.2 = STRING: "yyy"
+      .1.3.6.101.1 = STRING: "no"
+      .1.3.6.12123.2 = STRING: "no"
+      .1.3.6.2.1 = STRING: "aaa"
+      .1.3.6.2.2 = STRING: "bbb"
+      .1.3.6.20123.1 = STRING: "no"
+      .1.3.6.21123.2 = STRING: "no"
+      .1.3.6.3.1 = STRING: "no"
+      .1.3.6.333.1 = STRING: "no"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2.
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"yyy","MACRO2":"bbb"},{"{#SNMPINDEX}":"1","MACRO1":"xxx","MACRO2":"aaa"}]'
+---
+test case: SNMP walk to JSON - suppressed output of chosen oids that are longer than prefix 4 (dot at the end of param)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "xxx"
+      .1.3.6.1.2 = STRING: "yyy"
+      .1.3.6.101.1 = STRING: "no"
+      .1.3.6.12123.2 = STRING: "no"
+      .1.3.6.2.1 = STRING: "aaa"
+      .1.3.6.2.2 = STRING: "bbb"
+      .1.3.6.20123.1 = STRING: "no"
+      .1.3.6.21123.2 = STRING: "no"
+      .1.3.6.3.1 = STRING: "no"
+      .1.3.6.333.1 = STRING: "no"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      1.3.6.2.
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"yyy","MACRO2":"bbb"},{"{#SNMPINDEX}":"1","MACRO1":"xxx","MACRO2":"aaa"}]'
+---
+test case: SNMP walk to JSON - oid to be walked is a leaf and index cannot be chosen
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1 = STRING: "xxx"
+      .1.3.6.2.1 = STRING: "aaa"
+      .1.3.6.2.2 = STRING: "bbb"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO2":"bbb"},{"{#SNMPINDEX}":"1","MACRO2":"aaa"}]'
+---
+test case: SNMP walk to JSON - param with dot at the end - 1
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.2.1 = STRING: "123"
+      .1.3.6.2.2 = STRING: "234"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.2.
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"234"},{"{#SNMPINDEX}":"1","MACRO1":"123"}]'
+---
+test case: SNMP walk to JSON - param with dot at the end - 2
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "xxx"
+      .1.3.6.1.2 = STRING: "yyy"
+      .1.3.6.2.1 = STRING: "aaa"
+      .1.3.6.2.2 = STRING: "bbb"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1.
+      0
+      MACRO2
+      .1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"yyy","MACRO2":"bbb"},{"{#SNMPINDEX}":"1","MACRO1":"xxx","MACRO2":"aaa"}]'
+---
+test case: SNMP walk to JSON - param with dot at the end - 3
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "xxx"
+      .1.3.6.1.2 = STRING: "yyy"
+      .1.3.6.2.1 = STRING: "aaa"
+      .1.3.6.2.2 = STRING: "bbb"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      .1.3.6.1.
+      0
+      MACRO2
+      1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"yyy","MACRO2":"bbb"},{"{#SNMPINDEX}":"1","MACRO1":"xxx","MACRO2":"aaa"}]'
+---
+test case: SNMP walk to JSON - param with dot at the end - 4
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "xxx"
+      .1.3.6.1.2 = STRING: "yyy"
+      .1.3.6.2.1 = STRING: "aaa"
+      .1.3.6.2.2 = STRING: "bbb"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      1.3.6.1.
+      0
+      MACRO2
+      1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"yyy","MACRO2":"bbb"},{"{#SNMPINDEX}":"1","MACRO1":"xxx","MACRO2":"aaa"}]'
+---
+test case: SNMP walk to JSON - invalid params - 1
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "xxx"
+      .1.3.6.1.2 = STRING: "yyy"
+      .1.3.6.2.1 = STRING: "aaa"
+      .1.3.6.2.2 = STRING: "bbb"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+out:
+  return: FAIL
+---
+test case: SNMP walk to JSON - invalid params - 2
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "xxx"
+      .1.3.6.1.2 = STRING: "yyy"
+      .1.3.6.2.1 = STRING: "aaa"
+      .1.3.6.2.2 = STRING: "bbb"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      1.3.6.1.
+out:
+  return: FAIL
+---
+test case: SNMP walk to JSON - invalid params - 3
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "xxx"
+      .1.3.6.1.2 = STRING: "yyy"
+      .1.3.6.2.1 = STRING: "aaa"
+      .1.3.6.2.2 = STRING: "bbb"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      1.3.6.1.
+      0
+      MACRO2
+out:
+  return: FAIL
+---
+test case: SNMP walk to JSON - invalid params - 4
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "xxx"
+      .1.3.6.1.2 = STRING: "yyy"
+      .1.3.6.2.1 = STRING: "aaa"
+      .1.3.6.2.2 = STRING: "bbb"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      1.3.6.1.
+      0
+      MACRO2
+      1.3.6.2
+out:
+  return: FAIL
+---
+test case: SNMP walk to JSON - invalid params - 5
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "xxx"
+      .1.3.6.1.2 = STRING: "yyy"
+      .1.3.6.2.1 = STRING: "aaa"
+      .1.3.6.2.2 = STRING: "bbb"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      1.3.6.1.
+      0
+      MACRO2
+      1.3.6.2
+      1
+      X
+out:
+  return: FAIL
+---
+test case: SNMP walk to JSON - wrong type warning
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "xxx"
+      .1.3.6.1.2 = STRING: "yyy"
+      .1.3.6.2.1 = STRING: "aaa"
+      .1.3.6.2.2 = Wrong Type (should be Gauge32 or Unsigned32): Counter32: 123
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      1.3.6.1.
+      0
+      MACRO2
+      1.3.6.2
+      0
+out:
+  return: SUCCEED
+  value: '[{"{#SNMPINDEX}":"2","MACRO1":"yyy","MACRO2":"123"},{"{#SNMPINDEX}":"1","MACRO1":"xxx","MACRO2":"aaa"}]'
+---
+test case: SNMP walk to JSON - wrong type warning invalid format
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: |
+      .1.3.6.1.1 = STRING: "xxx"
+      .1.3.6.1.2 = STRING: "yyy"
+      .1.3.6.2.1 = STRING: "aaa"
+      .1.3.6.2.2 = Wrong Type (should be Gauge32 or Unsigned32): Counter32 123
+      .1.3.6.2.3 = STRING: "bbb"
+  step:
+    type: ZBX_PREPROC_SNMP_WALK_TO_JSON
+    params: |-
+      MACRO1
+      1.3.6.1.
+      0
+      MACRO2
+      1.3.6.2
+      0
+out:
+  return: FAIL
+---
+test case: HMAC in JavaScript - Invalid algorithm
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "k"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: "return hmac('xxx', 'xxx', 'yyy');"
+out:
+  return: FAIL
+---
+test case: HMAC in JavaScript - MD5
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "k"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: "return hmac('md5', 'xxx', 'yyy');"
+out:
+  return: SUCCEED
+  value: 'd8e8efd954dabfdbfd69398d92ad62d1'
+---
+test case: HMAC in JavaScript - SHA-256
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "k"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: "return hmac('sha256', 'xxx', 'yyy');"
+out:
+  return: SUCCEED
+  value: '97f50eed1079c9460f2bb9ddf7dc2e4258471f301ad2c1f14ad50144c4de4303'
+---
+test case: HMAC in JavaScript - Invalid key
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "k"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: "return hmac('sha256', null, 'yyy');"
+out:
+  return: FAIL
+---
+test case: HMAC in JavaScript - Missing key
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "k"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: "return hmac('sha256');"
+out:
+  return: FAIL
+---
+test case: HMAC in JavaScript - Invalid data
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "k"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: "return hmac('sha256', 'xxx', null);"
+out:
+  return: FAIL
+---
+test case: HMAC in JavaScript - Missing data
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "k"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: "return hmac('sha256', 'xxx');"
+out:
+  return: FAIL
+---
+test case: RS256 in JavaScript - single line pkey w/o newlines
+in:
+  encryption_required: 1
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "k"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: "return sign('sha256', '-----BEGIN RSA PRIVATE KEY-----MIICXgIBAAKBgQCsDnSry3s269UFKpYvptshcmKZ4ZXxqj6771qr/oEOtRa/o+8JmFtucELQg7HrzRUwxG9htmCuSZ+eOcMQ7vJOrgS+1Ol01P+Ol/PdFFeT5utqzG2NaYSIs/oLAaTkiDUkDBhnG6Ns0xWgJlRomR2W4RI8Os/zKh9eccRaZorjQwIDAQABAoGBAKT300vo9QHqyruCYq/bxx1hpEKw9ejZd/8P9xsUEb/9R4uF7iqAB6JzRszQiKZzY473uWexyy8w7jdyYKL6yB2vCMLdy68nxoIYcjSrk3F/kC47ga7NKCS8T21OFarxhRzxqgF6rg/mfrgeT7nxD1EM0vk6mCSmftbaVZE7M/KRAkEA4FDqvtjen9RrROe2Al23h/1gDqgL9rJ5SzSbwwYmzRA/XYlfH7k9RPGQahzq15IHrdxN04Ov2dVRyybbR0A1awJBAMRb3+P1yKzIkkTGYE2ZWctBcDCnzwwaKKZuWX7OfA+ZPNUm+L6Owg4gztHIAA6DyizXxaHhh8qcL0A6nx7hJ4kCQQCjrces3LiNrcVcMSuZTGMYYuVNrIeWSqLBIrEpvHphlaJ3ET8M+fDgNtgm5dTi2daqoZ9UYLnXXJXjhAXrVsnjAkEAnn8ahcNLLEzp5CHMclaqKGq1yFBry/UBgvXnv3ekpGKou9UtS4OoGAdbafHqOc0fUHsKx9Rn65+OdGXdMuvDIQJAJ+L5i2iRo4TuNpHxMCPN/3bamMlDktIfPlVLbuEcinG1XZ9zs9Y1J738iCF2d56wlApbYGqw4vp9+CdX62LoMw==-----END RSA PRIVATE KEY-----', 'test');"
+out:
+  return: SUCCEED
+  value: '272f1ef9012b81365bd29f929cfd63dc8a0bafbfaf1fb0bb1a6982d04260ee888573e7591e0e8076a3d8eb9da7a85bd57e61b4504abcfd62815f88cb0c6955fe4bab6d0b4361182182e316a96c83d5ab9ac8e314b5f11eabcefbeb520ec41b04b52323aedcf53b630a232f0a63c66a4cc4411241160ccb30409525c9c51a06d5'
+---
+test case: RS256 in JavaScript - single line pkey with newlines
+in:
+  encryption_required: 1
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "a"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: |
+      var pkey = '-----BEGIN RSA PRIVATE KEY-----\nMIICXgIBAAKBgQCsDnSry3s269UFKpYvptshcmKZ4ZXxqj6771qr/oEOtRa/o+8J\nmFtucELQg7HrzRUwxG9htmCuSZ+eOcMQ7vJOrgS+1Ol01P+Ol/PdFFeT5utqzG2N\naYSIs/oLAaTkiDUkDBhnG6Ns0xWgJlRomR2W4RI8Os/zKh9eccRaZorjQwIDAQAB\nAoGBAKT300vo9QHqyruCYq/bxx1hpEKw9ejZd/8P9xsUEb/9R4uF7iqAB6JzRszQ\niKZzY473uWexyy8w7jdyYKL6yB2vCMLdy68nxoIYcjSrk3F/kC47ga7NKCS8T21O\nFarxhRzxqgF6rg/mfrgeT7nxD1EM0vk6mCSmftbaVZE7M/KRAkEA4FDqvtjen9Rr\nROe2Al23h/1gDqgL9rJ5SzSbwwYmzRA/XYlfH7k9RPGQahzq15IHrdxN04Ov2dVR\nyybbR0A1awJBAMRb3+P1yKzIkkTGYE2ZWctBcDCnzwwaKKZuWX7OfA+ZPNUm+L6O\nwg4gztHIAA6DyizXxaHhh8qcL0A6nx7hJ4kCQQCjrces3LiNrcVcMSuZTGMYYuVN\nrIeWSqLBIrEpvHphlaJ3ET8M+fDgNtgm5dTi2daqoZ9UYLnXXJXjhAXrVsnjAkEA\nnn8ahcNLLEzp5CHMclaqKGq1yFBry/UBgvXnv3ekpGKou9UtS4OoGAdbafHqOc0f\nUHsKx9Rn65+OdGXdMuvDIQJAJ+L5i2iRo4TuNpHxMCPN/3bamMlDktIfPlVLbuEc\ninG1XZ9zs9Y1J738iCF2d56wlApbYGqw4vp9+CdX62LoMw==\n-----END RSA PRIVATE KEY-----';
+      return sign('sha256', pkey, 'test');
+out:
+  return: SUCCEED
+  value: "272f1ef9012b81365bd29f929cfd63dc8a0bafbfaf1fb0bb1a6982d04260ee888573e7591e0e8076a3d8eb9da7a85bd57e61b4504abcfd62815f88cb0c6955fe4bab6d0b4361182182e316a96c83d5ab9ac8e314b5f11eabcefbeb520ec41b04b52323aedcf53b630a232f0a63c66a4cc4411241160ccb30409525c9c51a06d5"
+---
+test case: RS256 in JavaScript - single line pkey with missing newline before END block
+in:
+  encryption_required: 1
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "a"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: |
+      var pkey = '-----BEGIN RSA PRIVATE KEY-----\nMIICXgIBAAKBgQCsDnSry3s269UFKpYvptshcmKZ4ZXxqj6771qr/oEOtRa/o+8J\nmFtucELQg7HrzRUwxG9htmCuSZ+eOcMQ7vJOrgS+1Ol01P+Ol/PdFFeT5utqzG2N\naYSIs/oLAaTkiDUkDBhnG6Ns0xWgJlRomR2W4RI8Os/zKh9eccRaZorjQwIDAQAB\nAoGBAKT300vo9QHqyruCYq/bxx1hpEKw9ejZd/8P9xsUEb/9R4uF7iqAB6JzRszQ\niKZzY473uWexyy8w7jdyYKL6yB2vCMLdy68nxoIYcjSrk3F/kC47ga7NKCS8T21O\nFarxhRzxqgF6rg/mfrgeT7nxD1EM0vk6mCSmftbaVZE7M/KRAkEA4FDqvtjen9Rr\nROe2Al23h/1gDqgL9rJ5SzSbwwYmzRA/XYlfH7k9RPGQahzq15IHrdxN04Ov2dVR\nyybbR0A1awJBAMRb3+P1yKzIkkTGYE2ZWctBcDCnzwwaKKZuWX7OfA+ZPNUm+L6O\nwg4gztHIAA6DyizXxaHhh8qcL0A6nx7hJ4kCQQCjrces3LiNrcVcMSuZTGMYYuVN\nrIeWSqLBIrEpvHphlaJ3ET8M+fDgNtgm5dTi2daqoZ9UYLnXXJXjhAXrVsnjAkEA\nnn8ahcNLLEzp5CHMclaqKGq1yFBry/UBgvXnv3ekpGKou9UtS4OoGAdbafHqOc0f\nUHsKx9Rn65+OdGXdMuvDIQJAJ+L5i2iRo4TuNpHxMCPN/3bamMlDktIfPlVLbuEc\ninG1XZ9zs9Y1J738iCF2d56wlApbYGqw4vp9+CdX62LoMw==-----END RSA PRIVATE KEY-----';
+      return sign('sha256', pkey, 'test');
+out:
+  return: SUCCEED
+  value: "272f1ef9012b81365bd29f929cfd63dc8a0bafbfaf1fb0bb1a6982d04260ee888573e7591e0e8076a3d8eb9da7a85bd57e61b4504abcfd62815f88cb0c6955fe4bab6d0b4361182182e316a96c83d5ab9ac8e314b5f11eabcefbeb520ec41b04b52323aedcf53b630a232f0a63c66a4cc4411241160ccb30409525c9c51a06d5"
+---
+test case: RS256 in JavaScript - single line pkey with missing newline before BEGIN block
+in:
+  encryption_required: 1
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "a"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: |
+      var pkey = '-----BEGIN RSA PRIVATE KEY-----MIICXgIBAAKBgQCsDnSry3s269UFKpYvptshcmKZ4ZXxqj6771qr/oEOtRa/o+8J\nmFtucELQg7HrzRUwxG9htmCuSZ+eOcMQ7vJOrgS+1Ol01P+Ol/PdFFeT5utqzG2N\naYSIs/oLAaTkiDUkDBhnG6Ns0xWgJlRomR2W4RI8Os/zKh9eccRaZorjQwIDAQAB\nAoGBAKT300vo9QHqyruCYq/bxx1hpEKw9ejZd/8P9xsUEb/9R4uF7iqAB6JzRszQ\niKZzY473uWexyy8w7jdyYKL6yB2vCMLdy68nxoIYcjSrk3F/kC47ga7NKCS8T21O\nFarxhRzxqgF6rg/mfrgeT7nxD1EM0vk6mCSmftbaVZE7M/KRAkEA4FDqvtjen9Rr\nROe2Al23h/1gDqgL9rJ5SzSbwwYmzRA/XYlfH7k9RPGQahzq15IHrdxN04Ov2dVR\nyybbR0A1awJBAMRb3+P1yKzIkkTGYE2ZWctBcDCnzwwaKKZuWX7OfA+ZPNUm+L6O\nwg4gztHIAA6DyizXxaHhh8qcL0A6nx7hJ4kCQQCjrces3LiNrcVcMSuZTGMYYuVN\nrIeWSqLBIrEpvHphlaJ3ET8M+fDgNtgm5dTi2daqoZ9UYLnXXJXjhAXrVsnjAkEA\nnn8ahcNLLEzp5CHMclaqKGq1yFBry/UBgvXnv3ekpGKou9UtS4OoGAdbafHqOc0f\nUHsKx9Rn65+OdGXdMuvDIQJAJ+L5i2iRo4TuNpHxMCPN/3bamMlDktIfPlVLbuEc\ninG1XZ9zs9Y1J738iCF2d56wlApbYGqw4vp9+CdX62LoMw==\n-----END RSA PRIVATE KEY-----';
+      return sign('sha256', pkey, 'test');
+out:
+  return: SUCCEED
+  value: "272f1ef9012b81365bd29f929cfd63dc8a0bafbfaf1fb0bb1a6982d04260ee888573e7591e0e8076a3d8eb9da7a85bd57e61b4504abcfd62815f88cb0c6955fe4bab6d0b4361182182e316a96c83d5ab9ac8e314b5f11eabcefbeb520ec41b04b52323aedcf53b630a232f0a63c66a4cc4411241160ccb30409525c9c51a06d5"
+---
+test case: RS256 in JavaScript - spaces instead of newlines
+in:
+  encryption_required: 1
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "a"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: |
+      var pkey = '-----BEGIN RSA PRIVATE KEY----- MIICXgIBAAKBgQCsDnSry3s269UFKpYvptshcmKZ4ZXxqj6771qr/oEOtRa/o+8J mFtucELQg7HrzRUwxG9htmCuSZ+eOcMQ7vJOrgS+1Ol01P+Ol/PdFFeT5utqzG2N aYSIs/oLAaTkiDUkDBhnG6Ns0xWgJlRomR2W4RI8Os/zKh9eccRaZorjQwIDAQAB AoGBAKT300vo9QHqyruCYq/bxx1hpEKw9ejZd/8P9xsUEb/9R4uF7iqAB6JzRszQ iKZzY473uWexyy8w7jdyYKL6yB2vCMLdy68nxoIYcjSrk3F/kC47ga7NKCS8T21O FarxhRzxqgF6rg/mfrgeT7nxD1EM0vk6mCSmftbaVZE7M/KRAkEA4FDqvtjen9Rr ROe2Al23h/1gDqgL9rJ5SzSbwwYmzRA/XYlfH7k9RPGQahzq15IHrdxN04Ov2dVR yybbR0A1awJBAMRb3+P1yKzIkkTGYE2ZWctBcDCnzwwaKKZuWX7OfA+ZPNUm+L6O wg4gztHIAA6DyizXxaHhh8qcL0A6nx7hJ4kCQQCjrces3LiNrcVcMSuZTGMYYuVN rIeWSqLBIrEpvHphlaJ3ET8M+fDgNtgm5dTi2daqoZ9UYLnXXJXjhAXrVsnjAkEA nn8ahcNLLEzp5CHMclaqKGq1yFBry/UBgvXnv3ekpGKou9UtS4OoGAdbafHqOc0f UHsKx9Rn65+OdGXdMuvDIQJAJ+L5i2iRo4TuNpHxMCPN/3bamMlDktIfPlVLbuEc inG1XZ9zs9Y1J738iCF2d56wlApbYGqw4vp9+CdX62LoMw== -----END RSA PRIVATE KEY-----';
+      return sign('sha256', pkey, 'test');
+out:
+  return: SUCCEED
+  value: "272f1ef9012b81365bd29f929cfd63dc8a0bafbfaf1fb0bb1a6982d04260ee888573e7591e0e8076a3d8eb9da7a85bd57e61b4504abcfd62815f88cb0c6955fe4bab6d0b4361182182e316a96c83d5ab9ac8e314b5f11eabcefbeb520ec41b04b52323aedcf53b630a232f0a63c66a4cc4411241160ccb30409525c9c51a06d5"
+---
+test case: RS256 in JavaScript - PKCS#8
+in:
+  encryption_required: 1
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "a"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: |
+      var pkey = '-----BEGIN PRIVATE KEY-----MIICeAIBADANBgkqhkiG9w0BAQEFAASCAmIwggJeAgEAAoGBAKwOdKvLezbr1QUqli+m2yFyYpnhlfGqPrvvWqv+gQ61Fr+j7wmYW25wQtCDsevNFTDEb2G2YK5Jn545wxDu8k6uBL7U6XTU/46X890UV5Pm62rMbY1phIiz+gsBpOSINSQMGGcbo2zTFaAmVGiZHZbhEjw6z/MqH15xxFpmiuNDAgMBAAECgYEApPfTS+j1AerKu4Jir9vHHWGkQrD16Nl3/w/3GxQRv/1Hi4XuKoAHonNGzNCIpnNjjve5Z7HLLzDuN3JgovrIHa8Iwt3LryfGghhyNKuTcX+QLjuBrs0oJLxPbU4VqvGFHPGqAXquD+Z+uB5PufEPUQzS+TqYJKZ+1tpVkTsz8pECQQDgUOq+2N6f1GtE57YCXbeH/WAOqAv2snlLNJvDBibNED9diV8fuT1E8ZBqHOrXkget3E3Tg6/Z1VHLJttHQDVrAkEAxFvf4/XIrMiSRMZgTZlZy0FwMKfPDBoopm5Zfs58D5k81Sb4vo7CDiDO0cgADoPKLNfFoeGHypwvQDqfHuEniQJBAKOtx6zcuI2txVwxK5lMYxhi5U2sh5ZKosEisSm8emGVoncRPwz58OA22Cbl1OLZ1qqhn1RguddcleOEBetWyeMCQQCefxqFw0ssTOnkIcxyVqooarXIUGvL9QGC9ee/d6SkYqi71S1Lg6gYB1tp8eo5zR9QewrH1Gfrn450Zd0y68MhAkAn4vmLaJGjhO42kfEwI83/dtqYyUOS0h8+VUtu4RyKcbVdn3Oz1jUnvfyIIXZ3nrCUCltgarDi+n34J1frYugz-----END PRIVATE KEY-----';
+      return sign('sha256', pkey, 'test');
+out:
+  return: SUCCEED
+  value: "272f1ef9012b81365bd29f929cfd63dc8a0bafbfaf1fb0bb1a6982d04260ee888573e7591e0e8076a3d8eb9da7a85bd57e61b4504abcfd62815f88cb0c6955fe4bab6d0b4361182182e316a96c83d5ab9ac8e314b5f11eabcefbeb520ec41b04b52323aedcf53b630a232f0a63c66a4cc4411241160ccb30409525c9c51a06d5"
+---
+test case: RS256 in JavaScript - data as Uint8Array
+in:
+  encryption_required: 1
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "a"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: |
+      var pkey = '-----BEGIN PRIVATE KEY-----MIICeAIBADANBgkqhkiG9w0BAQEFAASCAmIwggJeAgEAAoGBAKwOdKvLezbr1QUqli+m2yFyYpnhlfGqPrvvWqv+gQ61Fr+j7wmYW25wQtCDsevNFTDEb2G2YK5Jn545wxDu8k6uBL7U6XTU/46X890UV5Pm62rMbY1phIiz+gsBpOSINSQMGGcbo2zTFaAmVGiZHZbhEjw6z/MqH15xxFpmiuNDAgMBAAECgYEApPfTS+j1AerKu4Jir9vHHWGkQrD16Nl3/w/3GxQRv/1Hi4XuKoAHonNGzNCIpnNjjve5Z7HLLzDuN3JgovrIHa8Iwt3LryfGghhyNKuTcX+QLjuBrs0oJLxPbU4VqvGFHPGqAXquD+Z+uB5PufEPUQzS+TqYJKZ+1tpVkTsz8pECQQDgUOq+2N6f1GtE57YCXbeH/WAOqAv2snlLNJvDBibNED9diV8fuT1E8ZBqHOrXkget3E3Tg6/Z1VHLJttHQDVrAkEAxFvf4/XIrMiSRMZgTZlZy0FwMKfPDBoopm5Zfs58D5k81Sb4vo7CDiDO0cgADoPKLNfFoeGHypwvQDqfHuEniQJBAKOtx6zcuI2txVwxK5lMYxhi5U2sh5ZKosEisSm8emGVoncRPwz58OA22Cbl1OLZ1qqhn1RguddcleOEBetWyeMCQQCefxqFw0ssTOnkIcxyVqooarXIUGvL9QGC9ee/d6SkYqi71S1Lg6gYB1tp8eo5zR9QewrH1Gfrn450Zd0y68MhAkAn4vmLaJGjhO42kfEwI83/dtqYyUOS0h8+VUtu4RyKcbVdn3Oz1jUnvfyIIXZ3nrCUCltgarDi+n34J1frYugz-----END PRIVATE KEY-----';
+      return sign('sha256', pkey, new Uint8Array([0x74, 0x65, 0x73, 0x74]));
+out:
+  return: SUCCEED
+  value: "272f1ef9012b81365bd29f929cfd63dc8a0bafbfaf1fb0bb1a6982d04260ee888573e7591e0e8076a3d8eb9da7a85bd57e61b4504abcfd62815f88cb0c6955fe4bab6d0b4361182182e316a96c83d5ab9ac8e314b5f11eabcefbeb520ec41b04b52323aedcf53b630a232f0a63c66a4cc4411241160ccb30409525c9c51a06d5"
+---
+test case: RS256 in JavaScript - Invalid algorithm
+in:
+  encryption_required: 1
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "a"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: "return sign('q', pkey, 'test');"
+out:
+  return: FAIL
+---
+test case: RS256 in JavaScript - Invalid pkey
+in:
+  encryption_required: 1
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "a"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: "return sign('q', 'invalid', 'test');"
+out:
+  return: FAIL
+---
+test case: RS256 in JavaScript - Missing pkey
+in:
+  encryption_required: 1
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "a"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: "return sign('q');"
+out:
+  return: FAIL
+---
+test case: RS256 in JavaScript - Invalid data
+in:
+  encryption_required: 1
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "a"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: "return sign('q', 'invalid', '');"
+out:
+  return: FAIL
+---
+test case: RS256 in JavaScript - Missing data
+in:
+  encryption_required: 1
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "a"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: "return sign('q', 'pkey');"
+out:
+  return: FAIL
+---
+test case: Check for not supported without parameter (false)
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "no error"
+  step:
+    type: ZBX_PREPROC_VALIDATE_NOT_SUPPORTED
+    params: ""
+    error_handler: ZBX_PREPROC_FAIL_SET_VALUE
+    error_handler_params: error_value
+out:
+  return: SUCCEED
+  value: "no error"
+---
+test case: Check for not supported without parameter
+in:
+  error:
+    time: 2017-10-29 03:15:00 +03:00
+    data: "error any"
+  step:
+    type: ZBX_PREPROC_VALIDATE_NOT_SUPPORTED
+    params: ""
+    error_handler: ZBX_PREPROC_FAIL_SET_VALUE
+    error_handler_params: error_value
+out:
+  return: SUCCEED
+  value: error_value
+---
+test case: Check for not supported with parameter (false)
+in:
+  error:
+    time: 2017-10-29 03:15:00 +03:00
+    data: "error any"
+  step:
+    type: ZBX_PREPROC_VALIDATE_NOT_SUPPORTED
+    params: "0\n123"
+    error_handler: ZBX_PREPROC_FAIL_SET_ERROR
+    error_handler_params: custom error
+out:
+  return: SUCCEED
+  value: "error any"
+---
+test case: Check for not supported with parameter
+in:
+  error:
+    time: 2017-10-29 03:15:00 +03:00
+    data: "error 123"
+  step:
+    type: ZBX_PREPROC_VALIDATE_NOT_SUPPORTED
+    params: "0\n123"
+    error_handler: ZBX_PREPROC_FAIL_SET_ERROR
+    error_handler_params: custom error
+out:
+  return: FAIL
+  error: custom error
+---
+test case: Check for not supported with parameter and capturing group
+in:
+  error:
+    time: 2017-10-29 03:15:00 +03:00
+    data: "error 123"
+  step:
+    type: ZBX_PREPROC_VALIDATE_NOT_SUPPORTED
+    params: "0\n123"
+    error_handler: ZBX_PREPROC_FAIL_SET_ERROR
+    error_handler_params: custom error \0
+out:
+  return: FAIL
+  error: custom error 123
+---
+test case: btoa in JavaScript - binary
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "k"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: "return btoa(new Uint8Array([49, 0, 51]));"
+out:
+  return: SUCCEED
+  value: 'MQAz'
+---
+test case: Crash by accessing internal object pointer in JavaScript
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "a"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: |
+      var http = new HttpRequest();
+      var fake = {};
+      fake[atob('//9k')] = 'xyz';
+      fake.get = http.get;
+      fake.get('http://localhost');
+      return 0;
+  script_uses_curl: 1
+out:
+  return: FAIL
+---
+test case: Memory leak with global variable and exception
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "a"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: |
+      req = new HttpRequest();
+      throw 0;
+  script_uses_curl: 1
+out:
+  return: FAIL
+---
+test case: Memory leak with finalizer
+in:
+  value:
+    value_type: ITEM_VALUE_TYPE_STR
+    time: 2017-10-29 03:15:00 +03:00
+    data: "a"
+  step:
+    type: ZBX_PREPROC_SCRIPT
+    params: |
+      var req = new HttpRequest();
+
+      req[atob('gkZpbmFsaXplcg==')] = null;
+
+      return 0;
+  script_uses_curl: 1
+out:
+  value: "0"
+  return: SUCCEED
+---
+  test case: SNMP walk to value - duplicate oids
+  in:
+    value:
+      value_type: ITEM_VALUE_TYPE_STR
+      time: 2017-10-29 03:15:00 +03:00
+      data: |
+        .1.3.6.1.1 = STRING: "AAA"
+        .1.3.6.1.1 = STRING: "AAA"
+    step:
+      type: ZBX_PREPROC_SNMP_WALK_VALUE
+      params: |-
+        .1.3.6.1.1
+        0
+  out:
+    return: SUCCEED
+    value: "AAA"
+...

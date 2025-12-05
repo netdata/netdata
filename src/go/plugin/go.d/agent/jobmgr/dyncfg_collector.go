@@ -214,7 +214,6 @@ func (m *Manager) dyncfgConfigTest(fn functions.Function) {
 		m.dyncfgApi.SendCodef(fn, 404, "The specified module '%s' is not registered.", mn)
 		return
 	}
-
 	cfg, err := configFromPayload(fn)
 	if err != nil {
 		m.Warningf("dyncfg: %s: module %s: failed to create config from payload: %v", cmd, mn, err)
