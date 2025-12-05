@@ -96,6 +96,9 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
         return (ULONGLONG)ULONG_LONG_MAX;
     }
 
+    if (col_data_len == SQL_NULL_DATA)
+        db_size = 0;
+
     netdata_MSSQL_release_results(stmt);
     return (ULONGLONG)(db_size * MEGA_FACTOR);
 }
@@ -164,6 +167,11 @@ void dict_mssql_fill_instance_transactions(struct mssql_db_instance *mdi)
             default:
                 goto enditransactions;
         }
+
+        if (col_object_len == SQL_NULL_DATA)
+            object_name[0] = '\0';
+        if (col_value_len == SQL_NULL_DATA)
+            value = 0;
 
         // We cannot use strcmp, because buffer is filled with spaces instead NULL.
         if (unlikely(!strncmp(
@@ -282,6 +290,11 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
                 goto endtransactions;
         }
 
+        if (col_object_len == SQL_NULL_DATA)
+            object_name[0] = '\0';
+        if (col_value_len == SQL_NULL_DATA)
+            value = 0;
+
         // We cannot use strcmp, because buffer is filled with spaces instead NULL.
         if (unlikely(!strncmp(
                 object_name,
@@ -377,6 +390,11 @@ void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
                 goto endlocks;
         }
 
+        if (col_object_len == SQL_NULL_DATA)
+            resource_type[0] = '\0';
+        if (col_value_len == SQL_NULL_DATA)
+            value = 0;
+
         char *space = strchr(resource_type, ' ');
         if (likely(space))
             *space = '\0';
@@ -471,6 +489,21 @@ int dict_mssql_fill_waits(struct mssql_instance *mi)
                 success = 1;
                 goto endwait;
         }
+
+        if (col_wait_type_len == SQL_NULL_DATA)
+            wait_type[0] = '\0';
+        if (col_total_wait_len == SQL_NULL_DATA)
+            total_wait = 0;
+        if (col_resource_wait_len == SQL_NULL_DATA)
+            resource_wait = 0;
+        if (col_signal_wait_len == SQL_NULL_DATA)
+            signal_wait = 0;
+        if (col_max_wait_len == SQL_NULL_DATA)
+            max_wait = 0;
+        if (col_waiting_tasks_len == SQL_NULL_DATA)
+            waiting_tasks = 0;
+        if (col_wait_category_len == SQL_NULL_DATA)
+            wait_category[0] = '\0';
 
         struct mssql_db_waits *mdw = dictionary_set(mi->waits, wait_type, NULL, sizeof(*mdw));
         if (!mdw)
@@ -684,6 +717,29 @@ void dict_mssql_fill_replication(struct mssql_db_instance *mdi)
                 goto endreplication;
         }
 
+        if (publisherdb_len == SQL_NULL_DATA)
+            publisher_db[0] = '\0';
+        if (publication_len == SQL_NULL_DATA)
+            publication[0] = '\0';
+        if (type_len == SQL_NULL_DATA)
+            type = 0;
+        if (status_len == SQL_NULL_DATA)
+            status = 0;
+        if (warning_len == SQL_NULL_DATA)
+            warning = 0;
+        if (avg_latency_len == SQL_NULL_DATA)
+            avg_latency = 0;
+        if (retention_len == SQL_NULL_DATA)
+            retention = 0;
+        if (subscriptioncount_len == SQL_NULL_DATA)
+            subscriptioncount = 0;
+        if (runningagentcount_len == SQL_NULL_DATA)
+            runningdistagentcount = 0;
+        if (average_runspeedperf_len == SQL_NULL_DATA)
+            average_runspeedPerf = 0;
+        if (publisher_len == SQL_NULL_DATA)
+            publisher[0] = '\0';
+
         snprintfz(key, sizeof(key) - 1, "%s:%s", publisher_db, publication);
         struct mssql_publisher_publication *mpp =
             dictionary_set(mdi->parent->publisher_publication, key, NULL, sizeof(*mpp));
@@ -781,6 +837,9 @@ long netdata_mssql_check_permission(struct mssql_instance *mi)
         goto endperm;
     }
 
+    if (col_data_len == SQL_NULL_DATA)
+        perm = 0;
+
 endperm:
     netdata_MSSQL_release_results(mi->conn->checkPermSTMT);
     return perm;
@@ -808,13 +867,15 @@ void netdata_mssql_fill_mssql_status(struct mssql_instance *mi)
         goto enddbstate;
     }
 
-    ret = SQLBindCol(mi->conn->dbSQLState, 1, SQL_C_TINYINT, &state, sizeof(state), &col_data_len);
+    SQLLEN col_state_len = 0, col_readonly_len = 0;
+
+    ret = SQLBindCol(mi->conn->dbSQLState, 1, SQL_C_TINYINT, &state, sizeof(state), &col_state_len);
     if (likely(netdata_mssql_check_result(ret))) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLState, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto enddbstate;
     }
 
-    ret = SQLBindCol(mi->conn->dbSQLState, 3, SQL_C_BIT, &readonly, sizeof(readonly), &col_data_len);
+    ret = SQLBindCol(mi->conn->dbSQLState, 3, SQL_C_BIT, &readonly, sizeof(readonly), &col_readonly_len);
     if (likely(netdata_mssql_check_result(ret))) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto enddbstate;
@@ -825,6 +886,11 @@ void netdata_mssql_fill_mssql_status(struct mssql_instance *mi)
         if (likely(netdata_mssql_check_result(ret))) {
             goto enddbstate;
         }
+
+        if (col_state_len == SQL_NULL_DATA)
+            state = 0;
+        if (col_readonly_len == SQL_NULL_DATA)
+            readonly = 0;
 
         struct mssql_db_instance *mdi = dictionary_set(mi->databases, dbname, NULL, sizeof(*mdi));
         if (unlikely(!mdi))
@@ -878,6 +944,11 @@ void netdata_mssql_fill_job_status(struct mssql_instance *mi)
             goto enddbjobs;
         }
 
+        if (col_job_len == SQL_NULL_DATA)
+            job[0] = '\0';
+        if (col_state_len == SQL_NULL_DATA)
+            state = 0;
+
         struct mssql_db_jobs *mdj = dictionary_set(mi->sysjobs, job, NULL, sizeof(*mdj));
         if (unlikely(!mdj))
             continue;
@@ -929,6 +1000,11 @@ void netdata_mssql_fill_user_connection(struct mssql_instance *mi)
             goto enduserconn;
         }
 
+        if (col_user_connections_len == SQL_NULL_DATA)
+            connections = 0;
+        if (col_user_bit_len == SQL_NULL_DATA)
+            is_user = 0;
+
         if (is_user)
             mi->MSSQLUserConnections.current.Data = (ULONGLONG)connections;
         else
@@ -972,6 +1048,9 @@ void netdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
         if (likely(netdata_mssql_check_result(ret))) {
             goto enddblist;
         }
+
+        if (col_data_len == SQL_NULL_DATA)
+            dbname[0] = '\0';
 
         struct mssql_db_instance *mdi = dictionary_set(mi->databases, dbname, NULL, sizeof(*mdi));
         if (!mdi)
