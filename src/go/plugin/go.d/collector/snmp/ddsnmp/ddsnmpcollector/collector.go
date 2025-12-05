@@ -117,7 +117,7 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 
 			pm.Metrics = slices.DeleteFunc(pm.Metrics, func(m ddsnmp.Metric) bool { return strings.HasPrefix(m.Name, "_") })
 			pm.Metrics = append(pm.Metrics, vmetrics...)
-			pm.Stats.Metrics.Virtual += len(vmetrics)
+			pm.Stats.Metrics.Virtual += int64(len(vmetrics))
 		}
 		pm.Stats.Timing.VirtualMetrics = time.Since(now)
 	}
@@ -178,7 +178,7 @@ func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, er
 	}
 	pm.Metrics = append(pm.Metrics, scalarMetrics...)
 	pm.Stats.Timing.Scalar = time.Since(now)
-	pm.Stats.Metrics.Scalar += len(scalarMetrics)
+	pm.Stats.Metrics.Scalar += int64(len(scalarMetrics))
 
 	now = time.Now()
 	tableMetrics, err := c.tableCollector.collect(ps.profile, &pm.Stats)
@@ -187,7 +187,7 @@ func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, er
 	}
 	pm.Metrics = append(pm.Metrics, tableMetrics...)
 	pm.Stats.Timing.Table = time.Since(now)
-	pm.Stats.Metrics.Table += len(tableMetrics)
+	pm.Stats.Metrics.Table += int64(len(tableMetrics))
 
 	for i := range pm.Metrics {
 		pm.Metrics[i].Profile = pm
