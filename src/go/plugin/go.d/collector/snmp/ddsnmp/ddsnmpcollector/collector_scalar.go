@@ -32,23 +32,25 @@ func newScalarCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, 
 }
 
 // Collect gathers all scalar metrics from the profile
-func (sc *scalarCollector) Collect(prof *ddsnmp.Profile) ([]ddsnmp.Metric, error) {
+func (sc *scalarCollector) collect(prof *ddsnmp.Profile, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
 	oids, missingOIDs := sc.identifyScalarOIDs(prof.Definition.Metrics)
 
 	if len(missingOIDs) > 0 {
 		sc.log.Debugf("scalar metrics missing OIDs: %v", missingOIDs)
+		stats.Errors.MissingOIDs += len(missingOIDs)
 	}
 
 	if len(oids) == 0 {
 		return nil, nil
 	}
 
-	pdus, err := sc.getScalarValues(oids)
+	pdus, err := sc.getScalarValues(oids, stats)
 	if err != nil {
+		stats.Errors.SNMP++
 		return nil, err
 	}
 
-	return sc.processScalarMetrics(prof.Definition.Metrics, pdus)
+	return sc.processScalarMetrics(prof.Definition.Metrics, pdus, stats)
 }
 
 // identifyScalarOIDs returns OIDs to collect and OIDs that are known to be missing
@@ -77,11 +79,14 @@ func (sc *scalarCollector) identifyScalarOIDs(configs []ddprofiledefinition.Metr
 	return oids, missingOIDs
 }
 
-func (sc *scalarCollector) getScalarValues(oids []string) (map[string]gosnmp.SnmpPDU, error) {
+func (sc *scalarCollector) getScalarValues(oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.SnmpPDU, error) {
 	pdus := make(map[string]gosnmp.SnmpPDU)
 	maxOids := sc.snmpClient.MaxOids()
 
 	for chunk := range slices.Chunk(oids, maxOids) {
+		stats.SNMP.GetOIDs += len(chunk)
+		stats.SNMP.GetRequests++
+
 		result, err := sc.snmpClient.Get(chunk)
 		if err != nil {
 			return nil, err
@@ -90,6 +95,7 @@ func (sc *scalarCollector) getScalarValues(oids []string) (map[string]gosnmp.Snm
 		for _, pdu := range result.Variables {
 			if !isPduWithData(pdu) {
 				sc.missingOIDs[trimOID(pdu.Name)] = true
+				stats.Errors.MissingOIDs++
 				continue
 			}
 			pdus[trimOID(pdu.Name)] = pdu
@@ -100,7 +106,7 @@ func (sc *scalarCollector) getScalarValues(oids []string) (map[string]gosnmp.Snm
 }
 
 // processScalarMetrics converts PDUs into metrics
-func (sc *scalarCollector) processScalarMetrics(configs []ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.SnmpPDU) ([]ddsnmp.Metric, error) {
+func (sc *scalarCollector) processScalarMetrics(configs []ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.SnmpPDU, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
 	var metrics []ddsnmp.Metric
 	var errs []error
 
@@ -113,6 +119,7 @@ func (sc *scalarCollector) processScalarMetrics(configs []ddprofiledefinition.Me
 		if err != nil {
 			errs = append(errs, fmt.Errorf("metric '%s': %w", cfg.Symbol.Name, err))
 			sc.log.Debugf("Error processing scalar metric '%s': %v", cfg.Symbol.Name, err)
+			stats.Errors.Processing.Scalar++
 			continue
 		}
 
