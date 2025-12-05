@@ -253,7 +253,10 @@ impl CatalogFunction {
             Err(e) => {
                 error!("log query execution failed: {}", e);
                 if !search_query.is_empty() {
-                    error!("query may have failed due to invalid regex pattern: {:?}", search_query);
+                    error!(
+                        "query may have failed due to invalid regex pattern: {:?}",
+                        search_query
+                    );
                 }
                 return (Vec::new(), false, false);
             }
@@ -312,7 +315,9 @@ impl CatalogFunction {
                 Err(e) => {
                     warn!("opposite direction query error: {}", e);
                     if !search_query.is_empty() {
-                        warn!("opposite direction query may have failed due to invalid regex pattern");
+                        warn!(
+                            "opposite direction query may have failed due to invalid regex pattern"
+                        );
                     }
                     false
                 }
@@ -385,17 +390,19 @@ impl CatalogFunction {
             bucket_operations_metrics,
         );
 
-        // Initialize response logging directory
-        let response_dir = std::path::Path::new("/tmp/responses");
-        if response_dir.exists() {
-            if let Err(e) = std::fs::remove_dir_all(response_dir) {
-                warn!("Failed to remove existing /tmp/responses directory: {}", e);
+        // Initialize response logging directory at info level
+        if tracing::enabled!(tracing::Level::INFO) {
+            let response_dir = std::path::Path::new("/tmp/responses");
+            if response_dir.exists() {
+                if let Err(e) = std::fs::remove_dir_all(response_dir) {
+                    warn!("Failed to remove existing /tmp/responses directory: {}", e);
+                }
             }
-        }
-        if let Err(e) = std::fs::create_dir_all(response_dir) {
-            warn!("Failed to create /tmp/responses directory: {}", e);
-        } else {
-            info!("created /tmp/responses directory for response logging");
+            if let Err(e) = std::fs::create_dir_all(response_dir) {
+                warn!("Failed to create /tmp/responses directory: {}", e);
+            } else {
+                info!("created /tmp/responses directory for response logging");
+            }
         }
 
         let inner = CatalogFunctionInner {
@@ -475,6 +482,11 @@ impl CatalogFunction {
 
     /// Logs the response as pretty-printed JSON to /tmp/responses/<request-number>-<timestamp>.json
     fn log_response(&self, response: &CatalogResponse) {
+        // Early return if INFO level is not enabled
+        if !tracing::enabled!(tracing::Level::INFO) {
+            return;
+        }
+
         const MAX_RESPONSES: usize = 60;
         const RESPONSE_DIR: &str = "/tmp/responses";
 
