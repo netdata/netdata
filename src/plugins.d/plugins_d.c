@@ -328,6 +328,12 @@ void *pluginsd_main(void *ptr) {
                     continue;
                 }
 
+                // Blacklist obsolete plugins that have been replaced
+                if (strcmp(pluginname, "systemd-journal") == 0) {
+                    netdata_log_info("plugin '%s' has been replaced by 'journal-viewer' and is no longer supported", file->d_name);
+                    continue;
+                }
+
                 int enabled = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGINS, pluginname, automatic_run);
                 if (unlikely(!enabled)) {
                     netdata_log_debug(D_PLUGINSD, "plugin '%s' is not enabled", file->d_name);

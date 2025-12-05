@@ -131,6 +131,7 @@ mark_as_advanced(ENABLE_DASHBOARD)
 # Data collection plugins
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable journal viewer plugin" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
 cmake_dependent_option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD OR OS_MACOS OR OS_WINDOWS" False)
@@ -3192,7 +3193,13 @@ if(ENABLE_PLUGIN_OTEL)
             DESTINATION usr/lib/netdata/conf.d/otel.d/v1/metrics)
 
     install(DIRECTORY COMPONENT plugin-otel DESTINATION etc/netdata/otel.d/v1/metrics)
+endif()
 
+#
+# journal-viewer-plugin
+#
+# Handle journal-viewer plugin
+if(ENABLE_NETDATA_JOURNAL_FILE_READER)
     corrosion_install(TARGETS journal-viewer-plugin
                       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE
                       RUNTIME DESTINATION usr/libexec/netdata/plugins.d
@@ -3273,7 +3280,7 @@ set(logdir_POST "${LOG_DIR}")
 set(netdata_user_POST "${NETDATA_USER}")
 set(netdata_group_POST "${NETDATA_USER}")
 
-if(ENABLE_PLUGIN_OTEL)
+if(ENABLE_NETDATA_JOURNAL_FILE_READER)
     configure_file(src/crates/netdata-log-viewer/journal-viewer-plugin/configs/journal-viewer.yml.in
                    src/crates/netdata-log-viewer/journal-viewer-plugin/configs/journal-viewer.yml
                    @ONLY)
