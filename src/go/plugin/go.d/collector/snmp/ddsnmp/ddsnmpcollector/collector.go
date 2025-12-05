@@ -118,8 +118,8 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 			pm.Metrics = slices.DeleteFunc(pm.Metrics, func(m ddsnmp.Metric) bool { return strings.HasPrefix(m.Name, "_") })
 			pm.Metrics = append(pm.Metrics, vmetrics...)
 			pm.Stats.Metrics.Virtual += int64(len(vmetrics))
+			pm.Stats.Timing.VirtualMetrics = time.Since(now)
 		}
-		pm.Stats.Timing.VirtualMetrics = time.Since(now)
 	}
 
 	if len(metrics) == 0 && len(errs) > 0 {
