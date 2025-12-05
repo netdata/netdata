@@ -253,6 +253,7 @@ You can reference environment/system/context variables directly in your system a
 Supported variables:
 
 - `DATETIME`: Current local date/time in RFC 3339 with numeric offset, e.g. `2025-08-31T02:05:07+03:00`.
+- `TIMESTAMP`: Current Unix epoch timestamp in seconds, e.g. `1733437845`.
 - `DAY`: Weekday name, e.g. `Monday`.
 - `TIMEZONE`: IANA time zone when available (e.g. `Europe/Athens`), else `TZ` env or `UTC`.
 - `MAX_TURNS`: The configured maximum tool turns for the agent loop.

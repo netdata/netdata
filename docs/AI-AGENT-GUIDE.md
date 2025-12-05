@@ -131,6 +131,7 @@ You synthesize research data into concise briefs. Answer in ${FORMAT}.
 | Placeholder | Description | Source |
 | --- | --- | --- |
 | `${DATETIME}` | Current local timestamp in RFC 3339 format. | `buildPromptVars()`
+| `${TIMESTAMP}` | Current Unix epoch timestamp in seconds. | `buildPromptVars()`
 | `${DAY}` | Local weekday name (e.g., “Friday”). | `buildPromptVars()`
 | `${TIMEZONE}` | Olson timezone ID (`America/Los_Angeles` fallback `TZ`/`UTC`). | `buildPromptVars()`
 | `${MAX_TURNS}` | Effective `maxTurns` after overrides. | Injected in `AIAgentSession`
