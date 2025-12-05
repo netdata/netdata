@@ -79,7 +79,7 @@ const COLLAPSE_RECOVERY_RESULT = 'Proper result after collapse.';
 const COLLAPSE_FIXED_RESULT = 'Fixed after collapse.';
 const MAX_RETRY_SUCCESS_RESULT = 'Success after retries.';
 const COLLAPSING_REMAINING_TURNS_FRAGMENT = 'Collapsing remaining turns';
-const CONTEXT_POST_SHRINK_TURN_WARN = 'Context guard post-shrink still over projected limit during turn execution; proceeding anyway.';
+const CONTEXT_LIMIT_TURN_WARN = 'Context limit exceeded during turn execution; proceeding with final turn.';
 const parseDumpList = (raw?: string): string[] => {
   if (typeof raw !== 'string') return [];
   return raw.split(',').map((value) => value.trim()).filter((value) => value.length > 0);
@@ -1724,7 +1724,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           entry.remoteIdentifier === CONTEXT_REMOTE
           && entry.severity === 'WRN'
           && typeof entry.message === 'string'
-          && entry.message.includes(CONTEXT_POST_SHRINK_TURN_WARN)
+          && entry.message.includes(CONTEXT_LIMIT_TURN_WARN)
         );
         invariant(shrinkWarn !== undefined, 'Post-shrink warning log expected when schema tokens exceed limit for run-test-context-forced-final.');
       } else {
@@ -2351,7 +2351,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           entry.remoteIdentifier === CONTEXT_REMOTE
           && entry.severity === 'WRN'
           && typeof entry.message === 'string'
-          && entry.message.includes(CONTEXT_POST_SHRINK_TURN_WARN)
+          && entry.message.includes(CONTEXT_LIMIT_TURN_WARN)
         );
         invariant(shrinkWarn !== undefined, 'Post-shrink warning log expected when schema tokens exceed limit for context_guard__forced_final_turn_flow.');
       } else {
@@ -2628,7 +2628,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         entry.remoteIdentifier === CONTEXT_REMOTE
         && entry.severity === 'WRN'
         && typeof entry.message === 'string'
-        && entry.message.includes('post-shrink'));
+        && entry.message.includes('Context limit exceeded'));
       invariant(warnLog !== undefined, 'Context guard warning expected for bulk tool scenario.');
       invariant(result.success, 'Final report should succeed after bulk trimming.');
     },

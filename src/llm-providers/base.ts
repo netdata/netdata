@@ -1426,6 +1426,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
       const usage = await awaitWithSuppression(result.usage);
       const resp = await awaitWithSuppression(result.response);
+      // providerMetadata is a separate property on the result, not nested in response
+      const resultProviderMetadata = await awaitWithSuppression(result.providerMetadata);
       this.traceSdkPayload(request, 'response', resp);
       stopReason = stopReason ?? this.extractStopReason(resp) ?? this.extractStopReason(result);
       if (process.env.DEBUG === 'true') {
@@ -1460,16 +1462,12 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       }
       const tokens = this.extractTokenUsage(usage);
       // Try to enrich with provider metadata (e.g., Anthropic cache creation tokens)
+      // Note: In streaming, result.providerMetadata contains this data, NOT result.response.providerMetadata
       try {
         const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object';
-         
-        const provMeta = isObj(resp) && isObj((resp as Record<string, unknown>).providerMetadata)
-           
-          ? ((resp as Record<string, unknown>).providerMetadata as Record<string, unknown>)
-          : undefined;
         let w: unknown = undefined;
-        if (isObj(provMeta)) {
-          const pm: Record<string, unknown> = provMeta;
+        if (isObj(resultProviderMetadata)) {
+          const pm: Record<string, unknown> = resultProviderMetadata;
           const a = pm.anthropic;
           if (isObj(a)) {
             const ar: Record<string, unknown> = a;
@@ -1488,8 +1486,6 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
             w = cand;
           }
         }
-        // const anthropic = isObj(provMeta) && isObj(provMeta.anthropic) ? (provMeta.anthropic as Record<string, unknown>) : undefined;
-        // const w = anthropic !== undefined ? anthropic.cacheCreationInputTokens : undefined;
         if (typeof w === 'number' && Number.isFinite(w)) {
           tokens.cacheWriteInputTokens = Math.trunc(w);
         }

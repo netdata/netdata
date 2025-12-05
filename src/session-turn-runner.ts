@@ -405,7 +405,7 @@ export class TurnRunner {
                 this.schemaCtxTokens = this.estimateToolSchemaTokens(toolSelection.toolsForTurn);
                 const providerContextStatus = this.evaluateContextForProvider(provider, model);
                 if (providerContextStatus === 'final') {
-                    const evaluation = this.evaluateContextGuard(this.schemaCtxTokens);
+                    const evaluation = this.evaluateContextGuard();
                     const blockedEntry = evaluation.blocked.find((entry) => entry.provider === provider && entry.model === model) ?? evaluation.blocked[0];
                     const enforceDueToBaseOverflow = (blockedEntry.projected - this.schemaCtxTokens) > blockedEntry.limit;
                     if (enforceDueToBaseOverflow) {
@@ -414,7 +414,7 @@ export class TurnRunner {
                         const finalToolSelection = this.selectToolsForTurn(provider, true);
                         this.state.pendingToolSelection = finalToolSelection;
                         this.schemaCtxTokens = this.computeForcedFinalSchemaTokens(provider);
-                        const postEnforce = this.evaluateContextGuard(this.schemaCtxTokens);
+                        const postEnforce = this.evaluateContextGuard();
                         if (postEnforce.blocked.length > 0) {
                             const [firstBlocked] = postEnforce.blocked;
                             const warnEntry = {
@@ -426,7 +426,7 @@ export class TurnRunner {
                                 type: 'llm' as const,
                                 remoteIdentifier: REMOTE_CONTEXT,
                                 fatal: false,
-                                message: 'Context guard post-shrink still over projected limit; continuing with forced final turn.',
+                                message: 'Context limit exceeded; forcing final turn.',
                                 details: {
                                     projected_tokens: postEnforce.projectedTokens,
                                     limit_tokens: firstBlocked.limit,
@@ -439,7 +439,7 @@ export class TurnRunner {
                     }
                 }
                 if (providerContextStatus === 'skip') {
-                    const evaluation = this.evaluateContextGuard(this.schemaCtxTokens);
+                    const evaluation = this.evaluateContextGuard();
                     const blocked = evaluation.blocked.find((entry) => entry.provider === provider && entry.model === model);
                     if (blocked !== undefined) {
                         const limitTokens = blocked.limit;
@@ -554,7 +554,7 @@ export class TurnRunner {
                         this.pendingCtxTokens += this.newCtxTokens;
                         this.newCtxTokens = 0;
                     }
-                const guardEvaluation = this.evaluateContextGuard(this.schemaCtxTokens);
+                const guardEvaluation = this.evaluateContextGuard();
                 if (guardEvaluation.blocked.length > 0) {
                     const blocked = guardEvaluation.blocked.find((entry) => entry.provider === provider && entry.model === model) ?? guardEvaluation.blocked[0];
                     const baseProjected = blocked.projected - this.schemaCtxTokens;
@@ -565,7 +565,7 @@ export class TurnRunner {
                         const finalToolSelection = this.selectToolsForTurn(provider, true);
                         this.state.pendingToolSelection = finalToolSelection;
                         this.schemaCtxTokens = this.computeForcedFinalSchemaTokens(provider);
-                        const postEnforceGuard = this.evaluateContextGuard(this.schemaCtxTokens);
+                        const postEnforceGuard = this.evaluateContextGuard();
                         if (postEnforceGuard.blocked.length > 0) {
                             const [firstBlocked] = postEnforceGuard.blocked;
                             const warnEntry = {
@@ -577,7 +577,7 @@ export class TurnRunner {
                                 type: 'llm' as const,
                                 remoteIdentifier: REMOTE_CONTEXT,
                                 fatal: false,
-                                message: 'Context guard post-shrink still over projected limit during turn execution; proceeding anyway.',
+                                message: 'Context limit exceeded during turn execution; proceeding with final turn.',
                                 details: {
                                     projected_tokens: postEnforceGuard.projectedTokens,
                                     limit_tokens: firstBlocked.limit,
@@ -772,12 +772,21 @@ export class TurnRunner {
                         catch (e) {
                             warn(`onAccounting callback failed: ${e instanceof Error ? e.message : String(e)}`);
                         }
-                        // Update context guard with actual response tokens
-                        const cacheRead = tokens.cacheReadInputTokens ?? tokens.cachedTokens ?? 0;
-                        const responseCtxTokens = tokens.inputTokens + tokens.outputTokens + cacheRead;
-                        this.currentCtxTokens = responseCtxTokens;
-                        this.pendingCtxTokens = 0;
-                        this.schemaCtxTokens = 0;
+                        // Update context guard with actual response tokens - only on success
+                        // On errors (especially model_error with no output), tokens may be 0
+                        // and we should NOT wipe out the existing context tracking
+                        if (turnResult.status.type === 'success') {
+                            const cacheRead = tokens.cacheReadInputTokens ?? tokens.cachedTokens ?? 0;
+                            const cacheWrite = tokens.cacheWriteInputTokens ?? 0;
+                            // Full context = inputTokens + cacheRead + cacheWrite + outputTokens
+                            // This is the total context consumed by this conversation so far
+                            // Note: schema may be in cache_write (first turn) or cache_read (subsequent)
+                            // so we track total, not trying to separate messages from schema
+                            const fullInputTokens = tokens.inputTokens + cacheRead + cacheWrite;
+                            // outputTokens already includes reasoning tokens (they're part of output)
+                            this.currentCtxTokens = fullInputTokens + tokens.outputTokens;
+                            this.pendingCtxTokens = 0;
+                        }
                     }
                     // Close hierarchical LLM op
                     try {
@@ -2866,6 +2875,8 @@ export class TurnRunner {
             effectiveReasoningLevel = undefined;
             effectiveReasoningValue = undefined;
         }
+        // Update context guard with current reasoning budget for accurate context evaluation
+        this.ctx.contextGuard.setReasoningTokens(effectiveReasoningValue);
         addSpanAttributes({
             'ai.llm.reasoning.level_effective': effectiveReasoningLevel ?? 'none',
             'ai.llm.reasoning.value_effective': effectiveReasoningValue ?? 'none',
@@ -2900,7 +2911,13 @@ export class TurnRunner {
         // Refresh schema token estimate right before issuing the LLM request so logs reflect the final tool set.
         const schemaToolsForRequest = toolsForTurn.length > 0 ? toolsForTurn : availableTools;
         this.schemaCtxTokens = this.estimateToolSchemaTokens(schemaToolsForRequest);
-        const metricsForRequest = this.ctx.contextGuard.buildMetrics(provider, model);
+        // Pass reasoning value so context metrics include thinking budget tokens
+        const metricsForRequest = this.ctx.contextGuard.buildMetrics(provider, model, effectiveReasoningValue);
+
+        // Set currentCtxTokens to expected BEFORE the request, so tool budget reservation
+        // knows about this turn's consumption. Will be overwritten with actual after response.
+        // Schema is already in currentCtxTokens after first turn (via cache_write/cache_read).
+        this.currentCtxTokens = metricsForRequest.ctxTokens + metricsForRequest.newTokens;
         const turnMetadata: {
             attempt: number;
             maxAttempts: number;

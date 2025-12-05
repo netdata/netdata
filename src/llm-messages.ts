@@ -346,7 +346,7 @@ export interface XmlPastTemplatePayload {
 }
 
 export const renderXmlNextTemplate = (payload: XmlNextTemplatePayload): string => {
-  const { nonce, turn, maxTurns } = payload;
+  const { turn, maxTurns } = payload;
   const lines: string[] = [];
   lines.push('# System Notice');
   lines.push('');
@@ -411,7 +411,11 @@ export const finalReportXmlInstructions = (
   schemaBlock: string,
   sessionNonce?: string
 ): string => {
-  const slotId = sessionNonce !== undefined ? `${sessionNonce}-FINAL` : 'NONCE-FINAL';
+  // Caller MUST provide a nonce - without it, LLM will output literal 'NONCE-FINAL'
+  if (sessionNonce === undefined) {
+    throw new Error('sessionNonce is required for XML final report instructions');
+  }
+  const slotId = `${sessionNonce}-FINAL`;
   // For slack-block-kit: show array example (messages array directly, no wrapper)
   // For json: show object example
   // For text formats: show text placeholder

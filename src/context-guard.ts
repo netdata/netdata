@@ -80,6 +80,9 @@ export class ContextGuard {
   private forcedFinalTurnReason?: 'context';
   private contextLimitWarningLogged = false;
 
+  // Current reasoning/thinking budget tokens (for extended thinking models)
+  private currentReasoningTokens = 0;
+
   constructor(config: ContextGuardConfig) {
     this.targets = config.targets.length > 0 ? config.targets : [];
     this.defaultContextWindow = config.defaultContextWindow;
@@ -179,6 +182,8 @@ export class ContextGuard {
    * Evaluate if context budget is exceeded
    */
   evaluate(extraTokens = 0): ContextGuardEvaluation {
+    // Schema is in currentCtxTokens after first turn (via cache_write/cache_read)
+    // First turn will be slightly underestimated, subsequent turns accurate
     const projectedTokens = this.currentCtxTokens + this.pendingCtxTokens + this.newCtxTokens + extraTokens;
     const blocked: ContextGuardBlockedEntry[] = [];
     const targets = this.getTargets();
@@ -188,7 +193,9 @@ export class ContextGuard {
       currentCtxTokens: this.currentCtxTokens,
       pendingCtxTokens: this.pendingCtxTokens,
       newCtxTokens: this.newCtxTokens,
+      schemaCtxTokens: this.schemaCtxTokens,
       extraTokens,
+      currentReasoningTokens: this.currentReasoningTokens,
     });
 
     // eslint-disable-next-line functional/no-loop-statements
@@ -196,6 +203,7 @@ export class ContextGuard {
       const contextWindow = target.contextWindow;
       const bufferTokens = target.bufferTokens;
       const maxOutputTokens = this.computeMaxOutputTokens(contextWindow);
+      // Reasoning tokens are INSIDE max_output_tokens, not on top
       const limit = Math.max(0, contextWindow - bufferTokens - maxOutputTokens);
 
       this.debug('evaluate-target', {
@@ -228,11 +236,14 @@ export class ContextGuard {
    */
   evaluateForProvider(provider: string, model: string): 'ok' | 'skip' | 'final' {
     const targets = this.getTargets();
-    const evaluation = this.evaluate(this.schemaCtxTokens);
+    // Schema tokens are now included in evaluate() automatically
+    const evaluation = this.evaluate();
 
-    // If the only overflow comes from schema tokens, allow one attempt before forcing final turn
+    // If the only overflow comes from schema tokens, allow the request (never block)
     const target = targets.find((cfg) => cfg.provider === provider && cfg.model === model) ?? targets[0];
-    const limit = Math.max(0, target.contextWindow - target.bufferTokens - this.computeMaxOutputTokens(target.contextWindow));
+    const maxOutputTokens = this.computeMaxOutputTokens(target.contextWindow);
+    // Reasoning tokens are INSIDE max_output_tokens, not on top
+    const limit = Math.max(0, target.contextWindow - target.bufferTokens - maxOutputTokens);
     const baseProjected = this.currentCtxTokens + this.pendingCtxTokens + this.newCtxTokens;
     if (limit > 0 && baseProjected <= limit) {
       const blockedCurrent = evaluation.blocked.find((entry) => entry.provider === provider && entry.model === model);
@@ -273,8 +284,9 @@ export class ContextGuard {
 
   /**
    * Build context metrics for a turn request
+   * @param reasoningValue - Optional reasoning/thinking budget tokens (for extended thinking models)
    */
-  buildMetrics(provider: string, model: string): TurnRequestContextMetrics {
+  buildMetrics(provider: string, model: string, reasoningValue?: number | string | null): TurnRequestContextMetrics {
     const targets = this.getTargets();
     const target = targets.find((cfg) => cfg.provider === provider && cfg.model === model) ?? targets[0];
     const contextWindow = target.contextWindow;
@@ -283,7 +295,17 @@ export class ContextGuard {
     const ctxTokens = this.currentCtxTokens;
     const newTokens = this.pendingCtxTokens;
     const schemaTokens = this.schemaCtxTokens;
-    const expectedTokens = ctxTokens + newTokens + schemaTokens;
+    // Note: ctxTokens already includes schema from previous turns (tracked as total context)
+    // For next turn, we add newTokens (new user input) but schema is already counted
+    // in ctxTokens via cache_read/cache_write
+    const expectedTokens = ctxTokens + newTokens;
+
+    // Calculate reasoning tokens from the reasoning value (for display/logging only)
+    const reasoningTokens = this.parseReasoningTokens(reasoningValue);
+
+    // Reasoning tokens are INSIDE max_output_tokens, not on top
+    // Schema is in ctx after first turn (via cache), so don't add separately
+    // First turn will be slightly underestimated, subsequent turns accurate
     const expectedPct = contextWindow > 0
       ? Math.round(((expectedTokens + bufferTokens + maxOutputTokens) / contextWindow) * 100)
       : undefined;
@@ -297,6 +319,8 @@ export class ContextGuard {
       newTokens,
       schemaTokens,
       expectedTokens,
+      reasoningTokens,
+      maxOutputTokens,
     });
 
     return {
@@ -308,7 +332,27 @@ export class ContextGuard {
       contextWindow,
       bufferTokens,
       maxOutputTokens,
+      reasoningTokens,
     };
+  }
+
+  /**
+   * Parse reasoning value to extract token count
+   */
+  private parseReasoningTokens(reasoningValue?: number | string | null): number {
+    if (reasoningValue === null || reasoningValue === undefined) {
+      return 0;
+    }
+    if (typeof reasoningValue === 'number' && Number.isFinite(reasoningValue)) {
+      return Math.max(0, Math.trunc(reasoningValue));
+    }
+    if (typeof reasoningValue === 'string') {
+      const parsed = Number(reasoningValue.trim());
+      if (Number.isFinite(parsed)) {
+        return Math.max(0, Math.trunc(parsed));
+      }
+    }
+    return 0;
   }
 
   /**
@@ -362,6 +406,22 @@ export class ContextGuard {
       },
       canExecuteTool: () => !this.toolBudgetExceeded,
     };
+  }
+
+  /**
+   * Get available token budget for schema (tools).
+   * Used to decide whether to use full tools or shrink to final-only before the request.
+   */
+  getAvailableSchemaBudget(provider: string, model: string): number {
+    const targets = this.getTargets();
+    const target = targets.find((cfg) => cfg.provider === provider && cfg.model === model) ?? targets[0];
+    const contextWindow = target.contextWindow;
+    const bufferTokens = target.bufferTokens;
+    const maxOutputTokens = this.computeMaxOutputTokens(contextWindow);
+    // Reasoning tokens are INSIDE max_output_tokens, not on top
+    const limit = Math.max(0, contextWindow - bufferTokens - maxOutputTokens);
+    const baseProjected = this.currentCtxTokens + this.pendingCtxTokens + this.newCtxTokens;
+    return Math.max(0, limit - baseProjected);
   }
 
   // ---------------------------------------------------------------------------
@@ -424,6 +484,19 @@ export class ContextGuard {
       this.currentCtxTokens += this.pendingCtxTokens;
       this.pendingCtxTokens = 0;
     }
+  }
+
+  /** Get current reasoning/thinking budget tokens */
+  getReasoningTokens(): number {
+    return this.currentReasoningTokens;
+  }
+
+  /**
+   * Set reasoning/thinking budget tokens for context evaluation.
+   * Should be called at the start of each turn with the effective reasoning value.
+   */
+  setReasoningTokens(value?: number | string | null): void {
+    this.currentReasoningTokens = this.parseReasoningTokens(value);
   }
 
   // ---------------------------------------------------------------------------

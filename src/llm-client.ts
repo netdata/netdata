@@ -577,9 +577,14 @@ export class LLMClient {
       if (metrics.expectedPct !== undefined) {
         details.context_pct = metrics.expectedPct;
       }
+      if (metrics.reasoningTokens > 0) {
+        details.reasoning_tokens = metrics.reasoningTokens;
+      }
       const percentText = metrics.expectedPct !== undefined ? `${String(metrics.expectedPct)}%` : 'n/a';
       const windowText = metrics.contextWindow !== undefined ? ` of ${String(metrics.contextWindow)}` : '';
-      message = `${baseMessage} [tokens: ctx ${String(metrics.ctxTokens)}, new ${String(metrics.newTokens)}, schema ${String(metrics.schemaTokens)}, expected ${String(metrics.expectedTokens)}, ${percentText}${windowText}]`;
+      const expectedInput = metrics.ctxTokens + metrics.newTokens;
+      // Schema is included in ctx (via cache) after first turn, so don't show separately
+      message = `${baseMessage} [ctx ${String(metrics.ctxTokens)}, new ${String(metrics.newTokens)}, expected ${String(expectedInput)} + output ${String(metrics.maxOutputTokens)} = ${percentText}${windowText}]`;
     }
     this.log('VRB', 'request', 'llm', `${request.provider}:${request.model}`, message, {
       details,
@@ -688,8 +693,10 @@ export class LLMClient {
     if (typeof outputTokens === 'number' && Number.isFinite(outputTokens)) {
       details.output_tokens = outputTokens;
     }
-    const ctxTokens = cacheRead
-      + (typeof inputTokens === 'number' && Number.isFinite(inputTokens) ? inputTokens : 0)
+    // Full context = inputTokens + cacheRead + cacheWrite + outputTokens (Anthropic formula)
+    const ctxTokens = (typeof inputTokens === 'number' && Number.isFinite(inputTokens) ? inputTokens : 0)
+      + cacheRead
+      + cacheWrite
       + (typeof outputTokens === 'number' && Number.isFinite(outputTokens) ? outputTokens : 0);
     if (ctxTokens > 0 && Number.isFinite(ctxTokens)) {
       details.ctx_tokens = ctxTokens;

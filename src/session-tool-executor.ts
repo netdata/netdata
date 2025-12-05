@@ -207,6 +207,12 @@ export class SessionToolExecutor {
             }
           );
 
+          // For batch tools, count inner non-progress tools that were invoked
+          if (isBatchTool && managed.result.length > 0) {
+            const innerToolCount = this.countBatchInnerTools(managed.result);
+            state.executedNonProgressBatchTools += innerToolCount;
+          }
+
           if (isSubAgentTool) {
             this.subAgents.addInvoked(effectiveToolName);
           }
@@ -682,6 +688,35 @@ export class SessionToolExecutor {
     } catch {
       const fallback = Object.prototype.toString.call(raw);
       return truncateUtf8WithNotice(fallback, 512);
+    }
+  }
+
+  /**
+   * Count non-progress, non-batch tools that were invoked within a batch result.
+   * Per design: any MCP/REST/Subagent tool (excluding progress and batch) that is
+   * actually invoked counts toward turn success, even if execution fails.
+   */
+  private countBatchInnerTools(batchResult: string): number {
+    try {
+      const parsed = JSON.parse(batchResult) as unknown;
+      if (parsed === null || typeof parsed !== 'object') return 0;
+      const results = Array.isArray(parsed) ? parsed : (parsed as Record<string, unknown>).results;
+      if (!Array.isArray(results)) return 0;
+
+      let count = 0;
+      // eslint-disable-next-line functional/no-loop-statements
+      for (const entry of results) {
+        if (entry === null || typeof entry !== 'object') continue;
+        const tool = (entry as Record<string, unknown>).tool;
+        if (typeof tool !== 'string') continue;
+        // Exclude progress and batch tools from count
+        const normalized = sanitizeToolName(tool);
+        if (normalized === 'agent__progress_report' || normalized === 'agent__batch') continue;
+        count += 1;
+      }
+      return count;
+    } catch {
+      return 0;
     }
   }
 }

@@ -744,6 +744,8 @@ export interface TurnRequestContextMetrics {
   contextWindow?: number;
   bufferTokens: number;
   maxOutputTokens: number;
+  /** Reasoning/thinking budget tokens (for extended thinking models) */
+  reasoningTokens: number;
 }
 
 export interface LLMProvider {

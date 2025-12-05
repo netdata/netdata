@@ -218,11 +218,8 @@ export class InternalToolProvider extends ToolProvider {
     lines.push('');
     {
       const schemaBlock = this.buildFinalReportSchemaBlock();
-      if (this.xmlSessionNonce !== undefined) {
-        lines.push(finalReportXmlInstructions(this.formatId, this.formatDescription, schemaBlock, this.xmlSessionNonce));
-      } else {
-        lines.push(finalReportXmlInstructions(this.formatId, this.formatDescription, schemaBlock));
-      }
+      // xmlSessionNonce is now always provided from ai-agent.ts
+      lines.push(finalReportXmlInstructions(this.formatId, this.formatDescription, schemaBlock, this.xmlSessionNonce));
     }
 
     // Mandatory rules section

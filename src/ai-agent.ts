@@ -84,8 +84,8 @@ export class AIAgentSession {
   private static readonly FINAL_REPORT_SHORT = 'final_report';
   private static readonly TOOL_NO_OUTPUT = '(tool failed: context window budget exceeded)';
   private static readonly RETRY_ACTION_SKIP_PROVIDER = 'skip-provider';
-  private static readonly CONTEXT_POST_SHRINK_WARN = 'Context guard post-shrink still over projected limit; continuing with forced final turn.';
-  private static readonly CONTEXT_POST_SHRINK_TURN_WARN = 'Context guard post-shrink still over projected limit during turn execution; proceeding anyway.';
+  private static readonly CONTEXT_LIMIT_WARN = 'Context limit exceeded; forcing final turn.';
+  private static readonly CONTEXT_LIMIT_TURN_WARN = 'Context limit exceeded during turn execution; proceeding with final turn.';
   readonly config: Configuration;
   readonly conversation: ConversationMessage[];
   readonly logs: LogEntry[];
@@ -580,6 +580,7 @@ export class AIAgentSession {
         expectedJsonSchema,
         disableProgressTool: !enableProgressTool,
         maxToolCallsPerTurn: resolvedMaxToolCallsPerTurn,
+        xmlSessionNonce: this.xmlTransport.getSessionNonce(),
         logError: (message: string) => {
           const entry: LogEntry = {
             timestamp: Date.now(),
@@ -1734,8 +1735,8 @@ export class AIAgentSession {
     return this.contextGuard.evaluate(extraTokens);
   }
 
-  private buildContextMetrics(provider: string, model: string): TurnRequestContextMetrics {
-    return this.contextGuard.buildMetrics(provider, model);
+  private buildContextMetrics(provider: string, model: string, reasoningValue?: number | string | null): TurnRequestContextMetrics {
+    return this.contextGuard.buildMetrics(provider, model, reasoningValue);
   }
 
 
