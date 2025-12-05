@@ -53,6 +53,9 @@
 - Ci: add concurrency to check-markdown.yml ([#21393](https://github.com/netdata/netdata/issues/21393))
 - Use systemd-tmpfiles to handle required directories at runtime when possible. ([#21243](https://github.com/netdata/netdata/issues/21243))
 - Improve check for DBENGINE max datafile size allowed ([#21390](https://github.com/netdata/netdata/issues/21390))
+- Fix shutdown timeout handling in completion wait function ([#21395](https://github.com/netdata/netdata/issues/21395))
+- Fix validation of extent index in journal file ([#21400](https://github.com/netdata/netdata/issues/21400))
+- Fix(kickstart): fix incorrect find command patterns ([#21399](https://github.com/netdata/netdata/issues/21399))
 
 ## [2.8.0] - 2025-11-19
 
