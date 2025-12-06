@@ -131,13 +131,13 @@ int format_dimension_collected_graphite_plaintext(struct instance *instance, RRD
 
     buffer_sprintf(
         instance->buffer,
-        "%s.%s.%s.%s%s " COLLECTED_NUMBER_FORMAT " %llu\n",
+        "%s.%s.%s.%s%s " NETDATA_DOUBLE_FORMAT " %llu\n",
         instance->config.prefix,
         (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         chart_name,
         dimension_name,
         (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "",
-        rd->collector.last_collected_value,
+        rrddim_last_collected_as_double(rd),
         (unsigned long long)rd->collector.last_collected_time.tv_sec);
 
     return 0;
