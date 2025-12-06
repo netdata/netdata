@@ -1115,11 +1115,11 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
   }
 
   // DRY helpers for final-turn behavior across providers
-  protected filterToolsForFinalTurn(tools: MCPTool[], isFinalTurn?: boolean): MCPTool[] {
-    if (isFinalTurn === true) {
-      return tools.filter((t) => t.name === 'agent__final_report');
-    }
-    return tools;
+  // The LLM uses XML wrapper to deliver final reports, so agent__final_report
+  // is never exposed as a callable tool. It exists in the internal list only
+  // for core's final-turn enforcement logic.
+  protected filterToolsForFinalTurn(tools: MCPTool[], _isFinalTurn?: boolean): MCPTool[] {
+    return tools.filter((t) => t.name !== 'agent__final_report');
   }
 
   protected buildFinalTurnMessages(messages: ModelMessage[], isFinalTurn?: boolean): ModelMessage[] {

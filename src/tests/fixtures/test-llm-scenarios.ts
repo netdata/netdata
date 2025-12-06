@@ -26,6 +26,7 @@ export type ScenarioStepResponse =
       reportFormat: string;
       status?: 'success' | 'failure';
       reportContentJson?: Record<string, unknown>;
+      reportMessages?: unknown[];  // For slack-block-kit: array of messages
       tokenUsage?: TokenUsage;
       reasoning?: ReasoningOutput[];
       reasoningContent?: string | ReasoningOutput | ReasoningOutput[];
@@ -2242,8 +2243,9 @@ const SCENARIOS: ScenarioDefinition[] = [
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Delivering Slack formatted summary.',
-          reportContent: `${RESULT_HEADING}*Slack* message generated for delivery.`,
+          reportContent: '*Slack* message generated for delivery.',
           reportFormat: SLACK_BLOCK_KIT_FORMAT,
+          reportMessages: [{ blocks: [{ type: 'header', text: { type: 'plain_text', text: 'Phase 1 Result' } }, { type: 'section', text: { type: 'mrkdwn', text: '*Slack* message generated for delivery.' } }] }],
           status: STATUS_SUCCESS,
           tokenUsage: DEFAULT_TOKEN_USAGE,
         },

@@ -318,10 +318,10 @@ const SESSIONS_SUBDIR = 'sessions';
 const BILLING_FILENAME = 'billing.jsonl';
 const THRESHOLD_BUFFER_TOKENS = 8;
 const THRESHOLD_MAX_OUTPUT_TOKENS = 32;
-// Prompt + instructions currently estimate to ~556 tokens (ctx + new, schema excluded from projection).
-const THRESHOLD_CONTEXT_WINDOW_BELOW = 620; // limit = 620 - 8 - 32 = 580 (> projected)
-const THRESHOLD_CONTEXT_WINDOW_EQUAL = 596; // limit = 556 (matches projected)
-const THRESHOLD_CONTEXT_WINDOW_ABOVE = 580; // limit = 540 (< projected)
+// Prompt + instructions currently estimate to ~502 tokens (ctx + new, schema excluded from projection).
+const THRESHOLD_CONTEXT_WINDOW_BELOW = 560; // limit = 560 - 8 - 32 = 520 (> projected 502)
+const THRESHOLD_CONTEXT_WINDOW_EQUAL = 542; // limit = 542 - 8 - 32 = 502 (matches projected)
+const THRESHOLD_CONTEXT_WINDOW_ABOVE = 530; // limit = 530 - 8 - 32 = 490 (< projected 502)
 const PREFLIGHT_CONTEXT_WINDOW = 80;
 const PREFLIGHT_BUFFER_TOKENS = 8;
 const PREFLIGHT_MAX_OUTPUT_TOKENS = 16;
@@ -2142,7 +2142,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         message.role === 'tool'
         && (message as { toolCallId?: string }).toolCallId === 'call-progress-guard-status');
       invariant(progressTool !== undefined, 'Progress tool response missing for context_guard__progress_passthrough.');
-      invariant(progressTool.content === '{"ok":true}', 'Progress tool output should remain intact after guard enforcement.');
+      invariant(progressTool.content === '{"status":"shown_to_user"}', 'Progress tool output should remain intact after guard enforcement.');
 
       const progressSkipLog = result.logs.find((entry) =>
         entry.type === 'tool'

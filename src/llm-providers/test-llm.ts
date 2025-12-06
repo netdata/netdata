@@ -403,16 +403,22 @@ function buildFinalReportContent(response: FinalReportStep): LanguageModelV2Cont
   if (typeof response.assistantText === 'string' && response.assistantText.trim().length > 0) {
     items.push({ type: 'text', text: response.assistantText });
   }
+  const inputPayload: Record<string, unknown> = {
+    status: response.status ?? 'success',
+    report_format: response.reportFormat,
+  };
+  // For slack-block-kit, pass messages array directly (not report_content)
+  if (response.reportMessages !== undefined) {
+    inputPayload.messages = response.reportMessages;
+  } else {
+    inputPayload.report_content = response.reportContent;
+    inputPayload.content_json = response.reportContentJson;
+  }
   items.push({
     type: 'tool-call',
     toolCallId: 'agent-final-report',
     toolName: 'agent__final_report',
-    input: JSON.stringify({
-      status: response.status ?? 'success',
-      report_format: response.reportFormat,
-      report_content: response.reportContent,
-      content_json: response.reportContentJson,
-    }),
+    input: JSON.stringify(inputPayload),
   });
   return items;
 }

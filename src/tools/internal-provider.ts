@@ -116,7 +116,10 @@ export class InternalToolProvider extends ToolProvider {
         },
       });
     }
-    // Final report is delivered via XML tags, not as a tool call
+    // Final report: included for internal filtering (final-turn enforcement).
+    // The LLM uses XML wrapper to deliver reports, but the tool must be in the list
+    // so session-turn-runner can filter to it on final turn.
+    tools.push(this.buildFinalReportTool());
     if (this.opts.enableBatch) {
       const { schemas } = this.ensureBatchSchemas();
       const fallbackItemSchema: Record<string, unknown> = {
