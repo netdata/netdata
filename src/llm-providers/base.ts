@@ -1396,12 +1396,14 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           response += part.text;
 
           // Call chunk callback for real-time text streaming
-          if (request.onChunk !== undefined) {
+          // Skip empty chunks to prevent unnecessary thinking block interruptions
+          if (request.onChunk !== undefined && part.text.length > 0) {
             request.onChunk(part.text, 'content');
           }
         } else if (part.type === 'reasoning-delta') {
           // Call chunk callback for real-time reasoning streaming
-          if (request.onChunk !== undefined) {
+          // Skip empty chunks to avoid emitting empty thinking deltas
+          if (request.onChunk !== undefined && part.text.length > 0) {
             request.onChunk(part.text, 'thinking');
           }
         } else if (part.type === 'tool-call') {
