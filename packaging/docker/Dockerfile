@@ -19,22 +19,31 @@ ARG DEBUG_BUILD
 
 ENV DEBUG_BUILD=$DEBUG_BUILD
 
+ARG BUILD_ARCH
+
+ENV BUILD_ARCH=$BUILD_ARCH
+
 # Copy source
 COPY . /opt/netdata.git
 WORKDIR /opt/netdata.git
 
 # Install from source
 RUN chmod +x netdata-installer.sh && \
-   cp -rp /deps/* /usr/local/ && \
-   /bin/echo -e "INSTALL_TYPE='oci'\nPREBUILT_ARCH='$(uname -m)'" > ./system/.install-type && \
-   CFLAGS="$(packaging/docker/gen-cflags.sh)" LDFLAGS="-Wl,--gc-sections" ./netdata-installer.sh --dont-wait --dont-start-it \
-   --use-system-protobuf \
-   --disable-ebpf \
-   --enable-plugin-otel \
-   --internal-systemd-journal \
-   ${EXTRA_INSTALL_OPTS} \
-   --install-no-prefix / \
-   "$([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)"
+    cp -rp /deps/* /usr/local/ && \
+    BUILD_ARCH="${BUILD_ARCH:-"$(uname -m)"}" && \
+    /bin/echo -e "INSTALL_TYPE='oci'\nPREBUILT_ARCH='${BUILD_ARCH}'" > ./system/.install-type && \
+    if [ "${BUILD_ARCH}" = "armv7l" ]; then \
+        NETDATA_CMAKE_OPTIONS="-DENABLE_NETDATA_JOURNAL_FILE_READER=Off" ; \
+    fi && \
+    NETDATA_BUILD_DIR=/build \
+    CFLAGS="$(packaging/docker/gen-cflags.sh)" LDFLAGS="-Wl,--gc-sections" ./netdata-installer.sh --dont-wait --dont-start-it \
+    --use-system-protobuf \
+    --disable-ebpf \
+    --enable-plugin-otel \
+    ${EXTRA_INSTALL_OPTS} \
+    --install-no-prefix / \
+    "$([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)" && \
+    rm -rf /build /root/.cargo
 
 # files to one directory
 RUN mkdir -p /app/usr/sbin/ \
@@ -134,7 +143,7 @@ RUN addgroup --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
                 slabinfo.plugin \
                 network-viewer.plugin \
                 otel-plugin \
-                systemd-journal.plugin; do \
+                journal-viewer-plugin; do \
         [ -f "/usr/libexec/netdata/plugins.d/$name" ] && chmod 4755 "/usr/libexec/netdata/plugins.d/$name"; \
     done && \
     # Group write permissions due to: https://github.com/netdata/netdata/pull/6543

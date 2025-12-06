@@ -138,15 +138,15 @@ https://github.com/netdata/netdata/edit/master/src/web/api/exporters/shell/READM
 ,,,,,
 ,,,,,
 logs_integrations,,,,,
-https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/README.md,Systemd Journal Plugin Reference,Published,Logs/Systemd Journal Logs,,View and analyze logs available in systemd journal
-https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/forward_secure_sealing.md,Forward Secure Sealing (FSS) in Systemd-Journal,Published,Logs/Systemd Journal Logs,,
+https://github.com/netdata/netdata/edit/master/docs/logs/README.md,Journal Viewer Plugin,Published,Logs/Systemd Journal Logs,,View and analyze logs available in systemd journal
+https://github.com/netdata/netdata/edit/master/docs/logs/forward_secure_sealing.md,Forward Secure Sealing (FSS) in Systemd-Journal,Published,Logs/Systemd Journal Logs,,
 https://github.com/netdata/netdata/edit/master/src/collectors/windows-events.plugin/README.md,Windows Events Plugin Reference,Published,Logs/Windows Event Logs,,
 https://github.com/netdata/netdata/edit/master/src/collectors/log2journal/README.md,log2journal,Published,Logs/log2journal,,
 https://github.com/netdata/netdata/edit/master/src/libnetdata/log/systemd-cat-native.md,systemd-cat-native,Published,Logs/systemd-cat-native,,
 https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md,Logs Centralization Points with systemd-journald,Published,Logs/Logs Centralization Points with systemd-journald,,
 https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-with-encryption-using-self-signed-certificates.md,Passive journal centralization with encryption using self-signed certificates,Published,Logs/Logs Centralization Points with systemd-journald,,
 https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-without-encryption.md,Passive journal centralization without encryption,Published,Logs/Logs Centralization Points with systemd-journald,,
-https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/active_journal_centralization_guide_no_encryption.md,Active journal source without encryption,Published,Logs/Logs Centralization Points with systemd-journald,,
+https://github.com/netdata/netdata/edit/master/docs/logs/active_journal_centralization_guide_no_encryption.md,Active journal source without encryption,Published,Logs/Logs Centralization Points with systemd-journald,,
 ,,,,,
 ,,,,,
 https://github.com/netdata/netdata/edit/master/docs/top-monitoring-netdata-functions.md,Top Consumers,Published,Top Consumers,,Present the Netdata Functions what these are and why they should be used.
