@@ -7,18 +7,18 @@
 
 typedef uint32_t UUIDMAP_ID;
 
-#define UUIDMAP_PARTITIONS 8
+#define UUIDMAP_PARTITIONS 16
 
 static inline uint8_t uuid_to_uuidmap_partition(const nd_uuid_t uuid) {
-    return uuid[15] & 0x07;  // Mask for 8 partitions (0b111)
+    return uuid[15] & 0x0F;  // Mask for 16 partitions (0b1111)
 }
 
 static inline uint8_t uuidmap_id_to_partition(UUIDMAP_ID id) {
-    return (uint8_t)(id >> 29);  // Use top 3 bits for partition
+    return (uint8_t)(id >> 28);  // Use top 4 bits for partition
 }
 
 static inline UUIDMAP_ID uuidmap_make_id(uint8_t partition, uint32_t id) {
-    return ((UUIDMAP_ID)partition << 29) | (id & 0x1FFFFFFF);  // Use bottom 29 bits for sequence
+    return ((UUIDMAP_ID)partition << 28) | (id & 0x0FFFFFFF);  // Use bottom 28 bits for sequence
 }
 
 // returns ID, or zero on error
