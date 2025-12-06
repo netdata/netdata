@@ -106,6 +106,12 @@ Another way to fetch the page data and extract the information yourself.
   - `extracted_info: "content not found"`
   - and describe the issue in `commentary` and `limitations`.
 
+- If the page loads but it does not contain exactly what needed (partial), set:
+  - `status: true`
+  - `confidence: 100`
+  - `extracted_info: "put here the information you managed to extract"`
+  - and describe the issue in `commentary` and `limitations`.
+
 ---
 
 Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
