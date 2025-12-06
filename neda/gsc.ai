@@ -15,7 +15,6 @@ models:
 tools:
   - gsc1
 #  - gsc2
-  - batch
 toolResponseMaxBytes: 100000
 maxOutputTokens: 16384
 maxTurns: 100

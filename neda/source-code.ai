@@ -11,7 +11,6 @@ models:
   - openai/gpt-5.1
 tools:
   - filesystem_repos
-  - batch
 toolResponseMaxBytes: 8192
 maxOutputTokens: 32768
 maxTurns: 50

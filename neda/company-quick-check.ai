@@ -8,7 +8,6 @@ models:
 tools:
   - jina-search
   - brave
-  - batch
 agents:
   - web-fetch.ai
 toolResponseMaxBytes: 65536
@@ -26,7 +25,7 @@ Your goal is to find information about the company the user provided:
 - Employee count
 - Primary industry
 
-Come up with 5 search queries, use the `batch` tool, get the results, and provide your findings (even if partial).
+Come up with 5 search queries, run them in parallel when helpful, get the results, and provide your findings (even if partial).
 
 ## Search Providers
 1. `brave`

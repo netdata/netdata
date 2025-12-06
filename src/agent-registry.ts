@@ -135,6 +135,8 @@ export class AgentRegistry {
   private buildSystemPrompt(agent: LoadedAgent, format: OutputFormatId, payload: Record<string, unknown>): string {
     const templ = applyFormat(agent.systemTemplate, formatPromptValue(format));
     const vars = { ...buildPromptVars() } as Record<string, string>;
+    vars.MAX_TURNS = String(agent.effective.maxTurns);
+    vars.MAX_TOOLS = String(agent.effective.maxToolCallsPerTurn);
     Object.entries(payload).forEach(([key, value]) => {
       if (typeof value !== 'string') return;
       vars[key] = value;

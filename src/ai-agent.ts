@@ -1220,7 +1220,11 @@ export class AIAgentSession {
       // Inject plain format description only where ${FORMAT} or {{FORMAT}} exists; do not prepend extra text
       const fmtDesc = this.resolvedFormatPromptValue ?? '';
       const withFormat = applyFormat(sysBody, fmtDesc);
-      const vars = { ...buildPromptVars(), MAX_TURNS: String(this.sessionConfig.maxTurns ?? 10) };
+      const vars = {
+        ...buildPromptVars(),
+        MAX_TURNS: String(this.sessionConfig.maxTurns ?? 10),
+        MAX_TOOLS: String(Math.max(1, this.sessionConfig.maxToolCallsPerTurn ?? 10))
+      };
       const systemExpanded = expandVars(withFormat, vars);
       const userExpanded = expandVars(this.sessionConfig.userPrompt, vars);
       this.resolvedUserPrompt = userExpanded;

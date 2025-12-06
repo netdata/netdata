@@ -15,7 +15,6 @@ models:
 #  - openai/gpt-5.1
 tools:
   - openapi:encharge
-  - batch
 toolResponseMaxBytes: 20000
 maxOutputTokens: 16384
 maxTurns: 100

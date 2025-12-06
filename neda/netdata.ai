@@ -14,7 +14,6 @@ tools:
 #  - netdata_costa
   - netdata_production
 #  - netdata_demos
-  - batch
 toolResponseMaxBytes: 32768
 maxOutputTokens: 16384
 maxTurns: 40

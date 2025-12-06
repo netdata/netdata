@@ -14,7 +14,6 @@ models:
   - openai/gpt-5.1
 tools:
   - posthog-query
-  - batch
 toolResponseMaxBytes: 65536
 maxOutputTokens: 16384
 maxTurns: 30

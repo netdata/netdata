@@ -15,7 +15,6 @@ models:
 #  - openai/gpt-5.1
 tools:
   - bigquery
-  - batch
 toolResponseMaxBytes: 16384
 maxOutputTokens: 16384
 maxTurns: 50

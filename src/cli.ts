@@ -1762,7 +1762,7 @@ program
       const fmtRaw: unknown = (() => { const rec: Record<string, unknown> = options; return Object.prototype.hasOwnProperty.call(rec, 'format') ? (rec as { format?: unknown }).format : undefined; })();
       const fmtOpt = typeof fmtRaw === 'string' && fmtRaw.length > 0 ? fmtRaw : undefined;
       const chosenFormatId = resolveFormatIdForCli(fmtOpt, expectedJson, process.stdout.isTTY ? true : false);
-      const vars = buildPromptVariables(loaded.effective.maxTurns);
+      const vars = buildPromptVariables(loaded.effective.maxTurns, loaded.effective.maxToolCallsPerTurn);
       vars.FORMAT = formatPromptValue(chosenFormatId);
       const resolvedSystem = expandPrompt(stripFrontmatter(resolvedSystemRaw), vars);
       const resolvedUser = expandPrompt(stripFrontmatter(resolvedUserRaw), vars);
@@ -1967,7 +1967,7 @@ async function readPrompt(value: string): Promise<string> {
   return value;
 }
 
-function buildPromptVariables(maxTurns: number): Record<string, string> {
+function buildPromptVariables(maxTurns: number, maxTools: number): Record<string, string> {
   function pad2(n: number): string { return n < 10 ? `0${String(n)}` : String(n); }
   function formatRFC3339Local(d: Date): string {
     const y = d.getFullYear();
@@ -2002,6 +2002,7 @@ function buildPromptVariables(maxTurns: number): Record<string, string> {
     DAY: now.toLocaleDateString(undefined, { weekday: 'long' }),
     TIMEZONE: detectTimezone(),
     MAX_TURNS: String(maxTurns),
+    MAX_TOOLS: String(maxTools),
     OS: detectOS(),
     ARCH: process.arch,
     KERNEL: `${os.type()} ${os.release()}`,

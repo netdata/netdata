@@ -15,7 +15,6 @@ models:
 tools:
   - cloudflare-graphql
   - cloudflare-radar
-  - batch
 toolResponseMaxBytes: 100000
 maxOutputTokens: 16384
 maxTurns: 100

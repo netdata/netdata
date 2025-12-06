@@ -7,7 +7,6 @@ models:
   - anthropic/claude-sonnet-4-5
 tools:
   - intercom
-  - batch
 toolResponseMaxBytes: 100000
 maxOutputTokens: 8192
 maxTurns: 30

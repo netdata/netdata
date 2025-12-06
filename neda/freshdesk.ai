@@ -9,7 +9,6 @@ models:
   - anthropic/claude-sonnet-4-5
 tools:
   - freshdesk
-  - batch
 toolResponseMaxBytes: 20000
 maxOutputTokens: 16384
 maxTurns: 30

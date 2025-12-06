@@ -135,6 +135,7 @@ You synthesize research data into concise briefs. Answer in ${FORMAT}.
 | `${DAY}` | Local weekday name (e.g., “Friday”). | `buildPromptVars()`
 | `${TIMEZONE}` | Olson timezone ID (`America/Los_Angeles` fallback `TZ`/`UTC`). | `buildPromptVars()`
 | `${MAX_TURNS}` | Effective `maxTurns` after overrides. | Injected in `AIAgentSession`
+| `${MAX_TOOLS}` | Effective `maxToolCallsPerTurn` after overrides (>=1). | Injected in `AIAgentSession`
 | `${FORMAT}` / `{{FORMAT}}` | Target output instructions (“Markdown with tables”, “JSON matching schema X”). | `applyFormat()`
 
 - **CLI inline prompt placeholders** (`ai-agent "sys" "user"` mode only): same as above **plus** the host metadata shown below (see `buildPromptVariables` in `src/cli.ts`). These extras are *not* injected when running `.ai` files via headends.
@@ -154,10 +155,12 @@ You synthesize research data into concise briefs. Answer in ${FORMAT}.
   ## Operating Context
   - Today is ${DAY} (${DATETIME} in ${TIMEZONE}).
   - You have up to ${MAX_TURNS} tool turns; prioritize the highest-signal tools.
+  - Per turn you can make up to ${MAX_TOOLS} tool calls; parallelize when useful.
   - Deliver the final response in ${FORMAT}.
   ```
 - **Best practices**:
   - Always mention `${MAX_TURNS}` so sub-agents understand remaining budget.
+  - Use `${MAX_TOOLS}` instead of hardcoding per-turn tool limits in prompts.
   - Keep include files small and composable; avoid bringing in secrets.
   - Prefer `${FORMAT}` over hard-coding “Answer in Markdown” so headends remain authoritative.
 

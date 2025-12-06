@@ -7,7 +7,6 @@ models:
   - anthropic/claude-haiku-4-5
 tools:
   - github
-  - batch
 toolResponseMaxBytes: 65536
 maxOutputTokens: 32768
 maxTurns: 30

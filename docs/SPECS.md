@@ -257,6 +257,7 @@ Supported variables:
 - `DAY`: Weekday name, e.g. `Monday`.
 - `TIMEZONE`: IANA time zone when available (e.g. `Europe/Athens`), else `TZ` env or `UTC`.
 - `MAX_TURNS`: The configured maximum tool turns for the agent loop.
+- `MAX_TOOLS`: The configured maximum tool calls per turn (after overrides), minimum 1.
 - `OS`: Operating system name. On Linux, uses `/etc/os-release` PRETTY_NAME if available (e.g. `Ubuntu 24.04.1 LTS`) and appends kernel (e.g. `(kernel 6.8.0-41-generic)`). Otherwise falls back to `os.type() os.release()`.
 - `ARCH`: CPU architecture, e.g. `x64`, `arm64`.
 - `KERNEL`: Kernel string as `os.type() os.release()`, e.g. `Linux 6.8.0-41-generic`.
@@ -268,7 +269,6 @@ Notes:
 
 - Unknown variables are left unchanged in the prompt.
 - Substitutions occur after reading prompts from `@file` or stdin and before appending tools' instructions.
-- `MAX_TOOLS` is intentionally not provided at this time (no app-level cap on tools per turn).
 
 ## Core Requirements
 

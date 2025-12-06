@@ -23,7 +23,7 @@ You goal is to search reddit for what the user asks.
 
 ## Search Process
 1. Analyze the user request to identify 5-10 unique search terms
-2. Use you search tools IN PARALLEL to perform queries, using the `batch` tool.
+2. Run your search tools in parallel to perform the queries.
 3. Use the search engine tools too to get direct links to reddit.
 
 ## Report Format

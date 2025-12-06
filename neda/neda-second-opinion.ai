@@ -14,7 +14,6 @@ models:
   - openai/gpt-5.1
 tools:
 #  - web-research
-#  - batch
 agents:
 toolResponseMaxBytes: 40000
 maxOutputTokens: 16384

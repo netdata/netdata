@@ -168,7 +168,7 @@ export const TURN_FAILED_PROGRESS_ONLY =
  * NOTE: Reasoning-only responses skip this check (hasReasoning === true bypasses)
  */
 export const EMPTY_RESPONSE_RETRY_NOTICE =
-  'System notice: No progress made in this turn: no tools called and no final report/answer provided. To progress you MUST call tools or provide your final report/answer. Review carefully the provided instructions and tools (if any), decide your next action(s), and follow the instructions precisely to progress. If you believe you called tools or provided a final report, it did not work: ensure the tool calls and final report are correctly formatted as per the instructions. Try again NOW.';
+  'System notice: No progress made in this turn: no tools called and no final report/answer provided. To advance you MUST call tools or provide your final report/answer. Review carefully the provided instructions and tools (if any), decide your next action(s), and follow the instructions precisely to continue. If you believe you called tools or provided a final report, it did not work: ensure the tool calls and final report are correctly formatted as per the instructions. Try again NOW.';
 
 // =============================================================================
 // FINAL REPORT REMINDER
@@ -377,7 +377,7 @@ export const renderXmlNextTemplate = (payload: XmlNextTemplatePayload): string =
   // Guidance based on tool availability
   if (hasExternalTools) {
     lines.push('You now need to decide your next move:');
-    lines.push('1. Call tools to progress your task (pay attention to their formatting and schema requirements).');
+    lines.push('1. Call tools to advance your task (pay attention to their formatting and schema requirements).');
     lines.push(`2. Provide your final report/answer in the expected format (${expectedFinalFormat}) using the XML wrapper (\`<ai-agent-${finalSlotId} format="${expectedFinalFormat}">\`)`);
   } else {
     lines.push(`You MUST now provide your final report/answer in the expected format (${expectedFinalFormat}) using the XML wrapper (\`<ai-agent-${finalSlotId} format="${expectedFinalFormat}">\`).`);

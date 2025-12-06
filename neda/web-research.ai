@@ -10,7 +10,6 @@ models:
 #  - openrouter/openai/gpt-oss-120b
 #  - openrouter/openai/gpt-oss-20b
 tools:
-  - batch
 agents:
   - web-search.ai
   - web-fetch.ai

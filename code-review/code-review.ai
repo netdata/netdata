@@ -16,7 +16,6 @@ agents:
   - code-review-production.ai
 
 tools:
-  - batch
 
 maxTurns: 10
 temperature: 0.3
@@ -39,7 +38,7 @@ You are a member of a team of 8 AI core reviewers:
 Follow this process:
 
 1. Call the `code-review-discovery` agent, passing to it the user request.
-2. Once you have the discovery report, call in parallel the following agents (code reviewers), using the `batch` tool:
+2. Once you have the discovery report, call the following agents in parallel in the same turn when possible:
    - `code-review-tests`
    - `code-review-architecture`
    - `code-review-quality`

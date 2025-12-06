@@ -10,7 +10,6 @@ agents:
   - web-research.ai
   - source-code.ai
 tools:
-  - batch
 maxTurns: 10
 toolResponseMaxBytes: 80000
 maxOutputTokens: 32000

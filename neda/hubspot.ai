@@ -6,7 +6,6 @@ models:
   - anthropic/claude-sonnet-4-5
 tools:
   - hubspot
-  - batch
 toolResponseMaxBytes: 100000
 maxOutputTokens: 16384
 maxTurns: 30
@@ -344,7 +343,7 @@ Look for /spaces/ URLs with recent timestamps
 ## PERFORMANCE METRICS
 
 ### SUCCESS CRITERIA:
-- Complete discovery in <10 turns (use batch tool)
+- Complete discovery within ${MAX_TURNS} turns; parallelize calls when helpful
 - Identify all active users
 - Find all Netdata spaces
 - Retrieve recent communications, meetings, web visits
@@ -397,5 +396,3 @@ All above plus:
 
 Output Format: ${FORMAT}
 Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
-
-

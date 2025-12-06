@@ -7,7 +7,6 @@ models:
   - openai/gpt-5.1
 tools:
   - ask-netdata
-  - batch
 agents:
   - company-quick-check.ai
   - company.ai
