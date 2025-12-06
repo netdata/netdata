@@ -13,7 +13,7 @@ tools:
   - reddit
 agents: []
 toolResponseMaxBytes: 300000
-maxOutputTokens: 8192
+maxOutputTokens: 16384
 maxTurns: 10
 maxToolCallsPerTurn: 10
 reasoning: none

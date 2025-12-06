@@ -251,7 +251,7 @@ export function resolveEffectiveOptions(args: {
       return v !== null ? Math.trunc(v) : null;
     })(),
     maxOutputTokens: ((): number | undefined => {
-      const v = readNum('maxOutputTokens', (fm as { maxOutputTokens?: number } | undefined)?.maxOutputTokens, 4096);
+      const v = readNum('maxOutputTokens', (fm as { maxOutputTokens?: number } | undefined)?.maxOutputTokens, 16384);
       return Number.isNaN(v) ? undefined : Math.trunc(v);
     })(),
     repeatPenalty: readNullableNum('repeatPenalty', (fm as { repeatPenalty?: number | null } | undefined)?.repeatPenalty, null),

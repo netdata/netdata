@@ -38,7 +38,7 @@ llmTimeout: 60000
 toolTimeout: 30000
 temperature: 0.7
 topP: 0.9
-maxOutputTokens: 4096
+maxOutputTokens: 16384
 repeatPenalty: 1.0
 toolResponseMaxBytes: 100000
 reasoning: medium

@@ -70,7 +70,7 @@
 | `toolTimeout` | ms | `300000` | Per tool call timeout. |
 | `temperature` | number | `0.7` | Clamped `0-2`. |
 | `topP` | number | `1.0` | `0-1`. |
-| `maxOutputTokens` | int | `4096` | `undefined` disables explicit cap. |
+| `maxOutputTokens` | int | `16384` | `undefined` disables explicit cap. |
 | `repeatPenalty` | number | `1.1` | >=0. |
 | `toolResponseMaxBytes` | bytes | `12288` | Over-limit responses are truncated. |
 | `stream` | boolean | `false` | CLI default is streaming off; headends opt-in. |
@@ -529,7 +529,7 @@ Values can be strings (Anthropic effort labels) or integers (token budgets). Use
 | --- | --- |
 | `temperature` | `0.7` |
 | `topP` | `1.0` |
-| `maxOutputTokens` | `4096` |
+| `maxOutputTokens` | `16384` |
 | `repeatPenalty` | `1.1` |
 | `llmTimeout` | `600000` ms |
 | `toolTimeout` | `300000` ms |

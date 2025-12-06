@@ -11,7 +11,7 @@ tools:
 agents:
   - web-fetch.ai
 toolResponseMaxBytes: 65536
-maxOutputTokens: 4096
+maxOutputTokens: 16384
 maxTurns: 3
 maxToolCallsPerTurn: 10
 caching: none

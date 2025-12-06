@@ -177,8 +177,8 @@ effectiveLimit = contextWindow - bufferTokens - maxOutputTokens;
 **Example**:
 - contextWindow: 128000
 - bufferTokens: 256
-- maxOutputTokens: 4096
-- effectiveLimit: 123648
+- maxOutputTokens: 16384
+- effectiveLimit: 111360
 
 ## Guard Triggers
 
