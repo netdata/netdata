@@ -18,6 +18,8 @@ SCRIPT_SOURCE="$(
 )"
 SOURCE_DIR="$(dirname "$(dirname "${SCRIPT_SOURCE}")")"
 
+. /etc/os-release
+
 CMAKE_ARGS="-S ${SOURCE_DIR} -B ${BUILD_DIR}"
 
 add_cmake_option() {
@@ -46,7 +48,6 @@ add_cmake_option ENABLE_PLUGIN_SYSTEMD_JOURNAL On
 add_cmake_option ENABLE_PLUGIN_SYSTEMD_UNITS On
 
 add_cmake_option ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE On
-add_cmake_option ENABLE_EXPORTER_MONGODB On
 
 add_cmake_option ENABLE_BUNDLED_PROTOBUF Off
 add_cmake_option ENABLE_BUNDLED_JSONC Off
@@ -80,6 +81,15 @@ case "${PKG_TYPE}" in
                 add_cmake_option ENABLE_PLUGIN_IBM Off
                 ;;
         esac
+
+        if [ "${ID}" = "ubuntu" ]; then
+            case "${VERSION_ID}" in
+                20.04|22.04|24.04) add_cmake_option ENABLE_EXPORTER_MONGODB Off ;;
+                *) add_cmake_option ENABLE_EXPORTER_MONGODB On ;;
+            esac
+        else
+            add_cmake_option ENABLE_EXPORTER_MONGODB On
+        fi
         ;;
     RPM) ;;
     *) echo "Unrecognized package type ${PKG_TYPE}." ; exit 1 ;;

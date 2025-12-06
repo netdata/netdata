@@ -67,6 +67,7 @@ func New() *Collector {
 		charts:            &module.Charts{},
 		seenScalarMetrics: make(map[string]bool),
 		seenTableMetrics:  make(map[string]bool),
+		seenProfiles:      make(map[string]bool),
 
 		newProber:     ping.NewProber,
 		newSnmpClient: gosnmp.NewHandler,
@@ -86,6 +87,7 @@ type (
 		charts            *module.Charts
 		seenScalarMetrics map[string]bool
 		seenTableMetrics  map[string]bool
+		seenProfiles      map[string]bool
 
 		prober    ping.Prober
 		newProber func(ping.ProberConfig, *logger.Logger) ping.Prober
