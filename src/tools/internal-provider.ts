@@ -41,7 +41,7 @@ interface InternalToolProviderOptions {
   getCurrentTurn: () => number;
   toolTimeoutMs?: number;
   disableProgressTool?: boolean;
-  xmlSessionNonce?: string;  // For xml-final mode: the session-wide nonce for final report tag
+  xmlSessionNonce: string;  // Session-wide nonce for final report XML wrapper
 }
 
 const PROGRESS_TOOL = 'agent__progress_report';
@@ -75,7 +75,7 @@ export class InternalToolProvider extends ToolProvider {
   private instructions: string;
   private cachedBatchSchemas?: { schemas: Record<string, unknown>[]; summaries: { name: string; required: string[] }[] };
   private readonly disableProgressTool: boolean;
-  private readonly xmlSessionNonce?: string;
+  private readonly xmlSessionNonce: string;
 
   constructor(
     public readonly namespace: string,
@@ -431,7 +431,7 @@ export class InternalToolProvider extends ToolProvider {
     if (name === 'agent__progress_report') {
       const progress = typeof (parameters.progress) === 'string' ? parameters.progress : '';
       this.opts.updateStatus(progress);
-      return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
+      return { ok: true, result: JSON.stringify({ status: 'shown_to_user' }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
     }
     if (name === 'agent__final_report') {
       const requestedFormat = typeof parameters.report_format === 'string' ? parameters.report_format : (typeof parameters.format === 'string' ? parameters.format : undefined);

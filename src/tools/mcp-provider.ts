@@ -1214,11 +1214,13 @@ export class MCPProvider extends ToolProvider {
       const ns = this.sanitizeNamespace(serverKey);
       const blocks: string[] = [];
       const displayName = server.name || serverKey;
-      blocks.push(`#### MCP Server: ${displayName}`);
+      blocks.push(`#### ${displayName}`);
+      let hasInstructions = false;
       if (typeof server.instructions === 'string') {
         const trimmedServer = server.instructions.trim();
         if (trimmedServer.length > 0) {
           blocks.push(trimmedServer);
+          hasInstructions = true;
         }
       }
       server.tools.forEach((tool) => {
@@ -1226,13 +1228,13 @@ export class MCPProvider extends ToolProvider {
         const trimmedTool = tool.instructions.trim();
         if (trimmedTool.length === 0) return;
         const exposed = `${ns}__${tool.name}`;
-        blocks.push(`##### Tool: ${exposed}
-${trimmedTool}`);
+        blocks.push(`${exposed}: ${trimmedTool}`);
+        hasInstructions = true;
       });
-      const nonEmpty = blocks.filter((block) => block.trim().length > 0);
-      if (nonEmpty.length > 0) {
-        segments.push(nonEmpty.join('\n\n'));
+      if (!hasInstructions) {
+        blocks.push('No specific instructions for this tool provider, use the tool schemas to derive usage.');
       }
+      segments.push(blocks.join('\n\n'));
     });
     return segments.join('\n\n');
   }

@@ -74,6 +74,10 @@ describe('XML streaming parser', () => {
       progressSlot: undefined,
       expectedFinalFormat: 'markdown',
       finalSchema: undefined,
+      attempt: 1,
+      maxRetries: 3,
+      contextPercentUsed: 12,
+      hasExternalTools: true,
     });
     // xml-final: XML-NEXT describes the final-report tag with nonce and omits non-final tool schemas
     expect(xml).toContain(`${NONCE}-FINAL`);

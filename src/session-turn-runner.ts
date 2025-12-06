@@ -11,7 +11,7 @@
  */
 import crypto from 'node:crypto';
 
-import type { ContextGuard, ContextGuardBlockedEntry, ContextGuardEvaluation } from './context-guard.js';
+import type { ContextGuardBlockedEntry, ContextGuardEvaluation } from './context-guard.js';
 import type { FinalReportManager, FinalReportSource, PendingFinalReportPayload } from './final-report-manager.js';
 import type { OutputFormatId } from './formats.js';
 import type { LLMClient } from './llm-client.js';
@@ -24,6 +24,7 @@ import type { ToolsOrchestrator } from './tools/tools.js';
 import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, CallbackMeta, Configuration, ConversationMessage, LogDetailValue, LogEntry, MCPTool, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, ToolCall, TurnResult, TurnRetryDirective, TurnStatus } from './types.js';
 import type { XmlToolTransport } from './xml-transport.js';
 
+import { ContextGuard } from './context-guard.js';
 import { FINAL_REPORT_FORMAT_VALUES } from './final-report-manager.js';
 import {
   CONTENT_GUIDANCE_JSON,
@@ -34,11 +35,12 @@ import {
   FINAL_REPORT_JSON_REQUIRED,
   FINAL_REPORT_SLACK_MESSAGES_MISSING,
   TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT,
+  TURN_FAILED_PROGRESS_ONLY,
   FINAL_TURN_NOTICE,
   MAX_TURNS_FINAL_MESSAGE,
   TOOL_CALL_MALFORMED,
   TOOL_NO_OUTPUT,
-  emptyResponseRetryNotice,
+  EMPTY_RESPONSE_RETRY_NOTICE,
   finalReportFormatMismatch,
   finalReportReminder,
   toolReminderMessage,
@@ -74,7 +76,7 @@ export interface TurnRunnerContext {
   readonly opTree: SessionTreeBuilder;
   readonly progressReporter: SessionProgressReporter;
   readonly sessionExecutor: SessionToolExecutor;
-  readonly xmlTransport?: XmlToolTransport;
+  readonly xmlTransport: XmlToolTransport;
   readonly subAgents?: SubAgentRegistry;
   readonly resolvedFormat?: OutputFormatId;
   readonly resolvedFormatPromptValue?: string;
@@ -261,9 +263,7 @@ export class TurnRunner {
             if (this.ctx.stopRef?.stopping === true) {
                 return this.finalizeGracefulStopSession(conversation, logs, accounting);
             }
-            if (this.ctx.xmlTransport !== undefined) {
-                this.ctx.xmlTransport.beginTurn();
-            }
+            this.ctx.xmlTransport.beginTurn();
             this.state.turnFailureReasons = [];
             this.state.currentTurn = currentTurn;
             this.callbacks.setCurrentTurn(currentTurn);
@@ -482,28 +482,37 @@ export class TurnRunner {
                         attemptConversation.push({ role: 'user', content: feedback });
                         this.state.turnFailureReasons = [];
                     }
-                    if (this.ctx.xmlTransport !== undefined) {
-                        const allTools = this.ctx.toolsOrchestrator?.listTools() ?? [];
-                        const xmlResult = this.ctx.xmlTransport.buildMessages({
-                            turn: currentTurn,
-                            maxTurns,
-                            tools: allTools,
-                            maxToolCallsPerTurn: Math.max(1, this.ctx.sessionConfig.maxToolCallsPerTurn ?? 10),
-                            progressToolEnabled: this.ctx.progressToolEnabled,
-                            finalReportToolName: FINAL_REPORT_TOOL,
-                            resolvedFormat: this.ctx.resolvedFormat,
-                            expectedJsonSchema: this.ctx.expectedJsonSchema,
-                        });
-                        if (xmlResult.pastMessage !== undefined)
-                            attemptConversation.push(xmlResult.pastMessage);
-                        attemptConversation.push(xmlResult.nextMessage);
-                    }
+                    const allTools = this.ctx.toolsOrchestrator?.listTools() ?? [];
+                    // Calculate context window usage percentage
+                    const ctxGuard = this.ctx.contextGuard;
+                    const currentTokens = ctxGuard.getCurrentTokens();
+                    const pendingTokens = ctxGuard.getPendingTokens();
+                    const newTokens = ctxGuard.getNewTokens();
+                    const contextWindow = ctxGuard.getTargets()[0]?.contextWindow ?? ContextGuard.DEFAULT_CONTEXT_WINDOW_TOKENS;
+                    const contextPercentUsed = Math.min(100, Math.round((currentTokens + pendingTokens + newTokens) * 100 / contextWindow));
+
+                    const xmlResult = this.ctx.xmlTransport.buildMessages({
+                        turn: currentTurn,
+                        maxTurns,
+                        tools: allTools,
+                        maxToolCallsPerTurn: Math.max(1, this.ctx.sessionConfig.maxToolCallsPerTurn ?? 10),
+                        progressToolEnabled: this.ctx.progressToolEnabled,
+                        finalReportToolName: FINAL_REPORT_TOOL,
+                        resolvedFormat: this.ctx.resolvedFormat,
+                        expectedJsonSchema: this.ctx.expectedJsonSchema,
+                        attempt: attempts + 1,  // attempts is 0-based, but we want 1-based for display
+                        maxRetries,
+                        contextPercentUsed,
+                    });
+                    if (xmlResult.pastMessage !== undefined)
+                        attemptConversation.push(xmlResult.pastMessage);
+                    attemptConversation.push(xmlResult.nextMessage);
                     // On the last allowed attempt within this turn, nudge the model to use tools
                     if ((attempts === maxRetries - 1) && currentTurn < (maxTurns - 1)) {
                         const excludeProgress = this.ctx.progressToolEnabled ? ' (excluding `agent__progress_report`)' : '';
                         attemptConversation.push({
                             role: 'user',
-                            content: toolReminderMessage(excludeProgress, FINAL_REPORT_TOOL)
+                            content: toolReminderMessage(excludeProgress)
                         });
                     }
                     // Force the final-report instruction onto the conversation once we enter the last turn
@@ -1279,7 +1288,7 @@ export class TurnRunner {
                                 maxRateLimitWaitMs = 0;
                             }
                             // CONTRACT: Only inject ephemeral retry message, do NOT add empty response
-                            this.pushSystemRetryMessage(conversation, emptyResponseRetryNotice(FINAL_REPORT_TOOL));
+                            this.pushSystemRetryMessage(conversation, EMPTY_RESPONSE_RETRY_NOTICE);
                             // do not mark turnSuccessful; continue retry loop
                             continue;
                         }
@@ -1376,7 +1385,14 @@ export class TurnRunner {
                             continue;
                         }
                         // Non-final turns: require non-progress tools for success
-                        lastError = 'invalid_response: no_tools';
+                        const hasProgressOnly = executionStats.executedProgressBatchTools > 0 && executionStats.executedNonProgressBatchTools === 0;
+                        if (hasProgressOnly) {
+                            lastError = 'invalid_response: progress_report_only';
+                            this.addTurnFailure(TURN_FAILED_PROGRESS_ONLY);
+                        } else {
+                            lastError = 'invalid_response: no_tools';
+                            this.addTurnFailure(TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT);
+                        }
                         lastErrorType = 'invalid_response';
                         logAttemptFailure();
                         continue;
@@ -1891,11 +1907,13 @@ export class TurnRunner {
     if (this.forcedFinalTurnReason === 'context') slugs.add('context_guard');
     const stats = lastTurnResult?.executionStats ?? { executedTools: 0, executedNonProgressBatchTools: 0, executedProgressBatchTools: 0, unknownToolEncountered: false };
     const hasNonProgressTools = stats.executedNonProgressBatchTools > 0;
+    const hasProgressOnly = stats.executedProgressBatchTools > 0 && stats.executedNonProgressBatchTools === 0;
     const hadToolCalls = (lastTurnResult?.messages ?? []).some((m) => {
         const toolCalls = (m as { toolCalls?: unknown }).toolCalls;
         return Array.isArray(toolCalls) && toolCalls.length > 0;
     });
-    if (!hasNonProgressTools) slugs.add('no_tools');
+    if (hasProgressOnly) slugs.add('progress_report_only');
+    else if (!hasNonProgressTools) slugs.add('no_tools');
     if (this.finalReport === undefined) slugs.add('final_report_missing');
     const responseText = typeof lastTurnResult?.response === 'string' ? lastTurnResult.response.trim() : '';
     if (responseText.length === 0) slugs.add('empty_response');
@@ -2391,7 +2409,7 @@ export class TurnRunner {
                 return CONTENT_GUIDANCE_SLACK;
             return CONTENT_GUIDANCE_TEXT;
         })();
-        return finalReportReminder(FINAL_REPORT_TOOL, format, formatDescription, contentGuidance);
+        return finalReportReminder(format, formatDescription, contentGuidance);
     }
     private buildFallbackRetryDirective(input: { status: TurnStatus; remoteId: string; attempt: number }): TurnRetryDirective | undefined {
         const { status, remoteId, attempt } = input;
@@ -2537,7 +2555,7 @@ export class TurnRunner {
             let rawToolCalls = msg.toolCalls;
             let parsedToolCalls;
             // XML transport parsing
-            if (this.ctx.xmlTransport !== undefined && msg.role === 'assistant' && typeof msg.content === 'string') {
+            if (msg.role === 'assistant' && typeof msg.content === 'string') {
                 const parseResult = this.ctx.xmlTransport.parseAssistantMessage(msg.content, { turn: context.turn, resolvedFormat: this.ctx.resolvedFormat, stopReason: context.stopReason }, {
                     onTurnFailure: (reason) => { this.addTurnFailure(reason); },
                     onLog: (entry) => {
@@ -2952,11 +2970,9 @@ export class TurnRunner {
         }
         const llmTools = toolsForTurn;
         let xmlFilter: XmlFinalReportFilter | undefined;
-        if (this.ctx.xmlTransport !== undefined) {
-            const nonce = this.ctx.xmlTransport.getNonce();
-            if (nonce !== undefined) {
-                xmlFilter = new XmlFinalReportFilter(nonce);
-            }
+        const nonce = this.ctx.xmlTransport.getNonce();
+        if (nonce !== undefined) {
+            xmlFilter = new XmlFinalReportFilter(nonce);
         }
         // Reset streaming flag for this attempt
         this.finalReportStreamed = false;

@@ -58,6 +58,11 @@ export interface XmlBuildMessagesConfig {
   finalReportToolName: string;
   resolvedFormat: OutputFormatId | undefined;
   expectedJsonSchema: Record<string, unknown> | undefined;
+  // Retry info
+  attempt: number;
+  maxRetries: number;
+  // Context window info (for percentage calculation)
+  contextPercentUsed: number;
 }
 
 // Result from building messages
@@ -159,6 +164,9 @@ export class XmlToolTransport {
     const finalSlotId = `${nonce}-FINAL`;
     const slotTemplates: XmlSlotTemplate[] = [{ slotId: finalSlotId, tools: [finalReportToolName] }];
 
+    // Determine if external tools are available (exclude internal agent__ tools)
+    const hasExternalTools = config.tools.some(t => !t.name.startsWith('agent__'));
+
     const nextContent = renderXmlNext({
       nonce,
       turn: config.turn,
@@ -168,6 +176,10 @@ export class XmlToolTransport {
       progressSlot: undefined,
       expectedFinalFormat: (config.resolvedFormat ?? 'markdown') as XmlNextPayload['expectedFinalFormat'],
       finalSchema: config.resolvedFormat === 'json' ? config.expectedJsonSchema : undefined,
+      attempt: config.attempt,
+      maxRetries: config.maxRetries,
+      contextPercentUsed: config.contextPercentUsed,
+      hasExternalTools,
     });
 
     const nextMessage: ConversationMessage = {
@@ -222,9 +234,7 @@ export class XmlToolTransport {
     const afterOpenTag = content.slice(openTagIdx);
     const openTagEndMatch = /^<ai-agent-[A-Za-z0-9\-]+[^>]*>/.exec(afterOpenTag);
     if (openTagEndMatch === null) return undefined; // Incomplete opening tag
-
-    // Check if this is actually a final report tool
-    if (!afterOpenTag.includes('tool="agent__final_report"')) return undefined;
+    // Tag name already identifies final report via -FINAL suffix, no need for tool attribute
 
     // Extract content after the opening tag
     const contentStart = openTagIdx + openTagEndMatch[0].length;

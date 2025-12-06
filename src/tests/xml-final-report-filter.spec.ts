@@ -4,7 +4,7 @@ import { XmlFinalReportFilter } from '../xml-transport.js';
 
 describe('XmlFinalReportFilter', () => {
   const nonce = 'af834d4d';
-  const openTag = `<ai-agent-${nonce}-FINAL tool="agent__final_report" format="markdown">`;
+  const openTag = `<ai-agent-${nonce}-FINAL format="markdown">`;
   const closeTag = `</ai-agent-${nonce}-FINAL>`;
 
   it('passes through content when no tags are present', () => {

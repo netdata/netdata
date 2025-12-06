@@ -33,6 +33,9 @@ describe('XmlToolTransport', () => {
       finalReportToolName: 'agent__final_report',
       resolvedFormat: 'markdown',
       expectedJsonSchema: undefined,
+      attempt: 1,
+      maxRetries: 3,
+      contextPercentUsed: 10,
     });
 
     expect(first.nonce).toBe(NONCE);
@@ -54,6 +57,9 @@ describe('XmlToolTransport', () => {
       finalReportToolName: 'agent__final_report',
       resolvedFormat: 'markdown',
       expectedJsonSchema: undefined,
+      attempt: 1,
+      maxRetries: 3,
+      contextPercentUsed: 15,
     });
 
     expect(second.pastMessage).toBeUndefined();
@@ -72,6 +78,9 @@ describe('XmlToolTransport', () => {
       finalReportToolName: 'agent__final_report',
       resolvedFormat: undefined,
       expectedJsonSchema: undefined,
+      attempt: 1,
+      maxRetries: 3,
+      contextPercentUsed: 5,
     });
 
     const slotId = build.slotTemplates[0].slotId;
@@ -102,6 +111,9 @@ describe('XmlToolTransport', () => {
       finalReportToolName: 'agent__final_report',
       resolvedFormat: 'json',
       expectedJsonSchema: { type: 'object' },
+      attempt: 1,
+      maxRetries: 3,
+      contextPercentUsed: 8,
     });
 
     const finalSlot = build.slotTemplates.find((s) => s.slotId.endsWith('FINAL'))?.slotId ?? `${NONCE}-FINAL`;
@@ -109,7 +121,7 @@ describe('XmlToolTransport', () => {
     const onLog = vi.fn();
 
     const parse = transport.parseAssistantMessage(
-      `<ai-agent-${finalSlot} tool="agent__final_report">not-json</ai-agent-${finalSlot}>`,
+      `<ai-agent-${finalSlot} format="json">not-json</ai-agent-${finalSlot}>`,
       { turn: 1, resolvedFormat: 'json' },
       { onTurnFailure: onFailure, onLog }
     );

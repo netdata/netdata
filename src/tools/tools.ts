@@ -1055,7 +1055,7 @@ export class ToolsOrchestrator {
   }
 
   // Aggregate instructions across providers
-  // Structure: external tools (if any) get "AVAILABLE TOOLS" header; internal instructions lead with final report format
+  // Order: internal (final report + internal tools) first, then external tool providers
   getCombinedInstructions(): string {
     const external: string[] = [];
     let internal: string | undefined;
@@ -1077,15 +1077,14 @@ export class ToolsOrchestrator {
       return '';
     }
     const sections: string[] = [];
-    // Only add "AVAILABLE TOOLS" header if there are external tools (MCP, REST, etc.)
-    // Internal instructions now lead with final report format, not tool listings
-    if (external.length > 0) {
-      sections.push('## AVAILABLE TOOLS');
-      sections.push('### External Tools');
-      sections.push(external.join('\n\n'));
-    }
+    // Internal instructions first (final report format + internal tools like progress_report)
     if (internal !== undefined) {
       sections.push(internal);
+    }
+    // External tool providers last
+    if (external.length > 0) {
+      sections.push('## Available Tool Providers');
+      sections.push(external.join('\n\n'));
     }
     return sections.join('\n\n');
   }

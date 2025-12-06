@@ -18,6 +18,13 @@ export interface XmlNextPayload {
   progressSlot?: { slotId: string };
   expectedFinalFormat: OutputFormatId | 'text';
   finalSchema?: Record<string, unknown>;
+  // Retry info
+  attempt: number;
+  maxRetries: number;
+  // Context window percentage (0-100)
+  contextPercentUsed: number;
+  // Whether external tools (MCP, REST, etc.) are available
+  hasExternalTools: boolean;
 }
 
 export interface XmlPastEntry {
@@ -72,7 +79,8 @@ export function createXmlParser(): { parseChunk: (chunk: string, nonce: string, 
       if (closeIdx === -1) break; // incomplete
       const openTag = state.buffer.slice(idx, openTagEnd);
       const toolMatch = /tool="([^"]+)"/.exec(openTag);
-      const tool = toolMatch?.[1] ?? '';
+      // For FINAL slot, infer tool as agent__final_report if not specified
+      const tool = toolMatch?.[1] ?? (slotId.endsWith('-FINAL') ? 'agent__final_report' : '');
       // Extract status and format attributes from opening tag
       const statusMatch = /status="([^"]+)"/.exec(openTag);
       const formatMatch = /format="([^"]+)"/.exec(openTag);

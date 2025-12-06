@@ -52,8 +52,8 @@ export const CONTEXT_FINAL_MESSAGE =
  * CONDITION: (attempts === maxRetries - 1) && currentTurn < (maxTurns - 1)
  * (last retry attempt within a non-final turn)
  */
-export const toolReminderMessage = (excludeProgress: string, finalReportTool: string): string =>
-  `Reminder: do not end with plain text. Use an available tool${excludeProgress} to make progress. When ready to conclude, provide your final report/answer (${finalReportTool}).`;
+export const toolReminderMessage = (excludeProgress: string): string =>
+  `Reminder: do not end with plain text. Use an available tool${excludeProgress} to make progress. When ready to conclude, provide your final report/answer in the required XML wrapper.`;
 
 /**
  * On final turn without final answer.
@@ -142,6 +142,16 @@ export const TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT =
 export const TOOL_CALL_MALFORMED =
   'Tool call payload malformed; provide JSON arguments matching the schema.';
 
+/**
+ * When only progress_report was called without any productive tools.
+ * Used in: session-turn-runner.ts via addTurnFailure
+ *
+ * CONDITION: executedNonProgressBatchTools === 0 && executedProgressBatchTools > 0
+ * (progress_report was called but no other tools)
+ */
+export const TURN_FAILED_PROGRESS_ONLY =
+  'Calling progress_report alone is not sufficient. You must also call tools to make progress on your task, or provide your final report/answer if you are done.';
+
 // =============================================================================
 // SYSTEM NOTICES (LLM-facing only)
 // =============================================================================
@@ -157,8 +167,8 @@ export const TOOL_CALL_MALFORMED =
  *
  * NOTE: Reasoning-only responses skip this check (hasReasoning === true bypasses)
  */
-export const emptyResponseRetryNotice = (finalReportTool: string): string =>
-  `System notice: No progress made in this turn: no tools called and no final report/answer provided. To progress you MUST call tools or provide a final report/answer (${finalReportTool}). Review carefully the provided instructions and tools (if any), decide your next action(s), and follow the instructions precisely to progress. If you believe you called tools or provided a final report, it did not work: ensure the tool calls and final report are correctly formatted as per the instructions. Try again NOW.`;
+export const EMPTY_RESPONSE_RETRY_NOTICE =
+  'System notice: No progress made in this turn: no tools called and no final report/answer provided. To progress you MUST call tools or provide your final report/answer. Review carefully the provided instructions and tools (if any), decide your next action(s), and follow the instructions precisely to progress. If you believe you called tools or provided a final report, it did not work: ensure the tool calls and final report are correctly formatted as per the instructions. Try again NOW.';
 
 // =============================================================================
 // FINAL REPORT REMINDER
@@ -174,12 +184,11 @@ export const emptyResponseRetryNotice = (finalReportTool: string): string =>
  * - After final report validation errors (format mismatch, content missing, etc.)
  */
 export const finalReportReminder = (
-  finalReportTool: string,
   format: string,
   formatDescription: string,
   contentGuidance: string
 ): string =>
-  `System notice: call ${finalReportTool} with report_format="${format}" (${formatDescription}), and ${contentGuidance}.`;
+  `System notice: provide your final report/answer in the required XML wrapper with format="${format}" (${formatDescription}), and ${contentGuidance}.`;
 
 /**
  * Content guidance for JSON format.
@@ -330,6 +339,11 @@ export interface XmlNextTemplatePayload {
   tools: { name: string; schema?: Record<string, unknown> }[];
   slotTemplates: { slotId: string; tools: string[] }[];
   progressSlot?: { slotId: string };
+  expectedFinalFormat: string;
+  attempt: number;
+  maxRetries: number;
+  contextPercentUsed: number;
+  hasExternalTools: boolean;
 }
 
 export interface XmlPastTemplateEntry {
@@ -346,11 +360,28 @@ export interface XmlPastTemplatePayload {
 }
 
 export const renderXmlNextTemplate = (payload: XmlNextTemplatePayload): string => {
-  const { turn, maxTurns } = payload;
+  const { nonce, turn, maxTurns, attempt, maxRetries, contextPercentUsed, hasExternalTools, expectedFinalFormat } = payload;
+  const finalSlotId = `${nonce}-FINAL`;
   const lines: string[] = [];
+
   lines.push('# System Notice');
   lines.push('');
-  lines.push(`This is turn No ${String(turn)}${maxTurns !== undefined ? ` of ${String(maxTurns)}` : ''}.`);
+
+  // Turn info with optional retry count
+  const turnInfo = `This is turn ${String(turn)}${maxTurns !== undefined ? ` of ${String(maxTurns)}` : ''}`;
+  const retryInfo = attempt > 1 ? ` (retry ${String(attempt)} of ${String(maxRetries)})` : '';
+  lines.push(`${turnInfo}${retryInfo}.`);
+  lines.push(`Your context window is ${String(contextPercentUsed)}% full.`);
+  lines.push('');
+
+  // Guidance based on tool availability
+  if (hasExternalTools) {
+    lines.push('You now need to decide your next move:');
+    lines.push('1. Call tools to progress your task');
+    lines.push(`2. Provide your final report/answer in the expected format (${expectedFinalFormat}) using the XML wrapper (\`<ai-agent-${finalSlotId} format="${expectedFinalFormat}">\`)`);
+  } else {
+    lines.push(`You MUST now provide your final report/answer in the expected format (${expectedFinalFormat}) using the XML wrapper (\`<ai-agent-${finalSlotId} format="${expectedFinalFormat}">\`).`);
+  }
   lines.push('');
 
   return lines.join('\n');
@@ -384,26 +415,8 @@ export const renderXmlPastTemplate = (past: XmlPastTemplatePayload): string => {
 // =============================================================================
 
 /**
- * Tool-based final_report instructions (for native mode).
- * Used in: internal-provider.ts buildInstructions() for native tools
- */
-export const finalReportToolInstructions = (
-  _formatId: string,
-  formatFields: string
-): string => `## How to Deliver Your Final Report/Answer to the User
-
-When your task is complete you MUST call the 'agent__final_report' tool to provide your final answer to the user.
-All the content of your final report MUST be delivered using this tool.
-
-Required fields:
-${formatFields}
-
-Include optional \`metadata\` only when explicitly relevant.
-**CRITICAL:** The content of your final report MUST be delivered using this tool ONLY, not as part of your regular output.`;
-
-/**
- * XML-based final_report instructions (for xml-final mode).
- * Used in: internal-provider.ts buildInstructions() (xml-final final-report slot)
+ * Final report instructions with XML wrapper.
+ * Used in: internal-provider.ts buildInstructions()
  *
  * Structure optimized for first-try success:
  * 1. Critical rules first (what MUST happen)
@@ -447,7 +460,7 @@ export const finalReportXmlInstructions = (
 
 **Required XML Wrapper:**
 \`\`\`
-<ai-agent-${slotId} tool="agent__final_report" format="${formatId}">
+<ai-agent-${slotId} format="${formatId}">
 ${exampleContent}
 </ai-agent-${slotId}>
 \`\`\`

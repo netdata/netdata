@@ -25,6 +25,7 @@ const baseOpts = {
   getCurrentTurn: () => 1,
   toolTimeoutMs: 1000,
   disableProgressTool: false,
+  xmlSessionNonce: 'test-nonce',
 };
 
 describe('json repair pipeline', () => {

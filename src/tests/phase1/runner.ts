@@ -4654,8 +4654,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         );
         invariant(
           typeof data.combined === 'string' &&
-            data.combined.includes('#### MCP Server: alpha') &&
-            data.combined.includes('##### Tool: alpha__alphaTool'),
+            data.combined.includes('#### alpha') &&
+            data.combined.includes('alpha__alphaTool:'),
           'Combined instructions mismatch for run-test-65.'
         );
         invariant(
@@ -11158,7 +11158,7 @@ BASE_TEST_SCENARIOS.push({
       if (invocation > 1) throw new Error('Unexpected extra invocation');
       const assistantMessage: ConversationMessage = {
         role: 'assistant',
-        content: `<ai-agent-${nonce}-FINAL tool="agent__final_report" status="success" format="markdown">{\"status\":\"success\",\"report_format\":\"markdown\",\"report_content\":\"Done via XML\"}</ai-agent-${nonce}-FINAL>`,
+        content: `<ai-agent-${nonce}-FINAL status="success" format="markdown">{\"status\":\"success\",\"report_format\":\"markdown\",\"report_content\":\"Done via XML\"}</ai-agent-${nonce}-FINAL>`,
       };
       const payload = { report_format: 'markdown', report_content: 'Done via XML' };
       await request.toolExecutor('agent__final_report', payload, { toolCallId: `${nonce}-FINAL` });
@@ -11193,7 +11193,7 @@ BASE_TEST_SCENARIOS.push({
       const nonce = extractNonceFromMessages(request.messages, 'run-test-xml-final-only');
       const assistantMessage: ConversationMessage = {
         role: 'assistant',
-        content: `<ai-agent-${nonce}-FINAL tool="agent__final_report" status="success" format="markdown">Final via xml-final</ai-agent-${nonce}-FINAL>`,
+        content: `<ai-agent-${nonce}-FINAL status="success" format="markdown">Final via xml-final</ai-agent-${nonce}-FINAL>`,
       };
       const payload = { report_format: 'markdown', report_content: 'Final via xml-final' };
       await request.toolExecutor('agent__final_report', payload, { toolCallId: `${nonce}-FINAL` });
@@ -11228,7 +11228,7 @@ BASE_TEST_SCENARIOS.push({
       if (invocation === 1) {
         const assistantMessage: ConversationMessage = {
           role: 'assistant',
-          content: `<ai-agent-deadbeef-FINAL tool="agent__final_report" status="success" format="markdown">ignored</ai-agent-deadbeef-FINAL>`,
+          content: `<ai-agent-deadbeef-FINAL status="success" format="markdown">ignored</ai-agent-deadbeef-FINAL>`,
         };
         return {
           status: { type: 'success', hasToolCalls: false, finalAnswer: false },
@@ -11240,7 +11240,7 @@ BASE_TEST_SCENARIOS.push({
       const payload = { report_format: 'markdown', report_content: 'Recovered after invalid tag' };
       const assistantMessage: ConversationMessage = {
         role: 'assistant',
-        content: `<ai-agent-${nonce}-FINAL tool="agent__final_report" status="success" format="markdown">${JSON.stringify(payload)}</ai-agent-${nonce}-FINAL>`,
+        content: `<ai-agent-${nonce}-FINAL status="success" format="markdown">${JSON.stringify(payload)}</ai-agent-${nonce}-FINAL>`,
       };
       await request.toolExecutor('agent__final_report', payload, { toolCallId: `${nonce}-FINAL` });
       return {
