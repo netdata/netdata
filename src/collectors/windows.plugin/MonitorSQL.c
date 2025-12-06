@@ -291,7 +291,7 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
         }
 
         if (col_object_len == SQL_NULL_DATA)
-            object_name[0] = '\0';
+            continue;
         if (col_value_len == SQL_NULL_DATA)
             value = 0;
 
@@ -391,7 +391,7 @@ void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
         }
 
         if (col_object_len == SQL_NULL_DATA)
-            resource_type[0] = '\0';
+            continue;
         if (col_value_len == SQL_NULL_DATA)
             value = 0;
 
@@ -491,7 +491,7 @@ int dict_mssql_fill_waits(struct mssql_instance *mi)
         }
 
         if (col_wait_type_len == SQL_NULL_DATA)
-            wait_type[0] = '\0';
+            continue;
         if (col_total_wait_len == SQL_NULL_DATA)
             total_wait = 0;
         if (col_resource_wait_len == SQL_NULL_DATA)
@@ -740,6 +740,9 @@ void dict_mssql_fill_replication(struct mssql_db_instance *mdi)
         if (publisher_len == SQL_NULL_DATA)
             publisher[0] = '\0';
 
+        if(unlikely(!publisher_db[0] || !publication[0]))
+            continue;
+
         snprintfz(key, sizeof(key) - 1, "%s:%s", publisher_db, publication);
         struct mssql_publisher_publication *mpp =
             dictionary_set(mdi->parent->publisher_publication, key, NULL, sizeof(*mpp));
@@ -945,7 +948,7 @@ void netdata_mssql_fill_job_status(struct mssql_instance *mi)
         }
 
         if (col_job_len == SQL_NULL_DATA)
-            job[0] = '\0';
+            continue;
         if (col_state_len == SQL_NULL_DATA)
             state = 0;
 
@@ -1050,7 +1053,7 @@ void netdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
         }
 
         if (col_data_len == SQL_NULL_DATA)
-            dbname[0] = '\0';
+            continue;
 
         struct mssql_db_instance *mdi = dictionary_set(mi->databases, dbname, NULL, sizeof(*mdi));
         if (!mdi)
