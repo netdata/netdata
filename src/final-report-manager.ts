@@ -15,7 +15,11 @@ import type { OutputFormatId } from './formats.js';
 import type { AIAgentResult } from './types.js';
 import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
 
+import { getFormatSchema } from './formats.js';
 import { parseJsonRecord } from './utils.js';
+
+// Format constant to avoid string duplication
+const FORMAT_SLACK_BLOCK_KIT: OutputFormatId = 'slack-block-kit';
 
 // Reusable type definitions
 export type FinalReportPayload = NonNullable<AIAgentResult['finalReport']>;
@@ -140,19 +144,53 @@ export class FinalReportManager {
   }
 
   /**
-   * Validate the committed final report against the expected JSON schema
-   * Returns validation result with errors if invalid
+   * Validate the committed final report against the expected JSON schema.
+   * For 'json' format: validates against the provided user schema.
+   * For 'slack-block-kit' format: validates against the built-in Block Kit schema.
+   * Returns validation result with errors if invalid.
    */
-  validateSchema(schema: Record<string, unknown>): ValidationResult {
+  validateSchema(schema: Record<string, unknown> | undefined): ValidationResult {
     const fr = this.finalReport;
-    if (fr?.format !== 'json' || fr.content_json === undefined) {
+    if (fr === undefined) {
       return { valid: true };
+    }
+
+    // Determine what to validate based on format
+    let dataToValidate: unknown;
+    let schemaToUse: Record<string, unknown> | undefined;
+
+    if (fr.format === 'json' && fr.content_json !== undefined && schema !== undefined) {
+      // User-defined JSON schema validation
+      dataToValidate = fr.content_json;
+      schemaToUse = schema;
+    } else if (fr.format === FORMAT_SLACK_BLOCK_KIT) {
+      // Built-in slack-block-kit schema validation
+      schemaToUse = getFormatSchema(FORMAT_SLACK_BLOCK_KIT);
+      if (schemaToUse === undefined) {
+        return { valid: true }; // No schema defined, skip validation
+      }
+      // Parse content as JSON (slack-block-kit stores JSON in content string)
+      if (typeof fr.content === 'string' && fr.content.trim().length > 0) {
+        try {
+          dataToValidate = JSON.parse(fr.content.trim());
+        } catch {
+          return {
+            valid: false,
+            errors: `${FORMAT_SLACK_BLOCK_KIT} content is not valid JSON`,
+            payloadPreview: fr.content.length > 200 ? `${fr.content.slice(0, 200)}…` : fr.content
+          };
+        }
+      } else {
+        return { valid: true }; // No content to validate
+      }
+    } else {
+      return { valid: true }; // No validation needed for this format
     }
 
     try {
       this.ajv = this.ajv ?? new AjvCtor({ allErrors: true, strict: false });
-      const validate = this.ajv.compile(schema);
-      const valid = validate(fr.content_json);
+      const validate = this.ajv.compile(schemaToUse);
+      const valid = validate(dataToValidate);
 
       if (valid) {
         return { valid: true };
@@ -169,7 +207,7 @@ export class FinalReportManager {
 
       const payloadPreview = (() => {
         try {
-          const raw = JSON.stringify(fr.content_json);
+          const raw = JSON.stringify(dataToValidate);
           return typeof raw === 'string'
             ? (raw.length > 200 ? `${raw.slice(0, 200)}…` : raw)
             : undefined;

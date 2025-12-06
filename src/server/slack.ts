@@ -470,7 +470,7 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
   const acquireRunSlot = options.acquireRunSlot;
   const registerRunSlot = options.registerRunSlot;
 const vlog = (msg: string): void => { if (verbose) { try { process.stderr.write(`[SRV] ← [0.0] server slack: ${msg}\n`); } catch (e) { try { process.stderr.write(`[warn] failed to write vlog: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} } } };
-const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0] server slack: ${msg}\n`); } catch (e) { try { process.stderr.write(`[warn] failed to write elog: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} } };
+const elog = (msg: string): void => { try { process.stderr.write(`[ERR] ← [0.0] server slack: ${msg}\n`); } catch (e) { try { process.stderr.write(`[warn] failed to write elog: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} } };
 
   // Tracks any pending delayed update timeouts per message (channel:ts)
   const updating = new Map<string, NodeJS.Timeout>();
@@ -660,6 +660,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
           await client.chat.update({ channel, ts, text: fallback, blocks: firstBlocks });
         } catch (e1) {
           elog(`First block update attempt failed: ${(e1 as Error).message}`);
+          elog(`First block payload:\n${JSON.stringify(firstBlocks, null, 2)}`);
           const eb = repairBlocks(firstBlocks);
           await client.chat.update({ channel, ts, text: fallback, blocks: eb });
         }
@@ -734,6 +735,12 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
       const bytes = byteLength(finalText);
       const chars = finalText.length;
       elog(`[SLACK-ERROR] Failed to post response: ${errMsg} (${String(chars)} chars, ${String(bytes)} bytes)`);
+
+      // Log the full payload for debugging - this helps identify malformed Block Kit output
+      const fullPayload = slackMessages && slackMessages.length > 0
+        ? JSON.stringify(slackMessages, null, 2)
+        : finalText;
+      elog(`[SLACK-ERROR] Full payload that failed:\n${fullPayload}`);
 
       // Try to post a simple error message back to Slack
       const userErrorMsg = '❌ Failed to post response. The message might be too large or contain invalid formatting.';

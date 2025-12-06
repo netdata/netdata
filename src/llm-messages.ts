@@ -404,6 +404,12 @@ Include optional \`metadata\` only when explicitly relevant.
 /**
  * XML-based final_report instructions (for xml-final mode).
  * Used in: internal-provider.ts buildInstructions() (xml-final final-report slot)
+ *
+ * Structure optimized for first-try success:
+ * 1. Critical rules first (what MUST happen)
+ * 2. Pre-response checklist before example (reinforces "first in response")
+ * 3. XML wrapper example
+ * 4. Format-specific details last
  */
 export const finalReportXmlInstructions = (
   formatId: string,
@@ -425,26 +431,30 @@ export const finalReportXmlInstructions = (
       ? '{ ... your JSON here ... }'
       : '[Your final report/answer here]';
   return `
+## MANDATORY: How to Respond
 
-## How to Deliver Your Final Report/Answer to the User
+**CRITICAL RULES — Read First:**
+1. Your response MUST use the XML wrapper shown below
+2. The opening XML tag MUST be the FIRST thing in your response
+3. Do NOT output plain text, greetings, or explanations outside the XML tags
+4. ALL content must be between the opening and closing XML tags
 
-When your task is complete you MUST provide your final report/answer using XML tags as described below.
+**Pre-Response Checklist:**
+- [ ] Response starts with \`<ai-agent-${slotId}\` (no text before it)
+- [ ] Content matches ${formatId} format
+- [ ] Response ends with \`</ai-agent-${slotId}>\`
+- [ ] No text outside the XML tags
 
+**Required XML Wrapper:**
 \`\`\`
 <ai-agent-${slotId} tool="agent__final_report" format="${formatId}">
 ${exampleContent}
 </ai-agent-${slotId}>
 \`\`\`
 
-**Final Report/Answer Format**
-${formatId}** — ${formatDescription}
-${schemaBlock}
-
-**Final Report/Answer Checklist**
-- [ ] The opening XML tag \`<ai-agent-${slotId}\` MUST be first in your response
-- [ ] Your report content/payload matches the expected format (${formatId})
-- [ ] Your output MUST end with the closing XML tag \`</ai-agent-${slotId}>\`
-- [ ] Your entire report is between the opening and closing XML tags, not outside them`;
+**Output Format: ${formatId}**
+${formatDescription}
+${schemaBlock}`;
 };
 
 /**
@@ -472,12 +482,16 @@ export const MANDATORY_TOOLS_RULES = `### MANDATORY RULE FOR TOOLS
 /**
  * Mandatory rules for XML final report.
  * Used in: internal-provider.ts buildInstructions() (xml-final final-report slot)
+ *
+ * Rewritten to avoid confusion when no external tools are available.
+ * Focuses on output format requirements, not tool usage.
  */
-export const MANDATORY_XML_FINAL_RULES = `### MANDATORY RULE FOR FINAL REPORT
-- You run in agentic mode, interfacing with software tools with specific formatting requirements.
-- Always respond with valid tool calls for regular tools.
-- Your final report MUST be delivered using XML tags as described above, NOT as a tool call.
-- The CONTENT of your final report must be between the XML tags ONLY.`;
+export const MANDATORY_XML_FINAL_RULES = `### RESPONSE FORMAT RULES
+- You operate in agentic mode with strict output formatting requirements
+- Your response MUST be wrapped in the XML tags shown above
+- Never respond with plain text outside the XML wrapper
+- If tools are available and you need to call them, do so; your FINAL response always uses the XML wrapper
+- The XML tag MUST be the first content in your response — no greetings, no preamble`;
 
 /**
  * Mandatory rules for JSON newlines.

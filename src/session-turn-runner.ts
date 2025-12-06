@@ -1170,6 +1170,17 @@ export class TurnRunner {
                                             return [];
                                         };
                                         const normalizedMessages = messagesArray.map((entry) => {
+                                            // If entry already has a blocks field, normalize those blocks
+                                            if (entry !== null && typeof entry === 'object' && !Array.isArray(entry) && 'blocks' in entry) {
+                                                const existingBlocks = (entry as Record<string, unknown>).blocks;
+                                                const normalized = normalizeBlocks(existingBlocks);
+                                                if (normalized.length > 0) {
+                                                    return { blocks: normalized };
+                                                }
+                                                // Fallback: stringify the entry for display
+                                                const fallbackText = (() => { try { return JSON.stringify(entry); } catch { return '(invalid entry)'; } })();
+                                                return { blocks: [{ type: 'section', text: { type: 'mrkdwn', text: fallbackText } }] };
+                                            }
                                             const blocks = normalizeBlocks(entry);
                                             if (blocks.length === 0) {
                                                 return { blocks: [{ type: 'section', text: { type: 'mrkdwn', text: String(entry) } }] };
@@ -2120,29 +2131,28 @@ export class TurnRunner {
                 return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn);
             }
         }
+        // Validate schema: for 'json' format uses user-defined schema, for 'slack-block-kit' uses built-in schema
         const schema = this.ctx.sessionConfig.expectedOutput?.schema;
-        if (schema !== undefined) {
-            const validationResult = this.ctx.finalReportManager.validateSchema(schema);
-            if (!validationResult.valid) {
-                const errs = validationResult.errors ?? 'unknown validation error';
-                const payloadPreview = validationResult.payloadPreview;
-                const errMsg = `final_report JSON schema validation failed: ${errs}${payloadPreview !== undefined ? `; payload preview=${payloadPreview}` : ''}`;
-                const errLog = {
-                    timestamp: Date.now(),
-                    severity: 'ERR' as const,
-                    turn: currentTurn,
-                    subturn: 0,
-                    direction: 'response' as const,
-                    type: 'llm' as const,
-                    remoteIdentifier: 'agent:ajv',
-                    fatal: false,
-                    message: errMsg
-                };
-                this.log(errLog);
-                this.state.lastFinalReportStatus = 'failure';
-                this.state.finalReportSchemaFailed = true;
-                this.state.toolFailureMessages.set('final_report_schema', errMsg);
-            }
+        const validationResult = this.ctx.finalReportManager.validateSchema(schema);
+        if (!validationResult.valid) {
+            const errs = validationResult.errors ?? 'unknown validation error';
+            const payloadPreview = validationResult.payloadPreview;
+            const errMsg = `final_report schema validation failed: ${errs}${payloadPreview !== undefined ? `; payload preview=${payloadPreview}` : ''}`;
+            const errLog = {
+                timestamp: Date.now(),
+                severity: 'ERR' as const,
+                turn: currentTurn,
+                subturn: 0,
+                direction: 'response' as const,
+                type: 'llm' as const,
+                remoteIdentifier: 'agent:ajv',
+                fatal: false,
+                message: errMsg
+            };
+            this.log(errLog);
+            this.state.lastFinalReportStatus = 'failure';
+            this.state.finalReportSchemaFailed = true;
+            this.state.toolFailureMessages.set('final_report_schema', errMsg);
         }
         if (this.ctx.sessionConfig.renderTarget !== 'sub-agent' && this.callbacks.onOutput !== undefined) {
             if (!this.finalReportStreamed) {

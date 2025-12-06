@@ -11,7 +11,7 @@ type AjvErrorObject = ErrorObject<string, Record<string, unknown>>;
 type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
 const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
 
-import { describeFormatParameter, formatPromptValue } from '../formats.js';
+import { describeFormatParameter, formatPromptValue, getFormatSchema } from '../formats.js';
 import {
   FINAL_REPORT_FIELDS_JSON,
   FINAL_REPORT_FIELDS_SLACK,
@@ -116,7 +116,7 @@ export class InternalToolProvider extends ToolProvider {
         },
       });
     }
-    tools.push(this.buildFinalReportTool());
+    // Final report is delivered via XML tags, not as a tool call
     if (this.opts.enableBatch) {
       const { schemas } = this.ensureBatchSchemas();
       const fallbackItemSchema: Record<string, unknown> = {
@@ -179,50 +179,13 @@ export class InternalToolProvider extends ToolProvider {
   }
 
   private buildInstructions(): string {
-    const lines: string[] = ['### Internal Tools', ''];
+    const lines: string[] = [];
 
-    lines.push('You have access to the following internal tools to assist you in completing your task effectively.');
-    lines.push('These tools expect valid JSON input according to their defined schemas.');
-    lines.push('In many cases you may have to include multi-line strings in JSON fields; remember to use the `\\n` escape sequence for newlines within JSON string values.');
+    // SECTION 1: Final report instructions FIRST (most critical for first-try success)
+    const schemaBlock = this.buildFinalReportSchemaBlock();
+    lines.push(finalReportXmlInstructions(this.formatId, this.formatDescription, schemaBlock, this.xmlSessionNonce));
 
-    if (!this.disableProgressTool) {
-      lines.push(PROGRESS_TOOL_INSTRUCTIONS);
-      lines.push('');
-    }
-
-    if (this.opts.enableBatch) {
-      lines.push('');
-      lines.push(`#### ${BATCH_TOOL} — How to Run Tools in Parallel`);
-      lines.push('- Use this helper to execute multiple tools in one request.');
-      lines.push("- Each `calls[]` entry needs an `id`, the real tool name, and a `parameters` object that matches that tool's schema.");
-      lines.push('- Example:');
-      lines.push('  {');
-      lines.push('    "calls": [');
-      if (!this.disableProgressTool) {
-        lines.push(`      { "id": 1, "tool": "${PROGRESS_TOOL}", "parameters": { "progress": "Collected data about X, now researching Y" } },`);
-        lines.push('      { "id": 2, "tool": "tool1", "parameters": { "param1": "value1", "param2": "value2" } },');
-        lines.push('      { "id": 3, "tool": "tool2", "parameters": { "param1": "value1" } }');
-      } else {
-        lines.push('      { "id": 1, "tool": "tool1", "parameters": { "param1": "value1", "param2": "value2" } },');
-        lines.push('      { "id": 2, "tool": "tool2", "parameters": { "param1": "value1" } }');
-      }
-      lines.push('      (Tool names must match exactly, and every required parameter must be present.)');
-      lines.push('    ]');
-      lines.push('  }');
-      if (!this.disableProgressTool) {
-        lines.push('- Do not combine `agent__progress_report` with `agent__final_report` in the same request; send the final report on its own.');
-      }
-    }
-
-    // Final report instructions: XML-based for xml-final (only mode)
-    lines.push('');
-    {
-      const schemaBlock = this.buildFinalReportSchemaBlock();
-      // xmlSessionNonce is now always provided from ai-agent.ts
-      lines.push(finalReportXmlInstructions(this.formatId, this.formatDescription, schemaBlock, this.xmlSessionNonce));
-    }
-
-    // Mandatory rules section
+    // SECTION 2: Mandatory rules (reinforces critical format requirements)
     lines.push('');
     lines.push(MANDATORY_XML_FINAL_RULES);
     if (this.opts.enableBatch) {
@@ -234,12 +197,50 @@ export class InternalToolProvider extends ToolProvider {
     lines.push('');
     lines.push(MANDATORY_JSON_NEWLINES_RULES);
 
-    if (this.opts.enableBatch) {
+    // SECTION 3: Internal tools (only if any are available)
+    const hasProgressTool = !this.disableProgressTool;
+    const hasBatchTool = this.opts.enableBatch;
+
+    if (hasProgressTool || hasBatchTool) {
       lines.push('');
-      lines.push('### MANDATORY RULE FOR PARALLEL TOOL CALLS');
-      lines.push(`When gathering information from multiple independent sources, use the ${BATCH_TOOL} tool to execute tools in parallel.`);
-      if (!this.disableProgressTool) {
-        lines.push(PROGRESS_TOOL_BATCH_RULES);
+      lines.push('### Internal Tools');
+      lines.push('');
+      lines.push('The following internal tools are available. They expect valid JSON input according to their schemas.');
+
+      if (hasProgressTool) {
+        lines.push('');
+        lines.push(PROGRESS_TOOL_INSTRUCTIONS);
+      }
+
+      if (hasBatchTool) {
+        lines.push('');
+        lines.push(`#### ${BATCH_TOOL} — How to Run Tools in Parallel`);
+        lines.push('- Use this helper to execute multiple tools in one request.');
+        lines.push("- Each `calls[]` entry needs an `id`, the real tool name, and a `parameters` object that matches that tool's schema.");
+        lines.push('- Example:');
+        lines.push('  {');
+        lines.push('    "calls": [');
+        if (hasProgressTool) {
+          lines.push(`      { "id": 1, "tool": "${PROGRESS_TOOL}", "parameters": { "progress": "Collected data about X, now researching Y" } },`);
+          lines.push('      { "id": 2, "tool": "tool1", "parameters": { "param1": "value1", "param2": "value2" } },');
+          lines.push('      { "id": 3, "tool": "tool2", "parameters": { "param1": "value1" } }');
+        } else {
+          lines.push('      { "id": 1, "tool": "tool1", "parameters": { "param1": "value1", "param2": "value2" } },');
+          lines.push('      { "id": 2, "tool": "tool2", "parameters": { "param1": "value1" } }');
+        }
+        lines.push('      (Tool names must match exactly, and every required parameter must be present.)');
+        lines.push('    ]');
+        lines.push('  }');
+        if (hasProgressTool) {
+          lines.push('- Do not combine `agent__progress_report` with `agent__final_report` in the same request; send the final report on its own.');
+        }
+
+        lines.push('');
+        lines.push('### MANDATORY RULE FOR PARALLEL TOOL CALLS');
+        lines.push(`When gathering information from multiple independent sources, use the ${BATCH_TOOL} tool to execute tools in parallel.`);
+        if (hasProgressTool) {
+          lines.push(PROGRESS_TOOL_BATCH_RULES);
+        }
       }
     }
 
@@ -262,23 +263,10 @@ export class InternalToolProvider extends ToolProvider {
     if (this.formatId === SLACK_BLOCK_KIT_FORMAT) {
       // For XML mode: show messages array schema directly (no wrapper - format is in XML attribute)
       // The LLM should output just the messages array [...] inside the XML tags
-      const messagesArraySchema = {
-        type: 'array',
-        description: 'Array of Slack messages (output this array directly, not wrapped in an object)',
-        minItems: 1,
-        items: {
-          type: 'object',
-          required: ['blocks'],
-          properties: {
-            blocks: {
-              type: 'array',
-              description: 'Slack Block Kit blocks: section (mrkdwn ≤2900), header (plain_text ≤150), divider, context (mrkdwn ≤2000)',
-              items: { type: 'object' }
-            }
-          }
-        }
-      };
-      return `\n**Your response must be a JSON array (the messages array directly, NOT wrapped in an object):**\n\`\`\`json\n${JSON.stringify(messagesArraySchema, null, 2)}\n\`\`\`\n`;
+      const slackSchema = getFormatSchema(SLACK_BLOCK_KIT_FORMAT);
+      if (slackSchema !== undefined) {
+        return `\n**Your response must be a JSON array (the messages array directly, NOT wrapped in an object):**\n\`\`\`json\n${JSON.stringify(slackSchema, null, 2)}\n\`\`\`\n`;
+      }
     }
     return '';
   }
