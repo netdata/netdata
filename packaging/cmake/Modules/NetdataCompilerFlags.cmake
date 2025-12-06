@@ -3,16 +3,7 @@
 
 include(CheckCCompilerFlag)
 include(CheckCXXCompilerFlag)
-
-# Construct a pre-processor safe name
-#
-# This takes a specified value, and assigns the generated name to the
-# specified target.
-function(make_cpp_safe_name value target)
-  string(REPLACE "-" "_" tmp "${value}")
-  string(REPLACE "=" "_" tmp "${tmp}")
-  set(${target} "${tmp}" PARENT_SCOPE)
-endfunction()
+include(CMakePushCheckState)
 
 # Conditionally add an extra compiler flag to C and C++ flags.
 #
@@ -21,9 +12,10 @@ endfunction()
 # the compiler flags for the run. Also sets `result` to MATCHED/ADDED/UNSUPPORTED
 # depending on whether the flag was added or not.
 function(add_extra_compiler_flag match flag result)
+  cmake_push_check_state()
   set(CMAKE_REQUIRED_FLAGS "-Werror")
 
-  make_cpp_safe_name("${flag}" flag_name)
+  string(MAKE_C_IDENTIFIER "${flag}" flag_name)
 
   if(NOT ${CMAKE_C_FLAGS} MATCHES ${match})
     check_c_compiler_flag("${flag}" HAVE_C_${flag_name})
@@ -36,6 +28,7 @@ function(add_extra_compiler_flag match flag result)
   else()
     set(matched_cxx TRUE)
   endif()
+  cmake_pop_check_state()
 
   if(HAVE_C_${flag_name} AND HAVE_CXX_${flag_name})
     add_compile_options("${flag}")
@@ -66,12 +59,14 @@ endfunction()
 # Similar logic to add_extra_compiler_flag, but ignores existing
 # instances and throws an error if the flag is not supported.
 function(add_required_compiler_flag flag)
+  cmake_push_check_state()
   set(CMAKE_REQUIRED_FLAGS "-Werror")
 
-  make_cpp_safe_name("${flag}" flag_name)
+  string(MAKE_C_IDENTIFIER "${flag}" flag_name)
 
   check_c_compiler_flag("${flag}" HAVE_C_${flag_name})
   check_cxx_compiler_flag("${flag}" HAVE_CXX_${flag_name})
+  cmake_pop_check_state()
 
   if(HAVE_C_${flag_name} AND HAVE_CXX_${flag_name})
     add_compile_options("${flag}")
