@@ -164,8 +164,8 @@ export class XmlToolTransport {
     const finalSlotId = `${nonce}-FINAL`;
     const slotTemplates: XmlSlotTemplate[] = [{ slotId: finalSlotId, tools: [finalReportToolName] }];
 
-    // Determine if external tools are available (exclude internal agent__ tools)
-    const hasExternalTools = config.tools.some(t => !t.name.startsWith('agent__'));
+    // Agent can call tools if anything besides final_report is available
+    const hasExternalTools = config.tools.some(t => t.name !== 'agent__final_report');
 
     const nextContent = renderXmlNext({
       nonce,

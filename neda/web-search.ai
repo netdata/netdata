@@ -61,7 +61,7 @@ At each turn/step, use the `batch` tool to call the following tools in parallel:
 2. ALWAYS: one or more of the following:
   - one or more searches to gather more leads
   - one or more `web-fetch` agent requests to extract information from web pages
-  - or the `final-report` tool, to complete the task
+  - or provide your final report/answer, to complete the task
 
 You can call up to 10 tools in one `batch` (including `progress-report` when it is available).
 
@@ -203,7 +203,7 @@ Output format: ${FORMAT}
 
 ## To Complete the Task
 - [ ] stop ONLY when a SEARCH-EXTRACT set did not provide any additional leads or findings
-- [ ] call the `final-report` tool, to provide the findings to the user
+- [ ] provide your final report/answer to deliver the findings to the user
 
 ---
 
