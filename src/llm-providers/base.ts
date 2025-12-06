@@ -1559,7 +1559,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       }
       
       const normalizedMessages = this.normalizeResponseMessages(resp);
-      const conversationMessages = this.convertResponseMessages(normalizedMessages, request.provider, request.model, tokens);
+      const rawConversationMessages = this.convertResponseMessages(normalizedMessages, request.provider, request.model, tokens);
+      const conversationMessages = this.injectMissingToolResults(rawConversationMessages, request.provider, request.model, tokens);
       if (process.env.DEBUG === 'true') {
         try {
           const tMsgs = conversationMessages.filter((m) => m.role === 'tool');
@@ -1806,12 +1807,13 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           console.log('normalizedMessages:', JSON.stringify(normalizedMessages, null, 2));
         } catch { /* ignore */ }
       }
-      const conversationMessages = this.convertResponseMessages(
+      const rawConversationMessages = this.convertResponseMessages(
         normalizedMessages,
         request.provider,
         request.model,
         tokens
       );
+      const conversationMessages = this.injectMissingToolResults(rawConversationMessages, request.provider, request.model, tokens);
       if (process.env.DEBUG === 'true') {
         try {
           const tMsgs = conversationMessages.filter((m) => m.role === 'tool');
@@ -2097,7 +2099,106 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     return out;
   }
 
-  
+  /**
+   * Inject failure tool_result messages for tool calls that weren't executed.
+   * This handles the case where a model emits tool_use for a tool not in the SDK's ToolSet
+   * (e.g., agent__final_report which is filtered out). Without a matching tool_result,
+   * providers like Anthropic reject the next request.
+   */
+  protected injectMissingToolResults(
+    messages: ConversationMessage[],
+    provider: string,
+    model: string,
+    tokens: TokenUsage
+  ): ConversationMessage[] {
+    // Collect all tool call IDs from assistant messages
+    const toolCallIds = new Set<string>();
+    const toolCallNames = new Map<string, string>();
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const msg of messages) {
+      if (msg.role === 'assistant' && Array.isArray(msg.toolCalls)) {
+        // eslint-disable-next-line functional/no-loop-statements
+        for (const tc of msg.toolCalls) {
+          if (typeof tc.id === 'string' && tc.id.length > 0) {
+            toolCallIds.add(tc.id);
+            toolCallNames.set(tc.id, tc.name);
+          }
+        }
+      }
+    }
+
+    // Collect all tool result IDs from tool messages
+    const toolResultIds = new Set<string>();
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const msg of messages) {
+      if (msg.role === 'tool' && typeof msg.toolCallId === 'string' && msg.toolCallId.length > 0) {
+        toolResultIds.add(msg.toolCallId);
+      }
+    }
+
+    // Find orphaned tool calls (have tool_use but no tool_result)
+    const orphanedIds: string[] = [];
+    toolCallIds.forEach((id) => {
+      if (!toolResultIds.has(id)) {
+        orphanedIds.push(id);
+      }
+    });
+
+    if (orphanedIds.length === 0) {
+      return messages;
+    }
+
+    // Inject failure results for orphaned tool calls
+    const injected: ConversationMessage[] = [];
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const id of orphanedIds) {
+      const toolName = toolCallNames.get(id) ?? 'unknown';
+      injected.push({
+        role: 'tool',
+        content: `${TOOL_FAILED_PREFIX}Tool not available: ${toolName}${TOOL_FAILED_SUFFIX}`,
+        toolCallId: id,
+        metadata: {
+          provider,
+          model,
+          tokens: {
+            inputTokens: tokens.inputTokens,
+            outputTokens: tokens.outputTokens,
+            cachedTokens: tokens.cachedTokens,
+            totalTokens: tokens.totalTokens,
+          },
+          timestamp: Date.now(),
+        },
+      });
+    }
+
+    // Insert injected messages after the last assistant message
+    // (tool results must follow assistant message with tool_use)
+    const result = [...messages];
+    let lastAssistantIdx = -1;
+    // eslint-disable-next-line functional/no-loop-statements
+    for (let i = result.length - 1; i >= 0; i--) {
+      if (result[i].role === 'assistant') {
+        lastAssistantIdx = i;
+        break;
+      }
+    }
+
+    if (lastAssistantIdx >= 0) {
+      // Insert after last assistant message and any existing tool messages
+      let insertIdx = lastAssistantIdx + 1;
+      // eslint-disable-next-line functional/no-loop-statements
+      while (insertIdx < result.length && result[insertIdx].role === 'tool') {
+        insertIdx++;
+      }
+      result.splice(insertIdx, 0, ...injected);
+    } else {
+      // No assistant message found (shouldn't happen), append at end
+      result.push(...injected);
+    }
+
+    return result;
+  }
+
   /**
    * Convert conversation messages to AI SDK format
    * Preserves tool messages which are critical for multi-turn tool conversations

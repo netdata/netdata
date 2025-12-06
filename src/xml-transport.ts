@@ -281,7 +281,13 @@ export class XmlToolTransport {
       // Try to parse as JSON first
       let parameters: Record<string, unknown>;
       try {
-        parameters = JSON.parse(unclosedFinal.content) as Record<string, unknown>;
+        const parsed = JSON.parse(unclosedFinal.content) as Record<string, unknown>;
+        parameters = {
+          status: 'success',
+          report_format: expectedFormat,
+          _rawPayload: unclosedFinal.content,
+          content_json: parsed,
+        };
       } catch {
         // Not JSON - wrap as text content
         if (expectedFormat === 'json') {

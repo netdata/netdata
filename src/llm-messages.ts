@@ -488,9 +488,8 @@ export const finalReportFieldsText = (formatId: string): string =>
  */
 export const MANDATORY_TOOLS_RULES = `### MANDATORY RULE FOR TOOLS
 - You run in agentic mode, interfacing with software tools with specific formatting requirements.
-- Always respond with valid tool calls, even for your final report.
-- You must provide your final report to the user using the agent__final_report tool, with the correct format (pay attention to formatting and newlines handling).
-- The CONTENT of your final report must be delivered using the agent__final_report tool ONLY.`;
+- Always respond with valid tool calls when invoking tools, and provide your final report/answer in the required XML final wrapper.
+- The CONTENT of your final report must be delivered inside the XML final wrapper only (no plain text outside the tags).`;
 
 /**
  * Mandatory rules for XML final report.

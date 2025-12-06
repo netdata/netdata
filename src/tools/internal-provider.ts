@@ -235,7 +235,7 @@ export class InternalToolProvider extends ToolProvider {
         lines.push('    ]');
         lines.push('  }');
         if (hasProgressTool) {
-          lines.push('- Do not combine `agent__progress_report` with `agent__final_report` in the same request; send the final report on its own.');
+          lines.push('- Do not combine `agent__progress_report` with your final report; send the final report on its own.');
         }
 
         lines.push('');
@@ -276,7 +276,8 @@ export class InternalToolProvider extends ToolProvider {
 
   private buildFinalReportTool(): MCPTool {
     const metadataProp = { type: 'object' };
-    const baseDescription = 'You MUST use agent__final_report to provide your final response to the user request.';
+    // Description is for internal use only - tool is filtered from SDK ToolSet
+    const baseDescription = 'Internal: final report tool for turn enforcement.';
 
     if (this.formatId === 'json') {
       const schema = this.opts.expectedJsonSchema ?? { type: 'object' };
