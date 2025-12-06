@@ -58,7 +58,27 @@ const OPEN_PREFIX = '<ai-agent-';
 export function createXmlParser(): { parseChunk: (chunk: string, nonce: string, allowedSlots: Set<string>, allowedTools: Set<string>) => ParsedXmlSlot[]; flush: () => { slots: ParsedXmlSlot[]; leftover: string } } {
   const state: ParserState = { buffer: '' };
 
+  /**
+   * Strip leading <think>...</think> block if present.
+   * Reasoning models may include XML tag examples inside thinking blocks,
+   * which would confuse the parser. We skip the thinking content entirely.
+   */
+  const stripLeadingThink = (): void => {
+    const thinkOpen = '<think>';
+    const thinkClose = '</think>';
+    if (state.buffer.startsWith(thinkOpen)) {
+      const closeIdx = state.buffer.indexOf(thinkClose);
+      if (closeIdx !== -1) {
+        state.buffer = state.buffer.slice(closeIdx + thinkClose.length);
+      }
+      // If </think> not found yet, keep the buffer as-is (incomplete)
+    }
+  };
+
   const parseBuffer = (nonce: string, allowedSlots: Set<string>, allowedTools: Set<string>): ParsedXmlSlot[] => {
+    // Strip <think>...</think> from beginning before parsing
+    stripLeadingThink();
+
     const results: ParsedXmlSlot[] = [];
     let idx = state.buffer.indexOf(OPEN_PREFIX);
     // eslint-disable-next-line functional/no-loop-statements

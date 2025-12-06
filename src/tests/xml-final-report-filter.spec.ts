@@ -79,4 +79,42 @@ describe('XmlFinalReportFilter', () => {
     filter.process('<ai-agent-'); // Partial buffer
     expect(filter.flush()).toBe('<ai-agent-');
   });
+
+  it('skips <think> block at start and extracts content after', () => {
+    const filter = new XmlFinalReportFilter(nonce);
+    const content = 'Real report content';
+    // Model thinks about the tag, then provides the actual report
+    const chunk = `<think>I'll use ${openTag} to wrap my answer.</think>${openTag}${content}${closeTag}`;
+    expect(filter.process(chunk)).toBe(content);
+    expect(filter.hasStreamedContent).toBe(true);
+  });
+
+  it('skips <think> block split across chunks', () => {
+    const filter = new XmlFinalReportFilter(nonce);
+    const content = 'Report after thinking';
+
+    // First chunk has <think> and part of thinking content
+    expect(filter.process('<think>Thinking about')).toBe('');
+    // Second chunk completes </think> and has the real content
+    expect(filter.process(` the tag...</think>${openTag}${content}${closeTag}`)).toBe(content);
+    expect(filter.hasStreamedContent).toBe(true);
+  });
+
+  it('processes normally when content does not start with <think>', () => {
+    const filter = new XmlFinalReportFilter(nonce);
+    const content = 'Normal content';
+    // Just normal content without <think>
+    const chunk = `Some preamble ${openTag}${content}${closeTag}`;
+    expect(filter.process(chunk)).toBe(`Some preamble ${content}`);
+    expect(filter.hasStreamedContent).toBe(true);
+  });
+
+  it('handles content starting with < but not <think>', () => {
+    const filter = new XmlFinalReportFilter(nonce);
+    const content = 'Content here';
+    // Starts with < but not <think>
+    const chunk = `<other>stuff</other>${openTag}${content}${closeTag}`;
+    expect(filter.process(chunk)).toBe(`<other>stuff</other>${content}`);
+    expect(filter.hasStreamedContent).toBe(true);
+  });
 });

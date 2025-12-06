@@ -64,7 +64,7 @@ describe('XML streaming parser', () => {
     expect(res.map((r) => r.rawPayload)).toEqual(['hi', 'bye']);
   });
 
-  it('renders xml-final with only final-report and progress slot', () => {
+  it('renders xml-final with FINAL slot and format info', () => {
     const xml = renderXmlNext({
       nonce: NONCE,
       turn: 1,
@@ -79,9 +79,27 @@ describe('XML streaming parser', () => {
       contextPercentUsed: 12,
       hasExternalTools: true,
     });
-    // xml-final: XML-NEXT describes the final-report tag with nonce and omits non-final tool schemas
+    // xml-final: XML-NEXT describes the XML wrapper with nonce-FINAL
     expect(xml).toContain(`${NONCE}-FINAL`);
-    expect(xml).toContain('agent__final_report');
+    expect(xml).toContain('markdown');
     expect(xml).not.toContain('mock_tool');
+  });
+
+  it('skips <think> block and parses actual XML tag after it', () => {
+    const parser = createXmlParser();
+    // Simulate reasoning model output: <think> block mentions the tag as example, real tag follows
+    const content = `<think>I'll use the <ai-agent-${SLOT_ONE} tool="echo"> wrapper.</think><ai-agent-${SLOT_ONE} tool="echo">real content</ai-agent-${SLOT_ONE}>`;
+    const res = parser.parseChunk(content, NONCE, ALLOWED_SLOTS, ALLOWED_TOOLS);
+    expect(res).toHaveLength(1);
+    expect(res[0].rawPayload).toBe('real content');
+  });
+
+  it('handles content not starting with <think>', () => {
+    const parser = createXmlParser();
+    // Normal content without <think>
+    const content = `Some preamble text. <ai-agent-${SLOT_ONE} tool="echo">hello</ai-agent-${SLOT_ONE}>`;
+    const res = parser.parseChunk(content, NONCE, ALLOWED_SLOTS, ALLOWED_TOOLS);
+    expect(res).toHaveLength(1);
+    expect(res[0].rawPayload).toBe('hello');
   });
 });

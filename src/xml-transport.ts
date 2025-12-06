@@ -500,13 +500,20 @@ export class XmlToolTransport {
 /**
  * Filter for streaming XML final reports.
  * Strips <ai-agent-{nonce}-FINAL ...> tags and passes through content.
+ *
+ * Handles reasoning models that embed <think>...</think> inline in content.
+ * If the first content starts with <think>, we skip past </think> before
+ * processing XML tags. This prevents matching XML tags mentioned as examples
+ * inside the thinking block.
  */
 export class XmlFinalReportFilter {
   private readonly openTagPrefix: string;
   private readonly closeTag: string;
   private buffer = '';
-  private state: 'search_open' | 'buffering_open' | 'inside' | 'buffering_close' | 'done' = 'search_open';
+  private state: 'check_think' | 'skip_think' | 'search_open' | 'buffering_open' | 'inside' | 'buffering_close' | 'done' = 'check_think';
   private _hasStreamedContent = false;
+  private thinkBuffer = '';
+  private readonly thinkCloseTag = '</think>';
 
   constructor(nonce: string) {
     this.openTagPrefix = `<ai-agent-${nonce}-FINAL`;
@@ -521,60 +528,124 @@ export class XmlFinalReportFilter {
     let output = '';
     // eslint-disable-next-line functional/no-loop-statements
     for (const char of chunk) {
-      if (this.state === 'search_open') {
-        if (char === '<') {
-          this.state = 'buffering_open';
-          this.buffer = char;
-        } else {
-          output += char;
-        }
-      } else if (this.state === 'buffering_open') {
-        this.buffer += char;
-        // Check prefix match
-        if (this.buffer.length <= this.openTagPrefix.length) {
-          if (!this.openTagPrefix.startsWith(this.buffer)) {
-            output += this.buffer;
-            this.buffer = '';
+      // Phase 1: Check if content starts with <think>
+      if (this.state === 'check_think') {
+        this.thinkBuffer += char;
+        const thinkOpenTag = '<think>';
+        if (this.thinkBuffer === thinkOpenTag) {
+          // Found <think>, skip until </think>
+          this.state = 'skip_think';
+          this.thinkBuffer = '';
+        } else if (this.thinkBuffer.length < thinkOpenTag.length) {
+          // Still building buffer - check if prefix matches
+          if (!thinkOpenTag.startsWith(this.thinkBuffer)) {
+            // Not starting with <think>, process buffered content normally
             this.state = 'search_open';
-          }
-        } else {
-          // Buffer longer than prefix
-          if (this.buffer.startsWith(this.openTagPrefix)) {
-            if (char === '>') {
-              // Tag close
-              this.buffer = '';
-              this.state = 'inside';
-              this._hasStreamedContent = true;
+            // Re-process thinkBuffer through normal state machine
+            // eslint-disable-next-line functional/no-loop-statements
+            for (const bufferedChar of this.thinkBuffer) {
+              output += this.processNormalChar(bufferedChar);
             }
-          } else {
-            // Should not happen if prefix matched before, but safety
-            output += this.buffer;
-            this.buffer = '';
-            this.state = 'search_open';
+            this.thinkBuffer = '';
           }
-        }
-      } else if (this.state === 'inside') {
-        if (char === '<') {
-          this.state = 'buffering_close';
-          this.buffer = char;
         } else {
-          output += char;
+          // Buffer exceeded <think> length without matching - not a think block
+          this.state = 'search_open';
+          // eslint-disable-next-line functional/no-loop-statements
+          for (const bufferedChar of this.thinkBuffer) {
+            output += this.processNormalChar(bufferedChar);
+          }
+          this.thinkBuffer = '';
         }
-      } else if (this.state === 'buffering_close') {
-        this.buffer += char;
-        if (!this.closeTag.startsWith(this.buffer)) {
-          output += this.buffer;
-          this.buffer = '';
-          this.state = 'inside';
-        } else if (this.buffer === this.closeTag) {
-          this.buffer = '';
-          this.state = 'done';
-        }
-      } else {
-        output += char;
+        continue;
       }
+
+      // Phase 2: Skip content inside <think>...</think>
+      if (this.state === 'skip_think') {
+        this.thinkBuffer += char;
+        if (this.thinkBuffer.endsWith(this.thinkCloseTag)) {
+          // Found </think>, switch to normal processing
+          this.state = 'search_open';
+          this.thinkBuffer = '';
+        } else if (this.thinkBuffer.length > 100000) {
+          // Safety: truncate buffer to prevent memory issues (keep last N chars for matching)
+          this.thinkBuffer = this.thinkBuffer.slice(-this.thinkCloseTag.length + 1);
+        }
+        continue;
+      }
+
+      // Normal XML processing states
+      output += this.processNormalChar(char);
     }
     return output;
+  }
+
+  private processNormalChar(char: string): string {
+    if (this.state === 'search_open') {
+      if (char === '<') {
+        this.state = 'buffering_open';
+        this.buffer = char;
+        return '';
+      }
+      return char;
+    }
+
+    if (this.state === 'buffering_open') {
+      this.buffer += char;
+      // Check prefix match
+      if (this.buffer.length <= this.openTagPrefix.length) {
+        if (!this.openTagPrefix.startsWith(this.buffer)) {
+          const out = this.buffer;
+          this.buffer = '';
+          this.state = 'search_open';
+          return out;
+        }
+      } else {
+        // Buffer longer than prefix
+        if (this.buffer.startsWith(this.openTagPrefix)) {
+          if (char === '>') {
+            // Tag close
+            this.buffer = '';
+            this.state = 'inside';
+            this._hasStreamedContent = true;
+          }
+        } else {
+          // Should not happen if prefix matched before, but safety
+          const out = this.buffer;
+          this.buffer = '';
+          this.state = 'search_open';
+          return out;
+        }
+      }
+      return '';
+    }
+
+    if (this.state === 'inside') {
+      if (char === '<') {
+        this.state = 'buffering_close';
+        this.buffer = char;
+        return '';
+      }
+      return char;
+    }
+
+    if (this.state === 'buffering_close') {
+      this.buffer += char;
+      if (!this.closeTag.startsWith(this.buffer)) {
+        const out = this.buffer;
+        this.buffer = '';
+        this.state = 'inside';
+        return out;
+      }
+      if (this.buffer === this.closeTag) {
+        this.buffer = '';
+        this.state = 'done';
+      }
+      return '';
+    }
+
+    // state === 'done'
+    return char;
   }
 
   flush(): string {
