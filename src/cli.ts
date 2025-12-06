@@ -1029,6 +1029,10 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
       caching: 'caching',
       contextWindow: 'contextWindow',
       'context-window': 'contextWindow',
+      noBatch: 'noBatch',
+      'no-batch': 'noBatch',
+      noProgress: 'noProgress',
+      'no-progress': 'noProgress',
     };
     return canonicalMap[lower] ?? lower;
   };
@@ -1053,17 +1057,22 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
     throw new Error(`${key} override requires a boolean value (true|false)`);
   };
 
+  // Boolean flags that can be specified without =value (e.g., --override no-batch)
+  const implicitTrueFlags = new Set(['noBatch', 'noProgress']);
+
   entries.forEach((entry) => {
     const idx = entry.indexOf('=');
-    if (idx <= 0 || idx === entry.length - 1) {
-      throw new Error(`invalid override '${entry}': use key=value with keys like models`);
-    }
-    const rawKey = entry.slice(0, idx).trim();
-    const value = entry.slice(idx + 1).trim();
-    if (rawKey.length === 0 || value.length === 0) {
-      throw new Error(`invalid override '${entry}': key and value must be non-empty`);
+    const hasValue = idx > 0 && idx < entry.length - 1;
+    const rawKey = hasValue ? entry.slice(0, idx).trim() : entry.trim();
+    const value = hasValue ? entry.slice(idx + 1).trim() : '';
+    if (rawKey.length === 0) {
+      throw new Error(`invalid override '${entry}': key must be non-empty`);
     }
     const key = normalizeKey(rawKey);
+    // Allow value-less form for implicit-true boolean flags
+    if (!hasValue && !implicitTrueFlags.has(key)) {
+      throw new Error(`invalid override '${entry}': use key=value with keys like models`);
+    }
     switch (key) {
       case 'models': {
         const parsed = parsePairs(value);
@@ -1153,8 +1162,14 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
         overrides.contextWindow = tokens;
         break;
       }
+      case 'noBatch':
+        overrides.noBatch = value === '' ? true : parseBoolean('noBatch', value);
+        break;
+      case 'noProgress':
+        overrides.noProgress = value === '' ? true : parseBoolean('noProgress', value);
+        break;
       default:
-        throw new Error(`unsupported override key '${rawKey}'; expected keys like models, maxOutputTokens, temperature, contextWindow`);
+        throw new Error(`unsupported override key '${rawKey}'; expected keys like models, maxOutputTokens, temperature, contextWindow, no-batch, no-progress`);
     }
   });
   return overrides;

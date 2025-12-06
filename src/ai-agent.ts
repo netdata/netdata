@@ -504,7 +504,7 @@ export class AIAgentSession {
         this.systemTurnBegan = true;
       }
       const sysInitOp = this.opTree.beginOp(0, 'system', { label: 'init' });
-      this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:init', fatal: false, message: 'session initialized' }, { opId: sysInitOp });
+      this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:init', fatal: false, message: `session initialized (txnId: ${this.txnId})` }, { opId: sysInitOp });
       this.opTree.endOp(sysInitOp, 'ok');
       this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
     } catch (e) { warn(`system init logging failed: ${e instanceof Error ? e.message : String(e)}`); }

@@ -377,7 +377,7 @@ export const renderXmlNextTemplate = (payload: XmlNextTemplatePayload): string =
   // Guidance based on tool availability
   if (hasExternalTools) {
     lines.push('You now need to decide your next move:');
-    lines.push('1. Call tools to progress your task');
+    lines.push('1. Call tools to progress your task (pay attention to their formatting and schema requirements).');
     lines.push(`2. Provide your final report/answer in the expected format (${expectedFinalFormat}) using the XML wrapper (\`<ai-agent-${finalSlotId} format="${expectedFinalFormat}">\`)`);
   } else {
     lines.push(`You MUST now provide your final report/answer in the expected format (${expectedFinalFormat}) using the XML wrapper (\`<ai-agent-${finalSlotId} format="${expectedFinalFormat}">\`).`);
@@ -444,15 +444,16 @@ export const finalReportXmlInstructions = (
       ? '{ ... your JSON here ... }'
       : '[Your final report/answer here]';
   return `
-## MANDATORY: READ-FIRST: How to Provide Your Final Report/Answer
+## MANDATORY READ-FIRST: How to Provide Your Final Report/Answer
 
-You run in agentic mode with strict output formatting requirements. Depending on the user request and the task at hand, you may need to run several turns, calling tools to gather information or perform actions, adapting to the data at hand, before providing your final report/answer. When tools are available and applicable, and you can utilize them to complete the task, you are expected to run an iterative process, making use of the available tools to complete the task.
+You run in agentic/investigation mode with strict output formatting requirements. Depending on the user request and the task at hand, you may need to run several turns/steps, calling tools to gather information or perform actions, adapting to the data at hand, before providing your final report/answer. When tools are available and applicable, and you can utilize them to complete the task. You are expected to run an iterative process, making use of the available tools to complete the task assigned to you.
 
-The system allows you to perform a limited number of turns to complete the task, monitors your context window size, and enforces these limits.
+The system allows you to perform a limited number of turns to complete the task, monitors your context window size, and enforces certain limits.
 
 Once you are ready to provide your final report/answer (or when the system will tell you to do so), you **MUST** follow these instructions carefully:
-1. Your final response **MUST** use the XML wrapper shown below
-2. The opening XML tag **MUST** be the **FIRST** thing in your response
+1. Your final response **MUST** be in your output (it is not a tool call).
+1. Your final response **MUST** use the XML wrapper shown below, at your output
+2. The opening XML tag **MUST** be the **FIRST** thing in your output
 3. Do NOT output plain text, greetings, or explanations outside the XML tags
 4. ALL content must be between the opening and closing XML tags
 
@@ -473,7 +474,11 @@ ${exampleContent}
 ${formatDescription}
 ${schemaBlock}
 
-Your final report/answer must be brutally honest to accurately and precisely reflect the information available. If you encountered limitations, tool failures that you couldn't overcome, or were unable to complete certain aspects of the task, clearly state these in your final report/answer.
+Your final report/answer content must follow any instructions given to accurately and precisely reflect the information available. If you encountered limitations, tool failures that you couldn't overcome, or you were unable to complete certain aspects of the task, clearly state these limitations in your final report/answer.
+
+In some cases, you may receive requests that are irrelevant to your instructions, such as greetings, casual conversation, or questions outside your domain. In such cases, be polite and helpful, and respond to the best of your knowledge, stating that the information provided is outside your scope, but always adhere to the final report/answer format and XML wrapper instructions provided above.
+
+CRITICAL: You should deliver your final report/answer on your output with the given XML wrapper. Your final report/answer is NOT a tool call.
 `;
 };
 

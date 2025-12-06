@@ -152,6 +152,9 @@ export interface GlobalOverrides {
   reasoningValue?: ProviderReasoningValue | null;
   caching?: 'none' | 'full';
   contextWindow?: number;
+  // Silent feature disablement
+  noBatch?: boolean;
+  noProgress?: boolean;
 }
 
 export interface LoadAgentOptions {
@@ -360,6 +363,10 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
   const selectedTargets = overrideTargets
     ?? (Array.isArray(options?.targets) && options.targets.length > 0 ? options.targets : fmModels);
   let selectedTools = Array.isArray(options?.tools) && options.tools.length > 0 ? [...options.tools] : [...fmTools];
+  // Apply no-batch override: silently remove 'batch' from tools list
+  if (options?.globalOverrides?.noBatch === true) {
+    selectedTools = selectedTools.filter((t) => t !== 'batch');
+  }
   const effAgents = Array.isArray(options?.agents) && options.agents.length > 0 ? options.agents : fmAgents;
   const selectedAgents = effAgents.map((rel) => path.resolve(baseDir, rel));
   const subAgentInfos: PreloadedSubAgent[] = [];
@@ -641,7 +648,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       reasoningValue: eff.reasoningValue,
       caching: eff.caching,
       headendId: o.headendId ?? o.renderTarget ?? 'cli',
-      headendWantsProgressUpdates: o.wantsProgressUpdates !== undefined ? o.wantsProgressUpdates : true,
+      headendWantsProgressUpdates: options?.globalOverrides?.noProgress === true ? false : (o.wantsProgressUpdates !== undefined ? o.wantsProgressUpdates : true),
       // Preserve the original reference (no clone) so recursion guards see identical identity.
       // Harness expectations rely on the session receiving the exact array instance from callers.
       ancestors: Array.isArray(o.ancestors) ? o.ancestors : ancestorChain,
