@@ -19,7 +19,7 @@ import { buildEffectiveOptionsSchema } from './options-schema.js';
 import { openApiToRestTools, parseOpenAPISpec } from './tools/openapi-importer.js';
 import { queueManager } from './tools/queue-manager.js';
 import { clampToolName, sanitizeToolName } from './utils.js';
-import { mergeCallbacksWithPersistence } from './persistence.js';
+import { mergeCallbacksWithPersistence, resolvePeristenceConfig } from './persistence.js';
 
 
 export interface LoadedAgentSessionOptions {
@@ -677,7 +677,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
     } else if (sessionConfig.headendId !== undefined) {
       sessionConfig.telemetryLabels = { headend: sessionConfig.headendId };
     }
-    sessionConfig.callbacks = mergeCallbacksWithPersistence(sessionConfig.callbacks, config.persistence);
+    sessionConfig.callbacks = mergeCallbacksWithPersistence(sessionConfig.callbacks, resolvePeristenceConfig(config.persistence));
     if (typeof o.traceLLM === 'boolean') {
       sessionConfig.traceLLM = o.traceLLM;
     }

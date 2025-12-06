@@ -14,6 +14,33 @@ export interface PersistenceConfig {
   billingFile?: string;
 }
 
+/**
+ * Returns default persistence configuration based on user's home directory.
+ * Sessions: ~/.ai-agent/sessions/
+ * Billing:  ~/.ai-agent/accounting.jsonl
+ */
+export function getDefaultPersistenceConfig(): PersistenceConfig {
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
+  if (home.length === 0) return {};
+  const base = path.join(home, '.ai-agent');
+  return {
+    sessionsDir: path.join(base, 'sessions'),
+    billingFile: path.join(base, 'accounting.jsonl'),
+  };
+}
+
+/**
+ * Merges user-provided persistence config with defaults.
+ * User config takes precedence; defaults fill in missing values.
+ */
+export function resolvePeristenceConfig(config?: PersistenceConfig): PersistenceConfig {
+  const defaults = getDefaultPersistenceConfig();
+  return {
+    sessionsDir: config?.sessionsDir ?? defaults.sessionsDir,
+    billingFile: config?.billingFile ?? defaults.billingFile,
+  };
+}
+
 type SnapshotPayload = Parameters<NonNullable<AIAgentCallbacks['onSessionSnapshot']>>[0];
 type LedgerPayload = Parameters<NonNullable<AIAgentCallbacks['onAccountingFlush']>>[0];
 

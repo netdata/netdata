@@ -1,12 +1,13 @@
 # Session Snapshots
 
 ## TL;DR
-Point-in-time captures of session state including opTree, accounting, and metadata. Persisted via callbacks for recovery and monitoring.
+Point-in-time captures of session state including opTree, accounting, and metadata. Persisted by default to `~/.ai-agent/sessions/` (gzipped JSON). All entry points (CLI, headends, library API) share the same defaults.
 
 ## Source Files
 - `src/ai-agent.ts:368-386` - persistSessionSnapshot()
 - `src/types.ts:514-528` - Snapshot payload definitions
 - `src/session-tree.ts` - opTree snapshot structure
+- `src/persistence.ts` - File persistence callbacks and defaults
 
 ## Data Structures
 
@@ -234,9 +235,19 @@ private async flushAccounting(entries: AccountingEntry[]): Promise<void> {
 
 | Setting | Effect |
 |---------|--------|
-| `onSessionSnapshot` | Snapshot sink callback |
-| `onAccountingFlush` | Accounting sink callback |
-| Snapshot timing | When to capture |
+| `persistence.sessionsDir` | Directory for snapshot files (default: `~/.ai-agent/sessions/`) |
+| `persistence.billingFile` | Path for accounting ledger (default: `~/.ai-agent/accounting.jsonl`) |
+| `onSessionSnapshot` | Custom snapshot sink callback (overrides file persistence) |
+| `onAccountingFlush` | Custom accounting sink callback (overrides file persistence) |
+
+### Default Persistence
+**Location**: `src/persistence.ts:22-30`
+
+All entry points (CLI, headends, library API) apply the same defaults via `resolvePeristenceConfig()`:
+- Sessions saved to `~/.ai-agent/sessions/{originId}.json.gz`
+- Accounting appended to `~/.ai-agent/accounting.jsonl`
+
+User-provided `persistence` config values override defaults. Custom callbacks (`onSessionSnapshot`, `onAccountingFlush`) bypass file persistence entirely.
 
 ## Telemetry
 

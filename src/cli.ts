@@ -26,7 +26,7 @@ import { resolveIncludes } from './include-resolver.js';
 import { formatLog } from './log-formatter.js';
 import { makeTTYLogCallbacks } from './log-sink-tty.js';
 import { getOptionsByGroup, formatCliNames, OPTIONS_REGISTRY } from './options-registry.js';
-import { mergeCallbacksWithPersistence } from './persistence.js';
+import { mergeCallbacksWithPersistence, resolvePeristenceConfig } from './persistence.js';
 import { ShutdownController } from './shutdown-controller.js';
 import { initTelemetry, shutdownTelemetry } from './telemetry/index.js';
 import { buildTelemetryRuntimeConfig, type TelemetryOverrides } from './telemetry/runtime-config.js';
@@ -2034,10 +2034,12 @@ function createCallbacks(
     })(), // Check if user explicitly requested a format
   });
 
-  const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
-  const defaultBase = home.length > 0 ? path.join(home, '.ai-agent') : undefined;
-  const resolvedSessionsDir = persistence?.sessionsDir ?? (defaultBase !== undefined ? path.join(defaultBase, 'sessions') : undefined);
-  const resolvedLedgerFile = accountingFile ?? persistence?.billingFile ?? (defaultBase !== undefined ? path.join(defaultBase, 'accounting.jsonl') : undefined);
+  // Use shared persistence defaults, with CLI accountingFile override
+  const resolved = resolvePeristenceConfig(persistence);
+  const persistenceConfig = {
+    sessionsDir: resolved.sessionsDir,
+    billingFile: accountingFile ?? resolved.billingFile,
+  };
 
   const baseCallbacks: AIAgentCallbacks = {
     onLog: (entry: LogEntry) => {
@@ -2077,11 +2079,6 @@ function createCallbacks(
     onAccounting: (_entry: AccountingEntry) => {
       // No per-entry file writes from CLI; consolidated flush occurs via onAccountingFlush.
     },
-  };
-
-  const persistenceConfig = {
-    sessionsDir: resolvedSessionsDir,
-    billingFile: resolvedLedgerFile,
   };
 
   return mergeCallbacksWithPersistence(baseCallbacks, persistenceConfig) ?? baseCallbacks;
