@@ -338,7 +338,7 @@ jobs:
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
       - name: Download Cache
         id: fetch-cache
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: cache-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/build-cache
@@ -427,7 +427,7 @@ jobs:
         uses: actions/checkout@v6
       - name: Download digests
         id: fetch-digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           path: /tmp/digests
           pattern: docker-digests-*
@@ -495,7 +495,7 @@ jobs:
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
       - name: Download Cache
         id: fetch-cache
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: cache-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/build-cache
@@ -585,7 +585,7 @@ jobs:
         uses: actions/checkout@v6
       - name: Download digests
         id: fetch-digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           path: /tmp/digests
           pattern: quay-digests-*
@@ -654,7 +654,7 @@ jobs:
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
       - name: Download Cache
         id: fetch-cache
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: cache-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/build-cache
@@ -744,7 +744,7 @@ jobs:
         uses: actions/checkout@v6
       - name: Download digests
         id: fetch-digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           path: /tmp/digests
           pattern: ghcr-digests-*
