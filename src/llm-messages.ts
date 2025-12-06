@@ -444,17 +444,21 @@ export const finalReportXmlInstructions = (
       ? '{ ... your JSON here ... }'
       : '[Your final report/answer here]';
   return `
-## MANDATORY: How to Respond
+## MANDATORY: READ-FIRST: How to Provide Your Final Report/Answer
 
-**CRITICAL RULES — Read First:**
-1. Your response MUST use the XML wrapper shown below
-2. The opening XML tag MUST be the FIRST thing in your response
+You run in agentic mode with strict output formatting requirements. Depending on the user request and the task at hand, you may need to run several turns, calling tools to gather information or perform actions, adapting to the data at hand, before providing your final report/answer. When tools are available and applicable, and you can utilize them to complete the task, you are expected to run an iterative process, making use of the available tools to complete the task.
+
+The system allows you to perform a limited number of turns to complete the task, monitors your context window size, and enforces these limits.
+
+Once you are ready to provide your final report/answer (or when the system will tell you to do so), you **MUST** follow these instructions carefully:
+1. Your final response **MUST** use the XML wrapper shown below
+2. The opening XML tag **MUST** be the **FIRST** thing in your response
 3. Do NOT output plain text, greetings, or explanations outside the XML tags
 4. ALL content must be between the opening and closing XML tags
 
 **Pre-Response Checklist:**
 - [ ] Response starts with \`<ai-agent-${slotId}\` (no text before it)
-- [ ] Content matches ${formatId} format
+- [ ] Content matches ${formatId} format requirements, including any schema if provided
 - [ ] Response ends with \`</ai-agent-${slotId}>\`
 - [ ] No text outside the XML tags
 
@@ -467,7 +471,10 @@ ${exampleContent}
 
 **Output Format: ${formatId}**
 ${formatDescription}
-${schemaBlock}`;
+${schemaBlock}
+
+Your final report/answer must be brutally honest to accurately and precisely reflect the information available. If you encountered limitations, tool failures that you couldn't overcome, or were unable to complete certain aspects of the task, clearly state these in your final report/answer.
+`;
 };
 
 /**
