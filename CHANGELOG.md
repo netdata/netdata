@@ -56,6 +56,17 @@
 - Fix shutdown timeout handling in completion wait function ([#21395](https://github.com/netdata/netdata/issues/21395))
 - Fix validation of extent index in journal file ([#21400](https://github.com/netdata/netdata/issues/21400))
 - Fix(kickstart): fix incorrect find command patterns ([#21399](https://github.com/netdata/netdata/issues/21399))
+- Fix(go.d/pkg/ndexec): return the output along with the error ([#21405](https://github.com/netdata/netdata/issues/21405))
+- Add keyword support to the documentation map ([#21402](https://github.com/netdata/netdata/issues/21402))
+- Regenerate integrations docs ([#21407](https://github.com/netdata/netdata/issues/21407))
+- Update bundled components for static builds. ([#21401](https://github.com/netdata/netdata/issues/21401))
+- Disable MongoDB exporter for Ubuntu 20.04, 22.04, and 24.04 packages. ([#21403](https://github.com/netdata/netdata/issues/21403))
+- Fix(kickstart): install epel before repo config pkg ([#21410](https://github.com/netdata/netdata/issues/21410))
+- Fix(rabbitmq): remove "rabbitmq_version" check ([#21411](https://github.com/netdata/netdata/issues/21411))
+- Change chart variable (Windows.plugin) ([#21412](https://github.com/netdata/netdata/issues/21412))
+- Chore(go.d/snmp): add collection stats ([#21409](https://github.com/netdata/netdata/issues/21409))
+- Docs: remove prereq install smartmontools in Docker ([#21413](https://github.com/netdata/netdata/issues/21413))
+- Regenerate integrations docs ([#21415](https://github.com/netdata/netdata/issues/21415))
 
 ## [2.8.0] - 2025-11-19
 
