@@ -60,8 +60,8 @@ static void uuidmap_init_aral(void) {
 }
 
 static UUIDMAP_ID get_next_id_unsafe(struct uuidmap_partition *partition) {
-    // Check if we've reached the maximum ID value
-    if (unlikely(partition->next_id >= 0x1FFFFFFF))
+    // Check if we've reached the maximum ID value (28 bits with 16 partitions)
+    if (unlikely(partition->next_id >= 0x0FFFFFFF))
         fatal("UUIDMAP: Maximum ID limit reached for partition %u. UUIDs exhausted.",
               (unsigned int)(partition - uuid_map.p));
 
