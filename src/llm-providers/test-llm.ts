@@ -21,10 +21,21 @@ interface StepContext {
   scenarioId: string;
   turn: number;
   modelId: string;
+  xmlNonce?: string;  // For XML-wrapped final reports
 }
 
 interface ErrorDescriptor {
   message: string;
+}
+
+// Extract XML nonce from messages (looks for xml-next notice with ai-agent-{nonce}-FINAL pattern)
+function extractXmlNonce(messages: ConversationMessage[]): string | undefined {
+  // Look for the XML-NEXT notice message
+  const xmlNextMessage = messages.find(m => m.noticeType === 'xml-next');
+  if (xmlNextMessage === undefined) return undefined;
+  // Extract nonce from pattern like: ai-agent-{nonce}-FINAL
+  const match = /ai-agent-([a-zA-Z0-9]+)-FINAL/.exec(xmlNextMessage.content);
+  return match?.[1];
 }
 
 export class TestLLMProvider extends BaseLLMProvider {
@@ -138,12 +149,14 @@ export class TestLLMProvider extends BaseLLMProvider {
       }
     }
 
+    const xmlNonce = extractXmlNonce(request.messages);
     const context: StepContext = {
       scenario,
       step: activeStep,
       scenarioId,
       turn,
       modelId: request.model,
+      xmlNonce,
     };
 
     const providerKey = request.provider;
@@ -210,8 +223,12 @@ export class TestLLMProvider extends BaseLLMProvider {
     this.attemptCounters.set(attemptKey, attemptCount);
 
     const model = createScenarioLanguageModel(context);
-    const filteredTools = this.filterToolsForFinalTurn(request.tools, request.isFinalTurn === true);
-    const tools = this.convertTools(filteredTools, request.toolExecutor);
+    // For XML transport (xmlNonce present), filter out agent__final_report since LLM uses XML wrapper.
+    // For native transport (no nonce), keep agent__final_report since LLM uses tool calls.
+    const toolsForTurn = xmlNonce !== undefined
+      ? this.filterToolsForFinalTurn(request.tools, request.isFinalTurn === true)
+      : request.tools;
+    const tools = this.convertTools(toolsForTurn, request.toolExecutor);
     const messages = super.convertMessages(request.messages);
     const finalMessages = this.buildFinalTurnMessages(messages, request.isFinalTurn === true);
 
@@ -292,6 +309,7 @@ export class TestLLMProvider extends BaseLLMProvider {
       },
     };
 
+    const xmlNonce = extractXmlNonce(request.messages);
     const context: StepContext = {
       scenario: {
         id: scenarioId ?? 'unknown-scenario',
@@ -302,6 +320,7 @@ export class TestLLMProvider extends BaseLLMProvider {
       scenarioId: scenarioId ?? 'unknown-scenario',
       turn: fallback.turn,
       modelId: request.model,
+      xmlNonce,
     };
 
     const model = createScenarioLanguageModel(context);
@@ -314,17 +333,17 @@ export class TestLLMProvider extends BaseLLMProvider {
 }
 
 function createScenarioLanguageModel(context: StepContext): LanguageModelV2 {
-  const { step } = context;
+  const { step, xmlNonce } = context;
   return {
     specificationVersion: 'v2',
     provider: PROVIDER_NAME,
     modelId: context.modelId,
     supportedUrls: {},
     doGenerate(_options: LanguageModelV2CallOptions) {
-      return Promise.resolve(buildResponse(step.response));
+      return Promise.resolve(buildResponse(step.response, xmlNonce));
     },
     doStream(_options: LanguageModelV2CallOptions) {
-      const response = buildResponse(step.response);
+      const response = buildResponse(step.response, xmlNonce);
       const parts = convertContentToStream(response.content, response.finishReason, response.usage);
       const stream = new ReadableStream<LanguageModelV2StreamPart>({
         start(controller) {
@@ -339,7 +358,7 @@ function createScenarioLanguageModel(context: StepContext): LanguageModelV2 {
   };
 }
 
-function buildResponse(response: ScenarioStepResponse) {
+function buildResponse(response: ScenarioStepResponse, xmlNonce?: string) {
   const usage: LanguageModelV2Usage = response.tokenUsage ?? {
     inputTokens: 64,
     outputTokens: 32,
@@ -356,7 +375,7 @@ function buildResponse(response: ScenarioStepResponse) {
     };
   }
   if (response.kind === FINAL_REPORT_KIND) {
-    const content: LanguageModelV2Content[] = buildFinalReportContent(response);
+    const content: LanguageModelV2Content[] = buildFinalReportContent(response, xmlNonce);
     appendReasoningParts(content, response);
     return {
       content,
@@ -398,14 +417,16 @@ function buildToolCallContent(response: ToolCallStep): LanguageModelV2Content[] 
   return items;
 }
 
-function buildFinalReportContent(response: FinalReportStep): LanguageModelV2Content[] {
+function buildFinalReportContent(response: FinalReportStep, xmlNonce?: string): LanguageModelV2Content[] {
   const items: LanguageModelV2Content[] = [];
   if (typeof response.assistantText === 'string' && response.assistantText.trim().length > 0) {
     items.push({ type: 'text', text: response.assistantText });
   }
+  const status = response.status ?? 'success';
+  const format = response.reportFormat;
   const inputPayload: Record<string, unknown> = {
-    status: response.status ?? 'success',
-    report_format: response.reportFormat,
+    status,
+    report_format: format,
   };
   // For slack-block-kit, pass messages array directly (not report_content)
   if (response.reportMessages !== undefined) {
@@ -414,6 +435,40 @@ function buildFinalReportContent(response: FinalReportStep): LanguageModelV2Cont
     inputPayload.report_content = response.reportContent;
     inputPayload.content_json = response.reportContentJson;
   }
+
+  // When nonce is present, use XML wrapper instead of tool call
+  // XML wrapper format: <ai-agent-{nonce}-FINAL status="{status}" format="{format}">{content}</ai-agent-{nonce}-FINAL>
+  // The wrapper attributes carry status/format; the content is the actual payload.
+  // For JSON format: content should be the stringified content_json (if present) or report_content
+  // For other formats: content is report_content or messages
+  if (xmlNonce !== undefined) {
+    const tag = `ai-agent-${xmlNonce}-FINAL`;
+    // Determine the content to put inside the XML tag
+    let xmlContent: string;
+    if (response.reportMessages !== undefined) {
+      // Slack block kit: messages array as JSON
+      xmlContent = JSON.stringify(response.reportMessages);
+    } else if (response.reportContentJson !== undefined) {
+      // JSON format with valid content_json: stringify the JSON data
+      xmlContent = JSON.stringify(response.reportContentJson);
+    } else {
+      // Text/markdown or invalid JSON: use report_content directly
+      xmlContent = response.reportContent;
+    }
+    // XML parser skips whitespace-only content (xml-tools.ts line 114).
+    // Fall back to native tool call for empty content so validation can process it.
+    if (xmlContent.trim().length > 0) {
+      const xmlText = `<${tag} status="${status}" format="${format}">${xmlContent}</${tag}>`;
+      items.push({
+        type: 'text',
+        text: xmlText,
+      });
+      return items;
+    }
+    // Fall through to native tool call for whitespace-only content
+  }
+
+  // Legacy: tool call fallback (no nonce available)
   items.push({
     type: 'tool-call',
     toolCallId: 'agent-final-report',
