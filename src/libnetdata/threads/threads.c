@@ -494,26 +494,25 @@ int nd_thread_join(ND_THREAD *nti) {
         }
     }
 
-    if(ret == 0) {
-        // we successfully joined the thread (or cleaned up after Windows fast-exit)
-        // JOINED flag was already set atomically at the start of this function
+    // Always clean up the thread structure - if uv_thread_join() failed,
+    // retrying won't help (thread doesn't exist, not joinable, or logic error)
+    // JOINED flag was already set atomically at the start of this function
 
-        spinlock_lock(&threads_globals.running.spinlock);
-        if(nti->list == ND_THREAD_LIST_RUNNING) {
-            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
-            nti->list = ND_THREAD_LIST_NONE;
-        }
-        spinlock_unlock(&threads_globals.running.spinlock);
-
-        spinlock_lock(&threads_globals.exited.spinlock);
-        if(nti->list == ND_THREAD_LIST_EXITED) {
-            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
-            nti->list = ND_THREAD_LIST_NONE;
-        }
-        spinlock_unlock(&threads_globals.exited.spinlock);
-
-        freez(nti);
+    spinlock_lock(&threads_globals.running.spinlock);
+    if(nti->list == ND_THREAD_LIST_RUNNING) {
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
+        nti->list = ND_THREAD_LIST_NONE;
     }
+    spinlock_unlock(&threads_globals.running.spinlock);
+
+    spinlock_lock(&threads_globals.exited.spinlock);
+    if(nti->list == ND_THREAD_LIST_EXITED) {
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+        nti->list = ND_THREAD_LIST_NONE;
+    }
+    spinlock_unlock(&threads_globals.exited.spinlock);
+
+    freez(nti);
 
     return ret;
 }
