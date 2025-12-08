@@ -42,7 +42,7 @@ Our [static builds](#static-builds) are expected to work on these platforms if a
 | Platform                 | Version        | Official Native Packages               | Notes                                                                                                          |
 |--------------------------|----------------|----------------------------------------|----------------------------------------------------------------------------------------------------------------|
 | Alpine Linux             | 3.21           | No                                     | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images |
-| Alpine Linux             | 3.20           | No                                     | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images |
+| Alpine Linux             | 3.20           | No                                     |                                                                                                                |
 | Alma Linux               | 9.x            | x86\_64, AArch64                       | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                |
 | Alma Linux               | 8.x            | x86\_64, AArch64                       | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                |
 | Amazon Linux             | 2023           | x86\_64, AArch64                       |                                                                                                                |
