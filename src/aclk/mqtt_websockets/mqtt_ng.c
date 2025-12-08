@@ -1177,6 +1177,20 @@ static void mark_message_for_gc(struct buffer_fragment *frag)
     }
 }
 
+// Check if sending_frag points to any fragment in the message starting at msg_head
+static bool sending_frag_in_message(struct transaction_buffer *buf, struct buffer_fragment *msg_head)
+{
+    struct buffer_fragment *frag = msg_head;
+    while (frag) {
+        if (buf->sending_frag == frag)
+            return true;
+        if (frag->flags & BUFFER_FRAG_MQTT_PACKET_TAIL)
+            return false;
+        frag = frag->next;
+    }
+    return false;
+}
+
 static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
 {
     size_t reclaimable = 0;
@@ -1196,6 +1210,12 @@ static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
             usec_t latency = now_monotonic_usec() - frag->sent_monotonic_ut;
             pulse_aclk_sent_message_acked(latency, frag->len);
             __atomic_store_n(&publish_latency, latency, __ATOMIC_RELEASE);
+
+            // Invalidate sending_frag if it points to any fragment in this message
+            // since mark_message_for_gc will free the data
+            if (sending_frag_in_message(&client->main_buffer, frag))
+                client->main_buffer.sending_frag = NULL;
+
             mark_message_for_gc(frag);
 
             size_t used = BUFFER_BYTES_USED(&client->main_buffer.hdr_buffer);
@@ -2096,6 +2116,9 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
             worker_is_busy(WORKER_ACLK_CPT_CONNACK);
 
             LOCK_HDR_BUFFER(&client->main_buffer);
+            // Invalidate sending_frag if it points to any fragment in the CONNECT message
+            if (sending_frag_in_message(&client->main_buffer, client->connect_msg))
+                client->main_buffer.sending_frag = NULL;
             mark_message_for_gc(client->connect_msg);
             UNLOCK_HDR_BUFFER(&client->main_buffer);
 
