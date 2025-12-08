@@ -91,10 +91,8 @@ pub fn build_ui_response(
         .map(|f| f.to_string())
         .collect();
     let column_schema = super::columns::generate_column_schema(&field_names);
-    let columns = serde_json::to_value(&column_schema).unwrap_or_else(|e| {
-        warn!("Failed to serialize column schema: {}", e);
-        serde_json::json!({})
-    });
+    // Convert to JSON with keys sorted by index (required by UI)
+    let columns = super::columns::columns_to_sorted_json(&column_schema);
 
     let transformations = systemd_transformations();
 

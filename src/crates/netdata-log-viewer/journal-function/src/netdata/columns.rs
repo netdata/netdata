@@ -4,6 +4,7 @@
 //! that defines how log entries should be displayed in the Netdata dashboard.
 
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use std::collections::HashMap as StdHashMap;
 
 /// Filter type for a column in the logs table.
@@ -221,25 +222,27 @@ impl ColumnSchema {
 /// - Default: `filter: "facet"` for all fields
 /// - Exception: MESSAGE, ND_JOURNAL_PROCESS, ND_JOURNAL_FILE → `filter: "none"`
 ///
+/// **IMPORTANT**: When serializing to JSON, the keys must be sorted by their `index`
+/// field to match the order expected by the UI. Use `columns_to_sorted_json()` helper.
+///
 /// # Arguments
 ///
 /// * `discovered_fields` - Ordered list of field names from HistogramResponse::discovered_fields()
 ///
 /// # Returns
 ///
-/// A HashMap mapping column keys to their schemas, suitable for JSON serialization
-/// to the Netdata dashboard.
+/// A HashMap mapping column keys to their schemas.
 pub fn generate_column_schema(discovered_fields: &[String]) -> StdHashMap<String, ColumnSchema> {
     let mut columns = StdHashMap::new();
 
-    // Add special columns first
+    // Add special columns first (in index order)
     let timestamp = ColumnSchema::timestamp();
     columns.insert(timestamp.key.clone(), timestamp);
 
     let row_options = ColumnSchema::row_options();
     columns.insert(row_options.key.clone(), row_options);
 
-    // Add discovered fields starting at index 2
+    // Add discovered fields starting at index 2 (in index order)
     // Skip special columns (timestamp, rowOptions) if they appear in discovered_fields
     let mut index = 2;
     for field_name in discovered_fields.iter() {
@@ -254,4 +257,36 @@ pub fn generate_column_schema(discovered_fields: &[String]) -> StdHashMap<String
     }
 
     columns
+}
+
+/// Convert column schema HashMap to JSON with keys sorted by index.
+///
+/// The UI expects column keys in the JSON object to appear in index order (0, 1, 2, ...).
+/// This function sorts the HashMap entries by their `index` field before creating the JSON.
+///
+/// **IMPORTANT**: This requires serde_json's "preserve_order" feature to be enabled,
+/// so that `serde_json::Map` uses IndexMap internally and preserves insertion order.
+///
+/// # Arguments
+///
+/// * `columns` - HashMap of column schemas
+///
+/// # Returns
+///
+/// A JSON Value with columns as an object where keys are ordered by index.
+pub fn columns_to_sorted_json(columns: &StdHashMap<String, ColumnSchema>) -> Value {
+    // Collect entries and sort by index
+    let mut entries: Vec<_> = columns.iter().collect();
+    entries.sort_by_key(|(_, schema)| schema.index);
+
+    // Build JSON object with keys in index order
+    // With preserve_order feature, serde_json::Map preserves insertion order
+    let mut map = Map::new();
+    for (key, schema) in entries {
+        if let Ok(value) = serde_json::to_value(schema) {
+            map.insert(key.clone(), value);
+        }
+    }
+
+    Value::Object(map)
 }
