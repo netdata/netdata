@@ -176,8 +176,9 @@ type Job struct {
 	dumpMode     bool
 	dumpAnalyzer interface{} // Will be *agent.DumpAnalyzer but avoid circular dependency
 
-	consecutiveSkips int           // tracks consecutive tick skips
-	lastCollectDur   time.Duration // duration of last data collection
+	consecutiveSkips int       // tracks consecutive tick skips
+	collectStartTime time.Time // when current collection started
+	collectStopTime  time.Time // when current collection finished
 }
 
 type collectedMetrics struct {
@@ -302,14 +303,18 @@ func (j *Job) UpdateVnode(vnode *vnodes.VirtualNode) {
 func (j *Job) Tick(clock int) {
 	select {
 	case j.tick <- clock:
-		j.consecutiveSkips = 0
+		if j.consecutiveSkips > 0 {
+			j.Infof("data collection resumed after %s (skipped %d times)",
+				j.collectStopTime.Sub(j.collectStartTime), j.consecutiveSkips)
+			j.consecutiveSkips = 0
+		}
 	default:
 		if j.consecutiveSkips++; j.consecutiveSkips >= 2 {
-			j.Warningf("skipping data collection: previous run is still in progress (skipped %d times in a row, last took %s, interval %ds)",
-				j.consecutiveSkips, j.lastCollectDur, j.updateEvery)
+			j.Warningf("skipping data collection: previous run is still in progress for %s (skipped %d times in a row, interval %ds)",
+				time.Since(j.collectStartTime), j.consecutiveSkips, j.updateEvery)
 		} else {
-			j.Infof("skipping data collection: previous run is still in progress (last took %s, interval %ds)",
-				j.lastCollectDur, j.updateEvery)
+			j.Infof("skipping data collection: previous run is still in progress for %s (interval %ds)",
+				time.Since(j.collectStartTime), j.updateEvery)
 		}
 	}
 }
@@ -326,9 +331,9 @@ LOOP:
 			break LOOP
 		case t := <-j.tick:
 			if t%(j.updateEvery+j.penalty()) == 0 {
-				now := time.Now()
+				j.collectStartTime = time.Now()
 				j.runOnce()
-				j.lastCollectDur = time.Since(now)
+				j.collectStopTime = time.Now()
 			}
 		}
 	}
