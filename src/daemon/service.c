@@ -211,7 +211,10 @@ static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
         if (delete) {
             netdata_log_info("Host '%s' with machine guid '%s' is archived, ephemeral clean up.", rrdhost_hostname(host), host->machine_guid);
             // we inform cloud a child has been removed
-            aclk_host_state_update(host, 0, 0);
+            send_node_info_with_wait(host);
+
+            send_node_update_with_wait(host, 0, 0);
+
             unregister_node(host->machine_guid);
             rrdhost_free___while_having_rrd_wrlock(host);
         }

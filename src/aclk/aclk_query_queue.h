@@ -68,6 +68,7 @@ typedef struct {
         void *payload;
         char *node_id;
     } data;
+    struct completion *completion;
 } aclk_query_t;
 
 aclk_query_t *aclk_query_new(aclk_query_type_t type);

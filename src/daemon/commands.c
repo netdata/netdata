@@ -371,8 +371,12 @@ static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error, b
     sql_set_host_label(&host->host_id.uuid, "_is_ephemeral", "true");
     pulse_host_status(host, 0, 0);
 
+    if (marked)
+        send_node_info_with_wait(host);
+
     if(unregister) {
-        aclk_host_state_update(host, 0, 0);
+        send_node_update_with_wait(host, 0, 0);
+
         unregister_node(host->machine_guid);
         host->node_id = UUID_ZERO;
         buffer_sprintf(wb, "Node '%s' (machine guid: %s) has been unregistered",
