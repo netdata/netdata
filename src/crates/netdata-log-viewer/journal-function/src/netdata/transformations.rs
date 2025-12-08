@@ -86,6 +86,29 @@ impl FieldTransformation for PriorityTransformation {
     }
 }
 
+/// log.severity_number: OpenTelemetry severity number → short names
+/// Maps according to OpenTelemetry specification ranges:
+/// https://opentelemetry.io/docs/specs/otel/logs/data-model/#displaying-severity
+pub struct OtelSeverityNumberTransformation;
+
+impl FieldTransformation for OtelSeverityNumberTransformation {
+    fn transform(&self, raw_value: &str) -> String {
+        match raw_value.parse::<u32>() {
+            Ok(num) => match num {
+                1..=4 => "TRACE".to_string(),
+                5..=8 => "DEBUG".to_string(),
+                9..=12 => "INFO".to_string(),
+                13..=16 => "WARN".to_string(),
+                17..=20 => "ERROR".to_string(),
+                21..=24 => "FATAL".to_string(),
+                0 => "UNSPECIFIED".to_string(),
+                _ => raw_value.to_string(),
+            },
+            Err(_) => raw_value.to_string(),
+        }
+    }
+}
+
 /// SYSLOG_FACILITY: 0-23 → facility names
 pub struct SyslogFacilityTransformation;
 
@@ -600,6 +623,9 @@ pub fn systemd_transformations() -> TransformationRegistry {
         Arc::new(SourceRealtimeTimestampTransformation),
     );
     registry.register("MESSAGE_ID", Arc::new(MessageIdTransformation));
+
+    // OpenTelemetry log fields
+    registry.register("log.severity_number", Arc::new(OtelSeverityNumberTransformation));
 
     // Also register variations that exist in the wild
     registry.register("OBJECT_UID", Arc::new(UidTransformation));
