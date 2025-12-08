@@ -176,7 +176,8 @@ type Job struct {
 	dumpMode     bool
 	dumpAnalyzer interface{} // Will be *agent.DumpAnalyzer but avoid circular dependency
 
-	consecutiveSkips int // tracks consecutive tick skips
+	consecutiveSkips int           // tracks consecutive tick skips
+	lastCollectDur   time.Duration // duration of last data collection
 }
 
 type collectedMetrics struct {
@@ -304,9 +305,11 @@ func (j *Job) Tick(clock int) {
 		j.consecutiveSkips = 0
 	default:
 		if j.consecutiveSkips++; j.consecutiveSkips >= 2 {
-			j.Warningf("skipping data collection: previous run is still in progress (skipped %d times in a row)", j.consecutiveSkips)
+			j.Warningf("skipping data collection: previous run is still in progress (skipped %d times in a row, last took %s, interval %ds)",
+				j.consecutiveSkips, j.lastCollectDur, j.updateEvery)
 		} else {
-			j.Info("skipping data collection: previous run is still in progress")
+			j.Infof("skipping data collection: previous run is still in progress (last took %s, interval %ds)",
+				j.lastCollectDur, j.updateEvery)
 		}
 	}
 }
@@ -323,7 +326,9 @@ LOOP:
 			break LOOP
 		case t := <-j.tick:
 			if t%(j.updateEvery+j.penalty()) == 0 {
+				now := time.Now()
 				j.runOnce()
+				j.lastCollectDur = time.Since(now)
 			}
 		}
 	}
