@@ -3820,10 +3820,11 @@ func TestTableCollector_Collect(t *testing.T) {
 			}
 
 			missingOIDs := make(map[string]bool)
-			tableCache := newTableCache(0, 0) // Cache disabled
-			collector := newTableCollector(mockHandler, missingOIDs, tableCache, logger.New(), false)
+			tcache := newTableCache(0, 0) // Cache disabled
+			collector := newTableCollector(mockHandler, missingOIDs, tcache, logger.New(), false)
 
-			result, err := collector.Collect(tc.profile)
+			var stats ddsnmp.CollectionStats
+			result, err := collector.collect(tc.profile, &stats)
 
 			if tc.expectedError {
 				assert.Error(t, err)
