@@ -1465,6 +1465,8 @@ static void netdata_read_config_options()
         dbconn->collect_data_size = inicfg_get_boolean(&netdata_config, section_name, "collect database size", true);
         dbconn->collect_user_connections =
             inicfg_get_boolean(&netdata_config, section_name, "collect user connections", true);
+        dbconn->collect_blocked_processes = inicfg_get_boolean(
+                &netdata_config, section_name, "collect blocked processes", true);
         dbconn->is_connected = FALSE;
 
         netdata_mount_mssql_connection_string(dbconn);
@@ -1624,7 +1626,8 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
             netdata_mssql_fill_mssql_status(mi);
             netdata_mssql_fill_job_status(mi);
             netdata_mssql_fill_user_connection(mi);
-            netdata_mssql_fill_connection_memory(mi);
+            if (likely(mi->conn->collect_blocked_processes))
+                netdata_mssql_fill_connection_memory(mi);
             dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
         }
 

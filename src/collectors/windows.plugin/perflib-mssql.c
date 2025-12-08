@@ -458,7 +458,8 @@ void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *
         }
     }
 
-    if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLBlockedProcesses))) {
+    if (unlikely(!mi || !mi->conn || mi->conn->collect_blocked_processes) &&
+        likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLBlockedProcesses))) {
         do_mssql_blocked_processes(mi, update_every);
     }
 }

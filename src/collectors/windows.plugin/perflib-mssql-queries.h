@@ -687,6 +687,7 @@ struct netdata_mssql_conn {
     BOOL collect_buffer;
     BOOL collect_data_size;
     BOOL collect_user_connections;
+    BOOL collect_blocked_processes;
 
     BOOL is_connected;
 };
