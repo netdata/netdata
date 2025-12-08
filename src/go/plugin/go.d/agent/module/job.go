@@ -176,7 +176,8 @@ type Job struct {
 	dumpMode     bool
 	dumpAnalyzer interface{} // Will be *agent.DumpAnalyzer but avoid circular dependency
 
-	consecutiveSkips int       // tracks consecutive tick skips
+	consecutiveSkips int // tracks consecutive tick skips
+	collectTimeMu    sync.Mutex
 	collectStartTime time.Time // when current collection started
 	collectStopTime  time.Time // when current collection finished
 }
@@ -301,20 +302,28 @@ func (j *Job) UpdateVnode(vnode *vnodes.VirtualNode) {
 
 // Tick Tick.
 func (j *Job) Tick(clock int) {
+	j.collectTimeMu.Lock()
+	startTime, stopTime := j.collectStartTime, j.collectStopTime
+	j.collectTimeMu.Unlock()
+
 	select {
 	case j.tick <- clock:
 		if j.consecutiveSkips > 0 {
-			j.Infof("data collection resumed after %s (skipped %d times)",
-				j.collectStopTime.Sub(j.collectStartTime), j.consecutiveSkips)
+			if stopTime.IsZero() {
+				j.Infof("data collection resumed (skipped %d times)", j.consecutiveSkips)
+			} else {
+				j.Infof("data collection resumed after %s (skipped %d times)", stopTime.Sub(startTime), j.consecutiveSkips)
+			}
 			j.consecutiveSkips = 0
 		}
 	default:
-		if j.consecutiveSkips++; j.consecutiveSkips >= 2 {
-			j.Warningf("skipping data collection: previous run is still in progress for %s (skipped %d times in a row, interval %ds)",
-				time.Since(j.collectStartTime), j.consecutiveSkips, j.updateEvery)
+		j.consecutiveSkips++
+		if startTime.IsZero() {
+			j.Infof("skipping data collection: previous run is still in progress (interval %ds)", j.updateEvery)
+		} else if j.consecutiveSkips >= 2 {
+			j.Warningf("skipping data collection: previous run is still in progress for %s (skipped %d times in a row, interval %ds)", time.Since(startTime), j.consecutiveSkips, j.updateEvery)
 		} else {
-			j.Infof("skipping data collection: previous run is still in progress for %s (interval %ds)",
-				time.Since(j.collectStartTime), j.updateEvery)
+			j.Infof("skipping data collection: previous run is still in progress for %s (interval %ds)", time.Since(startTime), j.updateEvery)
 		}
 	}
 }
@@ -331,9 +340,15 @@ LOOP:
 			break LOOP
 		case t := <-j.tick:
 			if t%(j.updateEvery+j.penalty()) == 0 {
+				j.collectTimeMu.Lock()
 				j.collectStartTime = time.Now()
+				j.collectTimeMu.Unlock()
+
 				j.runOnce()
+
+				j.collectTimeMu.Lock()
 				j.collectStopTime = time.Now()
+				j.collectTimeMu.Unlock()
 			}
 		}
 	}
