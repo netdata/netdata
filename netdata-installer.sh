@@ -1100,10 +1100,13 @@ fi
 # -----------------------------------------------------------------------------
 progress "Cleaning up old dashboard files"
 if [ -r "${NETDATA_WEB_DIR}/.MANIFEST" ]; then
+  tmp_manifest="${TMPDIR}/nd-dashboard-manifest"
   old_pwd="$(pwd)"
-  cd "${NETDATA_WEB_DIR}" && remove_files="$(find "." -type f -print0 | grep -vzF "" | grep -vzFf "${NETDATA_WEB_DIR}/.MANIFEST")"
+  grep -vE "^$" "${NETDATA_WEB_DIR}/.MANIFEST" > "${tmp_manifest}"
+  cd "${NETDATA_WEB_DIR}" && remove_files="$(find "." -type f -print0 | grep -vzFf "${tmp_manifest}")"
   cd "${old_pwd}" || true
   [ -n "${remove_files}" ] && echo "${remove_files}" | xargs -0 rm -f
+  rm -f "${tmp_manifest}"
 fi
 
 # -----------------------------------------------------------------------------
