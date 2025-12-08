@@ -67,6 +67,8 @@
 - Chore(go.d/snmp): add collection stats ([#21409](https://github.com/netdata/netdata/issues/21409))
 - Docs: remove prereq install smartmontools in Docker ([#21413](https://github.com/netdata/netdata/issues/21413))
 - Regenerate integrations docs ([#21415](https://github.com/netdata/netdata/issues/21415))
+- Build(deps): bump github.com/microsoft/go-mssqldb from 1.9.4 to 1.9.5 in /src/go ([#21420](https://github.com/netdata/netdata/issues/21420))
+- Build(deps): bump azure/trusted-signing-action from 0.5.10 to 0.5.11 ([#21419](https://github.com/netdata/netdata/issues/21419))
 
 ## [2.8.0] - 2025-11-19
 
