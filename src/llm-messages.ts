@@ -150,7 +150,7 @@ export const TOOL_CALL_MALFORMED =
  * (progress_report was called but no other tools)
  */
 export const TURN_FAILED_PROGRESS_ONLY =
-  'Calling progress_report alone is not sufficient. You must also call tools to make progress on your task, or provide your final report/answer if you are done.';
+  'You called agent__progress_report without calling any other tools together with it. agent__progress_report does not perform any actions other than showing a message to the user. To make actual progress, you must either:\n\n1. call other tools to collect data or perform actions (following their schemas precisely), or\n2. if your task is complete and you can now conclude, provide your final report/answer (using the XML wrapper as instructed - your final report/answer is not a tool call)';
 
 // =============================================================================
 // SYSTEM NOTICES (LLM-facing only)
