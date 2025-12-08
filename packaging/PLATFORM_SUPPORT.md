@@ -49,7 +49,7 @@ Our [static builds](#static-builds) are expected to work on these platforms if a
 | Amazon Linux             | 2              | x86\_64, AArch64                       |                                                                                                                |
 | CentOS                   | 7.x            | x86\_64                                |                                                                                                                |
 | Docker                   | 19.03 or newer | x86\_64, ARMv7, AArch64                | See our [Docker documentation](/packaging/docker/README.md) for more info on using Netdata on Docker           |
-| Debian                   | 13.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                |
+| Debian                   | 13.x           | x86\_64, ARMv7, AArch64          |                                                                                                                |
 | Debian                   | 12.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                |
 | Debian                   | 11.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                |
 | Fedora                   | 43             | x86\_64, AArch64                       |                                                                                                                |
