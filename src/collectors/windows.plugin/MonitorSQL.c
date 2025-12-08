@@ -1018,6 +1018,43 @@ enduserconn:
     netdata_MSSQL_release_results(mi->conn->dbSQLConnections);
 }
 
+static void netdata_mssql_fill_blocked_processes_query(struct mssql_instance *mi)
+{
+    if (unlikely(!mi || !mi->conn || mi->conn->dbSQLBlockedProcesses == SQL_NULL_HSTMT))
+        return;
+
+    long blocked_processes = 0;
+    SQLLEN col_len = 0;
+
+    SQLRETURN ret = SQLExecDirect(mi->conn->dbSQLBlockedProcesses, (SQLCHAR *)NETDATA_QUERY_BLOCKED_PROCESSES, SQL_NTS);
+    if (likely(netdata_mssql_check_result(ret))) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLBlockedProcesses, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
+        goto end_blocked_processes;
+    }
+
+    ret = SQLBindCol(
+            mi->conn->dbSQLBlockedProcesses,
+            1,
+            SQL_C_LONG,
+            &blocked_processes,
+            sizeof(blocked_processes),
+            &col_len);
+    if (likely(netdata_mssql_check_result(ret))) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLBlockedProcesses, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        goto end_blocked_processes;
+    }
+
+    ret = SQLFetch(mi->conn->dbSQLBlockedProcesses);
+    if (likely(netdata_mssql_check_result(ret)))
+        goto end_blocked_processes;
+
+    if (col_len != SQL_NULL_DATA)
+        netdata_mssql_update_blocked_processes(mi, blocked_processes);
+
+    end_blocked_processes:
+    netdata_MSSQL_release_results(mi->conn->dbSQLBlockedProcesses);
+}
+
 void netdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
 {
     char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
@@ -1183,6 +1220,12 @@ static bool netdata_MSSQL_initialize_connection(struct netdata_mssql_conn *nmc)
         }
 
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbSQLConnections);
+        if (likely(netdata_mssql_check_result(ret))) {
+            retConn = FALSE;
+            goto endMSSQLInitializationConnection;
+        }
+
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbSQLBlockedProcesses);
         if (likely(netdata_mssql_check_result(ret))) {
             retConn = FALSE;
             goto endMSSQLInitializationConnection;
@@ -1581,6 +1624,7 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
             netdata_mssql_fill_mssql_status(mi);
             netdata_mssql_fill_job_status(mi);
             netdata_mssql_fill_user_connection(mi);
+            netdata_mssql_fill_connection_memory(mi);
             dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
         }
 

@@ -676,6 +676,7 @@ struct netdata_mssql_conn {
     SQLHSTMT dbSQLState;
     SQLHSTMT dbSQLJobs;
     SQLHSTMT dbSQLConnections;
+    SQLHSTMT dbSQLBlockedProcesses;
     SQLHSTMT dbReplicationPublisher;
 
     BOOL collect_transactions;
