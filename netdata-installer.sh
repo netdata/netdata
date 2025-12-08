@@ -215,6 +215,8 @@ USAGE: ${PROGRAM} [options]
   --disable-plugin-xenstat   Explicitly disable the xenstat plugin.
   --enable-plugin-otel Enable the Netdata OpenTelemetry plugin. Default: disabled
   --disable-plugin-otel Explicitly disable the Netdata OpenTelemetry plugin.
+  --enable-plugin-systemd-journal Enable the systemd journal reader plugin. Default: enabled if Rust is available and the build isn’t known broken
+  --disable-plugin-systemd-journal Explicitly disable the systemd journal reader plugin.
   --enable-plugin-ibm        Enable the IBM ecosystem monitoring plugin. Default: disabled
   --disable-plugin-ibm       Explicitly disable the IBM ecosystem monitoring plugin.
   --enable-exporting-kinesis Enable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis
@@ -296,9 +298,8 @@ while [ -n "${1}" ]; do
     "--disable-plugin-nfacct") ENABLE_NFACCT=0 ;;
     "--enable-plugin-xenstat") ENABLE_XENSTAT=1 ;;
     "--disable-plugin-xenstat") ENABLE_XENSTAT=0 ;;
-    "--enable-plugin-systemd-journal") ;;
-    "--disable-plugin-systemd-journal") ;;
-    "--internal-systemd-journal")  ;;
+    "--enable-plugin-systemd-journal") ENABLE_SYSTEMD_JOURNAL=1 ;;
+    "--disable-plugin-systemd-journal") ENABLE_SYSTEMD_JOURNAL=0 ;;
     "--enable-plugin-otel") ENABLE_OTEL=1 ;;
     "--disable-plugin-otel") ENABLE_OTEL=0 ;;
     "--enable-plugin-ibm") ENABLE_IBM=1 ;;
