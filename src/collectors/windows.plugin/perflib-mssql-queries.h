@@ -39,6 +39,9 @@
 
 #define NETDATA_QUERY_CONNECTIONS "SELECT COUNT(*), is_user_process FROM sys.dm_exec_sessions GROUP BY is_user_process;"
 
+#define NETDATA_QUERY_BLOCKED_PROCESSES \
+    "SELECT COUNT(DISTINCT session_id) AS blocked_sessions FROM sys.dm_exec_requests WHERE blocking_session_id <> 0;"
+
 // https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql?view=sql-server-ver16
 #define NETDATA_QUERY_CHECK_WAITS                                                                                      \
     "SELECT                                                                                                            \
