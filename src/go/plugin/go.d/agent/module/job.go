@@ -319,7 +319,7 @@ func (j *Job) Tick(clock int) {
 	default:
 		j.consecutiveSkips++
 		if startTime.IsZero() {
-			j.Infof("skipping data collection: previous run is still in progress (interval %ds)", j.updateEvery)
+			j.Infof("skipping data collection: waiting for first collection to start (interval %ds)", j.updateEvery)
 		} else if j.consecutiveSkips >= 2 {
 			j.Warningf("skipping data collection: previous run is still in progress for %s (skipped %d times in a row, interval %ds)", time.Since(startTime), j.consecutiveSkips, j.updateEvery)
 		} else {
