@@ -144,7 +144,9 @@ RUN addgroup --stdoutmsglevel=info --gid ${NETDATA_GID} --system "${DOCKER_GRP}"
                 network-viewer.plugin \
                 otel-plugin \
                 journal-viewer-plugin; do \
-        [ -f "/usr/libexec/netdata/plugins.d/$name" ] && chmod -v 4755 "/usr/libexec/netdata/plugins.d/$name"; \
+        if [ -f "/usr/libexec/netdata/plugins.d/$name" ] ; then \
+            chmod -v 4755 "/usr/libexec/netdata/plugins.d/$name"; \
+        fi \
     done && \
     # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
     find /var/lib/netdata /var/cache/netdata -type d -exec chmod -v 0770 {} \; && \
