@@ -176,7 +176,10 @@ type Job struct {
 	dumpMode     bool
 	dumpAnalyzer interface{} // Will be *agent.DumpAnalyzer but avoid circular dependency
 
-	consecutiveSkips int // tracks consecutive tick skips
+	skipStateMu      sync.Mutex
+	consecutiveSkips int
+	collectStartTime time.Time // when current collection started
+	collectStopTime  time.Time // when current collection finished
 }
 
 type collectedMetrics struct {
@@ -301,12 +304,21 @@ func (j *Job) UpdateVnode(vnode *vnodes.VirtualNode) {
 func (j *Job) Tick(clock int) {
 	select {
 	case j.tick <- clock:
-		j.consecutiveSkips = 0
 	default:
-		if j.consecutiveSkips++; j.consecutiveSkips >= 2 {
-			j.Warningf("skipping data collection: previous run is still in progress (skipped %d times in a row)", j.consecutiveSkips)
-		} else {
-			j.Info("skipping data collection: previous run is still in progress")
+		if j.shouldCollect(clock) {
+			j.skipStateMu.Lock()
+			j.consecutiveSkips++
+			consecutiveSkips := j.consecutiveSkips
+			startTime := j.collectStartTime
+			j.skipStateMu.Unlock()
+
+			if startTime.IsZero() {
+				j.Infof("skipping data collection: waiting for first collection to start (interval %ds)", j.updateEvery)
+			} else if consecutiveSkips >= 2 {
+				j.Warningf("skipping data collection: previous run is still in progress for %s (skipped %d times in a row, interval %ds)", time.Since(startTime), consecutiveSkips, j.updateEvery)
+			} else {
+				j.Infof("skipping data collection: previous run is still in progress for %s (interval %ds)", time.Since(startTime), j.updateEvery)
+			}
 		}
 	}
 }
@@ -322,8 +334,24 @@ LOOP:
 		case <-j.stop:
 			break LOOP
 		case t := <-j.tick:
-			if t%(j.updateEvery+j.penalty()) == 0 {
+			if j.shouldCollect(t) {
+				j.skipStateMu.Lock()
+				if j.consecutiveSkips > 0 {
+					if j.collectStopTime.IsZero() {
+						j.Infof("data collection resumed (skipped %d times)", j.consecutiveSkips)
+					} else {
+						j.Infof("data collection resumed after %s (skipped %d times)", j.collectStopTime.Sub(j.collectStartTime), j.consecutiveSkips)
+					}
+					j.consecutiveSkips = 0
+				}
+				j.collectStartTime = time.Now()
+				j.skipStateMu.Unlock()
+
 				j.runOnce()
+
+				j.skipStateMu.Lock()
+				j.collectStopTime = time.Now()
+				j.skipStateMu.Unlock()
 			}
 		}
 	}
@@ -337,6 +365,10 @@ func (j *Job) Stop() {
 	// TODO: should have blocking and non blocking stop
 	j.stop <- struct{}{}
 	<-j.stop
+}
+
+func (j *Job) shouldCollect(clock int) bool {
+	return clock%(j.updateEvery+j.penalty()) == 0
 }
 
 func (j *Job) disableAutoDetection() {
