@@ -175,6 +175,8 @@ type Job struct {
 	// Dump mode support
 	dumpMode     bool
 	dumpAnalyzer interface{} // Will be *agent.DumpAnalyzer but avoid circular dependency
+
+	consecutiveSkips int // tracks consecutive tick skips
 }
 
 // NetdataChartIDMaxLength is the chart ID max length. See RRD_ID_LENGTH_MAX in the netdata source code.
@@ -286,8 +288,13 @@ func (j *Job) UpdateVnode(vnode *vnodes.VirtualNode) {
 func (j *Job) Tick(clock int) {
 	select {
 	case j.tick <- clock:
+		j.consecutiveSkips = 0
 	default:
-		j.Debug("skip the tick due to previous run hasn't been finished")
+		if j.consecutiveSkips++; j.consecutiveSkips >= 2 {
+			j.Warningf("skipping data collection: previous run is still in progress (skipped %d times in a row)", j.consecutiveSkips)
+		} else {
+			j.Info("skipping data collection: previous run is still in progress")
+		}
 	}
 }
 
