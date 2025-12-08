@@ -186,7 +186,10 @@ impl ColumnSchema {
             matches!(name.as_str(), "PRIORITY" | "SYSLOG_FACILITY" | "MESSAGE_ID");
 
         // MESSAGE gets full width
-        let full_width = name == "MESSAGE";
+        let full_width = (name == "MESSAGE") || (name == "log.body");
+
+        // log.body should not wrap
+        let wrap = (name == "MESSAGE") || (name == "log.body");
 
         Self {
             index,
@@ -204,7 +207,7 @@ impl ColumnSchema {
             summary: "count".to_string(),
             filter,
             full_width,
-            wrap: true,
+            wrap,
             default_expanded_filter,
             dummy: None,
         }
