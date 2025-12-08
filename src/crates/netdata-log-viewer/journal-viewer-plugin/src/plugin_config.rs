@@ -78,7 +78,7 @@ pub struct Config {
 
 pub struct PluginConfig {
     pub config: Config,
-    pub netdata_env: NetdataEnv,
+    pub _netdata_env: NetdataEnv,
 }
 
 impl PluginConfig {
@@ -135,7 +135,7 @@ impl PluginConfig {
 
         Ok(PluginConfig {
             config,
-            netdata_env,
+            _netdata_env: netdata_env,
         })
     }
 

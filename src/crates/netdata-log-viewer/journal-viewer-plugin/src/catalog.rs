@@ -11,11 +11,9 @@ use tracing::{debug, error, info, instrument, warn};
 
 // Import types from journal-function crate
 use journal_function::{
-    BucketCacheMetrics, BucketOperationsMetrics, Facets, FileIndexKey, FileIndexingMetrics,
-    FileInfo, Histogram, HistogramEngine, IndexingEngine, IndexingEngineBuilder, Monitor, Registry,
-    Result as CatalogResult, netdata,
+    Facets, FileIndexKey, Histogram, HistogramEngine, IndexingEngine, IndexingEngineBuilder,
+    Monitor, Registry, Result as CatalogResult, netdata,
 };
-use rt::ChartHandle;
 
 /*
  * CatalogFunction
@@ -363,9 +361,6 @@ impl CatalogFunction {
         cache_dir: impl Into<std::path::PathBuf>,
         memory_capacity: usize,
         disk_capacity: usize,
-        file_indexing_metrics: ChartHandle<FileIndexingMetrics>,
-        bucket_cache_metrics: ChartHandle<BucketCacheMetrics>,
-        bucket_operations_metrics: ChartHandle<BucketOperationsMetrics>,
     ) -> CatalogResult<Self> {
         let registry = Registry::new(monitor);
 
@@ -382,13 +377,6 @@ impl CatalogFunction {
 
         // Create histogram engine
         let histogram_engine = HistogramEngine::new(registry.clone(), indexing_engine.clone());
-
-        // Metrics available but not used by the services
-        let _ = (
-            file_indexing_metrics,
-            bucket_cache_metrics,
-            bucket_operations_metrics,
-        );
 
         // Initialize response logging directory at info level
         if tracing::enabled!(tracing::Level::INFO) {
@@ -417,11 +405,6 @@ impl CatalogFunction {
         })
     }
 
-    /// Get a reference to the histogram engine
-    pub fn histogram_engine(&self) -> Arc<HistogramEngine> {
-        self.inner.histogram_engine.clone()
-    }
-
     /// Get a histogram for the given parameters
     pub async fn get_histogram(
         &self,
@@ -447,30 +430,6 @@ impl CatalogFunction {
                 message: format!("failed to watch directory: {}", e),
             }
         })
-    }
-
-    /// Stop watching a directory for journal files
-    pub fn unwatch_directory(&self, path: &str) -> Result<()> {
-        self.inner.registry.unwatch_directory(path).map_err(|e| {
-            netdata_plugin_error::NetdataPluginError::Other {
-                message: format!("failed to unwatch directory: {}", e),
-            }
-        })
-    }
-
-    /// Find files in a time range
-    pub fn find_files_in_range(&self, start: u32, end: u32) -> Vec<FileInfo> {
-        match self
-            .inner
-            .registry
-            .find_files_in_range(Seconds(start), Seconds(end))
-        {
-            Ok(files) => files,
-            Err(e) => {
-                error!("failed to find files in range: {}", e);
-                Vec::new()
-            }
-        }
     }
 
     /// Process a notify event

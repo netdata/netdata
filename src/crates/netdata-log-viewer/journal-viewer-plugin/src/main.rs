@@ -1,15 +1,9 @@
 //! journal-viewer-plugin standalone binary
 
-#![allow(dead_code)]
-
-use journal_function::JournalMetrics;
 use journal_registry::Monitor;
 
 mod catalog;
 use catalog::CatalogFunction;
-
-mod charts;
-use charts::Metrics;
 
 mod plugin_config;
 use plugin_config::PluginConfig;
@@ -53,14 +47,6 @@ async fn run_plugin() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let mut runtime = PluginRuntime::new("journal-viewer");
     info!("plugin runtime created");
 
-    // Initialize plugin-level metrics
-    let _plugin_metrics = Metrics::new(&mut runtime);
-    info!("plugin metrics initialized");
-
-    // Initialize journal-function metrics
-    let journal_metrics = JournalMetrics::new(&mut runtime);
-    info!("journal metrics initialized");
-
     let (monitor, notify_rx) = match Monitor::new() {
         Ok(t) => t,
         Err(e) => {
@@ -76,9 +62,6 @@ async fn run_plugin() -> std::result::Result<(), Box<dyn std::error::Error>> {
         &config.cache.directory,
         config.cache.memory_capacity,
         config.cache.disk_capacity.as_u64() as usize,
-        journal_metrics.file_indexing.clone(),
-        journal_metrics.bucket_cache.clone(),
-        journal_metrics.bucket_operations.clone(),
     )
     .await?;
     info!("catalog function initialized");
