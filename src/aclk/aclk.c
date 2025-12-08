@@ -945,7 +945,7 @@ bool aclk_host_state_update_auto(RRDHOST *host) {
             live = 1;
             break;
     }
-    aclk_host_state_update(host, live, 1);
+    aclk_host_state_update(host, live, 1, NULL);
     return true;
 }
 
@@ -976,7 +976,7 @@ void aclk_create_node_instance_job(RRDHOST *host)
     aclk_add_job(query);
 }
 
-void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable)
+void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable, struct completion *compl)
 {
     if (unlikely(!host))
         return;
@@ -986,6 +986,7 @@ void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable)
         return;
 
     aclk_query_t *query = aclk_query_new(NODE_STATE_UPDATE);
+    query->completion = compl;
 
     int32_t hops = rrdhost_ingestion_hops(host);
     node_instance_connection_t node_state_update = {
@@ -1017,7 +1018,7 @@ void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable)
     aclk_add_job(query);
 }
 
-void aclk_host_state_update(RRDHOST *host, int live, int queryable)
+void aclk_host_state_update(RRDHOST *host, int live, int queryable, void *compl)
 {
     if (!aclk_online())
         return;
@@ -1025,7 +1026,7 @@ void aclk_host_state_update(RRDHOST *host, int live, int queryable)
     if (uuid_is_null(host->node_id.uuid))
         aclk_create_node_instance_job(host);
     else
-        aclk_update_node_instance_job(host, live, queryable);
+        aclk_update_node_instance_job(host, live, queryable, compl);
 }
 
 void aclk_send_node_instances()
@@ -1034,7 +1035,7 @@ void aclk_send_node_instances()
     dfe_start_reentrant(rrdhost_root_index, host)
     {
         int live = rrdhost_ingestion_status(host) == RRDHOST_INGEST_STATUS_ONLINE ? 1 : 0;
-        aclk_host_state_update(host, live, 1);
+        aclk_host_state_update(host, live, 1, NULL);
     }
     dfe_done(host);
 }

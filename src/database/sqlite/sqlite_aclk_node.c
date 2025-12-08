@@ -44,7 +44,7 @@ static void build_node_collectors(RRDHOST *host)
         aclk_host_config->node_id, rrdhost_hostname(host));
 }
 
-static void build_node_info(RRDHOST *host)
+static void build_node_info(RRDHOST *host, struct completion *compl)
 {
     struct update_node_info node_info;
 
@@ -82,7 +82,7 @@ static void build_node_info(RRDHOST *host)
 
     rrdhost_system_info_to_node_info(host->system_info, &node_info);
 
-    aclk_update_node_info(&node_info);
+    aclk_update_node_info(&node_info, compl);
     nd_log(
         NDLS_ACCESS,
         NDLP_DEBUG,
@@ -97,6 +97,34 @@ static void build_node_info(RRDHOST *host)
     freez(host_version);
 
     aclk_host_config->node_collectors_send = now_realtime_sec();
+}
+
+void send_node_info_with_wait(RRDHOST *host)
+{
+    if (unlikely(!host || !__atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED)))
+        return;
+
+    struct completion compl;
+    completion_init(&compl);
+
+    build_node_info(host, &compl);
+    completion_wait_for(&compl);
+
+    completion_destroy(&compl);
+}
+
+void send_node_update_with_wait(RRDHOST *host, int live, int queryable)
+{
+    if (unlikely(!host || !__atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED)))
+        return;
+
+    struct completion compl;
+    completion_init(&compl);
+
+    aclk_host_state_update(host, live, queryable, &compl);
+    completion_wait_for(&compl);
+
+    completion_destroy(&compl);
 }
 
 void aclk_check_node_info_and_collectors(void)
@@ -166,7 +194,7 @@ void aclk_check_node_info_and_collectors(void)
         if (pp_queue_empty && aclk_host_config->node_info_send_time &&
             aclk_host_config->node_info_send_time + 30 < now) {
             aclk_host_config->node_info_send_time = 0;
-            build_node_info(host);
+            build_node_info(host, NULL);
             schedule_node_state_update(host, 10000);
             internal_error(true, "ACLK SYNC: Sending node info for %s", rrdhost_hostname(host));
         }

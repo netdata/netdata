@@ -31,9 +31,10 @@ void aclk_update_node_collectors(struct update_node_collectors *collectors)
     QUEUE_IF_PAYLOAD_PRESENT(query);
 }
 
-void aclk_update_node_info(struct update_node_info *info)
+void aclk_update_node_info(struct update_node_info *info, struct completion *compl)
 {
     aclk_query_t *query = aclk_query_new(UPDATE_NODE_INFO);
+    query->completion = compl;
     query->data.bin_payload.topic = ACLK_TOPICID_NODE_INFO;
     query->data.bin_payload.payload = generate_update_node_info_message(&query->data.bin_payload.size, info);
     query->data.bin_payload.msg_name = "UpdateNodeInfo";
