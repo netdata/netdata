@@ -1048,9 +1048,6 @@ static void netdata_mssql_fill_blocked_processes_query(struct mssql_instance *mi
     if (likely(netdata_mssql_check_result(ret)))
         goto end_blocked_processes;
 
-    if (col_len != SQL_NULL_DATA)
-        netdata_mssql_update_blocked_processes(mi, blocked_processes);
-
     end_blocked_processes:
     netdata_MSSQL_release_results(mi->conn->dbSQLBlockedProcesses);
 }
@@ -1627,7 +1624,7 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
             netdata_mssql_fill_job_status(mi);
             netdata_mssql_fill_user_connection(mi);
             if (likely(mi->conn->collect_blocked_processes))
-                netdata_mssql_fill_connection_memory(mi);
+                netdata_mssql_fill_blocked_processes_query(mi);
             dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
         }
 
