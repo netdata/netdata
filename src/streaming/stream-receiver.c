@@ -902,8 +902,8 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
         // - For plain TCP: uses recv(MSG_PEEK | MSG_DONTWAIT)
         char probe_byte;
         ssize_t probe_rc = nd_sock_peek_nowait(&rpt->sock, &probe_byte, 1);
-        if (probe_rc == 0) {
-            // Connection closed gracefully by remote
+        if (probe_rc == 0 || (probe_rc < 0 && errno == ECONNRESET)) {
+            // Connection closed by remote (gracefully or via reset)
             ND_LOG_STACK lgs[] = {
                 ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->remote_ip),
                 ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->remote_port),
@@ -922,7 +922,7 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
             stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE);
             continue;
         }
-        if (probe_rc < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != ECONNRESET) {
+        if (probe_rc < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
             // Socket error detected (keepalive timeout, etc.)
             // Save errno immediately as subsequent calls may modify it
             int saved_errno = errno;
