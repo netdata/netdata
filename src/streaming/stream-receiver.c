@@ -922,8 +922,11 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
             stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE);
             continue;
         }
-        if (probe_rc < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-            // Socket error detected (keepalive timeout, connection reset, etc.)
+        if (probe_rc < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != ECONNRESET) {
+            // Socket error detected (keepalive timeout, etc.)
+            // Save errno immediately as subsequent calls may modify it
+            int saved_errno = errno;
+
             ND_LOG_STACK lgs[] = {
                 ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->remote_ip),
                 ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->remote_port),
@@ -937,7 +940,7 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
             worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_SOCKET_ERROR);
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM RCV[%zu] '%s' [from %s]: socket error detected: %s - closing connection",
-                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, strerror(errno));
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, strerror(saved_errno));
 
             stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_ERROR);
             continue;

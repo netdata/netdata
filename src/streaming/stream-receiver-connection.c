@@ -308,15 +308,15 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
                        "STREAM RCV '%s' [from [%s]:%s]: cannot enable SO_KEEPALIVE on socket %d",
                        rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
 #ifdef TCP_KEEPIDLE
-            else if (setsockopt(rpt->sock.fd, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof(idle)) != 0)
+            if (setsockopt(rpt->sock.fd, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof(idle)) != 0)
                 nd_log(NDLS_DAEMON, NDLP_WARNING,
                        "STREAM RCV '%s' [from [%s]:%s]: cannot set TCP_KEEPIDLE on socket %d",
                        rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
-            else if (setsockopt(rpt->sock.fd, IPPROTO_TCP, TCP_KEEPINTVL, &interval, sizeof(interval)) != 0)
+            if (setsockopt(rpt->sock.fd, IPPROTO_TCP, TCP_KEEPINTVL, &interval, sizeof(interval)) != 0)
                 nd_log(NDLS_DAEMON, NDLP_WARNING,
                        "STREAM RCV '%s' [from [%s]:%s]: cannot set TCP_KEEPINTVL on socket %d",
                        rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
-            else if (setsockopt(rpt->sock.fd, IPPROTO_TCP, TCP_KEEPCNT, &count, sizeof(count)) != 0)
+            if (setsockopt(rpt->sock.fd, IPPROTO_TCP, TCP_KEEPCNT, &count, sizeof(count)) != 0)
                 nd_log(NDLS_DAEMON, NDLP_WARNING,
                        "STREAM RCV '%s' [from [%s]:%s]: cannot set TCP_KEEPCNT on socket %d",
                        rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
