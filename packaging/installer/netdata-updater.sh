@@ -1044,7 +1044,7 @@ update_binpkg() {
   DISTRO="${ID}"
   SYSVERSION="${VERSION_ID}"
 
-  supported_compat_names="debian ubuntu centos fedora opensuse ol amzn"
+  supported_compat_names="debian ubuntu centos centos-stream fedora opensuse ol amzn"
 
   if str_in_list "${DISTRO}" "${supported_compat_names}"; then
     DISTRO_COMPAT_NAME="${DISTRO}"
