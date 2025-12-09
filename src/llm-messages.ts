@@ -152,6 +152,15 @@ export const TOOL_CALL_MALFORMED =
 export const TURN_FAILED_PROGRESS_ONLY =
   'You called agent__progress_report without calling any other tools together with it. agent__progress_report does not perform any actions other than showing a message to the user. To make actual progress, you must either:\n\n1. call other tools to collect data or perform actions (following their schemas precisely), or\n2. if your task is complete and you can now conclude, provide your final report/answer (using the XML wrapper as instructed - your final report/answer is not a tool call)';
 
+/**
+ * When model calls XML wrapper tag as a tool instead of outputting it as text.
+ * Used in: session-turn-runner.ts via addTurnFailure
+ *
+ * CONDITION: Model emits tool_use with name matching ai-agent-{nonce}-FINAL pattern
+ */
+export const turnFailedXmlWrapperAsTool = (sessionNonce: string, format: string): string =>
+  `You called the XML wrapper tag (ai-agent-${sessionNonce}-FINAL) as a tool. This is incorrect — the XML wrapper is NOT a tool, it is plain text that you output directly in your response.\n\nTo provide your final report/answer:\n1. Do NOT use tool calling syntax\n2. Write the XML wrapper directly in your response text\n3. Example: <ai-agent-${sessionNonce}-FINAL format="${format}">YOUR CONTENT HERE</ai-agent-${sessionNonce}-FINAL>\n\nThe system is waiting for your final report/answer as XML text output, not as a tool call.`;
+
 // =============================================================================
 // SYSTEM NOTICES (LLM-facing only)
 // =============================================================================
@@ -208,10 +217,24 @@ export const CONTENT_GUIDANCE_SLACK =
 export const CONTENT_GUIDANCE_TEXT =
   'include `report_content` containing the full final answer';
 
+/**
+ * Check if a tool name matches the XML final report tag pattern.
+ * Pattern: ai-agent-{8-hex-chars}-FINAL
+ */
+export const isXmlFinalReportTagName = (name: string): boolean =>
+  /^ai-agent-[a-f0-9]{8}-FINAL$/i.test(name);
+
 // =============================================================================
 // TOOL RESULTS
 // Messages returned as tool execution results (seen by LLM)
 // =============================================================================
+
+/**
+ * Error when the XML wrapper tag is called as a tool instead of being output as text.
+ * Used in: llm-providers/base.ts injectMissingToolResults()
+ */
+export const XML_WRAPPER_CALLED_AS_TOOL_RESULT =
+  'You called the XML wrapper tag as if it were a tool. The XML wrapper is NOT a tool — it is plain text you output directly in your response. Do NOT use tool calling for your final report/answer. Instead, write the XML tags directly in your response text, exactly as instructed.';
 
 /**
  * Placeholder for tool output when context budget exceeded.

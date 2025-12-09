@@ -18,6 +18,7 @@ import type {
 import type { ProviderOptions } from '@ai-sdk/provider-utils';
 import type { LanguageModel, ModelMessage, ProviderMetadata, ReasoningOutput, StreamTextResult, ToolSet } from 'ai';
 
+import { XML_WRAPPER_CALLED_AS_TOOL_RESULT, isXmlFinalReportTagName } from '../llm-messages.js';
 import { clampToolName, parseJsonRecord, sanitizeToolName, TOOL_NAME_MAX_LENGTH, truncateUtf8WithNotice, warn } from '../utils.js';
 
 const GUIDANCE_STRING_FORMATS = ['date-time', 'time', 'date', 'duration', 'email', 'hostname', 'ipv4', 'ipv6', 'uuid'] as const;
@@ -2111,6 +2112,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     model: string,
     tokens: TokenUsage
   ): ConversationMessage[] {
+    const normalizeTool = (n: string): string => n.replace(/^<\|[^|]+\|>/, '').trim();
     // Collect all tool call IDs from assistant messages
     const toolCallIds = new Set<string>();
     const toolCallNames = new Map<string, string>();
@@ -2153,9 +2155,13 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     // eslint-disable-next-line functional/no-loop-statements
     for (const id of orphanedIds) {
       const toolName = toolCallNames.get(id) ?? 'unknown';
+      const normalizedName = normalizeTool(toolName);
+      const errorMessage = isXmlFinalReportTagName(normalizedName)
+        ? XML_WRAPPER_CALLED_AS_TOOL_RESULT
+        : `Tool not available: ${toolName}`;
       injected.push({
         role: 'tool',
-        content: `${TOOL_FAILED_PREFIX}Tool not available: ${toolName}${TOOL_FAILED_SUFFIX}`,
+        content: `${TOOL_FAILED_PREFIX}${errorMessage}${TOOL_FAILED_SUFFIX}`,
         toolCallId: id,
         metadata: {
           provider,

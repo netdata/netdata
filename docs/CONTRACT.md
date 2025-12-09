@@ -1,7 +1,7 @@
 # AI Agent Contract
 
 **Version**: 1.0
-**Last Updated**: 2025-11-19
+**Last Updated**: 2025-12-09
 
 This document defines the **end-user contract** for ai-agent: the guarantees that MUST hold regardless of implementation details. Every condition/rule in `docs/specs/*.md` maps to a contract-level guarantee here.
 
@@ -54,6 +54,7 @@ See Section 2 “Context Management Contract” for the complete definition of c
 - When repair succeeds, a WARN log records the exact repair steps and includes both original and repaired payloads for visibility.
 - When parsing fails, the tool call is dropped, an ERR log records the full raw payload (not truncated), and the LLM is told to retry; valid calls in the same message still proceed.
 - `agent__final_report` adds an `encoding` field (`raw` | `base64`); when `base64` is provided, `report_content` is decoded before use. `content_json` undergoes schema validation with a small iterative repair loop that attempts to parse stringified nested JSON fields before final rejection.
+- When `agent__final_report` is invoked for text/markdown-like formats without usable `report_content` (missing or whitespace), the tool result sent back to the LLM is `(tool failed: final_report requires non-empty report_content.)`, the turn fails, and remaining turns are collapsed.
 - If the `agent__final_report` tool fails for any reason (validation, decode, execution error), remaining turns are collapsed immediately and an ERR log is emitted containing the full JSON payload that was provided to the tool.
 
 ### Provider Configuration
@@ -473,6 +474,7 @@ Any deviation from the guarantees above is a **contract violation** and must be 
   2. **Layer 2 (Format Processing)**: Process payload based on format—`sub-agent` is opaque passthrough (no validation), `json` parses and validates, `slack-block-kit` expects messages array, text formats use raw content.
   3. **Layer 3 (Final Report)**: Construct clean final report object with status='success'. Wrapper fields never pollute payload content.
 - This separation ensures user schema fields are never overwritten by transport metadata.
+- Misuse handling: If the model emits the XML final wrapper tag (`ai-agent-<nonce>-FINAL`) as a tool call, the agent injects a specific tool failure message, emits TURN-FAILED guidance with the actual nonce/format, and collapses remaining turns to a single final attempt.
 
 **Unclosed final-report tag handling**
 - When a valid final-report opening tag is detected (`<ai-agent-NONCE-FINAL tool="agent__final_report">`) with content following it, the closing tag requirement depends on the LLM's `stopReason`:

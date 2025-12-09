@@ -1148,6 +1148,14 @@ export class AIAgentSession {
           message: JSON.stringify(settings),
         };
         this.log(entry);
+        if (this.sessionConfig.traceLLM === true || this.sessionConfig.traceMCP === true || this.sessionConfig.traceSdk === true) {
+          const traceEntry: LogEntry = {
+            ...entry,
+            severity: 'TRC',
+            remoteIdentifier: 'trace:agent:agent',
+          };
+          this.log(traceEntry);
+        }
 
       }
       // MCP servers initialize lazily via provider; no explicit init here

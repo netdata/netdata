@@ -318,10 +318,10 @@ const SESSIONS_SUBDIR = 'sessions';
 const BILLING_FILENAME = 'billing.jsonl';
 const THRESHOLD_BUFFER_TOKENS = 8;
 const THRESHOLD_MAX_OUTPUT_TOKENS = 32;
-// Prompt + instructions currently estimate to ~502 tokens (ctx + new, schema excluded from projection).
-const THRESHOLD_CONTEXT_WINDOW_BELOW = 560; // limit = 560 - 8 - 32 = 520 (> projected 502)
-const THRESHOLD_CONTEXT_WINDOW_EQUAL = 542; // limit = 542 - 8 - 32 = 502 (matches projected)
-const THRESHOLD_CONTEXT_WINDOW_ABOVE = 530; // limit = 530 - 8 - 32 = 490 (< projected 502)
+// Prompt + instructions currently estimate to ~962 tokens (ctx + new, schema excluded from projection).
+const THRESHOLD_CONTEXT_WINDOW_BELOW = 1042; // limit = 1042 - 8 - 32 = 1002 (> projected 962)
+const THRESHOLD_CONTEXT_WINDOW_EQUAL = 1002; // limit = 1002 - 8 - 32 = 962 (matches projected)
+const THRESHOLD_CONTEXT_WINDOW_ABOVE = 982; // limit = 982 - 8 - 32 = 942 (< projected 962)
 const PREFLIGHT_CONTEXT_WINDOW = 80;
 const PREFLIGHT_BUFFER_TOKENS = 8;
 const PREFLIGHT_MAX_OUTPUT_TOKENS = 16;
@@ -5652,6 +5652,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       onAccounting: () => undefined,
       onProgress: () => undefined,
       onOpTree: () => undefined,
+      onSessionSnapshot: () => Promise.resolve(),
+      onAccountingFlush: () => Promise.resolve(),
     };
     const traceContext = { originId: 'origin-trace', parentId: 'parent-trace', callPath: 'loader/session' };
     const stopReference = { stopping: false };
@@ -11487,6 +11489,8 @@ BASE_TEST_SCENARIOS.push({
   },
 } satisfies HarnessTest);
 
+const UNKNOWN_TOOL_FAILURE_SLUGS = ['unknown_tool', 'final_report_missing', 'retries_exhausted'] as const;
+
 BASE_TEST_SCENARIOS.push({
   id: 'run-test-retry-exhaustion-no-tools',
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
@@ -11537,7 +11541,36 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(!result.success, 'unknown tool should fail session');
-    expectTurnFailureContains(result.logs, 'run-test-unknown-tool-fails', ['unknown_tool', 'final_report_missing', 'retries_exhausted']);
+    expectTurnFailureContains(result.logs, 'run-test-unknown-tool-fails', [...UNKNOWN_TOOL_FAILURE_SLUGS]);
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  // eslint-disable-next-line sonarjs/no-duplicate-string
+  id: 'run-test-xml-wrapper-as-tool',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.maxTurns = 3;
+    sessionConfig.maxRetries = 1;
+    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+      latencyMs: 5,
+      messages: [
+        {
+          role: 'assistant',
+          content: 'calling xml wrapper as tool',
+          toolCalls: [{ id: 'call-xml', name: 'ai-agent-deadbeef-FINAL', parameters: {} }],
+        },
+      ],
+      executionStats: { executedTools: 0, executedNonProgressBatchTools: 0, executedProgressBatchTools: 0, unknownToolEncountered: true },
+      tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+    }));
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(!result.success, 'xml wrapper called as tool should fail session');
+    const toolMessage = result.conversation.find((msg) => msg.role === 'tool' && typeof msg.content === 'string' && msg.content.includes('XML wrapper tag as if it were a tool'));
+    invariant(toolMessage !== undefined, 'Expected injected tool failure message for XML wrapper misuse');
+    expectTurnFailureContains(result.logs, 'run-test-xml-wrapper-as-tool', [...UNKNOWN_TOOL_FAILURE_SLUGS]);
+    expectLogIncludes(result.logs, 'agent:orchestrator', 'XML wrapper called as tool', 'run-test-xml-wrapper-as-tool');
   },
 } satisfies HarnessTest);
 
