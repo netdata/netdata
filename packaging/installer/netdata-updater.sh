@@ -300,6 +300,35 @@ install_build_dependencies() {
   fi
 }
 
+# Certain versions of this script had a bug that could cause /dev/null
+# to be removed mistakenly under some circumstances.
+#
+# This function attempts to detect and fix the resulting situation.
+dev_null_fix() {
+  if [ -f /dev/null ] || [ ! -e /dev/null ]; then
+    case "$(uname -s)" in
+      Linux)
+        mknod -m 666 /dev/.null c 1 3
+        # Some distros use ownership other than root:root for /dev/null,
+        # but it almost always matches the ownership of /dev/full,
+        # so if possible copy the onwership from there.
+        if [ -c /dev/full ]; then
+            chown --reference=/dev/full /dev/.null
+        fi
+        mv -f /dev/.null /dev/null
+        ;;
+      FreeBSD)
+        # Device numbers on FreeBSD don't seem to be consistent across
+        # systems, unlike on Linux, but running mknod there with a well
+        # known device name will use the 'right' numbers automatically.
+        rm -f /dev/null
+        mknod /dev/null
+        ;;
+      *) ;;
+    esac
+  fi
+}
+
 enable_netdata_updater() {
   updater_type="$(echo "${1}" | tr '[:upper:]' '[:lower:]')"
   case "${updater_type}" in
@@ -1390,6 +1419,8 @@ if echo "$INSTALL_TYPE" | grep -qv ^binpkg && [ "${INSTALL_UID}" != "$(id -u)" ]
 fi
 
 self_update
+
+dev_null_fix
 
 # shellcheck disable=SC2153
 case "${INSTALL_TYPE}" in
