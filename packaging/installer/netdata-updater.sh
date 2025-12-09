@@ -1044,7 +1044,7 @@ update_binpkg() {
   DISTRO="${ID}"
   SYSVERSION="${VERSION_ID}"
 
-  supported_compat_names="debian ubuntu centos fedora opensuse ol amzn"
+  supported_compat_names="debian ubuntu centos centos-stream fedora opensuse ol amzn"
 
   if str_in_list "${DISTRO}" "${supported_compat_names}"; then
     DISTRO_COMPAT_NAME="${DISTRO}"
@@ -1053,7 +1053,7 @@ update_binpkg() {
       opensuse-leap|opensuse-tumbleweed)
         DISTRO_COMPAT_NAME="opensuse"
         ;;
-      cloudlinux|almalinux|centos-stream|rocky|rhel)
+      cloudlinux|almalinux|rocky|rhel)
         DISTRO_COMPAT_NAME="centos"
         ;;
       raspbian)
@@ -1092,7 +1092,7 @@ update_binpkg() {
         repo_path="${DISTRO_COMPAT_NAME}/${VERSION_CODENAME}"
       fi
       ;;
-    centos|fedora|ol|amzn)
+    centos|centos-stream|fedora|ol|amzn)
       if [ "${INTERACTIVE}" = "0" ]; then
         interactive_opts="-y"
       fi
@@ -1110,7 +1110,13 @@ update_binpkg() {
       repo_update_opts="${interactive_opts}"
       pkg_installed_check="rpm -q"
       INSTALL_TYPE="binpkg-rpm"
-      repo_path="${DISTRO_COMPAT_NAME}/${SYSVERSION}/$(uname -m)"
+      case "${DISTRO_COMPAT_NAME}" in
+        amzn) repo_path="amazonlinux/${SYSVERSION}/$(uname -m)" ;;
+        centos-stream) repo_path="el/c${SYSVERSION}s/$(uname -m)" ;;
+        fedora) repo_path="fedora/${SYSVERSION}/$(uname -m)" ;;
+        ol) repo_path="ol/${SYSVERSION}/$(uname -m)" ;;
+        *) repo_path="el/$(echo "${SYSVERSION}" | cut -f 1 -d '.')/$(uname -m)" ;;
+      esac
       ;;
     opensuse)
       if [ "${INTERACTIVE}" = "0" ]; then
