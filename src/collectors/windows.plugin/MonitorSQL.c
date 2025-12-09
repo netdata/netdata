@@ -1048,6 +1048,7 @@ static void netdata_mssql_fill_blocked_processes_query(struct mssql_instance *mi
     if (likely(netdata_mssql_check_result(ret)))
         goto end_blocked_processes;
 
+    mi->MSSQLBlockedProcesses.current.Data = blocked_processes;
 end_blocked_processes:
     netdata_MSSQL_release_results(mi->conn->dbSQLBlockedProcesses);
 }
