@@ -896,6 +896,53 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
         if (m->type != POLLFD_TYPE_RECEIVER) continue;
         struct receiver_state *rpt = m->rpt;
 
+        // Probe socket to detect dead connections (e.g., from TCP keepalive)
+        // MSG_PEEK doesn't consume data, MSG_DONTWAIT makes it non-blocking
+        char probe_byte;
+        ssize_t probe_rc = recv(rpt->sock.fd, &probe_byte, 1, MSG_PEEK | MSG_DONTWAIT);
+        if (probe_rc == 0) {
+            // Connection closed gracefully by remote
+            ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->remote_ip),
+                ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->remote_port),
+                ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rpt->hostname),
+                ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, stream_receiver_log_transport, rpt),
+                ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_receiver_log_capabilities, rpt),
+                ND_LOG_FIELD_END(),
+            };
+            ND_LOG_STACK_PUSH(lgs);
+
+            worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_REMOTE_CLOSED);
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM RCV[%zu] '%s' [from %s]: socket closed by remote - closing connection",
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip);
+
+            stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE);
+            continue;
+        }
+        if (probe_rc < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+            // Socket error detected (keepalive timeout, connection reset, etc.)
+            ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->remote_ip),
+                ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->remote_port),
+                ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rpt->hostname),
+                ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, stream_receiver_log_transport, rpt),
+                ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_receiver_log_capabilities, rpt),
+                ND_LOG_FIELD_END(),
+            };
+            ND_LOG_STACK_PUSH(lgs);
+
+            worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_SOCKET_ERROR);
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM RCV[%zu] '%s' [from %s]: socket error detected: %s - closing connection",
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, strerror(errno));
+
+            stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_ERROR);
+            continue;
+        }
+        // probe_rc > 0: data available (normal)
+        // probe_rc < 0 with EAGAIN/EWOULDBLOCK: no data but connection alive
+
         spinlock_lock(&rpt->thread.send_to_child.spinlock);
         STREAM_CIRCULAR_BUFFER_STATS stats = *stream_circular_buffer_stats_unsafe(rpt->thread.send_to_child.scb);
         spinlock_unlock(&rpt->thread.send_to_child.spinlock);
