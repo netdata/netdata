@@ -1,6 +1,7 @@
 # Platform support policy
 
 Netdata defines three tiers of official support:
+
 - [Core](#core)
 - [Intermediate](#intermediate)
 - [Community](#community)
@@ -8,6 +9,7 @@ Netdata defines three tiers of official support:
 Each tier defines different guarantees for platforms in that tier, described below in the section about that tier.
 
 Additionally, we define two categories for special cases that we do not support:
+
 - [Third-party supported platforms](#third-party-supported-platforms)
 - [Previously supported platforms](#previously-supported-platforms)
 
@@ -39,49 +41,49 @@ Platforms in the core support tier are our top priority. They are covered rigoro
 
 Our [static builds](#static-builds) are expected to work on these platforms if available. Source-based installs are expected to work on these platforms with minimal user effort.
 
-| Platform                 | Version        | Official Native Packages               | Notes                                                                                                          |
-|--------------------------|----------------|----------------------------------------|----------------------------------------------------------------------------------------------------------------|
-| Alpine Linux             | 3.23           | No                                     | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images |
-| Alpine Linux             | 3.22           | No                                     |                                                                                                                |
-| Alma Linux               | 9.x            | x86\_64, AArch64                       | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                |
-| Alma Linux               | 8.x            | x86\_64, AArch64                       | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                |
-| Amazon Linux             | 2023           | x86\_64, AArch64                       |                                                                                                                |
-| Amazon Linux             | 2              | x86\_64, AArch64                       |                                                                                                                |
-| CentOS                   | 7.x            | x86\_64                                |                                                                                                                |
-| Docker                   | 19.03 or newer | x86\_64, ARMv7, AArch64                | See our [Docker documentation](/packaging/docker/README.md) for more info on using Netdata on Docker           |
-| Debian                   | 13.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                |
-| Debian                   | 12.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                |
-| Debian                   | 11.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                |
-| Fedora                   | 43             | x86\_64, AArch64                       |                                                                                                                |
-| Fedora                   | 42             | x86\_64, AArch64                       |                                                                                                                |
-| Fedora                   | 41             | x86\_64, AArch64                       |                                                                                                                |
-| openSUSE                 | Tumbleweed     | x86\_64, AArch64                       |                                                                                                                |
-| openSUSE                 | Leap 16.0      | x86\_64, AArch64                       |                                                                                                                |
-| openSUSE                 | Leap 15.6      | x86\_64, AArch64                       |                                                                                                                |
-| Oracle Linux             | 10.x           | x86\_64, AArch64                       |                                                                                                                |
-| Oracle Linux             | 9.x            | x86\_64, AArch64                       |                                                                                                                |
-| Oracle Linux             | 8.x            | x86\_64, AArch64                       |                                                                                                                |
-| Red Hat Enterprise Linux | 9.x            | x86\_64, AArch64                       |                                                                                                                |
-| Red Hat Enterprise Linux | 8.x            | x86\_64, AArch64                       |                                                                                                                |
-| Red Hat Enterprise Linux | 7.x            | x86\_64                                |                                                                                                                |
-| Rocky Linux              | 10.x           | x86\_64, AArch64                       | Also includes support for Alma Linux and other ABI compatible RHEL derivatives                                 |
-| Rocky Linux              | 9.x            | x86\_64, AArch64                       | Also includes support for Alma Linux and other ABI compatible RHEL derivatives                                 |
-| Rocky Linux              | 8.x            | x86\_64, AArch64                       | Also includes support for Alma Linux and other ABI compatible RHEL derivatives                                 |
-| Ubuntu                   | 25.10          | x86\_64, AArch64, ARMv7                |                                                                                                                |
-| Ubuntu                   | 25.04          | x86\_64, AArch64, ARMv7                |                                                                                                                |
-| Ubuntu                   | 24.04          | x86\_64, AArch64, ARMv7                |                                                                                                                |
-| Ubuntu                   | 22.04          | x86\_64, ARMv7, AArch64                |                                                                                                                |
-| Ubuntu                   | 20.04          | x86\_64, ARMv7, AArch64                |                                                                                                                |
+| Platform                 | Version        | Official Native Packages      | Notes                                                                                                          |
+|--------------------------|----------------|-------------------------------|----------------------------------------------------------------------------------------------------------------|
+| Alpine Linux             | 3.23           | No                            | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images |
+| Alpine Linux             | 3.22           | No                            |                                                                                                                |
+| Alma Linux               | 9.x            | x86\_64, AArch64              | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                |
+| Alma Linux               | 8.x            | x86\_64, AArch64              | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                |
+| Amazon Linux             | 2023           | x86\_64, AArch64              |                                                                                                                |
+| Amazon Linux             | 2              | x86\_64, AArch64              |                                                                                                                |
+| CentOS                   | 7.x            | x86\_64                       |                                                                                                                |
+| Docker                   | 19.03 or newer | x86\_64, ARMv7, AArch64       | See our [Docker documentation](/packaging/docker/README.md) for more info on using Netdata on Docker           |
+| Debian                   | 13.x           | x86\_64, i386, ARMv7, AArch64 |                                                                                                                |
+| Debian                   | 12.x           | x86\_64, i386, ARMv7, AArch64 |                                                                                                                |
+| Debian                   | 11.x           | x86\_64, i386, ARMv7, AArch64 |                                                                                                                |
+| Fedora                   | 43             | x86\_64, AArch64              |                                                                                                                |
+| Fedora                   | 42             | x86\_64, AArch64              |                                                                                                                |
+| Fedora                   | 41             | x86\_64, AArch64              |                                                                                                                |
+| openSUSE                 | Tumbleweed     | x86\_64, AArch64              |                                                                                                                |
+| openSUSE                 | Leap 16.0      | x86\_64, AArch64              |                                                                                                                |
+| openSUSE                 | Leap 15.6      | x86\_64, AArch64              |                                                                                                                |
+| Oracle Linux             | 10.x           | x86\_64, AArch64              |                                                                                                                |
+| Oracle Linux             | 9.x            | x86\_64, AArch64              |                                                                                                                |
+| Oracle Linux             | 8.x            | x86\_64, AArch64              |                                                                                                                |
+| Red Hat Enterprise Linux | 9.x            | x86\_64, AArch64              |                                                                                                                |
+| Red Hat Enterprise Linux | 8.x            | x86\_64, AArch64              |                                                                                                                |
+| Red Hat Enterprise Linux | 7.x            | x86\_64                       |                                                                                                                |
+| Rocky Linux              | 10.x           | x86\_64, AArch64              | Also includes support for Alma Linux and other ABI compatible RHEL derivatives                                 |
+| Rocky Linux              | 9.x            | x86\_64, AArch64              | Also includes support for Alma Linux and other ABI compatible RHEL derivatives                                 |
+| Rocky Linux              | 8.x            | x86\_64, AArch64              | Also includes support for Alma Linux and other ABI compatible RHEL derivatives                                 |
+| Ubuntu                   | 25.10          | x86\_64, AArch64, ARMv7       |                                                                                                                |
+| Ubuntu                   | 25.04          | x86\_64, AArch64, ARMv7       |                                                                                                                |
+| Ubuntu                   | 24.04          | x86\_64, AArch64, ARMv7       |                                                                                                                |
+| Ubuntu                   | 22.04          | x86\_64, ARMv7, AArch64       |                                                                                                                |
+| Ubuntu                   | 20.04          | x86\_64, ARMv7, AArch64       |                                                                                                                |
 
 ### Intermediate
 
 Platforms in the intermediate support tier are those which Netdata wants to support, but cannot justify core level support for. They are also covered in CI, but not as rigorously as the core tier. They may or may not include official binary packages, and any platform-specific bugs receive a normal priority. Generally, we will add new platforms that we officially support ourselves to the intermediate tier. Our [static builds](#static-builds) are expected to work on these platforms if available. Source-based installs are expected to work on these platforms with minimal user effort.
 
-| Platform      | Version    | Official Native Packages | Notes                                                                                                |
-|---------------|------------|--------------------------|------------------------------------------------------------------------------------------------------|
-| Alpine Linux  | Edge       | No                       |                                                                                                      |
-| Arch Linux    | Latest     | No                       | We officially recommend the community packages available for Arch Linux                              |
-| Manjaro Linux | Latest     | No                       | We officially recommend the community packages available for Arch Linux                              |
+| Platform      | Version | Official Native Packages | Notes                                                                   |
+|---------------|---------|--------------------------|-------------------------------------------------------------------------|
+| Alpine Linux  | Edge    | No                       |                                                                         |
+| Arch Linux    | Latest  | No                       | We officially recommend the community packages available for Arch Linux |
+| Manjaro Linux | Latest  | No                       | We officially recommend the community packages available for Arch Linux |
 
 ### Community
 
@@ -113,7 +115,7 @@ Currently, we know of the following platforms having some degree of third-party 
 
 We consider a platform to be end of life when the upstream maintainers of that platform stop providing official support for it themselves, or when that platform transitions into an 'extended security maintenance' period.
 
-Platforms that meet these criteria will be immediately transitioned to the **Previously Supported** category, with no prior warning from Netdata and no deprecation notice, unlike those being dropped for technical reasons, as our end of support should already coincide with the end of the normal support lifecycle for that platform.
+Platforms that meet these criteria will be immediately transitioned to the **Previously Supported** category. Unlike platforms dropped for technical reasons, there will be no prior warning from Netdata and no deprecation notice. This is because our end of support should already coincide with the end of the normal support lifecycle for that platform.
 
 :::
 
