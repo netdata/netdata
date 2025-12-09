@@ -574,7 +574,7 @@ _safe_download() {
 
     if "${curl}" -fsSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"; then
       succeeded=1
-    else
+    elif [ "${dest}" != "/dev/null" ]; then
       rm -f "${dest}"
     fi
   fi
@@ -585,7 +585,7 @@ _safe_download() {
 
       if wget -T 15 -O - "${url}" > "${dest}"; then
         succeeded=1
-      else
+      elif [ "${dest}" != "/dev/null" ]; then
         rm -f "${dest}"
       fi
     fi
