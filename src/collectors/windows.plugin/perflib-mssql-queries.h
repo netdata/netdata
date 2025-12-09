@@ -705,6 +705,7 @@ enum netdata_mssql_metrics {
     NETDATA_MSSQL_BUFFER_MANAGEMENT,
     NETDATA_MSSQL_JOBS,
     NETDATA_USER_CONNECTIONS,
+    NETDATA_BLOCKED_PROCESS,
 
     NETDATA_MSSQL_METRICS_END
 };
@@ -1003,4 +1004,5 @@ extern void do_mssql_statistics_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssq
 extern void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
 extern void do_mssql_user_connections(struct mssql_instance *mi, int update_every);
 extern void do_mssql_sessions_connections(struct mssql_instance *mi, int update_every);
+extern void netdata_mssql_blocked_processes_chart(struct mssql_instance *mi, int update_every);
 #endif

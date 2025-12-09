@@ -1048,7 +1048,7 @@ static void netdata_mssql_fill_blocked_processes_query(struct mssql_instance *mi
     if (likely(netdata_mssql_check_result(ret)))
         goto end_blocked_processes;
 
-    end_blocked_processes:
+end_blocked_processes:
     netdata_MSSQL_release_results(mi->conn->dbSQLBlockedProcesses);
 }
 
@@ -1675,6 +1675,45 @@ static int initialize(int update_every)
     }
 
     return 0;
+}
+
+// Charts
+void netdata_mssql_blocked_processes_chart(struct mssql_instance *mi, int update_every)
+{
+    if (unlikely(!mi->st_process_blocked)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_blocked_process", mi->instanceID);
+        netdata_fix_chart_name(id);
+        mi->st_process_blocked = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "processes",
+                "mssql.instance_blocked_processes",
+                "Blocked processes",
+                "process",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_BLOCKED_PROCESSES,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        mi->rd_process_blocked = rrddim_add(mi->st_process_blocked, "blocked", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(mi->st_process_blocked->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            mi->st_process_blocked, mi->rd_process_blocked, (collected_number)mi->MSSQLBlockedProcesses.current.Data);
+    rrdset_done(mi->st_process_blocked);
+}
+
+static void do_mssql_blocked_processes(PERF_DATA_BLOCK *pDataBlock __maybe_unused, struct mssql_instance *mi, int update_every)
+{
+    if (unlikely(!mi || !mi->conn || !mi->conn->collect_blocked_processes))
+        return;
+
+    netdata_mssql_blocked_processes_chart(mi, update_every);
 }
 
 void dict_mssql_locks_wait_charts(struct mssql_instance *mi, struct mssql_lock_instance *mli, const char *resource)
@@ -3203,13 +3242,14 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
         do_mssql_bufferman_stats_sql,
         do_mssql_job_status_sql,
         do_mssql_user_connection,
+        do_mssql_blocked_processes,
 
         NULL};
 
     DWORD i;
     PERF_DATA_BLOCK *pDataBlock;
     static bool collect_perflib[NETDATA_MSSQL_METRICS_END] = {
-        true, true, true, true, true, true, true, true, true, true, false};
+        true, true, true, true, true, true, true, true, true, true, false, false};
     for (i = 0; i < NETDATA_MSSQL_ACCESS_METHODS; i++) {
         if (unlikely(!collect_perflib[i]))
             continue;

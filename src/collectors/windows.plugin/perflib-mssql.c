@@ -415,36 +415,6 @@ void do_mssql_sessions_connections(struct mssql_instance *mi, int update_every)
     rrdset_done(mi->st_session_connections);
 }
 
-void do_mssql_blocked_processes(struct mssql_instance *mi, int update_every)
-{
-    if (unlikely(!mi->st_process_blocked)) {
-        char id[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_blocked_process", mi->instanceID);
-        netdata_fix_chart_name(id);
-        mi->st_process_blocked = rrdset_create_localhost(
-                "mssql",
-                id,
-                NULL,
-                "processes",
-                "mssql.instance_blocked_processes",
-                "Blocked processes",
-                "process",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibMSSQL",
-                PRIO_MSSQL_BLOCKED_PROCESSES,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-        mi->rd_process_blocked = rrddim_add(mi->st_process_blocked, "blocked", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-        rrdlabels_add(mi->st_process_blocked->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
-    }
-
-    rrddim_set_by_pointer(
-            mi->st_process_blocked, mi->rd_process_blocked, (collected_number)mi->MSSQLBlockedProcesses.current.Data);
-    rrdset_done(mi->st_process_blocked);
-}
-
 void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType =
@@ -458,8 +428,8 @@ void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *
         }
     }
 
-    if (unlikely(!mi || !mi->conn || mi->conn->collect_blocked_processes) &&
+    if (unlikely(!mi || !mi->conn || !mi->conn->collect_blocked_processes) &&
         likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLBlockedProcesses))) {
-        do_mssql_blocked_processes(mi, update_every);
+        netdata_mssql_blocked_processes_chart(mi, update_every);
     }
 }
