@@ -897,9 +897,11 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
         struct receiver_state *rpt = m->rpt;
 
         // Probe socket to detect dead connections (e.g., from TCP keepalive)
-        // MSG_PEEK doesn't consume data, MSG_DONTWAIT makes it non-blocking
+        // Uses nd_sock_peek_nowait() which handles both SSL and plain TCP:
+        // - For SSL: uses SSL_peek() to avoid corrupting SSL state
+        // - For plain TCP: uses recv(MSG_PEEK | MSG_DONTWAIT)
         char probe_byte;
-        ssize_t probe_rc = recv(rpt->sock.fd, &probe_byte, 1, MSG_PEEK | MSG_DONTWAIT);
+        ssize_t probe_rc = nd_sock_peek_nowait(&rpt->sock, &probe_byte, 1);
         if (probe_rc == 0) {
             // Connection closed gracefully by remote
             ND_LOG_STACK lgs[] = {
