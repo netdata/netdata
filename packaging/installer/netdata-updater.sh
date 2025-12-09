@@ -1110,7 +1110,12 @@ update_binpkg() {
       repo_update_opts="${interactive_opts}"
       pkg_installed_check="rpm -q"
       INSTALL_TYPE="binpkg-rpm"
-      repo_path="${DISTRO_COMPAT_NAME}/${SYSVERSION}/$(uname -m)"
+      case "${DISTRO_COMPAT_NAME}" in
+        amzn) repo_path="amazonlinux/${SYSVERSION}/$(uname -m)" ;;
+        fedora) repo_path="fedora/${SYSVERSION}/$(uname -m)" ;;
+        ol) repo_path="ol/${SYSVERSION}/$(uname -m)" ;;
+        *) repo_path="el/${SYSVERSION}/$(uname -m)" ;;
+      esac
       ;;
     opensuse)
       if [ "${INTERACTIVE}" = "0" ]; then
