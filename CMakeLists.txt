@@ -3193,11 +3193,11 @@ if(ENABLE_PLUGIN_OTEL)
                       RUNTIME DESTINATION usr/libexec/netdata/plugins.d
                       COMPONENT plugin-otel)
 
-    install(FILES src/crates/netdata-otel/otel-plugin/configs/otel.yml
+    install(FILES src/crates/netdata-otel/otel-plugin/configs/otel.yaml
             COMPONENT plugin-otel
             DESTINATION usr/lib/netdata/conf.d)
 
-    install(FILES src/crates/netdata-otel/otel-plugin/configs/otel.d/v1/metrics/hostmetrics-receiver.yml
+    install(FILES src/crates/netdata-otel/otel-plugin/configs/otel.d/v1/metrics/hostmetrics-receiver.yaml
             COMPONENT plugin-otel
             DESTINATION usr/lib/netdata/conf.d/otel.d/v1/metrics)
 
@@ -3290,11 +3290,11 @@ set(netdata_user_POST "${NETDATA_USER}")
 set(netdata_group_POST "${NETDATA_USER}")
 
 if(ENABLE_NETDATA_JOURNAL_FILE_READER)
-    configure_file(src/crates/netdata-log-viewer/journal-viewer-plugin/configs/journal-viewer.yml.in
-                   src/crates/netdata-log-viewer/journal-viewer-plugin/configs/journal-viewer.yml
+    configure_file(src/crates/netdata-log-viewer/journal-viewer-plugin/configs/journal-viewer.yaml.in
+                   src/crates/netdata-log-viewer/journal-viewer-plugin/configs/journal-viewer.yaml
                    @ONLY)
 
-    install(FILES ${CMAKE_BINARY_DIR}/src/crates/netdata-log-viewer/journal-viewer-plugin/configs/journal-viewer.yml
+    install(FILES ${CMAKE_BINARY_DIR}/src/crates/netdata-log-viewer/journal-viewer-plugin/configs/journal-viewer.yaml
             COMPONENT plugin-journal-viewer
             DESTINATION usr/lib/netdata/conf.d)
 endif()

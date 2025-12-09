@@ -700,7 +700,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 # journal-viewer belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/journal-viewer-plugin
-%exclude %{_libdir}/%{name}/conf.d/journal-viewer.yml
+%exclude %{_libdir}/%{name}/conf.d/journal-viewer.yaml
 
 # xenstat belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/xenstat.plugin

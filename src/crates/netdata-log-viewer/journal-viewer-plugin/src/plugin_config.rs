@@ -91,7 +91,7 @@ impl PluginConfig {
             let user_config = netdata_env
                 .user_config_dir
                 .as_ref()
-                .map(|path| path.join("journal-viewer.yml"))
+                .map(|path| path.join("journal-viewer.yaml"))
                 .and_then(|path| {
                     if path.exists() {
                         Config::from_yaml_file(&path)
@@ -107,7 +107,7 @@ impl PluginConfig {
             } else if let Some(stock_path) = netdata_env
                 .stock_config_dir
                 .as_ref()
-                .map(|p| p.join("journal-viewer.yml"))
+                .map(|p| p.join("journal-viewer.yaml"))
             {
                 if stock_path.exists() {
                     Config::from_yaml_file(&stock_path).with_context(|| {

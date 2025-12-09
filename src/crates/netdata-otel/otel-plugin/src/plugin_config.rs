@@ -216,7 +216,7 @@ impl PluginConfig {
             let user_config = netdata_env
                 .user_config_dir
                 .as_ref()
-                .map(|path| path.join("otel.yml"))
+                .map(|path| path.join("otel.yaml"))
                 .and_then(|path| {
                     Self::from_yaml_file(&path)
                         .with_context(|| format!("Loading user config from {}", path.display()))
@@ -228,7 +228,7 @@ impl PluginConfig {
             } else if let Some(stock_path) = netdata_env
                 .stock_config_dir
                 .as_ref()
-                .map(|p| p.join("otel.yml"))
+                .map(|p| p.join("otel.yaml"))
             {
                 Self::from_yaml_file(&stock_path).with_context(|| {
                     format!("Loading stock config from {}", stock_path.display())

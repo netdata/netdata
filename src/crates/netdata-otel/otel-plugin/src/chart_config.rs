@@ -95,7 +95,7 @@ impl ChartConfigManager {
 
     fn load_stock_config(&mut self) {
         const DEFAULT_CONFIGS_YAML: &str =
-            include_str!("../configs/otel.d/v1/metrics/hostmetrics-receiver.yml");
+            include_str!("../configs/otel.d/v1/metrics/hostmetrics-receiver.yaml");
 
         match serde_yaml::from_str::<ChartConfigs>(DEFAULT_CONFIGS_YAML) {
             Ok(configs) => {
