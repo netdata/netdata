@@ -27,7 +27,7 @@ The following table shows a general outline of the various support tiers and cat
 | Third-party Supported | Users directed to platform maintainers | None                           | None                                                                                              | No                                       | Best Effort          |
 | Previously Supported  | Users asked to upgrade                 | None                           | None                                                                                              | Yes, but only already published versions | Best Effort          |
 
-- 'Bug Support': How we handle of platform-specific bugs.
+- 'Bug Support': How we handle platform-specific bugs.
 - 'Guaranteed Configurations': Which runtime configurations for the Agent we try to guarantee will work with minimal effort from users.
 - 'CI Coverage': What level of coverage we provide for the platform in CI.
 - 'Native Packages': Whether we provide native packages for the system package manager for the platform.
