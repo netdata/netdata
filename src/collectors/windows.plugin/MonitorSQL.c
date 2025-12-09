@@ -1025,6 +1025,7 @@ static void netdata_mssql_fill_blocked_processes_query(struct mssql_instance *mi
 
     long blocked_processes = 0;
     SQLLEN col_len = 0;
+    mi->MSSQLBlockedProcesses.current.Data = 0;
 
     SQLRETURN ret = SQLExecDirect(mi->conn->dbSQLBlockedProcesses, (SQLCHAR *)NETDATA_QUERY_BLOCKED_PROCESSES, SQL_NTS);
     if (likely(netdata_mssql_check_result(ret))) {
