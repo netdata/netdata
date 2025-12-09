@@ -69,6 +69,13 @@
 - Regenerate integrations docs ([#21415](https://github.com/netdata/netdata/issues/21415))
 - Build(deps): bump github.com/microsoft/go-mssqldb from 1.9.4 to 1.9.5 in /src/go ([#21420](https://github.com/netdata/netdata/issues/21420))
 - Build(deps): bump azure/trusted-signing-action from 0.5.10 to 0.5.11 ([#21419](https://github.com/netdata/netdata/issues/21419))
+- Report inability to update due to native packages no longer being published. ([#21288](https://github.com/netdata/netdata/issues/21288))
+- Adjust result when NULL (MSSQL). ([#21417](https://github.com/netdata/netdata/issues/21417))
+- Chore(go.d): log skipped data collection ([#21423](https://github.com/netdata/netdata/issues/21423))
+- Chore(go.d/snmp): remove non-default update_every from sd config ([#21424](https://github.com/netdata/netdata/issues/21424))
+- Improve thread join handling ([#21421](https://github.com/netdata/netdata/issues/21421))
+- Chore(go.d): log data collection duration when skipping tick ([#21425](https://github.com/netdata/netdata/issues/21425))
+- Fix MQTT packet ACK  ([#21416](https://github.com/netdata/netdata/issues/21416))
 
 ## [2.8.0] - 2025-11-19
 
