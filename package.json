@@ -31,7 +31,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^2.0.53",
+    "@ai-sdk/anthropic": "^2.0.54",
     "@ai-sdk/google": "^2.0.45",
     "@ai-sdk/openai": "^2.0.80",
     "@ai-sdk/provider-utils": "^3.0.18",
@@ -39,7 +39,7 @@
     "@dqbd/tiktoken": "^1.0.22",
     "@lenml/tokenizer-gemini": "^3.7.2",
     "@modelcontextprotocol/sdk": "^1.24.3",
-    "@openrouter/ai-sdk-provider": "^1.4.1",
+    "@openrouter/ai-sdk-provider": "^1.5.2",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/api-logs": "^0.208.0",
     "@opentelemetry/exporter-logs-otlp-grpc": "^0.208.0",
@@ -58,7 +58,7 @@
     "commander": "^14.0.2",
     "express": "^5.2.1",
     "js-yaml": "^4.1.1",
-    "json-schema-library": "^10.5.1",
+    "json-schema-library": "^10.5.2",
     "jsonrepair": "^3.13.1",
     "ollama-ai-provider-v2": "^1.5.5",
     "undici": "^7.16.0",
@@ -85,7 +85,7 @@
     "eslint-plugin-security": "^3.0.1",
     "eslint-plugin-sonarjs": "^3.0.5",
     "eslint-plugin-unicorn": "^62.0.0",
-    "knip": "^5.72.0",
+    "knip": "^5.73.0",
     "prettier": "^3.7.4",
     "typescript": "^5.9.3",
     "vitest": "^4.0.15"
