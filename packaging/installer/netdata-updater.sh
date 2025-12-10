@@ -316,6 +316,15 @@ dev_null_fix() {
             chown --reference=/dev/full /dev/.null
         fi
         mv -f /dev/.null /dev/null
+        # If the system seems to be using SELinux, apply the correct
+        # security context to the new /dev/null.
+        #
+        # This check doesn’t use /dev/null as trying to access it
+        # without the right security context being set may fail.
+        if command -v restorecon >/tmp/nd-null 2>&1; then
+            restorecon /dev/null
+        fi
+        rm -f /tmp/nd-null # Cleanup from the above check
         ;;
       FreeBSD)
         # Device numbers on FreeBSD don't seem to be consistent across
