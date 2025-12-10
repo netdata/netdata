@@ -76,6 +76,9 @@
 - Improve thread join handling ([#21421](https://github.com/netdata/netdata/issues/21421))
 - Chore(go.d): log data collection duration when skipping tick ([#21425](https://github.com/netdata/netdata/issues/21425))
 - Fix MQTT packet ACK  ([#21416](https://github.com/netdata/netdata/issues/21416))
+- Fix(updater): fix deleting /dev/null when URL check fails ([#21428](https://github.com/netdata/netdata/issues/21428))
+- Update PLATFORM_SUPPORT.md ([#21422](https://github.com/netdata/netdata/issues/21422))
+- Properly handle package check URL creation for RHEL derivatives. ([#21431](https://github.com/netdata/netdata/issues/21431))
 
 ## [2.8.0] - 2025-11-19
 
