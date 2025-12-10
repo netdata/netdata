@@ -2,4 +2,4 @@
 description: "Test agent 1"
 usage: "call me with just the word 'run'"
 ---
-Call `agent__final_report` with status="success", report_format="sub-agent", and content="123".
+Respond with your final answer only (no tool calls). Return exactly the text "123" in sub-agent format.

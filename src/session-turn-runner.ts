@@ -36,6 +36,7 @@ import {
   FINAL_REPORT_SLACK_MESSAGES_MISSING,
   TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT,
   TURN_FAILED_PROGRESS_ONLY,
+  turnFailedXmlWrapperAsTool,
   FINAL_TURN_NOTICE,
   MAX_TURNS_FINAL_MESSAGE,
   TOOL_CALL_MALFORMED,
@@ -43,6 +44,7 @@ import {
   EMPTY_RESPONSE_RETRY_NOTICE,
   finalReportFormatMismatch,
   finalReportReminder,
+  isXmlFinalReportTagName,
   toolReminderMessage,
   turnFailedPrefix,
 } from './llm-messages.js';
@@ -304,13 +306,25 @@ export class TurnRunner {
         let lastTurnResult: (TurnResult & { shownThinking?: boolean; incompleteFinalReportDetected?: boolean }) | undefined;
             let turnHadFinalReportAttempt = false;
             let collapseLoggedThisTurn = false;
-            const collapseRemainingTurns = (reason: 'incomplete_final_report' | 'final_report_attempt'): void => {
+            const collapseRemainingTurns = (reason: 'incomplete_final_report' | 'final_report_attempt' | 'xml_wrapper_as_tool'): void => {
                 if (collapseLoggedThisTurn)
                     return;
                 if (currentTurn >= maxTurns)
                     return;
                 const previousMaxTurns = maxTurns;
                 maxTurns = currentTurn + 1;
+                const collapseMessage = (() => {
+                    switch (reason) {
+                        case 'incomplete_final_report':
+                            return `Incomplete final report detected at turn ${String(currentTurn)}; Collapsing remaining turns from ${String(previousMaxTurns)} to ${String(maxTurns)}`;
+                        case 'final_report_attempt':
+                            return `Final report retry detected at turn ${String(currentTurn)}; Collapsing remaining turns from ${String(previousMaxTurns)} to ${String(maxTurns)}`;
+                        case 'xml_wrapper_as_tool':
+                            return `XML wrapper called as tool at turn ${String(currentTurn)}; Collapsing remaining turns from ${String(previousMaxTurns)} to ${String(maxTurns)}`;
+                        default:
+                            return `Collapsing remaining turns from ${String(previousMaxTurns)} to ${String(maxTurns)}`;
+                    }
+                })();
                 const adjustLog: LogEntry = {
                     timestamp: Date.now(),
                     severity: 'WRN' as const,
@@ -320,9 +334,7 @@ export class TurnRunner {
                     type: 'llm' as const,
                     remoteIdentifier: REMOTE_ORCHESTRATOR,
                     fatal: false,
-                    message: reason === 'incomplete_final_report'
-                        ? `Incomplete final report detected at turn ${String(currentTurn)}; Collapsing remaining turns from ${String(previousMaxTurns)} to ${String(maxTurns)}`
-                        : `Final report retry detected at turn ${String(currentTurn)}; Collapsing remaining turns from ${String(previousMaxTurns)} to ${String(maxTurns)}`
+                    message: collapseMessage
                 };
                 this.log(adjustLog);
                 recordRetryCollapseMetrics({
@@ -600,7 +612,7 @@ export class TurnRunner {
                 }
                     const turnResult = await this.executeSingleTurn(attemptConversation, provider, model, isFinalTurn, currentTurn, logs, accounting, lastShownThinkingHeaderTurn, attempts, maxRetries, sessionReasoningLevel, sessionReasoningValue ?? undefined);
                     lastTurnResult = turnResult;
-                    const { messages: sanitizedMessages, dropped: droppedInvalidToolCalls, finalReportAttempted } = this.sanitizeTurnMessages(turnResult.messages, { turn: currentTurn, provider, model, stopReason: turnResult.stopReason });
+                    const { messages: sanitizedMessages, dropped: droppedInvalidToolCalls, finalReportAttempted } = this.sanitizeTurnMessages(turnResult.messages, { turn: currentTurn, provider, model, stopReason: turnResult.stopReason, maxOutputTokens: this.ctx.sessionConfig.maxOutputTokens });
                     this.state.droppedInvalidToolCalls = droppedInvalidToolCalls;
                     // Mark turnResult with finalReportAttempted flag but defer collapseRemainingTurns
                     // until we know if the final report was actually accepted (done later in the flow)
@@ -674,7 +686,9 @@ export class TurnRunner {
                     if (turnResult.shownThinking || reasoningHeaderEmitted) {
                         lastShownThinkingHeaderTurn = currentTurn;
                     }
-                    // Emit WRN for unknown tool calls
+                    // Emit WRN for unknown tool calls and detect XML wrapper misuse
+                    let xmlWrapperCalledAsTool = false;
+                    const sessionNonce = this.ctx.xmlTransport.getSessionNonce();
                     try {
                         const internal = new Set([FINAL_REPORT_TOOL]);
                         if (this.ctx.progressToolEnabled)
@@ -685,7 +699,9 @@ export class TurnRunner {
                         const assistantMessages = sanitizedMessages.filter((m) => m.role === 'assistant');
                         const assistantMsg = assistantMessages.length > 0 ? assistantMessages[assistantMessages.length - 1] : undefined;
                         if (assistantMsg?.toolCalls !== undefined && assistantMsg.toolCalls.length > 0) {
-                            (assistantMsg.toolCalls).forEach((tc) => {
+                            const calls = assistantMsg.toolCalls;
+                            xmlWrapperCalledAsTool = calls.some((tc) => isXmlFinalReportTagName(normalizeTool(tc.name)));
+                            calls.forEach((tc) => {
                                 const n = normalizeTool(tc.name);
                                 const known = (this.ctx.toolsOrchestrator?.hasTool(n) ?? false) || internal.has(n);
                                 if (!known) {
@@ -708,6 +724,11 @@ export class TurnRunner {
                     }
                     catch (e) {
                         warn(`unknown tool warning failed: ${e instanceof Error ? e.message : String(e)}`);
+                    }
+                    if (xmlWrapperCalledAsTool) {
+                        const formatValue = this.ctx.resolvedFormat ?? 'markdown';
+                        this.addTurnFailure(turnFailedXmlWrapperAsTool(sessionNonce, formatValue));
+                        collapseRemainingTurns('xml_wrapper_as_tool');
                     }
                     // Record accounting for every attempt
                     {
@@ -908,6 +929,15 @@ export class TurnRunner {
                                 sanitizedHasText = fallbackResult.hasRemainingText;
                                 // Add tool results to messages
                                 sanitizedMessages.push(...fallbackResult.toolResults);
+                                // Merge fallback execution stats into turnResult so turn validation sees them
+                                const fbStats = fallbackResult.executionStats;
+                                const existingStats = turnResult.executionStats ?? { executedTools: 0, executedNonProgressBatchTools: 0, executedProgressBatchTools: 0, unknownToolEncountered: false };
+                                turnResult.executionStats = {
+                                    executedTools: existingStats.executedTools + fbStats.executedTools,
+                                    executedNonProgressBatchTools: existingStats.executedNonProgressBatchTools + fbStats.executedNonProgressBatchTools,
+                                    executedProgressBatchTools: existingStats.executedProgressBatchTools + fbStats.executedProgressBatchTools,
+                                    unknownToolEncountered: (existingStats.unknownToolEncountered === true) || fbStats.unknownToolEncountered,
+                                };
                                 const extractionMessage = `Retrying for proper tool call after extracting ${String(fallbackResult.toolCalls.length)} leaked call(s).`;
                                 this.log({
                                     timestamp: Date.now(),
@@ -967,26 +997,6 @@ export class TurnRunner {
                                 const params = finalReportCall.parameters;
                                 const expectedFormat = this.ctx.resolvedFormat ?? 'text';
 
-                                // Log the attempt for diagnostics (even if validation fails)
-                                try {
-                                    const preview = formatToolRequestCompact(FINAL_REPORT_TOOL, params);
-                                    this.log({
-                                        timestamp: Date.now(),
-                                        severity: 'WRN' as const,
-                                        turn: currentTurn,
-                                        subturn: 0,
-                                        direction: 'response' as const,
-                                        type: 'llm' as const,
-                                        remoteIdentifier: 'agent:final-report-preview',
-                                        fatal: false,
-                                        message: `agent__final_report attempt: ${preview}`,
-                                        details: { request_preview: preview }
-                                    });
-                                }
-                                catch {
-                                    // ignore logging errors
-                                }
-
                                 const formatParamRaw = params.report_format;
                                 const formatParam = typeof formatParamRaw === 'string' && formatParamRaw.trim().length > 0 ? formatParamRaw.trim() : undefined;
                                 const statusParamRaw = params.status;
@@ -1011,12 +1021,28 @@ export class TurnRunner {
                                 const messagesValue = params.messages;
                                 const messagesParam = Array.isArray(messagesValue) ? messagesValue : undefined;
                                 const contentJsonCandidate = params.content_json;
+                                const setFinalReportFailureMessage = (content: string): void => {
+                                    const callId = typeof finalReportCall.id === 'string' ? finalReportCall.id : undefined;
+                                    const existing = callId === undefined
+                                        ? undefined
+                                        : sanitizedMessages.find((msg) => msg.role === 'tool' && msg.toolCallId === callId);
+                                    if (existing !== undefined) {
+                                        existing.content = content;
+                                        return;
+                                    }
+                                    sanitizedMessages.push({
+                                        role: 'tool',
+                                        content,
+                                        toolCallId: callId,
+                                    });
+                                };
 
                                 // Validate wrapper: format must match expected
                                 const formatCandidate = formatParam ?? expectedFormat;
                                 const finalFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === formatCandidate) ?? expectedFormat;
                                 if (finalFormat !== expectedFormat) {
                                     this.addTurnFailure(finalReportFormatMismatch(expectedFormat, formatCandidate));
+                                    this.logFinalReportDump(currentTurn, params, `format mismatch: expected ${expectedFormat}, got ${formatCandidate}`, rawContent);
                                     return false;
                                 }
 
@@ -1205,11 +1231,7 @@ export class TurnRunner {
                                     if (finalFormat === 'json' && contentJson === undefined) {
                                         const failureMessage = 'final_report(json) requires `content_json` (object).';
                                         const failureToolMessage = `${TOOL_FAILED_PREFIX} ${failureMessage})`;
-                                        sanitizedMessages.push({
-                                            role: 'tool',
-                                            content: failureToolMessage,
-                                            toolCallId: typeof finalReportCall.id === 'string' ? finalReportCall.id : undefined,
-                                        });
+                                        setFinalReportFailureMessage(failureToolMessage);
                                         this.addTurnFailure(FINAL_REPORT_CONTENT_MISSING);
                                         this.state.finalReportToolFailedThisTurn = true;
                                         this.state.finalReportToolFailedEver = true;
@@ -1220,7 +1242,13 @@ export class TurnRunner {
                                     // Use raw payload or report_content directly
                                     finalContent = rawPayload ?? contentParam;
                                     if (finalContent === undefined || finalContent.length === 0) {
+                                        const failureMessage = 'final_report requires non-empty report_content.';
+                                        const failureToolMessage = `${TOOL_FAILED_PREFIX} ${failureMessage})`;
+                                        setFinalReportFailureMessage(failureToolMessage);
                                         this.addTurnFailure(FINAL_REPORT_CONTENT_MISSING);
+                                        this.state.finalReportToolFailedThisTurn = true;
+                                        this.state.finalReportToolFailedEver = true;
+                                        toolFailureDetected = true;
                                         this.logFinalReportDump(currentTurn, params, 'expected report_content', rawContent);
                                         return false;
                                     }
@@ -1230,6 +1258,14 @@ export class TurnRunner {
                                 // LAYER 3: Final Report construction
                                 // Build clean final report object
                                 // =================================================================
+
+                                // Handle truncated output (unstructured formats only - structured would have been rejected)
+                                const truncatedFlag = params._truncated;
+                                if (truncatedFlag === true) {
+                                    commitMetadata = { ...commitMetadata, truncated: true };
+                                    finalContent = `${finalContent}\n\n[OUTPUT TRUNCATED: Response exceeded output token limit.]`;
+                                }
+
                                 this.commitFinalReport({
                                     format: finalFormat,
                                     content: finalContent,
@@ -2015,7 +2051,7 @@ export class TurnRunner {
         final_report_attempts: this.ctx.finalReportManager.finalReportAttempts,
       },
     }, 'synthetic');
-    return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn, { sessionFailed: true, failureSlugs: failureInfo.slugs });
+    return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn);
   }
     private commitFinalReport(payload: PendingFinalReportPayload, source: FinalReportSource): void {
         this.state.finalReportInvalidFormat = false;
@@ -2066,7 +2102,7 @@ export class TurnRunner {
         this.emitFinalSummary(logs, accounting);
         return { success: true, conversation, logs, accounting, childConversations: this.state.childConversations };
     }
-    private finalizeWithCurrentFinalReport(conversation: ConversationMessage[], logs: LogEntry[], accounting: AccountingEntry[], currentTurn: number, options?: { sessionFailed?: boolean; failureSlugs?: string[] }): AIAgentResult {
+    private finalizeWithCurrentFinalReport(conversation: ConversationMessage[], logs: LogEntry[], accounting: AccountingEntry[], currentTurn: number): AIAgentResult {
         const fr = this.finalReport;
         if (fr === undefined) {
             throw new Error('finalizeWithCurrentFinalReport called without final report');
@@ -2224,11 +2260,11 @@ export class TurnRunner {
         const exitMessage = this.forcedFinalTurnReason === 'context'
             ? `Final report received after context guard triggered (${FINAL_REPORT_TOOL}), session complete`
             : `Final report received (${FINAL_REPORT_TOOL}), session complete`;
-        const validationFailed = this.state.finalReportInvalidFormat || this.state.finalReportSchemaFailed || statusMeta === 'failure' || this.state.lastFinalReportStatus === 'failure';
-        const computedSuccess = (options?.sessionFailed === true)
-            ? false
-            : (source !== 'synthetic' && !this.state.toolLimitExceeded && !validationFailed);
-        this.logExit(exitCode, exitMessage, currentTurn, { fatal: !computedSuccess, severity: computedSuccess ? 'VRB' : 'ERR' });
+        // Transport-layer success: any model-provided report that passes validation is successful.
+        // Content-level failure (model says "I couldn't find data") is semantic, not transport failure.
+        // Synthetic reports (generated by system due to session failure) are the only transport failures.
+        const success = source !== 'synthetic';
+        this.logExit(exitCode, exitMessage, currentTurn, { fatal: !success, severity: success ? 'VRB' : 'ERR' });
         const metadataRecord = fr.metadata;
         const metadataReason = typeof metadataRecord?.reason === 'string' ? metadataRecord.reason : undefined;
         recordFinalReportMetrics({
@@ -2243,8 +2279,6 @@ export class TurnRunner {
             customLabels: this.ctx.telemetryLabels,
         });
         this.emitFinalSummary(logs, accounting);
-        // Success contract: model-provided final reports succeed unless explicitly marked failure; synthetic reports are failures.
-        const success = computedSuccess;
         const error = (() => {
             if (success) return undefined;
             if (typeof fr.content === 'string' && fr.content.length > 0) return fr.content;
@@ -2540,14 +2574,15 @@ export class TurnRunner {
         // Create tool executor for fallback execution
         const executor = this.ctx.sessionExecutor.createExecutor(turn, provider, executionState);
 
-        // Delegate to the module
+        // Delegate to the module, passing executionState as stats reference
         return processLeakedToolCalls({
             textContent,
             executor,
+            executionStatsRef: executionState,
         });
     }
 
-    private sanitizeTurnMessages(messages: ConversationMessage[], context: { turn: number; provider: string; model: string; stopReason?: string }): { messages: ConversationMessage[]; dropped: number; finalReportAttempted: boolean } {
+    private sanitizeTurnMessages(messages: ConversationMessage[], context: { turn: number; provider: string; model: string; stopReason?: string; maxOutputTokens?: number }): { messages: ConversationMessage[]; dropped: number; finalReportAttempted: boolean } {
         let dropped = 0;
         let finalReportAttempted = false;
         const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -2556,7 +2591,7 @@ export class TurnRunner {
             let parsedToolCalls;
             // XML transport parsing
             if (msg.role === 'assistant' && typeof msg.content === 'string') {
-                const parseResult = this.ctx.xmlTransport.parseAssistantMessage(msg.content, { turn: context.turn, resolvedFormat: this.ctx.resolvedFormat, stopReason: context.stopReason }, {
+                const parseResult = this.ctx.xmlTransport.parseAssistantMessage(msg.content, { turn: context.turn, resolvedFormat: this.ctx.resolvedFormat, stopReason: context.stopReason, maxOutputTokens: context.maxOutputTokens }, {
                     onTurnFailure: (reason) => { this.addTurnFailure(reason); },
                     onLog: (entry) => {
                         this.callbacks.log({

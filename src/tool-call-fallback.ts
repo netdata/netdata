@@ -34,6 +34,16 @@ export type ToolExecutorFn = (
 ) => Promise<string>;
 
 /**
+ * Execution state reference for tracking stats.
+ */
+export interface ExecutionStatsRef {
+  executedTools: number;
+  executedNonProgressBatchTools: number;
+  executedProgressBatchTools: number;
+  unknownToolEncountered: boolean;
+}
+
+/**
  * Input for processing leaked tool calls.
  */
 export interface LeakedToolFallbackInput {
@@ -41,6 +51,18 @@ export interface LeakedToolFallbackInput {
   textContent: string;
   /** Function to execute tools - provided by the session */
   executor: ToolExecutorFn;
+  /** Reference to execution state for reading stats after execution */
+  executionStatsRef: ExecutionStatsRef;
+}
+
+/**
+ * Execution statistics from leaked tool call processing.
+ */
+export interface LeakedToolExecutionStats {
+  executedTools: number;
+  executedNonProgressBatchTools: number;
+  executedProgressBatchTools: number;
+  unknownToolEncountered: boolean;
 }
 
 /**
@@ -57,6 +79,8 @@ export interface LeakedToolFallbackResult {
   toolResults: ConversationMessage[];
   /** Pattern names that matched (for logging) */
   patternsMatched: string[];
+  /** Execution statistics from the fallback execution */
+  executionStats: LeakedToolExecutionStats;
 }
 
 /**
@@ -264,7 +288,7 @@ export const tryExtractLeakedToolCalls = (input: string): LeakedToolExtractionRe
 export const processLeakedToolCalls = async (
   input: LeakedToolFallbackInput
 ): Promise<LeakedToolFallbackResult | undefined> => {
-  const { textContent, executor } = input;
+  const { textContent, executor, executionStatsRef } = input;
 
   // Step 1: Extract tool calls from text
   const extraction = tryExtractLeakedToolCalls(textContent);
@@ -297,7 +321,7 @@ export const processLeakedToolCalls = async (
     }
   }
 
-  // Step 3: Return complete result
+  // Step 3: Return complete result with execution stats from the state reference
   const hasRemainingText = extraction.content !== null && extraction.content.length > 0;
 
   return {
@@ -306,5 +330,11 @@ export const processLeakedToolCalls = async (
     toolCalls: extraction.toolCalls,
     toolResults,
     patternsMatched: extraction.patternsMatched,
+    executionStats: {
+      executedTools: executionStatsRef.executedTools,
+      executedNonProgressBatchTools: executionStatsRef.executedNonProgressBatchTools,
+      executedProgressBatchTools: executionStatsRef.executedProgressBatchTools,
+      unknownToolEncountered: executionStatsRef.unknownToolEncountered,
+    },
   };
 };

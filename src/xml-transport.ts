@@ -15,6 +15,7 @@ import type { OutputFormatId } from './formats.js';
 import type { ConversationMessage, MCPTool, ToolCall } from './types.js';
 
 import {
+  turnFailedStructuredOutputTruncated,
   XML_FINAL_REPORT_NOT_JSON,
   xmlMalformedMismatch,
   xmlMissingClosingTag,
@@ -48,6 +49,23 @@ const TRUNCATION_STOP_REASONS = new Set([
   'max_tokens', // Anthropic
 ]);
 
+// Structured output formats that cannot be truncated (must be complete)
+const STRUCTURED_FORMATS = new Set<OutputFormatId>(['json', 'slack-block-kit']);
+
+/**
+ * Truncate content keeping first and last portions for logging.
+ * Used to provide diagnostic output in logs without excessive size.
+ */
+function truncateFirstLast(content: string, firstChars: number, lastChars: number): string {
+  if (content.length <= firstChars + lastChars + 50) {
+    return content;
+  }
+  const first = content.slice(0, firstChars);
+  const last = content.slice(-lastChars);
+  const omitted = content.length - firstChars - lastChars;
+  return `${first}\n\n...[${String(omitted)} chars omitted]...\n\n${last}`;
+}
+
 // Configuration for building messages
 export interface XmlBuildMessagesConfig {
   turn: number;
@@ -79,6 +97,7 @@ export interface XmlParseContext {
   turn: number;
   resolvedFormat: OutputFormatId | undefined;
   stopReason?: string;  // LLM stop reason - used to accept unclosed final reports on normal completion
+  maxOutputTokens?: number;  // For truncation error messages
 }
 
 // Callback for logging/errors during parsing
@@ -210,13 +229,18 @@ export class XmlToolTransport {
 
   /**
    * Try to extract an unclosed final report when stop reason indicates normal completion.
-   * Returns the extracted content if successful, undefined otherwise.
+   * Returns:
+   * - { slotId, content, truncated? } on success (possibly with truncated flag for unstructured)
+   * - { truncatedRejected: true } when structured format was truncated (must retry)
+   * - undefined when no final report found
    */
   private tryExtractUnclosedFinalReport(
     content: string,
     stopReason: string | undefined,
+    resolvedFormat: OutputFormatId | undefined,
+    maxOutputTokens: number | undefined,
     callbacks: XmlParseCallbacks
-  ): { slotId: string; content: string } | undefined {
+  ): { slotId: string; content: string; truncated?: boolean } | { truncatedRejected: true } | undefined {
     if (this.nonce === undefined) return undefined;
 
     const finalSlotId = `${this.nonce}-FINAL`;
@@ -244,9 +268,25 @@ export class XmlToolTransport {
 
     // Check stop reason to decide whether to accept
     if (TRUNCATION_STOP_REASONS.has(stopReason ?? '')) {
-      // Truncated - reject and retry
-      callbacks.onLog({ severity: 'WRN', message: `Final report truncated (stopReason=${stopReason ?? 'unknown'}), will retry.` });
-      return undefined;
+      const isStructured = resolvedFormat !== undefined && STRUCTURED_FORMATS.has(resolvedFormat);
+
+      if (isStructured) {
+        // Structured format: MUST retry - log with content dump for diagnosis
+        const preview = truncateFirstLast(extractedContent, 2000, 1000);
+        callbacks.onLog({
+          severity: 'WRN',
+          message: `Final report truncated (stopReason=${stopReason ?? 'unknown'}, format=${resolvedFormat}, length=${String(extractedContent.length)} chars). Will retry.\nTruncated output:\n${preview}`
+        });
+        callbacks.onTurnFailure(turnFailedStructuredOutputTruncated(maxOutputTokens));
+        return { truncatedRejected: true };
+      } else {
+        // Unstructured format: Accept - log without dump (content visible in final report)
+        callbacks.onLog({
+          severity: 'WRN',
+          message: `Final report truncated (stopReason=${stopReason ?? 'unknown'}, format=${resolvedFormat ?? 'unknown'}, length=${String(extractedContent.length)} chars). Accepting truncated output.`
+        });
+        return { slotId: finalSlotId, content: extractedContent, truncated: true };
+      }
     }
 
     if (NORMAL_COMPLETION_STOP_REASONS.has(stopReason ?? '')) {
@@ -273,8 +313,21 @@ export class XmlToolTransport {
     }
 
     // First, try to extract unclosed final report if stop reason indicates normal completion
-    const unclosedFinal = this.tryExtractUnclosedFinalReport(content, context.stopReason, callbacks);
+    const unclosedFinal = this.tryExtractUnclosedFinalReport(
+      content,
+      context.stopReason,
+      context.resolvedFormat,
+      context.maxOutputTokens,
+      callbacks
+    );
+
     if (unclosedFinal !== undefined) {
+      // Check if this was a structured format truncation that was rejected
+      if ('truncatedRejected' in unclosedFinal) {
+        // Structured format truncation - already reported error via onTurnFailure, don't add more errors
+        return { toolCalls: undefined, errors: [] };
+      }
+
       const expectedFormat = context.resolvedFormat ?? 'text';
       const finalReportToolName = 'agent__final_report';
 
@@ -309,6 +362,11 @@ export class XmlToolTransport {
           report_format: expectedFormat,
           report_content: unclosedFinal.content,
         };
+      }
+
+      // Add truncated flag if content was truncated (unstructured format)
+      if (unclosedFinal.truncated === true) {
+        parameters._truncated = true;
       }
 
       const toolCall: ToolCall = {

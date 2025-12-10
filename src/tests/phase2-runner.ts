@@ -64,10 +64,11 @@ const PROJECT_ROOT = process.cwd();
 const TEST_AGENTS_DIR = path.resolve(PROJECT_ROOT, 'src', 'tests', 'phase2', 'test-agents');
 const MASTER_AGENT_PATH = path.join(TEST_AGENTS_DIR, 'test-master.ai');
 const DEFAULT_CONFIG_PATH = path.resolve(PROJECT_ROOT, 'neda/.ai-agent.json');
-const FINAL_REPORT_INSTRUCTION = 'Call agent__final_report with status="success", report_format="text", and content set to the required text.';
-const FINAL_REPORT_ARGS = 'agent__final_report(status="success", report_format="text", content=<value>)';
+const FINAL_REPORT_INSTRUCTION =
+  'Produce your final answer using the XML wrapper <ai-agent-{nonce}-FINAL format="text">...content...</ai-agent-{nonce}-FINAL> with the required content.';
+const FINAL_REPORT_ARGS = '<ai-agent-{nonce}-FINAL format="text">CONTENT</ai-agent-{nonce}-FINAL>';
 const BASIC_PROMPT = `${FINAL_REPORT_INSTRUCTION} The content must be exactly "test".`;
-const BASIC_USER = `Invoke ${FINAL_REPORT_ARGS.replace('<value>', '"test"')} and produce no other output.`;
+const BASIC_USER = `Output exactly ${FINAL_REPORT_ARGS.replace('CONTENT', 'test')} as your final response. No tool calls.`;
 const MULTI_PROMPT = `You are a helpful CI tester helping the verification of multi-turn agentic operation.
 
 You have 2 agents: agent1 and agent2. The test completes in 3 turns.
@@ -84,14 +85,14 @@ Follow exactly these steps for a successful outcome:
 
 1. Call ONLY "agent__test-agent1" with parameters {"prompt":"run","reason":"execute agent1","format":"sub-agent"}.
 2. Once agent1 responds and you have its output, call ONLY "agent__test-agent2" with {"prompt":"I received this from agent1: [agent1 response]","reason":"execute agent2","format":"sub-agent"}.
-3. Once agent2 responds and you have its output, call ONLY agent__final_report with status="success", report_format="text", and content="I received this from agent2: [agent2 response]".
+3. Once agent2 responds and you have its output, emit your final answer as XML: <ai-agent-{nonce}-FINAL format="text">I received this from agent2: [agent2 response]</ai-agent-{nonce}-FINAL>. Do NOT call tools for the final answer.
 
 Do not emit plain text.`;
 const MULTI_USER = `CI verification scenario: follow the multi-turn process exactly.
 
 1) Call ONLY "agent__test-agent1" with parameters {"prompt":"run","reason":"execute agent1","format":"sub-agent"}.
 2) After agent__test-agent1 responds, call ONLY "agent__test-agent2" with {"prompt":"I received this from agent1: [agent1 response]","reason":"execute agent2","format":"sub-agent"}.
-3) After agent__test-agent2 responds, call ONLY agent__final_report with status="success", report_format="text", and content="I received this from agent2: [agent2 response]".
+3) After agent__test-agent2 responds, emit your final answer as XML: <ai-agent-{nonce}-FINAL format="text">I received this from agent2: [agent2 response]</ai-agent-{nonce}-FINAL>. Do NOT call tools for the final answer.
 
 If you skip a step or call any other tool, the CI test fails.`;
 
@@ -356,8 +357,8 @@ const validateScenarioResult = (
   if (session.finalReport === undefined) {
     failures.push('final report missing or not successful');
   }
-  if (!hasToolInvocation(session.logs, session.conversation, 'agent__final_report')) {
-    failures.push('final report tool was not invoked');
+  if (hasToolInvocation(session.logs, session.conversation, 'agent__final_report')) {
+    failures.push('final report tool was invoked (final answers must use XML wrapper)');
   }
   const maxTurn = extractMaxLlmTurn(session.logs);
   const accountingOk = hasAccountingEntries(session.accounting);

@@ -107,7 +107,7 @@ Netdata ships purpose-built collector frameworks that share a unified lifecycle:
 | `cgroups.plugin` | C | Container and VM resource accounting | Native cgroup v1/v2 support |
 | `go.d` | Go | Network/service-facing collectors (200+ integrations) | Auto-discovery, parallel polling |
 | `scripts.d` | Go | Nagios plugins scheduler and collector (4000+ integrations) | Vast ecosystem and simple protocol for scripts execution and synthetic tests |
-| `otelcol.plugin` | Go | OpenTelemetry collector distro (metrics/logs ingest/export) | Built from upstream OTel Collector with Netdata exporters |
+| `otelcol.plugin` | Go | OpenTelemetry collector distro (metrics/logs ingestion only) | Built from upstream OTel Collector with Netdata receivers |
 | `otel-plugin` | Rust | OTel intake for metrics and logs (writes systemd-journal compatible files) | Rust journald writer preserving native format |
 | `python.d` | Python | Long-tail integrations & IoT sensors | Ideal for quick custom collectors |
 | `charts.d` | Bash | Lightweight shell-based collectors | Legacy but still maintained |
@@ -1243,8 +1243,8 @@ helm install netdata netdata/netdata
 ### 18.1 Upcoming Features
 
 **OpenTelemetry Support**:
-- Native OTel collector integration
-- OTel export capabilities
+- Native OTel collector integration (ingestion)
+- OTLP traces ingestion (planned Q2 2026)
 - Full MELT (Metrics, Events, Logs, Traces) visibility
 
 **Enhanced Kubernetes Monitoring**:

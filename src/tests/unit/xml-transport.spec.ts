@@ -132,4 +132,199 @@ describe('XmlToolTransport', () => {
     expect(onFailure).not.toHaveBeenCalled();
     expect(onLog).not.toHaveBeenCalled();
   });
+
+  describe('truncation handling (stopReason=length)', () => {
+    it('rejects truncated structured output (json) and calls onTurnFailure', () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue(MOCK_UUID);
+      const transport = new XmlToolTransport();
+      transport.buildMessages({
+        turn: 1,
+        maxTurns: 2,
+        tools: baseTools,
+        maxToolCallsPerTurn: 1,
+        progressToolEnabled: false,
+        finalReportToolName: 'agent__final_report',
+        resolvedFormat: 'json',
+        expectedJsonSchema: { type: 'object' },
+        attempt: 1,
+        maxRetries: 3,
+        contextPercentUsed: 8,
+      });
+
+      const finalSlot = `${NONCE}-FINAL`;
+      const onFailure = vi.fn();
+      const logCalls: { severity: string; message: string }[] = [];
+      const onLog = vi.fn((entry: { severity: 'WRN'; message: string }) => { logCalls.push(entry); });
+
+      // Unclosed tag with stopReason=length and structured format
+      const parse = transport.parseAssistantMessage(
+        `<ai-agent-${finalSlot} format="json">{"incomplete": "json`,
+        { turn: 1, resolvedFormat: 'json', stopReason: 'length', maxOutputTokens: 8192 },
+        { onTurnFailure: onFailure, onLog }
+      );
+
+      // Should reject - no tool calls returned
+      expect(parse.toolCalls).toBeUndefined();
+      expect(parse.errors).toHaveLength(0);
+      // Should call onTurnFailure with truncation message
+      expect(onFailure).toHaveBeenCalledTimes(1);
+      expect(onFailure.mock.calls[0][0]).toContain('truncated');
+      expect(onFailure.mock.calls[0][0]).toContain('8192 tokens');
+      // Should log with content dump
+      expect(onLog).toHaveBeenCalledTimes(1);
+      expect(logCalls[0].severity).toBe('WRN');
+      expect(logCalls[0].message).toContain('Will retry');
+    });
+
+    it('rejects truncated structured output (slack-block-kit) and calls onTurnFailure', () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue(MOCK_UUID);
+      const transport = new XmlToolTransport();
+      transport.buildMessages({
+        turn: 1,
+        maxTurns: 2,
+        tools: baseTools,
+        maxToolCallsPerTurn: 1,
+        progressToolEnabled: false,
+        finalReportToolName: 'agent__final_report',
+        resolvedFormat: 'slack-block-kit',
+        expectedJsonSchema: undefined,
+        attempt: 1,
+        maxRetries: 3,
+        contextPercentUsed: 8,
+      });
+
+      const finalSlot = `${NONCE}-FINAL`;
+      const onFailure = vi.fn();
+      const onLog = vi.fn();
+
+      // Unclosed tag with stopReason=length and structured format
+      const parse = transport.parseAssistantMessage(
+        `<ai-agent-${finalSlot} format="slack-block-kit">[{"blocks": [`,
+        { turn: 1, resolvedFormat: 'slack-block-kit', stopReason: 'max_tokens', maxOutputTokens: 4096 },
+        { onTurnFailure: onFailure, onLog }
+      );
+
+      // Should reject - no tool calls returned
+      expect(parse.toolCalls).toBeUndefined();
+      expect(parse.errors).toHaveLength(0);
+      // Should call onTurnFailure
+      expect(onFailure).toHaveBeenCalledTimes(1);
+      expect(onFailure.mock.calls[0][0]).toContain('4096 tokens');
+      // Should log
+      expect(onLog).toHaveBeenCalledTimes(1);
+    });
+
+    it('accepts truncated unstructured output (markdown) with truncated flag', () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue(MOCK_UUID);
+      const transport = new XmlToolTransport();
+      transport.buildMessages({
+        turn: 1,
+        maxTurns: 2,
+        tools: baseTools,
+        maxToolCallsPerTurn: 1,
+        progressToolEnabled: false,
+        finalReportToolName: 'agent__final_report',
+        resolvedFormat: 'markdown',
+        expectedJsonSchema: undefined,
+        attempt: 1,
+        maxRetries: 3,
+        contextPercentUsed: 8,
+      });
+
+      const finalSlot = `${NONCE}-FINAL`;
+      const onFailure = vi.fn();
+      const logCalls: { severity: string; message: string }[] = [];
+      const onLog = vi.fn((entry: { severity: 'WRN'; message: string }) => { logCalls.push(entry); });
+
+      const truncatedContent = '# Report\n\nThis is a truncated markdown report that got cut off mid-senten';
+
+      // Unclosed tag with stopReason=length but unstructured format
+      const parse = transport.parseAssistantMessage(
+        `<ai-agent-${finalSlot} format="markdown">${truncatedContent}`,
+        { turn: 1, resolvedFormat: 'markdown', stopReason: 'length', maxOutputTokens: 8192 },
+        { onTurnFailure: onFailure, onLog }
+      );
+
+      // Should accept - tool call returned with truncated flag
+      expect(parse.toolCalls).toHaveLength(1);
+      expect(parse.toolCalls?.[0].name).toBe('agent__final_report');
+      expect(parse.toolCalls?.[0].parameters).toHaveProperty('_truncated', true);
+      expect(parse.toolCalls?.[0].parameters).toHaveProperty('report_content', truncatedContent);
+      expect(parse.errors).toHaveLength(0);
+      // Should NOT call onTurnFailure (we're accepting it)
+      expect(onFailure).not.toHaveBeenCalled();
+      // Should log acceptance
+      expect(onLog).toHaveBeenCalledTimes(1);
+      expect(logCalls[0].severity).toBe('WRN');
+      expect(logCalls[0].message).toContain('Accepting truncated output');
+    });
+
+    it('accepts truncated unstructured output (tty) with truncated flag', () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue(MOCK_UUID);
+      const transport = new XmlToolTransport();
+      transport.buildMessages({
+        turn: 1,
+        maxTurns: 2,
+        tools: baseTools,
+        maxToolCallsPerTurn: 1,
+        progressToolEnabled: false,
+        finalReportToolName: 'agent__final_report',
+        resolvedFormat: 'tty',
+        expectedJsonSchema: undefined,
+        attempt: 1,
+        maxRetries: 3,
+        contextPercentUsed: 8,
+      });
+
+      const finalSlot = `${NONCE}-FINAL`;
+      const onFailure = vi.fn();
+      const onLog = vi.fn();
+
+      const parse = transport.parseAssistantMessage(
+        `<ai-agent-${finalSlot} format="tty">Some tty output that was trunca`,
+        { turn: 1, resolvedFormat: 'tty', stopReason: 'length' },
+        { onTurnFailure: onFailure, onLog }
+      );
+
+      // Should accept
+      expect(parse.toolCalls).toHaveLength(1);
+      expect(parse.toolCalls?.[0].parameters).toHaveProperty('_truncated', true);
+      expect(onFailure).not.toHaveBeenCalled();
+    });
+
+    it('accepts normal completion (stopReason=stop) without truncated flag', () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue(MOCK_UUID);
+      const transport = new XmlToolTransport();
+      transport.buildMessages({
+        turn: 1,
+        maxTurns: 2,
+        tools: baseTools,
+        maxToolCallsPerTurn: 1,
+        progressToolEnabled: false,
+        finalReportToolName: 'agent__final_report',
+        resolvedFormat: 'markdown',
+        expectedJsonSchema: undefined,
+        attempt: 1,
+        maxRetries: 3,
+        contextPercentUsed: 8,
+      });
+
+      const finalSlot = `${NONCE}-FINAL`;
+      const onFailure = vi.fn();
+      const onLog = vi.fn();
+
+      // Unclosed tag with stopReason=stop (normal completion)
+      const parse = transport.parseAssistantMessage(
+        `<ai-agent-${finalSlot} format="markdown"># Complete Report\n\nThis is complete.`,
+        { turn: 1, resolvedFormat: 'markdown', stopReason: 'stop' },
+        { onTurnFailure: onFailure, onLog }
+      );
+
+      // Should accept without truncated flag
+      expect(parse.toolCalls).toHaveLength(1);
+      expect(parse.toolCalls?.[0].parameters).not.toHaveProperty('_truncated');
+      expect(onFailure).not.toHaveBeenCalled();
+      expect(onLog).not.toHaveBeenCalled();
+    });
+  });
 });

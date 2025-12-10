@@ -37,6 +37,7 @@ Harness scenarios MUST combine configuration + scripted LLM/MCP behavior to hit 
 - `run-test-final-report-retry-text` validates that invalid final-report tool calls trigger retries, text extraction stays pending until the final turn, and the eventual acceptance log cites `source='tool-call'`. Assertions inspect both logs and `finalReport.content`.
 - `run-test-synthetic-failure-contract` forces max turns without any tool calls so we can assert the synthetic failure contract (`status: failure`, metadata reason `max_turns_exhausted`, `agent:failure-report`, telemetry source `synthetic`).
 - Future tests added under `TODO-retry-testing-plan.md` must assert `result.finalReport !== undefined`, the correct `finalReportSource`, and the telemetry/log identifiers introduced in Nov 2025. Use the same pattern as the scenarios above when building new fixtures.
+- `run-test-xml-wrapper-as-tool` ensures calling the XML final wrapper tag as a tool yields a specific tool failure, TURN-FAILED guidance with the real nonce/format, and collapses remaining turns.
 
 ### Restart Fixture Controls
 The deterministic stdio MCP server exposes several environment knobs so restart scenarios stay reproducible:

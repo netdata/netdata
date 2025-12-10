@@ -128,7 +128,7 @@ export interface RetryCollapseMetricsRecord {
   agentId?: string;
   callPath?: string;
   headendId?: string;
-  reason: 'final_report_attempt' | 'incomplete_final_report';
+  reason: 'final_report_attempt' | 'incomplete_final_report' | 'xml_wrapper_as_tool';
   turn: number;
   previousMaxTurns: number;
   newMaxTurns: number;
