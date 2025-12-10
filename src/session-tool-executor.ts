@@ -139,7 +139,7 @@ export class SessionToolExecutor {
         const msg = `Tool calls per turn exceeded: limit=${String(maxToolCallsPerTurn)}. Switch strategy: avoid further tool calls this turn; either summarize progress or call ${this.sessionContext.finalReportToolName} to conclude.`;
         const warn: LogEntry = {
           timestamp: Date.now(),
-          severity: 'ERR',
+          severity: 'WRN',
           turn,
           subturn: subturnCounter,
           direction: 'response',

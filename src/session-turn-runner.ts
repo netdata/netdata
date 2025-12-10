@@ -997,26 +997,6 @@ export class TurnRunner {
                                 const params = finalReportCall.parameters;
                                 const expectedFormat = this.ctx.resolvedFormat ?? 'text';
 
-                                // Log the attempt for diagnostics (even if validation fails)
-                                try {
-                                    const preview = formatToolRequestCompact(FINAL_REPORT_TOOL, params);
-                                    this.log({
-                                        timestamp: Date.now(),
-                                        severity: 'WRN' as const,
-                                        turn: currentTurn,
-                                        subturn: 0,
-                                        direction: 'response' as const,
-                                        type: 'llm' as const,
-                                        remoteIdentifier: 'agent:final-report-preview',
-                                        fatal: false,
-                                        message: `agent__final_report attempt: ${preview}`,
-                                        details: { request_preview: preview }
-                                    });
-                                }
-                                catch {
-                                    // ignore logging errors
-                                }
-
                                 const formatParamRaw = params.report_format;
                                 const formatParam = typeof formatParamRaw === 'string' && formatParamRaw.trim().length > 0 ? formatParamRaw.trim() : undefined;
                                 const statusParamRaw = params.status;
@@ -1062,6 +1042,7 @@ export class TurnRunner {
                                 const finalFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === formatCandidate) ?? expectedFormat;
                                 if (finalFormat !== expectedFormat) {
                                     this.addTurnFailure(finalReportFormatMismatch(expectedFormat, formatCandidate));
+                                    this.logFinalReportDump(currentTurn, params, `format mismatch: expected ${expectedFormat}, got ${formatCandidate}`, rawContent);
                                     return false;
                                 }
 
