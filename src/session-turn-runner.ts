@@ -612,7 +612,7 @@ export class TurnRunner {
                 }
                     const turnResult = await this.executeSingleTurn(attemptConversation, provider, model, isFinalTurn, currentTurn, logs, accounting, lastShownThinkingHeaderTurn, attempts, maxRetries, sessionReasoningLevel, sessionReasoningValue ?? undefined);
                     lastTurnResult = turnResult;
-                    const { messages: sanitizedMessages, dropped: droppedInvalidToolCalls, finalReportAttempted } = this.sanitizeTurnMessages(turnResult.messages, { turn: currentTurn, provider, model, stopReason: turnResult.stopReason });
+                    const { messages: sanitizedMessages, dropped: droppedInvalidToolCalls, finalReportAttempted } = this.sanitizeTurnMessages(turnResult.messages, { turn: currentTurn, provider, model, stopReason: turnResult.stopReason, maxOutputTokens: this.ctx.sessionConfig.maxOutputTokens });
                     this.state.droppedInvalidToolCalls = droppedInvalidToolCalls;
                     // Mark turnResult with finalReportAttempted flag but defer collapseRemainingTurns
                     // until we know if the final report was actually accepted (done later in the flow)
@@ -1258,6 +1258,14 @@ export class TurnRunner {
                                 // LAYER 3: Final Report construction
                                 // Build clean final report object
                                 // =================================================================
+
+                                // Handle truncated output (unstructured formats only - structured would have been rejected)
+                                const truncatedFlag = params._truncated;
+                                if (truncatedFlag === true) {
+                                    commitMetadata = { ...commitMetadata, truncated: true };
+                                    finalContent = `${finalContent}\n\n[OUTPUT TRUNCATED: Response exceeded output token limit.]`;
+                                }
+
                                 this.commitFinalReport({
                                     format: finalFormat,
                                     content: finalContent,
@@ -2574,7 +2582,7 @@ export class TurnRunner {
         });
     }
 
-    private sanitizeTurnMessages(messages: ConversationMessage[], context: { turn: number; provider: string; model: string; stopReason?: string }): { messages: ConversationMessage[]; dropped: number; finalReportAttempted: boolean } {
+    private sanitizeTurnMessages(messages: ConversationMessage[], context: { turn: number; provider: string; model: string; stopReason?: string; maxOutputTokens?: number }): { messages: ConversationMessage[]; dropped: number; finalReportAttempted: boolean } {
         let dropped = 0;
         let finalReportAttempted = false;
         const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -2583,7 +2591,7 @@ export class TurnRunner {
             let parsedToolCalls;
             // XML transport parsing
             if (msg.role === 'assistant' && typeof msg.content === 'string') {
-                const parseResult = this.ctx.xmlTransport.parseAssistantMessage(msg.content, { turn: context.turn, resolvedFormat: this.ctx.resolvedFormat, stopReason: context.stopReason }, {
+                const parseResult = this.ctx.xmlTransport.parseAssistantMessage(msg.content, { turn: context.turn, resolvedFormat: this.ctx.resolvedFormat, stopReason: context.stopReason, maxOutputTokens: context.maxOutputTokens }, {
                     onTurnFailure: (reason) => { this.addTurnFailure(reason); },
                     onLog: (entry) => {
                         this.callbacks.log({

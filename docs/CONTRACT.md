@@ -479,10 +479,22 @@ Any deviation from the guarantees above is a **contract violation** and must be 
 **Unclosed final-report tag handling**
 - When a valid final-report opening tag is detected (`<ai-agent-NONCE-FINAL tool="agent__final_report">`) with content following it, the closing tag requirement depends on the LLM's `stopReason`:
   - `stop`, `end_turn`, `end`, `eos` (normal completion): Accept content even without closing tag.
-  - `length`, `max_tokens` (truncation): Treat as incomplete, trigger retry.
+  - `length`, `max_tokens` (truncation): Behavior depends on output format (see below).
   - Unknown/undefined: Log warning but accept content.
 - This applies ONLY to `agent__final_report`; other tools always require complete tags.
 - Rationale: Large models often stop generating after completing their final answer without emitting closing tags. The stop reason is the authoritative signal for completion.
+
+**Truncation handling (stopReason=length|max_tokens)**
+- **Structured formats (`json`, `slack-block-kit`)**: Truncated output is invalid and unusable.
+  - Reject the output and trigger retry.
+  - Model receives actionable error: "Your response was truncated (stopReason=length) because it exceeded the output token limit (N tokens). Repeat the same final-report, but this time keep your output within the required token count limit."
+  - Log WRN with content dump (first 2KB + last 1KB) for operator diagnosis.
+- **Unstructured formats (`markdown`, `markdown+mermaid`, `tty`, `pipe`, `sub-agent`)**: Truncated output is still useful.
+  - Accept the truncated output immediately (no retry).
+  - Append truncation notice at end of content: `[OUTPUT TRUNCATED: Response exceeded output token limit.]`
+  - Set `truncated: true` in final report metadata.
+  - Log WRN without content dump (content visible in final report).
+- Rationale: Structured formats must be complete to be valid (truncated JSON cannot be parsed). Unstructured formats provide value even when incomplete—retrying wastes resources and may produce similar-length output.
 
 **Tool execution and responses**
 - Tags from the assistant are parsed by nonce and unused slot id; invalid/mismatched tags are ignored (do not count as attempts).

@@ -296,6 +296,19 @@ export const xmlMissingClosingTag = (capturedSlot: string): string =>
 export const xmlMalformedMismatch = (slotInfo: string): string =>
   `Malformed XML: nonce/slot/tool mismatch or empty content for '${slotInfo}'.`;
 
+/**
+ * Structured output (json, slack-block-kit) truncated due to stopReason=length.
+ * Model must retry with shorter output.
+ * Used in: xml-transport.ts via onTurnFailure
+ *
+ * CONDITION: XML mode && final report detected && stopReason=length && format is structured
+ */
+export const turnFailedStructuredOutputTruncated = (maxOutputTokens?: number): string => {
+  const tokenLimit = maxOutputTokens !== undefined ? ` (${String(maxOutputTokens)} tokens)` : '';
+  return `Your response was truncated (stopReason=length) because it exceeded the output token limit${tokenLimit}. ` +
+    `Repeat the same final-report, but this time keep your output within the required token count limit.`;
+};
+
 // =============================================================================
 // PROGRESS REPORT INSTRUCTIONS
 // Single source of truth for agent__progress_report tool guidance.
