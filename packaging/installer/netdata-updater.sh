@@ -312,6 +312,7 @@ dev_null_fix() {
   if [ -f /dev/null ] || [ ! -e /dev/null ]; then
     case "$(uname -s)" in
       Linux)
+        rm -f /dev/.null
         mknod -m 666 /dev/.null c 1 3
         # Some distros use ownership other than root:root for /dev/null,
         # but it almost always matches the ownership of /dev/full,
