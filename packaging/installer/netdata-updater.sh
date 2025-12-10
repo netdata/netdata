@@ -304,6 +304,10 @@ install_build_dependencies() {
 # to be removed mistakenly under some circumstances.
 #
 # This function attempts to detect and fix the resulting situation.
+#
+# Fix limited to Linux for the moment because apparently trying to
+# proactively fix systems that we aren’t certain have been affected is
+# too invasive of a change for some people...
 dev_null_fix() {
   if [ -f /dev/null ] || [ ! -e /dev/null ]; then
     case "$(uname -s)" in
@@ -325,13 +329,6 @@ dev_null_fix() {
             restorecon /dev/null
         fi
         rm -f /tmp/nd-null # Cleanup from the above check
-        ;;
-      FreeBSD)
-        # Device numbers on FreeBSD don't seem to be consistent across
-        # systems, unlike on Linux, but running mknod there with a well
-        # known device name will use the 'right' numbers automatically.
-        rm -f /dev/null
-        mknod /dev/null
         ;;
       *) ;;
     esac
