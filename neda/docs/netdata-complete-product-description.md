@@ -23,7 +23,7 @@ Netdata's architecture is built on a fundamental principle: **distribute the cod
    - Streams data to Parents for centralization (optional, 1 parent at a time, with multiple configured as fallback)
    - Exports data to multiple 3rd party TSDBs at once (optional)
    - Is a Model Context Protocol (MCP) server (single-node, streamable http, sse, websocket - stdio with a bridge)
-   - Resource usage: <5% CPU, 150-200 MB RAM (including ML). Memory is proportional to metrics discovered (~5000 metrics baseline) and affected by metric ephemerality. Can be tuned to <1% CPU, <100 MB RAM (offloading to parents and 32-bit IoT)
+   - Resource usage: <5% CPU, 150-200 MB RAM (including ML). Memory is proportional to metrics discovered (~5000 metrics baseline) and affected by metric ephemerality. Resources scale linearly per metric. Can be tuned to <1% CPU, <100 MB RAM (offloading to parents and 32-bit IoT)
   
    Comparison with other monitoring agents at: https://www.netdata.cloud/blog/netdata-vs-datadog-dynatrace-instana-grafana/
 
@@ -804,7 +804,7 @@ helm install netdata netdata/netdata
 **Key Metrics:**
 - **Billions of metrics/second** processed globally
 - **100% sampling rate** (no data loss)
-- **Unlimited metrics** (no artificial limits)
+- **Unlimited metrics** with linear resource scaling per metric (no artificial limits, isolated blast radius)
 - **Proven at scale**: 100,000+ node deployments
 
 ### 10.2 Architectural Advantages
@@ -826,6 +826,12 @@ helm install netdata netdata/netdata
 - No exponential cost curves
 - Lower infrastructure costs than centralized solutions
 - Energy-efficient (independently validated)
+
+**Cardinality Handling:**
+- Linear resource scaling per metric (doubling metrics roughly doubles resources, not exponentially)
+- Isolated blast radius: each agent handles its own cardinality independently—explosions on one server can't cascade to take down entire monitoring
+- Automated cardinality protection: ephemeral metrics are automatically cleaned from higher storage tiers (per-minute, per-hour) while real-time data (per-second) is always preserved
+- No manual cardinality management required (unlike Prometheus, Datadog)
 
 ## 11. Security & Privacy
 
@@ -975,7 +981,7 @@ Regardless of tier, all users benefit from:
 - ✅ 1-second granularity
 - ✅ No storage charges (data on-premises)
 - ✅ No container charges
-- ✅ Distributed architecture (no cardinality limits)
+- ✅ Distributed architecture (no cardinality limits—each agent handles cardinality independently, issues can't cascade)
 - ✅ Real-time querying
 - ✅ System journal logs
 
