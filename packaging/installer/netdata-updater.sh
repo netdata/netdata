@@ -326,10 +326,11 @@ dev_null_fix() {
         #
         # This check doesn’t use /dev/null as trying to access it
         # without the right security context being set may fail.
-        if command -v restorecon >/tmp/nd-null 2>&1; then
+        dummy_null="$(mktemp)"
+        if command -v restorecon >"${dummy_null}" 2>&1; then
             restorecon /dev/null
         fi
-        rm -f /tmp/nd-null # Cleanup from the above check
+        rm -f "${dummy_null}" || true # Cleanup from the above check
         ;;
       *) ;;
     esac
