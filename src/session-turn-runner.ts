@@ -929,6 +929,15 @@ export class TurnRunner {
                                 sanitizedHasText = fallbackResult.hasRemainingText;
                                 // Add tool results to messages
                                 sanitizedMessages.push(...fallbackResult.toolResults);
+                                // Merge fallback execution stats into turnResult so turn validation sees them
+                                const fbStats = fallbackResult.executionStats;
+                                const existingStats = turnResult.executionStats ?? { executedTools: 0, executedNonProgressBatchTools: 0, executedProgressBatchTools: 0, unknownToolEncountered: false };
+                                turnResult.executionStats = {
+                                    executedTools: existingStats.executedTools + fbStats.executedTools,
+                                    executedNonProgressBatchTools: existingStats.executedNonProgressBatchTools + fbStats.executedNonProgressBatchTools,
+                                    executedProgressBatchTools: existingStats.executedProgressBatchTools + fbStats.executedProgressBatchTools,
+                                    unknownToolEncountered: (existingStats.unknownToolEncountered === true) || fbStats.unknownToolEncountered,
+                                };
                                 const extractionMessage = `Retrying for proper tool call after extracting ${String(fallbackResult.toolCalls.length)} leaked call(s).`;
                                 this.log({
                                     timestamp: Date.now(),
@@ -2578,10 +2587,11 @@ export class TurnRunner {
         // Create tool executor for fallback execution
         const executor = this.ctx.sessionExecutor.createExecutor(turn, provider, executionState);
 
-        // Delegate to the module
+        // Delegate to the module, passing executionState as stats reference
         return processLeakedToolCalls({
             textContent,
             executor,
+            executionStatsRef: executionState,
         });
     }
 
