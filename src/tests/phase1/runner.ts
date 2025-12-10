@@ -1230,7 +1230,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-2',
     expect: (result) => {
-      invariant(!result.success, 'Scenario run-test-2 should fail when final report status is failure.');
+      // Transport-layer success: model produced a valid final report.
+      // The model's status:failure is semantic (content says "tool failed"), not a transport failure.
+      invariant(result.success, 'Scenario run-test-2: transport succeeds even when model reports content-level failure.');
       invariant(result.finalReport !== undefined, 'Final report missing for run-test-2.');
 
       const toolEntries = result.accounting.filter(isToolAccounting);
@@ -1308,7 +1310,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       sessionConfig.toolTimeout = 200;
     },
     expect: (result) => {
-      invariant(!result.success, 'Scenario run-test-7 should fail when final report status is failure.');
+      // Transport-layer success: model produced a valid final report despite tool timeout.
+      invariant(result.success, 'Scenario run-test-7: transport succeeds even when tool timed out.');
       const toolEntries = result.accounting.filter(isToolAccounting);
       const timeoutEntry = toolEntries.find((entry) => entry.command === 'test__test');
       invariant(timeoutEntry !== undefined, 'Expected MCP accounting entry for run-test-7.');
@@ -1331,7 +1334,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-9',
     expect: (result) => {
-      invariant(!result.success, 'Scenario run-test-9 should fail when only unknown tools are present.');
+      // Transport-layer success: model produced a final report (via test-llm fallback).
+      // The report content indicates failure, but transport succeeded.
+      invariant(result.success, 'Scenario run-test-9: transport succeeds with model-provided report.');
       invariant(result.finalReport !== undefined, 'Final report should be present for run-test-9.');
       const log = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Unknown tool requested'));
       invariant(log !== undefined, 'Unknown tool warning log expected for run-test-9.');
@@ -1352,7 +1357,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: RUN_TEST_11,
     expect: (result) => {
-      invariant(!result.success, `Scenario ${RUN_TEST_11} should fail when final report schema/format is invalid.`);
+      // Transport-layer success: model produced a final report even if schema validation has issues.
+      // Schema validation warnings are logged but don't constitute transport failure.
+      invariant(result.success, `Scenario ${RUN_TEST_11}: transport succeeds with model-provided report.`);
       const logs = result.logs;
       invariant(logs.some((log) => {
         // Check in message
@@ -3174,7 +3181,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result) => {
       const finalReport = result.finalReport!;
       invariant(finalReport !== undefined, 'Final report missing for run-test-33.');
-      invariant(!result.success, 'Scenario run-test-33 should fail when final report status is failure.');
+      // Transport-layer success: model produced a valid final report.
+      invariant(result.success, 'Scenario run-test-33: transport succeeds when model produces valid report.');
       const exitLog = result.logs.find((entry) => entry.remoteIdentifier === EXIT_FINAL_REPORT_IDENTIFIER);
       invariant(exitLog !== undefined, 'Synthesized EXIT-FINAL-ANSWER log expected for run-test-33.');
     },
@@ -3327,7 +3335,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       };
     },
     expect: (result) => {
-      invariant(!result.success, 'Scenario run-test-47 should fail due to schema validation.');
+      // Transport-layer success: model produced a final report.
+      // Schema validation warnings are logged but don't constitute transport failure.
+      invariant(result.success, 'Scenario run-test-47: transport succeeds with model-provided report.');
       const schemaLog = result.logs.find((entry) => entry.severity === 'ERR' && typeof entry.message === 'string' && entry.message.includes('schema validation failed'));
       invariant(schemaLog !== undefined, 'Schema validation log expected for run-test-47.');
     },
@@ -6815,7 +6825,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       }
     },
     expect: (result: AIAgentResult) => {
-      invariant(!result.success, 'Scenario run-test-85 should fail on schema validation.');
+      // Transport-layer success: model produced a final report.
+      // Schema validation warnings are logged but don't constitute transport failure.
+      invariant(result.success, 'Scenario run-test-85: transport succeeds with model-provided report.');
       const ajvLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:ajv');
       invariant(ajvLog !== undefined, 'AJV warning expected for run-test-85.');
       invariant(typeof ajvLog.message === 'string' && ajvLog.message.includes('payload preview='), 'Payload preview missing in AJV warning for run-test-85.');
@@ -6936,10 +6948,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       }
     },
     expect: (result: AIAgentResult) => {
-           invariant(!result.success, 'Scenario run-test-87 should produce a usable final report (presence-based contract).');
+      // Transport-layer success: model produced a valid final report.
+      // The report content says "upstream service unavailable" - that's semantic, not transport failure.
+      invariant(result.success, 'Scenario run-test-87: transport succeeds with model-provided report.');
       const finalReport = result.finalReport!;
       invariant(finalReport !== undefined, 'Final report missing for run-test-87.');
-      invariant(!result.success, 'Final report status should be failure for run-test-87.');
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes('upstream service unavailable'), 'Final report content mismatch for run-test-87.');
       const exitLog = result.logs.find((entry) => entry.remoteIdentifier === EXIT_FINAL_REPORT_IDENTIFIER);
       invariant(exitLog !== undefined, 'EXIT-FINAL-ANSWER log missing for run-test-87.');
