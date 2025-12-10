@@ -40,7 +40,7 @@ static inline void netdata_update_power_supply_values(
     if (bs.Capacity != BATTERY_UNKNOWN_CAPACITY) {
         NETDATA_DOUBLE num = bs.Capacity;
         NETDATA_DOUBLE den = bi->FullChargedCapacity;
-        num /= den;
+        num = (den) ? den /num : 0;
 
         power_supply_root->capacity->value = (unsigned long long)(num * 100.0);
     }
@@ -84,7 +84,7 @@ int do_GetPowerSupply(int update_every, usec_t dt __maybe_unused)
     SP_DEVICE_INTERFACE_DATA did = {0};
     did.cbSize = sizeof(did);
 
-    for (LONG i = 0; i < 32 && SetupDiEnumDeviceInterfaces(hdev, 0, &GUID_DEVCLASS_BATTERY, 0, &did); i++) {
+    for (LONG i = 0; i < 32 && SetupDiEnumDeviceInterfaces(hdev, 0, &GUID_DEVCLASS_BATTERY, i, &did); i++) {
         DWORD cbRequired = 0;
         PSP_DEVICE_INTERFACE_DETAIL_DATA pdidd = NULL;
         HANDLE hBattery = NULL;
@@ -124,8 +124,8 @@ int do_GetPowerSupply(int update_every, usec_t dt __maybe_unused)
                 &bqi.BatteryTag,
                 sizeof(bqi.BatteryTag),
                 &dwOut,
-                NULL) &&
-            bqi.BatteryTag)
+                NULL) ||
+            !bqi.BatteryTag)
             goto endPowerSupply;
 
         BATTERY_INFORMATION bi = {0};
@@ -141,8 +141,14 @@ int do_GetPowerSupply(int update_every, usec_t dt __maybe_unused)
         char name[RRD_ID_LENGTH_MAX + 1];
         snprintfz(name, sizeof(name), "BAT%d", i + 1);
 
-        power_supply_root->name = name;
-        power_supply_root->capacity->filename = power_supply_root->name;
+        if (likely(power_supply_root->name))
+            freez(power_supply_root->name);
+        if (likely(power_supply_root->capacity->filename))
+            freez(power_supply_root->capacity->filename);
+
+        power_supply_root->name = power_supply_root->capacity->filename = NULL;
+        power_supply_root->name = strdupz(name);
+        power_supply_root->capacity->filename = strdupz(power_supply_root->name);
 
         netdata_update_power_supply_values(hBattery, &voltage, &bi, &bqi);
 
