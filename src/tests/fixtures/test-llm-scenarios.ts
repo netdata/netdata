@@ -676,7 +676,7 @@ const SCENARIOS: ScenarioDefinition[] = [
     turns: [
       {
         turn: 1,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Providing final report due to final-turn lock.',
@@ -1511,7 +1511,7 @@ const SCENARIOS: ScenarioDefinition[] = [
     turns: [
       {
         turn: 1,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Streaming final report with reasoning.',
@@ -2218,7 +2218,7 @@ const SCENARIOS: ScenarioDefinition[] = [
     turns: [
       {
         turn: 1,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Invalid JSON final report to trigger schema failure.',
@@ -2278,30 +2278,21 @@ const SCENARIOS: ScenarioDefinition[] = [
       {
         turn: 1,
         response: {
-          kind: 'tool-call',
-          assistantText: 'Preparing Slack batch.',
-          toolCalls: [
-            {
-              toolName: 'agent__final_report',
-              callId: 'call-slack-messages',
-              assistantText: 'Sending rich Slack content.',
-              arguments: {
-                report_format: SLACK_BLOCK_KIT_FORMAT,
-                messages: [
-                  'Primary message with *formatting*',
-                  { blocks: [{ type: 'section', text: { type: 'mrkdwn', text: '*Detail* section with field' }, fields: [{ type: 'mrkdwn', text: 'Field line' }] }] },
-                  JSON.stringify({ type: 'divider' }),
-                  [
-                    JSON.stringify({ type: 'header', text: { type: 'plain_text', text: 'Header Title' } }),
-                    { type: 'context', elements: ['Context line 1', { text: 'Context line 2', type: 'mrkdwn' }] }
-                  ]
-                ],
-                metadata: { slack: { footer: 'Existing metadata' } },
-              },
-            },
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Sending rich Slack content.',
+          reportFormat: SLACK_BLOCK_KIT_FORMAT,
+          reportContent: `${RESULT_HEADING}Slack block kit messages normalized.`,
+          reportMessages: [
+            'Primary message with *formatting*',
+            { blocks: [{ type: 'section', text: { type: 'mrkdwn', text: '*Detail* section with field' }, fields: [{ type: 'mrkdwn', text: 'Field line' }] }] },
+            JSON.stringify({ type: 'divider' }),
+            [
+              JSON.stringify({ type: 'header', text: { type: 'plain_text', text: 'Header Title' } }),
+              { type: 'context', elements: ['Context line 1', { text: 'Context line 2', type: 'mrkdwn' }] }
+            ]
           ],
+          status: STATUS_SUCCESS,
           tokenUsage: DEFAULT_TOKEN_USAGE,
-          finishReason: TOOL_FINISH_REASON,
         },
       },
       {
@@ -2431,7 +2422,7 @@ const SCENARIOS: ScenarioDefinition[] = [
     turns: [
       {
         turn: 1,
-        expectedTools: ['agent__progress_report', 'agent__final_report'],
+        expectedTools: ['agent__progress_report'],
         response: {
           kind: 'tool-call',
           assistantText: 'Issuing progress update and Slack final report.',
@@ -2442,29 +2433,6 @@ const SCENARIOS: ScenarioDefinition[] = [
               assistantText: 'Reporting current progress.',
               arguments: {
                 progress: 'Analyzing deterministic harness outputs.',
-              },
-            },
-            {
-              toolName: 'agent__final_report',
-              callId: 'call-slack-run-test-57',
-              assistantText: 'Submitting Slack styled final report.',
-              arguments: {
-                report_format: SLACK_BLOCK_KIT_FORMAT,
-                messages: [
-                  'Primary summary with _structured_ content.',
-                  {
-                    blocks: [
-                      {
-                        type: 'section',
-                        text: { type: 'mrkdwn', text: '*Detailed* findings and next actions.' },
-                        fields: [{ type: 'mrkdwn', text: 'Next: Validate coverage.' }],
-                      },
-                      { type: 'divider' },
-                      { type: 'context', elements: ['Context item 1', { type: 'mrkdwn', text: 'Context item 2' }] },
-                    ],
-                  },
-                ],
-                metadata: { slack: { footer: 'Existing footer' } },
               },
             },
           ],
@@ -2478,7 +2446,21 @@ const SCENARIOS: ScenarioDefinition[] = [
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Slack final report delivered.',
           reportContent: `${RESULT_HEADING}Slack report dispatched successfully.`,
-          reportFormat: MARKDOWN_FORMAT,
+          reportFormat: SLACK_BLOCK_KIT_FORMAT,
+          reportMessages: [
+            'Primary summary with _structured_ content.',
+            {
+              blocks: [
+                {
+                  type: 'section',
+                  text: { type: 'mrkdwn', text: '*Detailed* findings and next actions.' },
+                  fields: [{ type: 'mrkdwn', text: 'Next: Validate coverage.' }],
+                },
+                { type: 'divider' },
+                { type: 'context', elements: ['Context item 1', { type: 'mrkdwn', text: 'Context item 2' }] },
+              ],
+            },
+          ],
           status: STATUS_SUCCESS,
           tokenUsage: DEFAULT_TOKEN_USAGE,
         },
@@ -2948,22 +2930,12 @@ const SCENARIOS: ScenarioDefinition[] = [
       {
         turn: 1,
         response: {
-          kind: 'tool-call',
+          kind: FINAL_RESPONSE_KIND,
           assistantText: 'Submitting final report without content to trigger validation.',
-          toolCalls: [
-            {
-              toolName: 'agent__final_report',
-              callId: 'call-invalid-final-report',
-              assistantText: 'Attempted final report with missing content.',
-              arguments: {
-                status: STATUS_SUCCESS,
-                report_format: MARKDOWN_FORMAT,
-                report_content: '   ',
-              },
-            },
-          ],
+          reportContent: '   ',
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
           tokenUsage: DEFAULT_TOKEN_USAGE,
-          finishReason: TOOL_FINISH_REASON,
         },
       },
       {
@@ -3054,7 +3026,7 @@ const SCENARIOS: ScenarioDefinition[] = [
     turns: [
       {
         turn: 1,
-        expectedTools: ['agent__batch', LONG_TOOL_NAME, 'agent__final_report'],
+        expectedTools: ['agent__batch', LONG_TOOL_NAME],
         allowMissingTools: true,
         response: {
           kind: 'tool-call',
@@ -3103,15 +3075,6 @@ const SCENARIOS: ScenarioDefinition[] = [
                 text: 'sanitizer-valid-call',
               },
             },
-            {
-              toolName: 'agent__final_report',
-              callId: 'call-final-invalid',
-              assistantText: 'Final report missing content should fail and require retry.',
-              arguments: {
-                status: STATUS_SUCCESS,
-                report_format: MARKDOWN_FORMAT,
-              },
-            },
           ],
           tokenUsage: DEFAULT_TOKEN_USAGE,
           finishReason: TOOL_FINISH_REASON,
@@ -3141,32 +3104,17 @@ const SCENARIOS: ScenarioDefinition[] = [
     turns: [
       {
         turn: 1,
-        expectedTools: ['agent__progress_report', 'agent__final_report'],
+        expectedTools: ['agent__progress_report'],
         response: {
           kind: 'tool-call',
           assistantText: 'Preparing batched final report call.',
           toolCalls: [
             {
-              toolName: 'agent__final_report',
-              callId: 'call-batched-final',
-              assistantText: 'Bundling progress update with final report.',
+              toolName: 'agent__progress_report',
+              callId: 'call-batched-final-progress',
+              assistantText: 'Bundling progress update before final report.',
               arguments: {
-                calls: [
-                  {
-                    id: 'call-progress',
-                    tool: 'agent__progress_report',
-                    parameters: { progress: 'Providing name' },
-                  },
-                  {
-                    id: 'call-final',
-                    tool: 'agent__final_report',
-                    parameters: {
-                      status: STATUS_SUCCESS,
-                      report_format: 'pipe',
-                      report_content: 'My name is ChatGPT.',
-                    },
-                  },
-                ],
+                progress: 'Providing name',
               },
             },
           ],
@@ -3356,7 +3304,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Context window nearly exhausted; delivering final report.',
@@ -3398,7 +3346,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Internal guard triggered; providing final report.',
@@ -3450,7 +3398,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Bulk tool outputs trimmed; delivering final report.',
@@ -3494,7 +3442,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Tokenizer drift accounted for; responding within limits.',
@@ -3539,7 +3487,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Cache tokens reconciled; delivering cached summary.',
@@ -3582,7 +3530,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Secondary provider completed work after primary budget exhaustion.',
@@ -3628,7 +3576,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Context guard enforced final turn following retry.',
@@ -3670,7 +3618,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Trim applied; proceeding with final report.',
@@ -3712,7 +3660,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Forced final turn executed after guard intervention.',
@@ -3754,7 +3702,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Returning final report after verifying context metrics.',
@@ -3796,7 +3744,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Tool completed; sharing final report after logging tokens.',
@@ -3838,7 +3786,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Providing final report after verifying context counters.',
@@ -3880,7 +3828,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Final report generated after validating history-seeded counters.',
@@ -3903,7 +3851,7 @@ const SCENARIOS: ScenarioDefinition[] = [
     turns: [
       {
         turn: 1,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Schema-only overflow resolved by proceeding directly to final report.',
@@ -3945,7 +3893,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Returning final report after verifying context metrics.',
@@ -3987,7 +3935,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Forced final turn executed after guard intervention.',
@@ -4029,7 +3977,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Fallback provider completed final report after guard intervention.',
@@ -4079,7 +4027,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Reporting combined findings from both tool outputs.',
@@ -4129,7 +4077,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Final report after context guard drop enforcement.',
@@ -4179,7 +4127,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Summarizing after guard enforcement and progress update.',
@@ -4238,7 +4186,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Summarizing batched heavy outputs.',
@@ -4280,7 +4228,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Proceeding after overflow drop to summarise available data.',
@@ -4330,7 +4278,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Concluding after overflow prevented additional tool execution.',
@@ -4417,7 +4365,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       {
         // Turn 2 because conversationHistory includes an assistant message
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Context budget exceeded; unable to complete task.',
@@ -4518,7 +4466,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Tool executed via fallback extraction.',
@@ -4547,7 +4495,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Completed after <tool_call> extraction.',
@@ -4576,7 +4524,7 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
       {
         turn: 2,
-        expectedTools: ['agent__final_report'],
+        expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Unknown tool error received; providing summary.',
