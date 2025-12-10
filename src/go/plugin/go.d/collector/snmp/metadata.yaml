@@ -11,7 +11,157 @@ modules:
         categories:
           - data-collection.generic-data-collection
       keywords:
+        # Protocol/generic
         - snmp
+        - mib
+        - oid
+        - network
+        # Device types
+        - router
+        - switch
+        - firewall
+        - ap
+        - access point
+        - wireless controller
+        - wlc
+        - wifi
+        - load balancer
+        - load balancers
+        - vpn
+        - pdu
+        - ups
+        - nas
+        - san
+        - printer
+        # Standard MIB-related (from std-* profiles)
+        - bgp
+        - ospf
+        - ucd
+        # Vendors (from profiles) + common variants
+        - 3com
+        - a10
+        - alcatel
+        - alcatel lucent
+        - nokia
+        - anue
+        - apc
+        - apc netbotz
+        - arista
+        - aruba
+        - audiocodes
+        - avayal
+        - avocent
+        - avtech
+        - roomalert
+        - barracuda
+        - bluecat
+        - brocade
+        - brother
+        - chatsworth
+        - checkpoint
+        - chrysalis
+        - cisco
+        - cisco asa
+        - cisco asr
+        - cisco catalyst
+        - cisco nexus
+        - cisco ironport
+        - cisco ics
+        - cisco wlc
+        - cisco ucs
+        - meraki
+        - citrix
+        - netscaler
+        - cradlepoint
+        - cyberpower
+        - dell
+        - dell emc
+        - poweredge
+        - sonicwall
+        - dialogic
+        - dlink
+        - d-link
+        - eaton
+        - exagrid
+        - extreme
+        - f5
+        - big-ip
+        - fireeye
+        - fortinet
+        - fortigate
+        - fortiswitch
+        - gigamon
+        - hp
+        - hewlett packard
+        - hp ilo
+        - ilo
+        - ilo4
+        - hp h3c
+        - hp icf
+        - hpe
+        - hewlett packard
+        - proliant
+        - huawei
+        - 3com huawei
+        - ibm
+        - datapower
+        - lenovo
+        - idrac
+        - dell idrac
+        - infinera
+        - coriant
+        - infinera coriant groove
+        - coriant groove
+        - infoblox
+        - isilon
+        - ixsystems
+        - truenas
+        - juniper
+        - junos
+        - kyocera
+        - linksys
+        - mcafee
+        - mikrotik
+        - nasuni
+        - nec
+        - net-snmp
+        - netsnmp
+        - netapp
+        - netgear
+        - readynas
+        - omron
+        - opengear
+        - palo alto
+        - cloudgenix
+        - peplink
+        - raritan
+        - riverbed
+        - ruckus
+        - serveriron
+        - server-iron
+        - servertech
+        - silverpeak
+        - silver peak
+        - edgeconnect
+        - sinetica
+        - sophos
+        - synology
+        - diskstation
+        - tp-link
+        - tplink
+        - tripplite
+        - tripp lite
+        - ubiquiti
+        - unifi
+        - velocloud
+        - vertiv
+        - liebert
+        - watchguard
+        - western digital
+        - wd
+        - mycloud
+        - zebra
+        - zyxel
       related_resources:
         integrations:
           list: []
