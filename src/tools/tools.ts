@@ -7,7 +7,7 @@ import type { MCPTool, LogEntry, AccountingEntry, ProgressMetrics, LogDetailValu
 import type { ToolExecuteOptions, ToolExecuteResult, ToolKind, ToolProvider, ToolExecutionContext } from './types.js';
 
 import { recordToolMetrics, runWithSpan, addSpanAttributes, addSpanEvent, recordSpanError, recordQueueDepthMetrics, recordQueueWaitMetrics } from '../telemetry/index.js';
-import { truncateJsonStrings, truncateToBytes } from '../truncation.js';
+import { truncateJsonStrings, truncateToBytes, truncateToTokens } from '../truncation.js';
 import { appendCallPathSegment, formatToolRequestCompact, normalizeCallPath, sanitizeToolName, warn } from '../utils.js';
 
 import { queueManager, type AcquireResult, QueueAbortError } from './queue-manager.js';
@@ -42,6 +42,7 @@ export interface ToolBudgetReservation {
   ok: boolean;
   tokens?: number;
   reason?: string;
+  availableTokens?: number;  // Available token budget (only set when ok=false)
 }
 
 export interface ToolBudgetCallbacks {
@@ -814,11 +815,24 @@ export class ToolsOrchestrator {
 
     // Ensure non-empty result for downstream providers that expect a non-empty tool output
     if (result.length === 0) result = ' ';
-    const resultBytes = Buffer.byteLength(result, 'utf8');
+    let resultBytes = Buffer.byteLength(result, 'utf8');
+    let truncatedForBudget = false;
 
-    const reservation: ToolBudgetReservation = (!isInternalAgentTool && budgetCallbacks !== undefined)
+    let reservation: ToolBudgetReservation = (!isInternalAgentTool && budgetCallbacks !== undefined)
       ? await budgetCallbacks.reserveToolOutput(result)
       : { ok: true };
+
+    // If reservation fails but we have available budget, try truncating to fit
+    if (!reservation.ok && budgetCallbacks !== undefined && reservation.availableTokens !== undefined && reservation.availableTokens > 0) {
+      const truncated = truncateToTokens(result, reservation.availableTokens);
+      if (truncated !== undefined) {
+        result = truncated;
+        resultBytes = Buffer.byteLength(result, 'utf8');
+        truncatedForBudget = true;
+        // Retry reservation with truncated output
+        reservation = await budgetCallbacks.reserveToolOutput(result);
+      }
+    }
 
     if (!reservation.ok) {
       const failureReason = reservation.reason ?? 'token_budget_exceeded';
@@ -833,6 +847,7 @@ export class ToolsOrchestrator {
         tokens_estimated: reservation.tokens ?? 0,
         reason: failureReason,
         truncated: result !== raw,
+        truncated_for_budget: truncatedForBudget,
         latency_ms: latency,
       };
       if (batchToolSummary !== undefined) dropDetails.batch_tools = batchToolSummary;

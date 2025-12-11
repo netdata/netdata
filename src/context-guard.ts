@@ -399,7 +399,11 @@ export class ContextGuard {
               this.toolBudgetExceeded = true;
               this.enforceFinalTurn(guard.blocked, 'tool_preflight');
             }
-            return { ok: false as const, tokens, reason: 'token_budget_exceeded' };
+            // Calculate available tokens: use the minimum limit across all blocked targets
+            const baseProjected = this.currentCtxTokens + this.pendingCtxTokens + this.newCtxTokens;
+            const minLimit = Math.min(...guard.blocked.map((entry) => entry.limit));
+            const availableTokens = Math.max(0, minLimit - baseProjected);
+            return { ok: false as const, tokens, reason: 'token_budget_exceeded', availableTokens };
           }
           // Accumulate tokens so subsequent tool reservations see the updated context
           this.newCtxTokens += tokens;
