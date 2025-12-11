@@ -198,9 +198,9 @@ Recommendation for JSON output: include an explicit error structure in the schem
 
 - Configurable via `sessionConfig.toolResponseMaxBytes`.
 - When an MCP tool response exceeds the cap:
-  - Emits a `WRN` log (response, mcp) with full request formatting + actual size and limit, tagged “(truncated)”.
-  - Returns the response with a prefix and the head of the original content, total within the limit:
-    - Prefix: `[TRUNCATED] Original size {actual} bytes; truncated to {limit} bytes.`
+  - Emits a `WRN` log (response, mcp) with full request formatting + actual size and limit, tagged "(truncated)".
+  - Returns truncated content using 50/50 split (first half + last half) with marker at truncation point:
+    - Marker format: `[···TRUNCATED {omitted} bytes···]` (appears in the middle of content)
   - Counts occurrences; `FIN` MCP summary includes `capped=<count>`.
 - Headend surfaces (REST/MCP/OpenAI/Anthropic) apply the same cap via their session configuration and surface errors through HTTP/SSE/WebSocket semantics. Their incoming request payloads must include `format`, and when `format` is `json`, a `schema` object is required so the library can validate structured content.
 

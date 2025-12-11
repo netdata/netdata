@@ -38,7 +38,7 @@ See Section 2 “Context Management Contract” for the complete definition of c
 
 **`toolResponseMaxBytes`**
 - Tool responses exceeding this size are truncated
-- Truncated responses include notice: `[TRUNCATED] Original size X bytes; truncated to Y bytes.` (prepended to content)
+- Truncated responses use 50/50 split (first half + last half) with marker in middle: `[···TRUNCATED N bytes···]`
 - Warning logged with metadata: tool name, actual bytes, limit bytes
 - Original response only preserved in logs when `traceTools` mode enabled
 - **Exception:** `agent__batch` meta-tool output NOT truncated as a whole; individual tools within the batch ARE subject to truncation

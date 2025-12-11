@@ -414,7 +414,7 @@ interface MCPTool {
 
 ### Large response truncated
 - Check toolResponseMaxBytes setting
-- Response includes `[RESPONSE TRUNCATED]` notice
+- Response uses 50/50 split with marker: `[···TRUNCATED N bytes···]`
 
 ### MCP connection failed
 - Check command/args for stdio
