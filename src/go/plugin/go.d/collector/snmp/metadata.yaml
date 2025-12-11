@@ -187,7 +187,7 @@ modules:
           
           > This list highlights major vendors—any SNMP-enabled device can be monitored using stock or custom profiles.
         method_description: |
-          ::: info
+          :::info
 
           See: [SNMP Profile Format](/src/go/plugin/go.d/collector/snmp/profile-format.md) to learn how to write your own or extend stock ones.
 
