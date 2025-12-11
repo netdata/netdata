@@ -40,7 +40,7 @@ static inline void netdata_update_power_supply_values(
     if (bs.Capacity != BATTERY_UNKNOWN_CAPACITY) {
         NETDATA_DOUBLE num = bs.Capacity;
         NETDATA_DOUBLE den = bi->FullChargedCapacity;
-        num = (den) ? den /num : 0;
+        num = (den) ? num/ den : 0;
 
         power_supply_root->capacity->value = (unsigned long long)(num * 100.0);
     }

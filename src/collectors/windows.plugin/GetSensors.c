@@ -574,7 +574,10 @@ static void netdata_get_sensors()
             continue;
         }
 
-        netdata_clsid_to_char(thread_values, sizeof(thread_values), &id);
+        if (!netdata_clsid_to_char(thread_values, sizeof(thread_values), &id)) {
+            pSensor->lpVtbl->Release(pSensor);
+            continue;
+        }
 
         struct sensor_data *sd = dictionary_set(sensors, thread_values, NULL, sizeof(*sd));
 
