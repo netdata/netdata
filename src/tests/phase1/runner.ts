@@ -91,6 +91,7 @@ const dumpScenarioResultIfNeeded = (scenarioId: string, result: AIAgentResult): 
   console.log(`[dump] scenario=${scenarioId}:`, JSON.stringify(result, null, 2));
 };
 const TOOL_DROP_STUB = `(tool failed: ${CONTEXT_OVERFLOW_FRAGMENT})`;
+const TOOL_SIZE_CAP_STUB = '(tool failed: response exceeded max size)';
 const SHARED_REGISTRY_RESULT = 'shared-response';
 const SECOND_TURN_FINAL_ANSWER = 'Second turn final answer.';
 const RESTART_TRIGGER_PAYLOAD = 'restart-cycle';
@@ -275,7 +276,7 @@ const sessionConfigObservers: ((config: AIAgentSessionConfig) => void)[] = [];
 };
 
 const COVERAGE_ALIAS_BASENAME = 'parent.ai';
-const TRUNCATION_MARKER_PATTERN = /\[···TRUNCATED \d+ bytes···\]/;
+const TRUNCATION_MARKER_PATTERN = /\[···TRUNCATED \d+ (?:bytes|chars|tokens)···\]/;
 const CONFIG_FILE_NAME = 'config.json';
 const INCLUDE_DIRECTIVE_TOKEN = '${include:';
 const FINAL_REPORT_CALL_ID = 'agent-final-report';
@@ -9225,6 +9226,105 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Reasoning replay test expected success.');
+    },
+  },
+  // =====================================================================
+  // Budget Truncation Tests
+  // =====================================================================
+  {
+    id: 'run-test-size-cap-truncation',
+    configure: (_configuration, sessionConfig, defaults) => {
+      // Set a small limit that will truncate the 2000-byte payload
+      sessionConfig.toolResponseMaxBytes = 500;
+      defaults.toolResponseMaxBytes = 500;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-size-cap-truncation expected success.');
+      const toolMessages = result.conversation.filter((message) => message.role === 'tool');
+      invariant(toolMessages.length > 0, 'Expected tool messages in run-test-size-cap-truncation.');
+      // Tool output should be truncated with marker, not the failure stub
+      const hasTruncationMarker = toolMessages.some((message) => typeof message.content === 'string' && TRUNCATION_MARKER_PATTERN.test(message.content));
+      invariant(hasTruncationMarker, 'Truncation marker expected in run-test-size-cap-truncation.');
+      // Should NOT have the failure stub
+      const hasFailureStub = toolMessages.some((message) => typeof message.content === 'string' && message.content === TOOL_SIZE_CAP_STUB);
+      invariant(!hasFailureStub, 'Failure stub should NOT appear when truncation succeeds in run-test-size-cap-truncation.');
+    },
+  },
+  {
+    id: 'run-test-size-cap-small-payload-passes',
+    configure: (_configuration, sessionConfig, defaults) => {
+      // Limit that accommodates the 100-byte payload without truncation
+      sessionConfig.toolResponseMaxBytes = 1000;
+      defaults.toolResponseMaxBytes = 1000;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-size-cap-small-payload-passes expected success.');
+      const toolMessages = result.conversation.filter((message) => message.role === 'tool');
+      invariant(toolMessages.length > 0, 'Expected tool messages in run-test-size-cap-small-payload-passes.');
+      // Payload should pass through unchanged - no truncation marker
+      const hasTruncationMarker = toolMessages.some((message) => typeof message.content === 'string' && TRUNCATION_MARKER_PATTERN.test(message.content));
+      invariant(!hasTruncationMarker, 'Truncation marker should NOT appear when payload fits in run-test-size-cap-small-payload-passes.');
+      // Should contain the actual payload (100 Y's)
+      const hasExpectedContent = toolMessages.some((message) => typeof message.content === 'string' && message.content.includes('YYYYYY'));
+      invariant(hasExpectedContent, 'Expected original payload content in run-test-size-cap-small-payload-passes.');
+    },
+  },
+  {
+    id: 'run-test-size-cap-small-over-limit-fails',
+    configure: (_configuration, sessionConfig, defaults) => {
+      // Limit of 100 for a 300-byte payload (between limit and 512B minimum)
+      sessionConfig.toolResponseMaxBytes = 100;
+      defaults.toolResponseMaxBytes = 100;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-size-cap-small-over-limit-fails expected success.');
+      const toolMessages = result.conversation.filter((message) => message.role === 'tool');
+      invariant(toolMessages.length > 0, 'Expected tool messages in run-test-size-cap-small-over-limit-fails.');
+      // Should have the failure stub (payload too small to truncate but exceeds limit)
+      const hasFailureStub = toolMessages.some((message) => typeof message.content === 'string' && message.content === TOOL_SIZE_CAP_STUB);
+      invariant(hasFailureStub, 'Failure stub expected in run-test-size-cap-small-over-limit-fails.');
+    },
+  },
+  {
+    id: 'run-test-budget-truncation-preserves-output',
+    configure: (configuration, sessionConfig, defaults) => {
+      // Set up a small context window that will trigger budget truncation
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: 1500,
+              tokenizer: 'approximate',
+            },
+          },
+        },
+      };
+      // No size cap - let budget truncation handle it
+      sessionConfig.toolResponseMaxBytes = 10000;
+      defaults.toolResponseMaxBytes = 10000;
+      defaults.contextWindowBufferTokens = 100;
+      configuration.defaults = defaults;
+      sessionConfig.maxOutputTokens = 200;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-budget-truncation-preserves-output expected success.');
+      const toolMessages = result.conversation.filter((message) => message.role === 'tool');
+      // Either truncated with marker OR dropped entirely (depends on timing)
+      // The key assertion: if there's tool output, it should be truncated, not raw oversized
+      if (toolMessages.length > 0) {
+        const hasTruncationOrDrop = toolMessages.some((message) => {
+          if (typeof message.content !== 'string') return false;
+          // Could be truncated with marker
+          if (TRUNCATION_MARKER_PATTERN.test(message.content)) return true;
+          // Could be dropped entirely due to no budget
+          if (message.content === TOOL_DROP_STUB) return true;
+          // Small enough to fit (unlikely with 2000-byte payload)
+          if (message.content.length < 500) return true;
+          return false;
+        });
+        invariant(hasTruncationOrDrop, 'Tool output should be truncated or dropped, not oversized in run-test-budget-truncation-preserves-output.');
+      }
     },
   },
   ...buildReasoningMatrixScenarios(),

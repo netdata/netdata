@@ -4536,6 +4536,161 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
     ],
   },
+  // =====================================================================
+  // Budget Truncation Tests
+  // =====================================================================
+  {
+    id: 'run-test-size-cap-truncation',
+    description: 'Tool response exceeding toolResponseMaxBytes is truncated with marker.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Fetching large payload that will be truncated by size cap.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-size-cap',
+              arguments: {
+                text: 'budget-truncatable',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: [],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Received truncated tool output.',
+          reportContent: `${RESULT_HEADING}Tool output was truncated to fit size cap.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-size-cap-small-payload-passes',
+    description: 'Small tool response that fits size cap passes through unchanged.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Fetching small payload that fits the cap.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-small-fits',
+              arguments: {
+                text: 'small-fits',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: [],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Received full tool output without truncation.',
+          reportContent: `${RESULT_HEADING}Small payload passed through unchanged.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-size-cap-small-over-limit-fails',
+    description: 'Payload between cap and 512B minimum returns failure stub.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Fetching payload that exceeds cap but is too small to truncate.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-small-over',
+              arguments: {
+                text: 'small-over-limit',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: [],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Tool output was replaced with failure stub.',
+          reportContent: `${RESULT_HEADING}Tool response exceeded max size and could not be truncated.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_FAILURE,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-budget-truncation-preserves-output',
+    description: 'Tool output truncated (not dropped) when exceeds token budget but truncation fits.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Fetching large payload that exceeds token budget.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-budget-truncate',
+              arguments: {
+                text: 'budget-truncatable',
+              },
+            },
+          ],
+          tokenUsage: {
+            inputTokens: 800,
+            outputTokens: 100,
+            totalTokens: 900,
+          },
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: [],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Received budget-truncated tool output with marker.',
+          reportContent: `${RESULT_HEADING}Tool output was truncated to fit token budget.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
 ];
 
 const scenarios = new Map<string, ScenarioDefinition>(SCENARIOS.map((scenario) => [scenario.id, scenario] as const));

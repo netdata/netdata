@@ -39,6 +39,10 @@ server.registerTool(
 
 const longPayload = '#'.repeat(3200);
 const guardOverflowPayload = '@'.repeat(1200);
+// Payloads for budget truncation tests
+const budgetTruncatablePayload = 'X'.repeat(2000);  // Large enough to truncate (>512 bytes)
+const smallFitsPayload = 'Y'.repeat(100);           // Small, fits any reasonable limit
+const smallOverLimitPayload = 'Z'.repeat(300);      // Between limit (100) and MIN_PAYLOAD_BYTES (512)
 
 const fixtureMode = process.env.MCP_FIXTURE_MODE ?? '';
 const fixtureStateFile = process.env.MCP_FIXTURE_STATE_FILE;
@@ -188,6 +192,31 @@ server.server.setRequestHandler(CallToolRequestSchema, async (request, extra) =>
       return {
         content: [
           { type: 'text', text: guardOverflowPayload },
+        ],
+      };
+    }
+
+    // Budget truncation test payloads
+    if (payload === 'budget-truncatable') {
+      return {
+        content: [
+          { type: 'text', text: budgetTruncatablePayload },
+        ],
+      };
+    }
+
+    if (payload === 'small-fits') {
+      return {
+        content: [
+          { type: 'text', text: smallFitsPayload },
+        ],
+      };
+    }
+
+    if (payload === 'small-over-limit') {
+      return {
+        content: [
+          { type: 'text', text: smallOverLimitPayload },
         ],
       };
     }
