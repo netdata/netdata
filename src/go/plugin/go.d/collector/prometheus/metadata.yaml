@@ -311,36 +311,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-a10-acos
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: A10 ACOS network devices
-        link: https://github.com/a10networks/PrometheusExporter
-        icon_filename: a10-networks.png
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords:
-        - network monitoring
-        - network performance
-        - traffic analysis
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor A10 Networks device metrics for comprehensive management and analysis.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [A10-Networks Prometheus Exporter](https://github.com/a10networks/PrometheusExporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [A10-Networks Prometheus Exporter](https://github.com/a10networks/PrometheusExporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-airflow
       most_popular: false
       community: true
@@ -1008,36 +978,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-cisco_aci
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Cisco ACI
-        link: https://github.com/RavuAlHemio/prometheus_aci_exporter
-        icon_filename: cisco.svg
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords:
-        - network monitoring
-        - network performance
-        - cisco devices
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Cisco ACI infrastructure metrics for optimized network performance and resource management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Cisco ACI Exporter](https://github.com/RavuAlHemio/prometheus_aci_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Cisco ACI Exporter](https://github.com/RavuAlHemio/prometheus_aci_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-citrix_netscaler
       most_popular: false
       community: true
@@ -1381,33 +1321,6 @@ modules:
           Track etcd database metrics for optimized distributed key-value store management and performance.
         method_description: |
           Metrics are gathered by periodically sending HTTP requests to etcd built-in Prometheus exporter.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-fortigate
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Fortigate firewall
-        link: https://github.com/bluecmd/fortigate_exporter
-        icon_filename: fortinet.svg
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep tabs on Fortigate firewall metrics for enhanced network protection and management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [fortigate_exporter](https://github.com/bluecmd/fortigate_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [fortigate_exporter](https://github.com/bluecmd/fortigate_exporter) by following the instructions mentioned in the exporter README.
   - <<: *module
     meta:
       <<: *meta
@@ -4624,33 +4537,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-fritzbox
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Fritzbox network devices
-        link: https://github.com/pdreker/fritz_exporter
-        icon_filename: avm.png
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track AVM Fritzbox router metrics for efficient home network management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Fritzbox exporter](https://github.com/pdreker/fritz_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Fritzbox exporter](https://github.com/pdreker/fritz_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-frrouting
       most_popular: false
       community: true
@@ -5606,33 +5492,6 @@ modules:
               Install [Memcached exporter](https://github.com/prometheus/memcached_exporter) by following the instructions mentioned in the exporter README.
   - <<: *module
     meta:
-      id: collector-go.d.plugin-prometheus-meraki
-      <<: *meta
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Meraki dashboard
-        link: https://github.com/TheHolm/meraki-dashboard-promethus-exporter
-        icon_filename: meraki.png
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep tabs on Cisco Meraki cloud-managed networking device metrics for efficient network management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Meraki dashboard data exporter using API](https://github.com/TheHolm/meraki-dashboard-promethus-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Meraki dashboard data exporter using API](https://github.com/TheHolm/meraki-dashboard-promethus-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-mesos
       most_popular: false
@@ -6077,33 +5936,6 @@ modules:
           - title: Install Exporter
             description: |
               Install [NRPE exporter](https://github.com/canonical/nrpe_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-mikrotik
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: MikroTik devices
-        link: https://github.com/swoga/mikrotik-exporter
-        icon_filename: mikrotik.png
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep tabs on MikroTik RouterOS metrics for efficient network device management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [mikrotik-exporter](https://github.com/swoga/mikrotik-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [nshttpd/mikrotik-exporter, swoga/m](https://github.com/swoga/mikrotik-exporter) by following the instructions mentioned in the exporter README.
   - <<: *module
     meta:
       <<: *meta
@@ -6823,34 +6655,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-routeros
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Mikrotik RouterOS devices
-        link: https://github.com/welbymcroberts/routeros_exporter
-        icon_filename: routeros.png
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track MikroTik RouterOS metrics for efficient network device management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [RouterOS exporter](https://github.com/welbymcroberts/routeros_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [RouterOS exporter](https://github.com/welbymcroberts/routeros_exporter) by following the instructions mentioned in the exporter README.
-
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-sabnzbd
       most_popular: false
       community: true
@@ -7091,33 +6895,6 @@ modules:
           - title: Install Exporter
             description: |
               Install [sma-exporter](https://github.com/dr0ps/sma_inverter_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-smartrg808ac
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: SmartRG 808AC Cable Modem
-        link: https://github.com/AdamIsrael/smartrg808ac_exporter
-        icon_filename: smartr.jpeg
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor SmartRG SR808ac router metrics for efficient network device management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [smartrg808ac_exporter](https://github.com/AdamIsrael/smartrg808ac_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [smartrg808ac_exporter](https://github.com/AdamIsrael/smartrg808ac_exporter) by following the instructions mentioned in the exporter README.
   - <<: *module
     meta:
       <<: *meta
@@ -7878,31 +7655,3 @@ modules:
           - title: Install Exporter
             description: |
               Install [Zulip Exporter](https://github.com/brokenpip3/zulip-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-zyxel_gs1200
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Zyxel GS1200-8
-        link: https://github.com/robinelfrink/gs1200-exporter
-        icon_filename: zyxel.png
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track Zyxel GS1200 network switch metrics for efficient network device management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Zyxel GS1200 Exporter](https://github.com/robinelfrink/gs1200-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Zyxel GS1200 Exporter](https://github.com/robinelfrink/gs1200-exporter) by following the instructions mentioned in the exporter README.
-
