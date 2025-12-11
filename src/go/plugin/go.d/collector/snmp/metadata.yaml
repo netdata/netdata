@@ -25,8 +25,6 @@ modules:
         - wireless controller
         - wlc
         - wifi
-        - load balancer
-        - load balancers
         - vpn
         - pdu
         - ups
@@ -41,11 +39,11 @@ modules:
         - 3com
         - a10
         - alcatel
-        - alcatel lucent
+        - lucent
         - nokia
         - anue
         - apc
-        - apc netbotz
+        - netbotz
         - arista
         - aruba
         - audiocodes
@@ -99,7 +97,6 @@ modules:
         - hp h3c
         - hp icf
         - hpe
-        - hewlett packard
         - proliant
         - huawei
         - 3com huawei
@@ -110,8 +107,7 @@ modules:
         - dell idrac
         - infinera
         - coriant
-        - infinera coriant groove
-        - coriant groove
+        - infinera
         - infoblox
         - isilon
         - ixsystems
@@ -171,40 +167,54 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This SNMP collector discovers and monitors SNMP-enabled devices using **profiles**.
+          This collector discovers and monitors any SNMP-enabled network device.
+          
+          - **Built-in vendor profiles**: Netdata ships with a [large library of profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/snmp.profiles/default) for major vendors, enabling automatic, out-of-the-box monitoring—**no manual OID configuration needed** for common hardware.
+          - **Custom profiles supported**: Users can extend or override stock profiles to add new devices, modify charts, or collect additional OIDs.
+          - **Automatic vendor/model detection**: Devices are matched to the right profile using selectors such as `sysObjectID` and `sysDescr`.
+          - **ICMP ping**: Optional round-trip latency monitoring alongside SNMP, with a `ping_only` mode available.
+          - **SNMP v1, v2c, and v3 support**: Fully implemented via the [gosnmp](https://github.com/gosnmp/gosnmp) library.
 
-          :::tip
 
-          See: [SNMP Profile Format](/src/go/plugin/go.d/collector/snmp/profile-format.md) to learn how to write profiles and define their fields.
+          **Built-in profiles for major vendors:**
+
+          | Category | Vendors |
+          |----------|---------|
+          | Switches & Routers | Cisco (Catalyst, Nexus, ASR, ISR), Arista, Juniper, HP/HPE, Dell, Extreme |
+          | Firewalls | Palo Alto, Fortinet FortiGate, Cisco ASA, Checkpoint, SonicWall |
+          | Wireless | Aruba, Cisco WLC, Ubiquiti, Alcatel-Lucent |
+          | Load Balancers | F5 BIG-IP, Citrix NetScaler, A10 Thunder |
+          | Infrastructure | APC UPS/PDU, Dell servers, plus standard MIBs (BGP, OSPF, TCP/UDP) |
+          
+          > This list highlights major vendors—any SNMP-enabled device can be monitored using stock or custom profiles.
+        method_description: |
+          ::: info
+
+          See: [SNMP Profile Format](/src/go/plugin/go.d/collector/snmp/profile-format.md) to learn how to write your own or extend stock ones.
+
+          :::
 
           **Profile locations**
 
           | Type | Default path | Notes |
-          |------|---------------|--------|
-          | **Stock profiles** | `/usr/lib/netdata/conf.d/go.d/snmp.profiles/default/` | Provided with Netdata. |
-          | **User profiles**  | `/etc/netdata/go.d/snmp.profiles/` | Place your custom or modified profiles here. |
+          |------|--------------|-------|
+          | **Stock profiles** | `/usr/lib/netdata/conf.d/go.d/snmp.profiles/default/` | Shipped with Netdata |
+          | **User profiles** | `/etc/netdata/go.d/snmp.profiles/` | Place custom or modified profiles here |
 
-          Depending on your installation method, both paths may include the `/opt/netdata` prefix.
+          > Depending on installation, paths may be prefixed with `/opt/netdata`.
 
-          :::
+          A **profile** defines:
 
-          A *profile* declares:
-          - device selectors (e.g. `sysObjectID`, `sysDescr`) for auto-matching,
-          - which OIDs to collect (scalars and tables),
-          - how to label rows (metric tags), and
-          - chart/metric metadata (units, families, types), including optional **virtual metrics**.
-
-          At runtime, the collector:
-          1) identifies the device by reading standard system OIDs (e.g. `sysObjectID`, `sysDescr`),
-          2) picks the best-matching profile(s), and
-          3) collects exactly the metrics defined by those profiles.
-
-          Because profiles vary per vendor/model/OS, there is **no fixed list of metrics** in this page. Netdata renders the charts that each matched profile defines (interfaces, optics, CPU/mem, environment, VLANs, etc., depending on the device).
-
-          The collector optionally runs **ICMP round-trip (ping)** alongside SNMP for availability and latency. A `ping_only` mode is available to skip periodic SNMP polling.
-
-          SNMP versions v1, v2c, and v3 are supported, implemented via the [gosnmp](https://github.com/gosnmp/gosnmp) library.
-        method_description: ""
+          - Device selectors for auto-matching (e.g. `sysObjectID`, `sysDescr`)
+          - The exact OIDs to collect (scalars and tables)
+          - How to label table rows (metric tags)
+          - Chart/metric metadata (units, families, types), including optional **virtual metrics**
+          
+          **At runtime, the collector**:
+          
+          1. Reads standard system OIDs (e.g. `sysObjectID`, `sysDescr`) to identify the device
+          2. Picks the best matching vendor/model profile(s)
+          3. Collects exactly the metrics those profiles define
       supported_platforms:
         include: []
         exclude: []
