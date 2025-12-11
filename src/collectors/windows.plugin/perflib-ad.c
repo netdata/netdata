@@ -187,9 +187,12 @@ static void netdata_ad_searches(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *p
     static RRDSET *st_ldap_searches_total = NULL;
     static RRDDIM *rd_ldap_searches_total = NULL;
 
-    if (perflibGetObjectCounter(pDataBlock, pObjectType, &ldapSearchesTotal)) {
-        if (unlikely(!st_ldap_searches_total)) {
-            st_ldap_searches_total = rrdset_create_localhost(
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ldapSearchesTotal)) {
+        return;
+    }
+
+    if (unlikely(!st_ldap_searches_total)) {
+        st_ldap_searches_total = rrdset_create_localhost(
                 "ad",
                 "ldap_searches",
                 NULL,
@@ -203,14 +206,13 @@ static void netdata_ad_searches(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *p
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            rd_ldap_searches_total =
+        rd_ldap_searches_total =
                 rrddim_add(st_ldap_searches_total, "searches", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(
-            st_ldap_searches_total, rd_ldap_searches_total, (collected_number)ldapSearchesTotal.current.Data);
-        rrdset_done(st_ldap_searches_total);
     }
+
+    rrddim_set_by_pointer(
+            st_ldap_searches_total, rd_ldap_searches_total, (collected_number)ldapSearchesTotal.current.Data);
+    rrdset_done(st_ldap_searches_total);
 }
 
 static void netdata_ad_properties(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
@@ -490,9 +492,12 @@ netdata_ad_service_threads_in_use(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE 
     static RRDSET *st_directory_services_threads = NULL;
     static RRDDIM *rd_directory_services_threads = NULL;
 
-    if (perflibGetObjectCounter(pDataBlock, pObjectType, &directoryServiceThreads)) {
-        if (unlikely(!st_directory_services_threads)) {
-            st_directory_services_threads = rrdset_create_localhost(
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &directoryServiceThreads)) {
+        return;
+    }
+
+    if (unlikely(!st_directory_services_threads)) {
+        st_directory_services_threads = rrdset_create_localhost(
                 "ad",
                 "ds_threads",
                 NULL,
@@ -506,16 +511,15 @@ netdata_ad_service_threads_in_use(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE 
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            rd_directory_services_threads =
+        rd_directory_services_threads =
                 rrddim_add(st_directory_services_threads, "thread", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        }
+    }
 
-        rrddim_set_by_pointer(
+    rrddim_set_by_pointer(
             st_directory_services_threads,
             rd_directory_services_threads,
             (collected_number)directoryServiceThreads.current.Data);
-        rrdset_done(st_directory_services_threads);
-    }
+    rrdset_done(st_directory_services_threads);
 }
 
 static void netdata_ad_bind(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
