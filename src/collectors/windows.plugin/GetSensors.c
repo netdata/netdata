@@ -362,8 +362,10 @@ static bool netdata_clsid_to_char(char *output, size_t output_len, const GUID *p
     size_t converted = wcstombs(output, wguid, output_len - 1);
     CoTaskMemFree(wguid);
 
-    if (unlikely(converted == (size_t)-1))
+    if (unlikely(converted == (size_t)-1)) {
+        output[0] = '\0';
         return false;
+    }
 
     output[converted] = '\0';
 
