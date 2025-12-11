@@ -41,10 +41,10 @@ This collector discovers and monitors any SNMP-enabled network device.
 | Load Balancers | F5 BIG-IP, Citrix NetScaler, A10 Thunder |
 | Infrastructure | APC UPS/PDU, Dell servers, plus standard MIBs (BGP, OSPF, TCP/UDP) |
 
-> This list highlights major vendors—any SNMP-enabled device can be monitored using stock or custom profiles.
+> This table highlights common vendors—the **full library includes many more**.
 
 
-::: info
+:::info
 
 See: [SNMP Profile Format](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/snmp/profile-format.md) to learn how to write your own or extend stock ones.
 
