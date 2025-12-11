@@ -346,23 +346,37 @@ struct sensor_data {
 DICTIONARY *sensors;
 
 // Microsoft appends additional data
-#define ADDTIONAL_UUID_STR_LEN (UUID_STR_LEN + 8)
+#define ADDTIONAL_UUID_STR_LEN (UUID_STR_LEN + 17)
 
-static void netdata_clsid_to_char(char *output, const GUID *pguid)
+static bool netdata_clsid_to_char(char *output, size_t output_len, const GUID *pguid)
 {
+    if (unlikely(!output))
+        return false;
+
     LPWSTR wguid = NULL;
-    if (SUCCEEDED(StringFromCLSID(pguid, &wguid)) && wguid) {
-        size_t len = wcslen(wguid);
-        wcstombs(output, wguid, len);
-        CoTaskMemFree(wguid);
+    HRESULT hr = StringFromCLSID(pguid, &wguid);
+    output[0] = '\0';
+    if (FAILED(hr) || unlikely(!wguid))
+        return false;
+
+    size_t converted = wcstombs(output, wguid, output_len - 1);
+    CoTaskMemFree(wguid);
+
+    if (unlikely(converted == (size_t)-1)) {
+        output[0] = '\0';
+        return false;
     }
+
+    output[converted] = '\0';
+
+    return true;
 }
 
 static inline char *netdata_convert_guid_to_string(HRESULT hr, GUID *value)
 {
     if (SUCCEEDED(hr)) {
         char cguid[ADDTIONAL_UUID_STR_LEN];
-        netdata_clsid_to_char(cguid, value);
+        netdata_clsid_to_char(cguid, ADDTIONAL_UUID_STR_LEN, value);
         return strdupz(cguid);
     }
     return NULL;
@@ -540,6 +554,7 @@ static void netdata_get_sensors()
     ULONG count = 0;
     hr = pSensorCollection->lpVtbl->GetCount(pSensorCollection, &count);
     if (FAILED(hr)) {
+        pSensorCollection->lpVtbl->Release(pSensorCollection);
         return;
     }
 
@@ -555,9 +570,14 @@ static void netdata_get_sensors()
         GUID id = {0};
         hr = pSensor->lpVtbl->GetID(pSensor, &id);
         if (FAILED(hr)) {
+            pSensor->lpVtbl->Release(pSensor);
             continue;
         }
-        netdata_clsid_to_char(thread_values, &id);
+
+        if (!netdata_clsid_to_char(thread_values, sizeof(thread_values), &id)) {
+            pSensor->lpVtbl->Release(pSensor);
+            continue;
+        }
 
         struct sensor_data *sd = dictionary_set(sensors, thread_values, NULL, sizeof(*sd));
 
