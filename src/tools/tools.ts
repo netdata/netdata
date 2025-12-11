@@ -48,6 +48,7 @@ export interface ToolBudgetReservation {
 export interface ToolBudgetCallbacks {
   reserveToolOutput: (output: string) => Promise<ToolBudgetReservation>;
   canExecuteTool: () => boolean;
+  countTokens: (text: string) => number;  // Tokenizer for accurate budget truncation
 }
 
 export interface ManagedToolResult {
@@ -824,7 +825,7 @@ export class ToolsOrchestrator {
 
     // If reservation fails but we have available budget, try truncating to fit
     if (!reservation.ok && budgetCallbacks !== undefined && reservation.availableTokens !== undefined && reservation.availableTokens > 0) {
-      const truncated = truncateToTokens(result, reservation.availableTokens);
+      const truncated = truncateToTokens(result, reservation.availableTokens, budgetCallbacks.countTokens);
       if (truncated !== undefined) {
         result = truncated;
         resultBytes = Buffer.byteLength(result, 'utf8');

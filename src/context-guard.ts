@@ -411,6 +411,21 @@ export class ContextGuard {
         });
       },
       canExecuteTool: () => !this.toolBudgetExceeded,
+      countTokens: (text: string): number => {
+        // Use the same tokenizer logic as estimateTokens for consistency
+        let maxTokens = 0;
+        const targets = this.getTargets();
+        // eslint-disable-next-line functional/no-loop-statements
+        for (const target of targets) {
+          const tokenizer = resolveTokenizer(target.tokenizerId);
+          const tokens = tokenizer.countText(text);
+          if (tokens > maxTokens) {
+            maxTokens = tokens;
+          }
+        }
+        const approxTokens = Math.ceil(text.length / 4);
+        return Math.max(maxTokens, approxTokens);
+      },
     };
   }
 
