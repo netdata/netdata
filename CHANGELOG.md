@@ -79,6 +79,10 @@
 - Fix(updater): fix deleting /dev/null when URL check fails ([#21428](https://github.com/netdata/netdata/issues/21428))
 - Update PLATFORM_SUPPORT.md ([#21422](https://github.com/netdata/netdata/issues/21422))
 - Properly handle package check URL creation for RHEL derivatives. ([#21431](https://github.com/netdata/netdata/issues/21431))
+- Build(deps): bump peter-evans/create-pull-request from 7 to 8 ([#21437](https://github.com/netdata/netdata/issues/21437))
+- Build(deps): bump k8s.io/client-go from 0.34.2 to 0.34.3 in /src/go ([#21438](https://github.com/netdata/netdata/issues/21438))
+- Build(deps): bump golang.org/x/net from 0.47.0 to 0.48.0 in /src/go ([#21434](https://github.com/netdata/netdata/issues/21434))
+- Build(deps): bump github.com/valyala/fastjson from 1.6.4 to 1.6.5 in /src/go ([#21440](https://github.com/netdata/netdata/issues/21440))
 
 ## [2.8.0] - 2025-11-19
 
