@@ -39,6 +39,9 @@
 
 #define NETDATA_QUERY_CONNECTIONS "SELECT COUNT(*), is_user_process FROM sys.dm_exec_sessions GROUP BY is_user_process;"
 
+#define NETDATA_QUERY_BLOCKED_PROCESSES \
+    "SELECT COUNT(DISTINCT session_id) AS blocked_sessions FROM sys.dm_exec_requests WHERE blocking_session_id <> 0;"
+
 // https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql?view=sql-server-ver16
 #define NETDATA_QUERY_CHECK_WAITS                                                                                      \
     "SELECT                                                                                                            \
@@ -673,6 +676,7 @@ struct netdata_mssql_conn {
     SQLHSTMT dbSQLState;
     SQLHSTMT dbSQLJobs;
     SQLHSTMT dbSQLConnections;
+    SQLHSTMT dbSQLBlockedProcesses;
     SQLHSTMT dbReplicationPublisher;
 
     BOOL collect_transactions;
@@ -683,6 +687,7 @@ struct netdata_mssql_conn {
     BOOL collect_buffer;
     BOOL collect_data_size;
     BOOL collect_user_connections;
+    BOOL collect_blocked_processes;
 
     BOOL is_connected;
 };
@@ -700,6 +705,7 @@ enum netdata_mssql_metrics {
     NETDATA_MSSQL_BUFFER_MANAGEMENT,
     NETDATA_MSSQL_JOBS,
     NETDATA_USER_CONNECTIONS,
+    NETDATA_BLOCKED_PROCESS,
 
     NETDATA_MSSQL_METRICS_END
 };
@@ -998,4 +1004,5 @@ extern void do_mssql_statistics_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssq
 extern void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
 extern void do_mssql_user_connections(struct mssql_instance *mi, int update_every);
 extern void do_mssql_sessions_connections(struct mssql_instance *mi, int update_every);
+extern void netdata_mssql_blocked_processes_chart(struct mssql_instance *mi, int update_every);
 #endif

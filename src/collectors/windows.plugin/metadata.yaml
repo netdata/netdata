@@ -2285,6 +2285,10 @@ modules:
               description: Run queries to collect information from the server's connection.
               default_value: yes
               required: false
+            - name: collect blocked processes
+              description: Run queries to collect information from the server's blocked processes.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
