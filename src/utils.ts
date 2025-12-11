@@ -257,11 +257,15 @@ export const parseJsonValueDetailed = (raw: unknown): JsonParseDiagnostics => {
   const seen = new Set<string>();
 
   const hexFixed = originalText.replace(/\\x([0-9a-fA-F]{2})/g, (_match, hex) => `\\u00${String(hex).toUpperCase()}`);
+  // Fix backslash-newline (line continuation) - models sometimes emit \ followed by literal newline
+  // which is invalid JSON but intended as escaped newline
+  const backslashNewlineFixed = originalText.replace(/\\\n/g, '\\n');
   const baseCandidates = [
     enqueue(originalText, []),
     enqueue(stripSurroundingCodeFence(originalText), ['stripCodeFence']),
     enqueue(stripTrailingEllipsis(originalText), ['stripTrailingEllipsis']),
     enqueue(hexFixed !== originalText ? hexFixed : undefined, ['hexEscapeFix']),
+    enqueue(backslashNewlineFixed !== originalText ? backslashNewlineFixed : undefined, ['backslashNewlineFix']),
   ].filter((v): v is { text: string; steps: string[] } => v !== undefined);
   queue.push(...baseCandidates);
 

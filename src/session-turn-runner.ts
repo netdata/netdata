@@ -1938,7 +1938,8 @@ export class TurnRunner {
   }): { turn: number; slugs: string[]; provider: string; model: string; message: string; rawResponse?: string; rawResponseTruncated?: boolean } {
     const { turn, provider, model, lastError, lastErrorType, lastTurnResult, attempts, maxRetries, maxTurns, isFinalTurn } = params;
     const slugs = new Set<string>();
-    slugs.add('retries_exhausted');
+    // Only add retries_exhausted when attempts actually reached maxRetries
+    if (attempts >= maxRetries) slugs.add('retries_exhausted');
     if (isFinalTurn) slugs.add('final_turn');
     if (this.state.toolLimitExceeded) slugs.add('tool_limit');
     if (this.forcedFinalTurnReason === 'context') slugs.add('context_guard');
