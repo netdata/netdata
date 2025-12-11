@@ -22,7 +22,8 @@ import {
   xmlSlotMismatch,
   xmlToolPayloadNotJson,
 } from './llm-messages.js';
-import { sanitizeToolName, truncateUtf8WithNotice } from './utils.js';
+import { truncateToBytes } from './truncation.js';
+import { sanitizeToolName } from './utils.js';
 import {
   buildToolCallFromParsed,
   createXmlParser,
@@ -353,7 +354,7 @@ export class XmlToolTransport {
               slotId: unclosedFinal.slotId,
               tool: finalReportToolName,
               status: 'failed',
-              request: truncateUtf8WithNotice(unclosedFinal.content, 4096),
+              request: truncateToBytes(unclosedFinal.content, 4096) ?? unclosedFinal.content,
               response: XML_FINAL_REPORT_NOT_JSON,
             }]
           };
@@ -400,7 +401,7 @@ export class XmlToolTransport {
         slotId: slotMatch?.[1] ?? 'malformed',
         tool: 'agent__final_report',
         status: 'failed',
-        request: truncateUtf8WithNotice(flushResult.leftover, 4096),
+        request: truncateToBytes(flushResult.leftover, 4096) ?? flushResult.leftover,
         response: reason,
       };
       errors.push(errorEntry);
@@ -429,7 +430,7 @@ export class XmlToolTransport {
           slotId: slotMatch?.[1] ?? 'malformed',
           tool: 'agent__final_report',
           status: 'failed',
-          request: truncateUtf8WithNotice(content, 4096),
+          request: truncateToBytes(content, 4096) ?? content,
           response: reason,
         };
         errors.push(errorEntry);
@@ -481,7 +482,7 @@ export class XmlToolTransport {
             slotId: slot.slotId,
             tool: call.name,
             status: 'failed',
-            request: truncateUtf8WithNotice(asString, 4096),
+            request: truncateToBytes(asString, 4096) ?? asString,
             response: baseReason,
           };
           errors.push(errorEntry);
@@ -515,9 +516,12 @@ export class XmlToolTransport {
       : `${this.nonce ?? 'xml'}-${String(this.thisTurnEntries.length + 1).padStart(4, '0')}`;
 
     const safeRequest = (() => {
-      try { return truncateUtf8WithNotice(JSON.stringify(parameters), 4096); } catch { return '[unserializable]'; }
+      try {
+        const json = JSON.stringify(parameters);
+        return truncateToBytes(json, 4096) ?? json;
+      } catch { return '[unserializable]'; }
     })();
-    const safeResponse = truncateUtf8WithNotice(response, 4096);
+    const safeResponse = truncateToBytes(response, 4096) ?? response;
 
     this.thisTurnEntries.push({
       slotId,

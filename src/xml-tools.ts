@@ -2,7 +2,7 @@ import type { OutputFormatId } from './formats.js';
 import type { ToolCall } from './types.js';
 
 import { renderXmlNextTemplate, renderXmlPastTemplate } from './llm-messages.js';
-import { truncateUtf8WithNotice } from './utils.js';
+import { truncateToBytes } from './truncation.js';
 
 export interface XmlSlotTemplate {
   slotId: string;            // NONCE-0001 or NONCE-FINAL/PROGRESS
@@ -152,8 +152,8 @@ export function renderXmlPast(past: XmlPastPayload): string {
       tool: entry.tool,
       status: entry.status,
       durationText: entry.durationMs !== undefined ? ` duration="${(entry.durationMs / 1000).toFixed(2)}s"` : undefined,
-      request: truncateUtf8WithNotice(entry.request, 4096),
-      response: truncateUtf8WithNotice(entry.response, 4096),
+      request: truncateToBytes(entry.request, 4096) ?? entry.request,
+      response: truncateToBytes(entry.response, 4096) ?? entry.response,
     })),
   };
   return renderXmlPastTemplate(truncated);
