@@ -404,4 +404,54 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 docker logs netdata 2>&1 | grep snmp
 ```
 
+### Debugging Gaps on Charts
+
+If your SNMP charts show gaps, it means the collector could not finish metric collection before the next scheduled run. This usually happens when SNMP tables take longer to collect than your configured `update_every`.
+
+These gaps do *not* mean the device stopped exporting SNMP metrics — only that the collector had to skip cycles.
+
+**Step 1: Check the Logs**
+
+[Look for messages](#getting-logs) like:
+
+```text
+level=warn msg="skipping data collection: previous run is still in progress for 4s (skipped 4 times in a row, interval 1s)" collector=snmp job=your_device
+level=info msg="data collection resumed after 4.36s (skipped 4 times)" collector=snmp job=your_device
+```
+
+The “resumed after” message shows how long the previous collection actually took.  
+For example, if a run needs ~4.4 seconds and `update_every` is 1 second, 4 cycles will be skipped.
+
+
+**Step 2: Check Collection Timings**
+
+Open **SNMP → Internal → Stats** in the dashboard.  
+The **SNMP profile collection timings** chart shows how long each part of the SNMP polling takes.  
+Table metrics are usually the slowest and often determine the total collection time.
+
+**Step 3: Increase the data collection interval**
+
+[Set `update_every`](#setup) to a value **higher than your slowest collection time**, with some extra buffer for network variability.
+
+| Typical Collection Time | Recommended `update_every` |
+|-------------------------|-----------------------------|
+| < 2 seconds             | 2 seconds                  |
+| 2–5 seconds             | 5 seconds                  |
+| 5–10 seconds            | 10 seconds                 |
+| > 10 seconds            | collection_time × 2        |
+
+:::info
+
+- **Rule of thumb:** `update_every` should be at least 2× your slowest table collection time.  
+- The default `update_every: 10` works well in most environments.  
+- Only reduce it if your device consistently responds fast enough.
+
+:::
+
+**Quick Checklist**
+1. Do logs show “skipping data collection”?  
+2. Does *Internal → Stats* show collection time > `update_every`?  
+3. Increase `update_every` until skips disappear.
+
+
 
