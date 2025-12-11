@@ -194,6 +194,25 @@ Monitor CPU cycles.
 
 ### Debug Mode
 
+You can run `perf.plugin` with the debug option enabled to troubleshoot issues with it. The output should give you clues as to why the collector isn't working.
+
+- Navigate to the `plugins.d` directory, usually at `/usr/libexec/netdata/plugins.d/`. If that's not the case on your system, open `netdata.conf` and look for the `plugins` setting under `[directories]`.
+
+  ```bash
+  cd /usr/libexec/netdata/plugins.d/
+  ```
+
+- Switch to the `netdata` user.
+
+  ```bash
+  sudo -u netdata -s
+  ```
+
+- Run the `perf.plugin` in debug mode:
+
+  ```bash
+  ./perf.plugin 1 all debug
+  ```
 
 
 
