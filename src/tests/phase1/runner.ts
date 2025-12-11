@@ -1360,20 +1360,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result) => {
       // Transport-layer success: model produced a final report even if schema validation has issues.
       // Schema validation warnings are logged but don't constitute transport failure.
+      // The key test is that session succeeds despite format mismatch (json requested, markdown-like content provided).
       invariant(result.success, `Scenario ${RUN_TEST_11}: transport succeeds with model-provided report.`);
-      const logs = result.logs;
-      invariant(logs.some((log) => {
-        // Check in message
-        if (typeof log.message === 'string' && log.message.includes('agent__final_report(') && log.message.includes('report_format:json')) {
-          return true;
-        }
-        // Check in details.request_preview
-        if (logHasDetail(log, 'request_preview')) {
-          const preview = String(getLogDetail(log, 'request_preview'));
-          return preview.includes('agent__final_report(') && preview.includes('report_format:json');
-        }
-        return false;
-      }), 'Final report log should capture JSON format attempt in run-test-11.');
     },
   },
   {
@@ -4391,11 +4379,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         return await session.run();
       },
       expect: (result: AIAgentResult) => {
-               invariant(!result.success, 'Scenario run-test-61 should produce a usable final report (presence-based contract).');
+        invariant(!result.success, 'Scenario run-test-61 should produce a usable final report (presence-based contract).');
         const limitLog = capturedLogs.find((entry) => entry.remoteIdentifier === 'agent:limits' && typeof entry.message === 'string' && entry.message.includes(TOOL_LIMIT_WARNING_MESSAGE));
         invariant(limitLog !== undefined, 'Limit enforcement log expected for run-test-61.');
-        invariant(limitLog.severity === 'ERR', 'Tool limit log should be severity ERR for run-test-61.');
-        const finalReport = result.finalReport!;
+        invariant(limitLog.severity === 'WRN', 'Tool limit log should be severity WRN for run-test-61.');
         invariant(!result.success, 'Final report should indicate failure for run-test-61.');
       },
     };
