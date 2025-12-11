@@ -2,6 +2,8 @@ import { jsonrepair } from 'jsonrepair';
 
 import type { AIAgentResult, AccountingEntry, ConversationMessage } from './types.js';
 
+import { truncateToBytes } from './truncation.js';
+
 /**
  * Special string values that indicate "do not send this parameter to the model".
  * When any of these strings are used, the parameter should resolve to `null`.
@@ -40,13 +42,9 @@ function bytesLen(s: string): number {
 }
 
 function bytesPreview(s: string, maxBytes: number): string {
-  const enc = new TextEncoder();
-  const dec = new TextDecoder('utf-8', { fatal: false });
-  const b = enc.encode(s);
-  const slice = b.subarray(0, Math.min(maxBytes, b.byteLength));
-  const decoded = dec.decode(slice);
+  const truncated = truncateToBytes(s, maxBytes) ?? s;
   // Collapse newlines for single-line preview
-  return decoded.replace(/[\r\n]+/g, ' ').trim();
+  return truncated.replace(/[\r\n]+/g, ' ').trim();
 }
 
 function ensureTrailingNewline(s: string): string { return s.endsWith('\n') ? s : (s + '\n'); }

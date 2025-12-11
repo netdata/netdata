@@ -22,7 +22,7 @@ import {
   xmlSlotMismatch,
   xmlToolPayloadNotJson,
 } from './llm-messages.js';
-import { truncateToBytes } from './truncation.js';
+import { truncateToBytes, truncateToChars } from './truncation.js';
 import { sanitizeToolName } from './utils.js';
 import {
   buildToolCallFromParsed,
@@ -53,19 +53,6 @@ const TRUNCATION_STOP_REASONS = new Set([
 // Structured output formats that cannot be truncated (must be complete)
 const STRUCTURED_FORMATS = new Set<OutputFormatId>(['json', 'slack-block-kit']);
 
-/**
- * Truncate content keeping first and last portions for logging.
- * Used to provide diagnostic output in logs without excessive size.
- */
-function truncateFirstLast(content: string, firstChars: number, lastChars: number): string {
-  if (content.length <= firstChars + lastChars + 50) {
-    return content;
-  }
-  const first = content.slice(0, firstChars);
-  const last = content.slice(-lastChars);
-  const omitted = content.length - firstChars - lastChars;
-  return `${first}\n\n...[${String(omitted)} chars omitted]...\n\n${last}`;
-}
 
 // Configuration for building messages
 export interface XmlBuildMessagesConfig {
@@ -273,7 +260,7 @@ export class XmlToolTransport {
 
       if (isStructured) {
         // Structured format: MUST retry - log with content dump for diagnosis
-        const preview = truncateFirstLast(extractedContent, 2000, 1000);
+        const preview = truncateToChars(extractedContent, 3000) ?? extractedContent;
         callbacks.onLog({
           severity: 'WRN',
           message: `Final report truncated (stopReason=${stopReason ?? 'unknown'}, format=${resolvedFormat}, length=${String(extractedContent.length)} chars). Will retry.\nTruncated output:\n${preview}`
