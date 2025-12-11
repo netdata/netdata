@@ -47,7 +47,7 @@ modules:
         - arista
         - aruba
         - audiocodes
-        - avayal
+        - avaya
         - avocent
         - avtech
         - roomalert
@@ -107,7 +107,6 @@ modules:
         - dell idrac
         - infinera
         - coriant
-        - infinera
         - infoblox
         - isilon
         - ixsystems
