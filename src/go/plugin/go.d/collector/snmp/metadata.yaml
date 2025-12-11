@@ -527,7 +527,7 @@ modules:
               The **SNMP profile collection timings** chart shows how long each part of the SNMP polling takes.  
               Table metrics are usually the slowest and often determine the total collection time.
 
-              **Step 3:  Increase the data collection interval**
+              **Step 3: Increase the data collection interval**
 
               [Set `update_every`](#setup) to a value **higher than your slowest collection time**, with some extra buffer for network variability.
 
