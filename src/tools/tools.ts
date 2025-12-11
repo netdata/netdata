@@ -809,7 +809,7 @@ export class ToolsOrchestrator {
       };
       this.onLog(warnLog, { opId });
       // Try JSON-aware truncation first, fall back to byte truncation
-      result = truncateJsonStrings(raw, limit) ?? truncateToBytes(raw, limit) ?? raw;
+      result = truncateJsonStrings(raw, limit) ?? truncateToBytes(raw, limit) ?? '(tool failed: response exceeded max size)';
     }
 
     // Ensure non-empty result for downstream providers that expect a non-empty tool output

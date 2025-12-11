@@ -1987,7 +1987,7 @@ export class TurnRunner {
     let truncated = false;
     let clippedResponse: string | undefined = rawResponse;
     if (rawResponse !== undefined && Buffer.byteLength(rawResponse, 'utf8') > rawResponseLimit) {
-      clippedResponse = truncateToBytes(rawResponse, rawResponseLimit) ?? rawResponse;
+      clippedResponse = truncateToBytes(rawResponse, rawResponseLimit) ?? '(tool failed: response exceeded max size)';
       truncated = clippedResponse !== rawResponse;
     }
     const msg = `Turn ${String(turn)} failed after ${String(attempts)} attempt${attempts === 1 ? '' : 's'} of ${String(maxRetries)} (maxTurns=${String(maxTurns)}); last_error=${lastError}`;
