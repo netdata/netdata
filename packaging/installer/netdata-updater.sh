@@ -300,6 +300,43 @@ install_build_dependencies() {
   fi
 }
 
+# Certain versions of this script had a bug that could cause /dev/null
+# to be removed mistakenly under some circumstances.
+#
+# This function attempts to detect and fix the resulting situation.
+#
+# Fix limited to Linux for the moment because apparently trying to
+# proactively fix systems that we aren’t certain have been affected is
+# too invasive of a change for some people...
+dev_null_fix() {
+  if [ -f /dev/null ] || [ ! -e /dev/null ]; then
+    case "$(uname -s)" in
+      Linux)
+        rm -f /dev/.null
+        mknod -m 666 /dev/.null c 1 3
+        # Some distros use ownership other than root:root for /dev/null,
+        # but it almost always matches the ownership of /dev/full,
+        # so if possible copy the onwership from there.
+        if [ -c /dev/full ]; then
+            chown --reference=/dev/full /dev/.null
+        fi
+        mv -f /dev/.null /dev/null
+        # If the system seems to be using SELinux, apply the correct
+        # security context to the new /dev/null.
+        #
+        # This check doesn’t use /dev/null as trying to access it
+        # without the right security context being set may fail.
+        dummy_null="$(mktemp)"
+        if command -v restorecon >"${dummy_null}" 2>&1; then
+            restorecon /dev/null
+        fi
+        rm -f "${dummy_null}" || true # Cleanup from the above check
+        ;;
+      *) ;;
+    esac
+  fi
+}
+
 enable_netdata_updater() {
   updater_type="$(echo "${1}" | tr '[:upper:]' '[:lower:]')"
   case "${updater_type}" in
@@ -1396,6 +1433,8 @@ if echo "$INSTALL_TYPE" | grep -qv ^binpkg && [ "${INSTALL_UID}" != "$(id -u)" ]
 fi
 
 self_update
+
+dev_null_fix
 
 # shellcheck disable=SC2153
 case "${INSTALL_TYPE}" in
