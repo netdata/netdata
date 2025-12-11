@@ -7,7 +7,8 @@ import type { MCPTool, LogEntry, AccountingEntry, ProgressMetrics, LogDetailValu
 import type { ToolExecuteOptions, ToolExecuteResult, ToolKind, ToolProvider, ToolExecutionContext } from './types.js';
 
 import { recordToolMetrics, runWithSpan, addSpanAttributes, addSpanEvent, recordSpanError, recordQueueDepthMetrics, recordQueueWaitMetrics } from '../telemetry/index.js';
-import { appendCallPathSegment, formatToolRequestCompact, normalizeCallPath, sanitizeToolName, truncateUtf8WithNotice, warn } from '../utils.js';
+import { truncateJsonStrings, truncateToBytes } from '../truncation.js';
+import { appendCallPathSegment, formatToolRequestCompact, normalizeCallPath, sanitizeToolName, warn } from '../utils.js';
 
 import { queueManager, type AcquireResult, QueueAbortError } from './queue-manager.js';
 
@@ -807,7 +808,8 @@ export class ToolsOrchestrator {
         details: warnDetails,
       };
       this.onLog(warnLog, { opId });
-      result = truncateUtf8WithNotice(raw, limit, sizeBytes);
+      // Try JSON-aware truncation first, fall back to byte truncation
+      result = truncateJsonStrings(raw, limit) ?? truncateToBytes(raw, limit) ?? raw;
     }
 
     // Ensure non-empty result for downstream providers that expect a non-empty tool output

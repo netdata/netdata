@@ -27,7 +27,8 @@ import { InternalToolProvider } from './tools/internal-provider.js';
 import { MCPProvider } from './tools/mcp-provider.js';
 import { RestProvider } from './tools/rest-provider.js';
 import { ToolsOrchestrator } from './tools/tools.js';
-import { appendCallPathSegment, normalizeCallPath, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
+import { truncateJsonStrings, truncateToBytes } from './truncation.js';
+import { appendCallPathSegment, normalizeCallPath, sanitizeToolName, warn } from './utils.js';
 import { XmlToolTransport } from './xml-transport.js';
 
 // Exit codes according to DESIGN.md
@@ -1021,7 +1022,9 @@ export class AIAgentSession {
       this.log(warn);
     } catch { /* ignore logging errors */ }
     this.centralSizeCapHits += 1;
-    return truncateUtf8WithNotice(result, limitBytes, sizeBytes);
+    // Try JSON-aware truncation first, fall back to byte truncation
+    const truncated = truncateJsonStrings(result, limitBytes) ?? truncateToBytes(result, limitBytes);
+    return truncated ?? result; // If both fail, return original (shouldn't happen given size check above)
   }
 
   private applyLogPayloadToOp(opId: string, log: LogEntry): boolean {

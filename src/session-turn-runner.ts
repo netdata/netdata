@@ -50,6 +50,7 @@ import {
 } from './llm-messages.js';
 import { addSpanAttributes, addSpanEvent, recordContextGuardMetrics, recordFinalReportMetrics, recordLlmMetrics, recordRetryCollapseMetrics, runWithSpan } from './telemetry/index.js';
 import { processLeakedToolCalls } from './tool-call-fallback.js';
+import { truncateToBytes } from './truncation.js';
 import { estimateMessagesBytes, formatToolRequestCompact, parseJsonValueDetailed, sanitizeToolName, warn } from './utils.js';
 import { XmlFinalReportFilter } from './xml-transport.js';
 
@@ -1986,9 +1987,8 @@ export class TurnRunner {
     let truncated = false;
     let clippedResponse: string | undefined = rawResponse;
     if (rawResponse !== undefined && Buffer.byteLength(rawResponse, 'utf8') > rawResponseLimit) {
-      const buf = Buffer.from(rawResponse, 'utf8');
-      clippedResponse = buf.subarray(0, rawResponseLimit).toString('utf8');
-      truncated = true;
+      clippedResponse = truncateToBytes(rawResponse, rawResponseLimit) ?? rawResponse;
+      truncated = clippedResponse !== rawResponse;
     }
     const msg = `Turn ${String(turn)} failed after ${String(attempts)} attempt${attempts === 1 ? '' : 's'} of ${String(maxRetries)} (maxTurns=${String(maxTurns)}); last_error=${lastError}`;
     return { turn, slugs: [...slugs], provider, model, message: msg, rawResponse: clippedResponse, rawResponseTruncated: truncated };
