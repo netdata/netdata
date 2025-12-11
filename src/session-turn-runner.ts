@@ -1260,7 +1260,7 @@ export class TurnRunner {
                                 // =================================================================
 
                                 // Handle truncated output (unstructured formats only - structured would have been rejected)
-                                const truncatedFlag = params._truncated;
+                                const truncatedFlag = params._truncated as boolean | undefined;
                                 if (truncatedFlag === true) {
                                     commitMetadata = { ...commitMetadata, truncated: true };
                                     finalContent = `${finalContent}\n\n[OUTPUT TRUNCATED: Response exceeded output token limit.]`;
