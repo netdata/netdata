@@ -341,7 +341,8 @@ const expectLogIncludes = (logs: readonly LogEntry[], identifier: string, substr
 };
 
 const expectTurnFailureSlugs = (logs: readonly LogEntry[], scenarioId: string, required: string[]): LogEntry => {
-  const entry = logs.find((log) => log.remoteIdentifier === LOG_TURN_FAILURE && log.severity === 'WRN');
+  // Use findLast to get the final turn failure log (retries_exhausted only appears in the last one)
+  const entry = logs.findLast((log) => log.remoteIdentifier === LOG_TURN_FAILURE && log.severity === 'WRN');
   invariant(entry !== undefined, `Turn failure log missing for ${scenarioId}.`);
   const slugStr = typeof entry.details?.slugs === 'string' ? entry.details.slugs : '';
   const slugs = slugStr.split(',').filter((s) => s.length > 0);
