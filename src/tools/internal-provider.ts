@@ -23,7 +23,8 @@ import {
   PROGRESS_TOOL_DESCRIPTION,
   PROGRESS_TOOL_INSTRUCTIONS,
 } from '../llm-messages.js';
-import { parseJsonRecord, parseJsonValueDetailed, truncateUtf8WithNotice } from '../utils.js';
+import { truncateToBytes } from '../truncation.js';
+import { parseJsonRecord, parseJsonValueDetailed } from '../utils.js';
 
 import { ToolProvider } from './types.js';
 
@@ -56,13 +57,14 @@ const previewRawValue = (value: unknown): string => {
     return 'undefined';
   }
   if (typeof value === 'string') {
-    return truncateUtf8WithNotice(value, RAW_PREVIEW_LIMIT_BYTES);
+    return truncateToBytes(value, RAW_PREVIEW_LIMIT_BYTES) ?? value;
   }
   try {
-    return truncateUtf8WithNotice(JSON.stringify(value), RAW_PREVIEW_LIMIT_BYTES);
+    const serialized = JSON.stringify(value);
+    return truncateToBytes(serialized, RAW_PREVIEW_LIMIT_BYTES) ?? serialized;
   } catch {
     const fallback = Object.prototype.toString.call(value);
-    return truncateUtf8WithNotice(fallback, RAW_PREVIEW_LIMIT_BYTES);
+    return truncateToBytes(fallback, RAW_PREVIEW_LIMIT_BYTES) ?? fallback;
   }
 };
 

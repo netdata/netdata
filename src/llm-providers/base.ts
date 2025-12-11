@@ -19,7 +19,8 @@ import type { ProviderOptions } from '@ai-sdk/provider-utils';
 import type { LanguageModel, ModelMessage, ProviderMetadata, ReasoningOutput, StreamTextResult, ToolSet } from 'ai';
 
 import { XML_WRAPPER_CALLED_AS_TOOL_RESULT, isXmlFinalReportTagName } from '../llm-messages.js';
-import { clampToolName, parseJsonRecord, sanitizeToolName, TOOL_NAME_MAX_LENGTH, truncateUtf8WithNotice, warn } from '../utils.js';
+import { truncateToBytes } from '../truncation.js';
+import { clampToolName, parseJsonRecord, sanitizeToolName, TOOL_NAME_MAX_LENGTH, warn } from '../utils.js';
 
 const GUIDANCE_STRING_FORMATS = ['date-time', 'time', 'date', 'duration', 'email', 'hostname', 'ipv4', 'ipv6', 'uuid'] as const;
 const TOOL_FAILED_PREFIX = '(tool failed: ' as const;
@@ -403,14 +404,14 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       return 'undefined';
     }
     if (typeof raw === 'string') {
-      return truncateUtf8WithNotice(raw, BaseLLMProvider.RAW_PREVIEW_LIMIT_BYTES);
+      return truncateToBytes(raw, BaseLLMProvider.RAW_PREVIEW_LIMIT_BYTES) ?? raw;
     }
     try {
       const serialized = JSON.stringify(raw);
-      return truncateUtf8WithNotice(serialized, BaseLLMProvider.RAW_PREVIEW_LIMIT_BYTES);
+      return truncateToBytes(serialized, BaseLLMProvider.RAW_PREVIEW_LIMIT_BYTES) ?? serialized;
     } catch {
       const fallback = Object.prototype.toString.call(raw);
-      return truncateUtf8WithNotice(fallback, BaseLLMProvider.RAW_PREVIEW_LIMIT_BYTES);
+      return truncateToBytes(fallback, BaseLLMProvider.RAW_PREVIEW_LIMIT_BYTES) ?? fallback;
     }
   }
 

@@ -10,12 +10,12 @@ import type { XmlToolTransport } from './xml-transport.js';
 import { ContextGuard } from './context-guard.js';
 import { TOOL_NO_OUTPUT } from './llm-messages.js';
 import { addSpanEvent } from './telemetry/index.js';
+import { truncateToBytes } from './truncation.js';
 import {
   clampToolName,
   estimateMessagesBytes,
   parseJsonRecord,
   sanitizeToolName,
-  truncateUtf8WithNotice,
 } from './utils.js';
 
 export interface ToolExecutionState {
@@ -681,14 +681,14 @@ export class SessionToolExecutor {
       return 'undefined';
     }
     if (typeof raw === 'string') {
-      return truncateUtf8WithNotice(raw, 512);
+      return truncateToBytes(raw, 512) ?? raw;
     }
     try {
       const serialized = JSON.stringify(raw);
-      return truncateUtf8WithNotice(serialized, 512);
+      return truncateToBytes(serialized, 512) ?? serialized;
     } catch {
       const fallback = Object.prototype.toString.call(raw);
-      return truncateUtf8WithNotice(fallback, 512);
+      return truncateToBytes(fallback, 512) ?? fallback;
     }
   }
 
