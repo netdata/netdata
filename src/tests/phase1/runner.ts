@@ -37,7 +37,8 @@ import { SubAgentRegistry } from '../../subagent-registry.js';
 import { estimateMessagesTokens, resolveTokenizer } from '../../tokenizer-registry.js';
 import { MCPProvider, forceRemoveSharedRegistryEntry } from '../../tools/mcp-provider.js';
 import { queueManager } from '../../tools/queue-manager.js';
-import { clampToolName, sanitizeToolName, formatToolRequestCompact, truncateUtf8WithNotice, formatAgentResultHumanReadable, setWarningSink, getWarningSink, warn } from '../../utils.js';
+import { truncateToBytes } from '../../truncation.js';
+import { clampToolName, sanitizeToolName, formatToolRequestCompact, formatAgentResultHumanReadable, setWarningSink, getWarningSink, warn } from '../../utils.js';
 import { createWebSocketTransport } from '../../websocket-transport.js';
 import { getScenario } from '../fixtures/test-llm-scenarios.js';
 import { runJournaldSinkUnitTests } from '../unit/journald-sink.test.js';
@@ -274,7 +275,7 @@ const sessionConfigObservers: ((config: AIAgentSessionConfig) => void)[] = [];
 };
 
 const COVERAGE_ALIAS_BASENAME = 'parent.ai';
-const TRUNCATION_NOTICE = '[TRUNCATED]';
+const TRUNCATION_MARKER_PATTERN = /\[···TRUNCATED \d+ bytes···\]/;
 const CONFIG_FILE_NAME = 'config.json';
 const INCLUDE_DIRECTIVE_TOKEN = '${include:';
 const FINAL_REPORT_CALL_ID = 'agent-final-report';
@@ -980,7 +981,7 @@ let configErrorSummary: { readError?: string; jsonError?: string; schemaError?: 
 let includeAsyncSummary: { staged: string; depth: number } | undefined;
 let frontmatterErrorSummary: { strictError?: string; relaxedParsed?: boolean } | undefined;
 let frontmatterSummary: { toolName?: string; outputFormat?: string; inputFormat?: string; description?: string; models?: string[] } | undefined;
-let humanReadableSummaries: { json: string; text: string; successNoOutput: string; failure: string; truncatedZero: string } | undefined;
+let humanReadableSummaries: { json: string; text: string; successNoOutput: string; failure: string; truncatedZero: string | undefined } | undefined;
 let overrideTargetsRef: { provider: string; model: string }[] | undefined;
 const reasoningMatrixSummaries = new Map<string, { reasoning?: ReasoningLevel; reasoningValue?: ProviderReasoningValue | null }>();
 const overrideLLMExpected = {
@@ -1328,7 +1329,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-8 expected success.');
       const toolMessages = result.conversation.filter((message) => message.role === 'tool');
-      invariant(toolMessages.some((message) => message.content.includes(TRUNCATION_NOTICE)), 'Truncation notice expected in run-test-8.');
+      invariant(toolMessages.some((message) => TRUNCATION_MARKER_PATTERN.test(message.content)), 'Truncation marker expected in run-test-8.');
     },
   },
   {
@@ -4280,7 +4281,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(logHasDetail(mcpTrunc, 'tool_kind') && getLogDetail(mcpTrunc, 'tool_kind') === 'mcp', 'Truncation warning must carry tool_kind field for run-test-59.');
       invariant(logHasDetail(mcpTrunc, 'actual_bytes') && getLogDetail(mcpTrunc, 'actual_bytes') === 5000, 'Truncation warning must report actual_bytes for run-test-59.');
       invariant(logHasDetail(mcpTrunc, 'limit_bytes') && getLogDetail(mcpTrunc, 'limit_bytes') === 120, 'Truncation warning must report limit_bytes for run-test-59.');
-      const batchTool = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes(TRUNCATION_NOTICE));
+      const batchTool = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && TRUNCATION_MARKER_PATTERN.test(message.content));
       invariant(batchTool !== undefined, 'Truncated tool response expected for run-test-59.');
     },
   },
@@ -6082,7 +6083,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const sanitized = sanitizeToolName('  <|pref|>Bad Name!!!  ');
       const clamped = clampToolName('truncate-me', 5);
       const formatted = formatToolRequestCompact('demoTool', { alpha: ' value with spaces ', beta: 42, gamma: [1, 2, 3], delta: { nested: true } });
-      const truncated = truncateUtf8WithNotice('x'.repeat(200), 40);
+      const truncated = truncateToBytes('x'.repeat(600), 100) ?? '';
       utilsCoverageSummary = {
         sanitized,
         clamped,
@@ -6109,7 +6110,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(utilsCoverageSummary.clamped.truncated && utilsCoverageSummary.clamped.name === 'trunc', 'clampToolName should truncate and report flag.');
       invariant(utilsCoverageSummary.formatted.includes('alpha:value with spaces'), 'formatToolRequestCompact should include trimmed string values.');
       invariant(utilsCoverageSummary.formatted.includes('gamma:[3]'), 'formatToolRequestCompact should summarize arrays.');
-      invariant(utilsCoverageSummary.truncated.startsWith(TRUNCATION_NOTICE), 'truncateUtf8WithNotice should prepend notice.');
+      invariant(TRUNCATION_MARKER_PATTERN.test(utilsCoverageSummary.truncated), 'truncateToBytes should include marker.');
     },
   },
 
@@ -6164,7 +6165,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         text: formatAgentResultHumanReadable(successText),
         successNoOutput: formatAgentResultHumanReadable(successNoOutput),
         failure: formatAgentResultHumanReadable(failure),
-        truncatedZero: truncateUtf8WithNotice('ignored', 0),
+        truncatedZero: truncateToBytes('ignored', 0),
       };
       return {
         success: true,
@@ -6180,7 +6181,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(humanReadableSummaries.text === 'Text body', 'Text final report should return raw content.');
       invariant(humanReadableSummaries.successNoOutput.startsWith('AGENT COMPLETED WITHOUT OUTPUT'), 'Success without output should include completion banner.');
       invariant(humanReadableSummaries.failure.includes('AGENT FAILED') && humanReadableSummaries.failure.includes('Failure reason'), 'Failure output should include banner and reason.');
-      invariant(humanReadableSummaries.truncatedZero === '', 'truncateUtf8WithNotice should return empty string when limit is zero.');
+      invariant(humanReadableSummaries.truncatedZero === undefined, 'truncateToBytes should return undefined when target is too small.');
     },
   },
 

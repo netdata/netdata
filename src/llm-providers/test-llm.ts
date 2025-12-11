@@ -3,7 +3,8 @@ import type { LanguageModelV2, LanguageModelV2CallOptions, LanguageModelV2Conten
 import type { ReasoningOutput } from 'ai';
 
 import { getScenario, listScenarioIds, type ScenarioDefinition, type ScenarioStepResponse, type ScenarioTurn } from '../tests/fixtures/test-llm-scenarios.js';
-import { sanitizeToolName, truncateUtf8WithNotice } from '../utils.js';
+import { truncateToBytes } from '../truncation.js';
+import { sanitizeToolName } from '../utils.js';
 
 import { BaseLLMProvider, type ResponseMessage } from './base.js';
 
@@ -102,7 +103,8 @@ export class TestLLMProvider extends BaseLLMProvider {
 
     const scenario = getScenario(scenarioId);
     if (scenario === undefined) {
-      return await this.createErrorTurn(request, `Unknown scenario '${scenarioId}'. Available: ${truncateUtf8WithNotice(listScenarioIds().join(', '), 2000)}`);
+      const scenarios = listScenarioIds().join(', ');
+      return await this.createErrorTurn(request, `Unknown scenario '${scenarioId}'. Available: ${truncateToBytes(scenarios, 2000) ?? scenarios}`);
     }
 
     const validationError = this.validateScenarioContext(scenario, request);
