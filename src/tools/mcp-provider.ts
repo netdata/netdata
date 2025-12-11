@@ -96,6 +96,7 @@ export interface SharedRegistry {
 const DEFAULT_HEALTH_PROBE = 'ping' as const;
 const PROBE_TIMEOUT_MS = 3000;
 const SHARED_RESTART_BACKOFF_MS = [0, 1000, 2000, 5000, 10000, 30000, 60000] as const;
+const SHARED_ACQUIRE_TIMEOUT_MS = 60000;
 
 class SharedServerHandle implements SharedRegistryHandle {
   constructor(private registry: MCPSharedRegistry, private key: string, private entry: SharedServerEntry) {}
@@ -136,29 +137,62 @@ class SharedServerHandle implements SharedRegistryHandle {
 class MCPSharedRegistry {
   private entries = new Map<string, SharedServerEntry>();
   private initializing = new Map<string, Promise<SharedServerEntry>>();
+  private failedServers = new Map<string, number>(); // serverName -> failedAt timestamp
   private stopping = false;
 
   async acquire(serverName: string, config: MCPServerConfig, opts: SharedAcquireOptions): Promise<SharedServerHandle> {
     if (this.stopping) {
       throw new Error(`shared MCP registry is shutting down; cannot acquire '${serverName}'`);
     }
+
+    // Already initialized - return immediately
     let entry = this.entries.get(serverName);
-    if (entry === undefined) {
-      let pending = this.initializing.get(serverName);
-      if (pending === undefined) {
-        pending = (async () => {
-          try {
-            const created = await this.initializeEntry(serverName, config, opts);
-            this.entries.set(serverName, created);
-            return created;
-          } finally {
-            this.initializing.delete(serverName);
-          }
-        })();
-        this.initializing.set(serverName, pending);
-      }
-      entry = await pending;
+    if (entry !== undefined) {
+      entry.refCount += 1;
+      return new SharedServerHandle(this, serverName, entry);
     }
+
+    // Short circuit: if server previously failed and hasn't recovered, fail immediately
+    // (background init is still retrying, no point waiting another 60s)
+    const failedAt = this.failedServers.get(serverName);
+    if (failedAt !== undefined) {
+      const elapsedSec = Math.round((Date.now() - failedAt) / 1000);
+      throw new Error(`MCP server '${serverName}' is unavailable (initialization failed ${String(elapsedSec)}s ago, retrying in background)`);
+    }
+
+    // Start or join initialization
+    let pending = this.initializing.get(serverName);
+    if (pending === undefined) {
+      pending = (async () => {
+        try {
+          const created = await this.initializeEntry(serverName, config, opts);
+          this.entries.set(serverName, created);
+          this.failedServers.delete(serverName); // Clear failed state on success
+          return created;
+        } finally {
+          this.initializing.delete(serverName);
+        }
+      })();
+      this.initializing.set(serverName, pending);
+    }
+
+    // Wait with timeout
+    const timeoutPromise = (async (): Promise<never> => {
+      await delay(SHARED_ACQUIRE_TIMEOUT_MS);
+      throw new Error(`MCP server '${serverName}' initialization timed out after 60s`);
+    })();
+
+    try {
+      entry = await Promise.race([pending, timeoutPromise]);
+    } catch (error) {
+      // On timeout, record failure timestamp for short-circuit, but don't stop background retries
+      // Only set timestamp once - don't reset on subsequent failures (preserves TTL window)
+      if (!this.failedServers.has(serverName)) {
+        this.failedServers.set(serverName, Date.now());
+      }
+      throw error;
+    }
+
     entry.refCount += 1;
     return new SharedServerHandle(this, serverName, entry);
   }
@@ -171,6 +205,7 @@ class MCPSharedRegistry {
 
   forceRemove(serverName: string): void {
     this.entries.delete(serverName);
+    this.failedServers.delete(serverName);
   }
 
   getRestartError(serverName: string): MCPRestartFailedError | undefined {
@@ -211,6 +246,7 @@ class MCPSharedRegistry {
     });
     await Promise.allSettled(closers);
     this.entries.clear();
+    this.failedServers.clear();
   }
 
   async handleTimeout(serverName: string, logger: LogFn): Promise<void> {

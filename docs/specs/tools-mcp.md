@@ -207,17 +207,48 @@ normalizeToolResult(res) {
 ## Shared Registry
 
 ### Acquisition
-**Location**: `src/tools/mcp-provider.ts:141-164`
+**Location**: `src/tools/mcp-provider.ts:143-202`
 
 ```typescript
 async acquire(serverName, config, opts) {
   // Check not shutting down
-  // Get existing entry or create new
-  // Handle concurrent initialization
-  // Increment reference count
+  // Return immediately if already initialized
+  // Short circuit: fail immediately if server previously failed (no TTL)
+  // Start or join initialization promise
+  // Race initialization against 60s timeout
+  // On timeout: record failure timestamp, throw error
+  // On success: clear failed state, increment refCount
   return SharedServerHandle;
 }
 ```
+
+### Acquire Timeout and Short Circuit
+**Location**: `src/tools/mcp-provider.ts:143-198`
+
+**Timeout**: 60 seconds (`SHARED_ACQUIRE_TIMEOUT_MS`)
+
+When a shared MCP server fails to initialize (e.g., returns 404, network error):
+
+1. **First 60s**: All callers wait together on the shared pending promise
+2. **At 60s mark**: All waiting callers fail together, `failedAt` timestamp recorded
+3. **After failure (until recovery)**: All new callers fail immediately (short circuit)
+4. **On recovery**: Background `initializeEntry()` clears `failedServers`, next caller succeeds
+
+**Short circuit logic**:
+```
+T=0s:      First caller arrives, starts initialization, waits
+T=5s:      Second caller arrives, joins same pending promise, waits
+T=60s:     Timeout - both callers fail together, failedAt recorded
+T=65s:     Third caller → short circuit (fail immediately)
+T=120s:    Fourth caller → short circuit (fail immediately)
+...
+T=300s:    Background init succeeds, failedServers cleared
+T=305s:    Fifth caller → success (server ready)
+```
+
+**Concurrent callers**: Multiple callers arriving during the first 60s share the same pending promise - they wait together and fail simultaneously when timeout triggers.
+
+**Recovery**: When background `initializeEntry()` succeeds, it clears `failedServers` entry. Next `acquire()` returns immediately with the ready server. Short circuit persists until recovery - there is no TTL expiry.
 
 ### Health Probing
 **Location**: `src/tools/mcp-provider.ts:574-591`
@@ -365,9 +396,10 @@ Format:
 5. **Process tracking**: Stdio PIDs tracked for cleanup
 6. **Reference counting**: Shared handles released on cleanup
 
-## Business Logic Coverage (Verified 2025-11-16)
+## Business Logic Coverage (Verified 2025-12-11)
 
 - **Shared registry restarts**: Shared transports watch `onclose` and respawn stdio processes with exponential backoff, logging each attempt so operators can trace MCP recoveries (`src/tools/mcp-provider.ts:136-430`).
+- **Acquire timeout and short circuit**: Shared server acquisition times out after 60s; all subsequent callers fail immediately (short circuit) until server recovers, while background retries continue indefinitely (`src/tools/mcp-provider.ts:143-202`).
 - **Process tree cleanup**: Dedicated stdio servers track child PIDs and kill the entire process tree during shutdown/restart to prevent orphan processes (`src/tools/mcp-provider.ts:430-520`).
 - **Queue binding**: Server-level `queue` config (and per-tool overrides) populate `toolQueue`, letting heavy MCP servers throttle concurrency independent of agent sessions (`src/tools/mcp-provider.ts:1000-1100`).
 - **Health probes**: `healthProbe: 'ping'|'listTools'` determines whether initialization verifies connectivity via RPC or tool listing, stopping failed servers from polluting the mapping (`src/tools/mcp-provider.ts:520-590`).
@@ -388,6 +420,10 @@ Format:
 - Multiple provider instances
 - Transport reconnection scenarios
 - Large tool counts performance
+- Acquire timeout after 60s
+- Short circuit for subsequent callers
+- Background retry continues after timeout
+- Recovery clears failed state
 
 ## Troubleshooting
 
@@ -413,6 +449,18 @@ Format:
 - Verify process termination
 - Review probe health
 - Check transport stability
+
+### Initialization timed out after 60s
+- Server is unavailable (404, network error, etc.)
+- Check MCP server logs/status
+- Background retries continue indefinitely - server may recover later
+- All subsequent callers will short-circuit until recovery
+
+### Short circuit error (initialization failed Xs ago)
+- Previous caller already waited 60s and timed out
+- Background retries are running indefinitely
+- Short circuit persists until server recovers (no TTL expiry)
+- Check MCP server availability and fix the underlying issue
 
 ### Memory/process leak
 - Ensure cleanup() called
