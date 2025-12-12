@@ -106,7 +106,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused)
 
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
-    while (!plugin_should_exit) {
+    while (!__atomic_load_n(&plugin_should_exit, __ATOMIC_ACQUIRE)) {
         if (since_last_scan_ut > ND_SD_JOURNAL_ALL_FILES_SCAN_EVERY_USEC) {
             nd_journal_files_registry_update();
             since_last_scan_ut = 0;
