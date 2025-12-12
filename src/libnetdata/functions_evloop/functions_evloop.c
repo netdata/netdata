@@ -49,6 +49,7 @@ struct functions_evloop_globals {
 
     netdata_mutex_t *stdout_mutex;
     bool *plugin_should_exit;
+    int *status;
     bool workers_exit; // all workers are waiting on the same condition - this makes them all exit, when any is cancelled
 
     ND_THREAD *reader_thread;
@@ -331,9 +332,11 @@ static void rrd_functions_worker_globals_reader_main(void *arg) {
         status = 1;
     }
 
-    *wg->plugin_should_exit = true;
     buffer_free(wg->buffer);
-    exit(status);
+
+    if (wg->status)
+        __atomic_store_n(wg->status, status, __ATOMIC_RELEASE);
+    __atomic_store_n(wg->plugin_should_exit, true, __ATOMIC_RELEASE);
 }
 
 void worker_queue_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -341,7 +344,10 @@ void worker_queue_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *va
     worker_job_cleanup(j);
 }
 
-struct functions_evloop_globals *functions_evloop_init(size_t worker_threads, const char *tag, netdata_mutex_t *stdout_mutex, bool *plugin_should_exit) {
+struct functions_evloop_globals* functions_evloop_init(size_t worker_threads, const char* tag,
+                                                       netdata_mutex_t* stdout_mutex, bool* plugin_should_exit,
+                                                       int *status)
+{
     struct functions_evloop_globals *wg = callocz(1, sizeof(struct functions_evloop_globals));
 
     wg->worker_queue = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
@@ -357,6 +363,7 @@ struct functions_evloop_globals *functions_evloop_init(size_t worker_threads, co
     wg->workers = worker_threads;
     wg->worker_threads = callocz(wg->workers, sizeof(ND_THREAD *));
     wg->tag = tag;
+    wg->status = status;
 
     char tag_buffer[NETDATA_THREAD_TAG_MAX + 1];
     snprintfz(tag_buffer, NETDATA_THREAD_TAG_MAX, "%s_READER", wg->tag);

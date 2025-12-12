@@ -73,7 +73,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused)
     // the event loop for functions
 
     struct functions_evloop_globals *wg =
-        functions_evloop_init(ND_SD_JOURNAL_WORKER_THREADS, "SDJ", &stdout_mutex, &plugin_should_exit);
+        functions_evloop_init(ND_SD_JOURNAL_WORKER_THREADS, "SDJ", &stdout_mutex, &plugin_should_exit, NULL);
 
     functions_evloop_add_function(
         wg, ND_SD_JOURNAL_FUNCTION_NAME, function_systemd_journal, ND_SD_JOURNAL_DEFAULT_TIMEOUT, NULL);

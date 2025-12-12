@@ -1016,7 +1016,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // ----------------------------------------------------------------------------------------------------------------
 
     struct functions_evloop_globals *wg =
-        functions_evloop_init(5, "Network-Viewer", &stdout_mutex, &plugin_should_exit);
+        functions_evloop_init(5, "Network-Viewer", &stdout_mutex, &plugin_should_exit, NULL);
 
     functions_evloop_add_function(wg, NETWORK_CONNECTIONS_VIEWER_FUNCTION,
                                   network_viewer_function,
