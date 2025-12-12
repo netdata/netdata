@@ -789,7 +789,7 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // the event loop for functions
 
-    struct functions_evloop_globals* wg =
+    struct functions_evloop_globals *wg =
         functions_evloop_init(1, "APPS", &apps_and_stdout_mutex, &apps_plugin_exit, &exit_status);
 
     functions_evloop_add_function(wg, "processes", function_processes, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
@@ -802,8 +802,7 @@ int main(int argc, char **argv) {
     global_iterations_counter = 1;
     heartbeat_t hb;
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
-    for (; !__atomic_load_n(&apps_plugin_exit, __ATOMIC_ACQUIRE); global_iterations_counter++)
-    {
+    for (; !__atomic_load_n(&apps_plugin_exit, __ATOMIC_ACQUIRE); global_iterations_counter++) {
         netdata_mutex_unlock(&apps_and_stdout_mutex);
 
         usec_t dt;
