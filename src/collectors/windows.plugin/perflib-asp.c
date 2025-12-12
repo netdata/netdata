@@ -505,7 +505,7 @@ static void netdata_aspnet_requests_executing(struct aspnet_app *aa, char *app, 
     rrddim_set_by_pointer(
         aa->st_aspnet_requests_executing,
         aa->rd_aspnet_requests_executing,
-        (collected_number)aa->aspnetRequestsBytesTotalIn.current.Data);
+        (collected_number)aa->aspnetRequestsExecuting.current.Data);
     rrdset_done(aa->st_aspnet_requests_executing);
 }
 
@@ -999,10 +999,10 @@ static inline void netdata_aspnet_apps_transactions(
         netdata_aspnet_transactions_committed(aa, windows_shared_buffer, update_every);
 
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetTransactionsPending))
-        netdata_aspnet_transactions_aborted(aa, windows_shared_buffer, update_every);
+        netdata_aspnet_transactions_pending(aa, windows_shared_buffer, update_every);
 
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetTransactionsPerSec))
-        netdata_aspnet_transactions_aborted(aa, windows_shared_buffer, update_every);
+        netdata_aspnet_transactions_per_sec(aa, windows_shared_buffer, update_every);
 }
 
 static void netdata_aspnet_events_raised(struct aspnet_app *aa, char *app, int update_every)
