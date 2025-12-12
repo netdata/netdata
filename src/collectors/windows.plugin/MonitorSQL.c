@@ -1018,6 +1018,42 @@ enduserconn:
     netdata_MSSQL_release_results(mi->conn->dbSQLConnections);
 }
 
+static void netdata_mssql_fill_blocked_processes_query(struct mssql_instance *mi)
+{
+    if (unlikely(!mi || !mi->conn || mi->conn->dbSQLBlockedProcesses == SQL_NULL_HSTMT))
+        return;
+
+    long blocked_processes = 0;
+    SQLLEN col_len = 0;
+    mi->MSSQLBlockedProcesses.current.Data = 0;
+
+    SQLRETURN ret = SQLExecDirect(mi->conn->dbSQLBlockedProcesses, (SQLCHAR *)NETDATA_QUERY_BLOCKED_PROCESSES, SQL_NTS);
+    if (likely(netdata_mssql_check_result(ret))) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLBlockedProcesses, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
+        goto end_blocked_processes;
+    }
+
+    ret = SQLBindCol(
+            mi->conn->dbSQLBlockedProcesses,
+            1,
+            SQL_C_LONG,
+            &blocked_processes,
+            sizeof(blocked_processes),
+            &col_len);
+    if (likely(netdata_mssql_check_result(ret))) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLBlockedProcesses, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        goto end_blocked_processes;
+    }
+
+    ret = SQLFetch(mi->conn->dbSQLBlockedProcesses);
+    if (likely(netdata_mssql_check_result(ret)))
+        goto end_blocked_processes;
+
+    mi->MSSQLBlockedProcesses.current.Data = blocked_processes;
+end_blocked_processes:
+    netdata_MSSQL_release_results(mi->conn->dbSQLBlockedProcesses);
+}
+
 void netdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
 {
     char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
@@ -1183,6 +1219,12 @@ static bool netdata_MSSQL_initialize_connection(struct netdata_mssql_conn *nmc)
         }
 
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbSQLConnections);
+        if (likely(netdata_mssql_check_result(ret))) {
+            retConn = FALSE;
+            goto endMSSQLInitializationConnection;
+        }
+
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbSQLBlockedProcesses);
         if (likely(netdata_mssql_check_result(ret))) {
             retConn = FALSE;
             goto endMSSQLInitializationConnection;
@@ -1422,6 +1464,8 @@ static void netdata_read_config_options()
         dbconn->collect_data_size = inicfg_get_boolean(&netdata_config, section_name, "collect database size", true);
         dbconn->collect_user_connections =
             inicfg_get_boolean(&netdata_config, section_name, "collect user connections", true);
+        dbconn->collect_blocked_processes = inicfg_get_boolean(
+                &netdata_config, section_name, "collect blocked processes", true);
         dbconn->is_connected = FALSE;
 
         netdata_mount_mssql_connection_string(dbconn);
@@ -1581,6 +1625,8 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
             netdata_mssql_fill_mssql_status(mi);
             netdata_mssql_fill_job_status(mi);
             netdata_mssql_fill_user_connection(mi);
+            if (likely(mi->conn->collect_blocked_processes))
+                netdata_mssql_fill_blocked_processes_query(mi);
             dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
         }
 
@@ -1631,6 +1677,45 @@ static int initialize(int update_every)
     }
 
     return 0;
+}
+
+// Charts
+void netdata_mssql_blocked_processes_chart(struct mssql_instance *mi, int update_every)
+{
+    if (unlikely(!mi->st_process_blocked)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_blocked_process", mi->instanceID);
+        netdata_fix_chart_name(id);
+        mi->st_process_blocked = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "processes",
+                "mssql.instance_blocked_processes",
+                "Blocked processes",
+                "process",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_BLOCKED_PROCESSES,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        mi->rd_process_blocked = rrddim_add(mi->st_process_blocked, "blocked", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(mi->st_process_blocked->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            mi->st_process_blocked, mi->rd_process_blocked, (collected_number)mi->MSSQLBlockedProcesses.current.Data);
+    rrdset_done(mi->st_process_blocked);
+}
+
+static void do_mssql_blocked_processes(PERF_DATA_BLOCK *pDataBlock __maybe_unused, struct mssql_instance *mi, int update_every)
+{
+    if (unlikely(!mi || !mi->conn || !mi->conn->collect_blocked_processes))
+        return;
+
+    netdata_mssql_blocked_processes_chart(mi, update_every);
 }
 
 void dict_mssql_locks_wait_charts(struct mssql_instance *mi, struct mssql_lock_instance *mli, const char *resource)
@@ -3159,13 +3244,14 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
         do_mssql_bufferman_stats_sql,
         do_mssql_job_status_sql,
         do_mssql_user_connection,
+        do_mssql_blocked_processes,
 
         NULL};
 
     DWORD i;
     PERF_DATA_BLOCK *pDataBlock;
     static bool collect_perflib[NETDATA_MSSQL_METRICS_END] = {
-        true, true, true, true, true, true, true, true, true, true, false};
+        true, true, true, true, true, true, true, true, true, true, false, false};
     for (i = 0; i < NETDATA_MSSQL_ACCESS_METHODS; i++) {
         if (unlikely(!collect_perflib[i]))
             continue;

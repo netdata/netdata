@@ -41,13 +41,13 @@ static void initialize(void)
 
 static BOOL fill_dictionary_with_content()
 {
-    static PVOID buffer = NULL;
+    PVOID buffer = NULL;
     static DWORD bytes_needed = 0;
 
     LPENUM_SERVICE_STATUS_PROCESS service, services;
     DWORD total_services = 0;
     SC_HANDLE ndSCMH = OpenSCManager(NULL, NULL, SC_MANAGER_ENUMERATE_SERVICE | SC_MANAGER_CONNECT);
-    if (!ndSCMH) {
+    if (unlikely(!ndSCMH)) {
         return FALSE;
     }
 
@@ -64,11 +64,24 @@ static BOOL fill_dictionary_with_content()
         NULL,
         NULL);
 
-    if (GetLastError() == ERROR_MORE_DATA) {
-        if (!buffer)
+    DWORD test = GetLastError();
+    if (test == ERROR_MORE_DATA) {
+        if (unlikely(!buffer))
             buffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytes_needed);
         else
             buffer = HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, buffer, bytes_needed);
+    } else {
+        switch (test) {
+            case ERROR_ACCESS_DENIED:
+            case ERROR_INVALID_PARAMETER:
+            case ERROR_INVALID_HANDLE:
+            case ERROR_INVALID_LEVEL:
+            case ERROR_SHUTDOWN_IN_PROGRESS:
+                ret = FALSE;
+                goto endServiceCollection;
+            default:
+                ret = TRUE;
+        }
     }
 
     if (!buffer) {
@@ -112,6 +125,8 @@ static BOOL fill_dictionary_with_content()
     ret = TRUE;
 
 endServiceCollection:
+    if (buffer)
+        HeapFree(GetProcessHeap(), 0, buffer);
 
     CloseServiceHandle(ndSCMH);
     return ret;
