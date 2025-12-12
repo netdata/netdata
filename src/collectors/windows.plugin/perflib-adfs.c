@@ -247,8 +247,8 @@ struct adfs_certificate {
     .ADFSOauthClientWindowsAuthenticationsFailure.key = "OAuth Client Windows Integrated Authentication Failures",
     .ADFSOauthLogonCertificateRequestsSuccess.key = "OAuth Logon Certificate Token Requests",
     .ADFSOauthLogonCertificateRequestsFailure.key = "OAuth Logon Certificate Request Failures",
-    .ADFSOauthPasswordGrantRequestsSuccess.key = "OAuth Password Grant Request Failures",
-    .ADFSOauthPasswordGrantRequestsFailure.key = "OAuth Password Grant Request",
+    .ADFSOauthPasswordGrantRequestsSuccess.key = "OAuth Password Grant Requests",
+    .ADFSOauthPasswordGrantRequestsFailure.key = "OAuth Password Grant Request Failures",
     .ADFSOauthTokenRequestsSuccess.key = "OAuth Token Requests",
 
     // Requests
@@ -988,7 +988,7 @@ void netdata_adfs_oauth_password_grant_requests(
             "authentications/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibADFS",
-            PRIO_ADFS_OAUTH_CLIENT_WINDOWS_AUTH,
+            PRIO_ADFS_OAUTH_TOKEN_REQUESTS_SUCCESS,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -1032,7 +1032,7 @@ void netdata_adfs_oauth_token_requests_success(
             "requests/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibADFS",
-            PRIO_ADFS_OAUTH_TOKEN_REQUESTS_SUCCESS,
+            PRIO_ADFS_OAUTH_CLIENT_CREDENTIAL_REQUEST,
             update_every,
             RRDSET_TYPE_LINE);
 
