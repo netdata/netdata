@@ -16,8 +16,4 @@ name = "rdp"
 path = "src/main.rs"
 
 [dependencies]
-clap = { workspace = true, features = ["derive"] }
 md5 = { workspace = true }
-
-[dev-dependencies]
-proptest = { workspace = true }

@@ -1,73 +1,7 @@
-use clap::Parser;
-use rdp::{encode, encode_full, has_checksum, verify_structure_round_trip};
-use std::time::Instant;
-
-#[derive(Parser, Debug)]
-#[command(name = "rdp")]
-#[command(about = "RDP - String tokenizer, parser, and encoder for field names", long_about = None)]
-struct Args {
-    /// Run comprehensive fuzz testing on all valid strings up to the specified max length.
-    /// If no value is provided, defaults to 4.
-    #[arg(long, value_name = "MAX_LENGTH", default_missing_value = "4", num_args = 0..=1)]
-    fuzz: Option<usize>,
-}
+use rdp::encode_full;
 
 fn main() {
-    let args = Args::parse();
-
-    if let Some(max_length) = args.fuzz {
-        run_fuzz_tests(max_length);
-    } else {
-        run_examples();
-    }
-}
-
-fn run_examples() {
-    let examples = vec![
-        // Simple cases
-        ("hello", "Simple lowercase"),
-        ("HELLO", "Simple uppercase"),
-        ("Hello", "Simple capitalized"),
-        // Camel case
-        ("helloWorld", "Lower camel case"),
-        ("HelloWorld", "Upper camel case"),
-        ("myVarName", "Lower camel case (multi-word)"),
-        // With separators
-        ("hello.world", "Dot separator"),
-        ("hello_world", "Underscore separator"),
-        ("hello-world", "Hyphen separator"),
-        // Complex real-world examples
-        ("log.body.HostName", "Complex with camel case"),
-        ("log.body.hostname", "Complex without camel case"),
-        ("parseHTMLString", "Mixed case types"),
-        // Edge case that would collide without checksum
-        ("log.body.HostName", "Collision test 1"),
-        ("log.body.HostnAme", "Collision test 2"),
-    ];
-
-    println!("Key Encoding Examples");
-    println!("====================\n");
-
-    for (key, description) in examples {
-        let encoded = encode(key);
-        let with_checksum = has_checksum(&encoded);
-
-        println!(
-            "{:30} → {:10} (checksum: {})",
-            key,
-            format!("\"{}\"", encoded),
-            with_checksum
-        );
-        println!("  Description: {}", description);
-        println!(
-            "  Compression: {} bytes → {} bytes",
-            key.len(),
-            encoded.len()
-        );
-        println!();
-    }
-
-    let aws_keys = vec![
+    let mut aws_keys = vec![
         "log.attributes.log.file.path",
         "log.attributes.log.iostream",
         "log.attributes.logtag",
@@ -285,126 +219,23 @@ fn run_examples() {
         "foo_bar",
         "fooBar",
         "resource.attributes.service.instance.environment.region.zone",
+        // "resource.cαλημέρα",
     ];
 
-    println!("Otel,Otel key length,Systemd key,Systemd key length, Length diff");
-    for otel_key in aws_keys {
+    // Sort keys to ensure consistent ordering
+    aws_keys.sort();
+
+    // Collect all output lines for checksum calculation
+    let mut all_output = String::new();
+
+    for otel_key in &aws_keys {
         let systemd_key = encode_full(otel_key.as_bytes());
-        println!("{} {}", otel_key, systemd_key);
-    }
-}
-
-fn run_fuzz_tests(max_length: usize) {
-    // Character set: a-z, A-Z, 0-9, . _ -
-    const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-";
-    const CHARSET_LEN: usize = CHARSET.len();
-
-    // Calculate total number of tests based on max_length
-    // Length 0: 1 (empty string)
-    // Length n: CHARSET_LEN^n
-    let mut total_tests: usize = 1; // empty string
-    for length in 1..=max_length {
-        total_tests += CHARSET_LEN.pow(length as u32);
+        let line = format!("{:<40} {}\n", otel_key, systemd_key);
+        print!("{}", line);
+        all_output.push_str(&line);
     }
 
-    println!("Starting comprehensive fuzz testing...");
-    println!("Character set: [a-zA-Z0-9._-] ({} characters)", CHARSET_LEN);
-    println!("Testing all strings with length 0-{}", max_length);
-    println!("Total tests: {}\n", total_tests);
-
-    let start_time = Instant::now();
-    let mut tested = 0;
-    let mut failed = 0;
-    let report_interval = 1_000_000;
-    let mut next_report = report_interval;
-
-    // Test empty string
-    test_string("", &mut tested, &mut failed);
-
-    // Generate and test all strings of length 1..=max_length
-    for length in 1..=max_length {
-        generate_strings(
-            length,
-            CHARSET,
-            &mut tested,
-            &mut failed,
-            &mut next_report,
-            report_interval,
-            total_tests,
-        );
-    }
-
-    let elapsed = start_time.elapsed();
-    let tests_per_sec = tested as f64 / elapsed.as_secs_f64();
-
-    println!("\n{}", "=".repeat(70));
-    println!("Fuzz Testing Complete!");
-    println!("{}", "=".repeat(70));
-    println!("Total tests run: {}", tested);
-    println!("Tests passed:    {}", tested - failed);
-    println!("Tests failed:    {}", failed);
-    println!("Time elapsed:    {:.2}s", elapsed.as_secs_f64());
-    println!("Tests per sec:   {:.0}", tests_per_sec);
-
-    if failed > 0 {
-        println!("\n⚠️  WARNING: {} test(s) failed!", failed);
-        std::process::exit(1);
-    } else {
-        println!("\n✅ All tests passed!");
-    }
-}
-
-fn generate_strings(
-    length: usize,
-    charset: &[u8],
-    tested: &mut usize,
-    failed: &mut usize,
-    next_report: &mut usize,
-    report_interval: usize,
-    total_tests: usize,
-) {
-    let mut indices = vec![0usize; length];
-    let charset_len = charset.len();
-
-    loop {
-        // Build the current string
-        let s: String = indices.iter().map(|&i| charset[i] as char).collect();
-
-        // Test it
-        test_string(&s, tested, failed);
-
-        // Report progress
-        if *tested >= *next_report {
-            let percent = (*tested as f64 / total_tests as f64) * 100.0;
-            println!(
-                "Progress: {:>10} tests completed ({:>6.2}%, {} failed)",
-                tested, percent, failed
-            );
-            *next_report += report_interval;
-        }
-
-        // Increment to next combination
-        let mut pos = length - 1;
-        loop {
-            indices[pos] += 1;
-            if indices[pos] < charset_len {
-                break;
-            }
-            if pos == 0 {
-                // We've exhausted all combinations for this length
-                return;
-            }
-            indices[pos] = 0;
-            pos -= 1;
-        }
-    }
-}
-
-fn test_string(s: &str, tested: &mut usize, failed: &mut usize) {
-    *tested += 1;
-
-    if let Err(err) = verify_structure_round_trip(s) {
-        eprintln!("\n❌ Test failed: {}", err);
-        *failed += 1;
-    }
+    // Calculate and print MD5 checksum of all output
+    let digest = md5::compute(all_output.as_bytes());
+    println!("\nMD5 Checksum: {:x}", digest);
 }

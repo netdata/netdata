@@ -6,26 +6,6 @@
 //
 // Example: "log.body.HostName" → encoded: "C3aao" (5 chars: 2-char checksum + 3-char structure)
 
-fn is_uppercase_like(c: char) -> bool {
-    c.is_uppercase() || c.is_ascii_digit()
-}
-
-fn is_lowercase(c: char) -> bool {
-    c.is_lowercase()
-}
-
-fn is_dot(c: char) -> bool {
-    c == '.'
-}
-
-fn is_underscore(c: char) -> bool {
-    c == '_'
-}
-
-fn is_hyphen(c: char) -> bool {
-    c == '-'
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CharType {
     Lowercase,
@@ -35,198 +15,30 @@ enum CharType {
     Hyphen,
 }
 
-fn char_type(c: char) -> Option<CharType> {
-    if is_lowercase(c) {
+fn char_type(c: u8) -> Option<CharType> {
+    if c.is_ascii_lowercase() {
         Some(CharType::Lowercase)
-    } else if is_uppercase_like(c) {
+    } else if c.is_ascii_uppercase() || c.is_ascii_digit() {
         Some(CharType::Uppercase)
-    } else if is_dot(c) {
+    } else if c == b'.' {
         Some(CharType::Dot)
-    } else if is_underscore(c) {
+    } else if c == b'_' {
         Some(CharType::Underscore)
-    } else if is_hyphen(c) {
+    } else if c == b'-' {
         Some(CharType::Hyphen)
     } else {
         None
     }
 }
 
-/// Checks if all characters in the string are valid for rdp encoding.
-///
-/// Valid characters are: letters (a-z, A-Z), dots (.), underscores (_), and hyphens (-).
-fn has_only_valid_chars(s: &str) -> bool {
-    s.chars().all(|c| char_type(c).is_some())
-}
-
 /// Prefix for field names that were remapped due to containing invalid characters.
 const REMAPPED_PREFIX: &str = "ND_";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Word<'a> {
-    Lowercase(&'a str),
-    Uppercase(&'a str),
-    Capitalized(&'a str),
-    Dot(&'a str),
-    Underscore(&'a str),
-    Hyphen(&'a str),
-}
-
-impl<'a> Word<'a> {
-    #[allow(dead_code)]
-    fn as_str(&self) -> &'a str {
-        match self {
-            Word::Lowercase(s)
-            | Word::Uppercase(s)
-            | Word::Capitalized(s)
-            | Word::Dot(s)
-            | Word::Underscore(s)
-            | Word::Hyphen(s) => s,
-        }
-    }
-}
-
-fn tokenize<'a>(s: &'a str) -> Vec<Word<'a>> {
-    // Validate that all characters are valid
-    debug_assert!(
-        s.chars().all(|c| char_type(c).is_some()),
-        "Input string contains invalid characters"
-    );
-
-    let mut result = Vec::new();
-
-    if s.is_empty() {
-        return result;
-    }
-
-    let mut start = 0;
-    let mut chars = s.char_indices().peekable();
-    let mut prev_type: Option<CharType> = None;
-
-    // Track the current word characteristics
-    let mut first_type: Option<CharType> = None;
-    let mut has_lowercase = false;
-    let mut has_uppercase = false;
-
-    while let Some((i, ch)) = chars.next() {
-        let curr_type = char_type(ch).unwrap();
-
-        if let Some(prev) = prev_type {
-            let should_split = match (prev, curr_type) {
-                // Special characters are always single tokens
-                (CharType::Dot, _) | (CharType::Underscore, _) | (CharType::Hyphen, _) => true,
-                (_, CharType::Dot) | (_, CharType::Underscore) | (_, CharType::Hyphen) => true,
-
-                // Same type - check for special cases
-                (CharType::Uppercase, CharType::Uppercase) => {
-                    // Check if next char is lowercase: "HTTPResponse" -> split between 'P' and 'R'
-                    if let Some(&(_, next_ch)) = chars.peek() {
-                        matches!(char_type(next_ch), Some(CharType::Lowercase))
-                    } else {
-                        false
-                    }
-                }
-                (CharType::Lowercase, CharType::Lowercase) => false,
-
-                // Uppercase to Lowercase can be Capitalized - don't split yet
-                (CharType::Uppercase, CharType::Lowercase) => {
-                    // Only continue if we're at the first transition (potential Capitalized word)
-                    has_uppercase && has_lowercase
-                }
-
-                // Different types - split
-                _ => true,
-            };
-
-            if should_split {
-                // Create word based on what we've seen
-                if let Some(word) = create_word(
-                    &s[start..i],
-                    first_type.unwrap(),
-                    has_lowercase,
-                    has_uppercase,
-                ) {
-                    result.push(word);
-                }
-
-                // Reset tracking for new word
-                start = i;
-                first_type = Some(curr_type);
-                has_lowercase = false;
-                has_uppercase = false;
-            } else {
-                // Continue current word, update tracking
-                if curr_type == CharType::Lowercase {
-                    has_lowercase = true;
-                } else if curr_type == CharType::Uppercase {
-                    has_uppercase = true;
-                }
-            }
-        } else {
-            // First character of the string
-            first_type = Some(curr_type);
-            has_lowercase = false;
-            has_uppercase = false;
-        }
-
-        prev_type = Some(curr_type);
-    }
-
-    // Add the last word
-    if start < s.len() {
-        if let Some(word) = create_word(
-            &s[start..],
-            first_type.unwrap(),
-            has_lowercase,
-            has_uppercase,
-        ) {
-            result.push(word);
-        }
-    }
-
-    result
-}
-
-fn create_word<'a>(
-    s: &'a str,
-    first: CharType,
-    has_lowercase: bool,
-    has_uppercase: bool,
-) -> Option<Word<'a>> {
-    match first {
-        CharType::Lowercase => {
-            // If first is lowercase, all must be lowercase
-            if has_uppercase {
-                None
-            } else {
-                Some(Word::Lowercase(s))
-            }
-        }
-        CharType::Uppercase => {
-            // First is uppercase
-            if has_lowercase && has_uppercase {
-                // Mixed case after first char - invalid
-                None
-            } else if has_lowercase {
-                // Rest are lowercase - Capitalized
-                Some(Word::Capitalized(s))
-            } else {
-                // All uppercase - Uppercase
-                Some(Word::Uppercase(s))
-            }
-        }
-        CharType::Dot => Some(Word::Dot(s)),
-        CharType::Underscore => Some(Word::Underscore(s)),
-        CharType::Hyphen => Some(Word::Hyphen(s)),
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Field<'a> {
-    Lowercase(&'a str),
-    Uppercase(&'a str),
-    LowerCamel(&'a str),
-    UpperCamel(&'a str),
-    Empty,
+enum TokenType {
+    Lowercase,
+    Uppercase,
+    Capitalized,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -234,6 +46,154 @@ enum Separator {
     Dot,
     Hyphen,
     Underscore,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Token {
+    Word {
+        kind: TokenType,
+        start: usize,
+        end: usize,
+    },
+    Separator(Separator),
+}
+
+fn create_token(
+    first: CharType,
+    has_lowercase: bool,
+    has_uppercase: bool,
+    start: usize,
+    end: usize,
+) -> Token {
+    match first {
+        CharType::Lowercase => {
+            assert!(!has_uppercase);
+            Token::Word {
+                kind: TokenType::Lowercase,
+                start,
+                end,
+            }
+        }
+        CharType::Uppercase => {
+            assert!(!(has_lowercase && has_uppercase));
+
+            if has_lowercase {
+                // Rest are lowercase
+                Token::Word {
+                    kind: TokenType::Capitalized,
+                    start,
+                    end,
+                }
+            } else {
+                // All uppercase
+                Token::Word {
+                    kind: TokenType::Uppercase,
+                    start,
+                    end,
+                }
+            }
+        }
+        CharType::Dot => Token::Separator(Separator::Dot),
+        CharType::Hyphen => Token::Separator(Separator::Hyphen),
+        CharType::Underscore => Token::Separator(Separator::Underscore),
+    }
+}
+
+fn tokenize(s: &[u8]) -> Option<Vec<Token>> {
+    let mut tokens = Vec::new();
+
+    if s.is_empty() {
+        return Some(tokens);
+    }
+
+    let mut start = 0;
+    let mut chars = s.iter().enumerate().peekable();
+    let mut prev_type: Option<CharType> = None;
+
+    // track the current word characteristics
+    let mut first_type: Option<CharType> = None;
+    let mut has_lowercase = false;
+    let mut has_uppercase = false;
+
+    while let Some((i, &ch)) = chars.next() {
+        let curr_type = char_type(ch)?;
+
+        let Some(prev) = prev_type else {
+            // first character of the string
+            first_type = Some(curr_type);
+            prev_type = Some(curr_type);
+            continue;
+        };
+
+        let should_split = match (prev, curr_type) {
+            // special characters are always single tokens
+            (CharType::Dot, _) | (CharType::Underscore, _) | (CharType::Hyphen, _) => true,
+            (_, CharType::Dot) | (_, CharType::Underscore) | (_, CharType::Hyphen) => true,
+
+            // same type - check for special cases
+            (CharType::Uppercase, CharType::Uppercase) => {
+                // Check if next char is lowercase: "HTTPResponse" -> split between 'P' and 'R'
+                if let Some(&(_, &next_ch)) = chars.peek() {
+                    matches!(char_type(next_ch)?, CharType::Lowercase)
+                } else {
+                    false
+                }
+            }
+            (CharType::Lowercase, CharType::Lowercase) => false,
+
+            // Uppercase to Lowercase can be Capitalized - don't split yet
+            (CharType::Uppercase, CharType::Lowercase) => {
+                // only continue if we're at the first transition (potential Capitalized word)
+                has_uppercase && has_lowercase
+            }
+
+            // different types - split
+            _ => true,
+        };
+
+        if should_split {
+            // create word based on what we've seen
+            let token = create_token(first_type?, has_lowercase, has_uppercase, start, i);
+            tokens.push(token);
+
+            // reset tracking for new word
+            start = i;
+            first_type = Some(curr_type);
+            has_lowercase = false;
+            has_uppercase = false;
+        } else {
+            // continue current word, update tracking
+            if curr_type == CharType::Lowercase {
+                has_lowercase = true;
+            } else if curr_type == CharType::Uppercase {
+                has_uppercase = true;
+            }
+        }
+
+        prev_type = Some(curr_type);
+    }
+
+    // add the last word
+    if start < s.len() {
+        // make sure the rest of the word contains valid chars
+        if !s[start..].iter().all(|ch| char_type(*ch).is_some()) {
+            return None;
+        };
+
+        let token = create_token(first_type?, has_lowercase, has_uppercase, start, s.len());
+        tokens.push(token);
+    }
+
+    Some(tokens)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Field<'a> {
+    Lowercase(&'a [u8]),
+    Uppercase(&'a [u8]),
+    LowerCamel(&'a [u8]),
+    UpperCamel(&'a [u8]),
+    Empty,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -268,13 +228,13 @@ impl FieldBuilder {
         }
     }
 
-    fn can_add(&self, word_type: WordType) -> bool {
+    fn can_add(&self, word_type: TokenType) -> bool {
         matches!(
             (self.field_type, word_type),
-            (FieldType::Lowercase, WordType::Lowercase)
-                | (FieldType::Uppercase, WordType::Uppercase)
-                | (FieldType::LowerCamel, WordType::Capitalized)
-                | (FieldType::UpperCamel, WordType::Capitalized)
+            (FieldType::Lowercase, TokenType::Lowercase)
+                | (FieldType::Uppercase, TokenType::Uppercase)
+                | (FieldType::LowerCamel, TokenType::Capitalized)
+                | (FieldType::UpperCamel, TokenType::Capitalized)
         )
     }
 
@@ -291,8 +251,9 @@ impl FieldBuilder {
         self.field_type == FieldType::Lowercase && !self.extended
     }
 
-    fn into_field<'a>(self, source: &'a str) -> Field<'a> {
+    fn into_field<'a>(self, source: &'a [u8]) -> Field<'a> {
         let slice = &source[self.start..self.end];
+
         match self.field_type {
             FieldType::Lowercase => Field::Lowercase(slice),
             FieldType::Uppercase => Field::Uppercase(slice),
@@ -302,126 +263,82 @@ impl FieldBuilder {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum WordType {
-    Lowercase,
-    Uppercase,
-    Capitalized,
-}
-
-fn word_type(word: &Word) -> WordType {
+fn token_type(word: &Token) -> TokenType {
     match word {
-        Word::Lowercase(_) => WordType::Lowercase,
-        Word::Uppercase(_) => WordType::Uppercase,
-        Word::Capitalized(_) => WordType::Capitalized,
+        Token::Word { kind, .. } => *kind,
         _ => unreachable!(),
     }
 }
 
-fn word_byte_range(source: &str, word: &Word) -> (usize, usize) {
-    let word_str = match word {
-        Word::Lowercase(s) | Word::Uppercase(s) | Word::Capitalized(s) => s,
-        _ => unreachable!(),
-    };
-    let start = word_str.as_ptr() as usize - source.as_ptr() as usize;
-    let end = start + word_str.len();
-    (start, end)
-}
+fn parse<'a>(source: &'a [u8], tokens: &[Token]) -> Vec<Node<'a>> {
+    let mut nodes = Vec::new();
 
-fn parse<'a>(source: &'a str, tokens: &[Word<'a>]) -> Vec<Node<'a>> {
-    let mut result = Vec::new();
-    let mut i = 0;
-
-    // Handle leading empty field
-    if i < tokens.len() && is_separator(&tokens[i]) {
-        result.push(Node::Field(Field::Empty));
+    // handle leading empty field
+    if matches!(tokens.first(), Some(Token::Separator(_))) {
+        nodes.push(Node::Field(Field::Empty));
     }
 
-    let mut current_field: Option<FieldBuilder> = None;
+    let mut field_builder: Option<FieldBuilder> = None;
 
-    while i < tokens.len() {
-        // Check if current position is a separator
-        if let Some(sep) = token_to_separator(&tokens[i]) {
-            // Finish current field if any
-            if let Some(field) = current_field.take() {
-                result.push(Node::Field(field.into_field(source)));
-            }
-
-            result.push(Node::Separator(sep));
-            i += 1;
-
-            // Check for empty field (consecutive separators or trailing separator)
-            if i >= tokens.len() || is_separator(&tokens[i]) {
-                result.push(Node::Field(Field::Empty));
-            }
-            continue;
-        }
-
-        // Process a word token
-        let word = &tokens[i];
-        let wtype = word_type(word);
-        let (start, end) = word_byte_range(source, word);
-
-        if let Some(ref mut field) = current_field {
-            // Check if we can add this word to the current field
-            if field.can_add(wtype) {
-                field.extend_to(end);
-            } else {
-                // Can't add, so check if we can transition to LowerCamel
-                let should_transition =
-                    field.is_single_lowercase() && wtype == WordType::Capitalized;
-
-                if should_transition {
-                    // Transition from single lowercase to LowerCamel
-                    field.transition_to_lower_camel();
-                    field.extend_to(end);
-                    i += 1;
-                    continue;
+    for i in 0..tokens.len() {
+        match tokens[i] {
+            Token::Separator(sep) => {
+                // finish current field if any
+                if let Some(field) = field_builder.take() {
+                    nodes.push(Node::Field(field.into_field(source)));
                 }
 
-                // Otherwise, finish current field and start new one
-                let finished_field = current_field.take().unwrap();
-                result.push(Node::Field(finished_field.into_field(source)));
+                nodes.push(Node::Separator(sep));
 
-                let field_type = match wtype {
-                    WordType::Lowercase => FieldType::Lowercase,
-                    WordType::Uppercase => FieldType::Uppercase,
-                    WordType::Capitalized => FieldType::UpperCamel,
-                };
-                current_field = Some(FieldBuilder::new(field_type, start, end));
+                // check for empty field (consecutive separators or trailing separator)
+                if i + 1 >= tokens.len() || matches!(tokens[i + 1], Token::Separator(_)) {
+                    nodes.push(Node::Field(Field::Empty));
+                }
             }
-        } else {
-            // No current field, start a new one
-            let field_type = match wtype {
-                WordType::Lowercase => FieldType::Lowercase,
-                WordType::Uppercase => FieldType::Uppercase,
-                WordType::Capitalized => FieldType::UpperCamel,
-            };
-            current_field = Some(FieldBuilder::new(field_type, start, end));
+            Token::Word {
+                kind: wtype,
+                start,
+                end,
+            } => {
+                if let Some(ref mut field) = field_builder {
+                    if field.can_add(wtype) {
+                        // we can extend the field with this word type
+                        field.extend_to(end);
+                    } else if field.is_single_lowercase() && wtype == TokenType::Capitalized {
+                        // transition from single lowercase to LowerCamel
+                        field.transition_to_lower_camel();
+                        field.extend_to(end);
+                    } else {
+                        // finish current field and start new one
+                        let finished_field = field_builder.take().unwrap();
+                        nodes.push(Node::Field(finished_field.into_field(source)));
+
+                        let field_type = match wtype {
+                            TokenType::Lowercase => FieldType::Lowercase,
+                            TokenType::Uppercase => FieldType::Uppercase,
+                            TokenType::Capitalized => FieldType::UpperCamel,
+                        };
+                        field_builder = Some(FieldBuilder::new(field_type, start, end));
+                    }
+                } else {
+                    // no current field builder, start a new one
+                    let field_type = match wtype {
+                        TokenType::Lowercase => FieldType::Lowercase,
+                        TokenType::Uppercase => FieldType::Uppercase,
+                        TokenType::Capitalized => FieldType::UpperCamel,
+                    };
+                    field_builder = Some(FieldBuilder::new(field_type, start, end));
+                }
+            }
         }
-
-        i += 1;
     }
 
-    // Finish any remaining field
-    if let Some(field) = current_field {
-        result.push(Node::Field(field.into_field(source)));
+    // finish any remaining field
+    if let Some(field) = field_builder {
+        nodes.push(Node::Field(field.into_field(source)));
     }
 
-    result
-}
-
-fn is_separator(word: &Word) -> bool {
-    matches!(word, Word::Dot(_) | Word::Hyphen(_) | Word::Underscore(_))
-}
-
-fn token_to_separator(word: &Word) -> Option<Separator> {
-    match word {
-        Word::Dot(_) => Some(Separator::Dot),
-        Word::Hyphen(_) => Some(Separator::Hyphen),
-        Word::Underscore(_) => Some(Separator::Underscore),
-        _ => None,
-    }
+    nodes
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -565,7 +482,7 @@ fn compute_checksum(s: &str) -> String {
 
 /// Returns true if the encoded string contains a checksum prefix.
 /// Checksums are added for strings containing camel case fields.
-pub fn has_checksum(encoded: &str) -> bool {
+fn has_checksum(encoded: &str) -> bool {
     if let Some(first_char) = encoded.chars().next() {
         // Checksum uses A-Z and 0-9, structure encoding uses a-x
         first_char.is_ascii_uppercase() || first_char.is_ascii_digit()
@@ -727,9 +644,17 @@ fn encode_nodes(source: &str, nodes: &[Node]) -> String {
 /// let encoded = encode("log.body.HostName");
 /// assert_eq!(encoded.len(), 5); // 2-char checksum + 3-char structure
 /// ```
-pub fn encode(s: &str) -> String {
-    let tokens = tokenize(s);
-    let nodes = parse(s, &tokens);
+fn encode(b: &[u8]) -> String {
+    let Some(tokens) = tokenize(b) else {
+        let digest = md5::compute(b);
+        return format!("{}{:X}", REMAPPED_PREFIX, digest);
+    };
+
+    // SAFETY: We'll only get tokens when we have valid ASCII characters in
+    // the input byte slice.
+    let s = unsafe { str::from_utf8_unchecked(b) };
+
+    let nodes = parse(b, &tokens);
     encode_nodes(s, &nodes)
 }
 
@@ -747,7 +672,7 @@ pub fn encode(s: &str) -> String {
 /// assert_eq!(compress_runs("aaaaaaaaaaaa"), "9a3a");  // 12 a's → 9a + 3a
 /// assert_eq!(compress_runs("aabbbcc"), "aa3bcc");
 /// ```
-pub fn compress_runs(s: &str) -> String {
+fn compress_runs(s: &str) -> String {
     if s.is_empty() {
         return String::new();
     }
@@ -866,23 +791,7 @@ pub fn compress_runs(s: &str) -> String {
 /// assert!(result.len() <= 64);
 /// ```
 pub fn encode_full(field_name: &[u8]) -> String {
-    // Try to parse as UTF-8, fall back to MD5 if not valid
-    let s = match std::str::from_utf8(field_name) {
-        Ok(s) => s,
-        Err(_) => {
-            let digest = md5::compute(field_name);
-            return format!("{}{:X}", REMAPPED_PREFIX, digest);
-        }
-    };
-
-    // Check if the string contains only valid characters for rdp encoding
-    // If not, fall back to MD5 hash
-    if !has_only_valid_chars(s) {
-        let digest = md5::compute(field_name);
-        return format!("{}{:X}", REMAPPED_PREFIX, digest);
-    }
-
-    let encoded = encode(s);
+    let encoded = encode(field_name);
 
     // Compress runs in the structure encoding (but not the checksum)
     let compressed = if has_checksum(&encoded) {
@@ -895,6 +804,7 @@ pub fn encode_full(field_name: &[u8]) -> String {
         compress_runs(&encoded)
     };
 
+    let s = unsafe { String::from_utf8_unchecked(field_name.to_vec()) };
     let mut normalized = s.to_uppercase().replace(['.', '-'], "_");
 
     // Replace common prefixes with shorter versions
@@ -915,163 +825,4 @@ pub fn encode_full(field_name: &[u8]) -> String {
     }
 
     result
-}
-
-/// Tests that the structure encoding is lossless by verifying node types are preserved.
-///
-/// Returns Ok(()) if the round-trip test passes, or Err with a description if it fails.
-pub fn verify_structure_round_trip(s: &str) -> Result<(), String> {
-    // Parse to get original node types
-    let tokens = tokenize(s);
-    let original_nodes = parse(s, &tokens);
-    let original_types = node_types(&original_nodes);
-
-    // Encode structure
-    let encoded = encode_nodes(s, &original_nodes);
-
-    // Decode structure back to nodes
-    let decoded_nodes = decode_structure(&encoded);
-    let decoded_types = node_types(&decoded_nodes);
-
-    // Compare
-    if original_types == decoded_types {
-        Ok(())
-    } else {
-        Err(format!(
-            "Structure round-trip failed for '{}'\nOriginal: {:?}\nDecoded: {:?}",
-            s, original_types, decoded_types
-        ))
-    }
-}
-
-// Helper function to extract node types (ignoring content)
-fn node_types(nodes: &[Node]) -> Vec<String> {
-    nodes
-        .iter()
-        .map(|node| match node {
-            Node::Field(Field::Lowercase(_)) => "Field::Lowercase".to_string(),
-            Node::Field(Field::Uppercase(_)) => "Field::Uppercase".to_string(),
-            Node::Field(Field::LowerCamel(_)) => "Field::LowerCamel".to_string(),
-            Node::Field(Field::UpperCamel(_)) => "Field::UpperCamel".to_string(),
-            Node::Field(Field::Empty) => "Field::Empty".to_string(),
-            Node::Separator(Separator::Dot) => "Separator::Dot".to_string(),
-            Node::Separator(Separator::Underscore) => "Separator::Underscore".to_string(),
-            Node::Separator(Separator::Hyphen) => "Separator::Hyphen".to_string(),
-        })
-        .collect()
-}
-
-// Decode structure back to nodes (reconstructing from encoded structure)
-fn decode_structure(structure: &str) -> Vec<Node<'_>> {
-    let mut nodes = Vec::new();
-
-    for ch in structure.chars() {
-        let pair = FieldSeparatorPair::from_char(ch);
-        if pair.is_none() {
-            continue;
-        }
-        let pair = pair.unwrap();
-
-        // Determine field type and separator
-        let (field_type, separator) = match pair {
-            FieldSeparatorPair::LowercaseDot => (Some(Field::Lowercase("")), Some(Separator::Dot)),
-            FieldSeparatorPair::LowercaseUnderscore => {
-                (Some(Field::Lowercase("")), Some(Separator::Underscore))
-            }
-            FieldSeparatorPair::LowercaseHyphen => {
-                (Some(Field::Lowercase("")), Some(Separator::Hyphen))
-            }
-            FieldSeparatorPair::LowercaseNoSep => (Some(Field::Lowercase("")), None),
-            FieldSeparatorPair::LowercaseEnd => (Some(Field::Lowercase("")), None),
-
-            FieldSeparatorPair::LowerCamelDot => {
-                (Some(Field::LowerCamel("")), Some(Separator::Dot))
-            }
-            FieldSeparatorPair::LowerCamelUnderscore => {
-                (Some(Field::LowerCamel("")), Some(Separator::Underscore))
-            }
-            FieldSeparatorPair::LowerCamelHyphen => {
-                (Some(Field::LowerCamel("")), Some(Separator::Hyphen))
-            }
-            FieldSeparatorPair::LowerCamelNoSep => (Some(Field::LowerCamel("")), None),
-            FieldSeparatorPair::LowerCamelEnd => (Some(Field::LowerCamel("")), None),
-
-            FieldSeparatorPair::UpperCamelDot => {
-                (Some(Field::UpperCamel("")), Some(Separator::Dot))
-            }
-            FieldSeparatorPair::UpperCamelUnderscore => {
-                (Some(Field::UpperCamel("")), Some(Separator::Underscore))
-            }
-            FieldSeparatorPair::UpperCamelHyphen => {
-                (Some(Field::UpperCamel("")), Some(Separator::Hyphen))
-            }
-            FieldSeparatorPair::UpperCamelNoSep => (Some(Field::UpperCamel("")), None),
-            FieldSeparatorPair::UpperCamelEnd => (Some(Field::UpperCamel("")), None),
-
-            FieldSeparatorPair::UppercaseDot => (Some(Field::Uppercase("")), Some(Separator::Dot)),
-            FieldSeparatorPair::UppercaseUnderscore => {
-                (Some(Field::Uppercase("")), Some(Separator::Underscore))
-            }
-            FieldSeparatorPair::UppercaseHyphen => {
-                (Some(Field::Uppercase("")), Some(Separator::Hyphen))
-            }
-            FieldSeparatorPair::UppercaseNoSep => (Some(Field::Uppercase("")), None),
-            FieldSeparatorPair::UppercaseEnd => (Some(Field::Uppercase("")), None),
-
-            FieldSeparatorPair::EmptyDot => (Some(Field::Empty), Some(Separator::Dot)),
-            FieldSeparatorPair::EmptyUnderscore => {
-                (Some(Field::Empty), Some(Separator::Underscore))
-            }
-            FieldSeparatorPair::EmptyHyphen => (Some(Field::Empty), Some(Separator::Hyphen)),
-            FieldSeparatorPair::EmptyEnd => (Some(Field::Empty), None),
-        };
-
-        if let Some(field) = field_type {
-            nodes.push(Node::Field(field));
-        }
-        if let Some(sep) = separator {
-            nodes.push(Node::Separator(sep));
-        }
-    }
-
-    nodes
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use proptest::prelude::*;
-
-    #[test]
-    fn test_structure_round_trip() {
-        let test_cases = vec![
-            "hello",
-            "HELLO",
-            "Hello",
-            "helloWorld",
-            "HelloWorld",
-            "hello.world",
-            "hello_world",
-            "hello-world",
-            "HELLO.WORLD",
-            "log.body.hostname",
-            "LOG.BODY.HOSTNAME",
-            "log.body.HostName",
-            "parseHTMLString",
-            ".hello",
-            "hello.",
-            "hello..world",
-        ];
-
-        for key in test_cases {
-            verify_structure_round_trip(key).unwrap();
-        }
-    }
-
-    proptest! {
-        #[test]
-        fn prop_structure_round_trip(s in "[a-zA-Z0-9._-]{1,3}") {
-            prop_assert!(verify_structure_round_trip(&s).is_ok());
-        }
-    }
 }
