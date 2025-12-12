@@ -1355,7 +1355,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // the event loop for functions
 
     struct functions_evloop_globals *wg =
-            functions_evloop_init(WINDOWS_EVENTS_WORKER_THREADS, "WEVT", &stdout_mutex, &plugin_should_exit);
+            functions_evloop_init(WINDOWS_EVENTS_WORKER_THREADS, "WEVT", &stdout_mutex, &plugin_should_exit, NULL);
 
     functions_evloop_add_function(wg,
                                   WEVT_FUNCTION_NAME,
