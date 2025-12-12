@@ -1018,7 +1018,7 @@ void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable, struc
     aclk_add_job(query);
 }
 
-void aclk_host_state_update(RRDHOST *host, int live, int queryable, void *compl)
+void aclk_host_state_update(RRDHOST *host, int live, int queryable, struct completion *compl)
 {
     if (!aclk_online())
         return;
