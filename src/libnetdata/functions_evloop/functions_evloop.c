@@ -307,7 +307,7 @@ static void rrd_functions_worker_globals_reader_main(void *arg) {
     buffered_reader_init(&wg->reader);
     wg->buffer = buffer_create(sizeof(wg->reader.read_buffer) + 2, NULL);
 
-    while(!(*wg->plugin_should_exit)) {
+    while(!__atomic_load_n(wg->plugin_should_exit, __ATOMIC_ACQUIRE)) {
         if(unlikely(!buffered_reader_next_line(&wg->reader, wg->buffer))) {
             buffered_reader_ret_t ret = buffered_reader_read_timeout(
                 &wg->reader,
@@ -327,7 +327,7 @@ static void rrd_functions_worker_globals_reader_main(void *arg) {
     }
 
     int status = 0;
-    if(!(*wg->plugin_should_exit)) {
+    if(!__atomic_load_n(wg->plugin_should_exit, __ATOMIC_ACQUIRE)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Read error on stdin");
         status = 1;
     }
@@ -344,8 +344,8 @@ void worker_queue_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *va
     worker_job_cleanup(j);
 }
 
-struct functions_evloop_globals* functions_evloop_init(size_t worker_threads, const char* tag,
-                                                       netdata_mutex_t* stdout_mutex, bool* plugin_should_exit,
+struct functions_evloop_globals *functions_evloop_init(size_t worker_threads, const char *tag,
+                                                       netdata_mutex_t *stdout_mutex, bool *plugin_should_exit,
                                                        int *status)
 {
     struct functions_evloop_globals *wg = callocz(1, sizeof(struct functions_evloop_globals));
