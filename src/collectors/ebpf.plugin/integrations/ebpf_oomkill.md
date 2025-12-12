@@ -160,14 +160,14 @@ There are no configuration examples.
 
 ### update every
 
-
+Data collection frequency.
 
 ### ebpf load mode
 
-
+Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
 
 ### lifetime
 
-
+Set default lifetime for thread when enabled by cloud.
 
 

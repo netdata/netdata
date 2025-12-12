@@ -57,7 +57,7 @@ jobs:
         run: rm -rf go.d.plugin virtualenv integrations/integrations.js integrations/integrations.json
       - name: Create PR
         id: create-pr
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           commit-message: Regenerate integrations docs

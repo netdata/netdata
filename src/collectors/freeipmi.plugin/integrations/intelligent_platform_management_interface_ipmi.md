@@ -273,10 +273,45 @@ ID  | Name             | Type                     | State    | Reading    | Unit
 
 ### Debug Mode
 
+You can run `freeipmi.plugin` with the debug option enabled, to troubleshoot issues with it. The output should give you clues as to why the collector isn't working.
+
+- Navigate to the `plugins.d` directory, usually at `/usr/libexec/netdata/plugins.d/`. If that's not the case on your system, open `netdata.conf` and look for the `plugins` setting under `[directories]`.
+
+  ```bash
+  cd /usr/libexec/netdata/plugins.d/
+  ```
+
+- Switch to the `netdata` user.
+
+  ```bash
+  sudo -u netdata -s
+  ```
+
+- Run the `freeipmi.plugin` in debug mode:
+
+  ```bash
+  ./freeipmi.plugin 5 debug
+  ```
 
 
 ### kimpi0 CPU usage
 
+There have been reports that kipmi is showing increased CPU when the IPMI is queried. To lower the CPU consumption of the system you can issue this command:
+
+```sh
+echo 10 > /sys/module/ipmi_si/parameters/kipmid_max_busy_us
+```
+
+You can also permanently set the above setting by creating the file `/etc/modprobe.d/ipmi.conf` with this content:
+
+```sh
+# prevent kipmi from consuming 100% CPU
+options ipmi_si kipmid_max_busy_us=10
+```
+
+This instructs the kernel IPMI module to pause for a tick between checking IPMI. Querying IPMI will be a lot slower now (e.g. several seconds for IPMI to respond), but `kipmi` will not use any noticeable CPU.
+
+You can also use a higher number (this is the number of microseconds to poll IPMI for a response, before waiting for a tick).
 
 
 

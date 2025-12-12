@@ -300,6 +300,43 @@ install_build_dependencies() {
   fi
 }
 
+# Certain versions of this script had a bug that could cause /dev/null
+# to be removed mistakenly under some circumstances.
+#
+# This function attempts to detect and fix the resulting situation.
+#
+# Fix limited to Linux for the moment because apparently trying to
+# proactively fix systems that we aren’t certain have been affected is
+# too invasive of a change for some people...
+dev_null_fix() {
+  if [ -f /dev/null ] || [ ! -e /dev/null ]; then
+    case "$(uname -s)" in
+      Linux)
+        rm -f /dev/.null
+        mknod -m 666 /dev/.null c 1 3
+        # Some distros use ownership other than root:root for /dev/null,
+        # but it almost always matches the ownership of /dev/full,
+        # so if possible copy the onwership from there.
+        if [ -c /dev/full ]; then
+            chown --reference=/dev/full /dev/.null
+        fi
+        mv -f /dev/.null /dev/null
+        # If the system seems to be using SELinux, apply the correct
+        # security context to the new /dev/null.
+        #
+        # This check doesn’t use /dev/null as trying to access it
+        # without the right security context being set may fail.
+        dummy_null="$(mktemp)"
+        if command -v restorecon >"${dummy_null}" 2>&1; then
+            restorecon /dev/null
+        fi
+        rm -f "${dummy_null}" || true # Cleanup from the above check
+        ;;
+      *) ;;
+    esac
+  fi
+}
+
 enable_netdata_updater() {
   updater_type="$(echo "${1}" | tr '[:upper:]' '[:lower:]')"
   case "${updater_type}" in
@@ -1044,7 +1081,7 @@ update_binpkg() {
   DISTRO="${ID}"
   SYSVERSION="${VERSION_ID}"
 
-  supported_compat_names="debian ubuntu centos fedora opensuse ol amzn"
+  supported_compat_names="debian ubuntu centos centos-stream fedora opensuse ol amzn"
 
   if str_in_list "${DISTRO}" "${supported_compat_names}"; then
     DISTRO_COMPAT_NAME="${DISTRO}"
@@ -1053,7 +1090,7 @@ update_binpkg() {
       opensuse-leap|opensuse-tumbleweed)
         DISTRO_COMPAT_NAME="opensuse"
         ;;
-      cloudlinux|almalinux|centos-stream|rocky|rhel)
+      cloudlinux|almalinux|rocky|rhel)
         DISTRO_COMPAT_NAME="centos"
         ;;
       raspbian)
@@ -1092,7 +1129,7 @@ update_binpkg() {
         repo_path="${DISTRO_COMPAT_NAME}/${VERSION_CODENAME}"
       fi
       ;;
-    centos|fedora|ol|amzn)
+    centos|centos-stream|fedora|ol|amzn)
       if [ "${INTERACTIVE}" = "0" ]; then
         interactive_opts="-y"
       fi
@@ -1110,7 +1147,13 @@ update_binpkg() {
       repo_update_opts="${interactive_opts}"
       pkg_installed_check="rpm -q"
       INSTALL_TYPE="binpkg-rpm"
-      repo_path="${DISTRO_COMPAT_NAME}/${SYSVERSION}/$(uname -m)"
+      case "${DISTRO_COMPAT_NAME}" in
+        amzn) repo_path="amazonlinux/${SYSVERSION}/$(uname -m)" ;;
+        centos-stream) repo_path="el/c${SYSVERSION}s/$(uname -m)" ;;
+        fedora) repo_path="fedora/${SYSVERSION}/$(uname -m)" ;;
+        ol) repo_path="ol/${SYSVERSION}/$(uname -m)" ;;
+        *) repo_path="el/$(echo "${SYSVERSION}" | cut -f 1 -d '.')/$(uname -m)" ;;
+      esac
       ;;
     opensuse)
       if [ "${INTERACTIVE}" = "0" ]; then
@@ -1377,6 +1420,8 @@ if echo "$INSTALL_TYPE" | grep -qv ^binpkg && [ "${INSTALL_UID}" != "$(id -u)" ]
 fi
 
 self_update
+
+dev_null_fix
 
 # shellcheck disable=SC2153
 case "${INSTALL_TYPE}" in

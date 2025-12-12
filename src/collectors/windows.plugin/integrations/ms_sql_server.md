@@ -334,6 +334,7 @@ These options allow the collector to connect to your MSSQL instance and collect 
 | collect buffer stats | Run queries to collect information from the server's buffer statistics. | yes | no |
 | collect database size | Run queries to collect information from the server's database size. | yes | no |
 | collect user connections | Run queries to collect information from the server's connection. | yes | no |
+| collect blocked processes | Run queries to collect information from the server's blocked processes. | yes | no |
 
 
 

@@ -236,7 +236,7 @@ static void netdata_detect_cpu()
         temperature_fcnt = netdata_amd_cpu_temp;
 }
 
-static int initialize(int update_every)
+static int initialize()
 {
     netdata_detect_cpu();
     if (!temperature_fcnt) {
@@ -254,7 +254,7 @@ static int initialize(int update_every)
     ncpus = os_get_system_cpus();
     cpus = callocz(ncpus, sizeof(struct cpu_data));
 
-    hardware_info_thread = nd_thread_create("hi_threads", NETDATA_THREAD_OPTION_DEFAULT, get_hardware_info_thread, &update_every);
+    hardware_info_thread = nd_thread_create("hi_threads", NETDATA_THREAD_OPTION_DEFAULT, get_hardware_info_thread, NULL);
 
     return 0;
 }
@@ -270,7 +270,7 @@ static RRDSET *netdata_publish_cpu_chart(int update_every)
                 "temperature",
                 "cpu.temperature",
                 "Core temperature",
-                "Celcius",
+                "Celsius",
                 PLUGIN_WINDOWS_NAME,
                 "GetHardwareInfo",
                 NETDATA_CHART_PRIO_CPU_TEMPERATURE,
@@ -284,11 +284,11 @@ static RRDSET *netdata_publish_cpu_chart(int update_every)
 static void netdata_loop_cpu_chart(int update_every)
 {
     RRDSET *chart = netdata_publish_cpu_chart(update_every);
-    for (size_t i = 0; i < ncpus; i++) {
+    for (int i = 0; i < (int)ncpus; i++) {
         struct cpu_data *lcpu = &cpus[i];
         if (!lcpu->rd_cpu_temp) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "cpu%lu.temp", i);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "cpu%d.temp", i);
             lcpu->rd_cpu_temp = rrddim_add(chart, id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
         rrddim_set_by_pointer(chart, lcpu->rd_cpu_temp, lcpu->cpu_temp);
@@ -301,7 +301,7 @@ int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
     static bool initialized = false;
     if (unlikely(!initialized)) {
         initialized = true;
-        if (initialize(update_every)) {
+        if (initialize()) {
             return -1;
         }
     }
@@ -314,7 +314,7 @@ int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
 void do_GetHardwareInfo_cleanup()
 {
     if (nd_thread_join(hardware_info_thread))
-        nd_log_daemon(NDLP_ERR, "Failed to join mssql queries thread");
+        nd_log_daemon(NDLP_ERR, "Failed to join Get Hardware Info thread");
 
     netdata_stop_driver();
 }
