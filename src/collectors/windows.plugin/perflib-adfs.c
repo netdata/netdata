@@ -239,8 +239,8 @@ struct adfs_certificate {
     .ADFSOauthClientCredentialsFailure.key = "OAuth Client Credentials Request Failures",
     .ADFSOauthClientPrivkeyJwtAuthenticationSuccess.key = "OAuth Client Private Key Jwt Authentications",
     .ADFSOauthClientPrivkeyJwtAuthenticationFailure.key = "OAuth Client Private Key Jwt Authentication Failures",
-    .ADFSOauthClientSecretBasicAuthenticationsSuccess.key = "OAuth Client Secret Post Authentication",
-    .ADFSOauthClientSecretBasicAuthenticationsFailure.key = "OAuth Client Secret Post Authentication Failures",
+    .ADFSOauthClientSecretBasicAuthenticationsSuccess.key = "OAuth Client Secret Basic Authentications",
+    .ADFSOauthClientSecretBasicAuthenticationsFailure.key = "OAuth Client Secret Basic Authentication Failures",
     .ADFSOauthClientSecretPostAuthenticationsSuccess.key = "OAuth Client Secret Post Authentication",
     .ADFSOauthClientSecretPostAuthenticationsFailure.key = "OAuth Client Secret Post Authentication Failures",
     .ADFSOauthClientWindowsAuthenticationsSuccess.key = "OAuth Client Windows Integrated Authentication",
@@ -261,8 +261,8 @@ struct adfs_certificate {
     .ADFSSSOAuthenticationsSuccess.key = "SSO Authentications",
     .ADFSSSOAuthenticationsFailure.key = "SSO Authentication Failures",
     .ADFSTokenRequests.key = "Token Requests",
-    .ADFSUserPasswordAuthenticationsSuccess.key = "SSO Authentications",
-    .ADFSUserPasswordAuthenticationsFailure.key = "SSO Authentication Failures",
+    .ADFSUserPasswordAuthenticationsSuccess.key = "U/P Authentications",
+    .ADFSUserPasswordAuthenticationsFailure.key = "U/P Authentication Failures",
     .ADFSWindowsIntegratedAuthentications.key = "Windows Integrated Authentications",
     .ADFSWSFedTokenRequestsSuccess.key = "WS-Fed Token Requests",
 };
@@ -577,7 +577,7 @@ void netdata_adfs_federated_authentications(PERF_DATA_BLOCK *pDataBlock, PERF_OB
         adfs.rd_adfs_federation_authentications,
         (collected_number)adfs.ADFSFederationAuthentications.current.Data);
 
-    rrdset_done(adfs.st_adfs_external_authentications);
+    rrdset_done(adfs.st_adfs_federation_authentications);
 }
 
 void netdata_adfs_federation_metadata_authentications(
@@ -935,11 +935,11 @@ void netdata_adfs_oauth_logon_certificate_request(
     if (!adfs.st_adfs_oauth_logon_certificate_requests) {
         adfs.st_adfs_oauth_logon_certificate_requests = rrdset_create_localhost(
             "adfs",
-            "oauth_client_windows_authentications",
+            "oauth_logon_certificate_requests",
             NULL,
             "oauth",
-            "adfs.oauth_client_windows_authentications",
-            "OAuth client windows integrated authentications",
+            "adfs.oauth_logon_certificate_requests",
+            "OAuth logon certificate requests",
             "requests/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibADFS",
@@ -980,11 +980,11 @@ void netdata_adfs_oauth_password_grant_requests(
     if (!adfs.st_adfs_oauth_password_grant_requests) {
         adfs.st_adfs_oauth_password_grant_requests = rrdset_create_localhost(
             "adfs",
-            "oauth_client_windows_authentications",
+            "oauth_password_grant_requests",
             NULL,
             "oauth",
-            "adfs.oauth_client_windows_authentications",
-            "OAuth client windows integrated authentications",
+            "adfs.oauth_password_grant_requests",
+            "OAuth password grant requests",
             "authentications/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibADFS",

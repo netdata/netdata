@@ -1517,7 +1517,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			vmc := newVirtualMetricsCollector(logger.New())
-			result := vmc.Collect(tc.profileDef, tc.collectedMetrics)
+			result := vmc.collect(tc.profileDef, tc.collectedMetrics)
 
 			// Sort both slices for consistent comparison
 			assert.ElementsMatch(t, tc.expected, result)

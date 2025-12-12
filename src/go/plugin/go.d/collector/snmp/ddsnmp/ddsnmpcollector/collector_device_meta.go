@@ -31,7 +31,7 @@ func newDeviceMetadataCollector(snmpClient gosnmp.Handler, missingOIDs map[strin
 	}
 }
 
-func (dc *deviceMetadataCollector) Collect(prof *ddsnmp.Profile) (map[string]ddsnmp.MetaTag, error) {
+func (dc *deviceMetadataCollector) collect(prof *ddsnmp.Profile) (map[string]ddsnmp.MetaTag, error) {
 	if len(prof.Definition.Metadata) == 0 && len(prof.Definition.SysobjectIDMetadata) == 0 {
 		return nil, nil
 	}

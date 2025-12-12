@@ -259,12 +259,10 @@ func (m *Manager) runNotifyRunningJobs() {
 }
 
 func (m *Manager) startRunningJob(job *module.Job) {
+	m.stopRunningJob(job.FullName())
+
 	m.runningJobs.lock()
 	defer m.runningJobs.unlock()
-
-	if job, ok := m.runningJobs.lookup(job.FullName()); ok {
-		job.Stop()
-	}
 
 	go job.Start()
 	m.runningJobs.add(job.FullName(), job)
@@ -272,11 +270,14 @@ func (m *Manager) startRunningJob(job *module.Job) {
 
 func (m *Manager) stopRunningJob(name string) {
 	m.runningJobs.lock()
-	defer m.runningJobs.unlock()
-
-	if job, ok := m.runningJobs.lookup(name); ok {
-		job.Stop()
+	job, ok := m.runningJobs.lookup(name)
+	if ok {
 		m.runningJobs.remove(name)
+	}
+	m.runningJobs.unlock()
+
+	if ok {
+		job.Stop()
 	}
 }
 
