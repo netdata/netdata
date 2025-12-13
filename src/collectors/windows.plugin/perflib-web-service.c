@@ -450,16 +450,16 @@ static inline void netdata_webservice_connection_attempt_rate(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISConnAttemptsAllInstancesTotal)) {
         if (!p->st_connections_attempts) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_connection_attemptts_rate", windows_shared_buffer);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_connection_attempts_rate", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_connections_attempts = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
                 "connections",
-                "iis.website_connection_attemptts_rate",
-                "Website connections attemptts",
-                "attemptts/s",
+                "iis.website_connection_attempts_rate",
+                "Website connections attempts",
+                "attempts/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
                 PRIO_WEBSITE_IIS_CONNECTIONS_ATTEMPT,
@@ -663,16 +663,16 @@ static inline void netdata_webservice_logon_attempt_rate(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISLogonAttemptsTotal)) {
         if (!p->st_logon_attempts) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_logon_attemptts_rate", windows_shared_buffer);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_logon_attempts_rate", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_logon_attempts = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
                 "logon",
-                "iis.website_logon_attemptts_rate",
-                "Website logon attemptts",
-                "attemptts/s",
+                "iis.website_logon_attempts_rate",
+                "Website logon attempts",
+                "attempts/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
                 PRIO_WEBSITE_IIS_LOGON_ATTEMPTS,
