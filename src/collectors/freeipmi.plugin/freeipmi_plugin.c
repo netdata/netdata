@@ -2072,7 +2072,7 @@ int main (int argc, char **argv) {
         if (add_func_sensors) {
             add_func_sensors = false;
             struct functions_evloop_globals *wg =
-                functions_evloop_init(1, "FREEIPMI", &stdout_mutex, &function_plugin_should_exit);
+                functions_evloop_init(1, "FREEIPMI", &stdout_mutex, &function_plugin_should_exit, NULL);
             functions_evloop_add_function(
                 wg, "ipmi-sensors", freeimi_function_sensors, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
             FREEIPMI_GLOBAL_FUNCTION_SENSORS();
