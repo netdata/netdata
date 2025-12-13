@@ -195,7 +195,7 @@ static STRING *getFileSystemType(struct logical_disk *d, const char *diskName)
     success = GetVolumeInformationA(
         pathBuffer,                  // Path to the disk
         volumeName,                  // Volume name buffer
-        260,                         // Size of volume name bufferr
+        260,                         // Size of volume name buffer
         &serialNumber,               // Volume serial number
         &maxComponentLength,         // Maximum component length
         &fileSystemFlags,            // File system flags
