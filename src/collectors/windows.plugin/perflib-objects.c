@@ -21,8 +21,8 @@ static bool do_objects(PERF_DATA_BLOCK *pDataBlock, int update_every)
     static COUNTER_DATA semaphores = {.key = "Semaphores"};
 
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &semaphores)) {
-        ULONGLONG sem = semaphores.current.Data;
-        common_semaphore_ipc(sem, WINDOWS_MAX_KERNEL_OBJECT, _COMMON_PLUGIN_MODULE_NAME, update_every);
+        ULONGLONG sem = (ULONGLONG)semaphores.current.Data;
+        common_semaphore_ipc(sem, (NETDATA_DOUBLE)WINDOWS_MAX_KERNEL_OBJECT, _COMMON_PLUGIN_MODULE_NAME, update_every);
     }
 
     return true;
@@ -45,7 +45,8 @@ int do_PerflibObjects(int update_every, usec_t dt __maybe_unused)
     if (!pDataBlock)
         return -1;
 
-    do_objects(pDataBlock, update_every);
+    if (!do_objects(pDataBlock, update_every))
+        return -1;
 
     return 0;
 }

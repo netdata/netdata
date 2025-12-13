@@ -37,7 +37,7 @@ static void netdata_numa_chart(struct netdata_numa *nn, int update_every)
 {
     if (unlikely(!nn->st_numa)) {
         char id[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(id, RRD_ID_LENGTH_MAX, "numae_node_%s_mem_usage", windows_shared_buffer);
+        snprintfz(id, RRD_ID_LENGTH_MAX, "numa_node_%s_mem_usage", windows_shared_buffer);
 
         nn->st_numa = rrdset_create_localhost(
             "numa_node_mem_usage",
@@ -91,10 +91,10 @@ static bool do_numa(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
         struct netdata_numa *nn = dictionary_set(numa_dict, windows_shared_buffer, NULL, sizeof(*nn));
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &nn->standby) ||
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &nn->available) ||
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &nn->free_zero))
-            netdata_numa_chart(nn, update_every);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &nn->standby);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &nn->available);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &nn->free_zero);
+        netdata_numa_chart(nn, update_every);
     }
 
     return true;

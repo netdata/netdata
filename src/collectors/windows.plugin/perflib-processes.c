@@ -7,11 +7,6 @@
 #define _COMMON_PLUGIN_MODULE_NAME "PerflibProcesses"
 #include "../common-contexts/common-contexts.h"
 
-static void initialize(void)
-{
-    ;
-}
-
 static void do_processor_queue(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static RRDSET *st_queue = NULL;
@@ -74,13 +69,6 @@ static bool do_processes(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
 int do_PerflibProcesses(int update_every, usec_t dt __maybe_unused)
 {
-    static bool initialized = false;
-
-    if (unlikely(!initialized)) {
-        initialize();
-        initialized = true;
-    }
-
     DWORD id = RegistryFindIDByName("System");
     if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
         return -1;
