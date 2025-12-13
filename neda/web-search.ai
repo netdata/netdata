@@ -20,6 +20,7 @@ agents:
   - web-fetch.ai
   - github-search.ai
   - reddit.ai
+  - sourcegraph.ai
 toolResponseMaxBytes: 100000
 maxOutputTokens: 32768
 maxTurns: 30

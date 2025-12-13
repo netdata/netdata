@@ -488,7 +488,11 @@ export class OpenAICompletionsHeadend implements Headend {
         clearTimeout(bufferTimer);
         bufferTimer = undefined;
       }
-      if (thinkingBuffer.length === 0) return;
+      // Skip whitespace-only buffers to prevent mode switches on empty newlines from open-source models
+      if (thinkingBuffer.length === 0 || thinkingBuffer.trim().length === 0) {
+        thinkingBuffer = '';
+        return;
+      }
       const bufferedContent = thinkingBuffer;
       thinkingBuffer = '';
       // Switch mode BEFORE emitting
@@ -529,8 +533,8 @@ export class OpenAICompletionsHeadend implements Headend {
         // In progress mode: buffer thinking
         thinkingBuffer += chunk;
 
-        // Check for newline - if found, flush immediately
-        if (thinkingBuffer.includes('\n')) {
+        // Check for newline - if found and buffer has non-whitespace content, flush immediately
+        if (thinkingBuffer.includes('\n') && thinkingBuffer.trim().length > 0) {
           flushThinkingBuffer();
           return;
         }
