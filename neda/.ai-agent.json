@@ -775,6 +775,18 @@
         "firecrawl_extract"
       ],
       "toolsDenied": []
+    },
+    "sourcegraph": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/opt/ai-agent/mcp/sourcegraph/sourcegraph-mcp-server.js"
+      ],
+      "enabled": true,
+      "toolsAllowed": [
+        "*"
+      ],
+      "toolsDenied": []
     }
   },
   "slack": {
