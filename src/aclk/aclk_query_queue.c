@@ -98,5 +98,8 @@ void aclk_query_free(aclk_query_t *query)
     freez(query->dedup_id);
     freez(query->callback_topic);
     freez(query->msg_id);
+
+    if (query->completion)
+        completion_mark_complete(query->completion);
     return_query(query);
 }
