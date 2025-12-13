@@ -96,6 +96,9 @@
 - Fix(go.d): correct Windows install paths ([#21451](https://github.com/netdata/netdata/issues/21451))
 - Docs(go.d/snmp): add Debugging Gaps on Charts ([#21452](https://github.com/netdata/netdata/issues/21452))
 - Regenerate integrations docs ([#21453](https://github.com/netdata/netdata/issues/21453))
+- AD fixes (windows.plugin) ([#21454](https://github.com/netdata/netdata/issues/21454))
+- Build(deps): bump github.com/miekg/dns from 1.1.68 to 1.1.69 in /src/go ([#21457](https://github.com/netdata/netdata/issues/21457))
+- Improve streaming connection loss detection ([#21430](https://github.com/netdata/netdata/issues/21430))
 
 ## [2.8.0] - 2025-11-19
 
