@@ -353,6 +353,7 @@ export class OpenAICompletionsHeadend implements Headend {
       writeSseChunk(res, roleChunk);
     };
     let reasoningEmitted = false;
+    let lastSentType: 'thinking' | 'output' | undefined;
     const emitReasoning = (text: string): void => {
       if (!streamed || text.length === 0) return;
       emitAssistantRole();
@@ -371,6 +372,7 @@ export class OpenAICompletionsHeadend implements Headend {
       };
       writeSseChunk(res, chunk);
       reasoningEmitted = true;
+      lastSentType = 'thinking';
     };
     const computeTotals = (): { tokensIn: number; tokensOut: number; tokensCacheRead: number; tokensCacheWrite: number; tools: number; costUsd: number } => {
       let tokensIn = 0;
@@ -706,6 +708,8 @@ export class OpenAICompletionsHeadend implements Headend {
         if (meta?.agentId !== undefined && meta.agentId !== agent.id) return;
         output += chunk;
         if (streamed) {
+          // Skip whitespace-only output if last sent was thinking (prevents closing thinking block)
+          if (lastSentType === 'thinking' && chunk.trim().length === 0) return;
           emitAssistantRole();
           const chunkPayload = {
             id: responseId,
@@ -721,6 +725,7 @@ export class OpenAICompletionsHeadend implements Headend {
             ],
           };
           writeSseChunk(res, chunkPayload);
+          lastSentType = 'output';
           if (chunk.length > 0) {
             streamedChunks += 1;
           }
