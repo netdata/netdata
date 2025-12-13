@@ -36,6 +36,7 @@ static struct {
     {STREAM_CAP_PROGRESS,     "PROGRESS" },
     {STREAM_CAP_NODE_ID,      "NODEID" },
     {STREAM_CAP_PATHS,        "PATHS" },
+    {STREAM_CAP_FLOAT_BASELINE, "FLOATBASELINE" },
 
     // terminator
     {0 , NULL },
@@ -139,6 +140,7 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
             STREAM_CAP_PATHS |
             STREAM_CAP_IEEE754 |
             STREAM_CAP_ML_MODELS |
+            STREAM_CAP_FLOAT_BASELINE |
             0) & ~disabled_capabilities;
 }
 

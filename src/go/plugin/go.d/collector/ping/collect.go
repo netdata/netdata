@@ -7,9 +7,9 @@ import (
 	"sync"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]float64, error) {
 	mu := &sync.Mutex{}
-	mx := make(map[string]int64)
+	mx := make(map[string]float64)
 	var wg sync.WaitGroup
 
 	for _, v := range c.Hosts {
@@ -21,7 +21,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Collector) pingHost(host string, mx map[string]int64, mu *sync.Mutex) {
+func (c *Collector) pingHost(host string, mx map[string]float64, mu *sync.Mutex) {
 	stats, err := c.prober.Ping(host)
 	if err != nil {
 		c.Error(err)
@@ -38,12 +38,12 @@ func (c *Collector) pingHost(host string, mx map[string]int64, mu *sync.Mutex) {
 
 	px := fmt.Sprintf("host_%s_", host)
 	if stats.PacketsRecv != 0 {
-		mx[px+"min_rtt"] = stats.MinRtt.Microseconds()
-		mx[px+"max_rtt"] = stats.MaxRtt.Microseconds()
-		mx[px+"avg_rtt"] = stats.AvgRtt.Microseconds()
-		mx[px+"std_dev_rtt"] = stats.StdDevRtt.Microseconds()
+		mx[px+"min_rtt"] = stats.MinRtt.Seconds()
+		mx[px+"max_rtt"] = stats.MaxRtt.Seconds()
+		mx[px+"avg_rtt"] = stats.AvgRtt.Seconds()
+		mx[px+"std_dev_rtt"] = stats.StdDevRtt.Seconds()
 	}
-	mx[px+"packets_recv"] = int64(stats.PacketsRecv)
-	mx[px+"packets_sent"] = int64(stats.PacketsSent)
-	mx[px+"packet_loss"] = int64(stats.PacketLoss * 1000)
+	mx[px+"packets_recv"] = float64(stats.PacketsRecv)
+	mx[px+"packets_sent"] = float64(stats.PacketsSent)
+	mx[px+"packet_loss"] = stats.PacketLoss
 }
