@@ -42,11 +42,11 @@ void initialize_swap_keys(struct swap *p)
 {
     // SWAP Operations
     p->pageReadsTotal.key = "Page Reads/sec";
-    p->pageWritesTotal.key = "Page Writes/s";
+    p->pageWritesTotal.key = "Page Writes/sec";
 
     // Swap Pages
     p->pageInputTotal.key = "Pages Input/sec";
-    p->pageOutputTotal.key = "Pages Output/s";
+    p->pageOutputTotal.key = "Pages Output/sec";
 }
 
 void initialize_pool_keys(struct system_pool *p)
@@ -75,9 +75,7 @@ static void do_memory_swap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjec
             "swap_operations",
             NULL,
             "swap",
-            "mem.swap_iops"
-
-            ,
+            "mem.swap_iops",
             "Swap Operations",
             "operations/s",
             PLUGIN_WINDOWS_NAME,
@@ -103,9 +101,7 @@ static void do_memory_swap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjec
             "swap_pages",
             NULL,
             "swap",
-            "mem.swap_pages_io"
-
-            ,
+            "mem.swap_pages_io",
             "Swap Pages",
             "pages/s",
             PLUGIN_WINDOWS_NAME,
@@ -137,9 +133,7 @@ static void do_memory_system_pool(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE 
             "system_pool",
             NULL,
             "mem",
-            "mem.system_pool_size"
-
-            ,
+            "mem.system_pool_size",
             "System Memory Pool",
             "bytes",
             PLUGIN_WINDOWS_NAME,
