@@ -36,8 +36,8 @@ struct web_service {
     RRDSET *st_curr_connections;
     RRDDIM *rd_curr_connections;
 
-    RRDSET *st_connections_attemps;
-    RRDDIM *rd_connections_attemps;
+    RRDSET *st_connections_attempts;
+    RRDDIM *rd_connections_attempts;
 
     RRDSET *st_user_count;
     RRDDIM *rd_user_anonymous;
@@ -53,8 +53,8 @@ struct web_service {
     RRDDIM *rd_error_rate_locked;
     RRDDIM *rd_error_rate_not_found;
 
-    RRDSET *st_logon_attemps;
-    RRDDIM *rd_logon_attemps;
+    RRDSET *st_logon_attempts;
+    RRDDIM *rd_logon_attempts;
 
     RRDSET *st_service_uptime;
     RRDDIM *rd_service_uptime;
@@ -440,7 +440,7 @@ static inline void netdata_webservice_active_connection(
     }
 }
 
-static inline void netdata_webservice_connection_attemp_rate(
+static inline void netdata_webservice_connection_attempt_rate(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
     PERF_INSTANCE_DEFINITION *pi,
@@ -448,36 +448,36 @@ static inline void netdata_webservice_connection_attemp_rate(
     int update_every)
 {
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISConnAttemptsAllInstancesTotal)) {
-        if (!p->st_connections_attemps) {
+        if (!p->st_connections_attempts) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_connection_attempts_rate", windows_shared_buffer);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_connection_attemptts_rate", windows_shared_buffer);
             netdata_fix_chart_name(id);
-            p->st_connections_attemps = rrdset_create_localhost(
+            p->st_connections_attempts = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
                 "connections",
-                "iis.website_connection_attempts_rate",
-                "Website connections attempts",
-                "attempts/s",
+                "iis.website_connection_attemptts_rate",
+                "Website connections attemptts",
+                "attemptts/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
-                PRIO_WEBSITE_IIS_CONNECTIONS_ATTEMP,
+                PRIO_WEBSITE_IIS_CONNECTIONS_ATTEMPT,
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_connections_attemps =
-                rrddim_add(p->st_connections_attemps, "connection", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_connections_attempts =
+                rrddim_add(p->st_connections_attempts, "connection", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-            rrdlabels_add(p->st_connections_attemps->rrdlabels, "website", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_connections_attempts->rrdlabels, "website", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
-            p->st_connections_attemps,
-            p->rd_connections_attemps,
-            (collected_number)p->IISCurrentConnections.current.Data);
+            p->st_connections_attempts,
+            p->rd_connections_attempts,
+            (collected_number)p->IISConnAttemptsAllInstancesTotal.current.Data);
 
-        rrdset_done(p->st_connections_attemps);
+        rrdset_done(p->st_connections_attempts);
     }
 }
 
@@ -653,7 +653,7 @@ static inline void netdata_webservice_errors_rate(
     }
 }
 
-static inline void netdata_webservice_logon_attemp_rate(
+static inline void netdata_webservice_logon_attempt_rate(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
     PERF_INSTANCE_DEFINITION *pi,
@@ -661,33 +661,33 @@ static inline void netdata_webservice_logon_attemp_rate(
     int update_every)
 {
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISLogonAttemptsTotal)) {
-        if (!p->st_logon_attemps) {
+        if (!p->st_logon_attempts) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_logon_attempts_rate", windows_shared_buffer);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_logon_attemptts_rate", windows_shared_buffer);
             netdata_fix_chart_name(id);
-            p->st_logon_attemps = rrdset_create_localhost(
+            p->st_logon_attempts = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
                 "logon",
-                "iis.website_logon_attempts_rate",
-                "Website logon attempts",
-                "attempts/s",
+                "iis.website_logon_attemptts_rate",
+                "Website logon attemptts",
+                "attemptts/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
                 PRIO_WEBSITE_IIS_LOGON_ATTEMPTS,
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_logon_attemps = rrddim_add(p->st_logon_attemps, "logon", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_logon_attempts = rrddim_add(p->st_logon_attempts, "logon", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-            rrdlabels_add(p->st_logon_attemps->rrdlabels, "website", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_logon_attempts->rrdlabels, "website", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
-            p->st_logon_attemps, p->rd_logon_attemps, (collected_number)p->IISLogonAttemptsTotal.current.Data);
+            p->st_logon_attempts, p->rd_logon_attempts, (collected_number)p->IISLogonAttemptsTotal.current.Data);
 
-        rrdset_done(p->st_logon_attemps);
+        rrdset_done(p->st_logon_attempts);
     }
 }
 
@@ -907,12 +907,12 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
         netdata_webservice_traffic(pDataBlock, pObjectType, pi, p, update_every);
         netdata_webservice_file_transfer_rate(pDataBlock, pObjectType, pi, p, update_every);
         netdata_webservice_active_connection(pDataBlock, pObjectType, pi, p, update_every);
-        netdata_webservice_connection_attemp_rate(pDataBlock, pObjectType, pi, p, update_every);
+        netdata_webservice_connection_attempt_rate(pDataBlock, pObjectType, pi, p, update_every);
         netdata_webservice_user_count(pDataBlock, pObjectType, pi, p, update_every);
         netdata_webservice_isapi_extension_request_count(pDataBlock, pObjectType, pi, p, update_every);
         netdata_webservice_isapi_extension_request_rate(pDataBlock, pObjectType, pi, p, update_every);
         netdata_webservice_errors_rate(pDataBlock, pObjectType, pi, p, update_every);
-        netdata_webservice_logon_attemp_rate(pDataBlock, pObjectType, pi, p, update_every);
+        netdata_webservice_logon_attempt_rate(pDataBlock, pObjectType, pi, p, update_every);
         netdata_webservice_uptime(pDataBlock, pObjectType, pi, p, update_every);
         netdata_webservice_requests(pDataBlock, pObjectType, pi, p, update_every);
     }
@@ -1176,7 +1176,7 @@ static inline void app_pool_recycles(
     }
 }
 
-static inline void app_pool_upime(
+static inline void app_pool_uptime(
     struct iis_app *p,
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
@@ -1357,7 +1357,7 @@ static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
         app_pool_worker_process_failures(p, pDataBlock, pObjectType, pi, update_every);
 
         app_pool_recycles(p, pDataBlock, pObjectType, pi, update_every);
-        app_pool_upime(p, pDataBlock, pObjectType, pi, update_every);
+        app_pool_uptime(p, pDataBlock, pObjectType, pi, update_every);
     }
 
     return true;
@@ -1511,7 +1511,7 @@ static inline void w3svc_w3wp_file_cache_mem_usage(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPFileCacheMemUsage)) {
         if (!p->st_wescv_w3wp_file_cache_mem_usage) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_file_cache_mem_usage", windows_shared_buffer);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_file_cache_mem_usage", app_name);
             netdata_fix_chart_name(id);
             p->st_wescv_w3wp_file_cache_mem_usage = rrdset_create_localhost(
                 "iis",
