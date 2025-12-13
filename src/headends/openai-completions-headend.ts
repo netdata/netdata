@@ -354,6 +354,7 @@ export class OpenAICompletionsHeadend implements Headend {
     };
     let reasoningEmitted = false;
     let lastSentType: 'thinking' | 'output' | undefined;
+    let pendingOutputWhitespace = '';
     const emitReasoning = (text: string): void => {
       if (!streamed || text.length === 0) return;
       emitAssistantRole();
@@ -708,8 +709,14 @@ export class OpenAICompletionsHeadend implements Headend {
         if (meta?.agentId !== undefined && meta.agentId !== agent.id) return;
         output += chunk;
         if (streamed) {
-          // Skip whitespace-only output if last sent was thinking (prevents closing thinking block)
-          if (lastSentType === 'thinking' && chunk.trim().length === 0) return;
+          // Buffer whitespace-only output if last sent was thinking (prevents closing thinking block)
+          if (lastSentType === 'thinking' && chunk.trim().length === 0) {
+            pendingOutputWhitespace += chunk;
+            return;
+          }
+          // Prepend any buffered whitespace to real output
+          const fullChunk = pendingOutputWhitespace + chunk;
+          pendingOutputWhitespace = '';
           emitAssistantRole();
           const chunkPayload = {
             id: responseId,
@@ -719,7 +726,7 @@ export class OpenAICompletionsHeadend implements Headend {
             choices: [
               {
                 index: 0,
-                delta: { content: chunk },
+                delta: { content: fullChunk },
                 finish_reason: null,
               },
             ],

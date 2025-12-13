@@ -314,6 +314,7 @@ export class AnthropicCompletionsHeadend implements Headend {
     let textBlockOpen = false;
     let thinkingBlockOpen = false;
     let lastSentType: 'thinking' | 'output' | undefined;
+    let pendingOutputWhitespace = '';
     const agentHeadingLabel = escapeMarkdown(resolveAgentHeadingLabel(agent));
     const turns: ReasoningTurnState[] = [];
     let renderedReasoning = '';
@@ -697,13 +698,19 @@ export class AnthropicCompletionsHeadend implements Headend {
         if (meta?.agentId !== undefined && meta.agentId !== agent.id) return;
         output += chunk;
         if (streamed) {
-          // Skip whitespace-only output if last sent was thinking (prevents closing thinking block)
-          if (lastSentType === 'thinking' && chunk.trim().length === 0) return;
+          // Buffer whitespace-only output if last sent was thinking (prevents closing thinking block)
+          if (lastSentType === 'thinking' && chunk.trim().length === 0) {
+            pendingOutputWhitespace += chunk;
+            return;
+          }
+          // Prepend any buffered whitespace to real output
+          const fullChunk = pendingOutputWhitespace + chunk;
+          pendingOutputWhitespace = '';
           if (thinkingBlockOpen) closeThinkingBlock();
           openTextBlock();
           const event = {
             type: 'content_block_delta',
-            content_block: { type: 'text', text_delta: chunk },
+            content_block: { type: 'text', text_delta: fullChunk },
           };
           writeSseChunk(res, event);
           lastSentType = 'output';
