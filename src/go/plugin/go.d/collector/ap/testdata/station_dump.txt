@@ -56,3 +56,32 @@ Station fa:50:db:c1:1c:18 (on wlp1s0)
 	associated at [boottime]:	13440.167s
 	associated at:	1720706069520 ms
 	current time:	1720706075344 ms
+Station a7:2f:9e:d3:f0:34 (on wlp1s0)
+        inactive time:  42324 ms
+        rx bytes:       6705
+        rx packets:     139
+        tx bytes:       1014
+        tx packets:     13
+        tx retries:     0
+        tx failed:      0
+        rx drop misc:   0
+        signal:         -87 [-87] dBm
+        signal avg:     -84 [-84] dBm
+        tx bitrate:     (unknown)
+        tx duration:    0 us
+        rx bitrate:     17.2 MBit/s HE-MCS 1 HE-NSS 1 HE-GI 0 HE-DCM 0
+        rx duration:    0 us
+        authorized:     yes
+        authenticated:  yes
+        associated:     yes
+        preamble:       long
+        WMM/WME:        yes
+        MFP:            no
+        TDLS peer:      no
+        DTIM period:    2
+        beacon interval:100
+        short slot time:yes
+        connected time: 2215 seconds
+        associated at [boottime]:       3810.003s
+        associated at:  <timestamp> ms
+        current time:   <timestamp> ms
