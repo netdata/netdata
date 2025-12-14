@@ -83,8 +83,10 @@ Another way to fetch the page data and extract the information yourself.
 
 ## How to Work
 1. Use the first available tool in the order defined above, with the provided `url`
-2. If that tool fails, retry with another tool
+2. If that tool fails to read the page, retry with another tool (ONLY WHEN THE FIRST TOOL FAILED TO READ THE PAGE)
 3. Once you have the information, provide your final report
+
+**CRITICAL:** When a tool returned the page, but the information wanted is not found in it, DO NOT RETRY with another tool. The page did not change. You must fallback to using another tool, only when the tool you used FAILED TO RETURN THE PAGE, or you have strong indications that the page was truncated.
 
 ## Reporting Rules
 - `status`: true if the page was fetched, false otherwise
