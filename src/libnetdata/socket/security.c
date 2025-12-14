@@ -286,8 +286,10 @@ ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
     errno = 0;
     ssl->ssl_errno = 0;
 
-    if(unlikely(!is_handshake_complete(ssl, "read")))
+    if(unlikely(!is_handshake_complete(ssl, "read"))) {
+        errno = ENOTCONN;
         return -1;
+    }
 
     int bytes = SSL_read(ssl->conn, buf, (int)num);
 
@@ -302,10 +304,66 @@ ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
             ssl->ssl_errno = err;
             errno = EWOULDBLOCK;
         }
-        else
+        else {
+            // For SSL_ERROR_SYSCALL, errno contains the underlying socket error
+            // (e.g., ECONNRESET). Save it before calling netdata_ssl_log_error_queue()
+            // which may corrupt errno through subsequent function calls.
+            int saved_errno = errno;
             netdata_ssl_log_error_queue("SSL_read", ssl, err);
+            errno = saved_errno;
+        }
 
         bytes = -1;  // according to read() or recv()
+    }
+
+    return bytes;
+}
+
+/*
+ * netdata_ssl_peek() - peek at incoming SSL data without consuming it
+ *
+ * This function is identical to netdata_ssl_read() but uses SSL_peek()
+ * instead of SSL_read(), leaving the data in the SSL buffer for a
+ * subsequent read operation. Useful for probing connection status.
+ *
+ * Returns:
+ *   > 0: Number of bytes available to peek
+ *   0: Connection closed (SSL_ERROR_ZERO_RETURN)
+ *   -1: Error (check errno: EWOULDBLOCK means no data available)
+ */
+ALWAYS_INLINE
+ssize_t netdata_ssl_peek(NETDATA_SSL *ssl, void *buf, size_t num) {
+    errno = 0;
+    ssl->ssl_errno = 0;
+
+    if(unlikely(!is_handshake_complete(ssl, "peek"))) {
+        errno = ENOTCONN;
+        return -1;
+    }
+
+    int bytes = SSL_peek(ssl->conn, buf, (int)num);
+
+    if(unlikely(bytes <= 0)) {
+        int err = SSL_get_error(ssl->conn, bytes);
+        if (err == SSL_ERROR_ZERO_RETURN) {
+            ssl->ssl_errno = err;
+            return 0;  // Connection closed
+        }
+
+        if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+            ssl->ssl_errno = err;
+            errno = EWOULDBLOCK;
+        }
+        else {
+            // For SSL_ERROR_SYSCALL, errno contains the underlying socket error
+            // (e.g., ECONNRESET). Save it before calling netdata_ssl_log_error_queue()
+            // which may corrupt errno through subsequent function calls.
+            int saved_errno = errno;
+            netdata_ssl_log_error_queue("SSL_peek", ssl, err);
+            errno = saved_errno;
+        }
+
+        bytes = -1;
     }
 
     return bytes;
@@ -329,8 +387,10 @@ ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num) {
     errno = 0;
     ssl->ssl_errno = 0;
 
-    if(unlikely(!is_handshake_complete(ssl, "write")))
+    if(unlikely(!is_handshake_complete(ssl, "write"))) {
+        errno = ENOTCONN;
         return -1;
+    }
 
     int bytes = SSL_write(ssl->conn, (uint8_t *)buf, (int)num);
 
@@ -340,8 +400,14 @@ ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num) {
             ssl->ssl_errno = err;
             errno = EWOULDBLOCK;
         }
-        else
+        else {
+            // For SSL_ERROR_SYSCALL, errno contains the underlying socket error
+            // (e.g., ECONNRESET). Save it before calling netdata_ssl_log_error_queue()
+            // which may corrupt errno through subsequent function calls.
+            int saved_errno = errno;
             netdata_ssl_log_error_queue("SSL_write", ssl, err);
+            errno = saved_errno;
+        }
 
         bytes = -1; // according to write() or send()
     }
