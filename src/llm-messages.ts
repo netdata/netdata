@@ -150,7 +150,7 @@ export const TOOL_CALL_MALFORMED =
  * (progress_report was called but no other tools)
  */
 export const TURN_FAILED_PROGRESS_ONLY =
-  'You called agent__progress_report without calling any other tools together with it. agent__progress_report does not perform any actions other than showing a message to the user. To make actual progress, you must either:\n\n1. call other tools to collect data or perform actions (following their schemas precisely), or\n2. if your task is complete and you can now conclude, provide your final report/answer (using the XML wrapper as instructed - your final report/answer is not a tool call)';
+  'You called agent__progress_report without calling any other tools together with it. agent__progress_report does not perform any actions other than showing a message to the user. To do actual work, you must either:\n\n1. call other tools to collect data or perform actions (following their schemas precisely), or\n2. if your task is complete and you can now conclude, provide your final report/answer (using the XML wrapper as instructed - your final report/answer is not a tool call). **CRITICAL:** DO NOT CALL agent__progress_report STANDALONE. If you have no other tools to call, skip it entirely.';
 
 /**
  * When model calls XML wrapper tag as a tool instead of outputting it as text.
@@ -335,10 +335,10 @@ When calling other tools, inject also a call to agent__progress_report, to provi
 - "Discovered how X works, now checking if it can also do Y or Z": informs the user that you found how X works, and you are now calling more tools to check for Y and Z
 - "Looks like X is not available, trying Y and Z instead": updates the user that X is not available, and you are calling other tools to try Y and Z
 
-**Bad examples:**
-- "I am calling tool X": the user is not aware of your tools - the useful information is why you call a tool, not that you call it
-- "I am now ready to provide my final report": incorrect, final report is NOT a tool call - provide your final report instead
-- "I now have all the information to complete my task": incorrect, if you have completed your task, provide your final report instead of calling progress_report
+**Bad examples (DO NOT DO THESE):**
+- "Calling tool X": the user is not aware of your tools - the useful information is why you call a tool, not that you call it
+- "Compiling/Preparing final report about X": incorrect, final report is NOT a tool call - provide your final report instead of calling agent__progress_report
+- "I now have all the information to complete my task": incorrect, if you have completed your task, provide your final report instead of calling agent__progress_report
 - "Extracted X and Y": too vague, does not inform the user about your next steps
 
 **Mandatory Rules about agent__progress_report:**
