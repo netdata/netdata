@@ -131,7 +131,7 @@ export class SubAgentRegistry {
   getTools(): MCPTool[] {
     return Array.from(this.children.values()).map((c) => {
       const inputSchema = (() => {
-        const reasonProp = { type: 'string', minLength: 1, description: '3-7 words about the reason of running this tool' };
+        const reasonProp = { type: 'string', minLength: 1, description: 'The reason you are running this tool. Be specific and concise. Up to 15 words.' };
         if (c.hasExplicitInputSchema) {
           return augmentSchemaWithReason(c.inputSchema, reasonProp);
         }
@@ -183,7 +183,7 @@ export class SubAgentRegistry {
     const userPrompt: string = (() => {
       if (info.inputFormat === 'json') {
         if (info.inputSchema !== undefined) {
-          const reasonProp = { type: 'string', minLength: 1, description: '3-7 words about the reason of running this tool' };
+          const reasonProp = { type: 'string', minLength: 1, description: 'The reason you are running this tool. Be specific and concise. Up to 15 words.' };
           const schemaForValidation = info.hasExplicitInputSchema
             ? augmentSchemaWithReason(info.inputSchema, reasonProp)
             : buildFallbackSchema(reasonProp, info.usage);

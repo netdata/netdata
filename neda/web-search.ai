@@ -1,7 +1,7 @@
 #!/usr/bin/env ai-agent
 ---
-description: Answers any question using publicly available sources (web pages, PDF files, github repos, reddit posts, etc)
-usage: Search term or question to investigate
+description: Answers any question using publicly available sources (web sites, PDF files, github repos, reddit posts, open source codebases, etc)
+usage: Provide the search term or question to search for. Provide as much relevant information as possible to steer the investigation, including any specific success criteria or expected details that can narrow down the scope of the search. The more details you provide, the more accurate results you will get.
 models:
 #  - anthropic/claude-3-5-haiku-20241022
   - anthropic/claude-haiku-4-5

@@ -328,22 +328,25 @@ export const PROGRESS_TOOL_DESCRIPTION =
  */
 export const PROGRESS_TOOL_INSTRUCTIONS = `#### agent__progress_report — Progress Updates for the User
 
-Use this tool to update the user on your overall progress and next steps.
-
-**Rules:**
-- This tool is OPTIONAL — only call it when you have something meaningful to report
-- ONLY call progress_report when you are ALSO calling other tools in the same turn
-- NEVER call progress_report standalone (if you have no other tools to call, skip it entirely)
-- NEVER combine progress_report with your final report/answer
-- NEVER call more than one progress_report per turn
-- Keep messages concise (max 15-20 words), no formatting or newlines
+When calling other tools, inject also a call to agent__progress_report, to provide information to the user about your current status and the reason you are calling the other tools.
 
 **Good examples:**
-- Found the data about X, now searching for Y and Z.
-- Discovered how X works, checking if it can also do Y or Z.
-- Looks like X is not available, trying Y and Z instead.
+- "Found the data about X, now searching for Y and Z": let the user know you have already acquired information about X and now you are calling more tools to search for Y and Z
+- "Discovered how X works, now checking if it can also do Y or Z": informs the user that you found how X works, and you are now calling more tools to check for Y and Z
+- "Looks like X is not available, trying Y and Z instead": updates the user that X is not available, and you are calling other tools to try Y and Z
 
-**CRITICAL:** progress_report only informs the user; it does NOT perform actions. You must call other tools to actually do work.`;
+**Bad examples:**
+- "I am calling tool X": the user is not aware of your tools - the useful information is why you call a tool, not that you call it
+- "I am now ready to provide my final report": incorrect, final report is NOT a tool call - provide your final report instead
+- "I now have all the information to complete my task": incorrect, if you have completed your task, provide your final report instead of calling progress_report
+- "Extracted X and Y": too vague, does not inform the user about your next steps
+
+**Mandatory Rules about agent__progress_report:**
+- Call agent__progress_report ONLY when you are ALSO calling other tools
+- NEVER call agent__progress_report standalone; if you are not calling other tools, skip it entirely
+- Keep messages concise (max 20 words), no formatting or newlines
+- agent__progress_report only informs the user; it does NOT perform actions; you must call other tools to do actual work
+`;
 
 /**
  * Brief instructions for XML-NEXT progress slot.
