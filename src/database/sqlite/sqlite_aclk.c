@@ -167,18 +167,19 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
 
     rrdhost_system_info_free(system_info);
 
-    if (likely(host)) {
-        if (is_ephemeral)
-            rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
+    if (unlikely(!host))
+        return 0;
 
-        if (is_ephemeral)
-            host->stream.rcv.status.last_disconnected = now_realtime_sec();
+    if (is_ephemeral)
+        rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
 
-        host->rrdlabels = sql_load_host_labels((nd_uuid_t *)argv[IDX_HOST_ID]);
-        host->stream.snd.status.last_connected = last_connected;
+    if (is_ephemeral)
+        host->stream.rcv.status.last_disconnected = now_realtime_sec();
 
-        pulse_host_status(host, 0, 0); // this will detect the receiver status
-    }
+    host->rrdlabels = sql_load_host_labels((nd_uuid_t *)argv[IDX_HOST_ID]);
+    host->stream.snd.status.last_connected = last_connected;
+
+    pulse_host_status(host, 0, 0); // this will detect the receiver status
 
     if (IS_VIRTUAL_HOST_OS(host))
         node_data->vnodes++;
@@ -320,6 +321,7 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t *quer
 {
     if (query->type == UNKNOWN || query->type >= ACLK_QUERY_TYPE_COUNT) {
         error_report("Unknown query in query queue. %u", query->type);
+        aclk_query_free(query);
         return;
     }
 
@@ -440,9 +442,6 @@ static void aclk_execute_batch(uv_work_t *req)
     if (!aclk_query_batch)
         return;
 
-    usec_t started_ut = now_monotonic_usec(); (void)started_ut;
-
-    size_t entries = aclk_query_batch->count;
     Word_t Index = 0;
     bool first = true;
     Pvoid_t *Pvalue;
@@ -456,11 +455,6 @@ static void aclk_execute_batch(uv_work_t *req)
 
     (void) JudyLFreeArray(&aclk_query_batch->JudyL, PJE0);
     freez(aclk_query_batch);
-
-    usec_t ended_ut = now_monotonic_usec();
-    (void)ended_ut;
-    nd_log_daemon(
-        NDLP_DEBUG, "Processed %zu ACLK commands in %0.2f ms", entries, (double)(ended_ut - started_ut) / USEC_PER_MS);
 
     worker_is_idle();
 }
@@ -729,7 +723,7 @@ static void aclk_synchronization_event_loop(void *arg)
                         create_aclk_config(host, &host->host_id.uuid, &host->node_id.uuid);
                         aclk_host_config = host->aclk_host_config;
                     }
-                    aclk_host_config->node_info_send_time = (host == localhost ||(void *)(uintptr_t) immediate) ? 1 : now_realtime_sec();
+                    aclk_host_config->node_info_send_time = (host == localhost || immediate) ? 1 : now_realtime_sec();
                     break;
                 case ACLK_CANCEL_NODE_UPDATE_TIMER:
                     host = cmd.param[0];
@@ -786,8 +780,10 @@ static void aclk_synchronization_event_loop(void *arg)
                         if (Pvalue != PJERR) {
                             *Pvalue = query;
                             pending_queries++;
-                        } else
+                        } else {
                             nd_log_daemon(NDLP_ERR, "Failed to add ACLK command to the pending commands Judy");
+                            aclk_query_free(query);
+                        }
                         break;
                     }
 
@@ -831,8 +827,10 @@ static void aclk_synchronization_event_loop(void *arg)
                             *Pvalue = query;
                             pending_queries++;
                         }
-                        else
+                        else {
                             nd_log_daemon(NDLP_ERR, "Failed to add ACLK command to the pending commands Judy");
+                            aclk_query_free(query);
+                        }
                     }
                     break;
 
@@ -846,8 +844,12 @@ static void aclk_synchronization_event_loop(void *arg)
                         aclk_query_batch = callocz(1, sizeof(*aclk_query_batch));
 
                     Pvalue = JudyLIns(&aclk_query_batch->JudyL, ++aclk_query_batch->count, PJE0);
-                    if (Pvalue)
+                    if (Pvalue != PJERR)
                         *Pvalue = query;
+                    else {
+                        aclk_query_free(query);
+                        break;
+                    }
 
                     config->aclk_jobs_pending++;
                     if (aclk_query_batch->count < MAX_ACLK_BATCH_JOBS_IN_QUEUE || config->aclk_batch_job_is_running)
@@ -891,7 +893,7 @@ static void aclk_synchronization_event_loop(void *arg)
         uv_close((uv_handle_t *)&config->timer_req, NULL);
 
     uv_close((uv_handle_t *)&config->async, NULL);
-    uv_walk(loop, libuv_close_callback, notify_timer_close_callback);
+    uv_walk(loop, libuv_close_callback, NULL);
 
     size_t loop_count = (MAX_SHUTDOWN_TIMEOUT_SECONDS * MSEC_PER_SEC) / SHUTDOWN_SLEEP_INTERVAL_MS;
 
@@ -1084,7 +1086,14 @@ void aclk_push_alert_config(const char *node_id, const char *config_hash)
     if (unlikely(!node_id || !config_hash))
         return;
 
-    queue_aclk_sync_cmd(ACLK_DATABASE_PUSH_ALERT_CONFIG, strdupz(node_id), strdupz(config_hash));
+    char *node_id_dup = strdupz(node_id);
+    char *config_hash_dup = strdupz(config_hash);
+    bool queued = queue_aclk_sync_cmd(ACLK_DATABASE_PUSH_ALERT_CONFIG, node_id_dup, config_hash_dup);
+    if (unlikely(!queued)) {
+        nd_log_daemon(NDLP_WARNING, "ACLK: Failed to queue alert config push for node %s (config hash %s)", node_id, config_hash);
+        freez(node_id_dup);
+        freez(config_hash_dup);
+    }
 }
 
 void aclk_execute_query(aclk_query_t *query)
@@ -1092,7 +1101,11 @@ void aclk_execute_query(aclk_query_t *query)
     if (unlikely(!query))
         return;
 
-    (void) queue_aclk_sync_cmd(ACLK_QUERY_EXECUTE, query, NULL);
+    bool queued = queue_aclk_sync_cmd(ACLK_QUERY_EXECUTE, query, NULL);
+    if (unlikely(!queued)) {
+        nd_log_daemon(NDLP_WARNING, "ACLK: Failed to queue query execution");
+        aclk_query_free(query);
+    }
 }
 
 void aclk_add_job(aclk_query_t *query)
@@ -1100,7 +1113,11 @@ void aclk_add_job(aclk_query_t *query)
     if (unlikely(!query))
         return;
 
-    (void) queue_aclk_sync_cmd(ACLK_QUERY_BATCH_ADD, query, NULL);
+    bool queued = queue_aclk_sync_cmd(ACLK_QUERY_BATCH_ADD, query, NULL);
+    if (unlikely(!queued)) {
+        nd_log_daemon(NDLP_WARNING, "ACLK: Failed to queue query job");
+        aclk_query_free(query);
+    }
 }
 
 void aclk_mqtt_client_set(mqtt_wss_client client)
@@ -1133,7 +1150,12 @@ void unregister_node(const char *machine_guid)
     if (unlikely(!machine_guid))
         return;
 
-    (void) queue_aclk_sync_cmd(ACLK_DATABASE_NODE_UNREGISTER, strdupz(machine_guid), NULL);
+    char *machine_guid_dup = strdupz(machine_guid);
+    bool queued = queue_aclk_sync_cmd(ACLK_DATABASE_NODE_UNREGISTER, machine_guid_dup, NULL);
+    if (unlikely(!queued)) {
+        nd_log_daemon(NDLP_WARNING, "ACLK: Failed to queue unregister node command for %s", machine_guid);
+        freez(machine_guid_dup);
+    }
 }
 
 void destroy_aclk_config(RRDHOST *host)
