@@ -42,7 +42,7 @@ static void initialize(void)
 static BOOL fill_dictionary_with_content()
 {
     PVOID buffer = NULL;
-    static DWORD bytes_needed = 0;
+    DWORD bytes_needed = 0;
 
     LPENUM_SERVICE_STATUS_PROCESS service, services;
     DWORD total_services = 0;
@@ -64,50 +64,27 @@ static BOOL fill_dictionary_with_content()
         NULL,
         NULL);
 
-    DWORD test = GetLastError();
-    if (test == ERROR_MORE_DATA) {
-        if (unlikely(!buffer))
-            buffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytes_needed);
-        else
-            buffer = HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, buffer, bytes_needed);
-    } else {
-        switch (test) {
-            case ERROR_ACCESS_DENIED:
-            case ERROR_INVALID_PARAMETER:
-            case ERROR_INVALID_HANDLE:
-            case ERROR_INVALID_LEVEL:
-            case ERROR_SHUTDOWN_IN_PROGRESS:
-                ret = FALSE;
-                goto endServiceCollection;
-            default:
-                ret = TRUE;
-        }
+    if (ret) {
+        // This should not happen, as we passed a 0-sized buffer. But if it does, it means 0 services.
+        goto endServiceCollection;
     }
 
+    if (GetLastError() != ERROR_MORE_DATA) {
+        goto endServiceCollection;
+    }
+
+    buffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytes_needed);
     if (!buffer) {
         ret = FALSE;
         goto endServiceCollection;
     }
 
-    if (!ret) {
-        ret = EnumServicesStatusEx(
-            ndSCMH,
-            SC_ENUM_PROCESS_INFO,
-            SERVICE_WIN32,
-            SERVICE_STATE_ALL,
-            (LPBYTE)buffer,
-            bytes_needed,
-            (LPDWORD)&bytes_needed,
-            (LPDWORD)&total_services,
-            NULL,
-            NULL);
-
-        if (!ret) {
-            goto endServiceCollection;
-        }
+    if (!EnumServicesStatusEx(ndSCMH, SC_ENUM_PROCESS_INFO, SERVICE_WIN32, SERVICE_STATE_ALL,
+                              (LPBYTE)buffer, bytes_needed, &bytes_needed, &total_services, NULL, NULL)) {
+        goto endServiceCollection;
     }
 
-    services = (LPENUM_SERVICE_STATUS_PROCESS)buffer;
+    LPENUM_SERVICE_STATUS_PROCESS services = (LPENUM_SERVICE_STATUS_PROCESS)buffer;
 
     for (ULONG i = 0; i < total_services; i++) {
         service = &services[i];
