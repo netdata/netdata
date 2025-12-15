@@ -99,6 +99,7 @@
 - AD fixes (windows.plugin) ([#21454](https://github.com/netdata/netdata/issues/21454))
 - Build(deps): bump github.com/miekg/dns from 1.1.68 to 1.1.69 in /src/go ([#21457](https://github.com/netdata/netdata/issues/21457))
 - Improve streaming connection loss detection ([#21430](https://github.com/netdata/netdata/issues/21430))
+- Fix(go.d/ap):  handle unknown values in station statistics gracefully ([#21461](https://github.com/netdata/netdata/issues/21461))
 
 ## [2.8.0] - 2025-11-19
 
