@@ -453,10 +453,12 @@ static int netdata_collect_sensor_data(collected_number *value, ISensor *pSensor
                 default:
                     goto error_collect_sensor_data;
             }
-        } else
+            pReport->lpVtbl->Release(pReport);
+        } else {
+            pReport->lpVtbl->Release(pReport);
             goto error_collect_sensor_data;
+        }
         PropVariantClear(&pv);
-        pReport->lpVtbl->Release(pReport);
     } else
         goto error_collect_sensor_data;
 
@@ -574,7 +576,8 @@ static void netdata_get_sensors()
         ISensor *pSensor = NULL;
         hr = pSensorCollection->lpVtbl->GetAt(pSensorCollection, i, &pSensor);
         if (FAILED(hr) || !pSensor) {
-            pSensor->lpVtbl->Release(pSensor);
+            if (pSensor)
+                pSensor->lpVtbl->Release(pSensor);
             continue;
         }
 
