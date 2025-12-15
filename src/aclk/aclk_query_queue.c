@@ -99,7 +99,7 @@ void aclk_query_free(aclk_query_t *query)
     freez(query->callback_topic);
     freez(query->msg_id);
 
-    if (query->completion)
-        completion_mark_complete(query->completion);
+    if (query->sync_completion)
+        aclk_sync_completion_signal(query->sync_completion);
     return_query(query);
 }

@@ -976,23 +976,23 @@ void aclk_create_node_instance_job(RRDHOST *host)
     aclk_add_job(query);
 }
 
-void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable, struct completion *compl)
+void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable, struct aclk_sync_completion *sync_completion)
 {
     if (unlikely(!host)) {
-        if (compl)
-            completion_mark_complete(compl);
+        if (sync_completion)
+            aclk_sync_completion_signal(sync_completion);
         return;
     }
 
     CLAIM_ID claim_id = claim_id_get();
     if (!claim_id_is_set(claim_id)) {
-        if (compl)
-            completion_mark_complete(compl);
+        if (sync_completion)
+            aclk_sync_completion_signal(sync_completion);
         return;
     }
 
     aclk_query_t *query = aclk_query_new(NODE_STATE_UPDATE);
-    query->completion = compl;
+    query->sync_completion = sync_completion;
 
     int32_t hops = rrdhost_ingestion_hops(host);
     node_instance_connection_t node_state_update = {
@@ -1024,21 +1024,21 @@ void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable, struc
     aclk_add_job(query);
 }
 
-void aclk_host_state_update(RRDHOST *host, int live, int queryable, struct completion *compl)
+void aclk_host_state_update(RRDHOST *host, int live, int queryable, struct aclk_sync_completion *sync_completion)
 {
     if (!aclk_online()) {
-        if (compl)
-            completion_mark_complete(compl);
+        if (sync_completion)
+            aclk_sync_completion_signal(sync_completion);
         return;
     }
 
     if (uuid_is_null(host->node_id.uuid)) {
         aclk_create_node_instance_job(host);
-        if (compl)
-            completion_mark_complete(compl);
+        if (sync_completion)
+            aclk_sync_completion_signal(sync_completion);
     }
     else
-        aclk_update_node_instance_job(host, live, queryable, compl);
+        aclk_update_node_instance_job(host, live, queryable, sync_completion);
 }
 
 void aclk_send_node_instances()

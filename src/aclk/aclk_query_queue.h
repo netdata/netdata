@@ -40,6 +40,45 @@ struct aclk_bin_payload {
     const char *msg_name;
 };
 
+// ----------------------------------------------------------------------------
+// Reference-counted completion for safe timed waits
+// Both waiter and query hold a reference; last one to release frees the structure
+
+struct aclk_sync_completion {
+    struct completion compl;
+    int32_t refcount;
+};
+
+static inline struct aclk_sync_completion *aclk_sync_completion_create(void) {
+    struct aclk_sync_completion *sc = callocz(1, sizeof(*sc));
+    completion_init(&sc->compl);
+    sc->refcount = 2;  // One for waiter, one for query
+    return sc;
+}
+
+static inline void aclk_sync_completion_release(struct aclk_sync_completion *sc) {
+    if (__atomic_sub_fetch(&sc->refcount, 1, __ATOMIC_ACQ_REL) == 0) {
+        completion_destroy(&sc->compl);
+        freez(sc);
+    }
+}
+
+// Called by query processing to signal completion and release query's reference
+static inline void aclk_sync_completion_signal(struct aclk_sync_completion *sc) {
+    completion_mark_complete(&sc->compl);
+    aclk_sync_completion_release(sc);
+}
+
+// Called by waiter - waits with timeout, then releases waiter's reference
+// Returns true if completed within timeout, false if timed out
+static inline bool aclk_sync_completion_timedwait(struct aclk_sync_completion *sc, uint64_t timeout_s) {
+    bool result = completion_timedwait_for(&sc->compl, timeout_s);
+    aclk_sync_completion_release(sc);
+    return result;
+}
+
+// ----------------------------------------------------------------------------
+
 typedef struct {
     aclk_query_type_t type;
     bool allocated;
@@ -68,7 +107,7 @@ typedef struct {
         void *payload;
         char *node_id;
     } data;
-    struct completion *completion;
+    struct aclk_sync_completion *sync_completion;
 } aclk_query_t;
 
 aclk_query_t *aclk_query_new(aclk_query_type_t type);
