@@ -180,7 +180,7 @@ export class XmlToolTransport {
       maxTurns: config.maxTurns,
       tools: [],
       slotTemplates,
-      progressSlot: undefined,
+      progressToolEnabled: config.progressToolEnabled,
       expectedFinalFormat: (config.resolvedFormat ?? 'markdown') as XmlNextPayload['expectedFinalFormat'],
       finalSchema: config.resolvedFormat === 'json' ? config.expectedJsonSchema : undefined,
       attempt: config.attempt,

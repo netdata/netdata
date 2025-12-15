@@ -71,7 +71,7 @@ describe('XML streaming parser', () => {
       maxTurns: 3,
       tools: [{ name: 'final_xml_only' }, { name: 'agent__progress_report' }, { name: 'mock_tool', schema: { type: 'object' } }],
       slotTemplates: [{ slotId: `${NONCE}-FINAL`, tools: ['final_xml_only'] }],
-      progressSlot: undefined,
+      progressToolEnabled: false,
       expectedFinalFormat: 'markdown',
       finalSchema: undefined,
       attempt: 1,

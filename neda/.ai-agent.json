@@ -310,8 +310,8 @@
       "toolsDenied": []
     },
     "jina-reader": {
-      "type": "sse",
-      "url": "https://mcp.jina.ai/sse",
+      "type": "http",
+      "url": "https://mcp.jina.ai/v1",
       "headers": {
         "Authorization": "Bearer ${JINA_API_KEY}"
       },
@@ -322,8 +322,8 @@
       "toolsDenied": []
     },
     "jina-search": {
-      "type": "sse",
-      "url": "https://mcp.jina.ai/sse",
+      "type": "http",
+      "url": "https://mcp.jina.ai/v1",
       "headers": {
         "Authorization": "Bearer ${JINA_API_KEY}"
       },
@@ -335,8 +335,8 @@
       "toolsDenied": []
     },
     "jina": {
-      "type": "sse",
-      "url": "https://mcp.jina.ai/sse",
+      "type": "http",
+      "url": "https://mcp.jina.ai/v1",
       "headers": {
         "Authorization": "Bearer ${JINA_API_KEY}"
       },

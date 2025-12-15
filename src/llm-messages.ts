@@ -320,7 +320,7 @@ export const turnFailedStructuredOutputTruncated = (maxOutputTokens?: number): s
  * Used in: internal-provider.ts listTools()
  */
 export const PROGRESS_TOOL_DESCRIPTION =
-  'Report current progress to user (max 15 words). Only call when also invoking other tools. Never call standalone.';
+  'When calling other tools, call this tool to provide feedback to the user about your current progress and actions. Do not call this tool if you are not calling other tools in the same turn. Do not call this tool when providing your final report/answer.';
 
 /**
  * Full instructions for agent__progress_report.
@@ -342,7 +342,7 @@ When calling other tools, inject also a call to agent__progress_report, to provi
 - "Extracted X and Y": too vague, does not inform the user about your next steps
 
 **Mandatory Rules about agent__progress_report:**
-- Call agent__progress_report ONLY when you are ALSO calling other tools
+- Call agent__progress_report ONLY when you are ALSO calling other tools in the same turn
 - NEVER call agent__progress_report standalone; if you are not calling other tools, skip it entirely
 - Keep messages concise (max 20 words), no formatting or newlines
 - agent__progress_report only informs the user; it does NOT perform actions; you must call other tools to do actual work
@@ -377,7 +377,7 @@ export interface XmlNextTemplatePayload {
   maxTurns?: number;
   tools: { name: string; schema?: Record<string, unknown> }[];
   slotTemplates: { slotId: string; tools: string[] }[];
-  progressSlot?: { slotId: string };
+  progressToolEnabled: boolean;
   expectedFinalFormat: string;
   attempt: number;
   maxRetries: number;
@@ -399,7 +399,7 @@ export interface XmlPastTemplatePayload {
 }
 
 export const renderXmlNextTemplate = (payload: XmlNextTemplatePayload): string => {
-  const { nonce, turn, maxTurns, attempt, maxRetries, contextPercentUsed, hasExternalTools, expectedFinalFormat } = payload;
+  const { nonce, turn, maxTurns, attempt, maxRetries, contextPercentUsed, hasExternalTools, expectedFinalFormat, progressToolEnabled } = payload;
   const finalSlotId = `${nonce}-FINAL`;
   const lines: string[] = [];
 
@@ -407,7 +407,7 @@ export const renderXmlNextTemplate = (payload: XmlNextTemplatePayload): string =
   lines.push('');
 
   // Turn info with optional retry count
-  const turnInfo = `This is turn ${String(turn)}${maxTurns !== undefined ? ` of ${String(maxTurns)}` : ''}`;
+  const turnInfo = `This is turn/step ${String(turn)}${maxTurns !== undefined ? ` of ${String(maxTurns)}` : ''}`;
   const retryInfo = attempt > 1 ? ` (retry ${String(attempt)} of ${String(maxRetries)})` : '';
   lines.push(`${turnInfo}${retryInfo}.`);
   lines.push(`Your context window is ${String(contextPercentUsed)}% full.`);
@@ -416,8 +416,17 @@ export const renderXmlNextTemplate = (payload: XmlNextTemplatePayload): string =
   // Guidance based on tool availability
   if (hasExternalTools) {
     lines.push('You now need to decide your next move:');
-    lines.push('1. Call tools to advance your task (pay attention to their formatting and schema requirements).');
-    lines.push(`2. Provide your final report/answer in the expected format (${expectedFinalFormat}) using the XML wrapper (\`<ai-agent-${finalSlotId} format="${expectedFinalFormat}">\`)`);
+    lines.push('EITHER');
+    lines.push('- Call tools to advance your task following the main prompt instructions (pay attention to tool formatting and schema requirements).');
+    if (progressToolEnabled) {
+      lines.push('- Together with these tool calls, also call `agent__progress_report` to explain what you are doing and why you are calling these tools.');
+    }
+    lines.push('OR');
+    lines.push(`- Provide your final report/answer in the expected format (${expectedFinalFormat}) using the XML wrapper (\`<ai-agent-${finalSlotId} format="${expectedFinalFormat}">\`)`);
+    if (progressToolEnabled) {
+      lines.push('');
+      lines.push('DO NOT call `agent__progress_report` standalone - it is only for updating the user during tool calls.)');
+    }
   } else {
     lines.push(`You MUST now provide your final report/answer in the expected format (${expectedFinalFormat}) using the XML wrapper (\`<ai-agent-${finalSlotId} format="${expectedFinalFormat}">\`).`);
   }
@@ -485,7 +494,7 @@ export const finalReportXmlInstructions = (
   return `
 ## MANDATORY READ-FIRST: How to Provide Your Final Report/Answer
 
-You run in agentic/investigation mode with strict output formatting requirements. Depending on the user request and the task at hand, you may need to run several turns/steps, calling tools to gather information or perform actions, adapting to the data at hand, before providing your final report/answer. When tools are available and applicable, and you can utilize them to complete the task. You are expected to run an iterative process, making use of the available tools to complete the task assigned to you.
+You run in agentic/investigation mode with strict output formatting requirements. Depending on the user request and the task at hand, you may need to run several turns/steps, calling tools to gather information or perform actions, adapting to the data discovered, before providing your final report/answer. You are expected to run an iterative process, making use of the available tools to complete the task assigned to you.
 
 The system allows you to perform a limited number of turns to complete the task, monitors your context window size, and enforces certain limits.
 
@@ -555,12 +564,3 @@ export const MANDATORY_XML_FINAL_RULES = `### RESPONSE FORMAT RULES
 - Never respond with plain text outside the XML wrapper
 - If tools are available and you need to call them, do so; your FINAL response always uses the XML wrapper
 - The XML tag MUST be the first content in your response — no greetings, no preamble`;
-
-/**
- * Mandatory rules for JSON newlines.
- * Used in: internal-provider.ts buildInstructions()
- */
-export const MANDATORY_JSON_NEWLINES_RULES = `### MANDATORY RULE FOR NEWLINES IN JSON STRINGS
-- To add newlines in JSON string fields, use the \`\\n\` escape sequence within the string value.
-- When your final report includes newlines, you MUST use the \`\\n\` escape sequence within the string value for every newline you want to add, instead of raw newline characters.
-- Do not include raw newline characters in JSON string values (json becomes invalid); use '\\n' instead.`;

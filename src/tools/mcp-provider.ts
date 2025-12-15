@@ -52,6 +52,48 @@ export class MCPRestartInProgressError extends MCPRestartError {
   }
 }
 
+/**
+ * Format MCP server config for logging purposes. Sensitive values (env, headers) are redacted.
+ */
+function formatMCPConfigForLog(name: string, config: MCPServerConfig): string {
+  const parts: string[] = [`server='${name}'`, `type=${config.type}`];
+  switch (config.type) {
+    case 'stdio':
+      parts.push(`command='${config.command ?? '<missing>'}'`);
+      if (config.args !== undefined && config.args.length > 0) {
+        parts.push(`args=[${config.args.map((a) => `'${a}'`).join(', ')}]`);
+      }
+      if (config.env !== undefined) {
+        const envKeys = Object.keys(config.env);
+        if (envKeys.length > 0) {
+          parts.push(`env_keys=[${envKeys.join(', ')}]`);
+        }
+      }
+      break;
+    case 'websocket':
+    case 'http':
+    case 'sse':
+      parts.push(`url='${config.url ?? '<missing>'}'`);
+      if (config.headers !== undefined) {
+        const headerKeys = Object.keys(config.headers);
+        if (headerKeys.length > 0) {
+          parts.push(`header_keys=[${headerKeys.join(', ')}]`);
+        }
+      }
+      break;
+  }
+  if (config.shared === false) {
+    parts.push('shared=false');
+  }
+  if (config.healthProbe !== undefined) {
+    parts.push(`healthProbe=${config.healthProbe}`);
+  }
+  if (config.requestTimeoutMs !== undefined) {
+    parts.push(`requestTimeoutMs=${String(config.requestTimeoutMs)}`);
+  }
+  return parts.join(', ');
+}
+
 export interface SharedAcquireOptions {
   trace: boolean;
   verbose: boolean;
@@ -361,7 +403,8 @@ class MCPSharedRegistry {
             ? error
             : new MCPRestartFailedError(entry.serverName, error instanceof Error ? error.message : String(error));
           entry.restartError = err;
-          logger('ERR', `shared restart failed for '${entry.serverName}' (attempt ${String(attemptLabel)}): ${err.message}`, `mcp:${entry.serverName}`, true);
+          const configDetails = formatMCPConfigForLog(entry.serverName, entry.config);
+          logger('ERR', `shared MCP server restart failed (attempt ${String(attemptLabel)}): ${err.message} [${configDetails}]`, `mcp:${entry.serverName}`, true);
           const latch = entry.restartAttempt;
           if (latch !== undefined) {
             latch.resolve(false);
@@ -417,7 +460,8 @@ class MCPSharedRegistry {
         return await this.tryInitializeEntry(serverName, config, opts);
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
-        opts.log('ERR', `shared server '${serverName}' initialization failed: ${msg}`, `mcp:${serverName}`, true);
+        const configDetails = formatMCPConfigForLog(serverName, config);
+        opts.log('ERR', `shared MCP server initialization failed: ${msg} [${configDetails}]`, `mcp:${serverName}`, true);
         attempt += 1;
       }
     }
@@ -875,7 +919,8 @@ export class MCPProvider extends ToolProvider {
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           const elapsedMs = Math.round(performance.now() - start);
-          this.log('ERR', `failed to initialize '${name}': ${msg}`, `mcp:${name}`, true);
+          const configDetails = formatMCPConfigForLog(name, config);
+          this.log('ERR', `failed to initialize MCP server: ${msg} [${configDetails}]`, `mcp:${name}`, true);
           this.failedServers.add(name);
           failedServers.push(`${name} (${msg})`);
           results.push({ name, elapsedMs, status: 'failure', error: msg });
@@ -980,7 +1025,8 @@ export class MCPProvider extends ToolProvider {
       this.log('TRC', `connected to '${name}'`, `mcp:${name}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      this.log('ERR', `connect failed for '${name}': ${msg}`, `mcp:${name}`);
+      const configDetails = formatMCPConfigForLog(name, config);
+      this.log('ERR', `MCP server connect failed: ${msg} [${configDetails}]`, `mcp:${name}`, true);
       throw e;
     }
     this.clients.set(name, client);

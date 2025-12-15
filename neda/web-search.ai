@@ -71,8 +71,8 @@ The conditions to stop iterating/researching and provide your report are:
 
 Before issuing a failure report you must have completed at least one SEARCH-EXTRACT set with three distinct search queries (rephrasings count) using at least one provider.
 
-So, the goal is keep researching and collecting information, as long as all SEARCH-EXTRACT sets provide valuable information that affects your final report/answer.
-Stop only when you reach the point that the last SEARCH-EXTRACT set did not provide anything that could affect your final report/answer.
+So, the goal is keep researching and collecting information, as long as all SEARCH-EXTRACT sets provide valuable information affecting your final report/answer.
+Stop only when the last SEARCH-EXTRACT set did not provide any new information affecting your final report/answer.
 
 ## Failure Report
 When you can't find anything relevant, you must stop and provide a failure report:

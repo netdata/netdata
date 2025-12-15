@@ -17,7 +17,6 @@ import {
   FINAL_REPORT_FIELDS_SLACK,
   finalReportFieldsText,
   finalReportXmlInstructions,
-  MANDATORY_JSON_NEWLINES_RULES,
   MANDATORY_XML_FINAL_RULES,
   PROGRESS_TOOL_BATCH_RULES,
   PROGRESS_TOOL_DESCRIPTION,
@@ -42,6 +41,7 @@ interface InternalToolProviderOptions {
   getCurrentTurn: () => number;
   toolTimeoutMs?: number;
   disableProgressTool?: boolean;
+  hasExternalTools?: boolean;  // Whether external tools (MCP, subagents, etc.) are available
   xmlSessionNonce: string;  // Session-wide nonce for final report XML wrapper
 }
 
@@ -193,18 +193,22 @@ export class InternalToolProvider extends ToolProvider {
     // SECTION 2: Mandatory rules (reinforces critical format requirements)
     lines.push('');
     lines.push(MANDATORY_XML_FINAL_RULES);
-    if (this.opts.enableBatch) {
-      lines.push(`- Per turn you can invoke at most ${String(this.maxToolCallsPerTurn)} tools in total (including those inside a batch request). Plan your tools accordingly.`);
-    } else {
-      lines.push(`- Per turn you can invoke at most ${String(this.maxToolCallsPerTurn)} tools in total.`);
-    }
-
-    lines.push('');
-    lines.push(MANDATORY_JSON_NEWLINES_RULES);
 
     // SECTION 3: Internal tools (only if any are available)
     const hasProgressTool = !this.disableProgressTool;
     const hasBatchTool = this.opts.enableBatch;
+    const hasAnyTools = hasProgressTool || hasBatchTool || this.opts.hasExternalTools === true;
+
+    // Tool limits (only when tools exist)
+    if (hasAnyTools) {
+      lines.push('');
+      lines.push('### Tool Limits');
+      if (this.opts.enableBatch) {
+        lines.push(`- You can invoke at most ${String(this.maxToolCallsPerTurn)} tools per turn/step (including those inside a batch request). Plan your tools accordingly.`);
+      } else {
+        lines.push(`- You can invoke at most ${String(this.maxToolCallsPerTurn)} tools per turn/step.`);
+      }
+    }
 
     if (hasProgressTool || hasBatchTool) {
       lines.push('');

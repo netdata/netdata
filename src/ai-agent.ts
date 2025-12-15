@@ -580,6 +580,7 @@ export class AIAgentSession {
         expectedOutputFormat: eo?.format === 'json' ? 'json' : undefined,
         expectedJsonSchema,
         disableProgressTool: !enableProgressTool,
+        hasExternalTools: hasNonInternalDeclaredTools || hasSubAgentsConfigured,
         maxToolCallsPerTurn: resolvedMaxToolCallsPerTurn,
         xmlSessionNonce: this.xmlTransport.getSessionNonce(),
         logError: (message: string) => {
