@@ -77,8 +77,18 @@ int netdata_install_driver()
         return -1;
     }
 
+    char expanded_path[MAX_PATH];
+    if (ExpandEnvironmentStringsA(drv_path, expanded_path, sizeof(expanded_path)) == 0) {
+        nd_log(
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "Cannot expand environment strings. Error= %lu \n", GetLastError());
+        CloseServiceHandle(scm);
+        return -1;
+    }
+
     // Create the service entry for the driver
-    SC_HANDLE service = CreateService(
+    SC_HANDLE service = CreateServiceA(
             scm,
             srv_name,
             srv_name,
@@ -86,7 +96,7 @@ int netdata_install_driver()
             SERVICE_KERNEL_DRIVER,
             SERVICE_DEMAND_START,
             SERVICE_ERROR_NORMAL,
-            drv_path,
+            expanded_path,
             NULL,
             NULL,
             NULL,
