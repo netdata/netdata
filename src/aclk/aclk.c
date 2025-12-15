@@ -978,12 +978,18 @@ void aclk_create_node_instance_job(RRDHOST *host)
 
 void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable, struct completion *compl)
 {
-    if (unlikely(!host))
+    if (unlikely(!host)) {
+        if (compl)
+            completion_mark_complete(compl);
         return;
+    }
 
     CLAIM_ID claim_id = claim_id_get();
-    if (!claim_id_is_set(claim_id))
+    if (!claim_id_is_set(claim_id)) {
+        if (compl)
+            completion_mark_complete(compl);
         return;
+    }
 
     aclk_query_t *query = aclk_query_new(NODE_STATE_UPDATE);
     query->completion = compl;
@@ -1020,11 +1026,17 @@ void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable, struc
 
 void aclk_host_state_update(RRDHOST *host, int live, int queryable, struct completion *compl)
 {
-    if (!aclk_online())
+    if (!aclk_online()) {
+        if (compl)
+            completion_mark_complete(compl);
         return;
+    }
 
-    if (uuid_is_null(host->node_id.uuid))
+    if (uuid_is_null(host->node_id.uuid)) {
         aclk_create_node_instance_job(host);
+        if (compl)
+            completion_mark_complete(compl);
+    }
     else
         aclk_update_node_instance_job(host, live, queryable, compl);
 }
