@@ -2,6 +2,30 @@
 
 ### Merged Pull Requests:
 
+- Update bundled components for static builds. ([#21401](https://github.com/netdata/netdata/issues/21401))
+- Disable MongoDB exporter for Ubuntu 20.04, 22.04, and 24.04 packages. ([#21403](https://github.com/netdata/netdata/issues/21403))
+- Change chart variable (Windows.plugin) ([#21412](https://github.com/netdata/netdata/issues/21412))
+- Fix shutdown timeout handling in completion wait function ([#21395](https://github.com/netdata/netdata/issues/21395))
+- Fix validation of extent index in journal file ([#21400](https://github.com/netdata/netdata/issues/21400))
+- Improve check for DBENGINE max datafile size allowed ([#21390](https://github.com/netdata/netdata/issues/21390))
+- Fix(go.d/pkg/ndexec): return the output along with the error ([#21405](https://github.com/netdata/netdata/issues/21405))
+- Fix(rabbitmq): remove "rabbitmq_version" check ([#21411](https://github.com/netdata/netdata/issues/21411))
+- Chore(go.d/snmp): add collection stats ([#21409](https://github.com/netdata/netdata/issues/21409))
+- Chore(go.d): log skipped data collection ([#21423](https://github.com/netdata/netdata/issues/21423))
+- Chore(go.d/snmp): remove non-default update_every from sd config ([#21424](https://github.com/netdata/netdata/issues/21424))
+- Chore(go.d): log data collection duration when skipping tick ([#21425](https://github.com/netdata/netdata/issues/21425))
+- Fix(go.d): avoid blocking all jobs when stopping a slow job ([#21448](https://github.com/netdata/netdata/issues/21448))
+- Use improved compression algorithms when building DEB packages. ([#21310](https://github.com/netdata/netdata/issues/21310))
+- Fix(go.d): correct Windows install paths ([#21451](https://github.com/netdata/netdata/issues/21451))
+- Adjust hardware collection (windows.plugin) ([#21433](https://github.com/netdata/netdata/issues/21433))
+- AD fixes (windows.plugin) ([#21454](https://github.com/netdata/netdata/issues/21454))
+- Fix(go.d/ap):  handle unknown values in station statistics gracefully ([#21461](https://github.com/netdata/netdata/issues/21461))
+- Improve streaming connection loss detection ([#21430](https://github.com/netdata/netdata/issues/21430))
+
+## [2.8.2] - 2025-12-03
+
+### Merged Pull Requests:
+
 - Improve replication logic by checking if parent is caught up with child ([#21352](https://github.com/netdata/netdata/issues/21352))
 - Improve stale replication ([#21357](https://github.com/netdata/netdata/issues/21357))
 - Fix(docker): add netdata user to nvidia device group on non-Debian systems ([#21358](https://github.com/netdata/netdata/issues/21358))
