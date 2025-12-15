@@ -2006,7 +2006,7 @@ int main (int argc, char **argv) {
 
     heartbeat_t hb;
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
-    for(iteration = 0; 1 ; iteration++) {
+    for(iteration = 0; !__atomic_load_n(&function_plugin_should_exit, __ATOMIC_ACQUIRE) ; iteration++) {
         usec_t dt = heartbeat_next(&hb);
 
         if (!tty) {
