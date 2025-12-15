@@ -84,7 +84,7 @@ static BOOL fill_dictionary_with_content()
         goto endServiceCollection;
     }
 
-    LPENUM_SERVICE_STATUS_PROCESS services = (LPENUM_SERVICE_STATUS_PROCESS)buffer;
+    services = (LPENUM_SERVICE_STATUS_PROCESS)buffer;
 
     for (ULONG i = 0; i < total_services; i++) {
         service = &services[i];
