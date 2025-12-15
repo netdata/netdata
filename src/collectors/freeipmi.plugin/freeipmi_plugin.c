@@ -1645,7 +1645,7 @@ close_and_send:
 
 static void plugin_exit(int code) {
     fflush(stdout);
-    function_plugin_should_exit = true;
+    __atomic_store_n(&function_plugin_should_exit, true, __ATOMIC_RELEASE);
     exit(code);
 }
 

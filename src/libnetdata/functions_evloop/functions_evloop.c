@@ -290,7 +290,7 @@ static bool rrd_function_worker_global_process_input(struct functions_evloop_glo
             nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "Received PROGRESS for transaction '%s', but it not available here", transaction);
     }
     else if(keyword && strcmp(keyword, PLUGINSD_CALL_QUIT) == 0) {
-        *wg->plugin_should_exit = true;
+        __atomic_store_n(wg->plugin_should_exit, true, __ATOMIC_RELEASE);
         return true;
     }
     else
