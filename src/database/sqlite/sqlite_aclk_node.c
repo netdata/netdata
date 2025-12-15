@@ -5,6 +5,7 @@
 
 #include "../../aclk/aclk_contexts_api.h"
 #include "../../aclk/aclk_capas.h"
+#include "../../aclk/aclk_query_queue.h"
 
 DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
     RRDSET *st;
@@ -44,7 +45,7 @@ static void build_node_collectors(RRDHOST *host)
         aclk_host_config->node_id, rrdhost_hostname(host));
 }
 
-static void build_node_info(RRDHOST *host, struct completion *compl)
+static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_completion)
 {
     struct update_node_info node_info;
 
@@ -82,7 +83,7 @@ static void build_node_info(RRDHOST *host, struct completion *compl)
 
     rrdhost_system_info_to_node_info(host->system_info, &node_info);
 
-    aclk_update_node_info(&node_info, compl);
+    aclk_update_node_info(&node_info, sync_completion);
     nd_log(
         NDLS_ACCESS,
         NDLP_DEBUG,
@@ -104,13 +105,20 @@ void send_node_info_with_wait(RRDHOST *host)
     if (unlikely(!host || !__atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED)))
         return;
 
-    struct completion compl;
-    completion_init(&compl);
+    if (!aclk_online())
+        return;
 
-    build_node_info(host, &compl);
-    completion_wait_for(&compl);
+    struct aclk_sync_completion *sc = aclk_sync_completion_create();
 
-    completion_destroy(&compl);
+    build_node_info(host, sc);
+
+    bool success = aclk_sync_completion_timedwait(sc, 30);
+    if (!success) {
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "Timed out waiting for node info update for host '%s'",
+               rrdhost_hostname(host));
+    }
+    // sc is automatically freed when both waiter and query release their references
 }
 
 void send_node_update_with_wait(RRDHOST *host, int live, int queryable)
@@ -118,13 +126,17 @@ void send_node_update_with_wait(RRDHOST *host, int live, int queryable)
     if (unlikely(!host || !__atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED)))
         return;
 
-    struct completion compl;
-    completion_init(&compl);
+    struct aclk_sync_completion *sc = aclk_sync_completion_create();
 
-    aclk_host_state_update(host, live, queryable, &compl);
-    completion_wait_for(&compl);
+    aclk_host_state_update(host, live, queryable, sc);
 
-    completion_destroy(&compl);
+    bool success = aclk_sync_completion_timedwait(sc, 30);
+    if (!success) {
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "Timed out waiting for node state update for host '%s'",
+               rrdhost_hostname(host));
+    }
+    // sc is automatically freed when both waiter and query release their references
 }
 
 void aclk_check_node_info_and_collectors(void)

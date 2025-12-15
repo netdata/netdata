@@ -210,13 +210,33 @@ static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
 
         if (delete) {
             netdata_log_info("Host '%s' with machine guid '%s' is archived, ephemeral clean up.", rrdhost_hostname(host), host->machine_guid);
-            // we inform cloud a child has been removed
-            send_node_info_with_wait(host);
 
+            // Save machine_guid before releasing lock - we'll use it to verify the host after re-acquiring
+            char machine_guid[GUID_LEN + 1];
+            strncpyz(machine_guid, host->machine_guid, GUID_LEN);
+
+            // Release lock before synchronous cloud operations to avoid deadlock
+            // (build_node_info acquires rrd_rdlock which would deadlock with our wrlock)
+            rrd_wrunlock();
+
+            // Inform cloud the child has been removed
+            send_node_info_with_wait(host);
             send_node_update_with_wait(host, 0, 0);
 
-            unregister_node(host->machine_guid);
-            rrdhost_free___while_having_rrd_wrlock(host);
+            // Re-acquire lock for cleanup
+            rrd_wrlock();
+
+            // Re-validate host still exists and matches (could have been modified while unlocked)
+            RRDHOST *host_check = rrdhost_find_by_guid(machine_guid);
+            if (host_check == host) {
+                unregister_node(host->machine_guid);
+                rrdhost_free___while_having_rrd_wrlock(host);
+            }
+            else {
+                nd_log(NDLS_DAEMON, NDLP_WARNING,
+                       "Host with machine guid '%s' changed while sending cloud notification, skipping cleanup",
+                       machine_guid);
+            }
         }
         else
             rrdhost_cleanup_data_collection_and_health(host);
