@@ -2889,19 +2889,19 @@ modules:
               unit: objects/s
               chart_type: line
               dimensions:
-                - name: objects
+                - name: allocated
             - name: netframework.clrremoting_context_proxies
               description: Remoting proxy objects
               unit: objects/s
               chart_type: line
               dimensions:
-                - name: contexts
+                - name: objects
             - name: netframework.clrremoting_remote_calls
               description: Remote Procedure Calls (RPC) invoked
               unit: calls/s
               chart_type: line
               dimensions:
-                - name: rpc
+                - name: calls
             - name: netframework.clrsecurity_link_time_checks
               description: Link-time code access security checks
               unit: checks/s
