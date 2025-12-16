@@ -65,7 +65,7 @@ static BOOL fill_dictionary_with_content()
         NULL);
 
     if (ret) {
-        // This should not happen, as we passed a 0-sized buffer. But if it does, it means 0 services.
+        // This only happens if there are truly 0 services in the system (a valid edge case).
         goto endServiceCollection;
     }
 

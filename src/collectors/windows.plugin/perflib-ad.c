@@ -639,9 +639,11 @@ static void netdata_ad_atq_latency(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE
     static RRDSET *st_atq_average_request_latency = NULL;
     static RRDDIM *rd_atq_average_request_latency = NULL;
 
-    if (perflibGetObjectCounter(pDataBlock, pObjectType, &atqAverageRequestLatency)) {
-        if (unlikely(!st_atq_average_request_latency)) {
-            st_atq_average_request_latency = rrdset_create_localhost(
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &atqAverageRequestLatency))
+        return;
+
+    if (unlikely(!st_atq_average_request_latency)) {
+        st_atq_average_request_latency = rrdset_create_localhost(
                 "ad",
                 "atq_average_request_latency",
                 NULL,
@@ -655,16 +657,15 @@ static void netdata_ad_atq_latency(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            rd_atq_average_request_latency =
+        rd_atq_average_request_latency =
                 rrddim_add(st_atq_average_request_latency, "time", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-        }
+    }
 
-        rrddim_set_by_pointer(
+    rrddim_set_by_pointer(
             st_atq_average_request_latency,
             rd_atq_average_request_latency,
             (collected_number)atqAverageRequestLatency.current.Data);
-        rrdset_done(st_atq_average_request_latency);
-    }
+    rrdset_done(st_atq_average_request_latency);
 }
 
 static void netdata_ad_op_total(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
