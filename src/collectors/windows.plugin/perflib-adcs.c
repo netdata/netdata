@@ -649,9 +649,10 @@ static void netdata_adcs_signed_certificate_timetamp_list_processing(
     rrdset_done(ac->st_adcs_signed_certificate_timestamp_list_processing_time_seconds);
 }
 
+#define CERTIFICATION_AUTHORITY "Certification Authority"
 static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
-    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Certification Authority");
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, CERTIFICATION_AUTHORITY);
     if (!pObjectType)
         return false;
 
@@ -703,7 +704,7 @@ int do_PerflibADCS(int update_every, usec_t dt __maybe_unused)
         initialized = true;
     }
 
-    DWORD id = RegistryFindIDByName("Certification Authority");
+    DWORD id = RegistryFindIDByName(CERTIFICATION_AUTHORITY);
     if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
         return -1;
 
@@ -711,7 +712,8 @@ int do_PerflibADCS(int update_every, usec_t dt __maybe_unused)
     if (!pDataBlock)
         return -1;
 
-    do_ADCS(pDataBlock, update_every);
+    if (!do_ADCS(pDataBlock, update_every))
+        return -1;
 
     return 0;
 }

@@ -974,18 +974,18 @@ void netdata_adfs_oauth_password_grant_requests(
 
     if (!adfs.st_adfs_oauth_password_grant_requests) {
         adfs.st_adfs_oauth_password_grant_requests = rrdset_create_localhost(
-            "adfs",
-            "oauth_password_grant_requests",
-            NULL,
-            "oauth",
-            "adfs.oauth_password_grant_requests",
-            "OAuth password grant requests",
-            "authentications/s",
-            PLUGIN_WINDOWS_NAME,
-            "PerflibADFS",
-            PRIO_ADFS_OAUTH_TOKEN_REQUESTS_SUCCESS,
-            update_every,
-            RRDSET_TYPE_LINE);
+                "adfs",
+                "oauth_password_grant_requests",
+                NULL,
+                "oauth",
+                "adfs.oauth_password_grant_requests",
+                "OAuth password grant requests",
+                "authentications/s",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibADFS",
+                PRIO_ADFS_OAUTH_PASSWORD_GRANT_REQUESTS,
+                update_every,
+                RRDSET_TYPE_LINE);
 
         adfs.rd_adfs_oauth_password_grant_requests_success =
             rrddim_add(adfs.st_adfs_oauth_password_grant_requests, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
