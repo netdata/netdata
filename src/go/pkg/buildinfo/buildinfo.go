@@ -31,8 +31,9 @@ var NetdataBinDir = "/usr/sbin"
 // Info returns all build information as a single line with snake_case keys.
 func Info() string {
 	return fmt.Sprintf(
-		"version=%s user_config_dir=%s stock_config_dir=%s plugins_dir=%s netdata_bin_dir=%s",
+		"version=%s go_version=%s user_config_dir=%s stock_config_dir=%s plugins_dir=%s netdata_bin_dir=%s",
 		Version,
+		runtime.Version(),
 		UserConfigDir,
 		StockConfigDir,
 		PluginsDir,
