@@ -100,6 +100,11 @@
 - Build(deps): bump github.com/miekg/dns from 1.1.68 to 1.1.69 in /src/go ([#21457](https://github.com/netdata/netdata/issues/21457))
 - Improve streaming connection loss detection ([#21430](https://github.com/netdata/netdata/issues/21430))
 - Fix(go.d/ap):  handle unknown values in station statistics gracefully ([#21461](https://github.com/netdata/netdata/issues/21461))
+- Build(deps): bump github.com/valyala/fastjson from 1.6.5 to 1.6.7 in /src/go ([#21465](https://github.com/netdata/netdata/issues/21465))
+- Build(deps): bump actions/cache from 4 to 5 ([#21463](https://github.com/netdata/netdata/issues/21463))
+- Build(deps): bump actions/upload-artifact from 5.0.0 to 6.0.0 ([#21462](https://github.com/netdata/netdata/issues/21462))
+- Build(deps): update go toolchain to v1.25.5 ([#21459](https://github.com/netdata/netdata/issues/21459))
+- Perflib fixes (Windows.plugin) ([#21458](https://github.com/netdata/netdata/issues/21458))
 
 ## [2.8.0] - 2025-11-19
 
