@@ -202,7 +202,7 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: paged
-                - name: pool-paged
+                - name: non-paged
             - name: mem.system_page_table_entries
               description: Unused page table entries.
               unit: "pages"
