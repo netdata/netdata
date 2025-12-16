@@ -21,7 +21,7 @@ pub fn facets(
     let mut field_value_counts: HashMap<FieldValuePair, usize> = HashMap::default();
 
     for (_, bucket_response) in &histogram_response.buckets {
-        for (pair, (_unfiltered, filtered)) in bucket_response.fv_counts() {
+        for (pair, (_unfiltered, filtered)) in &bucket_response.fv_counts {
             *field_value_counts.entry(pair.clone()).or_insert(0) += filtered;
         }
     }

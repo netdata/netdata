@@ -760,7 +760,7 @@ impl FunctionHandler for CatalogFunction {
         };
 
         let response = CatalogResponse {
-            progress: histogram.progress_percent(),
+            progress: 100, // All responses are now complete
             version: netdata::Version::default(),
             accepted_params: accepted_params(),
             required_params: required_params(),

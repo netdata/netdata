@@ -30,8 +30,7 @@ pub use cache::{Cache, FileIndexKey};
 pub use error::{EngineError, Result};
 pub use facets::Facets;
 pub use histogram::{
-    BucketCompleteResponse, BucketPartialResponse, BucketRequest, Histogram, HistogramEngine,
-    HistogramQueryBuilder, RequestMetadata,
+    BucketRequest, BucketResponse, Histogram, HistogramEngine, HistogramQueryBuilder,
 };
 pub use indexing::{
     FileIndexRequest, FileIndexResponse, FileIndexStream, IndexingEngine, IndexingEngineBuilder,

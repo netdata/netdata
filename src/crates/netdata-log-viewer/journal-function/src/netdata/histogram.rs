@@ -84,7 +84,7 @@ fn chart_result_from_histogram(
     let mut values = HashSet::default();
 
     for (_, bucket_response) in &histogram_response.buckets {
-        for pair in bucket_response.fv_counts().keys() {
+        for pair in bucket_response.fv_counts.keys() {
             if pair.field() == field_str {
                 values.insert(pair.value().to_string());
             }
@@ -113,7 +113,7 @@ fn chart_result_from_histogram(
             let pair = field.with_value(raw_value);
 
             let count = bucket_response
-                .fv_counts()
+                .fv_counts
                 .get(&pair)
                 .map(|(_, filtered)| *filtered)
                 .unwrap_or(0);
