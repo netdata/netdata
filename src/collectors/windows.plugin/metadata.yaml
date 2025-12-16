@@ -903,6 +903,12 @@ modules:
               chart_type: area
               dimensions:
                 - name: semaphores
+            - name: system.ipc_mutexes
+              description: IPC Mutexes
+              unit: "mutexes"
+              chart_type: area
+              dimensions:
+                - name: mutexes
   - meta:
       plugin_name: windows.plugin
       module_name: GetHardwareInfo
