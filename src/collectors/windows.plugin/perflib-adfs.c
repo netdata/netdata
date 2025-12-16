@@ -983,7 +983,7 @@ void netdata_adfs_oauth_password_grant_requests(
                 "authentications/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibADFS",
-                PRIO_ADFS_OAUTH_PASSWORD_GRANT_REQUESTS,
+                PRIO_ADFS_OAUTH_TOKEN_REQUESTS_SUCCESS,
                 update_every,
                 RRDSET_TYPE_LINE);
 
