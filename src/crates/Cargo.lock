@@ -1668,6 +1668,7 @@ dependencies = [
  "netdata-plugin-schema",
  "notify",
  "num_cpus",
+ "parking_lot",
  "rt",
  "schemars",
  "serde",
@@ -1963,6 +1964,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-util",
+ "tracing",
 ]
 
 [[package]]

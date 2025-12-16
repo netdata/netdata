@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use netdata_plugin_error::Result;
 use netdata_plugin_protocol::FunctionDeclaration;
 use netdata_plugin_schema::HttpAccess;
+use parking_lot::RwLock;
 use rt::FunctionHandler;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -109,12 +110,154 @@ fn required_params() -> Vec<netdata::RequiredParam> {
     Vec::new()
 }
 
+#[derive(Debug)]
+struct TransactionInner {
+    id: String,
+    start_time: tokio::time::Instant,
+    report_progress: bool,
+    cancel_call: bool,
+}
+
+/// Represents a tracked transaction for a function call.
+///
+/// Transactions track the lifecycle and state of individual function calls,
+/// allowing for cancellation checks, progress reporting, and timeout detection.
+#[derive(Debug, Clone)]
+struct Transaction {
+    inner: Arc<RwLock<TransactionInner>>,
+}
+
+impl Transaction {
+    /// Create a new transaction with the given ID.
+    fn new(id: String) -> Self {
+        Self {
+            inner: Arc::new(RwLock::new(TransactionInner {
+                id,
+                start_time: tokio::time::Instant::now(),
+                report_progress: false,
+                cancel_call: false,
+            })),
+        }
+    }
+
+    /// Get the transaction ID.
+    fn id(&self) -> String {
+        self.inner.read().id.clone()
+    }
+
+    /// Check if the transaction has been marked for cancellation.
+    #[allow(dead_code)]
+    fn is_cancelled(&self) -> bool {
+        self.inner.read().cancel_call
+    }
+
+    /// Mark the transaction for cancellation.
+    fn cancel(&self) {
+        self.inner.write().cancel_call = true;
+    }
+
+    /// Check if progress reporting is requested for this transaction.
+    #[allow(dead_code)]
+    fn should_report_progress(&self) -> bool {
+        self.inner.read().report_progress
+    }
+
+    /// Set the progress reporting flag.
+    fn set_report_progress(&self, report: bool) {
+        self.inner.write().report_progress = report;
+    }
+
+    /// Get the elapsed time since the transaction started.
+    fn elapsed(&self) -> std::time::Duration {
+        self.inner.read().start_time.elapsed()
+    }
+}
+
+/// Registry for managing active transactions.
+///
+/// Provides thread-safe storage and lookup for transactions, allowing
+/// multiple parts of the application to track and manage ongoing operations.
+#[derive(Debug, Clone)]
+struct TransactionRegistry {
+    transactions: Arc<RwLock<HashMap<String, Transaction>>>,
+}
+
+impl TransactionRegistry {
+    /// Create a new transaction registry.
+    fn new() -> Self {
+        Self {
+            transactions: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Create and register a new transaction with the given ID.
+    ///
+    /// Returns None if a transaction with this ID already exists.
+    fn create(&self, id: String) -> Option<Transaction> {
+        let mut transactions = self.transactions.write();
+
+        if transactions.contains_key(&id) {
+            warn!("Transaction {} already exists in registry", id);
+            return None;
+        }
+
+        let transaction = Transaction::new(id.clone());
+        transactions.insert(id, transaction.clone());
+        debug!("Created transaction {} in registry", transaction.id());
+
+        Some(transaction)
+    }
+
+    /// Get an existing transaction by ID.
+    fn get(&self, id: &str) -> Option<Transaction> {
+        self.transactions.read().get(id).cloned()
+    }
+
+    /// Remove a transaction from the registry.
+    ///
+    /// Returns the removed transaction if it existed.
+    fn remove(&self, id: &str) -> Option<Transaction> {
+        let transaction = self.transactions.write().remove(id);
+        if transaction.is_some() {
+            debug!("Removed transaction {} from registry", id);
+        }
+        transaction
+    }
+
+    /// Cancel a transaction by ID.
+    ///
+    /// Returns true if the transaction was found and cancelled.
+    fn cancel(&self, id: &str) -> bool {
+        if let Some(transaction) = self.get(id) {
+            transaction.cancel();
+            info!("Cancelled transaction {}", id);
+            true
+        } else {
+            warn!("Cannot cancel non-existent transaction {}", id);
+            false
+        }
+    }
+
+    /// Get the number of active transactions.
+    #[allow(dead_code)]
+    fn len(&self) -> usize {
+        self.transactions.read().len()
+    }
+
+    /// Check if the registry is empty.
+    #[allow(dead_code)]
+    fn is_empty(&self) -> bool {
+        self.transactions.read().is_empty()
+    }
+}
+
 /// Inner state for CatalogFunction (enables cloning)
 struct CatalogFunctionInner {
     registry: Registry,
     indexing_engine: IndexingEngine,
     histogram_engine: Arc<HistogramEngine>,
     request_counter: AtomicU64,
+    transaction_registry: TransactionRegistry,
 }
 
 /// Function handler that provides catalog information about journal files
@@ -398,6 +541,7 @@ impl CatalogFunction {
             indexing_engine,
             histogram_engine: Arc::new(histogram_engine),
             request_counter: AtomicU64::new(0),
+            transaction_registry: TransactionRegistry::new(),
         };
 
         Ok(Self {
@@ -522,8 +666,14 @@ impl FunctionHandler for CatalogFunction {
         before = request.before,
         num_selections = request.selections.len()
     ))]
-    async fn on_call(&self, request: Self::Request) -> Result<Self::Response> {
-        info!("processing catalog function call");
+    async fn on_call(&self, transaction: String, request: Self::Request) -> Result<Self::Response> {
+        // Register the transaction
+        let txn = self.inner.transaction_registry.create(transaction.clone());
+        if txn.is_none() {
+            warn!("Transaction {} already exists, continuing anyway", transaction);
+        }
+
+        info!("Got function call for transaction {}", transaction);
 
         // Log if regex search is being used
         if !request.query.is_empty() {
@@ -637,19 +787,47 @@ impl FunctionHandler for CatalogFunction {
         // Log response to file
         self.log_response(&response);
 
+        // Remove the transaction from the registry
+        self.inner.transaction_registry.remove(&transaction);
+        info!("Transaction {} completed successfully", transaction);
+
         Ok(response)
     }
 
-    async fn on_cancellation(&self) -> Result<Self::Response> {
-        warn!("catalog function call cancelled by Netdata");
+    async fn on_cancellation(&self, transaction: String) -> Result<Self::Response> {
+        warn!("catalog function call {} cancelled by Netdata", transaction);
+
+        // Mark the transaction as cancelled
+        self.inner.transaction_registry.cancel(&transaction);
+
+        // Remove the transaction from the registry
+        self.inner.transaction_registry.remove(&transaction);
 
         Err(netdata_plugin_error::NetdataPluginError::Other {
             message: "catalog function cancelled by user".to_string(),
         })
     }
 
-    async fn on_progress(&self) {
-        info!("progress report requested for catalog function call");
+    async fn on_progress(&self, transaction: String) {
+        info!(
+            "progress report requested for catalog function call {}",
+            transaction
+        );
+
+        // Mark the transaction for progress reporting
+        if let Some(txn) = self.inner.transaction_registry.get(&transaction) {
+            txn.set_report_progress(true);
+            debug!(
+                "Transaction {} marked for progress reporting (elapsed: {:?})",
+                transaction,
+                txn.elapsed()
+            );
+        } else {
+            warn!(
+                "Progress requested for non-existent transaction {}",
+                transaction
+            );
+        }
     }
 
     fn declaration(&self) -> FunctionDeclaration {

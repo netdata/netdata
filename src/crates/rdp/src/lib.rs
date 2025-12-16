@@ -263,6 +263,7 @@ impl FieldBuilder {
     }
 }
 
+#[allow(dead_code)]
 fn token_type(word: &Token) -> TokenType {
     match word {
         Token::Word { kind, .. } => *kind,

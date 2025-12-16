@@ -255,7 +255,7 @@ pub trait FunctionHandler: Send + Sync + 'static {
     ///
     /// This method may be interrupted if a cancellation is requested.
     /// When cancelled, the runtime will call [`on_cancellation`](Self::on_cancellation) instead.
-    async fn on_call(&self, request: Self::Request) -> Result<Self::Response>;
+    async fn on_call(&self, transaction: String, request: Self::Request) -> Result<Self::Response>;
 
     /// Handle cancellation requests while the function is running.
     ///
@@ -266,7 +266,7 @@ pub trait FunctionHandler: Send + Sync + 'static {
     ///
     /// Typically returns an error indicating the operation was cancelled,
     /// but may return a partial result if appropriate.
-    async fn on_cancellation(&self) -> Result<Self::Response>;
+    async fn on_cancellation(&self, transaction: String) -> Result<Self::Response>;
 
     /// Handle progress report requests while the function is running.
     ///
@@ -278,7 +278,7 @@ pub trait FunctionHandler: Send + Sync + 'static {
     ///
     /// This is called asynchronously while `on_call` is still running,
     /// so any shared state must be properly synchronized.
-    async fn on_progress(&self);
+    async fn on_progress(&self, transaction: String);
 
     /// Provide the function's declaration metadata.
     ///
@@ -362,7 +362,7 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
         // Drive the handler with cancellation and progress handling
         let handler = self.handler.clone();
 
-        let mut call_future = Box::pin(handler.on_call(payload));
+        let mut call_future = Box::pin(handler.on_call(transaction.clone(), payload));
         let mut signal_rx = ctx.signal_rx.lock().await;
 
         let result = loop {
@@ -375,13 +375,13 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
                 Some(msg) = signal_rx.recv() => {
                     match msg {
                         RuntimeSignal::Progress => {
-                            handler.on_progress().await;
+                            handler.on_progress(transaction.clone()).await;
                         }
                     }
                 }
                 // Handle cancellation
                 _ = ctx.cancellation_token.cancelled() => {
-                    break handler.on_cancellation().await;
+                    break handler.on_cancellation(transaction.clone()).await;
                 }
             }
         };

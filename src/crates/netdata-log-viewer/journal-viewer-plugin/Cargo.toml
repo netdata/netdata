@@ -33,6 +33,7 @@ bytesize = { workspace = true }
 bytesize-serde = { workspace = true }
 num_cpus = "1"
 serde_yaml = { workspace = true }
+parking_lot = { workspace = true }
 
 # Business logic
 # journal-engine = { workspace = true }
