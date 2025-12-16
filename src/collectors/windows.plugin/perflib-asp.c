@@ -84,7 +84,7 @@ struct aspnet_app {
     COUNTER_DATA aspnetSessionsAbandoned;
     COUNTER_DATA aspnetSessionsTimedOut;
     COUNTER_DATA aspnetTransactionsAborted;
-    COUNTER_DATA aspnetTransactionsCommited;
+    COUNTER_DATA aspnetTransactionsCommitted;
     COUNTER_DATA aspnetTransactionsPending;
     COUNTER_DATA aspnetTransactionsPerSec;
     COUNTER_DATA aspnetEventsRaisedPerSec;
@@ -120,7 +120,7 @@ static void aspnet_app_initialize_variables(struct aspnet_app *ap)
     ap->aspnetSessionsAbandoned.key = "Sessions Abandoned";
     ap->aspnetSessionsTimedOut.key = "Sessions Timed Out";
     ap->aspnetTransactionsAborted.key = "Transactions Aborted";
-    ap->aspnetTransactionsCommited.key = "Transactions Committed";
+    ap->aspnetTransactionsCommitted.key = "Transactions Committed";
     ap->aspnetTransactionsPending.key = "Transactions Pending";
     ap->aspnetTransactionsPerSec.key = "Transactions/Sec";
     ap->aspnetEventsRaisedPerSec.key = "Events Raised/Sec";
@@ -629,7 +629,7 @@ static void netdata_aspnet_requests_not_authorized(struct aspnet_app *aa, char *
             RRDSET_TYPE_LINE);
 
         aa->rd_aspnet_requests_not_authorized =
-            rrddim_add(aa->st_aspnet_requests_not_authorized, "queue", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(aa->st_aspnet_requests_not_authorized, "not_authorized", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
         rrdlabels_add(aa->st_aspnet_requests_not_authorized->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
     }
@@ -894,18 +894,18 @@ static void netdata_aspnet_transactions_committed(struct aspnet_app *aa, char *a
         snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_transactions_committed", app);
 
         aa->st_aspnet_transactions_committed = rrdset_create_localhost(
-            "aspnet",
-            id,
-            NULL,
-            "aspnet",
-            "aspnet.transactions_committed",
-            "Transactions Committed.",
-            "transactions",
-            PLUGIN_WINDOWS_NAME,
-            "PerflibASP",
-            PRIO_ASPNET_TRANSACTIONS_COMMITED,
-            update_every,
-            RRDSET_TYPE_LINE);
+                "aspnet",
+                id,
+                NULL,
+                "aspnet",
+                "aspnet.transactions_committed",
+                "Transactions Committed.",
+                "transactions",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibASP",
+                PRIO_ASPNET_TRANSACTIONS_COMMITTED,
+                update_every,
+                RRDSET_TYPE_LINE);
 
         aa->rd_aspnet_transactions_committed =
             rrddim_add(aa->st_aspnet_transactions_committed, "committed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -916,7 +916,7 @@ static void netdata_aspnet_transactions_committed(struct aspnet_app *aa, char *a
     rrddim_set_by_pointer(
         aa->st_aspnet_transactions_committed,
         aa->rd_aspnet_transactions_committed,
-        (collected_number)aa->aspnetTransactionsCommited.current.Data);
+        (collected_number)aa->aspnetTransactionsCommitted.current.Data);
     rrdset_done(aa->st_aspnet_transactions_committed);
 }
 
@@ -927,18 +927,18 @@ static void netdata_aspnet_transactions_pending(struct aspnet_app *aa, char *app
         snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_transactions_pending", app);
 
         aa->st_aspnet_transactions_pending = rrdset_create_localhost(
-            "aspnet",
-            id,
-            NULL,
-            "aspnet",
-            "aspnet.transactions_pending",
-            "Transactions Pending.",
-            "transactions",
-            PLUGIN_WINDOWS_NAME,
-            "PerflibASP",
-            PRIO_ASPNET_TRANSACTIONS_COMMITED,
-            update_every,
-            RRDSET_TYPE_LINE);
+                "aspnet",
+                id,
+                NULL,
+                "aspnet",
+                "aspnet.transactions_pending",
+                "Transactions Pending.",
+                "transactions",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibASP",
+                PRIO_ASPNET_TRANSACTIONS_PER_SEC,
+                update_every,
+                RRDSET_TYPE_LINE);
 
         aa->rd_aspnet_transactions_pending =
             rrddim_add(aa->st_aspnet_transactions_pending, "pending", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -960,18 +960,18 @@ static void netdata_aspnet_transactions_per_sec(struct aspnet_app *aa, char *app
         snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_transactions_per_sec", app);
 
         aa->st_aspnet_transactions_per_sec = rrdset_create_localhost(
-            "aspnet",
-            id,
-            NULL,
-            "aspnet",
-            "aspnet.transactions_per_sec",
-            "Transactions Started.",
-            "transactions",
-            PLUGIN_WINDOWS_NAME,
-            "PerflibASP",
-            PRIO_ASPNET_TRANSACTIONS_COMMITED,
-            update_every,
-            RRDSET_TYPE_LINE);
+                "aspnet",
+                id,
+                NULL,
+                "aspnet",
+                "aspnet.transactions_per_sec",
+                "Transactions Started.",
+                "transactions",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibASP",
+                PRIO_ASPNET_TRANSACTIONS_COMMITTED,
+                update_every,
+                RRDSET_TYPE_LINE);
 
         aa->rd_aspnet_transactions_per_sec =
             rrddim_add(aa->st_aspnet_transactions_per_sec, "transactions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -995,7 +995,7 @@ static inline void netdata_aspnet_apps_transactions(
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetTransactionsAborted))
         netdata_aspnet_transactions_aborted(aa, windows_shared_buffer, update_every);
 
-    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetTransactionsCommited))
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetTransactionsCommitted))
         netdata_aspnet_transactions_committed(aa, windows_shared_buffer, update_every);
 
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetTransactionsPending))
@@ -1205,7 +1205,7 @@ static void netdata_aspnet_membership_authentication_failure(struct aspnet_app *
             "auth",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASPNET_MEMBERSHIP_AUTHENTICATION_FAILURE,
+            PRIO_ASPNET_FORM_AUTHENTICATION_FAILURE
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -1238,7 +1238,7 @@ static void netdata_aspnet_form_authentication_success(struct aspnet_app *aa, ch
             "auth",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASPNET_MEMBERSHIP_AUTHENTICATION_FAILURE,
+            PRIO_ASPNET_FORM_AUTHENTICATION_SUCCESS,
             update_every,
             RRDSET_TYPE_LINE);
 

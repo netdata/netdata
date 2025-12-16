@@ -4189,6 +4189,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: not found
+            - name: aspnet.requests_not_authorized
+              description: Requests in the application queue.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: not_authorized
             - name: aspnet.requests_in_application_queue
               description: Requests in the application queue.
               unit: requests
