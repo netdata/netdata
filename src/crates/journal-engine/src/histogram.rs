@@ -15,7 +15,7 @@ use journal_index::{FieldName, FieldValuePair, Filter, Seconds};
 use journal_registry::Registry;
 use parking_lot::RwLock;
 use std::time::Duration;
-use tracing::{debug, instrument};
+use tracing::debug;
 
 /// A bucket request contains a [start, end) time range along with the
 /// filter that should be applied.
@@ -245,17 +245,28 @@ impl HistogramEngine {
         }
     }
 
-    /// Process a histogram request and return the histogram.
+    /// Creates a new histogram query builder.
     ///
-    /// This is an internal method. Use the builder API via `query()` instead.
-    #[instrument(skip(self), fields(
-        after = request.after,
-        before = request.before,
-        time_range = request.before - request.after,
-        num_facets = request.facets.len(),
-    ))]
-    pub(crate) async fn get_histogram(&self, request: HistogramRequest) -> Result<Histogram> {
-        let bucket_requests = request.bucket_requests();
+    /// # Example
+    ///
+    /// ```ignore
+    /// let histogram = engine.query()
+    ///     .with_time_range(start_time, end_time)
+    ///     .with_facets(&["PRIORITY", "_HOSTNAME"])
+    ///     .with_filter(&filter_expr)
+    ///     .execute()
+    ///     .await?;
+    /// ```
+    pub fn query(&self) -> HistogramQueryBuilder<'_> {
+        HistogramQueryBuilder::new(self)
+    }
+
+    /// Process a histogram request and return the histogram.
+    pub(crate) async fn get_histogram(
+        &self,
+        histogram_request: HistogramRequest,
+    ) -> Result<Histogram> {
+        let bucket_requests = histogram_request.bucket_requests();
         let num_buckets = bucket_requests.len();
         debug!(num_buckets, "Processing histogram request");
 
@@ -297,7 +308,7 @@ impl HistogramEngine {
             // Build file index keys
             let file_index_keys: Vec<FileIndexKey> = histogram_files
                 .iter()
-                .map(|file_info| FileIndexKey::new(&file_info.file, &request.facets))
+                .map(|file_info| FileIndexKey::new(&file_info.file, &histogram_request.facets))
                 .collect();
 
             // Create stream and process indexes
@@ -417,28 +428,9 @@ impl HistogramEngine {
 
         Ok(Histogram { buckets })
     }
-
-    /// Creates a new histogram query builder.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// let histogram = engine.query()
-    ///     .with_time_range(start_time, end_time)
-    ///     .with_facets(&["PRIORITY", "_HOSTNAME"])
-    ///     .with_filter(&filter_expr)
-    ///     .execute()
-    ///     .await?;
-    /// ```
-    pub fn query(&self) -> HistogramQueryBuilder<'_> {
-        HistogramQueryBuilder::new(self)
-    }
 }
 
 /// A builder for constructing and executing histogram queries.
-///
-/// This builder provides a fluent API for configuring histogram queries.
-/// Use `HistogramEngine::query()` to create a builder instance.
 pub struct HistogramQueryBuilder<'a> {
     engine: &'a HistogramEngine,
     after: Option<u32>,
@@ -484,13 +476,6 @@ impl<'a> HistogramQueryBuilder<'a> {
     }
 
     /// Executes the histogram query.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// - `after` was not set
-    /// - `before` was not set
-    /// - Any underlying query execution error occurs
     pub async fn execute(self) -> Result<Histogram> {
         let after = self.after.ok_or_else(|| {
             crate::error::EngineError::Io(std::io::Error::new(
