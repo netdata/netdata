@@ -355,9 +355,9 @@ export const TASK_STATUS_TOOL_INSTRUCTIONS = `#### agent__task_status — Task S
 Provides live feedback to the user about your accomplishments, pending items and goals. Use this tool as frequently as necessary to let the user know what you are doing, while you work on the task assigned to you. This tool is only updating the user. It does not perform any other actions.
 
 **Status Values:**
-- "starting": Beginning the task
-- "in-progress": Currently working on the task
-- "completed": Task is finished and should trigger final turn
+- "starting": You just started and you are planning your actions
+- "in-progress": You are currently working on this task - you are not yet ready to provide your final report/answer
+- "completed": You completed the task and you are now ready to provide your final report/answer
 
 **Good Examples:**
 - status: "starting", done: "Planning...", pending: "Find error logs", goal: "gather system error logs for the last 15 mins"
@@ -365,9 +365,9 @@ Provides live feedback to the user about your accomplishments, pending items and
 - status: "completed", done: "Found 3 critical errors", pending: "All done", goal: "Compile the final report/answer"
 
 **Mandatory Rules:**
-- Call agent__task_status alongside other tools (do not waste turns just for it)
-- Include clear "done", "pending" and "goal" descriptions for the user to understand your progress
-- Use status="completed" only when the standalone task is truly finished (you will immediately after asked to provide your final report/answer)
+- Call agent__task_status alongside other tools when possible (calling it alone wastes turns)
+- Include clear descriptions for "done", "pending" and "goal", for the user to understand your progress
+- Set status to "completed" ONLY AFTER you are done calling tools and you are now ready to provide your final report/answer - the system will force you to provide your final report/answer once you set status to "completed"
 `;
 
 /**
