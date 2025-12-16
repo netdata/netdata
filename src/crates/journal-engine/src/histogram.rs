@@ -267,37 +267,25 @@ impl HistogramEngine {
         histogram_request: HistogramRequest,
     ) -> Result<Histogram> {
         let bucket_requests = histogram_request.bucket_requests();
-        let num_buckets = bucket_requests.len();
-        debug!(num_buckets, "Processing histogram request");
 
         // Find buckets that need computation
-        let responses = self.responses.read();
-        let buckets_to_compute: Vec<BucketRequest> = bucket_requests
-            .iter()
-            .filter(|br| !responses.contains_key(br))
-            .cloned()
-            .collect();
-        drop(responses);
+        let buckets_to_compute: Vec<BucketRequest> = {
+            let responses = self.responses.read();
+
+            bucket_requests
+                .iter()
+                .filter(|br| !responses.contains_key(br))
+                .cloned()
+                .collect()
+        };
 
         if !buckets_to_compute.is_empty() {
-            debug!(
-                num_buckets_to_compute = buckets_to_compute.len(),
-                "Computing missing buckets"
-            );
-
             // Query registry once for entire histogram time range
             let histogram_start = bucket_requests.first().unwrap().start;
             let histogram_end = bucket_requests.last().unwrap().end;
             let histogram_files = self
                 .registry
                 .find_files_in_range(histogram_start, histogram_end)?;
-
-            debug!(
-                "Found {} files in histogram time range [{},{})",
-                histogram_files.len(),
-                histogram_start,
-                histogram_end
-            );
 
             // Initialize responses for buckets we need to compute
             let mut new_responses: HashMap<BucketRequest, BucketResponse> = buckets_to_compute
