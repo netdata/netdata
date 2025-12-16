@@ -12,7 +12,7 @@ const NONCE = 'abcd1234';
 const baseTools: MCPTool[] = [
   { name: 'mock_tool', description: 'mock', inputSchema: { type: 'object' } },
   { name: 'agent__final_report', description: 'final', inputSchema: { type: 'object' } },
-  { name: 'agent__progress_report', description: 'progress', inputSchema: { type: 'object' } },
+  { name: 'agent__task_status', description: 'task_status', inputSchema: { type: 'object' } },
 ];
 
 describe('XmlToolTransport', () => {
@@ -29,7 +29,7 @@ describe('XmlToolTransport', () => {
       maxTurns: 5,
       tools: baseTools,
       maxToolCallsPerTurn: 2,
-      progressToolEnabled: true,
+      taskStatusToolEnabled: true,
       finalReportToolName: 'agent__final_report',
       resolvedFormat: 'markdown',
       expectedJsonSchema: undefined,
@@ -42,7 +42,7 @@ describe('XmlToolTransport', () => {
     expect(first.slotTemplates).toHaveLength(1); // only final slot
     expect(first.allowedTools.has('mock_tool')).toBe(false);
     expect(first.allowedTools.has('agent__final_report')).toBe(true);
-    expect(first.allowedTools.has('agent__progress_report')).toBe(false);
+    expect(first.allowedTools.has('agent__task_status')).toBe(false);
     expect(first.pastMessage).toBeUndefined();
 
     transport.recordToolResult('mock_tool', { foo: 'bar' }, 'ok', 'resp', 7, first.slotTemplates[0].slotId);
@@ -53,7 +53,7 @@ describe('XmlToolTransport', () => {
       maxTurns: 5,
       tools: baseTools,
       maxToolCallsPerTurn: 1,
-      progressToolEnabled: true,
+      taskStatusToolEnabled: true,
       finalReportToolName: 'agent__final_report',
       resolvedFormat: 'markdown',
       expectedJsonSchema: undefined,
@@ -74,7 +74,7 @@ describe('XmlToolTransport', () => {
       maxTurns: 3,
       tools: baseTools,
       maxToolCallsPerTurn: 1,
-      progressToolEnabled: false,
+      taskStatusToolEnabled: false,
       finalReportToolName: 'agent__final_report',
       resolvedFormat: undefined,
       expectedJsonSchema: undefined,
@@ -107,7 +107,7 @@ describe('XmlToolTransport', () => {
       maxTurns: 2,
       tools: baseTools,
       maxToolCallsPerTurn: 1,
-      progressToolEnabled: false,
+      taskStatusToolEnabled: false,
       finalReportToolName: 'agent__final_report',
       resolvedFormat: 'json',
       expectedJsonSchema: { type: 'object' },
@@ -142,7 +142,7 @@ describe('XmlToolTransport', () => {
         maxTurns: 2,
         tools: baseTools,
         maxToolCallsPerTurn: 1,
-        progressToolEnabled: false,
+        taskStatusToolEnabled: false,
         finalReportToolName: 'agent__final_report',
         resolvedFormat: 'json',
         expectedJsonSchema: { type: 'object' },
@@ -184,7 +184,7 @@ describe('XmlToolTransport', () => {
         maxTurns: 2,
         tools: baseTools,
         maxToolCallsPerTurn: 1,
-        progressToolEnabled: false,
+        taskStatusToolEnabled: false,
         finalReportToolName: 'agent__final_report',
         resolvedFormat: 'slack-block-kit',
         expectedJsonSchema: undefined,
@@ -222,7 +222,7 @@ describe('XmlToolTransport', () => {
         maxTurns: 2,
         tools: baseTools,
         maxToolCallsPerTurn: 1,
-        progressToolEnabled: false,
+        taskStatusToolEnabled: false,
         finalReportToolName: 'agent__final_report',
         resolvedFormat: 'markdown',
         expectedJsonSchema: undefined,
@@ -267,7 +267,7 @@ describe('XmlToolTransport', () => {
         maxTurns: 2,
         tools: baseTools,
         maxToolCallsPerTurn: 1,
-        progressToolEnabled: false,
+        taskStatusToolEnabled: false,
         finalReportToolName: 'agent__final_report',
         resolvedFormat: 'tty',
         expectedJsonSchema: undefined,
@@ -300,7 +300,7 @@ describe('XmlToolTransport', () => {
         maxTurns: 2,
         tools: baseTools,
         maxToolCallsPerTurn: 1,
-        progressToolEnabled: false,
+        taskStatusToolEnabled: false,
         finalReportToolName: 'agent__final_report',
         resolvedFormat: 'markdown',
         expectedJsonSchema: undefined,

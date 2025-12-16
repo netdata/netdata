@@ -123,7 +123,7 @@ export class AIAgentSession {
   private readonly toolsOrchestrator?: ToolsOrchestrator;
   private readonly opTree: SessionTreeBuilder;
   private readonly progressReporter: SessionProgressReporter;
-  private readonly progressToolEnabled: boolean;
+  private readonly taskStatusToolEnabled: boolean;
   private readonly expectedJsonSchema?: Record<string, unknown>;
   private readonly xmlTransport: XmlToolTransport;
   private turnFailureReasons: string[] = [];
@@ -561,14 +561,14 @@ export class AIAgentSession {
         const normalized = toolName.trim();
         if (normalized.length === 0) return false;
         if (normalized === 'batch') return false;
-        if (normalized === 'agent__progress_report') return false;
+        if (normalized === 'agent__task_status') return false;
         if (normalized === AIAgentSession.FINAL_REPORT_TOOL) return false;
         return true;
       });
       const hasSubAgentsConfigured = Array.isArray(this.sessionConfig.subAgents) && this.sessionConfig.subAgents.length > 0;
       const wantsProgressUpdates = this.sessionConfig.headendWantsProgressUpdates !== false;
     const enableProgressTool = wantsProgressUpdates && (hasNonInternalDeclaredTools || hasSubAgentsConfigured);
-    this.progressToolEnabled = enableProgressTool;
+    this.taskStatusToolEnabled = enableProgressTool;
     this.xmlTransport = new XmlToolTransport();
       const enableBatch = declaredTools.includes('batch');
       const eo = this.sessionConfig.expectedOutput;
@@ -733,7 +733,7 @@ export class AIAgentSession {
       toolResponseMaxBytes: sessionConfig.toolResponseMaxBytes,
       stopRef: this.stopRef,
       isCanceled: () => this.canceled,
-      progressToolEnabled: this.progressToolEnabled,
+      taskStatusToolEnabled: this.taskStatusToolEnabled,
       finalReportToolName: AIAgentSession.FINAL_REPORT_TOOL,
     };
 
@@ -1309,7 +1309,7 @@ export class AIAgentSession {
         resolvedUserPrompt: this.resolvedUserPrompt,
         resolvedSystemPrompt: this.resolvedSystemPrompt,
         expectedJsonSchema: this.expectedJsonSchema,
-        progressToolEnabled: this.progressToolEnabled,
+        taskStatusToolEnabled: this.taskStatusToolEnabled,
         abortSignal: this.sessionConfig.abortSignal,
         stopRef: this.sessionConfig.stopRef,
         isCanceled: () => this.canceled,
@@ -1743,7 +1743,7 @@ export class AIAgentSession {
   private set newCtxTokens(value: number) { this.contextGuard.setNewTokens(value); }
   private get schemaCtxTokens(): number { return this.contextGuard.getSchemaTokens(); }
   private set schemaCtxTokens(value: number) { this.contextGuard.setSchemaTokens(value); }
-  private get forcedFinalTurnReason(): 'context' | undefined { return this.contextGuard.getForcedFinalReason(); }
+  private get forcedFinalTurnReason(): 'context' | 'max_turns' | 'task_status_completed' | 'task_status_standalone_limit' | 'retry_exhaustion' | undefined { return this.contextGuard.getForcedFinalReason(); }
   private get contextLimitWarningLogged(): boolean { return this.contextGuard.hasLoggedContextWarning(); }
   private set contextLimitWarningLogged(value: boolean) { if (value) this.contextGuard.markContextWarningLogged(); }
 

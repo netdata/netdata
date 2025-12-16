@@ -18,9 +18,8 @@ import {
   finalReportFieldsText,
   finalReportXmlInstructions,
   MANDATORY_XML_FINAL_RULES,
-  PROGRESS_TOOL_BATCH_RULES,
-  PROGRESS_TOOL_DESCRIPTION,
-  PROGRESS_TOOL_INSTRUCTIONS,
+  TASK_STATUS_TOOL_BATCH_RULES,
+  TASK_STATUS_TOOL_INSTRUCTIONS,
 } from '../llm-messages.js';
 import { truncateToBytes } from '../truncation.js';
 import { parseJsonRecord, parseJsonValueDetailed } from '../utils.js';
@@ -45,11 +44,13 @@ interface InternalToolProviderOptions {
   xmlSessionNonce: string;  // Session-wide nonce for final report XML wrapper
 }
 
-const PROGRESS_TOOL = 'agent__progress_report';
+const TASK_STATUS_TOOL = 'agent__task_status';
 const FINAL_REPORT_TOOL = 'agent__final_report';
 const BATCH_TOOL = 'agent__batch';
 const SLACK_BLOCK_KIT_FORMAT: OutputFormatId = 'slack-block-kit';
 const DEFAULT_PARAMETERS_DESCRIPTION = 'Parameters for selected tool';
+const VALID_TASK_STATUSES = ['starting', 'in-progress', 'completed'] as const;
+type TaskStatusValue = typeof VALID_TASK_STATUSES[number];
 
 const RAW_PREVIEW_LIMIT_BYTES = 512;
 const previewRawValue = (value: unknown): string => {
@@ -106,16 +107,32 @@ export class InternalToolProvider extends ToolProvider {
     const tools: MCPTool[] = [];
     if (!this.disableProgressTool) {
       tools.push({
-        name: PROGRESS_TOOL,
-        description: PROGRESS_TOOL_DESCRIPTION,
+        name: TASK_STATUS_TOOL,
+        description: 'Provides live feedback to the user about your accomplishments, pending items and goals. This tool is only updating the user. It does not perform any other actions.',
         inputSchema: {
           type: 'object',
           additionalProperties: false,
-          required: ['progress'],
+          required: ['status', 'done', 'pending', 'goal'],
           properties: {
-            progress: { type: 'string', description: 'Brief progress message (max 15 words)' }
-          },
-        },
+            status: {
+              type: 'string',
+              enum: [...VALID_TASK_STATUSES],
+              description: 'The current status of the task assigned to you (pick one of the values)'
+            },
+            done: {
+              type: 'string',
+              description: 'What has been completed so far (up to 15 words)'
+            },
+            pending: {
+              type: 'string',
+              description: 'What remains to be done (up to 15 words)'
+            },
+            goal: {
+              type: 'string',
+              description: 'You immediate step/goal - what you want to achieve with the tools you call now? (up to 15 words)'
+            }
+          }
+        }
       });
     }
     // Final report: included for internal filtering (final-turn enforcement).
@@ -162,7 +179,7 @@ export class InternalToolProvider extends ToolProvider {
   hasTool(name: string): boolean {
     if (name === FINAL_REPORT_TOOL) return true;
     if (this.opts.enableBatch && name === BATCH_TOOL) return true;
-    if (name === PROGRESS_TOOL) return !this.disableProgressTool;
+    if (name === TASK_STATUS_TOOL) return !this.disableProgressTool;
     return false;
   }
 
@@ -218,7 +235,7 @@ export class InternalToolProvider extends ToolProvider {
 
       if (hasProgressTool) {
         lines.push('');
-        lines.push(PROGRESS_TOOL_INSTRUCTIONS);
+        lines.push(TASK_STATUS_TOOL_INSTRUCTIONS);
       }
 
       if (hasBatchTool) {
@@ -230,7 +247,7 @@ export class InternalToolProvider extends ToolProvider {
         lines.push('  {');
         lines.push('    "calls": [');
         if (hasProgressTool) {
-          lines.push(`      { "id": 1, "tool": "${PROGRESS_TOOL}", "parameters": { "progress": "Collected data about X, now researching Y" } },`);
+          lines.push(`      { "id": 1, "tool": "${TASK_STATUS_TOOL}", "parameters": { "status": "in-progress", "done": "Collected data about X", "pending": "researching Y and Z" } },`);
           lines.push('      { "id": 2, "tool": "tool1", "parameters": { "param1": "value1", "param2": "value2" } },');
           lines.push('      { "id": 3, "tool": "tool2", "parameters": { "param1": "value1" } }');
         } else {
@@ -241,14 +258,14 @@ export class InternalToolProvider extends ToolProvider {
         lines.push('    ]');
         lines.push('  }');
         if (hasProgressTool) {
-          lines.push('- Do not combine `agent__progress_report` with your final report; send the final report on its own.');
+          lines.push('- Do not combine `agent__task_status` with your final report; send the final report on its own.');
         }
 
         lines.push('');
         lines.push('### MANDATORY RULE FOR PARALLEL TOOL CALLS');
         lines.push(`When gathering information from multiple independent sources, use the ${BATCH_TOOL} tool to execute tools in parallel.`);
         if (hasProgressTool) {
-          lines.push(PROGRESS_TOOL_BATCH_RULES);
+          lines.push(TASK_STATUS_TOOL_BATCH_RULES);
         }
       }
     }
@@ -433,15 +450,57 @@ export class InternalToolProvider extends ToolProvider {
     };
   }
 
+  private validateAndProcessTaskStatus(parameters: Record<string, unknown>): { status: TaskStatusValue; done: string; pending: string; goal: string; taskStatusCompleted: boolean; statusMessage: string } {
+    // Validate status parameter
+    const status = typeof (parameters.status) === 'string' ? parameters.status : '';
+    if (!VALID_TASK_STATUSES.includes(status as TaskStatusValue)) {
+      throw new Error(`Invalid status '${status}'. Must be one of: ${VALID_TASK_STATUSES.join(', ')}`);
+    }
+    
+    const done = typeof (parameters.done) === 'string' ? parameters.done : '';
+    const pending = typeof (parameters.pending) === 'string' ? parameters.pending : '';
+    const goal = typeof (parameters.goal) === 'string' ? parameters.goal : '';
+    
+    const statusMessage = [done, pending, goal].filter(Boolean).join(' | ') || status;
+    
+    return {
+      status: status as TaskStatusValue,
+      done,
+      pending,
+      goal,
+      taskStatusCompleted: status === 'completed',
+      statusMessage
+    };
+  }
+
   async execute(name: string, parameters: Record<string, unknown>, executionOpts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
     const start = Date.now();
-    if (name === PROGRESS_TOOL && this.disableProgressTool) {
-      throw new Error('agent__progress_report is disabled for this session');
+    if (name === TASK_STATUS_TOOL && this.disableProgressTool) {
+      throw new Error('agent__task_status is disabled for this session');
     }
-    if (name === 'agent__progress_report') {
-      const progress = typeof (parameters.progress) === 'string' ? parameters.progress : '';
-      this.opts.updateStatus(progress);
-      return { ok: true, result: JSON.stringify({ status: 'shown_to_user' }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
+    if (name === TASK_STATUS_TOOL) {
+      const { status, done, pending, goal, taskStatusCompleted, statusMessage } = this.validateAndProcessTaskStatus(parameters);
+      this.opts.updateStatus(statusMessage);
+
+      const taskStatusPayload = {
+        status,
+        taskStatusCompleted,
+        taskStatusData: {
+          status,
+          done,
+          pending,
+          goal,
+        },
+      };
+
+      return {
+        ok: true,
+        result: 'status shown to user',
+        latencyMs: Date.now() - start,
+        kind: this.kind,
+        namespace: this.namespace,
+        extras: taskStatusPayload,
+      };
     }
     if (name === 'agent__final_report') {
       const requestedFormat = typeof parameters.report_format === 'string' ? parameters.report_format : (typeof parameters.format === 'string' ? parameters.format : undefined);
@@ -919,13 +978,24 @@ export class InternalToolProvider extends ToolProvider {
       const baseSubturn = typeof parentContext?.subturn === 'number' ? parentContext.subturn : 0;
       const results: R[] = await Promise.all(normalizedCalls.map(async ({ id, tool, parameters: callParameters }, index) => {
         const t0 = Date.now();
-        // Allow progress_report in batch, but not final_report or nested batch
+        // Allow task_status in batch, but not final_report or nested batch
         if (tool === 'agent__final_report' || tool === 'agent__batch') return { id, tool, ok: false, elapsedMs: 0, error: { code: 'INTERNAL_NOT_ALLOWED', message: 'Internal tools are not allowed in batch' } };
-        // Handle progress_report directly in batch
-        if (tool === 'agent__progress_report') {
-          const progress = typeof (callParameters.progress) === 'string' ? callParameters.progress : '';
-          this.opts.updateStatus(progress);
-          return { id, tool, ok: true, elapsedMs: Date.now() - t0, output: JSON.stringify({ ok: true }) };
+        // Handle task_status directly in batch
+        if (tool === 'agent__task_status') {
+          try {
+            // Validate the parameters but don't use the parsed values for response
+            this.validateAndProcessTaskStatus(callParameters);
+            const done = typeof callParameters.done === 'string' ? callParameters.done : '';
+            const pending = typeof callParameters.pending === 'string' ? callParameters.pending : '';
+            const goal = typeof callParameters.goal === 'string' ? callParameters.goal : '';
+            const status = typeof callParameters.status === 'string' ? callParameters.status : '';
+            const statusMessage = [done, pending, goal].filter(Boolean).join(' | ') || status;
+            this.opts.updateStatus(statusMessage);
+            return { id, tool, ok: true, elapsedMs: Date.now() - t0, output: 'status shown to user' };
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : String(error);
+            return { id, tool, ok: false, elapsedMs: Date.now() - t0, error: { code: 'BAD_REQUEST', message: msg } };
+          }
         }
         try {
           if (!(this.opts.orchestrator.hasTool(tool))) return { id, tool, ok: false, elapsedMs: 0, error: { code: 'UNKNOWN_TOOL', message: `Unknown tool: ${tool}` } };
@@ -1001,12 +1071,17 @@ export class InternalToolProvider extends ToolProvider {
       // Ignore orchestrator failures; callers will use fallback schema
     }
 
-    if (!this.disableProgressTool && !summaries.some((summary) => summary.name === PROGRESS_TOOL)) {
-      pushSchema(PROGRESS_TOOL, {
+    if (!this.disableProgressTool && !summaries.some((summary) => summary.name === TASK_STATUS_TOOL)) {
+      pushSchema(TASK_STATUS_TOOL, {
         type: 'object',
         additionalProperties: false,
-        required: ['progress'],
-        properties: { progress: { type: 'string' } }
+        required: ['status', 'done', 'pending', 'goal'],
+        properties: {
+          status: { type: 'string', enum: ['starting', 'in-progress', 'completed'] },
+          done: { type: 'string' },
+          pending: { type: 'string' },
+          goal: { type: 'string' }
+        }
       });
     }
 

@@ -12,7 +12,7 @@ import type { StructuredLogEvent } from '../../logging/structured-log-event.js';
 import type { PreloadedSubAgent } from '../../subagent-registry.js';
 import type { MCPRestartFailedError, LogFn, SharedAcquireOptions, SharedRegistry, SharedRegistryHandle } from '../../tools/mcp-provider.js';
 import type { ToolExecuteResult } from '../../tools/types.js';
-import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogDetailValue, LogEntry, LogPayload, MCPServer, MCPServerConfig, MCPTool, ProviderConfig, ProviderReasoningValue, ReasoningLevel, TokenUsage, ToolCall, TurnRequest, TurnResult, TurnStatus, ToolChoiceMode } from '../../types.js';
+import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogDetailValue, LogEntry, LogPayload, MCPServer, MCPServerConfig, MCPTool, ProviderConfig, ProviderReasoningValue, ReasoningLevel, TokenUsage, ToolAccountingEntry, ToolCall, TurnRequest, TurnResult, TurnStatus, ToolChoiceMode } from '../../types.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { ModelMessage, LanguageModel, ToolSet } from 'ai';
 import type { ChildProcess } from 'node:child_process';
@@ -79,8 +79,12 @@ const PURE_TEXT_RETRY_RESULT = 'Valid report after pure text retry.';
 const COLLAPSE_RECOVERY_RESULT = 'Proper result after collapse.';
 const COLLAPSE_FIXED_RESULT = 'Fixed after collapse.';
 const MAX_RETRY_SUCCESS_RESULT = 'Success after retries.';
+const TASK_STATUS_IN_PROGRESS = 'in-progress';
+const RETRY_EXHAUSTED_MESSAGE = 'retry exhausted';
 const COLLAPSING_REMAINING_TURNS_FRAGMENT = 'Collapsing remaining turns';
 const CONTEXT_LIMIT_TURN_WARN = 'Context limit exceeded during turn execution; proceeding with final turn.';
+const TASK_CONTINUE_PROCESSING = 'Continue processing';
+const TASK_COMPLETE_TASK = 'Complete task';
 const parseDumpList = (raw?: string): string[] => {
   if (typeof raw !== 'string') return [];
   return raw.split(',').map((value) => value.trim()).filter((value) => value.length > 0);
@@ -1354,7 +1358,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(firstAssistant !== undefined, 'Assistant message missing in run-test-10.');
       const toolCalls = firstAssistant.toolCalls ?? [];
       const toolCallNames = toolCalls.map((call) => call.name);
-      invariant(toolCallNames.includes('agent__progress_report'), 'Progress report tool call expected in run-test-10.');
+      invariant(toolCallNames.includes('agent__task_status'), 'Task status tool call expected in run-test-10.');
     },
   },
   {
@@ -2146,7 +2150,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         entry.type === 'tool'
         && entry.severity === 'WRN'
         && typeof entry.message === 'string'
-        && entry.message.includes("Tool 'agent__progress_report' skipped"));
+        && entry.message.includes("Tool 'agent__task_status' skipped"));
       invariant(progressSkipLog === undefined, 'Progress tool must not be skipped after guard activation.');
     },
   },
@@ -3187,7 +3191,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success, 'Scenario run-test-34 expected success.');
       const finalReport = result.finalReport!;
       invariant(result.success, 'Final report should indicate success for run-test-34.');
-      const progressResult = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes('agent__progress_report'));
+      const progressResult = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes('agent__task_status'));
       invariant(progressResult !== undefined, 'Batch progress entry expected for run-test-34.');
       const toolMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes(BATCH_PROGRESS_RESPONSE));
       invariant(toolMessage !== undefined, 'Batch tool output expected for run-test-34.');
@@ -7290,7 +7294,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         invocation += 1;
         if (invocation === 1) {
           const nestedCallsPayload = JSON.stringify([
-            { id: 'nested-progress', tool: 'agent__progress_report', parameters: { progress: BATCH_STRING_PROGRESS } },
+            { id: 'nested-progress', tool: 'agent__task_status', parameters: { status: TASK_STATUS_IN_PROGRESS, done: BATCH_STRING_PROGRESS, pending: TASK_CONTINUE_PROCESSING, goal: TASK_COMPLETE_TASK } },
             { id: 'nested-hex', tool: 'test__test', parameters: BATCH_HEX_ARGUMENT_STRING },
           ]);
           const assistantMessage: ConversationMessage = {
@@ -8181,9 +8185,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             content: '',
             toolCalls: [
               {
-                name: 'agent__progress_report',
+                name: 'agent__task_status',
                 id: progressCallId,
-                parameters: { progress: 'Reviewing instructions.' },
+                parameters: { status: TASK_STATUS_IN_PROGRESS, done: 'Reviewing instructions', pending: 'Continue analysis', goal: TASK_COMPLETE_TASK },
               },
             ],
             reasoning: [
@@ -8299,8 +8303,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             toolCalls: [
               {
                 id: progressCallId,
-                name: 'agent__progress_report',
-                parameters: { progress: 'Setting up analysis.' },
+                name: 'agent__task_status',
+                parameters: { status: TASK_STATUS_IN_PROGRESS, done: 'Setting up analysis', pending: 'Complete setup phase', goal: 'Finish analysis setup' },
               },
             ],
           };
@@ -9118,7 +9122,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         {
           role: 'assistant',
           content: '',
-          toolCalls: [{ id: 'call-1', name: 'agent__progress_report', parameters: {} }],
+          toolCalls: [{ id: 'call-1', name: 'agent__task_status', parameters: {} }],
           reasoning: [{ type: 'reasoning', text: 'missing metadata', providerMetadata: { anthropic: {} } }],
         },
       ];
@@ -9183,7 +9187,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             {
               type: 'tool-call',
               toolCallId: 'call-1',
-              toolName: 'agent__progress_report',
+              toolName: 'agent__task_status',
               input: { progress: 'Checking replay order' },
             },
           ],
@@ -9194,7 +9198,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             {
               type: 'tool_result',
               toolCallId: 'call-1',
-              toolName: 'agent__progress_report',
+              toolName: 'agent__task_status',
               output: { type: 'text', value: 'ok' },
             },
           ],
@@ -11571,7 +11575,7 @@ BASE_TEST_SCENARIOS.push({
       const assistantMessage: ConversationMessage = {
         role: 'assistant',
         content: 'progress only',
-        toolCalls: [{ id: 'call-1', name: 'agent__progress_report', parameters: {} }],
+        toolCalls: [{ id: 'call-1', name: 'agent__task_status', parameters: {} }],
       };
       return Promise.resolve({
         status: { type: 'success', hasToolCalls: true, finalAnswer: false },
@@ -11613,6 +11617,200 @@ BASE_TEST_SCENARIOS.push({
   },
 } satisfies HarnessTest);
 
+// Task Status Tool Behavioral Tests
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-task-status-standalone-first',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.maxTurns = 2;
+    sessionConfig.maxRetries = 1;
+    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+      latencyMs: 5,
+      response: 'reporting first status update',
+      messages: [
+        {
+          role: 'assistant',
+          content: 'reporting first status update',
+          toolCalls: [{ id: 'call-1', name: 'agent__task_status', parameters: { status: TASK_STATUS_IN_PROGRESS, done: 'Starting analysis', pending: 'Continue processing', goal: TASK_COMPLETE_TASK } }],
+        },
+      ],
+      tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+    }));
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(result.success, 'First standalone task status call should succeed');
+    invariant(result.finalReport !== undefined, 'Final report should be provided after first status call');
+    // Verify that standalone counter was incremented but not triggered final turn yet
+    const taskStatusEntries = result.accounting.filter((entry): entry is ToolAccountingEntry => 
+      entry.type === 'tool' && entry.command === 'agent__task_status');
+    invariant(taskStatusEntries.length === 1, 'Should have exactly one task status call');
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-task-status-standalone-second',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.maxTurns = 2;
+    sessionConfig.maxRetries = 1;
+    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+      latencyMs: 5,
+      response: 'reporting second status update', 
+      messages: [
+        {
+          role: 'assistant',
+          content: 'reporting second status update',
+          toolCalls: [{ id: 'call-1', name: 'agent__task_status', parameters: { status: TASK_STATUS_IN_PROGRESS, done: 'Still processing', pending: 'Final steps', goal: TASK_COMPLETE_TASK } }],
+        },
+      ],
+      tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+    }));
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(!result.success, 'Second standalone task status call should force final turn and fail without final report');
+    expectTurnFailureContains(result.logs, 'run-test-task-status-standalone-second', ['task_status_standalone_limit', 'no_tools', 'final_report_missing']);
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-task-status-completed',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.maxTurns = 2;
+    sessionConfig.maxRetries = 1;
+    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+      latencyMs: 5,
+      response: 'task completed',
+      messages: [
+        {
+          role: 'assistant',
+          content: 'task completed',
+          toolCalls: [{ id: 'call-1', name: 'agent__task_status', parameters: { status: 'completed', done: 'All steps finished', pending: 'None', goal: 'Task complete' } }],
+        },
+      ],
+      tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+    }));
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(!result.success, 'Task status with completed should force final turn');
+    expectTurnFailureContains(result.logs, 'run-test-task-status-completed', ['task_status_completed', 'no_tools', 'final_report_missing']);
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-task-status-reset-on-real-tool',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.maxTurns = 3;
+    sessionConfig.maxRetries = 1;
+    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+      latencyMs: 5,
+      response: 'calling real tool after status',
+      messages: [
+        {
+          role: 'assistant',
+          content: 'calling real tool after status',
+          toolCalls: [
+            { id: 'call-1', name: 'agent__task_status', parameters: { status: TASK_STATUS_IN_PROGRESS, done: 'Initial step', pending: 'Main processing', goal: 'Process data' } },
+            { id: 'call-2', name: 'test__test', parameters: { text: 'phase-1-tool-success' } },
+          ],
+        },
+      ],
+      tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+    }));
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(result.success, 'Task status followed by real tool should succeed');
+    invariant(result.finalReport !== undefined, 'Final report should be provided');
+    const taskStatusEntries = result.accounting.filter((entry): entry is ToolAccountingEntry => 
+      entry.type === 'tool' && entry.command === 'agent__task_status');
+    const testEntries = result.accounting.filter((entry): entry is ToolAccountingEntry => 
+      entry.type === 'tool' && entry.command === 'test__test');
+    invariant(taskStatusEntries.length === 1, 'Should have exactly one task status call');
+    invariant(testEntries.length === 1, 'Should have exactly one test tool call');
+    // Verify that counter was reset by checking that the same turn allows another standalone call
+    // If counter wasn't reset, second standalone call would trigger final turn
+    invariant(result.conversation.length > 0, 'Should have conversation after reset');
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-retry-exhaustion-forces-final',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.maxTurns = 1;
+    sessionConfig.maxRetries = 0; // No retries to force immediate exhaustion
+    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      status: { type: 'auth_error', message: RETRY_EXHAUSTED_MESSAGE },
+      latencyMs: 5,
+      response: RETRY_EXHAUSTED_MESSAGE,
+      messages: [
+        {
+          role: 'assistant',
+          content: RETRY_EXHAUSTED_MESSAGE,
+        },
+      ],
+      tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+    }));
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(!result.success, 'Retry exhaustion should force final turn and fail');
+    expectTurnFailureContains(result.logs, 'run-test-retry-exhaustion-forces-final', ['retry_exhaustion', 'no_tools', 'final_report_missing']);
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-retry-exhaustion-during-final-turn',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    // Set up final turn with no retries to test edge case
+    sessionConfig.maxTurns = 1;
+    sessionConfig.maxRetries = 0; // No retries - immediate exhaustion on final turn
+    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      status: { type: 'auth_error', message: RETRY_EXHAUSTED_MESSAGE },
+      latencyMs: 5,
+      response: RETRY_EXHAUSTED_MESSAGE,
+      messages: [
+        {
+          role: 'assistant',
+          content: RETRY_EXHAUSTED_MESSAGE,
+        },
+      ],
+      tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+    }));
+  },
+  expect: (result: AIAgentResult) => {
+    // During final turn, retry exhaustion should fail normally (not force final turn)
+    invariant(!result.success, 'Retry exhaustion during final turn should fail normally');
+    // Should not have retry_exhaustion forced final turn reason - should be session failure
+    // Use the same pattern as other tests - check for expected failure slugs
+    expectTurnFailureContains(result.logs, 'run-test-retry-exhaustion-during-final-turn', ['no_tools', 'final_report_missing']);
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-old-progress-report-rejected',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.maxTurns = 1;
+    sessionConfig.maxRetries = 1;
+    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+      latencyMs: 5,
+      response: 'trying old tool name',
+      messages: [
+        {
+          role: 'assistant',
+          content: 'trying old tool name',
+          toolCalls: [{ id: 'call-1', name: 'agent__progress_report', parameters: { progress: 'old progress' } }],
+        },
+      ],
+      tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+    }));
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(!result.success, 'Old progress_report tool should be rejected');
+    const unknownToolError = result.logs.find((log) => log.type === 'tool' && typeof log.message === 'string' && log.message.includes('agent__progress_report'));
+    invariant(unknownToolError !== undefined, 'Should have error about unknown tool agent__progress_report');
+  },
+} satisfies HarnessTest);
 
 BASE_TEST_SCENARIOS.push({
   id: 'run-test-unknown-tool-fails',

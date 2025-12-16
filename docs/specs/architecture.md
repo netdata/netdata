@@ -57,7 +57,7 @@ Layered architecture with strict separation: CLI → Session → LLM Client → 
 **Registered Providers**:
 - MCPProvider - MCP protocol tools (stdio/websocket/http/sse)
 - RestProvider - REST/OpenAPI tools
-- InternalToolProvider - Built-in tools (progress_report, final_report, batch)
+- InternalToolProvider - Built-in tools (task_status, final_report, batch)
 - AgentProvider - Sub-agent invocation
 
 ### 4. SessionTreeBuilder (`src/session-tree.ts`)

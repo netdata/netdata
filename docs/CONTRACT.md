@@ -134,7 +134,7 @@ Note: Exit codes map to failure categories, not specific error types. Check `res
 #### Forced Final Turn
 - When the guard fires (either from a tool overflow or a turn preflight), the session immediately injects the final-instruction system message, restricts the tool list to `agent__final_report`, and logs the `forcedFinalTurnReason = 'context'`.
 - Schema tokens are recomputed for the reduced toolset and the guard is re-evaluated. If projections still exceed the limit, the session proceeds best-effort but MUST log the post-shrink warning.
-- From this point forward no new tools (including progress_report) may be executed; only the final report tool is allowed, and the agent must use already gathered information to respond.
+- From this point forward no new tools (including task_status) may be executed; only the final report tool is allowed, and the agent must use already gathered information to respond.
 
 ### Empty or Invalid LLM Responses
 

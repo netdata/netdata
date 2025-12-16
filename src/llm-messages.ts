@@ -64,6 +64,36 @@ export const toolReminderMessage = (excludeProgress: string): string =>
  */
 export const FINAL_TURN_NOTICE =
   'System notice: this is the final turn. You **MUST NOW** provide your final report/answer. Do NOT attempt to call any other tool. Read carefully the final report/answer instructions and provide your final report/answer based on the information already gathered. If the information is insufficient, provide the best possible answer based on what you have and note the limitation in your final report/answer.';
+
+/**
+ * Injected when task completion is signaled via task_status tool.
+ * Forces immediate finalization with task completion message.
+ * Used in: session-turn-runner.ts (pushed to conversation)
+ *
+ * CONDITION: forcedFinalTurnReason === 'task_status_completed'
+ * Where forcedFinalTurn is set when model calls task_status with status: completed
+ */
+export const TASK_STATUS_COMPLETED_FINAL_MESSAGE = FINAL_TURN_NOTICE;
+
+/**
+ * Injected when standalone task_status limit is reached.
+ * Forces finalization when too many consecutive standalone calls occur.
+ * Used in: session-turn-runner.ts (pushed to conversation)
+ *
+ * CONDITION: forcedFinalTurnReason === 'task_status_standalone_limit'
+ * Where forcedFinalTurn is set after 2 consecutive standalone task_status calls
+ */
+export const TASK_STATUS_STANDALONE_LIMIT_FINAL_MESSAGE = FINAL_TURN_NOTICE;
+
+/**
+ * Injected when all retry attempts are exhausted.
+ * Forces graceful finalization instead of session failure.
+ * Used in: session-turn-runner.ts (pushed to conversation)
+ *
+ * CONDITION: forcedFinalTurnReason === 'retry_exhaustion'
+ * Where forcedFinalTurn is set when all retry attempts within a turn fail
+ */
+export const RETRY_EXHAUSTION_FINAL_MESSAGE = FINAL_TURN_NOTICE;
   
 // =============================================================================
 // TURN FAILURE MESSAGES
@@ -143,14 +173,14 @@ export const TOOL_CALL_MALFORMED =
   'Tool call payload malformed; provide JSON arguments matching the schema.';
 
 /**
- * When only progress_report was called without any productive tools.
+ * When only task_status was called without any productive tools.
  * Used in: session-turn-runner.ts via addTurnFailure
  *
  * CONDITION: executedNonProgressBatchTools === 0 && executedProgressBatchTools > 0
- * (progress_report was called but no other tools)
+ * (task_status was called but no other tools)
  */
 export const TURN_FAILED_PROGRESS_ONLY =
-  'You called agent__progress_report without calling any other tools together with it. agent__progress_report does not perform any actions other than showing a message to the user. To do actual work, you must either:\n\n1. call other tools to collect data or perform actions (following their schemas precisely), or\n2. if your task is complete and you can now conclude, provide your final report/answer (using the XML wrapper as instructed - your final report/answer is not a tool call). **CRITICAL:** DO NOT CALL agent__progress_report STANDALONE. If you have no other tools to call, skip it entirely.';
+  'You called agent__task_status without calling any other tools together with it. agent__task_status only reports status to the user — it does NOT perform any actions. You must either:\n\n1. call other tools to collect data or perform actions (following their schemas precisely), or\n2. if your task is complete, call agent__task_status with status="completed" and then provide your final report/answer (using the XML wrapper as instructed).\n\n**NOTE:** agent__task_status can be called standalone, but consecutive standalone calls will force you to provide your final report.';
 
 /**
  * When model calls XML wrapper tag as a tool instead of outputting it as text.
@@ -309,66 +339,58 @@ export const turnFailedStructuredOutputTruncated = (maxOutputTokens?: number): s
     `Repeat the same final-report, but this time keep your output within the required token count limit.`;
 };
 
+
 // =============================================================================
-// PROGRESS REPORT INSTRUCTIONS
-// Single source of truth for agent__progress_report tool guidance.
+// TASK STATUS INSTRUCTIONS
+// Single source of truth for agent__task_status tool guidance.
 // Used by: internal-provider.ts (system prompt, tool schema), xml-tools.ts (XML-NEXT)
 // =============================================================================
 
 /**
- * Tool description for agent__progress_report schema.
- * Used in: internal-provider.ts listTools()
- */
-export const PROGRESS_TOOL_DESCRIPTION =
-  'When calling other tools, call this tool to provide feedback to the user about your current progress and actions. Do not call this tool if you are not calling other tools in the same turn. Do not call this tool when providing your final report/answer.';
-
-/**
- * Full instructions for agent__progress_report.
+ * Instructions for agent__task_status tool.
  * Used in: internal-provider.ts buildInstructions()
  */
-export const PROGRESS_TOOL_INSTRUCTIONS = `#### agent__progress_report — Progress Updates for the User
+export const TASK_STATUS_TOOL_INSTRUCTIONS = `#### agent__task_status — Task Status Feedback
 
-When calling other tools, inject also a call to agent__progress_report, to provide information to the user about your current status and the reason you are calling the other tools.
+Provides live feedback to the user about your accomplishments, pending items and goals. Use this tool as frequently as necessary to let the user know what you are doing, while you work on the task assigned to you. This tool is only updating the user. It does not perform any other actions.
 
-**Good examples:**
-- "Found the data about X, now searching for Y and Z": let the user know you have already acquired information about X and now you are calling more tools to search for Y and Z
-- "Discovered how X works, now checking if it can also do Y or Z": informs the user that you found how X works, and you are now calling more tools to check for Y and Z
-- "Looks like X is not available, trying Y and Z instead": updates the user that X is not available, and you are calling other tools to try Y and Z
+**Status Values:**
+- "starting": Beginning the task
+- "in-progress": Currently working on the task
+- "completed": Task is finished and should trigger final turn
 
-**Bad examples (DO NOT DO THESE):**
-- "Calling tool X": the user is not aware of your tools - the useful information is why you call a tool, not that you call it
-- "Compiling/Preparing final report about X": incorrect, final report is NOT a tool call - provide your final report instead of calling agent__progress_report
-- "I now have all the information to complete my task": incorrect, if you have completed your task, provide your final report instead of calling agent__progress_report
-- "Extracted X and Y": too vague, does not inform the user about your next steps
+**Good Examples:**
+- status: "starting", done: "Planning...", pending: "Find error logs", goal: "gather system error logs for the last 15 mins"
+- status: "in-progress", done: "got error logs for the last 15 mins", pending: "Find the specific error", goal: "expand search to 30 mins"
+- status: "completed", done: "Found 3 critical errors", pending: "All done", goal: "Compile the final report/answer"
 
-**Mandatory Rules about agent__progress_report:**
-- Call agent__progress_report ONLY when you are ALSO calling other tools in the same turn
-- NEVER call agent__progress_report standalone; if you are not calling other tools, skip it entirely
-- Keep messages concise (max 20 words), no formatting or newlines
-- agent__progress_report only informs the user; it does NOT perform actions; you must call other tools to do actual work
+**Mandatory Rules:**
+- Call agent__task_status alongside other tools (do not waste turns just for it)
+- Include clear "done", "pending" and "goal" descriptions for the user to understand your progress
+- Use status="completed" only when the standalone task is truly finished (you will immediately after asked to provide your final report/answer)
 `;
 
 /**
  * Brief instructions for XML-NEXT progress slot.
  * Used in: xml-tools.ts renderXmlNext()
  */
-export const PROGRESS_TOOL_INSTRUCTIONS_BRIEF =
-  'Update the user about your current status (only when also calling other tools):';
+export const TASK_STATUS_TOOL_INSTRUCTIONS_BRIEF =
+  'Update the user about your current task status and progress:';
 
 /**
- * Batch-specific rules for progress_report.
+ * Batch-specific rules for task_status.
  * Used in: internal-provider.ts buildInstructions() batch section
  */
-export const PROGRESS_TOOL_BATCH_RULES = `- Include at most one progress_report per batch
-- progress_report updates the user; to perform actions, use other tools in the same batch
-- If you have no other tools to call, do NOT include progress_report`;
+export const TASK_STATUS_TOOL_BATCH_RULES = `- Include at most one task_status per batch
+- task_status updates the user; to perform actions, use other tools in the same batch
+- task_status can be called standalone to track task progress`;
 
 /**
- * Mandatory workflow line mentioning progress_report for XML-NEXT.
+ * Mandatory workflow line mentioning task_status for XML-NEXT.
  * Used in: xml-tools.ts renderXmlNext()
  */
-export const PROGRESS_TOOL_WORKFLOW_LINE =
-  'Call one or more tools to collect data or perform actions (optionally include progress_report to update the user)';
+export const TASK_STATUS_TOOL_WORKFLOW_LINE =
+  'Call one or more tools to collect data or perform actions (optionally include task_status to update the user)';
 
 // XML System Notices (moved from xml-tools.ts to keep all LLM-facing strings here)
 export interface XmlNextTemplatePayload {
@@ -377,7 +399,7 @@ export interface XmlNextTemplatePayload {
   maxTurns?: number;
   tools: { name: string; schema?: Record<string, unknown> }[];
   slotTemplates: { slotId: string; tools: string[] }[];
-  progressToolEnabled: boolean;
+  taskStatusToolEnabled: boolean;
   expectedFinalFormat: string;
   attempt: number;
   maxRetries: number;
@@ -399,7 +421,7 @@ export interface XmlPastTemplatePayload {
 }
 
 export const renderXmlNextTemplate = (payload: XmlNextTemplatePayload): string => {
-  const { nonce, turn, maxTurns, attempt, maxRetries, contextPercentUsed, hasExternalTools, expectedFinalFormat, progressToolEnabled } = payload;
+  const { nonce, turn, maxTurns, attempt, maxRetries, contextPercentUsed, hasExternalTools, expectedFinalFormat, taskStatusToolEnabled } = payload;
   const finalSlotId = `${nonce}-FINAL`;
   const lines: string[] = [];
 
@@ -418,14 +440,14 @@ export const renderXmlNextTemplate = (payload: XmlNextTemplatePayload): string =
     lines.push('You now need to decide your next move:');
     lines.push('EITHER');
     lines.push('- Call tools to advance your task following the main prompt instructions (pay attention to tool formatting and schema requirements).');
-    if (progressToolEnabled) {
-      lines.push('- Together with these tool calls, also call `agent__progress_report` to explain what you are doing and why you are calling these tools.');
+    if (taskStatusToolEnabled) {
+      lines.push('- Together with these tool calls, also call `agent__task_status` to explain what you are doing and why you are calling these tools.');
     }
     lines.push('OR');
     lines.push(`- Provide your final report/answer in the expected format (${expectedFinalFormat}) using the XML wrapper (\`<ai-agent-${finalSlotId} format="${expectedFinalFormat}">\`)`);
-    if (progressToolEnabled) {
+    if (taskStatusToolEnabled) {
       lines.push('');
-      lines.push('DO NOT call `agent__progress_report` standalone - it is only for updating the user during tool calls.)');
+      lines.push('Call `agent__task_status` to track your progress and mark tasks as complete.');
     }
   } else {
     lines.push(`You MUST now provide your final report/answer in the expected format (${expectedFinalFormat}) using the XML wrapper (\`<ai-agent-${finalSlotId} format="${expectedFinalFormat}">\`).`);

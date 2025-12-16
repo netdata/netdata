@@ -163,7 +163,7 @@ interface RestToolConfig {
 
 **Tools**:
 1. **agent__final_report** - Deliver final answer
-2. **agent__progress_report** - Report progress (optional)
+2. **agent__task_status** - Track task progress and state (optional)
 3. **agent__batch** - Batch tool execution (optional)
 
 **final_report Parameters**:
@@ -174,12 +174,13 @@ interface RestToolConfig {
 - `metadata`: optional map passed through to consumers
 - `ts`: auto-populated timestamp (ms)
 
-**progress_report Parameters**:
+**task_status Parameters**:
 ```typescript
 {
-  status: string;  // Current status message
-  title?: string;  // Optional session title
-  emoji?: string;  // Optional emoji for title
+  status: 'starting' | 'in-progress' | 'completed';  // Task status
+  done: string;    // What has been completed
+  pending: string; // What remains to be done
+  goal: string;    // Overall task goal
 }
 ```
 

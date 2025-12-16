@@ -77,7 +77,7 @@ export class ContextGuard {
 
   // Budget state
   private toolBudgetExceeded = false;
-  private forcedFinalTurnReason?: 'context';
+  private forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_standalone_limit' | 'retry_exhaustion';
   private contextLimitWarningLogged = false;
 
   // Current reasoning/thinking budget tokens (for extended thinking models)
@@ -143,7 +143,7 @@ export class ContextGuard {
    * Estimate token count for tool schemas
    */
   estimateToolSchemaTokens(tools: readonly { name: string; description?: string; instructions?: string; inputSchema?: unknown }[]): number {
-    let filtered = tools.filter((tool) => tool.name !== 'agent__progress_report' && tool.name !== 'agent__final_report');
+    let filtered = tools.filter((tool) => tool.name !== 'agent__task_status' && tool.name !== 'agent__final_report');
     if (filtered.length === 0) {
       filtered = [...tools];
     }
@@ -530,8 +530,32 @@ export class ContextGuard {
   }
 
   /** Get the forced final turn reason, if any */
-  getForcedFinalReason(): 'context' | undefined {
+  getForcedFinalReason(): 'context' | 'max_turns' | 'task_status_completed' | 'task_status_standalone_limit' | 'retry_exhaustion' | undefined {
     return this.forcedFinalTurnReason;
+  }
+
+  /** Set forced final turn reason for task completion */
+  setTaskCompletionReason(): void {
+    this.forcedFinalTurnReason = 'task_status_completed';
+  }
+
+  /** Set forced final turn reason for task status standalone limit */
+  setTaskStatusStandaloneLimitReason(): void {
+    // Don't overwrite explicit task completion signals
+    if (this.forcedFinalTurnReason === 'task_status_completed') {
+      return;
+    }
+    this.forcedFinalTurnReason = 'task_status_standalone_limit';
+  }
+
+  /** Set forced final turn reason for retry exhaustion */
+  setRetryExhaustedReason(): void {
+    // Don't overwrite explicit task completion signals
+    if (this.forcedFinalTurnReason === 'task_status_completed' ||
+        this.forcedFinalTurnReason === 'task_status_standalone_limit') {
+      return;
+    }
+    this.forcedFinalTurnReason = 'retry_exhaustion';
   }
 
   /** Check if context limit warning has been logged */

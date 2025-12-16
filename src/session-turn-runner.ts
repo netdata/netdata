@@ -35,7 +35,6 @@ import {
   FINAL_REPORT_JSON_REQUIRED,
   FINAL_REPORT_SLACK_MESSAGES_MISSING,
   TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT,
-  TURN_FAILED_PROGRESS_ONLY,
   turnFailedXmlWrapperAsTool,
   FINAL_TURN_NOTICE,
   MAX_TURNS_FINAL_MESSAGE,
@@ -45,6 +44,9 @@ import {
   finalReportFormatMismatch,
   finalReportReminder,
   isXmlFinalReportTagName,
+  RETRY_EXHAUSTION_FINAL_MESSAGE,
+  TASK_STATUS_COMPLETED_FINAL_MESSAGE,
+  TASK_STATUS_STANDALONE_LIMIT_FINAL_MESSAGE,
   toolReminderMessage,
   turnFailedPrefix,
 } from './llm-messages.js';
@@ -87,7 +89,7 @@ export interface TurnRunnerContext {
   readonly resolvedUserPrompt?: string;
   readonly resolvedSystemPrompt?: string;
   readonly expectedJsonSchema?: Record<string, unknown>;
-  readonly progressToolEnabled: boolean;
+  readonly taskStatusToolEnabled: boolean;
   readonly abortSignal?: AbortSignal;
   readonly stopRef?: { stopping: boolean };
   isCanceled: () => boolean;
@@ -151,9 +153,11 @@ interface TurnRunnerState {
   pendingCtxTokens?: number;
   newCtxTokens?: number;
   schemaCtxTokens?: number;
-  forcedFinalTurnReason?: 'context' | 'max_turns';
+  forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_standalone_limit' | 'retry_exhaustion';
   lastTurnError?: string;
   lastTurnErrorType?: string;
+  standaloneTaskStatusCount: number;
+  lastTaskStatusCompleted?: boolean;
 }
 
 // Static constants (non-LLM-facing)
@@ -203,6 +207,8 @@ export class TurnRunner {
             lastFinalReportStatus: undefined,
             finalReportInvalidFormat: false,
             finalReportSchemaFailed: false,
+            standaloneTaskStatusCount: 0,
+            lastTaskStatusCompleted: undefined,
         };
     }
     /**
@@ -413,6 +419,8 @@ export class TurnRunner {
                         isFinalTurn = true;
                     }
                 };
+
+
                 const toolSelection = this.selectToolsForTurn(provider, isFinalTurn);
                 this.state.pendingToolSelection = toolSelection;
                 this.schemaCtxTokens = this.estimateToolSchemaTokens(toolSelection.toolsForTurn);
@@ -509,7 +517,7 @@ export class TurnRunner {
                         maxTurns,
                         tools: allTools,
                         maxToolCallsPerTurn: Math.max(1, this.ctx.sessionConfig.maxToolCallsPerTurn ?? 10),
-                        progressToolEnabled: this.ctx.progressToolEnabled,
+                        taskStatusToolEnabled: this.ctx.taskStatusToolEnabled,
                         finalReportToolName: FINAL_REPORT_TOOL,
                         resolvedFormat: this.ctx.resolvedFormat,
                         expectedJsonSchema: this.ctx.expectedJsonSchema,
@@ -522,7 +530,7 @@ export class TurnRunner {
                     attemptConversation.push(xmlResult.nextMessage);
                     // On the last allowed attempt within this turn, nudge the model to use tools
                     if ((attempts === maxRetries - 1) && currentTurn < (maxTurns - 1)) {
-                        const excludeProgress = this.ctx.progressToolEnabled ? ' (excluding `agent__progress_report`)' : '';
+                        const excludeProgress = this.ctx.taskStatusToolEnabled ? ' (excluding `agent__task_status`)' : '';
                         attemptConversation.push({
                             role: 'user',
                             content: toolReminderMessage(excludeProgress)
@@ -530,9 +538,26 @@ export class TurnRunner {
                     }
                     // Force the final-report instruction onto the conversation once we enter the last turn
                     if (isFinalTurn) {
-                        const finalInstruction = this.forcedFinalTurnReason === 'context'
-                            ? CONTEXT_FINAL_MESSAGE
-                            : MAX_TURNS_FINAL_MESSAGE;
+                        let finalInstruction: string;
+                        switch (this.forcedFinalTurnReason) {
+                            case 'context':
+                                finalInstruction = CONTEXT_FINAL_MESSAGE;
+                                break;
+                            case 'max_turns':
+                                finalInstruction = MAX_TURNS_FINAL_MESSAGE;
+                                break;
+                            case 'task_status_completed':
+                                finalInstruction = TASK_STATUS_COMPLETED_FINAL_MESSAGE;
+                                break;
+                            case 'task_status_standalone_limit':
+                                finalInstruction = TASK_STATUS_STANDALONE_LIMIT_FINAL_MESSAGE;
+                                break;
+                            case 'retry_exhaustion':
+                                finalInstruction = RETRY_EXHAUSTION_FINAL_MESSAGE;
+                                break;
+                            default:
+                                finalInstruction = MAX_TURNS_FINAL_MESSAGE;
+                        }
                         this.pushSystemRetryMessage(conversation, finalInstruction);
                         attemptConversation.push({
                             role: 'user',
@@ -541,7 +566,17 @@ export class TurnRunner {
                         });
                     }
                     if (isFinalTurn) {
-                        this.logEnteringFinalTurn(forcedFinalTurn ? 'context' : 'max_turns', currentTurn);
+                        let logReason: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_standalone_limit' | 'retry_exhaustion' = 'max_turns';
+                        if (this.forcedFinalTurnReason === 'context') {
+                            logReason = 'context';
+                        } else if (this.forcedFinalTurnReason === 'task_status_completed') {
+                            logReason = 'task_status_completed';
+                        } else if (this.forcedFinalTurnReason === 'task_status_standalone_limit') {
+                            logReason = 'task_status_standalone_limit';
+                        } else if (this.forcedFinalTurnReason === 'retry_exhaustion') {
+                            logReason = 'retry_exhaustion';
+                        }
+                        this.logEnteringFinalTurn(logReason, currentTurn);
                     }
                     this.state.llmAttempts++;
                     attempts += 1;
@@ -692,8 +727,8 @@ export class TurnRunner {
                     const sessionNonce = this.ctx.xmlTransport.getSessionNonce();
                     try {
                         const internal = new Set([FINAL_REPORT_TOOL]);
-                        if (this.ctx.progressToolEnabled)
-                            internal.add('agent__progress_report');
+                        if (this.ctx.taskStatusToolEnabled)
+                            internal.add('agent__task_status');
                         if (this.ctx.sessionConfig.tools.includes('batch'))
                             internal.add('agent__batch');
                         const normalizeTool = (n: string): string => n.replace(/^<\|[^|]+\|>/, '').trim();
@@ -844,7 +879,7 @@ export class TurnRunner {
                                 const name = (typeof tc.name === 'string' ? tc.name : '').trim();
                                 if (name.length === 0)
                                     return acc;
-                                if (name === 'agent__progress_report' || name === FINAL_REPORT_TOOL || name === 'agent__batch')
+                                if (name === 'agent__task_status' || name === FINAL_REPORT_TOOL || name === 'agent__batch')
                                     return acc;
                                 // Count only known tools (non-internal) present in orchestrator
                                 const isKnown = this.ctx.toolsOrchestrator?.hasTool(name) ?? false;
@@ -1369,6 +1404,20 @@ export class TurnRunner {
                         const finalReportReady = this.finalReport !== undefined;
         const executionStats = turnResult.executionStats ?? { executedTools: 0, executedNonProgressBatchTools: 0, executedProgressBatchTools: 0, unknownToolEncountered: false };
         const hasNonProgressTools = executionStats.executedNonProgressBatchTools > 0;
+        const hasProgressOnly = executionStats.executedProgressBatchTools > 0 && executionStats.executedNonProgressBatchTools === 0;
+
+        // Handle task status completion - force final turn if task is completed
+        if (executionStats.executedProgressBatchTools > 0 && this.state.lastTaskStatusCompleted === true) {
+            this.ctx.contextGuard.setTaskCompletionReason();
+        }
+
+        // Rule 2: Force final turn if standalone task status count >= 2
+        if (this.state.standaloneTaskStatusCount >= 2) {
+            this.ctx.contextGuard.setTaskStatusStandaloneLimitReason();
+        }
+
+        // Sync final turn flags after task status reason setting
+        syncFinalTurnFlags();
                         // Add new messages to conversation (skipped above for empty responses per CONTRACT)
                         conversation.push(...sanitizedMessages);
                         if (this.state.turnFailureReasons.length > 0) {
@@ -1377,7 +1426,8 @@ export class TurnRunner {
                             this.state.turnFailureReasons = [];
                         }
                         // If we encountered an invalid response and still have retries in this turn, retry
-                        if (!finalReportReady && !hasNonProgressTools && lastErrorType === 'invalid_response' && attempts < maxRetries) {
+                        // Skip retry if progress tools succeeded (standalone task_status consumes the turn per TODO design)
+                        if (!finalReportReady && !hasNonProgressTools && !hasProgressOnly && lastErrorType === 'invalid_response' && attempts < maxRetries) {
                             // Collapse turns on retry if a final report was attempted but rejected
                             if (turnHadFinalReportAttempt && currentTurn < maxTurns) {
                                 collapseRemainingTurns('final_report_attempt');
@@ -1401,8 +1451,9 @@ export class TurnRunner {
                             collapseRemainingTurns('final_report_attempt');
                         }
                         // Determine turn success based on tool execution or accepted final report
+                        // Progress-only (standalone task_status) also succeeds - turn is consumed per TODO design
                         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-                        if (finalReportReady || hasNonProgressTools) {
+                        if (finalReportReady || hasNonProgressTools || hasProgressOnly) {
                             turnSuccessful = true;
                             break;
                         }
@@ -1421,15 +1472,9 @@ export class TurnRunner {
                             this.pushSystemRetryMessage(conversation, this.buildFinalReportReminder());
                             continue;
                         }
-                        // Non-final turns: require non-progress tools for success
-                        const hasProgressOnly = executionStats.executedProgressBatchTools > 0 && executionStats.executedNonProgressBatchTools === 0;
-                        if (hasProgressOnly) {
-                            lastError = 'invalid_response: progress_report_only';
-                            this.addTurnFailure(TURN_FAILED_PROGRESS_ONLY);
-                        } else {
-                            lastError = 'invalid_response: no_tools';
-                            this.addTurnFailure(TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT);
-                        }
+                        // Non-final turns: no tools executed (progress-only already succeeded above)
+                        lastError = 'invalid_response: no_tools';
+                        this.addTurnFailure(TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT);
                         lastErrorType = 'invalid_response';
                         logAttemptFailure();
                         continue;
@@ -1564,24 +1609,39 @@ export class TurnRunner {
                     logAttemptFailure();
                 }
             }
-            // Check if all attempts failed for this turn (retry exhaustion) → session failure
+            // Check if all attempts failed for this turn (retry exhaustion)
             if (!turnSuccessful) {
-                const failureInfo = this.buildTurnFailureInfo({
-                    turn: currentTurn,
-                    provider: pairs[(attempts - 1) % pairs.length]?.provider ?? 'unknown',
-                    model: pairs[(attempts - 1) % pairs.length]?.model ?? 'unknown',
-                    lastError: typeof lastError === 'string' ? lastError : (lastErrorType ?? 'unknown'),
-                    lastErrorType,
-                    lastTurnResult,
-                    attempts,
-                    maxRetries,
-                    maxTurns,
-                    isFinalTurn: currentTurn === maxTurns,
-                });
-                this.logTurnFailure(failureInfo);
-                return this.finalizeSessionFailure(conversation, logs, accounting, failureInfo, currentTurn);
+                // Calculate if this is a final turn (same logic as in executeSingleTurn)
+                const forcedFinalTurn = this.forcedFinalTurnReason !== undefined;
+                const isCurrentlyFinalTurn = forcedFinalTurn || currentTurn === maxTurns;
+                
+                // Rule 5: Force final turn on retry exhaustion instead of session failure
+                // Exception: If already in final turn, fail normally (prevent infinite loop)
+                if (isCurrentlyFinalTurn) {
+                    // Already in final turn - fail session normally
+                    const failureInfo = this.buildTurnFailureInfo({
+                        turn: currentTurn,
+                        provider: pairs[(attempts - 1) % pairs.length]?.provider ?? 'unknown',
+                        model: pairs[(attempts - 1) % pairs.length]?.model ?? 'unknown',
+                        lastError: typeof lastError === 'string' ? lastError : (lastErrorType ?? 'unknown'),
+                        lastErrorType,
+                        lastTurnResult,
+                        attempts,
+                        maxRetries,
+                        maxTurns,
+                        isFinalTurn: currentTurn === maxTurns,
+                    });
+                    this.logTurnFailure(failureInfo);
+                    return this.finalizeSessionFailure(conversation, logs, accounting, failureInfo, currentTurn);
+                }
+                // Normal case: trigger graceful final turn
+                this.ctx.contextGuard.setRetryExhaustedReason();
+                // Immediately signal final turn to ensure deterministic transition
+                const finalInstruction = RETRY_EXHAUSTION_FINAL_MESSAGE;
+                this.pushSystemRetryMessage(conversation, finalInstruction);
+                // DO NOT mark turnSuccessful - proceed to next turn with forced final status
             }
-            // End of retry loop - close turn if successful (turnSuccessful guaranteed here)
+            // End of retry loop - close turn if successful (turnSuccessful may be true due to retry exhaustion)
             try {
                 const lastAssistant = (() => {
                     try {
@@ -1749,7 +1809,7 @@ export class TurnRunner {
     private set newCtxTokens(value: number) { this.ctx.contextGuard.setNewTokens(value); }
     private get schemaCtxTokens(): number { return this.ctx.contextGuard.getSchemaTokens(); }
     private set schemaCtxTokens(value: number) { this.ctx.contextGuard.setSchemaTokens(value); }
-    private get forcedFinalTurnReason(): 'context' | 'max_turns' | undefined { return this.ctx.contextGuard.getForcedFinalReason(); }
+    private get forcedFinalTurnReason(): 'context' | 'max_turns' | 'task_status_completed' | 'task_status_standalone_limit' | 'retry_exhaustion' | undefined { return this.ctx.contextGuard.getForcedFinalReason(); }
     private get finalReport() { return this.ctx.finalReportManager.getReport(); }
     private estimateTokensForCounters(messages: ConversationMessage[]): number {
         return this.ctx.contextGuard.estimateTokens(messages);
@@ -1950,7 +2010,7 @@ export class TurnRunner {
         const toolCalls = (m as { toolCalls?: unknown }).toolCalls;
         return Array.isArray(toolCalls) && toolCalls.length > 0;
     });
-    if (hasProgressOnly) slugs.add('progress_report_only');
+    if (hasProgressOnly) slugs.add('task_status_only');
     else if (!hasNonProgressTools) slugs.add('no_tools');
     if (this.finalReport === undefined) slugs.add('final_report_missing');
     const responseText = typeof lastTurnResult?.response === 'string' ? lastTurnResult.response.trim() : '';
@@ -2570,6 +2630,13 @@ export class TurnRunner {
             executedNonProgressBatchTools: 0,
             executedProgressBatchTools: 0,
             unknownToolEncountered: false,
+            standaloneTaskStatusCount: this.state.standaloneTaskStatusCount,
+            lastTaskStatusCompleted: this.state.lastTaskStatusCompleted,
+            productiveToolExecutedThisTurn: false,
+            onTaskCompletion: () => {
+                // Force final turn immediately when task completion is detected
+                this.ctx.contextGuard.setTaskCompletionReason();
+            },
         };
 
         // Create tool executor for fallback execution
@@ -2865,6 +2932,13 @@ export class TurnRunner {
             executedNonProgressBatchTools: 0,
             executedProgressBatchTools: 0,
             unknownToolEncountered: false,
+            standaloneTaskStatusCount: this.state.standaloneTaskStatusCount,
+            lastTaskStatusCompleted: this.state.lastTaskStatusCompleted,
+            productiveToolExecutedThisTurn: false,
+            onTaskCompletion: () => {
+                // Force final turn immediately when task completion is detected
+                this.ctx.contextGuard.setTaskCompletionReason();
+            },
         };
         const baseExecutor = this.ctx.sessionExecutor.createExecutor(currentTurn, provider, executionState, allowedToolNames);
         let incompleteFinalReportDetected = false;
@@ -2873,6 +2947,13 @@ export class TurnRunner {
                 const result = await baseExecutor(toolName, parameters, options);
                 incompleteFinalReportDetected = executionState.incompleteFinalReportDetected;
                 this.state.toolLimitExceeded = executionState.toolLimitExceeded;
+                // Sync task status state back to main state
+                this.state.standaloneTaskStatusCount = executionState.standaloneTaskStatusCount;
+                this.state.lastTaskStatusCompleted = executionState.lastTaskStatusCompleted;
+                // Reset counter if productive tools were executed this turn (success path)
+                if (executionState.productiveToolExecutedThisTurn) {
+                    this.state.standaloneTaskStatusCount = 0;
+                }
                 if (executionState.finalReportToolFailed) {
                     this.state.finalReportToolFailedThisTurn = true;
                     this.state.finalReportToolFailedEver = true;
@@ -2882,6 +2963,13 @@ export class TurnRunner {
             catch (e) {
                 incompleteFinalReportDetected = executionState.incompleteFinalReportDetected;
                 this.state.toolLimitExceeded = executionState.toolLimitExceeded;
+                // Sync task status state back to main state
+                this.state.standaloneTaskStatusCount = executionState.standaloneTaskStatusCount;
+                this.state.lastTaskStatusCompleted = executionState.lastTaskStatusCompleted;
+                // Reset counter if productive tools were executed this turn
+                if (executionState.productiveToolExecutedThisTurn) {
+                    this.state.standaloneTaskStatusCount = 0;
+                }
                 if (executionState.finalReportToolFailed) {
                     this.state.finalReportToolFailedThisTurn = true;
                     this.state.finalReportToolFailedEver = true;

@@ -15,7 +15,7 @@ export interface XmlNextPayload {
   maxTurns?: number;
   tools: { name: string; schema?: Record<string, unknown> }[];
   slotTemplates: XmlSlotTemplate[];
-  progressToolEnabled: boolean;
+  taskStatusToolEnabled: boolean;
   expectedFinalFormat: OutputFormatId | 'text';
   finalSchema?: Record<string, unknown>;
   // Retry info

@@ -119,7 +119,7 @@ export interface FinalReportMetricsRecord {
   source: 'tool-call' | 'tool-message' | 'synthetic';
   turnsCompleted: number;
   finalReportAttempts: number;
-  forcedFinalReason?: 'context' | 'max_turns';
+  forcedFinalReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_standalone_limit' | 'retry_exhaustion';
   syntheticReason?: string;
   customLabels?: Record<string, string>;
 }

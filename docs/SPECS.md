@@ -153,7 +153,7 @@ All string values in the configuration support environment variable expansion us
 
 - Define process-wide concurrency by declaring `queues` in `.ai-agent.json`. Each queue specifies a `concurrent` slot count and the agent automatically injects a `default` queue if omitted.
 - MCP servers, REST tools, and OpenAPI generated operations can bind to a queue by setting `queue: "name"`. When omitted they fall back to `default`.
-- Only external tools participate in queueing; internal agent helpers (`agent__final_report`, `progress_report`, `agent__batch`) bypass queues so they never deadlock against their parents.
+- Only external tools participate in queueing; internal agent helpers (`agent__final_report`, `agent__task_status`, `agent__batch`) bypass queues so they never deadlock against their parents.
 - Every tool execution is routed through the queue manager. When a tool must wait for a slot the agent logs a `queued` entry and emits telemetry via `ai_agent_queue_depth` (gauge of in-use/waiting slots) and `ai_agent_queue_wait_duration_ms` (histogram + last-wait gauge).
 
 ### Context Window Configuration
@@ -282,7 +282,7 @@ Notes:
 - **Error Messages**: If a tool can't be executed and no response message is received, generate an explanatory error message
 - **Parallel Execution**: Tools run concurrently but results are ordered correctly
 - **Performance Tracking**: Include latency and request/response size accounting for each tool execution
-- Progress (`agent__progress_report`) and batch wrapper (`agent__batch`) always return a response but do **not** satisfy turn success criteria.
+- Task Status (`agent__task_status`) and batch wrapper (`agent__batch`) always return a response but do **not** satisfy turn success criteria.
 - Turn success requires either (a) an accepted/valid final report, or (b) at least one executed non-progress/batch tool call. Turns advance only when successful.
 - Failed turns emit exactly one WRN log with slugged reasons and the full LLM response (capped ~128 KB). Retry exhaustion fails the session immediately with a single ERR log and a synthetic session report. Collapse logic may only shrink `maxTurns`, never increase it.
 <!-- Tool limits are now handled by the provider/SDK; no app-level limit option. -->

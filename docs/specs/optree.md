@@ -165,11 +165,11 @@ Creates:
 
 **setSessionTitle(title)**
 - Updates session title string
-- Used by progress_report tool
+- Used by task_status tool
 
 **setLatestStatus(status)**
 - Updates current status string
-- Used by progress_report tool
+- Used by task_status tool
 
 **endSession(success, error)**
 - Sets endedAt timestamp

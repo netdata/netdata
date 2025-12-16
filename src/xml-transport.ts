@@ -60,7 +60,7 @@ export interface XmlBuildMessagesConfig {
   maxTurns: number | undefined;
   tools: readonly MCPTool[];
   maxToolCallsPerTurn: number;
-  progressToolEnabled: boolean;
+  taskStatusToolEnabled: boolean;
   finalReportToolName: string;
   resolvedFormat: OutputFormatId | undefined;
   expectedJsonSchema: Record<string, unknown> | undefined;
@@ -180,7 +180,7 @@ export class XmlToolTransport {
       maxTurns: config.maxTurns,
       tools: [],
       slotTemplates,
-      progressToolEnabled: config.progressToolEnabled,
+      taskStatusToolEnabled: config.taskStatusToolEnabled,
       expectedFinalFormat: (config.resolvedFormat ?? 'markdown') as XmlNextPayload['expectedFinalFormat'],
       finalSchema: config.resolvedFormat === 'json' ? config.expectedJsonSchema : undefined,
       attempt: config.attempt,

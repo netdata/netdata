@@ -291,7 +291,7 @@ When `isFinalTurn === true`:
 - **Slack content fallback**: When Slack payloads omit `messages`, the provider falls back to `report_content` to avoid empty replies in Slack headend (`src/tools/internal-provider.ts:454-456`).
 - **Parameter aliases**: Both `report_format`/`format` and `report_content`/`content` are accepted, but canonicalized before storing the final report (`src/tools/internal-provider.ts:398-402`).
 - **Early JSON validation**: JSON outputs are validated immediately during tool execution (before `AIAgentSession` validates again), so models receive AJV diagnostics per turn (`src/tools/internal-provider.ts:629-652`).
-- **Progress pairing warning**: If the agent tries to call `progress_report` and `final_report` in the same turn, the tool logs a warning because finalization should not stream additional progress updates (`src/tools/internal-provider.ts:172-197`).
+- **Progress pairing warning**: If the agent tries to call `task_status` and `final_report` in the same turn, the tool logs a warning because finalization should not stream additional progress updates (`src/tools/internal-provider.ts:172-197`).
 
 ## Invariants
 

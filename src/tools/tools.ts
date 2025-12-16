@@ -1095,7 +1095,7 @@ export class ToolsOrchestrator {
       return '';
     }
     const sections: string[] = [];
-    // Internal instructions first (final report format + internal tools like progress_report)
+    // Internal instructions first (final report format + internal tools like task_status)
     if (internal !== undefined) {
       sections.push(internal);
     }

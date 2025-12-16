@@ -18,6 +18,13 @@ export interface ToolExecuteOptions {
   parentContext?: ToolExecutionContext;
 }
 
+export interface TaskStatusData {
+  status: 'starting' | 'in-progress' | 'completed';
+  done: string;
+  pending: string;
+  goal: string;
+}
+
 export interface ToolExecuteResult {
   ok: boolean;
   result?: string;
@@ -26,7 +33,10 @@ export interface ToolExecuteResult {
   kind: ToolKind;
   namespace: string; // e.g., mcp server namespace, 'rest', 'subagent'
   // Optional extras for providers that produce rich results (e.g., sub-agents)
-  extras?: Record<string, unknown>;
+  extras?: Record<string, unknown> | {
+    taskStatusCompleted?: boolean;
+    taskStatusData?: TaskStatusData;
+  };
 }
 
 export interface ToolCancelOptions {

@@ -27,7 +27,7 @@ echo "  VRB 1.0 → LLM web-search: anthropic/claude-3-haiku LLM request prepare
 echo "  VRB 1.0 ← LLM web-search: 1500ms, tokens:806/79, \$0.00030 LLM response received"
 echo "  VRB 1.1 → AGN web-search: agent__final_report(status:success, content:hello) Calling final_report"
 echo "  VRB 1.1 ← AGN web-search: agent__final_report: 11b, 1ms Tool completed"
-echo "  VRB 1.2-0.0 → AGN web-search:web-fetch: agent:progress_report(progress:Fetching article...) started"
+echo "  VRB 1.2-0.0 → AGN web-search:web-fetch: agent:task_status(status:in-progress, done:Fetching article...) started"
 echo "  VRB 1.2-0.1 → MCP web-search:web-fetch: fetcher:fetch_url(url:https://example.com, extractContent:true) started"
 echo "  VRB 1.2-0.1 ← MCP web-search:web-fetch: fetcher:fetch_url ok preview: \"{\\\"status\\\":true,...}\""
 echo "  WRN 2.0 ← LLM web-search: Turn result: hasToolCalls=true, hasToolResults=true, finalAnswer=false, ... (entire line in yellow)"

@@ -83,6 +83,7 @@ const FINAL_RESPONSE_KIND = 'final-report' as const;
 const MARKDOWN_FORMAT = 'markdown' as const;
 const STATUS_SUCCESS = 'success' as const;
 const STATUS_FAILURE = 'failure' as const;
+const STATUS_IN_PROGRESS = 'in-progress' as const;
 // Reserved for future XML scenarios
 const TOOL_REQUEST_TEXT = 'Requesting test to gather information.';
 const TOOL_ARGUMENT_SUCCESS = 'phase-1-tool-success';
@@ -584,17 +585,18 @@ const SCENARIOS: ScenarioDefinition[] = [
     turns: [
       {
         turn: 1,
-        expectedTools: ['agent__progress_report', TOOL_NAME],
+        expectedTools: ['agent__task_status', TOOL_NAME],
         response: {
           kind: 'tool-call',
           assistantText: 'Providing progress and calling test.',
           toolCalls: [
             {
-              toolName: 'agent__progress_report',
+              toolName: 'agent__task_status',
               callId: 'call-progress-1',
               assistantText: 'Reporting progress.',
               arguments: {
-                progress: 'Step 1 complete',
+                status: STATUS_IN_PROGRESS,
+                done: 'Step 1 complete',
               },
             },
             {
@@ -712,8 +714,8 @@ const SCENARIOS: ScenarioDefinition[] = [
                 calls: [
                   {
                     id: '1',
-                    tool: 'agent__progress_report',
-                    parameters: { progress: 'Batch step started' },
+                    tool: 'agent__task_status',
+                    parameters: { status: STATUS_IN_PROGRESS, done: 'Batch step started', pending: 'Process batch operations', goal: 'Complete batch processing' },
                   },
                   {
                     id: '2',
@@ -1667,8 +1669,8 @@ const SCENARIOS: ScenarioDefinition[] = [
                 calls: [
                   {
                     id: 'p-1',
-                    tool: 'agent__progress_report',
-                    parameters: { progress: BATCH_PROGRESS_STATUS },
+                    tool: 'agent__task_status',
+                    parameters: { status: STATUS_IN_PROGRESS, done: BATCH_PROGRESS_STATUS, pending: 'Complete batch processing', goal: 'Finalize batch operations' },
                   },
                   {
                     id: 'p-2',
@@ -1717,7 +1719,7 @@ const SCENARIOS: ScenarioDefinition[] = [
               callId: 'call-batch-string',
               assistantText: 'String payload contains progress and tool work.',
               arguments: {
-                calls: `[{"id":"s-1","tool":"agent__progress_report","parameters":{"progress":"${BATCH_STRING_PROGRESS}"}},{"id":"s-2","tool":"${TOOL_NAME}","parameters":{"text":"${BATCH_STRING_RESULT}"}}]`,
+                calls: `[{"id":"s-1","tool":"agent__task_status","parameters":{"status":"${STATUS_IN_PROGRESS}","done":"${BATCH_STRING_PROGRESS}","pending":"Continue processing","goal":"Complete task"}},{"id":"s-2","tool":"${TOOL_NAME}","parameters":{"text":"${BATCH_STRING_RESULT}"}}]`,
               },
             },
           ],
@@ -2422,17 +2424,18 @@ const SCENARIOS: ScenarioDefinition[] = [
     turns: [
       {
         turn: 1,
-        expectedTools: ['agent__progress_report'],
+        expectedTools: ['agent__task_status'],
         response: {
           kind: 'tool-call',
           assistantText: 'Issuing progress update and Slack final report.',
           toolCalls: [
             {
-              toolName: 'agent__progress_report',
+              toolName: 'agent__task_status',
               callId: 'call-progress-run-test-57',
               assistantText: 'Reporting current progress.',
               arguments: {
-                progress: 'Analyzing deterministic harness outputs.',
+                status: STATUS_IN_PROGRESS,
+                done: 'Analyzing deterministic harness outputs.',
               },
             },
           ],
@@ -2474,17 +2477,18 @@ const SCENARIOS: ScenarioDefinition[] = [
     turns: [
       {
         turn: 1,
-        expectedTools: ['agent__progress_report', TOOL_NAME],
+        expectedTools: ['agent__task_status', TOOL_NAME],
         response: {
           kind: 'tool-call',
           assistantText: 'Publishing progress and querying MCP tool.',
           toolCalls: [
             {
-              toolName: 'agent__progress_report',
+              toolName: 'agent__task_status',
               callId: 'call-progress-run-test-58',
               assistantText: 'Progress update before invoking MCP tool.',
               arguments: {
-                progress: 'Collecting metrics via test MCP tool.',
+                status: STATUS_IN_PROGRESS,
+                done: 'Collecting metrics via test MCP tool.',
               },
             },
             {
@@ -2531,7 +2535,7 @@ const SCENARIOS: ScenarioDefinition[] = [
               assistantText: 'Batch includes progress and large MCP output.',
               arguments: {
                 calls: [
-                  { id: 'p-1', tool: 'agent__progress_report', parameters: { progress: 'Starting large data export.' } },
+                  { id: 'p-1', tool: 'agent__task_status', parameters: { status: 'starting', done: 'Starting large data export.', pending: 'Process remaining data', goal: 'Complete export' } },
                   { id: 'p-2', tool: TOOL_NAME, parameters: { text: 'X'.repeat(5000) } }
                 ],
               },
@@ -3040,8 +3044,8 @@ const SCENARIOS: ScenarioDefinition[] = [
                 calls: [
                   {
                     id: 'm-1',
-                    tool: 'agent__progress_report',
-                    parameters: { progress: 'Valid batch progress entry.' },
+                    tool: 'agent__task_status',
+                    parameters: { status: STATUS_IN_PROGRESS, done: 'Valid batch progress entry.', pending: 'Complete batch validation', goal: 'Validate batch processing' },
                   },
                   {
                     id: 'm-2',
@@ -3104,17 +3108,18 @@ const SCENARIOS: ScenarioDefinition[] = [
     turns: [
       {
         turn: 1,
-        expectedTools: ['agent__progress_report'],
+        expectedTools: ['agent__task_status'],
         response: {
           kind: 'tool-call',
           assistantText: 'Preparing batched final report call.',
           toolCalls: [
             {
-              toolName: 'agent__progress_report',
+              toolName: 'agent__task_status',
               callId: 'call-batched-final-progress',
               assistantText: 'Bundling progress update before final report.',
               arguments: {
-                progress: 'Providing name',
+                status: STATUS_IN_PROGRESS,
+                done: 'Providing name',
               },
             },
           ],
@@ -4113,11 +4118,12 @@ const SCENARIOS: ScenarioDefinition[] = [
               },
             },
             {
-              toolName: 'agent__progress_report',
+              toolName: 'agent__task_status',
               callId: 'call-progress-guard-status',
               assistantText: 'Streaming progress after guard activation.',
               arguments: {
-                progress: 'Still collecting GitHub issues despite guard pressure.',
+                status: STATUS_IN_PROGRESS,
+                done: 'Still collecting GitHub issues despite guard pressure.',
               },
             },
           ],

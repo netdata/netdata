@@ -67,7 +67,7 @@ Controlled by `InternalToolProviderOptions.enableBatch`.
    - Clone tool's inputSchema
    - Wrap in call item schema with id, tool, parameters
    - Extract required parameters for summaries
-3. Add progress_report if enabled and not already present
+3. Add task_status if enabled and not already present
 4. Cache schemas and summaries
 
 ### Schema Cloning
@@ -148,10 +148,26 @@ const results = await Promise.all(normalizedCalls.map(async ({ id, tool, paramet
     return { ok: false, error: { code: 'INTERNAL_NOT_ALLOWED', message: '...' } };
   }
 
-  // Handle progress_report directly
-  if (tool === 'agent__progress_report') {
-    this.opts.updateStatus(parameters.progress);
-    return { ok: true, output: '{"ok":true}' };
+  // Handle task_status directly
+  if (tool === 'agent__task_status') {
+    const status = parameters.status || '';
+    const done = parameters.done || '';
+    const pending = parameters.pending || '';
+    const goal = parameters.goal || '';
+    
+    const statusMessage = [done, pending, goal].filter(Boolean).join(' | ');
+    this.opts.updateStatus(statusMessage || status);
+    const taskStatusPayload = {
+      status,
+      taskStatusCompleted: status === 'completed',
+      taskStatusData: {
+        status,
+        done,
+        pending,
+        goal,
+      },
+    };
+    return { ok: true, output: JSON.stringify(taskStatusPayload) };
   }
 
   // Delegate to orchestrator
@@ -202,7 +218,7 @@ const results = await Promise.all(normalizedCalls.map(async ({ id, tool, paramet
 ## Business Logic Coverage (Verified 2025-11-16)
 
 - **Truncated JSON recovery**: When the LLM emits partial JSON arrays (common with long batches), the parser walks the string, tracks bracket depth, and slices off the trailing garbage so valid calls still execute (`src/tools/internal-provider.ts:663-727`).
-- **Internal tool guardrails**: `agent__final_report` and nested `agent__batch` calls are rejected with `INTERNAL_NOT_ALLOWED`, while `agent__progress_report` is handled inline without queue acquisition to avoid deadlocks (`src/tools/internal-provider.ts:776-814`).
+- **Internal tool guardrails**: `agent__final_report` and nested `agent__batch` calls are rejected with `INTERNAL_NOT_ALLOWED`, while `agent__task_status` is handled inline without queue acquisition to avoid deadlocks (`src/tools/internal-provider.ts:776-814`).
 - **Per-call opTree context**: Each call runs in its own opTree child with `subturn` offsets so cost accounting and telemetry remain accurate even when dozens of calls execute inside a single turn (`src/tools/internal-provider.ts:735-780`).
 - **Schema caching**: Generated batch schemas are cached per orchestrator instance, so repeated invocations reflect newly-registered tools without rebuilding schemas on every call (`src/tools/internal-provider.ts:821-912`).
 
@@ -281,20 +297,20 @@ Provides example usage:
 ```json
 {
   "calls": [
-    { "id": 1, "tool": "progress_report", "parameters": { "progress": "..." } },
+    { "id": 1, "tool": "agent__task_status", "parameters": { "status": "in-progress", "done": "Collected data", "pending": "Analyze results" } },
     { "id": 2, "tool": "tool1", "parameters": { ... } },
     { "id": 3, "tool": "tool2", "parameters": { ... } }
   ]
 }
 ```
 
-Includes warning: "Do not combine progress_report with final_report in same request"
+Includes warning: "Do not combine task_status with final_report in same request"
 
 ## Restrictions
 
 1. **No nested batch**: Cannot call agent__batch from within batch
 2. **No final_report in batch**: Must be standalone call
-3. **Progress only with other tools**: Can include progress_report alongside regular tools
+3. **Task status with other tools**: Can include task_status alongside regular tools
 4. **Requires enableBatch**: Must be explicitly enabled
 
 ## Configuration Effects
@@ -302,7 +318,7 @@ Includes warning: "Do not combine progress_report with final_report in same requ
 | Setting | Effect |
 |---------|--------|
 | `enableBatch` | Tool availability |
-| `disableProgressTool` | Whether progress_report included in examples |
+| `disableProgressTool` | Whether task_status included in examples |
 | `toolTimeoutMs` | Timeout for each call |
 
 ## Telemetry

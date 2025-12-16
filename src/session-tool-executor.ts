@@ -30,6 +30,13 @@ export interface ToolExecutionState {
   executedNonProgressBatchTools: number;
   executedProgressBatchTools: number;
   unknownToolEncountered: boolean;
+  standaloneTaskStatusCount: number;
+  lastTaskStatusCompleted?: boolean;
+  productiveToolExecutedThisTurn: boolean;
+  // Callback to signal task completion to TurnRunner for immediate final turn
+  onTaskCompletion?: () => void;
+  // Internal field for deferred batch completion handling
+  pendingTaskCompletion?: boolean;
 }
 
 export interface SessionContext {
@@ -44,7 +51,7 @@ export interface SessionContext {
   stopRef?: { stopping: boolean };
   // cancel status provided via getter or similar mechanism since primitive boolean is pass-by-value
   isCanceled: () => boolean;
-  progressToolEnabled: boolean;
+  taskStatusToolEnabled: boolean;
   finalReportToolName: string;
 }
 
@@ -95,7 +102,7 @@ export class SessionToolExecutor {
       const isFinalReportTool =
         normalizedToolName === this.sessionContext.finalReportToolName ||
         normalizedToolName === 'final_report';
-      const isProgressTool = normalizedToolName === 'agent__progress_report';
+      const isProgressTool = normalizedToolName === 'agent__task_status';
 
       const recordXmlEntry = (
         status: 'ok' | 'failed',
@@ -209,8 +216,13 @@ export class SessionToolExecutor {
 
           // For batch tools, count inner non-progress tools that were invoked
           if (isBatchTool && managed.result.length > 0) {
-            const innerToolCount = this.countBatchInnerTools(managed.result);
+            const innerToolCount = this.countBatchInnerTools(managed.result, state);
             state.executedNonProgressBatchTools += innerToolCount;
+            // Execute any deferred task completion callbacks after batch processing
+            if (state.pendingTaskCompletion === true) {
+              state.onTaskCompletion?.();
+              state.pendingTaskCompletion = false;
+            }
           }
 
           if (isSubAgentTool) {
@@ -222,6 +234,27 @@ export class SessionToolExecutor {
             managed.providerLabel.length > 0
               ? managed.providerLabel
               : SessionToolExecutor.REMOTE_AGENT_TOOLS;
+
+          // Track task status tool usage
+          if (effectiveToolName === 'agent__task_status') {
+            // Only increment counter if this is a standalone call (no other tools executed this turn)
+            if (!state.productiveToolExecutedThisTurn) {
+              state.standaloneTaskStatusCount += 1;
+            }
+            // Check completion status from the tool parameters (not response)
+            const status = typeof parameters.status === 'string' ? parameters.status : '';
+            const isCompleted = status === 'completed';
+            state.lastTaskStatusCompleted = isCompleted;
+            // If task completion is signaled, trigger immediate final turn
+            if (isCompleted) {
+              state.onTaskCompletion?.();
+            }
+          }
+
+          // Track when productive tools are executed successfully
+          if (!isProgressTool && !isBatchTool && !isSubAgentTool && managed.ok) {
+            state.productiveToolExecutedThisTurn = true;
+          }
 
           const uncappedToolOutput =
             managed.result.length > 0
@@ -697,7 +730,7 @@ export class SessionToolExecutor {
    * Per design: any MCP/REST/Subagent tool (excluding progress and batch) that is
    * actually invoked counts toward turn success, even if execution fails.
    */
-  private countBatchInnerTools(batchResult: string): number {
+  private countBatchInnerTools(batchResult: string, state: ToolExecutionState): number {
     try {
       const parsed = JSON.parse(batchResult) as unknown;
       if (parsed === null || typeof parsed !== 'object') return 0;
@@ -710,9 +743,26 @@ export class SessionToolExecutor {
         if (entry === null || typeof entry !== 'object') continue;
         const tool = (entry as Record<string, unknown>).tool;
         if (typeof tool !== 'string') continue;
-        // Exclude progress and batch tools from count
+        
+        // Check if this is a task_status tool inside batch
         const normalized = sanitizeToolName(tool);
-        if (normalized === 'agent__progress_report' || normalized === 'agent__batch') continue;
+        if (normalized === 'agent__task_status') {
+          // Check completion status from call parameters
+          const callParams = (entry as Record<string, unknown>).parameters;
+          if (typeof callParams === 'object' && callParams !== null) {
+            const status = typeof (callParams as Record<string, unknown>).status === 'string' ? (callParams as Record<string, unknown>).status : '';
+            const isCompleted = status === 'completed';
+            if (isCompleted) {
+              state.lastTaskStatusCompleted = true;
+              // Don't trigger completion callback immediately - defer until batch completes
+              state.pendingTaskCompletion = true;
+            }
+          }
+          // Exclude task_status from count
+          continue;
+        }
+        
+        if (normalized === 'agent__batch') continue;
         count += 1;
       }
       return count;
