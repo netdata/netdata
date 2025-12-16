@@ -3,11 +3,6 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
-static void initialize(void)
-{
-    ;
-}
-
 static void netdata_ad_directory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA directoryPercReadsFromDCA = {.key = "DS % Reads from DRA"};
@@ -771,13 +766,6 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
 int do_PerflibAD(int update_every, usec_t dt __maybe_unused)
 {
-    static bool initialized = false;
-
-    if (unlikely(!initialized)) {
-        initialize();
-        initialized = true;
-    }
-
     DWORD id = RegistryFindIDByName("DirectoryServices");
     if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
         return -1;
@@ -786,7 +774,8 @@ int do_PerflibAD(int update_every, usec_t dt __maybe_unused)
     if (!pDataBlock)
         return -1;
 
-    do_AD(pDataBlock, update_every);
+    if (!do_AD(pDataBlock, update_every))
+        return -1;
 
     return 0;
 }
