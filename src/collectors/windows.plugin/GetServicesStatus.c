@@ -175,7 +175,7 @@ dict_win_services_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *va
             "Service state",
             "state",
             PLUGIN_WINDOWS_NAME,
-            "PerflibbService",
+            "PerflibService",
             PRIO_SERVICE_STATE,
             *update_every,
             RRDSET_TYPE_LINE);
