@@ -17,6 +17,7 @@ modules:
         description: ""
       keywords:
         - containers
+        - docker
       most_popular: true
     overview: &overview
       data_collection: &data_collection
