@@ -303,7 +303,7 @@ impl HistogramEngine {
             if !file_index_keys.is_empty() {
                 let bucket_duration = bucket_requests.first().unwrap().duration();
                 let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
-                let time_budget = Duration::from_secs(10); // TODO: Make configurable
+                let time_budget = Duration::from_secs(10);
 
                 let mut stream = FileIndexStream::new(
                     self.indexing_service.clone(),
@@ -389,8 +389,7 @@ impl HistogramEngine {
                             }
                         }
                         Err(e) => {
-                            debug!("Stream error: {}", e);
-                            break;
+                            panic!("Stream error: {}", e);
                         }
                     }
                 }
