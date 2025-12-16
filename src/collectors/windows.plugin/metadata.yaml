@@ -4032,7 +4032,6 @@ modules:
               dimensions:
                 - name: free
                 - name: standby
-                - name: available
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibASP
