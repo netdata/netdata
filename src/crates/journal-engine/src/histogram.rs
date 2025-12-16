@@ -36,36 +36,10 @@ impl BucketRequest {
     pub fn duration(&self) -> Seconds {
         self.end - self.start
     }
-
-    /// Returns the next bucket request with the same duration, facets, and filter.
-    /// The next bucket starts where this bucket ends.
-    pub fn next(&self) -> Self {
-        let duration = self.duration();
-        Self {
-            start: self.end,
-            end: self.end + duration,
-            facets: self.facets.clone(),
-            filter_expr: self.filter_expr.clone(),
-        }
-    }
-
-    /// Returns the previous bucket request with the same duration, facets, and filter.
-    /// The previous bucket ends where this bucket starts.
-    pub fn prev(&self) -> Self {
-        let duration = self.duration();
-        Self {
-            start: self.start.saturating_sub(duration),
-            end: self.start,
-            facets: self.facets.clone(),
-            filter_expr: self.filter_expr.clone(),
-        }
-    }
 }
 
 /// A histogram request for a given [start, end) time range with a specific
 /// filter expression that should be matched.
-///
-/// This type is internal to the crate. Use `HistogramEngine::query()` to build queries.
 #[derive(Debug, Clone)]
 pub(crate) struct HistogramRequest {
     /// Start time
@@ -79,49 +53,6 @@ pub(crate) struct HistogramRequest {
 }
 
 impl HistogramRequest {
-    pub(crate) fn new(after: u32, before: u32, facets: &[String], filter_expr: &Filter) -> Self {
-        Self {
-            after,
-            before,
-            facets: Facets::new(facets),
-            filter_expr: filter_expr.clone(),
-        }
-    }
-
-    /// Returns the bucket requests that should be used in order to
-    /// generate data for this histogram. The bucket duration is automatically
-    /// determined by time range of the histogram request, and it's large
-    /// enough to return at least 100 bucket requests.
-    pub(crate) fn bucket_requests(&self) -> Vec<BucketRequest> {
-        let bucket_duration = self.calculate_bucket_duration();
-
-        // Buckets are aligned to their duration
-        let aligned_start = (self.after / bucket_duration) * bucket_duration;
-        let aligned_end = self.before.div_ceil(bucket_duration) * bucket_duration;
-
-        // Allocate our buckets
-        let num_buckets = ((aligned_end - aligned_start) / bucket_duration) as usize;
-        let mut buckets = Vec::with_capacity(num_buckets);
-        assert!(
-            num_buckets > 0,
-            "histogram requests should always have at least one bucket"
-        );
-
-        // Create our buckets
-        for bucket_index in 0..num_buckets {
-            let start = aligned_start + (bucket_index as u32 * bucket_duration);
-
-            buckets.push(BucketRequest {
-                start: Seconds(start),
-                end: Seconds(start + bucket_duration),
-                facets: self.facets.clone(),
-                filter_expr: self.filter_expr.clone(),
-            });
-        }
-
-        buckets
-    }
-
     fn calculate_bucket_duration(&self) -> u32 {
         const MINUTE: Duration = Duration::from_secs(60);
         const HOUR: Duration = Duration::from_secs(60 * MINUTE.as_secs());
@@ -167,6 +98,49 @@ impl HistogramRequest {
             .find(|&&bucket_width| duration as u64 / bucket_width.as_secs() >= 50)
             .map(|d| d.as_secs())
             .unwrap_or(1) as u32
+    }
+
+    pub(crate) fn new(after: u32, before: u32, facets: &[String], filter_expr: &Filter) -> Self {
+        Self {
+            after,
+            before,
+            facets: Facets::new(facets),
+            filter_expr: filter_expr.clone(),
+        }
+    }
+
+    /// Returns the bucket requests that should be used in order to
+    /// generate data for this histogram. The bucket duration is automatically
+    /// determined by time range of the histogram request, and it's large
+    /// enough to return at least 100 bucket requests.
+    pub(crate) fn bucket_requests(&self) -> Vec<BucketRequest> {
+        let bucket_duration = self.calculate_bucket_duration();
+
+        // Buckets are aligned to their duration
+        let aligned_start = (self.after / bucket_duration) * bucket_duration;
+        let aligned_end = self.before.div_ceil(bucket_duration) * bucket_duration;
+
+        // Allocate our buckets
+        let num_buckets = ((aligned_end - aligned_start) / bucket_duration) as usize;
+        let mut buckets = Vec::with_capacity(num_buckets);
+        assert!(
+            num_buckets > 0,
+            "histogram requests should always have at least one bucket"
+        );
+
+        // Create our buckets
+        for bucket_index in 0..num_buckets {
+            let start = aligned_start + (bucket_index as u32 * bucket_duration);
+
+            buckets.push(BucketRequest {
+                start: Seconds(start),
+                end: Seconds(start + bucket_duration),
+                facets: self.facets.clone(),
+                filter_expr: self.filter_expr.clone(),
+            });
+        }
+
+        buckets
     }
 }
 
@@ -237,128 +211,17 @@ impl Histogram {
     }
 
     /// Returns all discovered field names from the histogram buckets in a deterministic order.
-    ///
-    /// This method collects all unique field names (both indexed and unindexed) that appear
-    /// across all buckets and returns them in a consistent, priority-based order suitable
-    /// for UI display.
-    ///
-    /// **Ordering**: Fields are sorted by:
-    /// 1. Priority tier (high-importance fields like PRIORITY, MESSAGE first)
-    /// 2. System vs user fields (system fields with '_' prefix come before user fields)
-    /// 3. Alphabetically within each tier
-    ///
-    /// **Note**: This does NOT include the special `timestamp` and `rowOptions` columns,
-    /// which must be added separately when generating the full column schema.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// let histogram = histogram_engine.get_histogram(request).await?;
-    /// let fields = histogram.discovered_fields();
-    /// // fields might be: [PRIORITY, MESSAGE, _HOSTNAME, _UID, SYSLOG_IDENTIFIER, ...]
-    /// ```
     pub fn discovered_fields(&self) -> Vec<FieldName> {
         // Collect all unique fields from all buckets
         let mut fields = HashSet::default();
-
         for (_, bucket_response) in &self.buckets {
-            // Add indexed fields (extracted from field=value pairs)
             fields.extend(bucket_response.indexed_fields());
-
-            // Add unindexed fields
             fields.extend(bucket_response.unindexed_fields.iter().cloned());
         }
 
-        // Convert to Vec and sort with priority ordering
-        let mut fields_vec: Vec<FieldName> = fields.into_iter().collect();
-
-        fields_vec.sort_by(|a, b| {
-            // Define priority tiers for common systemd journal fields
-            fn field_priority(field: &FieldName) -> u8 {
-                match field.as_str() {
-                    // Tier 0: Most critical fields (always first)
-                    "PRIORITY" => 0,
-                    "MESSAGE" => 1,
-
-                    // Tier 1: Important identification fields
-                    "_HOSTNAME" => 10,
-                    "SYSLOG_IDENTIFIER" => 11,
-                    "_COMM" => 12,
-                    "_PID" => 13,
-
-                    // Tier 2: Other important systemd fields
-                    "MESSAGE_ID" => 20,
-                    "_BOOT_ID" => 21,
-                    "_MACHINE_ID" => 22,
-                    "SYSLOG_FACILITY" => 23,
-                    "ERRNO" => 24,
-
-                    // Tier 3: Unit/systemd context fields
-                    "UNIT" | "USER_UNIT" => 30,
-                    "_SYSTEMD_UNIT" | "_SYSTEMD_USER_UNIT" => 31,
-                    "_SYSTEMD_SLICE" | "_SYSTEMD_USER_SLICE" => 32,
-                    "_SYSTEMD_CGROUP" => 33,
-                    "_SYSTEMD_SESSION" => 34,
-
-                    // Tier 4: User/security fields
-                    "_UID" | "_GID" => 40,
-                    "_AUDIT_LOGINUID" => 41,
-                    "_CAP_EFFECTIVE" => 42,
-
-                    // Tier 5: Process fields
-                    "_EXE" | "_CMDLINE" => 50,
-                    "_TRANSPORT" => 51,
-
-                    // Tier 6: Netdata-specific fields (ND_*)
-                    s if s.starts_with("ND_") => 60,
-
-                    // Tier 7: Anonymous event fields (AE_*)
-                    s if s.starts_with("AE_") => 70,
-
-                    // Tier 8: Other system fields (fields starting with '_')
-                    s if s.starts_with('_') => 80,
-
-                    // Tier 9: Code location fields
-                    "CODE_FILE" | "CODE_FUNC" | "CODE_LINE" => 90,
-
-                    // Tier 10: User/application fields
-                    _ => 100,
-                }
-            }
-
-            let priority_a = field_priority(a);
-            let priority_b = field_priority(b);
-
-            if priority_a != priority_b {
-                // Sort by priority first
-                priority_a.cmp(&priority_b)
-            } else {
-                // Within same priority tier, sort alphabetically
-                a.as_str().cmp(b.as_str())
-            }
-        });
-
-        fields_vec
-    }
-
-    /// Returns all discovered field names as a HashSet.
-    ///
-    /// **Deprecated**: Use `discovered_fields()` instead for deterministic ordering.
-    ///
-    /// This includes both indexed fields (from fv_counts) and unindexed fields.
-    #[deprecated(
-        since = "0.1.0",
-        note = "Use discovered_fields() for deterministic ordering suitable for UI display"
-    )]
-    pub fn all_fields(&self) -> HashSet<FieldName> {
-        let mut all_fields = HashSet::default();
-
-        for (_, bucket_response) in &self.buckets {
-            all_fields.extend(bucket_response.indexed_fields());
-            all_fields.extend(bucket_response.unindexed_fields.iter().cloned());
-        }
-
-        all_fields
+        let mut v: Vec<FieldName> = fields.into_iter().collect();
+        v.sort();
+        v
     }
 }
 
