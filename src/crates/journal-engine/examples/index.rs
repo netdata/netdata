@@ -72,7 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if files.is_empty() {
         return Ok(());
     }
-    files.truncate(20);
+    files.truncate(10);
 
     // Create indexing engine with cache
     let indexing_engine = IndexingEngineBuilder::new()
