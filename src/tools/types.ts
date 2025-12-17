@@ -23,6 +23,8 @@ export interface TaskStatusData {
   done: string;
   pending: string;
   now: string;
+  ready_for_final_report: boolean;
+  need_to_run_more_tools: boolean;
 }
 
 export interface ToolExecuteResult {

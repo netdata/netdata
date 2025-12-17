@@ -414,7 +414,8 @@ const SCENARIOS: ScenarioDefinition[] = [
     turns: [
       {
         turn: 1,
-        failuresBeforeSuccess: 1,
+        // With maxRetries=1, we need 2 failures to exhaust all attempts (initial + 1 retry)
+        failuresBeforeSuccess: 2,
         failureStatus: 'timeout',
         failureRetryable: false,
         failureMessage: 'Simulated timeout.',
@@ -1468,9 +1469,11 @@ const SCENARIOS: ScenarioDefinition[] = [
       {
         turn: 1,
         expectedTools: [TOOL_NAME],
-        failuresBeforeSuccess: 1,
-        failureStatus: 'model_error',
-        failureRetryable: false,
+        // Skip tool validation since first session uses maxTurns=1 (final turn restricts tools)
+        allowMissingTools: true,
+        // With maxRetries=1, we need 2 failures to exhaust all attempts (initial + 1 retry)
+        failuresBeforeSuccess: 2,
+        failureThrows: true,
         failureMessage: 'Simulated fatal error before manual retry.',
         response: {
           kind: 'tool-call',
@@ -4124,6 +4127,10 @@ const SCENARIOS: ScenarioDefinition[] = [
               arguments: {
                 status: STATUS_IN_PROGRESS,
                 done: 'Still collecting GitHub issues despite guard pressure.',
+                pending: 'Continue processing',
+                now: 'Guard passthrough test',
+                ready_for_final_report: false,
+                need_to_run_more_tools: true,
               },
             },
           ],

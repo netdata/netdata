@@ -20,7 +20,7 @@ Tool for reporting task execution state and tracking completion status. Supports
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["status", "done", "pending", "now"],
+  "required": ["status", "done", "pending", "now", "ready_for_final_report", "need_to_run_more_tools"],
   "properties": {
     "status": {
       "type": "string",
@@ -38,6 +38,14 @@ Tool for reporting task execution state and tracking completion status. Supports
     "now": {
       "type": "string",
       "description": "Current immediate step (max 15 words guidance)"
+    },
+    "ready_for_final_report": {
+      "type": "boolean",
+      "description": "Set to true when you have enough information to provide final report"
+    },
+    "need_to_run_more_tools": {
+      "type": "boolean",
+      "description": "Set to true when you need to run more tools"
     }
   }
 }
@@ -157,7 +165,9 @@ interface ToolExecutionState {
   "status": "starting",
   "done": "Initialized analysis",
   "pending": "Parse log entries",
-  "now": "Analyze server logs"
+  "now": "Analyze server logs",
+  "ready_for_final_report": false,
+  "need_to_run_more_tools": true
 }
 ```
 
@@ -167,7 +177,9 @@ interface ToolExecutionState {
   "status": "in-progress",
   "done": "Parsed 1000 log entries",
   "pending": "Search for error patterns",
-  "now": "Find critical errors"
+  "now": "Find critical errors",
+  "ready_for_final_report": false,
+  "need_to_run_more_tools": true
 }
 ```
 
@@ -177,7 +189,9 @@ interface ToolExecutionState {
   "status": "completed",
   "done": "Found 3 critical errors",
   "pending": "None",
-  "now": "Server log analysis complete"
+  "now": "Server log analysis complete",
+  "ready_for_final_report": true,
+  "need_to_run_more_tools": false
 }
 ```
 

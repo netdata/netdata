@@ -359,15 +359,20 @@ Provides live feedback to the user about your accomplishments, pending items and
 - "in-progress": You are currently working on this task - you are not yet ready to provide your final report/answer
 - "completed": You completed the task and you are now ready to provide your final report/answer
 
+**Boolean Flags:**
+- "ready_for_final_report": Set to true when you have enough information to provide your final report/answer, false otherwise
+- "need_to_run_more_tools": Set to true when you need to run more tools, false if you are done with tools
+
 **Good Examples:**
-- status: "starting", done: "Planning...", pending: "Find error logs", now: "gather system error logs for the last 15 mins"
-- status: "in-progress", done: "got error logs for the last 15 mins", pending: "Find the specific error", now: "expand search to 30 mins"
-- status: "completed", done: "Found 3 critical errors", pending: "All done", now: "Compile the final report/answer"
+- status: "starting", done: "Planning...", pending: "Find error logs", now: "gather system error logs for the last 15 mins", ready_for_final_report: false, need_to_run_more_tools: true
+- status: "in-progress", done: "got error logs for the last 15 mins", pending: "Find the specific error", now: "expand search to 30 mins", ready_for_final_report: false, need_to_run_more_tools: true
+- status: "in-progress", done: "Found relevant logs", pending: "Could verify more sources", now: "Deciding next step", ready_for_final_report: true, need_to_run_more_tools: true
+- status: "completed", done: "Found 3 critical errors", pending: "All done", now: "Compile the final report/answer", ready_for_final_report: true, need_to_run_more_tools: false
 
 **Mandatory Rules:**
 - Call agent__task_status alongside other tools when possible (calling it alone wastes turns)
 - Include clear descriptions for "done", "pending" and "now", for the user to understand your progress
-- Set status to "completed" ONLY AFTER you are done calling tools and you are now ready to provide your final report/answer - the system will force you to provide your final report/answer once you set status to "completed"
+- Set status to "completed" with ready_for_final_report: true and need_to_run_more_tools: false ONLY when you are truly done - the system will force you to provide your final report/answer once all three align
 `;
 
 /**

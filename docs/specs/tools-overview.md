@@ -181,8 +181,16 @@ interface RestToolConfig {
   done: string;    // What has been completed
   pending: string; // What remains to be done
   now: string;     // Current immediate step
+  ready_for_final_report: boolean;  // True when enough info to provide final report
+  need_to_run_more_tools: boolean;  // True when more tools need to be run
 }
 ```
+
+**task_status Completion Logic**:
+Final turn is forced only when all three conditions are met:
+- `status: 'completed'`
+- `ready_for_final_report: true`
+- `need_to_run_more_tools: false`
 
 **batch Parameters**:
 ```typescript

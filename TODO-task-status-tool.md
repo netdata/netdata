@@ -45,10 +45,27 @@ Rename `progress_report` to `task_status` with structured fields and new behavio
 interface TaskStatusArgs {
   status: 'starting' | 'in-progress' | 'completed';
   done: string;    // What has been accomplished (up to 15 words)
-  pending: string; // What remains to be done (up to 15 words)  
+  pending: string; // What remains to be done (up to 15 words)
   now: string;    // Your immediate step (up to 15 words)
+  ready_for_final_report: boolean;  // True when you have enough info to provide final report
+  need_to_run_more_tools: boolean;  // True when you plan to run more tools
 }
 ```
+
+### Triple Confirmation Logic
+
+Task completion forces final-turn ONLY when all three conditions are met:
+1. `status: 'completed'`
+2. `ready_for_final_report: true`
+3. `need_to_run_more_tools: false`
+
+**2x2 Matrix of States**:
+| ready_for_final_report | need_to_run_more_tools | Meaning |
+|------------------------|------------------------|---------|
+| true | true | "I could answer, but want to verify" |
+| false | false | "Stuck" (forces final-turn) |
+| false | true | "Working on it" (normal in-progress) |
+| true | false | "Done" ← Forces final-turn |
 
 ## Behavioral Rules
 
@@ -64,11 +81,12 @@ interface TaskStatusArgs {
 |-----------|----------|
 | `task_status` called alone for 2nd time | **Force final-turn** — model must conclude |
 
-### Rule 3: Explicit Completion
+### Rule 3: Explicit Completion (Triple Confirmation)
 
 | Condition | Behavior |
 |-----------|----------|
-| `task_status` with `status: completed` | **Force final-turn** immediately |
+| `status: completed` + `ready_for_final_report: true` + `need_to_run_more_tools: false` | **Force final-turn** immediately |
+| `status: completed` but other fields don't confirm | Normal operation, no force |
 
 ### Rule 4: Normal Usage
 
@@ -99,14 +117,15 @@ interface TurnRunnerState {
 ## Implementation Plan
 
 ### Phase 1: Tool Schema & Definition (File: src/tools/internal-provider.ts)
-1. **Rename tool**: `agent__progress_report` → `agent__task_status` 
-2. **Update schema**: `{progress: string}` → `{status: 'starting'|'in-progress'|'completed', done: string, pending: string, now: string}`
-3. **Update validation logic**: 
+1. **Rename tool**: `agent__progress_report` → `agent__task_status`
+2. **Update schema**: `{progress: string}` → `{status, done, pending, now, ready_for_final_report, need_to_run_more_tools}`
+3. **Update validation logic**:
    - Parse `status` as enum: 'starting' | 'in-progress' | 'completed'
    - No special behavior for 'starting' (treat same as 'in-progress')
    - Validate done/pending/now as strings (soft guidance for 15-word limit)
-   - Update parameter validation (lines 441-444)
-   - Response: concatenate all 3 strings, return "ok"
+   - Validate ready_for_final_report and need_to_run_more_tools as booleans (required)
+   - Triple confirmation: completion only when status='completed' AND ready_for_final_report=true AND need_to_run_more_tools=false
+   - Response: concatenate status + 3 strings as status message, return "ok"
 4. **Update instructions**: Tool description and usage examples
 
 ### Phase 2: State Management (File: src/session-turn-runner.ts)
@@ -143,7 +162,7 @@ interface TurnRunnerState {
 ### Phase 4: Type System Changes
 1. **Update ToolExecutionState**: Add `taskStatusCompleted: boolean`
 2. **Update forcedFinalTurnReason**: Add `'task_status_completed' | 'task_status_standalone_limit' | 'retry_exhaustion'`
-3. **Update ToolExecuteResult extras**: 
+3. **Update ToolExecuteResult extras**:
    ```typescript
    interface ToolExecuteResult {
      // ... existing fields
@@ -154,6 +173,8 @@ interface TurnRunnerState {
          done: string;
          pending: string;
          now: string;
+         ready_for_final_report: boolean;
+         need_to_run_more_tools: boolean;
        };
      };
    }

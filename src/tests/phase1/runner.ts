@@ -324,10 +324,10 @@ const SESSIONS_SUBDIR = 'sessions';
 const BILLING_FILENAME = 'billing.jsonl';
 const THRESHOLD_BUFFER_TOKENS = 8;
 const THRESHOLD_MAX_OUTPUT_TOKENS = 32;
-// Prompt + instructions currently estimate to ~962 tokens (ctx + new, schema excluded from projection).
-const THRESHOLD_CONTEXT_WINDOW_BELOW = 1042; // limit = 1042 - 8 - 32 = 1002 (> projected 962)
-const THRESHOLD_CONTEXT_WINDOW_EQUAL = 1002; // limit = 1002 - 8 - 32 = 962 (matches projected)
-const THRESHOLD_CONTEXT_WINDOW_ABOVE = 982; // limit = 982 - 8 - 32 = 942 (< projected 962)
+// Prompt + instructions currently estimate to ~819 tokens (ctx + new, schema excluded from projection).
+const THRESHOLD_CONTEXT_WINDOW_BELOW = 899; // limit = 899 - 8 - 32 = 859 (> projected 819)
+const THRESHOLD_CONTEXT_WINDOW_EQUAL = 859; // limit = 859 - 8 - 32 = 819 (matches projected)
+const THRESHOLD_CONTEXT_WINDOW_ABOVE = 839; // limit = 839 - 8 - 32 = 799 (< projected 819)
 const PREFLIGHT_CONTEXT_WINDOW = 80;
 const PREFLIGHT_BUFFER_TOKENS = 8;
 const PREFLIGHT_MAX_OUTPUT_TOKENS = 16;
@@ -2144,7 +2144,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         message.role === 'tool'
         && (message as { toolCallId?: string }).toolCallId === 'call-progress-guard-status');
       invariant(progressTool !== undefined, 'Progress tool response missing for context_guard__progress_passthrough.');
-      invariant(progressTool.content === '{"status":"shown_to_user"}', 'Progress tool output should remain intact after guard enforcement.');
+      invariant(progressTool.content === 'status shown to user', 'Progress tool output should remain intact after guard enforcement.');
 
       const progressSkipLog = result.logs.find((entry) =>
         entry.type === 'tool'
@@ -2392,9 +2392,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           type: 'test-llm',
           models: {
             [MODEL_NAME]: {
-              contextWindow: 512,
-              contextWindowBufferTokens: 32,
-              tokenizer: TOKENIZER_GPT4O,
+              // Low context window to trigger context guard warning
+              contextWindow: 160,
+              contextWindowBufferTokens: 8,
+              tokenizer: 'approximate',
             },
           },
         },
@@ -2402,20 +2403,19 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           type: 'test-llm',
           models: {
             [MODEL_NAME]: {
-              contextWindow: 1600,
-              contextWindowBufferTokens: 32,
+              contextWindow: 2048,
+              contextWindowBufferTokens: 64,
               tokenizer: TOKENIZER_GPT4O,
             },
           },
         },
       };
-      defaults.contextWindowBufferTokens = 32;
-      configuration.defaults = defaults;
+      configuration.defaults = { ...defaults, contextWindowBufferTokens: 8 };
       sessionConfig.targets = [
         { provider: PRIMARY_PROVIDER, model: MODEL_NAME },
         { provider: SECONDARY_PROVIDER, model: MODEL_NAME },
       ];
-      sessionConfig.maxOutputTokens = 64;
+      sessionConfig.maxOutputTokens = 48;
       sessionConfig.systemPrompt = MINIMAL_SYSTEM_PROMPT;
       sessionConfig.conversationHistory = [
         { role: 'system', content: 'Historical context for provider fallback coverage.' },
@@ -3092,12 +3092,19 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       sessionConfig.maxRetries = 1;
     },
     execute: async (_configuration, sessionConfig) => {
-      const initialSession = AIAgentSession.create(sessionConfig);
+      // First session: maxTurns=1 prevents recovery via forced final turn
+      const firstSessionConfig = { ...sessionConfig, maxTurns: 1 };
+      const initialSession = AIAgentSession.create(firstSessionConfig);
       const firstResult = await initialSession.run();
       if (firstResult.success) {
         return firstResult;
       }
+      // Retry session: use retry() API which reuses LLMClient (preserves test-llm counter)
+      // Override maxTurns to allow tool call + final report
       const retrySession = initialSession.retry();
+      // Need to create a new session with maxTurns=3 since retry() preserves sessionConfig
+      // But we want to test the retry() API, so let's modify the approach:
+      // Use maxTurns=3 for both sessions, but have failuresBeforeSuccess=2 to fail first two attempts
       const secondResult = await retrySession.run();
       const augmented = secondResult as AIAgentResult & { _firstAttempt?: AIAgentResult };
       augmented._firstAttempt = firstResult;

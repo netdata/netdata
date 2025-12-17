@@ -112,7 +112,7 @@ export class InternalToolProvider extends ToolProvider {
         inputSchema: {
           type: 'object',
           additionalProperties: false,
-          required: ['status', 'done', 'pending', 'now'],
+          required: ['status', 'done', 'pending', 'now', 'ready_for_final_report', 'need_to_run_more_tools'],
           properties: {
             status: {
               type: 'string',
@@ -130,6 +130,14 @@ export class InternalToolProvider extends ToolProvider {
             now: {
               type: 'string',
               description: 'Your immediate step - what you want to achieve with the tools you call now? (up to 15 words)'
+            },
+            ready_for_final_report: {
+              type: 'boolean',
+              description: 'Set to true when you have enough information to provide your final report/answer, false otherwise'
+            },
+            need_to_run_more_tools: {
+              type: 'boolean',
+              description: 'Set to true when you need to run more tools, false if you are done with tools'
             }
           }
         }
@@ -450,7 +458,7 @@ export class InternalToolProvider extends ToolProvider {
     };
   }
 
-  private validateAndProcessTaskStatus(parameters: Record<string, unknown>): { status: TaskStatusValue; done: string; pending: string; now: string; taskStatusCompleted: boolean; statusMessage: string } {
+  private validateAndProcessTaskStatus(parameters: Record<string, unknown>): { status: TaskStatusValue; done: string; pending: string; now: string; ready_for_final_report: boolean; need_to_run_more_tools: boolean; taskStatusCompleted: boolean; statusMessage: string } {
     // Validate status parameter
     const status = typeof (parameters.status) === 'string' ? parameters.status : '';
     if (!VALID_TASK_STATUSES.includes(status as TaskStatusValue)) {
@@ -460,15 +468,22 @@ export class InternalToolProvider extends ToolProvider {
     const done = typeof (parameters.done) === 'string' ? parameters.done : '';
     const pending = typeof (parameters.pending) === 'string' ? parameters.pending : '';
     const now = typeof (parameters.now) === 'string' ? parameters.now : '';
+    const ready_for_final_report = parameters.ready_for_final_report === true;
+    const need_to_run_more_tools = parameters.need_to_run_more_tools === true;
 
     const statusMessage = [status, done, pending, now].filter(Boolean).join(' | ');
+
+    // Triple confirmation: all three must align for task completion
+    const taskStatusCompleted = status === 'completed' && ready_for_final_report && !need_to_run_more_tools;
 
     return {
       status: status as TaskStatusValue,
       done,
       pending,
       now,
-      taskStatusCompleted: status === 'completed',
+      ready_for_final_report,
+      need_to_run_more_tools,
+      taskStatusCompleted,
       statusMessage
     };
   }
@@ -479,7 +494,7 @@ export class InternalToolProvider extends ToolProvider {
       throw new Error('agent__task_status is disabled for this session');
     }
     if (name === TASK_STATUS_TOOL) {
-      const { status, done, pending, now, taskStatusCompleted, statusMessage } = this.validateAndProcessTaskStatus(parameters);
+      const { status, done, pending, now, ready_for_final_report, need_to_run_more_tools, taskStatusCompleted, statusMessage } = this.validateAndProcessTaskStatus(parameters);
       this.opts.updateStatus(statusMessage);
 
       const taskStatusPayload = {
@@ -490,6 +505,8 @@ export class InternalToolProvider extends ToolProvider {
           done,
           pending,
           now,
+          ready_for_final_report,
+          need_to_run_more_tools,
         },
       };
 
@@ -1075,12 +1092,14 @@ export class InternalToolProvider extends ToolProvider {
       pushSchema(TASK_STATUS_TOOL, {
         type: 'object',
         additionalProperties: false,
-        required: ['status', 'done', 'pending', 'now'],
+        required: ['status', 'done', 'pending', 'now', 'ready_for_final_report', 'need_to_run_more_tools'],
         properties: {
           status: { type: 'string', enum: ['starting', 'in-progress', 'completed'] },
           done: { type: 'string' },
           pending: { type: 'string' },
-          now: { type: 'string' }
+          now: { type: 'string' },
+          ready_for_final_report: { type: 'boolean' },
+          need_to_run_more_tools: { type: 'boolean' }
         }
       });
     }
