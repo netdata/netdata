@@ -63,12 +63,13 @@ static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle, enum netdata_ms
     }
 }
 
-static inline void netdata_MSSQL_release_results(SQLHSTMT *stmt)
+static inline void netdata_MSSQL_release_results(SQLHSTMT stmt)
 {
-    SQLCloseCursor(stmt);
+    if (stmt && stmt != SQL_NULL_HSTMT)
+        SQLCloseCursor(stmt);
 }
 
-static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask, const char *dbname, char *instance)
+static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT stmt, const char *mask, const char *dbname, char *instance)
 {
     long db_size = 0;
     SQLLEN col_data_len = 0;
@@ -1107,6 +1108,7 @@ void netdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
         if (unlikely(!i)) {
             mdi->collect_instance = true;
         }
+        i++;
     } while (true);
 
 enddblist:
@@ -3002,7 +3004,7 @@ static void mssql_db_state_chart_loop(struct mssql_db_instance *mdi, const char 
     collected_number set_value =
         (mdi->MSSQLDBState.current.Data < 5) ? (collected_number)mdi->MSSQLDBState.current.Data : 5;
     mssql_db_states_chart(mdi, db, update_every);
-    for (collected_number i; i < NETDATA_DB_STATES; i++) {
+    for (collected_number i = 0; i < NETDATA_DB_STATES; i++) {
         rrddim_set_by_pointer(mdi->st_db_state, mdi->rd_db_state[i], i == set_value);
     }
     rrdset_done(mdi->st_db_state);
