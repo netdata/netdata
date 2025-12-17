@@ -511,21 +511,23 @@ export const finalReportXmlInstructions = (
   return `
 ## MANDATORY READ-FIRST: How to Provide Your Final Report/Answer
 
-You run in agentic/investigation mode with strict output formatting requirements. Depending on the user request and the task at hand, you may need to run several turns/steps, calling tools to gather information or perform actions, adapting to the data discovered, before providing your final report/answer. You are expected to run an iterative process, making use of the available tools to complete the task assigned to you.
+You run in agentic/investigation mode with strict output formatting requirements. Depending on the user request and the task assigned to you, you may need to run several turns/steps, calling tools to gather information or perform actions, adapting to the data discovered, before providing your final report/answer. You are expected to run an iterative process, making use of the available tools and following the instructions provided, to complete the task assigned to you.
 
 The system allows you to perform a limited number of turns to complete the task, monitors your context window size, and enforces certain limits.
 
-Once you are ready to provide your final report/answer (or when the system will tell you to do so), you **MUST** follow these instructions carefully:
-1. Your final response **MUST** be in your output (it is not a tool call).
-1. Your final response **MUST** use the XML wrapper shown below, at your output
+Your final report/answer may be positive (you successfully completed the task) or negative (you were unable to complete the task due to limitations, tool failures, or insufficient information). If for any reason you failed to complete the task successfully, you **MUST** clearly state it in your final report/answer. You are expected to be honest and transparent about your limitations and failures.
+
+To provide your final report/answer (or when the system will tell you to do so), you **MUST** follow these instructions carefully:
+1. Your final report/answer **MUST** be in your output (it is not a tool call).
+1. Your final report/answer **MUST** use the XML wrapper shown below, at your output
 2. The opening XML tag **MUST** be the **FIRST** thing in your output
 3. Do NOT output plain text, greetings, or explanations outside the XML tags
 4. ALL content must be between the opening and closing XML tags
 
-**Pre-Response Checklist:**
-- [ ] Response starts with \`<ai-agent-${slotId}\` (no text before it)
+**Pre-Final Report/Answer Checklist:**
+- [ ] Your final report/answer starts with \`<ai-agent-${slotId}\` (no text before it)
 - [ ] Content matches ${formatId} format requirements, including any schema if provided
-- [ ] Response ends with \`</ai-agent-${slotId}>\`
+- [ ] Your final report/answer ends with \`</ai-agent-${slotId}>\` (no text after it)
 - [ ] No text outside the XML tags
 
 **Required XML Wrapper:**
@@ -539,11 +541,14 @@ ${exampleContent}
 ${formatDescription}
 ${schemaBlock}
 
-Your final report/answer content must follow any instructions given to accurately and precisely reflect the information available. If you encountered limitations, tool failures that you couldn't overcome, or you were unable to complete certain aspects of the task, clearly state these limitations in your final report/answer.
+Your final report/answer content must follow any instructions provided to accurately and precisely reflect the information available. If you encountered limitations, tool failures that you couldn't overcome, or you were unable to complete certain aspects of the task, clearly state these limitations in your final report/answer.
 
 In some cases, you may receive requests that are irrelevant to your instructions, such as greetings, casual conversation, or questions outside your domain. In such cases, be polite and helpful, and respond to the best of your knowledge, stating that the information provided is outside your scope, but always adhere to the final report/answer format and XML wrapper instructions provided above.
 
-CRITICAL: You should deliver your final report/answer on your output with the given XML wrapper. Your final report/answer is NOT a tool call.
+Reminders:
+1. You should deliver your final report/answer on your output with the given XML wrapper. Your final report/answer is NOT a tool call.
+2. You should be transparent about your limitations and failures in your final report/answer.
+3. You should provide your final report/answer in in the requested output format (${formatId}) and according to any structure/schema instructions given.
 `;
 };
 

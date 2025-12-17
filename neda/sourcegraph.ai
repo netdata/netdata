@@ -1,13 +1,12 @@
 #!/usr/bin/env ai-agent
 ---
-description: Search code across public repositories using Sourcegraph
-usage: Any code search query across public GitHub, GitLab, and other repositories
+description: Find code examples and patterns across any open-source project codebase on GitHub, GitLab, and other public repositories, using sourcegraph
+usage: Any question about any open-source codebases
 models:
-  - anthropic/claude-3-5-haiku-20241022
   - anthropic/claude-haiku-4-5
 tools:
   - sourcegraph
-toolResponseMaxBytes: 65536
+toolResponseMaxBytes: 16384
 maxOutputTokens: 32768
 maxTurns: 30
 reasoning: none

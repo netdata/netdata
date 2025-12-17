@@ -1,10 +1,7 @@
 #!/usr/bin/env ai-agent
 ---
-description: |
-  Netdata Source Code Analyzer
-  Explore Netdata's Source Code and data repositories
-usage: |
-  question about source code, CI/CD, automations
+description: Answers anything that can be extracted from Netdata's public and private source code and documentation repos
+usage: Ask any question that can be answered from Netdata's public and private source code repos, documentation, CI/CD jobs, integrations and automations
 models:
 #  - anthropic/claude-haiku-4-5
   - anthropic/claude-sonnet-4-5
