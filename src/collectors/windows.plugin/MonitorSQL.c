@@ -1332,6 +1332,11 @@ void dict_mssql_insert_locks_cb(const DICTIONARY_ITEM *item __maybe_unused, void
     ptr->lockWait.key = "Lock Waits/sec";
 }
 
+void dict_mssql_insert_locks_destroy_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct mssql_lock_instance *mli = value;
+    freez(mli->resourceID);
+}
+
 void dict_mssql_insert_wait_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     const char *type = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
@@ -1344,6 +1349,12 @@ void dict_mssql_insert_wait_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
         mdw->rd_waiting_tasks = NULL;
 }
 
+void dict_mssql_wait_destroy_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct mssql_db_waits *mdw = value;
+    freez(mdw->wait_type);
+    freez(mdw->wait_category);
+}
+
 void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_db_instance *mdi = value;
@@ -1354,6 +1365,13 @@ void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, 
 void dict_mssql_insert_replication_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     UNUSED(value);
+}
+
+void dict_mssql_replication_destroy_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct mssql_publisher_publication *mpp = value;
+    freez(mpp->publisher);
+    freez(mpp->publication);
+    freez(mpp->db);
 }
 
 void dict_mssql_insert_jobs_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -1503,6 +1521,31 @@ void mssql_fill_initial_instances(struct mssql_instance *mi)
     }
 }
 
+
+void dict_mssql_instances_destroy_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct mssql_instance *mi = value;
+    freez(mi->instanceID);
+    for (int i = 0; i < NETDATA_MSSQL_METRICS_END; i++) {
+        freez(mi->objectName[i]);
+    }
+
+    if (mi->locks_instances) {
+        dictionary_destroy_with_callback(mi->locks_instances, dict_mssql_insert_locks_destroy_cb, NULL);
+    }
+    if (mi->databases) {
+        dictionary_destroy(mi->databases);
+    }
+    if (mi->publisher_publication) {
+        dictionary_destroy_with_callback(mi->publisher_publication, dict_mssql_replication_destroy_cb, NULL);
+    }
+    if (mi->sysjobs) {
+        dictionary_destroy(mi->sysjobs);
+    }
+    if (mi->waits) {
+        dictionary_destroy_with_callback(mi->waits, dict_mssql_wait_destroy_cb, NULL);
+    }
+}
+
 void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_instance *mi = value;
@@ -1515,6 +1558,7 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
         dictionary_register_insert_callback(mi->locks_instances, dict_mssql_insert_locks_cb, NULL);
         mssql_fill_initial_instances(mi);
     }
+
 
     if (unlikely(!mi->databases)) {
         mi->databases = dictionary_create_advanced(
@@ -1556,6 +1600,12 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
 void dict_mssql_insert_conn_option(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     ;
+}
+
+void dict_mssql_insert_conn_option_destroy_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct netdata_mssql_conn *nmc = value;
+    freez(nmc->instance);
+    freez(nmc->connectionString);
 }
 
 static void mssql_fill_dictionary(int update_every)
@@ -3301,4 +3351,13 @@ void do_PerflibMSSQL_cleanup()
 {
     if (likely(nd_thread_join(mssql_queries_thread)))
         nd_log_daemon(NDLP_ERR, "Failed to join mssql queries thread");
+
+    if (mssql_instances) {
+        dictionary_destroy_with_callback(mssql_instances, dict_mssql_instances_destroy_cb, NULL);
+        mssql_instances = NULL;
+    }
+    if (conn_options) {
+        dictionary_destroy_with_callback(conn_options, dict_mssql_insert_conn_option_destroy_cb, NULL);
+        conn_options = NULL;
+    }
 }
