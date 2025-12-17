@@ -202,7 +202,7 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: paged
-                - name: pool-paged
+                - name: non-paged
             - name: mem.system_page_table_entries
               description: Unused page table entries.
               unit: "pages"
@@ -903,6 +903,12 @@ modules:
               chart_type: area
               dimensions:
                 - name: semaphores
+            - name: system.ipc_mutexes
+              description: IPC Mutexes
+              unit: "mutexes"
+              chart_type: area
+              dimensions:
+                - name: mutexes
   - meta:
       plugin_name: windows.plugin
       module_name: GetHardwareInfo
@@ -2889,19 +2895,19 @@ modules:
               unit: objects/s
               chart_type: line
               dimensions:
-                - name: objects
+                - name: allocated
             - name: netframework.clrremoting_context_proxies
               description: Remoting proxy objects
               unit: objects/s
               chart_type: line
               dimensions:
-                - name: contexts
+                - name: objects
             - name: netframework.clrremoting_remote_calls
               description: Remote Procedure Calls (RPC) invoked
               unit: calls/s
               chart_type: line
               dimensions:
-                - name: rpc
+                - name: calls
             - name: netframework.clrsecurity_link_time_checks
               description: Link-time code access security checks
               unit: checks/s
@@ -4032,7 +4038,6 @@ modules:
               dimensions:
                 - name: free
                 - name: standby
-                - name: available
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibASP
@@ -4189,6 +4194,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: not found
+            - name: aspnet.requests_not_authorized
+              description: Requests that were not authorized.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: not_authorized
             - name: aspnet.requests_in_application_queue
               description: Requests in the application queue.
               unit: requests

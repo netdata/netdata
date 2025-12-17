@@ -19,10 +19,33 @@ static bool do_objects(PERF_DATA_BLOCK *pDataBlock, int update_every)
         return false;
 
     static COUNTER_DATA semaphores = {.key = "Semaphores"};
+    static COUNTER_DATA mutexes = {.key = "Mutexes"};
 
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &semaphores)) {
         ULONGLONG sem = (ULONGLONG)semaphores.current.Data;
         common_semaphore_ipc(sem, (NETDATA_DOUBLE)WINDOWS_MAX_KERNEL_OBJECT, _COMMON_PLUGIN_MODULE_NAME, update_every);
+    }
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &mutexes)) {
+        static RRDSET *st = NULL;
+        static RRDDIM *rd = NULL;
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost("system",
+                                       "ipc_mutexes",
+                                       NULL,
+                                       "ipc",
+                                       "system.ipc_mutexes",
+                                       "IPC Mutexes",
+                                       "mutexes",
+                                       _COMMON_PLUGIN_NAME,
+                                       _COMMON_PLUGIN_MODULE_NAME,
+                                       NETDATA_CHART_PRIO_SYSTEM_IPC_SEMAPHORES + 1,
+                                       update_every,
+                                       RRDSET_TYPE_AREA);
+            rd = rrddim_add(st, "mutexes", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+        rrddim_set_by_pointer(st, rd, (collected_number)mutexes.current.Data);
+        rrdset_done(st);
     }
 
     return true;
