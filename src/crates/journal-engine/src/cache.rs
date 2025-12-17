@@ -50,6 +50,17 @@ where
     pub fn contains(&self, key: &K) -> bool {
         self.inner.contains(key)
     }
+
+    /// Close the cache, flushing all in-memory entries to disk.
+    ///
+    /// This should be called before dropping the cache to ensure all background
+    /// I/O tasks complete gracefully. If not called explicitly, the cache will
+    /// be closed on drop, but this may cause task cancellation errors if the
+    /// tokio runtime is shutting down.
+    pub async fn close(&self) -> Result<()> {
+        self.inner.close().await?;
+        Ok(())
+    }
 }
 
 impl<K, V> Clone for Cache<K, V>

@@ -1,24 +1,18 @@
 //! Journal file indexing infrastructure.
 //!
-//! This module provides the complete infrastructure for indexing journal files:
-//! - Background indexing service with worker pool for cache warming
-//! - Stream that orchestrates cache checks and inline computation
+//! This module provides infrastructure for indexing journal files:
+//! - Batch parallel indexing with time budget enforcement
+//! - Cache management for file indexes
 //! - Request/response types for indexing operations
 
 use crate::{
     cache::{FileIndexCache, FileIndexKey},
     error::{EngineError, Result},
 };
-use async_stream::stream;
-use futures::stream::Stream;
 use journal_index::{FieldName, FileIndex, FileIndexer, Seconds};
 use journal_registry::{File, Registry};
-use std::pin::Pin;
-use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
-use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use thiserror::Error;
-use tracing::{error, info, warn};
+use tracing::{debug, warn};
 
 // ============================================================================
 // Helper Functions
@@ -47,7 +41,7 @@ pub fn compute_file_index(
     source_timestamp_field: &FieldName,
     bucket_duration: Seconds,
 ) -> Result<FileIndex> {
-    info!("computing file index for {}", file.path());
+    debug!("computing file index for {}", file.path());
 
     let mut file_indexer = FileIndexer::default();
     let file_index =
@@ -55,80 +49,9 @@ pub fn compute_file_index(
     Ok(file_index)
 }
 
-/// Worker that processes indexing requests.
-fn indexing_worker(
-    cache: FileIndexCache,
-    registry: Registry,
-    request_rx: Arc<Mutex<Receiver<FileIndexRequest>>>,
-) {
-    loop {
-        let request = {
-            let rx = request_rx.lock().unwrap();
-            rx.recv()
-        };
-
-        let Ok(request) = request else {
-            // Channel closed, exit worker
-            break;
-        };
-
-        // Age-based filtering: drop requests older than 2 seconds
-        if request.created_at.elapsed() > std::time::Duration::from_secs(2) {
-            continue;
-        }
-
-        // Compute the index
-        let result = compute_file_index(
-            &request.key.file,
-            request.key.facets.as_slice(),
-            &request.source_timestamp_field,
-            request.bucket_duration,
-        );
-
-        // Store in cache and update registry if successful
-        if let Ok(index) = result {
-            let file = &request.key.file;
-            let time_range = index.time_range();
-            let _ = registry.update_time_range(file, time_range);
-
-            // Store in cache
-            cache.insert(request.key, index);
-        }
-    }
-}
-
 // ============================================================================
-// Request/Response Types
+// Response Types
 // ============================================================================
-
-/// Request to index a journal file with specific parameters.
-#[derive(Debug, Clone)]
-pub struct FileIndexRequest {
-    /// The file and facets to index
-    pub key: FileIndexKey,
-    /// Field name to use for timestamps when indexing
-    pub source_timestamp_field: FieldName,
-    /// Duration of histogram buckets in seconds
-    pub bucket_duration: Seconds,
-    /// When this request was created (for age-based filtering)
-    pub created_at: std::time::Instant,
-}
-
-impl FileIndexRequest {
-    /// Creates a new file index request.
-    pub fn new(
-        key: FileIndexKey,
-        source_timestamp_field: FieldName,
-        bucket_duration: Seconds,
-    ) -> Self {
-        Self {
-            key,
-            source_timestamp_field,
-            bucket_duration,
-            created_at: std::time::Instant::now(),
-        }
-    }
-}
 
 /// Response from indexing a journal file.
 #[derive(Debug)]
@@ -157,43 +80,22 @@ impl FileIndexResponse {
 }
 
 // ============================================================================
-// Background Indexing Service
+// Indexing Engine
 // ============================================================================
 
-/// Service for background file indexing with worker pool.
+/// Service for file indexing with caching.
 ///
-/// This service manages a pool of worker threads that index journal files in the background,
-/// storing results in the cache. It uses a fire-and-forget API - callers queue requests
-/// and the cache is populated asynchronously.
+/// This service manages a cache for file indexes and provides batch parallel
+/// indexing capabilities with time budget enforcement.
 #[derive(Clone)]
 pub struct IndexingEngine {
-    request_tx: SyncSender<FileIndexRequest>,
     cache: FileIndexCache,
 }
 
 impl IndexingEngine {
-    /// Creates a new IndexingEngine with the specified configuration.
-    fn new(
-        cache: FileIndexCache,
-        registry: Registry,
-        num_workers: usize,
-        queue_capacity: usize,
-    ) -> Self {
-        let (request_tx, request_rx) = sync_channel(queue_capacity);
-        let request_rx = Arc::new(Mutex::new(request_rx));
-
-        // Spawn worker threads
-        for _ in 0..num_workers {
-            let cache = cache.clone();
-            let registry = registry.clone();
-            let request_rx = Arc::clone(&request_rx);
-
-            std::thread::spawn(move || {
-                indexing_worker(cache, registry, request_rx);
-            });
-        }
-
-        Self { request_tx, cache }
+    /// Creates a new IndexingEngine with the specified cache.
+    fn new(cache: FileIndexCache) -> Self {
+        Self { cache }
     }
 
     /// Gets a file index from the cache.
@@ -211,11 +113,13 @@ impl IndexingEngine {
         self.cache.insert(key, value);
     }
 
-    /// Queues a file for background indexing (fire-and-forget).
+    /// Closes the indexing engine, flushing all cached data to disk.
     ///
-    /// If the indexing queue is full, the request is silently dropped.
-    pub fn index(&self, request: FileIndexRequest) {
-        let _ = self.request_tx.try_send(request);
+    /// This ensures that all background I/O tasks complete gracefully before
+    /// the cache is dropped. Should be called before the tokio runtime shuts down
+    /// to avoid task cancellation errors.
+    pub async fn close(&self) -> Result<()> {
+        self.cache.close().await
     }
 }
 
@@ -225,13 +129,10 @@ impl IndexingEngine {
 
 /// Builder for constructing an IndexingEngine with custom configuration.
 pub struct IndexingEngineBuilder {
-    registry: Registry,
     cache_path: Option<std::path::PathBuf>,
     memory_capacity: Option<usize>,
     disk_capacity: Option<usize>,
     block_size: Option<usize>,
-    num_workers: Option<usize>,
-    queue_capacity: Option<usize>,
 }
 
 impl IndexingEngineBuilder {
@@ -239,20 +140,15 @@ impl IndexingEngineBuilder {
     ///
     /// All options use defaults if not explicitly set:
     /// - Cache path: temp directory + "journal-engine-cache"
-    /// - Memory capacity: 1000 entries
-    /// - Disk capacity: 1 GB
-    /// - Block size: 4 KB
-    /// - Workers: number of CPU cores
-    /// - Queue capacity: 100 requests
-    pub fn new(registry: Registry) -> Self {
+    /// - Memory capacity: 128 entries
+    /// - Disk capacity: 16 MB
+    /// - Block size: 4 MB
+    pub fn new() -> Self {
         Self {
-            registry,
             cache_path: None,
             memory_capacity: None,
             disk_capacity: None,
             block_size: None,
-            num_workers: None,
-            queue_capacity: None,
         }
     }
 
@@ -280,18 +176,6 @@ impl IndexingEngineBuilder {
         self
     }
 
-    /// Sets the number of worker threads for background indexing.
-    pub fn with_workers(mut self, num_workers: usize) -> Self {
-        self.num_workers = Some(num_workers);
-        self
-    }
-
-    /// Sets the queue capacity for pending indexing requests.
-    pub fn with_queue_capacity(mut self, queue_capacity: usize) -> Self {
-        self.queue_capacity = Some(queue_capacity);
-        self
-    }
-
     /// Builds the IndexingEngine with the configured settings.
     pub async fn build(self) -> Result<IndexingEngine> {
         use foyer::{
@@ -306,12 +190,6 @@ impl IndexingEngineBuilder {
         let memory_capacity = self.memory_capacity.unwrap_or(128);
         let disk_capacity = self.disk_capacity.unwrap_or(16 * 1024 * 1024);
         let block_size = self.block_size.unwrap_or(4 * 1024 * 1024);
-        let num_workers = self.num_workers.unwrap_or_else(|| {
-            std::thread::available_parallelism()
-                .map(|n| n.get())
-                .unwrap_or(4)
-        });
-        let queue_capacity = self.queue_capacity.unwrap_or(100);
 
         // Ensure cache directory exists
         std::fs::create_dir_all(&cache_path).map_err(|e| {
@@ -341,185 +219,144 @@ impl IndexingEngineBuilder {
 
         let cache = FileIndexCache::new(foyer_cache);
 
-        Ok(IndexingEngine::new(
-            cache,
-            self.registry,
-            num_workers,
-            queue_capacity,
-        ))
+        Ok(IndexingEngine::new(cache))
+    }
+}
+
+impl Default for IndexingEngineBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 // ============================================================================
-// File Index Iterator
+// Batch Processing
 // ============================================================================
 
-/// Errors that can occur during iteration.
-#[derive(Debug, Error)]
-pub enum IteratorError {
-    /// Time budget exceeded
-    #[error("Iterator time budget exceeded")]
-    TimeBudgetExceeded,
-}
-
-/// Stream that returns file indexes by checking cache first, then computing inline.
+/// Batch computes file indexes in parallel using rayon, with cache checking and time budget enforcement.
 ///
-/// On creation, checks cache for each key and queues background indexing for cache misses.
-/// On each poll, tries cache first (async), then computes inline if still missing.
+/// This function implements the ideal scenario:
+/// 1. Checks cache for all keys upfront
+/// 2. Identifies cache misses
+/// 3. Uses tokio::task to compute missing indexes in parallel
+/// 4. Inserts newly computed indexes into cache
+/// 5. Returns all results (cached + newly computed)
 ///
-/// Returns `Result<FileIndexResponse, IteratorError>` items. The outer Result handles
-/// stream-level errors (time budget), while FileIndexResponse.result
-/// contains indexing errors for individual files.
-pub struct FileIndexStream {
-    inner:
-        Pin<Box<dyn Stream<Item = std::result::Result<FileIndexResponse, IteratorError>> + Send>>,
-    failed_keys: Arc<Mutex<Vec<FileIndexKey>>>,
-}
+/// # Arguments
+/// * `indexing_engine` - The indexing engine with cache access
+/// * `registry` - Registry to update with file metadata
+/// * `keys` - Vector of (file, facets) pairs to fetch/compute indexes for
+/// * `source_timestamp_field` - Field name to use for timestamps when indexing
+/// * `bucket_duration` - Duration of histogram buckets in seconds
+/// * `time_budget` - Maximum total time to spend processing
+///
+/// # Returns
+/// Vector of responses for each key. Successful responses contain the file index.
+/// If time budget is exceeded, remaining keys will have TimeBudgetExceeded errors.
+pub async fn batch_compute_file_indexes(
+    indexing_engine: &IndexingEngine,
+    registry: &Registry,
+    keys: Vec<FileIndexKey>,
+    source_timestamp_field: FieldName,
+    bucket_duration: Seconds,
+    time_budget: Duration,
+) -> Result<Vec<FileIndexResponse>> {
+    let start_time = Instant::now();
 
-impl FileIndexStream {
-    /// Creates a new stream that fetches or computes file indexes.
-    ///
-    /// On creation, checks cache for each key and queues cache misses for background indexing.
-    ///
-    /// # Arguments
-    /// * `indexing_service` - The indexing service to use for background cache warming
-    /// * `registry` - Registry to update with file metadata on cache miss
-    /// * `keys` - Vector of (file, facets) pairs to fetch/compute indexes for
-    /// * `source_timestamp_field` - Field name to use for timestamps when indexing
-    /// * `bucket_duration` - Duration of histogram buckets in seconds
-    /// * `time_budget` - Maximum total time the stream can spend processing
-    pub fn new(
-        indexing_service: IndexingEngine,
-        registry: Registry,
-        keys: Vec<FileIndexKey>,
-        source_timestamp_field: FieldName,
-        bucket_duration: Seconds,
-        time_budget: Duration,
-    ) -> Self {
-        // Queue cache misses for background indexing
-        for key in &keys {
-            if !indexing_service.contains(key) {
-                let request = FileIndexRequest::new(
-                    key.clone(),
-                    source_timestamp_field.clone(),
-                    bucket_duration,
-                );
-                indexing_service.index(request);
+    // Phase 1: Batch check cache for all keys upfront
+    let cache_futures = keys.iter().map(|key| {
+        let key_clone = key.clone();
+        async move {
+            let cached = indexing_engine.get(&key_clone).await.ok().flatten();
+            (key_clone, cached)
+        }
+    });
+
+    let cache_results: Vec<(FileIndexKey, Option<FileIndex>)> =
+        futures::future::join_all(cache_futures).await;
+
+    // Phase 2: Separate cache hits from misses, check freshness and compatibility
+    let mut responses = Vec::with_capacity(keys.len());
+    let mut keys_to_compute = Vec::new();
+
+    for (key, cached_index) in cache_results {
+        match cached_index {
+            Some(file_index)
+                if is_fresh(&file_index)
+                    && file_index.bucket_duration() <= bucket_duration
+                    && bucket_duration.is_multiple_of(file_index.bucket_duration()) =>
+            {
+                // Cache hit with fresh data and compatible granularity
+                responses.push(FileIndexResponse::new(key, Ok(file_index)));
+            }
+            _ => {
+                // Cache miss or stale/incompatible - need to compute
+                keys_to_compute.push(key);
             }
         }
-
-        let failed_keys = Arc::new(Mutex::new(Vec::new()));
-        let failed_keys_clone = failed_keys.clone();
-
-        let inner = stream! {
-            let mut total_time = Duration::ZERO;
-
-            for (index, key) in keys.iter().enumerate() {
-                // Check time budget before processing
-                if total_time >= time_budget {
-                    // Add all remaining unprocessed keys to failed_keys
-                    let remaining = keys[index..].to_vec();
-                    failed_keys_clone.lock().unwrap().extend(remaining);
-                    yield Err(IteratorError::TimeBudgetExceeded);
-                    break;
-                }
-
-                let start = Instant::now();
-
-                // Try cache first
-                let result = match indexing_service.get(key).await {
-                    Ok(Some(cached_index))
-                        if is_fresh(&cached_index)
-                        && cached_index.bucket_duration() <= bucket_duration
-                        && bucket_duration.is_multiple_of(cached_index.bucket_duration()) =>
-                    {
-                        // Cache hit with fresh data and compatible granularity (bucket boundaries align)
-                        Ok(cached_index)
-                    }
-                    _ => {
-                        // Cache miss or incompatible granularity - compute inline
-                        tracing::info!("computing file index for {}", key.file.path());
-                        match compute_file_index(
-                            &key.file,
-                            key.facets.as_slice(),
-                            &source_timestamp_field,
-                            bucket_duration,
-                        ) {
-                            Ok(index) => {
-                                let file = &key.file;
-                                let time_range = index.time_range();
-                                let _ = registry.update_time_range(file, time_range);
-
-                                // Insert into cache for future use
-                                indexing_service.insert(key.clone(), index.clone());
-                                Ok(index)
-                            }
-                            Err(e) => Err(e),
-                        }
-                    }
-                };
-
-                // Track failures
-                if result.is_err() {
-                    failed_keys_clone.lock().unwrap().push(key.clone());
-                }
-
-                // Update cumulative time spent
-                total_time += start.elapsed();
-
-                yield Ok(FileIndexResponse::new(key.clone(), result));
-            }
-        };
-
-        Self {
-            inner: Box::pin(inner),
-            failed_keys,
-        }
     }
 
-    /// Returns the keys that failed to index.
-    ///
-    /// This can be called during or after streaming to retrieve the list
-    /// of files that couldn't be indexed so far, enabling selective retries.
-    pub fn remaining(&self) -> Vec<FileIndexKey> {
-        self.failed_keys.lock().unwrap().clone()
-    }
-
-    /// Consumes the stream and collects all successfully indexed files.
-    ///
-    /// This is a convenience method for consuming the entire stream and
-    /// collecting all files that were successfully indexed. Files that fail
-    /// to index are silently skipped.
-    pub async fn collect_indexes(mut self) -> Result<Vec<FileIndex>> {
-        use futures::stream::StreamExt;
-
-        let mut results = Vec::new();
-
-        while let Some(result) = self.next().await {
-            match result {
-                Ok(response) => {
-                    if let Ok(index) = response.result {
-                        results.push(index);
-                    }
-                }
-                Err(e) => {
-                    warn!("Streaming index collection timed out: {}", e);
-                    break;
-                }
-            }
+    // Phase 3: Check time budget before spawning compute tasks
+    if start_time.elapsed() >= time_budget {
+        // Time budget already exceeded, fail remaining keys
+        for key in keys_to_compute {
+            responses.push(FileIndexResponse::new(
+                key,
+                Err(EngineError::TimeBudgetExceeded),
+            ));
         }
 
-        Ok(results)
+        return Ok(responses);
     }
-}
 
-impl Stream for FileIndexStream {
-    type Item = std::result::Result<FileIndexResponse, IteratorError>;
+    // Phase 4: Spawn tokio tasks to compute missing indexes in parallel
+    let compute_tasks = keys_to_compute.into_iter().map(|key| {
+        let registry = registry.clone();
+        let source_timestamp_field = source_timestamp_field.clone();
 
-    fn poll_next(
-        mut self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        self.inner.as_mut().poll_next(cx)
+        tokio::task::spawn(async move {
+            // Check time budget before computing
+            if start_time.elapsed() >= time_budget {
+                return FileIndexResponse::new(key, Err(EngineError::TimeBudgetExceeded));
+            }
+
+            // Compute index
+            let result = compute_file_index(
+                &key.file,
+                key.facets.as_slice(),
+                &source_timestamp_field,
+                bucket_duration,
+            );
+
+            // Update registry on success
+            if let Ok(ref index) = result {
+                let time_range = index.time_range();
+                let _ = registry.update_time_range(&key.file, time_range);
+            }
+
+            FileIndexResponse::new(key, result)
+        })
+    });
+
+    // Phase 5: Wait for all compute tasks to complete
+    let computed_results = futures::future::join_all(compute_tasks).await;
+
+    // Phase 6: Insert successful results into cache and collect responses
+    for task_result in computed_results {
+        match task_result {
+            Ok(response) => {
+                if let Ok(ref index) = response.result {
+                    indexing_engine.insert(response.key.clone(), index.clone());
+                }
+                responses.push(response);
+            }
+            Err(join_error) => {
+                warn!("Task join error during indexing: {}", join_error);
+                // Task panicked or was cancelled - we can't recover the key
+                // This shouldn't happen in normal operation
+            }
+        }
     }
+
+    Ok(responses)
 }

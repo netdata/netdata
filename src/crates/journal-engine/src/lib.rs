@@ -33,6 +33,6 @@ pub use histogram::{
     BucketRequest, BucketResponse, Histogram, HistogramEngine, HistogramQueryBuilder,
 };
 pub use indexing::{
-    FileIndexRequest, FileIndexResponse, FileIndexStream, IndexingEngine, IndexingEngineBuilder,
+    batch_compute_file_indexes, FileIndexResponse, IndexingEngine, IndexingEngineBuilder,
 };
 pub use logs::{CellValue, ColumnInfo, LogEntryData, LogQuery, Table, entry_data_to_table};

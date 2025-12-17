@@ -45,6 +45,10 @@ pub enum EngineError {
     /// Foyer IO engine error
     #[error("Foyer IO error: {0}")]
     FoyerIo(#[from] foyer::IoError),
+
+    /// Time budget exceeded during batch processing
+    #[error("Time budget exceeded")]
+    TimeBudgetExceeded,
 }
 
 static_assertions::const_assert!(std::mem::size_of::<EngineError>() <= 64);

@@ -318,14 +318,15 @@ impl CatalogFunction {
             match self.inner.indexing_engine.get(&key).await {
                 Ok(Some(index)) => indexed_files.push(index),
                 Ok(None) => {
-                    warn!(
+                    error!(
                         "file index is not ready for logs querying: {}",
                         file_info.file.path()
                     );
+                    panic!("Adios");
                     continue;
                 }
                 Err(e) => {
-                    warn!("Failed to get index from cache: {}", e);
+                    error!("Failed to get index from cache: {}", e);
                     continue;
                 }
             }
@@ -507,14 +508,12 @@ impl CatalogFunction {
     ) -> CatalogResult<Self> {
         let registry = Registry::new(monitor);
 
-        // Create indexing engine with 24 workers and disk-backed cache
-        let indexing_engine = IndexingEngineBuilder::new(registry.clone())
+        // Create indexing engine with disk-backed cache
+        let indexing_engine = IndexingEngineBuilder::new()
             .with_cache_path(cache_dir)
             .with_memory_capacity(memory_capacity)
             .with_disk_capacity(disk_capacity)
             .with_block_size(4 * 1024 * 1024)
-            .with_workers(24)
-            .with_queue_capacity(100)
             .build()
             .await?;
 
@@ -670,7 +669,10 @@ impl FunctionHandler for CatalogFunction {
         // Register the transaction
         let txn = self.inner.transaction_registry.create(transaction.clone());
         if txn.is_none() {
-            warn!("Transaction {} already exists, continuing anyway", transaction);
+            warn!(
+                "Transaction {} already exists, continuing anyway",
+                transaction
+            );
         }
 
         info!("Got function call for transaction {}", transaction);

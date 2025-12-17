@@ -7,15 +7,16 @@ use crate::{
     cache::FileIndexKey,
     error::Result,
     facets::Facets,
-    indexing::{FileIndexStream, IndexingEngine},
+    indexing::{IndexingEngine, batch_compute_file_indexes},
 };
-use futures::StreamExt;
 use journal_core::collections::{HashMap, HashSet};
 use journal_index::{FieldName, FieldValuePair, Filter, Seconds};
 use journal_registry::Registry;
 use parking_lot::RwLock;
 use std::time::Duration;
-use tracing::debug;
+
+#[allow(unused_imports)]
+use tracing::{debug, error};
 
 /// A bucket request contains a [start, end) time range along with the
 /// filter that should be applied.
@@ -299,97 +300,89 @@ impl HistogramEngine {
                 .map(|file_info| FileIndexKey::new(&file_info.file, &histogram_request.facets))
                 .collect();
 
-            // Create stream and process indexes
+            // Batch compute all file indexes
             if !file_index_keys.is_empty() {
                 let bucket_duration = bucket_requests.first().unwrap().duration();
                 let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
-                let time_budget = Duration::from_secs(10);
+                let time_budget = Duration::from_secs(4);
 
-                let mut stream = FileIndexStream::new(
-                    self.indexing_service.clone(),
-                    self.registry.clone(),
+                let file_index_responses = batch_compute_file_indexes(
+                    &self.indexing_service,
+                    &self.registry,
                     file_index_keys,
                     source_timestamp_field,
                     bucket_duration,
                     time_budget,
-                );
+                )
+                .await?;
 
-                // Process file indexes and update responses
-                while let Some(result) = stream.next().await {
-                    match result {
-                        Ok(file_index_response) => {
-                            if let Ok(file_index) = file_index_response.result {
-                                // Get file's time range from the index
-                                let file_start = file_index.start_time();
-                                let file_end = file_index.end_time();
+                // Process all file indexes and update responses
+                for file_index_response in file_index_responses {
+                    if let Ok(file_index) = file_index_response.result {
+                        // Get file's time range from the index
+                        let file_start = file_index.start_time();
+                        let file_end = file_index.end_time();
 
-                                // Find all bucket requests that need data from this file
-                                for bucket_request in &buckets_to_compute {
-                                    let response = match new_responses.get_mut(bucket_request) {
-                                        Some(r) => r,
-                                        None => continue,
-                                    };
+                        // Find all bucket requests that need data from this file
+                        for bucket_request in &buckets_to_compute {
+                            let response = match new_responses.get_mut(bucket_request) {
+                                Some(r) => r,
+                                None => continue,
+                            };
 
-                                    // Skip if file's time range doesn't overlap with bucket's time range
-                                    if file_start >= bucket_request.end
-                                        || file_end <= bucket_request.start
-                                    {
-                                        continue;
-                                    }
+                            // Skip if file's time range doesn't overlap with bucket's time range
+                            if file_start >= bucket_request.end || file_end <= bucket_request.start
+                            {
+                                continue;
+                            }
 
-                                    // Evaluate filter to bitmap
-                                    let filter_bitmap = if !bucket_request.filter_expr.is_none() {
-                                        Some(bucket_request.filter_expr.evaluate(&file_index))
-                                    } else {
-                                        None
-                                    };
+                            // Evaluate filter to bitmap
+                            let filter_bitmap = if !bucket_request.filter_expr.is_none() {
+                                Some(bucket_request.filter_expr.evaluate(&file_index))
+                            } else {
+                                None
+                            };
 
-                                    // Track unindexed fields
-                                    for field in file_index.fields() {
-                                        if !file_index.is_indexed(field) {
-                                            if let Some(field_name) = FieldName::new(field) {
-                                                response.unindexed_fields.insert(field_name);
-                                            }
-                                        }
-                                    }
-
-                                    // Count field=value pairs in this file for this bucket's time range
-                                    for (indexed_field, field_bitmap) in file_index.bitmaps() {
-                                        let unfiltered_count = file_index
-                                            .count_entries_in_time_range(
-                                                field_bitmap,
-                                                bucket_request.start,
-                                                bucket_request.end,
-                                            )
-                                            .unwrap_or(0);
-
-                                        let filtered_count =
-                                            if let Some(ref filter_bitmap) = filter_bitmap {
-                                                let filtered_bitmap = field_bitmap & filter_bitmap;
-                                                file_index
-                                                    .count_entries_in_time_range(
-                                                        &filtered_bitmap,
-                                                        bucket_request.start,
-                                                        bucket_request.end,
-                                                    )
-                                                    .unwrap_or(0)
-                                            } else {
-                                                unfiltered_count
-                                            };
-
-                                        // Update counts
-                                        if let Some(pair) = FieldValuePair::parse(indexed_field) {
-                                            let counts =
-                                                response.fv_counts.entry(pair).or_insert((0, 0));
-                                            counts.0 += unfiltered_count;
-                                            counts.1 += filtered_count;
-                                        }
+                            // Track unindexed fields
+                            for field in file_index.fields() {
+                                if !file_index.is_indexed(field) {
+                                    if let Some(field_name) = FieldName::new(field) {
+                                        response.unindexed_fields.insert(field_name);
                                     }
                                 }
                             }
-                        }
-                        Err(e) => {
-                            panic!("Stream error: {}", e);
+
+                            // Count field=value pairs in this file for this bucket's time range
+                            for (indexed_field, field_bitmap) in file_index.bitmaps() {
+                                let unfiltered_count = file_index
+                                    .count_entries_in_time_range(
+                                        field_bitmap,
+                                        bucket_request.start,
+                                        bucket_request.end,
+                                    )
+                                    .unwrap_or(0);
+
+                                let filtered_count = if let Some(ref filter_bitmap) = filter_bitmap
+                                {
+                                    let filtered_bitmap = field_bitmap & filter_bitmap;
+                                    file_index
+                                        .count_entries_in_time_range(
+                                            &filtered_bitmap,
+                                            bucket_request.start,
+                                            bucket_request.end,
+                                        )
+                                        .unwrap_or(0)
+                                } else {
+                                    unfiltered_count
+                                };
+
+                                // Update counts
+                                if let Some(pair) = FieldValuePair::parse(indexed_field) {
+                                    let counts = response.fv_counts.entry(pair).or_insert((0, 0));
+                                    counts.0 += unfiltered_count;
+                                    counts.1 += filtered_count;
+                                }
+                            }
                         }
                     }
                 }
