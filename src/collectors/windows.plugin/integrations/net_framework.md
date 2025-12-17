@@ -91,9 +91,9 @@ Metrics:
 | netframework.clrloading_class_load_failures | class_load | failures/s |
 | netframework.clrremoting_channels | registered | channels/s |
 | netframework.clrremoting_context_bound_classes_loaded | loaded | classes |
-| netframework.clrremoting_context_bound_objects | objects | objects/s |
-| netframework.clrremoting_context_proxies | contexts | objects/s |
-| netframework.clrremoting_remote_calls | rpc | calls/s |
+| netframework.clrremoting_context_bound_objects | allocated | objects/s |
+| netframework.clrremoting_context_proxies | objects | objects/s |
+| netframework.clrremoting_remote_calls | calls | calls/s |
 | netframework.clrsecurity_link_time_checks | linktime | checks/s |
 | netframework.clrsecurity_checks_time | time | percentage |
 | netframework.clrsecurity_stack_walk_depth | stack | depth |
