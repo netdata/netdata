@@ -1523,6 +1523,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       // Backfill: Emit chunks for content that wasn't streamed (common with tool calls)
       // Many providers don't stream text-delta or reasoning-delta when producing tool calls
       if (request.onChunk !== undefined && Array.isArray((resp as { messages?: unknown[] } | undefined)?.messages)) {
+        const normalizeWhitespace = (input: string): string => input.replace(/\s+/g, ' ').trim();
+        const hasStreamedNormalized = (): string => normalizeWhitespace(response);
         // eslint-disable-next-line functional/no-loop-statements
         for (const msg of (resp as { messages?: unknown[] } | undefined)?.messages ?? []) {
           const m = msg as { role?: string; content?: unknown };
@@ -1548,7 +1550,10 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
               
               // Emit text content if we haven't streamed it yet
               if (p.type === 'text' && p.text !== undefined && p.text.length > 0) {
-                if (!hasEmittedText && !response.includes(p.text)) {
+                const alreadyStreamed = normalizeWhitespace(p.text).length > 0
+                  ? hasStreamedNormalized().includes(normalizeWhitespace(p.text))
+                  : false;
+                if (!hasEmittedText && !alreadyStreamed) {
                   // Only emit if this text wasn't already streamed as text-delta
                   request.onChunk(p.text, 'content');
                   response += p.text; // Add to response for completeness

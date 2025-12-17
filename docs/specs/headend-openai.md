@@ -131,7 +131,7 @@ interface OpenAIChatRequestMessage {
 6. **Acquire concurrency slot**
 
 7. **Initialize callbacks**:
-   - `onOutput`: Accumulate and stream content
+   - `onOutput`: Accumulate and stream content (TurnRunner avoids duplicating final report output when it was already streamed)
    - `onThinking`: Build reasoning structure
    - `onTurnStarted`: Track turn progression
    - `onProgress`: Handle progress events

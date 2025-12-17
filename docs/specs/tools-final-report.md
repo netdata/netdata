@@ -1,7 +1,7 @@
 # final_report Tool
 
 ## TL;DR
-Mandatory tool for agent to deliver final answer. Captures format, encoding, content, optional JSON payload, and metadata. Terminates session execution. `report_content` may be `raw` or `base64`; `content_json` is schema-validated with a light repair loop for stringified nested JSON. The model must call `agent__final_report` via the XML slot in XML-NEXT (single transport path: native tools + XML final report). Provider tool definitions remain native, but the final report must be sent via the XML tag.
+Mandatory tool for agent to deliver final answer. Captures format, encoding, content, optional JSON payload, and metadata. Terminates session execution. `report_content` may be `raw` or `base64`; `content_json` is schema-validated with a light repair loop for stringified nested JSON. The model must call `agent__final_report` via the XML slot in XML-NEXT (single transport path: native tools + XML final report). Provider tool definitions remain native, but the final report must be sent via the XML tag. When streaming is enabled, the session runner deduplicates output so the final report is not emitted twice (streaming + finalize).
 
 ## Source Files
 - `src/tools/internal-provider.ts` - Tool definition and handler
@@ -154,6 +154,9 @@ if (fr.format === 'json' && schema !== undefined && fr.content_json !== undefine
   }
 }
 ```
+
+### 5. Output Emission (Streaming Deduplication)
+When a headend supplies an `onOutput` callback, the session runner may stream model output in real time. When the final report is accepted, the runner emits the final report content via `onOutput` only if it was not already streamed, preventing duplicated answers in streaming UIs.
 
 ## Final Report Structure
 

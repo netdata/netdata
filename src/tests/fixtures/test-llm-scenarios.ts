@@ -4682,6 +4682,33 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
     ],
   },
+  {
+    id: 'run-test-stream-dedupe-final-report',
+    description: 'Streaming assistant text should not be duplicated by final_report emission.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Dedupe me.',
+          toolCalls: [
+            {
+              toolName: 'agent__final_report',
+              callId: 'agent-final-report',
+              arguments: {
+                status: STATUS_SUCCESS,
+                report_format: MARKDOWN_FORMAT,
+                report_content: 'Dedupe me.',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+    ],
+  },
 ];
 
 const scenarios = new Map<string, ScenarioDefinition>(SCENARIOS.map((scenario) => [scenario.id, scenario] as const));

@@ -327,10 +327,10 @@ const SESSIONS_SUBDIR = 'sessions';
 const BILLING_FILENAME = 'billing.jsonl';
 const THRESHOLD_BUFFER_TOKENS = 8;
 const THRESHOLD_MAX_OUTPUT_TOKENS = 32;
-// Prompt + instructions currently estimate to ~819 tokens (ctx + new, schema excluded from projection).
-const THRESHOLD_CONTEXT_WINDOW_BELOW = 899; // limit = 899 - 8 - 32 = 859 (> projected 819)
-const THRESHOLD_CONTEXT_WINDOW_EQUAL = 859; // limit = 859 - 8 - 32 = 819 (matches projected)
-const THRESHOLD_CONTEXT_WINDOW_ABOVE = 839; // limit = 839 - 8 - 32 = 799 (< projected 819)
+// Prompt + instructions currently estimate to ~1009-1010 tokens (ctx + new, schema excluded from projection).
+const THRESHOLD_CONTEXT_WINDOW_BELOW = 1089; // limit = 1089 - 8 - 32 = 1049 (> projected ~1009)
+const THRESHOLD_CONTEXT_WINDOW_EQUAL = 1049; // limit = 1049 - 8 - 32 = 1009 (matches projected)
+const THRESHOLD_CONTEXT_WINDOW_ABOVE = 1029; // limit = 1029 - 8 - 32 = 989 (< projected ~1010)
 const PREFLIGHT_CONTEXT_WINDOW = 80;
 const PREFLIGHT_BUFFER_TOKENS = 8;
 const PREFLIGHT_MAX_OUTPUT_TOKENS = 16;
@@ -2049,17 +2049,17 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'context_guard__tool_drop_after_success',
     configure: (configuration, sessionConfig, defaults) => {
-      configuration.providers = {
-        [PRIMARY_PROVIDER]: {
-          type: 'test-llm',
-          models: {
-            [MODEL_NAME]: {
-              contextWindow: 1620,
-              contextWindowBufferTokens: 0,
-              tokenizer: TOKENIZER_GPT4O,
-            },
-          },
-        },
+	      configuration.providers = {
+	        [PRIMARY_PROVIDER]: {
+	          type: 'test-llm',
+	          models: {
+	            [MODEL_NAME]: {
+	              contextWindow: 1760,
+	              contextWindowBufferTokens: 0,
+	              tokenizer: TOKENIZER_GPT4O,
+	            },
+	          },
+	        },
       };
       defaults.contextWindowBufferTokens = 0;
       configuration.defaults = defaults;
@@ -11356,6 +11356,37 @@ BASE_TEST_SCENARIOS.push({
     invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Recovered after invalid tag'), 'Final report content mismatch for run-test-xml-invalid-tag.');
   },
 } satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push((() => {
+  let streamedOutput = '';
+  const expected = 'Dedupe me.';
+  return {
+    id: 'run-test-stream-dedupe-final-report',
+    description: 'Streaming output should not be duplicated by final_report emission.',
+    configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig, defaults: NonNullable<Configuration['defaults']>) => {
+      streamedOutput = '';
+      defaults.stream = true;
+      configuration.defaults = defaults;
+      sessionConfig.stream = true;
+      const existingCallbacks = sessionConfig.callbacks ?? {};
+      sessionConfig.callbacks = {
+        ...existingCallbacks,
+        onOutput: (chunk) => {
+          streamedOutput += chunk;
+          existingCallbacks.onOutput?.(chunk);
+        },
+      };
+    },
+    expect: (result: AIAgentResult) => {
+      invariant(result.success, 'run-test-stream-dedupe-final-report expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined, 'Final report expected for run-test-stream-dedupe-final-report.');
+      invariant(typeof finalReport.content === 'string' && finalReport.content.trim() === expected, 'Final report content mismatch for run-test-stream-dedupe-final-report.');
+      const occurrences = streamedOutput.split(expected).length - 1;
+      invariant(occurrences === 1, `Expected streamed output to contain exactly 1 copy of final answer, got ${String(occurrences)}.`);
+    },
+  } satisfies HarnessTest;
+})());
 
 const filterScenarios = (ids: string[], logWarnings: boolean): HarnessTest[] => {
   if (ids.length === 0) return BASE_TEST_SCENARIOS;

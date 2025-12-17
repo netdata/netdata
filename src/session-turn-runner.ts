@@ -168,6 +168,7 @@ const FINAL_REPORT_TOOL = 'agent__final_report';
 const SLACK_BLOCK_KIT_FORMAT = 'slack-block-kit';
 const FINAL_REPORT_TOOL_ALIASES = new Set(['agent__final_report', 'agent-final-report']);
 const RETRY_ACTION_SKIP_PROVIDER = 'skip-provider';
+const STREAMED_OUTPUT_DEDUPE_MAX_CHARS = 200_000;
 export { FINAL_REPORT_TOOL };
 /**
  * TurnRunner encapsulates all turn iteration logic
@@ -177,6 +178,7 @@ export class TurnRunner {
     private readonly callbacks: TurnRunnerCallbacks;
     private state: TurnRunnerState;
     private finalReportStreamed = false;
+    private streamedOutputTail = '';
 
     constructor(ctx: TurnRunnerContext, callbacks: TurnRunnerCallbacks) {
         this.ctx = ctx;
@@ -207,6 +209,28 @@ export class TurnRunner {
             finalReportSchemaFailed: false,
             lastTaskStatusCompleted: undefined,
         };
+    }
+    private resetStreamedOutputTail(): void {
+        this.streamedOutputTail = '';
+    }
+    private appendStreamedOutputTail(chunk: string): void {
+        if (chunk.length === 0)
+            return;
+        const next = this.streamedOutputTail + chunk;
+        if (next.length <= STREAMED_OUTPUT_DEDUPE_MAX_CHARS) {
+            this.streamedOutputTail = next;
+            return;
+        }
+        this.streamedOutputTail = next.slice(-STREAMED_OUTPUT_DEDUPE_MAX_CHARS);
+    }
+    private hasStreamedFinalOutput(finalOutput: string): boolean {
+        const candidate = finalOutput.trimEnd();
+        if (candidate.length === 0)
+            return false;
+        const streamed = this.streamedOutputTail.trimEnd();
+        if (streamed.length === 0)
+            return false;
+        return streamed.endsWith(candidate);
     }
     /**
      * Main entry point - executes the agent loop
@@ -2257,21 +2281,21 @@ export class TurnRunner {
             this.state.toolFailureMessages.set('final_report_schema', errMsg);
         }
         if (this.ctx.sessionConfig.renderTarget !== 'sub-agent' && this.callbacks.onOutput !== undefined) {
-            if (!this.finalReportStreamed) {
-                const finalOutput = (() => {
-                    if (fr.format === 'json' && fr.content_json !== undefined) {
-                        try {
-                            return JSON.stringify(fr.content_json);
-                        }
-                        catch {
-                            return undefined;
-                        }
+            const finalOutput = (() => {
+                if (fr.format === 'json' && fr.content_json !== undefined) {
+                    try {
+                        return JSON.stringify(fr.content_json);
                     }
-                    if (typeof fr.content === 'string' && fr.content.length > 0)
-                        return fr.content;
-                    return undefined;
-                })();
-                if (finalOutput !== undefined) {
+                    catch {
+                        return undefined;
+                    }
+                }
+                if (typeof fr.content === 'string' && fr.content.length > 0)
+                    return fr.content;
+                return undefined;
+            })();
+            if (finalOutput !== undefined) {
+                if (!this.finalReportStreamed && !this.hasStreamedFinalOutput(finalOutput)) {
                     this.callbacks.onOutput(finalOutput, {
                         agentId: this.ctx.agentId,
                         callPath: this.ctx.callPath,
@@ -2279,6 +2303,7 @@ export class TurnRunner {
                         parentId: this.ctx.parentTxnId,
                         originId: this.ctx.originTxnId,
                     });
+                    this.appendStreamedOutputTail(finalOutput);
                     if (!finalOutput.endsWith('\n')) {
                         this.callbacks.onOutput('\n', {
                             agentId: this.ctx.agentId,
@@ -2287,7 +2312,12 @@ export class TurnRunner {
                             parentId: this.ctx.parentTxnId,
                             originId: this.ctx.originTxnId,
                         });
+                        this.appendStreamedOutputTail('\n');
                     }
+                    this.finalReportStreamed = true;
+                }
+                else {
+                    this.finalReportStreamed = true;
                 }
             }
         }
@@ -3075,6 +3105,7 @@ export class TurnRunner {
         }
         // Reset streaming flag for this attempt
         this.finalReportStreamed = false;
+        this.resetStreamedOutputTail();
 
         const request = {
             messages: requestMessages,
@@ -3100,6 +3131,7 @@ export class TurnRunner {
                         const filtered = xmlFilter.process(chunk);
                         if (filtered.length > 0) {
                             this.callbacks.onOutput(filtered, callbackMeta);
+                            this.appendStreamedOutputTail(filtered);
                             // Only mark as streamed if we actually emitted content (and are inside the tag)
                             if (xmlFilter.hasStreamedContent) {
                                 this.finalReportStreamed = true;
@@ -3107,6 +3139,7 @@ export class TurnRunner {
                         }
                     } else {
                         this.callbacks.onOutput(chunk, callbackMeta);
+                        this.appendStreamedOutputTail(chunk);
                     }
                 }
                 else if (type === 'thinking') {
@@ -3224,6 +3257,7 @@ export class TurnRunner {
                             parentId: this.ctx.parentTxnId,
                             originId: this.ctx.originTxnId,
                         });
+                        this.appendStreamedOutputTail(left);
                         if (xmlFilter.hasStreamedContent) {
                             this.finalReportStreamed = true;
                         }
