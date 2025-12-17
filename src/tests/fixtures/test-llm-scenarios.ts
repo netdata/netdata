@@ -1468,43 +1468,21 @@ const SCENARIOS: ScenarioDefinition[] = [
     turns: [
       {
         turn: 1,
-        expectedTools: [TOOL_NAME],
-        // Skip tool validation since first session uses maxTurns=1 (final turn restricts tools)
-        allowMissingTools: true,
-        // With maxRetries=1, we need 2 failures to exhaust all attempts (initial + 1 retry)
+        // With maxTurns=1, first session is in final turn from start.
+        // maxRetries=2 means 2 attempts, both throw.
+        // Retry exhaustion in final turn → actual session failure (not graceful exhaustion).
+        // retry() reuses LLMClient, so counter=2 persists.
+        // Retry session's turn 1: counter=2 >= 2, so succeeds with final-report.
         failuresBeforeSuccess: 2,
         failureThrows: true,
         failureMessage: 'Simulated fatal error before manual retry.',
         response: {
-          kind: 'tool-call',
-          assistantText: 'Retry scenario executes after manual retry.',
-          toolCalls: [
-            {
-              toolName: TOOL_NAME,
-              callId: 'call-retry-session',
-              assistantText: 'Executing tool call after retry.',
-              arguments: {
-                text: TOOL_ARGUMENT_SUCCESS,
-              },
-            },
-          ],
-          tokenUsage: DEFAULT_TOKEN_USAGE,
-          finishReason: TOOL_FINISH_REASON,
-        },
-      },
-      {
-        turn: 2,
-        response: {
           kind: FINAL_RESPONSE_KIND,
-          assistantText: 'Reporting retry outcome.',
+          assistantText: 'Session retry succeeded after manual invocation.',
           reportContent: `${RESULT_HEADING}Session retry succeeded after manual invocation.`,
           reportFormat: MARKDOWN_FORMAT,
           status: STATUS_SUCCESS,
-          tokenUsage: {
-            inputTokens: 84,
-            outputTokens: 32,
-            totalTokens: 116,
-          },
+          tokenUsage: DEFAULT_TOKEN_USAGE,
         },
       },
     ],
