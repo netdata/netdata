@@ -94,64 +94,64 @@ struct web_service {
 };
 
 struct ws3svc_w3wp_data {
-    RRDSET *st_wescv_w3wp_active_threads;
-    RRDDIM *rd_wescv_w3wp_active_threads;
+    RRDSET *st_w3svc_w3wp_active_threads;
+    RRDDIM *rd_w3svc_w3wp_active_threads;
 
-    RRDSET *st_wescv_w3wp_requests_total;
-    RRDDIM *rd_wescv_w3wp_requests_total;
+    RRDSET *st_w3svc_w3wp_requests_total;
+    RRDDIM *rd_w3svc_w3wp_requests_total;
 
-    RRDSET *st_wescv_w3wp_requests_active;
-    RRDDIM *rd_wescv_w3wp_requests_active;
+    RRDSET *st_w3svc_w3wp_requests_active;
+    RRDDIM *rd_w3svc_w3wp_requests_active;
 
-    RRDSET *st_wescv_w3wp_file_cache_mem_usage;
-    RRDDIM *rd_wescv_w3wp_file_cache_mem_usage;
+    RRDSET *st_w3svc_w3wp_file_cache_mem_usage;
+    RRDDIM *rd_w3svc_w3wp_file_cache_mem_usage;
 
-    RRDSET *st_wescv_w3wp_files_cache_total;
-    RRDDIM *rd_wescv_w3wp_files_cache_total;
+    RRDSET *st_w3svc_w3wp_files_cache_total;
+    RRDDIM *rd_w3svc_w3wp_files_cache_total;
 
-    RRDSET *st_wescv_w3wp_files_flushed_total;
-    RRDDIM *rd_wescv_w3wp_files_flushed_total;
+    RRDSET *st_w3svc_w3wp_files_flushed_total;
+    RRDDIM *rd_w3svc_w3wp_files_flushed_total;
 
-    RRDSET *st_wescv_w3wp_uri_cache_flushed;
-    RRDDIM *rd_wescv_w3wp_uri_cache_flushed;
+    RRDSET *st_w3svc_w3wp_uri_cache_flushed;
+    RRDDIM *rd_w3svc_w3wp_uri_cache_flushed;
 
-    RRDSET *st_wescv_w3wp_total_uri_cached;
-    RRDDIM *rd_wescv_w3wp_total_uri_cached;
+    RRDSET *st_w3svc_w3wp_total_uri_cached;
+    RRDDIM *rd_w3svc_w3wp_total_uri_cached;
 
-    RRDSET *st_wescv_w3wp_total_metadata_cache;
-    RRDDIM *rd_wescv_w3wp_total_metadata_cache;
+    RRDSET *st_w3svc_w3wp_total_metadata_cache;
+    RRDDIM *rd_w3svc_w3wp_total_metadata_cache;
 
-    RRDSET *st_wescv_w3wp_total_metadata_flushed;
-    RRDDIM *rd_wescv_w3wp_total_metadata_flushed;
+    RRDSET *st_w3svc_w3wp_total_metadata_flushed;
+    RRDDIM *rd_w3svc_w3wp_total_metadata_flushed;
 
-    RRDSET *st_wescv_w3wp_output_cache_active_flushed_items;
-    RRDDIM *rd_wescv_w3wp_output_cache_active_flushed_items;
+    RRDSET *st_w3svc_w3wp_output_cache_active_flushed_items;
+    RRDDIM *rd_w3svc_w3wp_output_cache_active_flushed_items;
 
-    RRDSET *st_wescv_w3wp_output_cache_memory_usage;
-    RRDDIM *rd_wescv_w3wp_output_cache_memory_usage;
+    RRDSET *st_w3svc_w3wp_output_cache_memory_usage;
+    RRDDIM *rd_w3svc_w3wp_output_cache_memory_usage;
 
-    RRDSET *st_wescv_w3wp_output_cache_flushed_total;
-    RRDDIM *rd_wescv_w3wp_output_cache_flushed_total;
+    RRDSET *st_w3svc_w3wp_output_cache_flushed_total;
+    RRDDIM *rd_w3svc_w3wp_output_cache_flushed_total;
 
-    COUNTER_DATA WESCVW3WPActiveThreads;
+    COUNTER_DATA W3SVCW3WPActiveThreads;
 
-    COUNTER_DATA WESCVW3WPRequestTotal;
-    COUNTER_DATA WESCVW3WPRequestActive;
+    COUNTER_DATA W3SVCW3WPRequestTotal;
+    COUNTER_DATA W3SVCW3WPRequestActive;
 
-    COUNTER_DATA WESCVW3WPFileCacheMemUsage;
+    COUNTER_DATA W3SVCW3WPFileCacheMemUsage;
 
-    COUNTER_DATA WESCVW3WPFilesCachedTotal;
-    COUNTER_DATA WESCVW3WPFilesFlushedTotal;
+    COUNTER_DATA W3SVCW3WPFilesCachedTotal;
+    COUNTER_DATA W3SVCW3WPFilesFlushedTotal;
 
-    COUNTER_DATA WESCVW3WPURICachedFlushed;
-    COUNTER_DATA WESCVW3WPTotalURICached;
+    COUNTER_DATA W3SVCW3WPURICachedFlushed;
+    COUNTER_DATA W3SVCW3WPTotalURICached;
 
-    COUNTER_DATA WESCVW3WPTotalMetadataCached;
-    COUNTER_DATA WESCVW3WPTotalMetadataFlushed;
+    COUNTER_DATA W3SVCW3WPTotalMetadataCached;
+    COUNTER_DATA W3SVCW3WPTotalMetadataFlushed;
 
-    COUNTER_DATA WESCVW3WPOutputCacheActiveFlushedItens;
-    COUNTER_DATA WESCVW3WPOutputCacheMemoryUsage;
-    COUNTER_DATA WESCVW3WPOutputCacheFlushesTotal;
+    COUNTER_DATA W3SVCW3WPOutputCacheActiveFlushedItems;
+    COUNTER_DATA W3SVCW3WPOutputCacheMemoryUsage;
+    COUNTER_DATA W3SVCW3WPOutputCacheFlushesTotal;
 };
 
 // AD information
@@ -271,25 +271,25 @@ void dict_app_pool_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *v
 
 static inline void initialize_w3svc_w3wp_keys(struct ws3svc_w3wp_data *p)
 {
-    p->WESCVW3WPActiveThreads.key = "Active Threads Count";
+    p->W3SVCW3WPActiveThreads.key = "Active Threads Count";
 
-    p->WESCVW3WPRequestTotal.key = "Total HTTP Requests Served";
-    p->WESCVW3WPRequestActive.key = "Active Requests";
+    p->W3SVCW3WPRequestTotal.key = "Total HTTP Requests Served";
+    p->W3SVCW3WPRequestActive.key = "Active Requests";
 
-    p->WESCVW3WPFileCacheMemUsage.key = "Current File Cache Memory Usage";
+    p->W3SVCW3WPFileCacheMemUsage.key = "Current File Cache Memory Usage";
 
-    p->WESCVW3WPFilesCachedTotal.key = "Total Files Cached";
-    p->WESCVW3WPFilesFlushedTotal.key = "Total Flushed Files";
+    p->W3SVCW3WPFilesCachedTotal.key = "Total Files Cached";
+    p->W3SVCW3WPFilesFlushedTotal.key = "Total Flushed Files";
 
-    p->WESCVW3WPURICachedFlushed.key = "Total Flushed URIs";
-    p->WESCVW3WPTotalURICached.key = "Total URIs Cached";
+    p->W3SVCW3WPURICachedFlushed.key = "Total Flushed URIs";
+    p->W3SVCW3WPTotalURICached.key = "Total URIs Cached";
 
-    p->WESCVW3WPTotalMetadataCached.key = "Total Metadata Cached";
-    p->WESCVW3WPTotalMetadataFlushed.key = "Total Flushed Metadata";
+    p->W3SVCW3WPTotalMetadataCached.key = "Total Metadata Cached";
+    p->W3SVCW3WPTotalMetadataFlushed.key = "Total Flushed Metadata";
 
-    p->WESCVW3WPOutputCacheActiveFlushedItens.key = "Output Cache Current Flushed Items";
-    p->WESCVW3WPOutputCacheMemoryUsage.key = "Output Cache Current Memory Usage";
-    p->WESCVW3WPOutputCacheFlushesTotal.key = "Output Cache Total Flushes";
+    p->W3SVCW3WPOutputCacheActiveFlushedItems.key = "Output Cache Current Flushed Items";
+    p->W3SVCW3WPOutputCacheMemoryUsage.key = "Output Cache Current Memory Usage";
+    p->W3SVCW3WPOutputCacheFlushesTotal.key = "Output Cache Total Flushes";
 }
 
 void dict_wesvc_w3wp_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -424,7 +424,7 @@ static inline void netdata_webservice_active_connection(
                 "Website active connections",
                 "connections",
                 PLUGIN_WINDOWS_NAME,
-                "PerflibWebService1",
+                "PerflibWebService",
                 PRIO_WEBSITE_IIS_ACTIVE_CONNECTIONS_COUNT,
                 update_every,
                 RRDSET_TYPE_LINE);
@@ -1385,12 +1385,12 @@ static inline void w3svc_w3wp_active_threads(
     int update_every,
     char *app_name)
 {
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPActiveThreads)) {
-        if (!p->st_wescv_w3wp_active_threads) {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->W3SVCW3WPActiveThreads)) {
+        if (!p->st_w3svc_w3wp_active_threads) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_active_threads", app_name);
             netdata_fix_chart_name(id);
-            p->st_wescv_w3wp_active_threads = rrdset_create_localhost(
+            p->st_w3svc_w3wp_active_threads = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
@@ -1404,17 +1404,17 @@ static inline void w3svc_w3wp_active_threads(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_wescv_w3wp_active_threads =
-                rrddim_add(p->st_wescv_w3wp_active_threads, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_wescv_w3wp_active_threads->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
+            p->rd_w3svc_w3wp_active_threads =
+                rrddim_add(p->st_w3svc_w3wp_active_threads, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrdlabels_add(p->st_w3svc_w3wp_active_threads->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
-            p->st_wescv_w3wp_active_threads,
-            p->rd_wescv_w3wp_active_threads,
-            (collected_number)p->WESCVW3WPActiveThreads.current.Data);
+            p->st_w3svc_w3wp_active_threads,
+            p->rd_w3svc_w3wp_active_threads,
+            (collected_number)p->W3SVCW3WPActiveThreads.current.Data);
 
-        rrdset_done(p->st_wescv_w3wp_active_threads);
+        rrdset_done(p->st_w3svc_w3wp_active_threads);
     }
 }
 
@@ -1426,12 +1426,12 @@ static inline void w3svc_w3wp_requests_total(
     int update_every,
     char *app_name)
 {
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPRequestTotal)) {
-        if (!p->st_wescv_w3wp_requests_total) {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->W3SVCW3WPRequestTotal)) {
+        if (!p->st_w3svc_w3wp_requests_total) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_requests_total", app_name);
             netdata_fix_chart_name(id);
-            p->st_wescv_w3wp_requests_total = rrdset_create_localhost(
+            p->st_w3svc_w3wp_requests_total = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
@@ -1445,17 +1445,17 @@ static inline void w3svc_w3wp_requests_total(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_wescv_w3wp_requests_total =
-                rrddim_add(p->st_wescv_w3wp_requests_total, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_wescv_w3wp_requests_total->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
+            p->rd_w3svc_w3wp_requests_total =
+                rrddim_add(p->st_w3svc_w3wp_requests_total, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(p->st_w3svc_w3wp_requests_total->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
-            p->st_wescv_w3wp_requests_total,
-            p->rd_wescv_w3wp_requests_total,
-            (collected_number)p->WESCVW3WPRequestTotal.current.Data);
+            p->st_w3svc_w3wp_requests_total,
+            p->rd_w3svc_w3wp_requests_total,
+            (collected_number)p->W3SVCW3WPRequestTotal.current.Data);
 
-        rrdset_done(p->st_wescv_w3wp_requests_total);
+        rrdset_done(p->st_w3svc_w3wp_requests_total);
     }
 }
 
@@ -1467,12 +1467,12 @@ static inline void w3svc_w3wp_requests_active(
     int update_every,
     char *app_name)
 {
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPRequestActive)) {
-        if (!p->st_wescv_w3wp_requests_active) {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->W3SVCW3WPRequestActive)) {
+        if (!p->st_w3svc_w3wp_requests_active) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_requests_active", app_name);
             netdata_fix_chart_name(id);
-            p->st_wescv_w3wp_requests_active = rrdset_create_localhost(
+            p->st_w3svc_w3wp_requests_active = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
@@ -1486,17 +1486,17 @@ static inline void w3svc_w3wp_requests_active(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_wescv_w3wp_requests_active =
-                rrddim_add(p->st_wescv_w3wp_requests_active, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_wescv_w3wp_requests_active->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
+            p->rd_w3svc_w3wp_requests_active =
+                rrddim_add(p->st_w3svc_w3wp_requests_active, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrdlabels_add(p->st_w3svc_w3wp_requests_active->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
-            p->st_wescv_w3wp_requests_active,
-            p->rd_wescv_w3wp_requests_active,
-            (collected_number)p->WESCVW3WPRequestActive.current.Data);
+            p->st_w3svc_w3wp_requests_active,
+            p->rd_w3svc_w3wp_requests_active,
+            (collected_number)p->W3SVCW3WPRequestActive.current.Data);
 
-        rrdset_done(p->st_wescv_w3wp_requests_active);
+        rrdset_done(p->st_w3svc_w3wp_requests_active);
     }
 }
 
@@ -1508,12 +1508,12 @@ static inline void w3svc_w3wp_file_cache_mem_usage(
     int update_every,
     char *app_name)
 {
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPFileCacheMemUsage)) {
-        if (!p->st_wescv_w3wp_file_cache_mem_usage) {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->W3SVCW3WPFileCacheMemUsage)) {
+        if (!p->st_w3svc_w3wp_file_cache_mem_usage) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_file_cache_mem_usage", app_name);
             netdata_fix_chart_name(id);
-            p->st_wescv_w3wp_file_cache_mem_usage = rrdset_create_localhost(
+            p->st_w3svc_w3wp_file_cache_mem_usage = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
@@ -1527,17 +1527,17 @@ static inline void w3svc_w3wp_file_cache_mem_usage(
                 update_every,
                 RRDSET_TYPE_AREA);
 
-            p->rd_wescv_w3wp_file_cache_mem_usage =
-                rrddim_add(p->st_wescv_w3wp_file_cache_mem_usage, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_wescv_w3wp_file_cache_mem_usage->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
+            p->rd_w3svc_w3wp_file_cache_mem_usage =
+                rrddim_add(p->st_w3svc_w3wp_file_cache_mem_usage, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrdlabels_add(p->st_w3svc_w3wp_file_cache_mem_usage->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
-            p->st_wescv_w3wp_file_cache_mem_usage,
-            p->rd_wescv_w3wp_file_cache_mem_usage,
-            (collected_number)p->WESCVW3WPFileCacheMemUsage.current.Data);
+            p->st_w3svc_w3wp_file_cache_mem_usage,
+            p->rd_w3svc_w3wp_file_cache_mem_usage,
+            (collected_number)p->W3SVCW3WPFileCacheMemUsage.current.Data);
 
-        rrdset_done(p->st_wescv_w3wp_file_cache_mem_usage);
+        rrdset_done(p->st_w3svc_w3wp_file_cache_mem_usage);
     }
 }
 
@@ -1549,12 +1549,12 @@ static inline void w3svc_w3wp_files_cached_total(
     int update_every,
     char *app_name)
 {
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPFilesCachedTotal)) {
-        if (!p->st_wescv_w3wp_files_cache_total) {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->W3SVCW3WPFilesCachedTotal)) {
+        if (!p->st_w3svc_w3wp_files_cache_total) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_files_cache_total", app_name);
             netdata_fix_chart_name(id);
-            p->st_wescv_w3wp_files_cache_total = rrdset_create_localhost(
+            p->st_w3svc_w3wp_files_cache_total = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
@@ -1568,17 +1568,17 @@ static inline void w3svc_w3wp_files_cached_total(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_wescv_w3wp_files_cache_total =
-                rrddim_add(p->st_wescv_w3wp_files_cache_total, "cached_files", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_wescv_w3wp_files_cache_total->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
+            p->rd_w3svc_w3wp_files_cache_total =
+                rrddim_add(p->st_w3svc_w3wp_files_cache_total, "cached_files", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(p->st_w3svc_w3wp_files_cache_total->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
-            p->st_wescv_w3wp_files_cache_total,
-            p->rd_wescv_w3wp_files_cache_total,
-            (collected_number)p->WESCVW3WPFilesCachedTotal.current.Data);
+            p->st_w3svc_w3wp_files_cache_total,
+            p->rd_w3svc_w3wp_files_cache_total,
+            (collected_number)p->W3SVCW3WPFilesCachedTotal.current.Data);
 
-        rrdset_done(p->st_wescv_w3wp_files_cache_total);
+        rrdset_done(p->st_w3svc_w3wp_files_cache_total);
     }
 }
 
@@ -1590,12 +1590,12 @@ static inline void w3svc_w3wp_files_flushed_total(
     int update_every,
     char *app_name)
 {
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPFilesFlushedTotal)) {
-        if (!p->st_wescv_w3wp_files_flushed_total) {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->W3SVCW3WPFilesFlushedTotal)) {
+        if (!p->st_w3svc_w3wp_files_flushed_total) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_files_flushed_total", app_name);
             netdata_fix_chart_name(id);
-            p->st_wescv_w3wp_files_flushed_total = rrdset_create_localhost(
+            p->st_w3svc_w3wp_files_flushed_total = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
@@ -1609,17 +1609,17 @@ static inline void w3svc_w3wp_files_flushed_total(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_wescv_w3wp_files_flushed_total =
-                rrddim_add(p->st_wescv_w3wp_files_flushed_total, "file_handles", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_wescv_w3wp_files_flushed_total->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
+            p->rd_w3svc_w3wp_files_flushed_total =
+                rrddim_add(p->st_w3svc_w3wp_files_flushed_total, "file_handles", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(p->st_w3svc_w3wp_files_flushed_total->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
-            p->st_wescv_w3wp_files_flushed_total,
-            p->rd_wescv_w3wp_files_flushed_total,
-            (collected_number)p->WESCVW3WPFilesFlushedTotal.current.Data);
+            p->st_w3svc_w3wp_files_flushed_total,
+            p->rd_w3svc_w3wp_files_flushed_total,
+            (collected_number)p->W3SVCW3WPFilesFlushedTotal.current.Data);
 
-        rrdset_done(p->st_wescv_w3wp_files_flushed_total);
+        rrdset_done(p->st_w3svc_w3wp_files_flushed_total);
     }
 }
 
@@ -1631,12 +1631,12 @@ static inline void w3svc_w3wp_uri_cached_flushed(
     int update_every,
     char *app_name)
 {
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPURICachedFlushed)) {
-        if (!p->st_wescv_w3wp_uri_cache_flushed) {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->W3SVCW3WPURICachedFlushed)) {
+        if (!p->st_w3svc_w3wp_uri_cache_flushed) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_uri_cache_flushed", app_name);
             netdata_fix_chart_name(id);
-            p->st_wescv_w3wp_uri_cache_flushed = rrdset_create_localhost(
+            p->st_w3svc_w3wp_uri_cache_flushed = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
@@ -1650,17 +1650,17 @@ static inline void w3svc_w3wp_uri_cached_flushed(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_wescv_w3wp_uri_cache_flushed =
-                rrddim_add(p->st_wescv_w3wp_uri_cache_flushed, "cached_uris", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_wescv_w3wp_uri_cache_flushed->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
+            p->rd_w3svc_w3wp_uri_cache_flushed =
+                rrddim_add(p->st_w3svc_w3wp_uri_cache_flushed, "cached_uris", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(p->st_w3svc_w3wp_uri_cache_flushed->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
-            p->st_wescv_w3wp_uri_cache_flushed,
-            p->rd_wescv_w3wp_uri_cache_flushed,
-            (collected_number)p->WESCVW3WPURICachedFlushed.current.Data);
+            p->st_w3svc_w3wp_uri_cache_flushed,
+            p->rd_w3svc_w3wp_uri_cache_flushed,
+            (collected_number)p->W3SVCW3WPURICachedFlushed.current.Data);
 
-        rrdset_done(p->st_wescv_w3wp_uri_cache_flushed);
+        rrdset_done(p->st_w3svc_w3wp_uri_cache_flushed);
     }
 }
 
@@ -1672,12 +1672,12 @@ static inline void w3svc_w3wp_total_uri_cached(
     int update_every,
     char *app_name)
 {
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPTotalURICached)) {
-        if (!p->st_wescv_w3wp_total_uri_cached) {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->W3SVCW3WPTotalURICached)) {
+        if (!p->st_w3svc_w3wp_total_uri_cached) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_total_uri_cached", app_name);
             netdata_fix_chart_name(id);
-            p->st_wescv_w3wp_total_uri_cached = rrdset_create_localhost(
+            p->st_w3svc_w3wp_total_uri_cached = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
@@ -1691,17 +1691,17 @@ static inline void w3svc_w3wp_total_uri_cached(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_wescv_w3wp_total_uri_cached =
-                rrddim_add(p->st_wescv_w3wp_total_uri_cached, "uri_cache_blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_wescv_w3wp_total_uri_cached->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
+            p->rd_w3svc_w3wp_total_uri_cached =
+                rrddim_add(p->st_w3svc_w3wp_total_uri_cached, "uri_cache_blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(p->st_w3svc_w3wp_total_uri_cached->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
-            p->st_wescv_w3wp_total_uri_cached,
-            p->rd_wescv_w3wp_total_uri_cached,
-            (collected_number)p->WESCVW3WPTotalURICached.current.Data);
+            p->st_w3svc_w3wp_total_uri_cached,
+            p->rd_w3svc_w3wp_total_uri_cached,
+            (collected_number)p->W3SVCW3WPTotalURICached.current.Data);
 
-        rrdset_done(p->st_wescv_w3wp_total_uri_cached);
+        rrdset_done(p->st_w3svc_w3wp_total_uri_cached);
     }
 }
 
@@ -1713,12 +1713,12 @@ static inline void w3svc_w3wp_total_metadata_cached(
     int update_every,
     char *app_name)
 {
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPTotalMetadataCached)) {
-        if (!p->st_wescv_w3wp_total_metadata_cache) {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->W3SVCW3WPTotalMetadataCached)) {
+        if (!p->st_w3svc_w3wp_total_metadata_cache) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_total_metadata_cache", app_name);
             netdata_fix_chart_name(id);
-            p->st_wescv_w3wp_total_metadata_cache = rrdset_create_localhost(
+            p->st_w3svc_w3wp_total_metadata_cache = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
@@ -1732,17 +1732,17 @@ static inline void w3svc_w3wp_total_metadata_cached(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_wescv_w3wp_total_metadata_cache =
-                rrddim_add(p->st_wescv_w3wp_total_metadata_cache, "metadata_blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_wescv_w3wp_total_metadata_cache->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
+            p->rd_w3svc_w3wp_total_metadata_cache =
+                rrddim_add(p->st_w3svc_w3wp_total_metadata_cache, "metadata_blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(p->st_w3svc_w3wp_total_metadata_cache->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
-            p->st_wescv_w3wp_total_metadata_cache,
-            p->rd_wescv_w3wp_total_metadata_cache,
-            (collected_number)p->WESCVW3WPTotalMetadataCached.current.Data);
+            p->st_w3svc_w3wp_total_metadata_cache,
+            p->rd_w3svc_w3wp_total_metadata_cache,
+            (collected_number)p->W3SVCW3WPTotalMetadataCached.current.Data);
 
-        rrdset_done(p->st_wescv_w3wp_total_metadata_cache);
+        rrdset_done(p->st_w3svc_w3wp_total_metadata_cache);
     }
 }
 
@@ -1754,12 +1754,12 @@ static inline void w3svc_w3wp_total_metadata_flushed(
     int update_every,
     char *app_name)
 {
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPTotalMetadataFlushed)) {
-        if (!p->st_wescv_w3wp_total_metadata_flushed) {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->W3SVCW3WPTotalMetadataFlushed)) {
+        if (!p->st_w3svc_w3wp_total_metadata_flushed) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_total_metadata_flushed", app_name);
             netdata_fix_chart_name(id);
-            p->st_wescv_w3wp_total_metadata_flushed = rrdset_create_localhost(
+            p->st_w3svc_w3wp_total_metadata_flushed = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
@@ -1773,17 +1773,17 @@ static inline void w3svc_w3wp_total_metadata_flushed(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_wescv_w3wp_total_metadata_flushed =
-                rrddim_add(p->st_wescv_w3wp_total_metadata_flushed, "metadata_blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_wescv_w3wp_total_metadata_flushed->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
+            p->rd_w3svc_w3wp_total_metadata_flushed =
+                rrddim_add(p->st_w3svc_w3wp_total_metadata_flushed, "metadata_blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(p->st_w3svc_w3wp_total_metadata_flushed->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
-            p->st_wescv_w3wp_total_metadata_flushed,
-            p->rd_wescv_w3wp_total_metadata_flushed,
-            (collected_number)p->WESCVW3WPTotalMetadataFlushed.current.Data);
+            p->st_w3svc_w3wp_total_metadata_flushed,
+            p->rd_w3svc_w3wp_total_metadata_flushed,
+            (collected_number)p->W3SVCW3WPTotalMetadataFlushed.current.Data);
 
-        rrdset_done(p->st_wescv_w3wp_total_metadata_flushed);
+        rrdset_done(p->st_w3svc_w3wp_total_metadata_flushed);
     }
 }
 
@@ -1795,12 +1795,12 @@ static inline void w3svc_w3wp_output_cache_active_flushed_items(
     int update_every,
     char *app_name)
 {
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPOutputCacheActiveFlushedItens)) {
-        if (!p->st_wescv_w3wp_output_cache_active_flushed_items) {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->W3SVCW3WPOutputCacheActiveFlushedItems)) {
+        if (!p->st_w3svc_w3wp_output_cache_active_flushed_items) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_output_cache_active_flushed_items", app_name);
             netdata_fix_chart_name(id);
-            p->st_wescv_w3wp_output_cache_active_flushed_items = rrdset_create_localhost(
+            p->st_w3svc_w3wp_output_cache_active_flushed_items = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
@@ -1814,18 +1814,18 @@ static inline void w3svc_w3wp_output_cache_active_flushed_items(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_wescv_w3wp_output_cache_active_flushed_items = rrddim_add(
-                p->st_wescv_w3wp_output_cache_active_flushed_items, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            p->rd_w3svc_w3wp_output_cache_active_flushed_items = rrddim_add(
+                p->st_w3svc_w3wp_output_cache_active_flushed_items, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrdlabels_add(
-                p->st_wescv_w3wp_output_cache_active_flushed_items->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
+                p->st_w3svc_w3wp_output_cache_active_flushed_items->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
-            p->st_wescv_w3wp_output_cache_active_flushed_items,
-            p->rd_wescv_w3wp_output_cache_active_flushed_items,
-            (collected_number)p->WESCVW3WPOutputCacheActiveFlushedItens.current.Data);
+            p->st_w3svc_w3wp_output_cache_active_flushed_items,
+            p->rd_w3svc_w3wp_output_cache_active_flushed_items,
+            (collected_number)p->W3SVCW3WPOutputCacheActiveFlushedItems.current.Data);
 
-        rrdset_done(p->st_wescv_w3wp_output_cache_active_flushed_items);
+        rrdset_done(p->st_w3svc_w3wp_output_cache_active_flushed_items);
     }
 }
 
@@ -1837,12 +1837,12 @@ static inline void w3svc_w3wp_output_cache_memory_usage(
     int update_every,
     char *app_name)
 {
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPOutputCacheMemoryUsage)) {
-        if (!p->st_wescv_w3wp_output_cache_memory_usage) {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->W3SVCW3WPOutputCacheMemoryUsage)) {
+        if (!p->st_w3svc_w3wp_output_cache_memory_usage) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_output_cache_memory_usage", app_name);
             netdata_fix_chart_name(id);
-            p->st_wescv_w3wp_output_cache_memory_usage = rrdset_create_localhost(
+            p->st_w3svc_w3wp_output_cache_memory_usage = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
@@ -1856,17 +1856,17 @@ static inline void w3svc_w3wp_output_cache_memory_usage(
                 update_every,
                 RRDSET_TYPE_AREA);
 
-            p->rd_wescv_w3wp_output_cache_memory_usage =
-                rrddim_add(p->st_wescv_w3wp_output_cache_memory_usage, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_wescv_w3wp_output_cache_memory_usage->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
+            p->rd_w3svc_w3wp_output_cache_memory_usage =
+                rrddim_add(p->st_w3svc_w3wp_output_cache_memory_usage, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrdlabels_add(p->st_w3svc_w3wp_output_cache_memory_usage->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
-            p->st_wescv_w3wp_output_cache_memory_usage,
-            p->rd_wescv_w3wp_output_cache_memory_usage,
-            (collected_number)p->WESCVW3WPOutputCacheMemoryUsage.current.Data);
+            p->st_w3svc_w3wp_output_cache_memory_usage,
+            p->rd_w3svc_w3wp_output_cache_memory_usage,
+            (collected_number)p->W3SVCW3WPOutputCacheMemoryUsage.current.Data);
 
-        rrdset_done(p->st_wescv_w3wp_output_cache_memory_usage);
+        rrdset_done(p->st_w3svc_w3wp_output_cache_memory_usage);
     }
 }
 
@@ -1878,12 +1878,12 @@ static inline void w3svc_w3wp_output_cache_flushed_total(
     int update_every,
     char *app_name)
 {
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPOutputCacheFlushesTotal)) {
-        if (!p->st_wescv_w3wp_output_cache_flushed_total) {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->W3SVCW3WPOutputCacheFlushesTotal)) {
+        if (!p->st_w3svc_w3wp_output_cache_flushed_total) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_output_cache_flushed_total", app_name);
             netdata_fix_chart_name(id);
-            p->st_wescv_w3wp_output_cache_flushed_total = rrdset_create_localhost(
+            p->st_w3svc_w3wp_output_cache_flushed_total = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
@@ -1897,17 +1897,17 @@ static inline void w3svc_w3wp_output_cache_flushed_total(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_wescv_w3wp_output_cache_flushed_total = rrddim_add(
-                p->st_wescv_w3wp_output_cache_flushed_total, "output_cache_entries", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_wescv_w3wp_output_cache_flushed_total->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
+            p->rd_w3svc_w3wp_output_cache_flushed_total = rrddim_add(
+                p->st_w3svc_w3wp_output_cache_flushed_total, "output_cache_entries", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(p->st_w3svc_w3wp_output_cache_flushed_total->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
-            p->st_wescv_w3wp_output_cache_flushed_total,
-            p->rd_wescv_w3wp_output_cache_flushed_total,
-            (collected_number)p->WESCVW3WPOutputCacheFlushesTotal.current.Data);
+            p->st_w3svc_w3wp_output_cache_flushed_total,
+            p->rd_w3svc_w3wp_output_cache_flushed_total,
+            (collected_number)p->W3SVCW3WPOutputCacheFlushesTotal.current.Data);
 
-        rrdset_done(p->st_wescv_w3wp_output_cache_flushed_total);
+        rrdset_done(p->st_w3svc_w3wp_output_cache_flushed_total);
     }
 }
 

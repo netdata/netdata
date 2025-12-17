@@ -267,11 +267,6 @@ struct adfs_certificate {
     .ADFSWSFedTokenRequestsSuccess.key = "WS-Fed Token Requests",
 };
 
-static void initialize(void)
-{
-    ;
-}
-
 void netdata_adfs_login_connection_failures(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSLoginConnectionFailure)) {
@@ -382,18 +377,18 @@ void netdata_adfs_db_artifacts_query_time_seconds(
 
     if (!adfs.st_adfs_db_artifact_query_time_seconds_total) {
         adfs.st_adfs_db_artifact_query_time_seconds_total = rrdset_create_localhost(
-            "adfs",
-            "db_artifact_query_time_seconds",
-            NULL,
-            "db artifact",
-            "adfs.db_artifact_query_time_seconds",
-            "Time taken for an artifact database query",
-            "seconds/s",
-            PLUGIN_WINDOWS_NAME,
-            "PerflibADFS",
-            PRIO_ADFS_DB_ARTIFACT_QUERY_TYME_SECONDS_TOTAL,
-            update_every,
-            RRDSET_TYPE_LINE);
+                "adfs",
+                "db_artifact_query_time_seconds",
+                NULL,
+                "db artifact",
+                "adfs.db_artifact_query_time_seconds",
+                "Time taken for an artifact database query",
+                "seconds/s",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibADFS",
+                PRIO_ADFS_DB_ARTIFACT_QUERY_TIME_SECONDS_TOTAL,
+                update_every,
+                RRDSET_TYPE_LINE);
 
         adfs.rd_adfs_db_artifact_query_time_seconds_total = rrddim_add(
             adfs.st_adfs_db_artifact_query_time_seconds_total, "query_time", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
@@ -943,7 +938,7 @@ void netdata_adfs_oauth_logon_certificate_request(
             "requests/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibADFS",
-            PRIO_ADFS_OAUTH_LOGON_CERTIFICATE_REQUESTS,
+            PRIO_ADFS_OAUTH_CLIENT_LOGON_CERTIFICATE_REQUEST,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -988,7 +983,7 @@ void netdata_adfs_oauth_password_grant_requests(
                 "authentications/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibADFS",
-                PRIO_ADFS_OAUTH_PASSWORD_GRANT_REQUESTS,
+                PRIO_ADFS_OAUTH_TOKEN_REQUESTS_SUCCESS,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1209,7 +1204,7 @@ void netdata_adfs_wstrust_token_requests(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
             "requests/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibADFS",
-            PRIO_ADFS_TRUST_TOKEN_SUCCESS,
+            PRIO_ADFS_WSTRUST_TOKEN_SUCCESS,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -1284,7 +1279,7 @@ void netdata_adfs_token_request(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *p
             "requests/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibADFS",
-            PRIO_ADFS_TRUST_TOKEN_SUCCESS,
+            PRIO_ADFS_TOKEN_REQUEST,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -1475,13 +1470,6 @@ static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
 int do_PerflibADFS(int update_every, usec_t dt __maybe_unused)
 {
-    static bool initialized = false;
-
-    if (unlikely(!initialized)) {
-        initialize();
-        initialized = true;
-    }
-
     DWORD id = RegistryFindIDByName("AD FS");
     if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
         return -1;
@@ -1490,7 +1478,8 @@ int do_PerflibADFS(int update_every, usec_t dt __maybe_unused)
     if (!pDataBlock)
         return -1;
 
-    do_ADFS(pDataBlock, update_every);
+    if (!do_ADFS(pDataBlock, update_every))
+        return -1;
 
     return 0;
 }

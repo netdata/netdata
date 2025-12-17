@@ -693,18 +693,18 @@ static void netdata_exchange_proxy_mailbox_server_locator(struct exchange_proxy 
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_proxy_%s_mailbox_server_locator_avg_latency_sec", proxy);
 
         ep->st_exchange_http_proxy_server_location_avg_latency = rrdset_create_localhost(
-            "exchange",
-            id,
-            NULL,
-            "proxy",
-            "exchange.http_proxy_mailbox_server_locator_avg_latency_sec",
-            "Average latency of MailboxServerLocator web service calls.",
-            "seconds",
-            PLUGIN_WINDOWS_NAME,
-            "PerflibExchange",
-            PRIO_EXCHANGE_PROXY_SERVER_LOCATIOR_AVG_LATENCY,
-            update_every,
-            RRDSET_TYPE_LINE);
+                "exchange",
+                id,
+                NULL,
+                "proxy",
+                "exchange.http_proxy_mailbox_server_locator_avg_latency_sec",
+                "Average latency of MailboxServerLocator web service calls.",
+                "seconds",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibExchange",
+                PRIO_EXCHANGE_PROXY_SERVER_LOCATOR_AVG_LATENCY,
+                update_every,
+                RRDSET_TYPE_LINE);
 
         ep->rd_exchange_http_proxy_server_location_avg_latency = rrddim_add(
             ep->st_exchange_http_proxy_server_location_avg_latency, "latency", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
@@ -761,18 +761,18 @@ static void netdata_exchange_proxy_request_total(struct exchange_proxy *ep, char
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_proxy_%s_requests_total", proxy);
 
         ep->st_exchange_http_proxy_requests_total = rrdset_create_localhost(
-            "exchange",
-            id,
-            NULL,
-            "proxy",
-            "exchange.http_proxy_requests",
-            "Number of proxy requests processed each second.",
-            "requests",
-            PLUGIN_WINDOWS_NAME,
-            "PerflibExchange",
-            PRIO_EXCHANGE_PROXY_PROXY_REQUESTS_TOTAL,
-            update_every,
-            RRDSET_TYPE_LINE);
+                "exchange",
+                id,
+                NULL,
+                "proxy",
+                "exchange.http_proxy_requests",
+                "Number of proxy requests processed each second.",
+                "requests",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibExchange",
+                PRIO_EXCHANGE_PROXY_REQUESTS_TOTAL,
+                update_every,
+                RRDSET_TYPE_LINE);
 
         ep->rd_exchange_http_proxy_requests_total =
             rrddim_add(ep->st_exchange_http_proxy_requests_total, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -881,7 +881,7 @@ static void netdata_exchange_workload_completed_tasks(struct exchange_workload *
         ew->rd_exchange_workload_complete_tasks =
             rrddim_add(ew->st_exchange_workload_complete_tasks, "completed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-        rrdlabels_add(ew->st_exchange_workload_complete_tasks->rrdlabels, "completed", workload, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(ew->st_exchange_workload_complete_tasks->rrdlabels, "workload", workload, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
@@ -991,7 +991,6 @@ static void netdata_exchange_workload_activity_status(struct exchange_workload *
         ew->st_exchange_workload_activity_status,
         ew->rd_exchange_workload_activity_active_status,
         (collected_number)value);
-    rrdset_done(ew->st_exchange_workload_activity_status);
 
     value = !value;
     rrddim_set_by_pointer(

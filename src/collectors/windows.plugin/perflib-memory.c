@@ -143,7 +143,7 @@ static void do_memory_system_pool(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE 
             RRDSET_TYPE_STACKED);
 
         localPool.rd_paged = rrddim_add(localPool.pool, "paged", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        localPool.rd_nonpaged = rrddim_add(localPool.pool, "pool-paged", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        localPool.rd_nonpaged = rrddim_add(localPool.pool, "non-paged", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(localPool.pool, localPool.rd_paged, (collected_number)localPool.pagedData.current.Data);
