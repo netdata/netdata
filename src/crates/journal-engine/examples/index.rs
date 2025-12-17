@@ -52,6 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         PathBuf::from(arg)
     } else {
         PathBuf::from("/mnt/slow-disk/otel-aws")
+        // PathBuf::from("/home/vk/repos/tmp/otel-aws")
     };
 
     info!("scanning directory: {}", dir.display());
@@ -77,15 +78,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create indexing engine with cache
     let indexing_engine = IndexingEngineBuilder::new()
         .with_cache_path("/mnt/slow-disk/foyer-cache")
-        .with_memory_capacity(128)
-        .with_disk_capacity(16 * 1024 * 1024)
+        // .with_cache_path("/tmp/foyer-cache")
+        .with_memory_capacity(1000)
+        .with_disk_capacity(2048 * 1024 * 1024)
+        .with_block_size(4 * 1024 * 1024)
         .build()
         .await?;
 
     info!("created indexing engine");
 
     // Configure indexing parameters (modify these as needed)
-    let facets = Facets::new(&["PRIORITY".to_string(), "_HOSTNAME".to_string()]);
+    let facets = Facets::new(&["log.severity_number".to_string()]);
 
     let keys: Vec<FileIndexKey> = files
         .iter()

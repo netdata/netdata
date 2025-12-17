@@ -12,7 +12,7 @@ use crate::{
 use journal_index::{FieldName, FileIndex, FileIndexer, Seconds};
 use journal_registry::{File, Registry};
 use std::time::{Duration, Instant};
-use tracing::{debug, warn};
+use tracing::debug;
 
 // ============================================================================
 // Helper Functions
@@ -25,9 +25,15 @@ use tracing::{debug, warn};
 /// is always fresh since they never change.
 fn is_fresh(index: &FileIndex) -> bool {
     if index.online() {
-        // Active file: check if indexed < 1 second ago
+        // let now = Seconds::now();
+        // now.get() - index.indexed_at().get() < 1
         let now = Seconds::now();
-        now.get() - index.indexed_at().get() < 1
+        let age = now.get() - index.indexed_at().get();
+        let fresh = age < 1;
+        if !fresh {
+            debug!("Cache entry stale: age={}s", age);
+        }
+        fresh
     } else {
         // Archived/offline file: always fresh
         true
@@ -202,6 +208,7 @@ impl IndexingEngineBuilder {
         // Build Foyer hybrid cache
         let foyer_cache = HybridCacheBuilder::new()
             .with_name("file-index-cache")
+            .with_policy(foyer::HybridCachePolicy::WriteOnInsertion)
             .memory(memory_capacity)
             .with_shards(4)
             .storage()
@@ -265,10 +272,14 @@ pub async fn batch_compute_file_indexes(
 
     // Phase 1: Batch check cache for all keys upfront
     debug!("phase 1");
-    let cache_futures = keys.iter().map(|key| {
+    let cache_futures = keys.iter().enumerate().map(|(idx, key)| {
         let key_clone = key.clone();
         async move {
             let cached = indexing_engine.get(&key_clone).await.ok().flatten();
+            if idx < 5 {
+                // Log first 5 lookups for debugging
+                debug!("cache lookup {}: {:?}", idx, cached.is_some());
+            }
             (key_clone, cached)
         }
     });
@@ -276,27 +287,51 @@ pub async fn batch_compute_file_indexes(
     let cache_results: Vec<(FileIndexKey, Option<FileIndex>)> =
         futures::future::join_all(cache_futures).await;
 
+    let found_count = cache_results.iter().filter(|(_, cached)| cached.is_some()).count();
+    debug!("phase 1 complete: found {} of {} entries in cache", found_count, keys.len());
+
     // Phase 2: Separate cache hits from misses, check freshness and compatibility
     debug!("phase 2");
     let mut responses = Vec::with_capacity(keys.len());
     let mut keys_to_compute = Vec::new();
+    let mut cache_hits = 0;
+    let mut cache_misses = 0;
+    let mut stale_entries = 0;
+    let mut incompatible_bucket = 0;
 
     for (key, cached_index) in cache_results {
         match cached_index {
-            Some(file_index)
-                if is_fresh(&file_index)
-                    && file_index.bucket_duration() <= bucket_duration
-                    && bucket_duration.is_multiple_of(file_index.bucket_duration()) =>
-            {
-                // Cache hit with fresh data and compatible granularity
-                responses.push(FileIndexResponse::new(key, Ok(file_index)));
+            Some(file_index) => {
+                let fresh = is_fresh(&file_index);
+                let bucket_ok = file_index.bucket_duration() <= bucket_duration
+                    && bucket_duration.is_multiple_of(file_index.bucket_duration());
+
+                if fresh && bucket_ok {
+                    // Cache hit with fresh data and compatible granularity
+                    cache_hits += 1;
+                    responses.push(FileIndexResponse::new(key, Ok(file_index)));
+                } else {
+                    if !fresh {
+                        stale_entries += 1;
+                    }
+                    if !bucket_ok {
+                        incompatible_bucket += 1;
+                    }
+                    keys_to_compute.push(key);
+                }
             }
-            _ => {
-                // Cache miss or stale/incompatible - need to compute
+            None => {
+                // Cache miss - need to compute
+                cache_misses += 1;
                 keys_to_compute.push(key);
             }
         }
     }
+
+    debug!(
+        "phase 2 summary: hits={}, misses={}, stale={}, incompatible_bucket={}",
+        cache_hits, cache_misses, stale_entries, incompatible_bucket
+    );
 
     // Phase 3: Check time budget before spawning compute tasks
     debug!("phase 3");
@@ -312,56 +347,69 @@ pub async fn batch_compute_file_indexes(
         return Ok(responses);
     }
 
-    // Phase 4: Spawn tokio tasks to compute missing indexes in parallel
+    // Phase 4: Spawn single blocking task with rayon for parallel computation
     debug!("phase 4");
-    let compute_tasks = keys_to_compute.into_iter().map(|key| {
-        let registry = registry.clone();
-        let source_timestamp_field = source_timestamp_field.clone();
+    let source_timestamp_field_clone = source_timestamp_field.clone();
+    let time_budget_remaining = time_budget.saturating_sub(start_time.elapsed());
 
-        tokio::task::spawn(async move {
-            // Check time budget before computing
-            if start_time.elapsed() >= time_budget {
-                return FileIndexResponse::new(key, Err(EngineError::TimeBudgetExceeded));
-            }
+    let compute_task = tokio::task::spawn_blocking(move || {
+        use rayon::prelude::*;
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, Ordering};
 
-            // Compute index
-            let result = compute_file_index(
-                &key.file,
-                key.facets.as_slice(),
-                &source_timestamp_field,
-                bucket_duration,
-            );
+        let deadline = std::time::Instant::now() + time_budget_remaining;
+        let timed_out = Arc::new(AtomicBool::new(false));
 
-            // Update registry on success
-            if let Ok(ref index) = result {
-                let time_range = index.time_range();
-                let _ = registry.update_time_range(&key.file, time_range);
-            }
+        keys_to_compute
+            .into_par_iter()
+            .map(|key| {
+                // Check time budget before processing
+                if std::time::Instant::now() >= deadline || timed_out.load(Ordering::Relaxed) {
+                    timed_out.store(true, Ordering::Relaxed);
+                    return FileIndexResponse::new(key, Err(EngineError::TimeBudgetExceeded));
+                }
 
-            FileIndexResponse::new(key, result)
-        })
+                // Compute index
+                let result = compute_file_index(
+                    &key.file,
+                    key.facets.as_slice(),
+                    &source_timestamp_field_clone,
+                    bucket_duration,
+                );
+
+                FileIndexResponse::new(key, result)
+            })
+            .collect::<Vec<FileIndexResponse>>()
     });
 
-    // Phase 5: Wait for all compute tasks to complete
+    // Phase 5: Wait for blocking task to complete (with timeout)
     debug!("phase 5");
-    let computed_results = futures::future::join_all(compute_tasks).await;
-
-    // Phase 6: Insert successful results into cache and collect responses
-    debug!("phase 6");
-    for task_result in computed_results {
-        match task_result {
-            Ok(response) => {
-                if let Ok(ref index) = response.result {
-                    indexing_engine.insert(response.key.clone(), index.clone());
-                }
-                responses.push(response);
-            }
-            Err(join_error) => {
-                warn!("Task join error during indexing: {}", join_error);
-                // Task panicked or was cancelled - we can't recover the key
-                // This shouldn't happen in normal operation
-            }
+    let computed_results = match tokio::time::timeout(time_budget_remaining, compute_task).await {
+        Ok(Ok(results)) => results,
+        Ok(Err(e)) => {
+            return Err(EngineError::Io(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Blocking task panicked: {}", e),
+            )));
         }
+        Err(_timeout) => {
+            // Timeout exceeded - the blocking task continues running in background,
+            // but we return early with whatever we've computed so far (cache hits only)
+            debug!("phase 5 timeout - returning cache hits only");
+            return Ok(responses);
+        }
+    };
+
+    // Phase 6: Update registry and cache, then collect responses
+    debug!("phase 6");
+    for response in computed_results {
+        // Update registry and cache on success
+        if let Ok(ref index) = response.result {
+            let time_range = index.time_range();
+            let _ = registry.update_time_range(&response.key.file, time_range);
+            indexing_engine.insert(response.key.clone(), index.clone());
+        }
+        responses.push(response);
     }
 
     Ok(responses)

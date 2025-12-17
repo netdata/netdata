@@ -1559,6 +1559,7 @@ dependencies = [
  "journal-index",
  "journal-registry",
  "parking_lot",
+ "rayon",
  "serde",
  "serde_json",
  "static_assertions",

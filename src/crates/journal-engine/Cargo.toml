@@ -23,6 +23,7 @@ tracing = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 foyer = { workspace = true }
 parking_lot = { workspace = true, features = ["send_guard"] }
+rayon = { workspace = true }
 
 journal-core = { workspace = true }
 journal-index = { workspace = true }
