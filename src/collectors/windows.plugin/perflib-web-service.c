@@ -149,7 +149,7 @@ struct ws3svc_w3wp_data {
     COUNTER_DATA W3SVCW3WPTotalMetadataCached;
     COUNTER_DATA W3SVCW3WPTotalMetadataFlushed;
 
-    COUNTER_DATA W3SVCW3WPOutputCacheActiveFlushedItens;
+    COUNTER_DATA W3SVCW3WPOutputCacheActiveFlushedItems;
     COUNTER_DATA W3SVCW3WPOutputCacheMemoryUsage;
     COUNTER_DATA W3SVCW3WPOutputCacheFlushesTotal;
 };
@@ -287,7 +287,7 @@ static inline void initialize_w3svc_w3wp_keys(struct ws3svc_w3wp_data *p)
     p->W3SVCW3WPTotalMetadataCached.key = "Total Metadata Cached";
     p->W3SVCW3WPTotalMetadataFlushed.key = "Total Flushed Metadata";
 
-    p->W3SVCW3WPOutputCacheActiveFlushedItens.key = "Output Cache Current Flushed Items";
+    p->W3SVCW3WPOutputCacheActiveFlushedItems.key = "Output Cache Current Flushed Items";
     p->W3SVCW3WPOutputCacheMemoryUsage.key = "Output Cache Current Memory Usage";
     p->W3SVCW3WPOutputCacheFlushesTotal.key = "Output Cache Total Flushes";
 }
@@ -424,7 +424,7 @@ static inline void netdata_webservice_active_connection(
                 "Website active connections",
                 "connections",
                 PLUGIN_WINDOWS_NAME,
-                "PerflibWebService1",
+                "PerflibWebService",
                 PRIO_WEBSITE_IIS_ACTIVE_CONNECTIONS_COUNT,
                 update_every,
                 RRDSET_TYPE_LINE);
@@ -1795,7 +1795,7 @@ static inline void w3svc_w3wp_output_cache_active_flushed_items(
     int update_every,
     char *app_name)
 {
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->W3SVCW3WPOutputCacheActiveFlushedItens)) {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->W3SVCW3WPOutputCacheActiveFlushedItems)) {
         if (!p->st_w3svc_w3wp_output_cache_active_flushed_items) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_output_cache_active_flushed_items", app_name);
@@ -1823,7 +1823,7 @@ static inline void w3svc_w3wp_output_cache_active_flushed_items(
         rrddim_set_by_pointer(
             p->st_w3svc_w3wp_output_cache_active_flushed_items,
             p->rd_w3svc_w3wp_output_cache_active_flushed_items,
-            (collected_number)p->W3SVCW3WPOutputCacheActiveFlushedItens.current.Data);
+            (collected_number)p->W3SVCW3WPOutputCacheActiveFlushedItems.current.Data);
 
         rrdset_done(p->st_w3svc_w3wp_output_cache_active_flushed_items);
     }
