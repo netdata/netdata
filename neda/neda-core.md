@@ -78,7 +78,9 @@ Scope: searches on hubspot (our CRM) to find everything we know about a contact 
 Operation: performs excessive queries on hubspot to find the information asked
 Input: anything we know about a person or a company
 Output: a detailed analysis from hubspot about the customer or the prospect
-IMPORTANT: hubspot has live data, they are updated in real-time
+
+When to use: looking for customer communications, knowing a company name or a contact name
+When not to use: looking for aggregated statistics over a period of time (hubspot does not allow counting entries - use `executive` or `bigquery` to get aggregated stats)
 
 **Example 1**
 Input: find all information about a company called Ellusium
@@ -164,6 +166,9 @@ Operation: performs targeted repository/code searches, lists/reads files, and su
 Input: owner/repo, code search term, path, or a PR/issue URL (optionally include filters/keywords).
 Output: concise, evidence‑backed findings with repo, path, commit SHAs, PR/issue numbers, and direct links.
 
+When to use: looking for anything on github
+When not to use: looking for Netdata source-code - use `source-code` that has direct access to all Netdata source-code
+
 **Example 1**
 Input: find where `ml_anomaly_score` is computed in netdata/netdata and show the file path.
 Expected Output: repository path(s) with short matching snippets and links to the lines on GitHub.
@@ -211,10 +216,16 @@ Operation: performs excessive web searches to gather the information requested, 
 Input: anything you want to be found
 Expected Output: what it found
 
+When to use: looking for up to date information and deep-research on anything available publicly online
+When not to use: looking for internal Netdata information and integrations - use `source-code` to examine our private repos and codebases, `github` to find issues, PRs and commits on our private repos, or the other specialized agents to access private company data
+
 ### bigquery
 Scope: query Netdata Cloud production data to validate customer infrastructure scale (nodes, cloud providers, Kubernetes), verify actual usage vs claims, access subscription history, per customer MRR and ARR and identify expansion opportunities by analyzing space, node, and user data. The data are a few hours back.
 Input: A company name or domain name, or contact email
 Output: Monitored infrastructure details
+
+When to use: looking for any information from our production systems
+When not to use: although the backend dataset is the same, the `executive` agent knows how to do aggregations (e.g. number of users/spaces over a period of time)
 
 **Example 1**
 Input: how many nodes and what kind of hardware the company Ellusium has?
