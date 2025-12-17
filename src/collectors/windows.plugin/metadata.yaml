@@ -4195,7 +4195,7 @@ modules:
               dimensions:
                 - name: not found
             - name: aspnet.requests_not_authorized
-              description: Requests in the application queue.
+              description: Requests that were not authorized.
               unit: requests
               chart_type: line
               dimensions:

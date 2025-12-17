@@ -620,7 +620,7 @@ static void netdata_aspnet_requests_not_authorized(struct aspnet_app *aa, char *
             NULL,
             "aspnet",
             "aspnet.requests_not_authorized",
-            "Requests in the application queue.",
+            "Requests that were not authorized.",
             "requests",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
@@ -969,7 +969,7 @@ static void netdata_aspnet_transactions_per_sec(struct aspnet_app *aa, char *app
                 "transactions",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibASP",
-                PRIO_ASPNET_TRANSACTIONS_COMMITTED,
+                PRIO_ASPNET_TRANSACTIONS_PER_SEC,
                 update_every,
                 RRDSET_TYPE_LINE);
 
