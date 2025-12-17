@@ -1,9 +1,7 @@
 #!/usr/bin/env ai-agent
 ---
-description: |-
-  Elite investigative web researcher that provides comprehensive, well-verified
-  answers through systematic research methodology.
-usage: any query or topic you need thoroughly researched
+description: Deep research any subject using publicly available online resources
+usage: any query or topic to deep research online (do not ask about Netdata's private data - it does not have access to Netdata internals)
 models:
   - anthropic/claude-sonnet-4-5
 #  - anthropic/claude-haiku-4-5

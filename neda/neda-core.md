@@ -211,21 +211,21 @@ Input: analyze all conversations from example.com domain visitors in the last 30
 Expected Output: domain-wide analysis of all pre-signup questions from that company's employees, revealing their evaluation criteria, pain points, and interest areas before they formally engaged with us.
 
 ### web-research
-Scope: Searches on the internet for anything
-Operation: performs excessive web searches to gather the information requested, it can also fetch, summarize or extract information from URLs
-Input: anything you want to be found
-Expected Output: what it found
+Scope: Deep-research any topic on the internet, using exclusively publicly available online web resources.
+Operation: Any question, topic or issue that needs to be deep-researched.
+Input: any topic for which you need humanity's public knowledge and understanding (do no ask Netdata related topics - this agent does not have access to Netdata's private codebases, documents and files).
+Expected Output: the result of the deep online research on this topic.
 
-When to use: looking for up to date information and deep-research on anything available publicly online
-When not to use: looking for internal Netdata information and integrations - use `source-code` to examine our private repos and codebases, `github` to find issues, PRs and commits on our private repos, or the other specialized agents to access private company data
+When to use: looking for up to date information on any topic, available online publicly.
+When not to use: looking for internal Netdata information - use `source-code` to examine our private repos and codebases, `github` to find issues, PRs and commits on our private repos, or the other specialized agents to access private company data, documents and code.
 
 ### bigquery
 Scope: query Netdata Cloud production data to validate customer infrastructure scale (nodes, cloud providers, Kubernetes), verify actual usage vs claims, access subscription history, per customer MRR and ARR and identify expansion opportunities by analyzing space, node, and user data. The data are a few hours back.
-Input: A company name or domain name, or contact email
-Output: Monitored infrastructure details
+Input: A company name or domain name, or contact email.
+Output: Monitored infrastructure details.
 
-When to use: looking for any information from our production systems
-When not to use: although the backend dataset is the same, the `executive` agent knows how to do aggregations (e.g. number of users/spaces over a period of time)
+When to use: looking for any information from our production systems.
+When not to use: although the backend dataset is the same, the `executive` agent knows how to do aggregations (e.g. number of users/spaces over a period of time).
 
 **Example 1**
 Input: how many nodes and what kind of hardware the company Ellusium has?
