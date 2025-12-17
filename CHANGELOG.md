@@ -2,6 +2,13 @@
 
 ### Merged Pull Requests:
 
+- Build(deps): update go toolchain to v1.25.5 ([#21459](https://github.com/netdata/netdata/issues/21459))
+- Chore(go.d): include Go version in build info ([#21473](https://github.com/netdata/netdata/issues/21473))
+
+## [2.8.3] - 2025-12-15
+
+### Merged Pull Requests:
+
 - Update bundled components for static builds. ([#21401](https://github.com/netdata/netdata/issues/21401))
 - Disable MongoDB exporter for Ubuntu 20.04, 22.04, and 24.04 packages. ([#21403](https://github.com/netdata/netdata/issues/21403))
 - Change chart variable (Windows.plugin) ([#21412](https://github.com/netdata/netdata/issues/21412))
