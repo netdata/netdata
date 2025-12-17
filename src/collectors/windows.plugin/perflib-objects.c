@@ -39,7 +39,7 @@ static bool do_objects(PERF_DATA_BLOCK *pDataBlock, int update_every)
                                        "mutexes",
                                        _COMMON_PLUGIN_NAME,
                                        _COMMON_PLUGIN_MODULE_NAME,
-                                       NETDATA_CHART_PRIO_SYSTEM_IPC_OBJECTS,
+                                       NETDATA_CHART_PRIO_SYSTEM_IPC_SEMAPHORES + 1,
                                        update_every,
                                        RRDSET_TYPE_AREA);
             rd = rrddim_add(st, "mutexes", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
