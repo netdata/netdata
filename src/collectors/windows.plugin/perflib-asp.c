@@ -936,7 +936,7 @@ static void netdata_aspnet_transactions_pending(struct aspnet_app *aa, char *app
                 "transactions",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibASP",
-                PRIO_ASPNET_TRANSACTIONS_PER_SEC,
+                PRIO_ASPNET_TRANSACTIONS_PENDING,
                 update_every,
                 RRDSET_TYPE_LINE);
 
