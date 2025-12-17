@@ -1490,7 +1490,8 @@ int do_PerflibADFS(int update_every, usec_t dt __maybe_unused)
     if (!pDataBlock)
         return -1;
 
-    do_ADFS(pDataBlock, update_every);
+    if (!do_ADFS(pDataBlock, update_every))
+        return -1;
 
     return 0;
 }
