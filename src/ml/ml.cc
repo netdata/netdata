@@ -1042,6 +1042,7 @@ void ml_detect_main(void *arg)
 }
 
 static void ml_flush_pending_models(ml_worker_t *worker) {
+    static time_t next_vacuum_run = 0;
     int op_no = 1;
 
     // begin transaction
@@ -1089,7 +1090,7 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
         worker->num_models_to_prune += worker->pending_model_info.size();
     }
 
-    vacuum_database(ml_db, "ML", 0, 0);
+    vacuum_database(ml_db, "ML", 0, 0, &next_vacuum_run);
 
     worker->pending_model_info.clear();
 }
