@@ -511,10 +511,9 @@ int dict_mssql_fill_waits(struct mssql_instance *mi)
             continue;
 
         mdw->MSSQLDatabaseTotalWait.current.Data = (ULONGLONG)total_wait;
-        // Variable mdw->MSSQLDatabaseResourceWaitMSec.current.Data stores a mathematical operation
-        // that can be negative sometimes. This is the reason we have this if
-        if (likely(resource_wait > mdw->MSSQLDatabaseResourceWaitMSec.current.Data))
-            mdw->MSSQLDatabaseResourceWaitMSec.current.Data = (ULONGLONG)resource_wait;
+        if (unlikely(resource_wait < 0))
+            resource_wait = 0;
+        mdw->MSSQLDatabaseResourceWaitMSec.current.Data = (ULONGLONG)resource_wait;
         mdw->MSSQLDatabaseSignalWaitMSec.current.Data = (ULONGLONG)signal_wait;
         mdw->MSSQLDatabaseMaxWaitTimeMSec.current.Data = (ULONGLONG)max_wait;
         mdw->MSSQLDatabaseWaitingTasks.current.Data = (ULONGLONG)waiting_tasks;
@@ -873,7 +872,13 @@ void netdata_mssql_fill_mssql_status(struct mssql_instance *mi)
 
     SQLLEN col_state_len = 0, col_readonly_len = 0;
 
-    ret = SQLBindCol(mi->conn->dbSQLState, 1, SQL_C_TINYINT, &state, sizeof(state), &col_state_len);
+    ret = SQLBindCol(mi->conn->dbSQLState, 1, SQL_C_CHAR, dbname, sizeof(dbname), &col_data_len);
+    if (likely(netdata_mssql_check_result(ret))) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLState, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        goto enddbstate;
+    }
+
+    ret = SQLBindCol(mi->conn->dbSQLState, 2, SQL_C_TINYINT, &state, sizeof(state), &col_state_len);
     if (likely(netdata_mssql_check_result(ret))) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLState, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto enddbstate;
@@ -891,6 +896,8 @@ void netdata_mssql_fill_mssql_status(struct mssql_instance *mi)
             goto enddbstate;
         }
 
+        if (col_data_len == SQL_NULL_DATA)
+            continue;
         if (col_state_len == SQL_NULL_DATA)
             state = 0;
         if (col_readonly_len == SQL_NULL_DATA)
