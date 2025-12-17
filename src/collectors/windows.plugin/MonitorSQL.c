@@ -7,7 +7,7 @@
 
 DICTIONARY *conn_options;
 
-static inline int netdata_mssql_check_result(SQLRETURN ret)
+static inline bool netdata_mssql_check_result(SQLRETURN ret)
 {
     return (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO);
 }
