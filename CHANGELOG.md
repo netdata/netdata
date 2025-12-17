@@ -105,6 +105,11 @@
 - Build(deps): bump actions/upload-artifact from 5.0.0 to 6.0.0 ([#21462](https://github.com/netdata/netdata/issues/21462))
 - Build(deps): update go toolchain to v1.25.5 ([#21459](https://github.com/netdata/netdata/issues/21459))
 - Perflib fixes (Windows.plugin) ([#21458](https://github.com/netdata/netdata/issues/21458))
+- Docs: clarify that netdata/netdata defaults to latest and how to use :stable ([#21467](https://github.com/netdata/netdata/issues/21467))
+- Update metadata.yaml ([#21469](https://github.com/netdata/netdata/issues/21469))
+- Regenerate integrations docs ([#21470](https://github.com/netdata/netdata/issues/21470))
+- Chore(go.d): include Go version in build info ([#21473](https://github.com/netdata/netdata/issues/21473))
+- Update windows.plugin ([#21466](https://github.com/netdata/netdata/issues/21466))
 
 ## [2.8.0] - 2025-11-19
 
