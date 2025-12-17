@@ -1532,6 +1532,34 @@
         "completion": 2.0,
         "cacheRead": 0.025
       },
+      "gpt-5.1-codex-max": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 1.25,
+        "completion": 10.0,
+        "cacheRead": 0.125
+      },
+      "gpt-5.2": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 1.75,
+        "completion": 14.0,
+        "cacheRead": 0.175
+      },
+      "gpt-5.2-chat-latest": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 1.75,
+        "completion": 14.0,
+        "cacheRead": 0.175
+      },
+      "gpt-5.2-pro": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 21.0,
+        "completion": 168.0,
+        "cacheRead": 0.0
+      },
       "gpt-5-pro": {
         "unit": "per_1m",
         "currency": "USD",
