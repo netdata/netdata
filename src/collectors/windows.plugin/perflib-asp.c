@@ -1205,7 +1205,7 @@ static void netdata_aspnet_membership_authentication_failure(struct aspnet_app *
             "auth",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASPNET_FORM_AUTHENTICATION_FAILURE,
+            PRIO_ASPNET_MEMBERSHIP_AUTHENTICATION_FAILURE,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -1271,7 +1271,7 @@ static void netdata_aspnet_form_authentication_failure(struct aspnet_app *aa, ch
             "auth",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASPNET_MEMBERSHIP_AUTHENTICATION_FAILURE,
+            PRIO_ASPNET_FORM_AUTHENTICATION_FAILURE,
             update_every,
             RRDSET_TYPE_LINE);
 
