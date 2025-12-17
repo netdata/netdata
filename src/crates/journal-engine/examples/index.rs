@@ -44,7 +44,7 @@ use tracing::{info, warn};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize tracing
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
+        .with_max_level(tracing::Level::DEBUG)
         .init();
 
     // Get directory from args or use default
@@ -72,7 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if files.is_empty() {
         return Ok(());
     }
-    files.truncate(10);
+    files.truncate(1);
 
     // Create indexing engine with cache
     let indexing_engine = IndexingEngineBuilder::new()

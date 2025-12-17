@@ -264,6 +264,7 @@ pub async fn batch_compute_file_indexes(
     let start_time = Instant::now();
 
     // Phase 1: Batch check cache for all keys upfront
+    debug!("phase 1");
     let cache_futures = keys.iter().map(|key| {
         let key_clone = key.clone();
         async move {
@@ -276,6 +277,7 @@ pub async fn batch_compute_file_indexes(
         futures::future::join_all(cache_futures).await;
 
     // Phase 2: Separate cache hits from misses, check freshness and compatibility
+    debug!("phase 2");
     let mut responses = Vec::with_capacity(keys.len());
     let mut keys_to_compute = Vec::new();
 
@@ -297,6 +299,7 @@ pub async fn batch_compute_file_indexes(
     }
 
     // Phase 3: Check time budget before spawning compute tasks
+    debug!("phase 3");
     if start_time.elapsed() >= time_budget {
         // Time budget already exceeded, fail remaining keys
         for key in keys_to_compute {
@@ -310,6 +313,7 @@ pub async fn batch_compute_file_indexes(
     }
 
     // Phase 4: Spawn tokio tasks to compute missing indexes in parallel
+    debug!("phase 4");
     let compute_tasks = keys_to_compute.into_iter().map(|key| {
         let registry = registry.clone();
         let source_timestamp_field = source_timestamp_field.clone();
@@ -339,9 +343,11 @@ pub async fn batch_compute_file_indexes(
     });
 
     // Phase 5: Wait for all compute tasks to complete
+    debug!("phase 5");
     let computed_results = futures::future::join_all(compute_tasks).await;
 
     // Phase 6: Insert successful results into cache and collect responses
+    debug!("phase 6");
     for task_result in computed_results {
         match task_result {
             Ok(response) => {
