@@ -7,7 +7,7 @@
 ## Implementation Design
 
 **Decision: Rename `agent__progress_report` → `agent__task_status`**
-- Schema: `{status: 'starting'|'in-progress'|'completed', done: string, pending: string, goal: string}`
+- Schema: `{status: 'starting'|'in-progress'|'completed', done: string, pending: string, now: string}`
 - Behavior: Standalone calls allowed (turns consumed), self-terminating at 2nd call, retry exhaustion forces final-turn
 - Migration: Immediate breaking change (all tests and docs updated at once)
 
@@ -46,7 +46,7 @@ interface TaskStatusArgs {
   status: 'starting' | 'in-progress' | 'completed';
   done: string;    // What has been accomplished (up to 15 words)
   pending: string; // What remains to be done (up to 15 words)  
-  goal: string;    // Goal of the current turn (up to 15 words)
+  now: string;    // Your immediate step (up to 15 words)
 }
 ```
 
@@ -100,11 +100,11 @@ interface TurnRunnerState {
 
 ### Phase 1: Tool Schema & Definition (File: src/tools/internal-provider.ts)
 1. **Rename tool**: `agent__progress_report` → `agent__task_status` 
-2. **Update schema**: `{progress: string}` → `{status: 'starting'|'in-progress'|'completed', done: string, pending: string, goal: string}`
+2. **Update schema**: `{progress: string}` → `{status: 'starting'|'in-progress'|'completed', done: string, pending: string, now: string}`
 3. **Update validation logic**: 
    - Parse `status` as enum: 'starting' | 'in-progress' | 'completed'
    - No special behavior for 'starting' (treat same as 'in-progress')
-   - Validate done/pending/goal as strings (soft guidance for 15-word limit)
+   - Validate done/pending/now as strings (soft guidance for 15-word limit)
    - Update parameter validation (lines 441-444)
    - Response: concatenate all 3 strings, return "ok"
 4. **Update instructions**: Tool description and usage examples
@@ -153,7 +153,7 @@ interface TurnRunnerState {
          status: 'starting'|'in-progress'|'completed';
          done: string;
          pending: string;
-         goal: string;
+         now: string;
        };
      };
    }

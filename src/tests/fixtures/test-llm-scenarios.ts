@@ -715,7 +715,7 @@ const SCENARIOS: ScenarioDefinition[] = [
                   {
                     id: '1',
                     tool: 'agent__task_status',
-                    parameters: { status: STATUS_IN_PROGRESS, done: 'Batch step started', pending: 'Process batch operations', goal: 'Complete batch processing' },
+                    parameters: { status: STATUS_IN_PROGRESS, done: 'Batch step started', pending: 'Process batch operations', now: 'Complete batch processing' },
                   },
                   {
                     id: '2',
@@ -1670,7 +1670,7 @@ const SCENARIOS: ScenarioDefinition[] = [
                   {
                     id: 'p-1',
                     tool: 'agent__task_status',
-                    parameters: { status: STATUS_IN_PROGRESS, done: BATCH_PROGRESS_STATUS, pending: 'Complete batch processing', goal: 'Finalize batch operations' },
+                    parameters: { status: STATUS_IN_PROGRESS, done: BATCH_PROGRESS_STATUS, pending: 'Complete batch processing', now: 'Finalize batch operations' },
                   },
                   {
                     id: 'p-2',
@@ -1719,7 +1719,7 @@ const SCENARIOS: ScenarioDefinition[] = [
               callId: 'call-batch-string',
               assistantText: 'String payload contains progress and tool work.',
               arguments: {
-                calls: `[{"id":"s-1","tool":"agent__task_status","parameters":{"status":"${STATUS_IN_PROGRESS}","done":"${BATCH_STRING_PROGRESS}","pending":"Continue processing","goal":"Complete task"}},{"id":"s-2","tool":"${TOOL_NAME}","parameters":{"text":"${BATCH_STRING_RESULT}"}}]`,
+                calls: `[{"id":"s-1","tool":"agent__task_status","parameters":{"status":"${STATUS_IN_PROGRESS}","done":"${BATCH_STRING_PROGRESS}","pending":"Continue processing","now":"Complete task"}},{"id":"s-2","tool":"${TOOL_NAME}","parameters":{"text":"${BATCH_STRING_RESULT}"}}]`,
               },
             },
           ],
@@ -2535,7 +2535,7 @@ const SCENARIOS: ScenarioDefinition[] = [
               assistantText: 'Batch includes progress and large MCP output.',
               arguments: {
                 calls: [
-                  { id: 'p-1', tool: 'agent__task_status', parameters: { status: 'starting', done: 'Starting large data export.', pending: 'Process remaining data', goal: 'Complete export' } },
+                  { id: 'p-1', tool: 'agent__task_status', parameters: { status: 'starting', done: 'Starting large data export.', pending: 'Process remaining data', now: 'Complete export' } },
                   { id: 'p-2', tool: TOOL_NAME, parameters: { text: 'X'.repeat(5000) } }
                 ],
               },
@@ -3045,7 +3045,7 @@ const SCENARIOS: ScenarioDefinition[] = [
                   {
                     id: 'm-1',
                     tool: 'agent__task_status',
-                    parameters: { status: STATUS_IN_PROGRESS, done: 'Valid batch progress entry.', pending: 'Complete batch validation', goal: 'Validate batch processing' },
+                    parameters: { status: STATUS_IN_PROGRESS, done: 'Valid batch progress entry.', pending: 'Complete batch validation', now: 'Validate batch processing' },
                   },
                   {
                     id: 'm-2',

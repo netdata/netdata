@@ -20,7 +20,7 @@ Tool for reporting task execution state and tracking completion status. Supports
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["status", "done", "pending", "goal"],
+  "required": ["status", "done", "pending", "now"],
   "properties": {
     "status": {
       "type": "string",
@@ -35,9 +35,9 @@ Tool for reporting task execution state and tracking completion status. Supports
       "type": "string",
       "description": "What remains to be done (max 15 words guidance)"
     },
-    "goal": {
+    "now": {
       "type": "string",
-      "description": "Overall task objective (max 15 words guidance)"
+      "description": "Current immediate step (max 15 words guidance)"
     }
   }
 }
@@ -111,13 +111,13 @@ interface ToolExecutionState {
 
 ### Single Call Path (`internal-provider.ts`)
 1. Validate status enum: `starting`, `in-progress`, `completed`
-2. Extract done/pending/goal strings
+2. Extract done/pending/now strings
 3. Update status via callback
 4. Return result with `taskStatusCompleted` flag in extras
 
 ### Batch Call Path (`internal-provider.ts`)
 1. Validate status enum (same as single call)
-2. Extract done/pending/goal strings
+2. Extract done/pending/now strings
 3. Update status via callback
 4. Return result with completion signal
 
@@ -157,7 +157,7 @@ interface ToolExecutionState {
   "status": "starting",
   "done": "Initialized analysis",
   "pending": "Parse log entries",
-  "goal": "Analyze server logs"
+  "now": "Analyze server logs"
 }
 ```
 
@@ -167,7 +167,7 @@ interface ToolExecutionState {
   "status": "in-progress",
   "done": "Parsed 1000 log entries",
   "pending": "Search for error patterns",
-  "goal": "Find critical errors"
+  "now": "Find critical errors"
 }
 ```
 
@@ -177,7 +177,7 @@ interface ToolExecutionState {
   "status": "completed",
   "done": "Found 3 critical errors",
   "pending": "None",
-  "goal": "Server log analysis complete"
+  "now": "Server log analysis complete"
 }
 ```
 

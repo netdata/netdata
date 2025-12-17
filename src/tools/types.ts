@@ -22,7 +22,7 @@ export interface TaskStatusData {
   status: 'starting' | 'in-progress' | 'completed';
   done: string;
   pending: string;
-  goal: string;
+  now: string;
 }
 
 export interface ToolExecuteResult {

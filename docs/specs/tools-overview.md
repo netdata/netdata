@@ -180,7 +180,7 @@ interface RestToolConfig {
   status: 'starting' | 'in-progress' | 'completed';  // Task status
   done: string;    // What has been completed
   pending: string; // What remains to be done
-  goal: string;    // Overall task goal
+  now: string;     // Current immediate step
 }
 ```
 

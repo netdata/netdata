@@ -153,10 +153,10 @@ const results = await Promise.all(normalizedCalls.map(async ({ id, tool, paramet
     const status = parameters.status || '';
     const done = parameters.done || '';
     const pending = parameters.pending || '';
-    const goal = parameters.goal || '';
-    
-    const statusMessage = [done, pending, goal].filter(Boolean).join(' | ');
-    this.opts.updateStatus(statusMessage || status);
+    const now = parameters.now || '';
+
+    const statusMessage = [status, done, pending, now].filter(Boolean).join(' | ');
+    this.opts.updateStatus(statusMessage);
     const taskStatusPayload = {
       status,
       taskStatusCompleted: status === 'completed',
@@ -164,7 +164,7 @@ const results = await Promise.all(normalizedCalls.map(async ({ id, tool, paramet
         status,
         done,
         pending,
-        goal,
+        now,
       },
     };
     return { ok: true, output: JSON.stringify(taskStatusPayload) };

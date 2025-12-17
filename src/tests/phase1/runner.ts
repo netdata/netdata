@@ -7294,7 +7294,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         invocation += 1;
         if (invocation === 1) {
           const nestedCallsPayload = JSON.stringify([
-            { id: 'nested-progress', tool: 'agent__task_status', parameters: { status: TASK_STATUS_IN_PROGRESS, done: BATCH_STRING_PROGRESS, pending: TASK_CONTINUE_PROCESSING, goal: TASK_COMPLETE_TASK } },
+            { id: 'nested-progress', tool: 'agent__task_status', parameters: { status: TASK_STATUS_IN_PROGRESS, done: BATCH_STRING_PROGRESS, pending: TASK_CONTINUE_PROCESSING, now: TASK_COMPLETE_TASK } },
             { id: 'nested-hex', tool: 'test__test', parameters: BATCH_HEX_ARGUMENT_STRING },
           ]);
           const assistantMessage: ConversationMessage = {
@@ -8187,7 +8187,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
               {
                 name: 'agent__task_status',
                 id: progressCallId,
-                parameters: { status: TASK_STATUS_IN_PROGRESS, done: 'Reviewing instructions', pending: 'Continue analysis', goal: TASK_COMPLETE_TASK },
+                parameters: { status: TASK_STATUS_IN_PROGRESS, done: 'Reviewing instructions', pending: 'Continue analysis', now: TASK_COMPLETE_TASK },
               },
             ],
             reasoning: [
@@ -8304,7 +8304,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
               {
                 id: progressCallId,
                 name: 'agent__task_status',
-                parameters: { status: TASK_STATUS_IN_PROGRESS, done: 'Setting up analysis', pending: 'Complete setup phase', goal: 'Finish analysis setup' },
+                parameters: { status: TASK_STATUS_IN_PROGRESS, done: 'Setting up analysis', pending: 'Complete setup phase', now: 'Finish analysis setup' },
               },
             ],
           };
@@ -11631,7 +11631,7 @@ BASE_TEST_SCENARIOS.push({
         {
           role: 'assistant',
           content: 'reporting first status update',
-          toolCalls: [{ id: 'call-1', name: 'agent__task_status', parameters: { status: TASK_STATUS_IN_PROGRESS, done: 'Starting analysis', pending: 'Continue processing', goal: TASK_COMPLETE_TASK } }],
+          toolCalls: [{ id: 'call-1', name: 'agent__task_status', parameters: { status: TASK_STATUS_IN_PROGRESS, done: 'Starting analysis', pending: 'Continue processing', now: TASK_COMPLETE_TASK } }],
         },
       ],
       tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
@@ -11660,7 +11660,7 @@ BASE_TEST_SCENARIOS.push({
         {
           role: 'assistant',
           content: 'reporting second status update',
-          toolCalls: [{ id: 'call-1', name: 'agent__task_status', parameters: { status: TASK_STATUS_IN_PROGRESS, done: 'Still processing', pending: 'Final steps', goal: TASK_COMPLETE_TASK } }],
+          toolCalls: [{ id: 'call-1', name: 'agent__task_status', parameters: { status: TASK_STATUS_IN_PROGRESS, done: 'Still processing', pending: 'Final steps', now: TASK_COMPLETE_TASK } }],
         },
       ],
       tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
@@ -11685,7 +11685,7 @@ BASE_TEST_SCENARIOS.push({
         {
           role: 'assistant',
           content: 'task completed',
-          toolCalls: [{ id: 'call-1', name: 'agent__task_status', parameters: { status: 'completed', done: 'All steps finished', pending: 'None', goal: 'Task complete' } }],
+          toolCalls: [{ id: 'call-1', name: 'agent__task_status', parameters: { status: 'completed', done: 'All steps finished', pending: 'None', now: 'Task complete' } }],
         },
       ],
       tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
@@ -11711,7 +11711,7 @@ BASE_TEST_SCENARIOS.push({
           role: 'assistant',
           content: 'calling real tool after status',
           toolCalls: [
-            { id: 'call-1', name: 'agent__task_status', parameters: { status: TASK_STATUS_IN_PROGRESS, done: 'Initial step', pending: 'Main processing', goal: 'Process data' } },
+            { id: 'call-1', name: 'agent__task_status', parameters: { status: TASK_STATUS_IN_PROGRESS, done: 'Initial step', pending: 'Main processing', now: 'Process data' } },
             { id: 'call-2', name: 'test__test', parameters: { text: 'phase-1-tool-success' } },
           ],
         },

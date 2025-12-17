@@ -112,7 +112,7 @@ export class InternalToolProvider extends ToolProvider {
         inputSchema: {
           type: 'object',
           additionalProperties: false,
-          required: ['status', 'done', 'pending', 'goal'],
+          required: ['status', 'done', 'pending', 'now'],
           properties: {
             status: {
               type: 'string',
@@ -127,9 +127,9 @@ export class InternalToolProvider extends ToolProvider {
               type: 'string',
               description: 'What remains to be done (up to 15 words)'
             },
-            goal: {
+            now: {
               type: 'string',
-              description: 'You immediate step/goal - what you want to achieve with the tools you call now? (up to 15 words)'
+              description: 'Your immediate step - what you want to achieve with the tools you call now? (up to 15 words)'
             }
           }
         }
@@ -450,24 +450,24 @@ export class InternalToolProvider extends ToolProvider {
     };
   }
 
-  private validateAndProcessTaskStatus(parameters: Record<string, unknown>): { status: TaskStatusValue; done: string; pending: string; goal: string; taskStatusCompleted: boolean; statusMessage: string } {
+  private validateAndProcessTaskStatus(parameters: Record<string, unknown>): { status: TaskStatusValue; done: string; pending: string; now: string; taskStatusCompleted: boolean; statusMessage: string } {
     // Validate status parameter
     const status = typeof (parameters.status) === 'string' ? parameters.status : '';
     if (!VALID_TASK_STATUSES.includes(status as TaskStatusValue)) {
       throw new Error(`Invalid status '${status}'. Must be one of: ${VALID_TASK_STATUSES.join(', ')}`);
     }
-    
+
     const done = typeof (parameters.done) === 'string' ? parameters.done : '';
     const pending = typeof (parameters.pending) === 'string' ? parameters.pending : '';
-    const goal = typeof (parameters.goal) === 'string' ? parameters.goal : '';
-    
-    const statusMessage = [done, pending, goal].filter(Boolean).join(' | ') || status;
-    
+    const now = typeof (parameters.now) === 'string' ? parameters.now : '';
+
+    const statusMessage = [status, done, pending, now].filter(Boolean).join(' | ');
+
     return {
       status: status as TaskStatusValue,
       done,
       pending,
-      goal,
+      now,
       taskStatusCompleted: status === 'completed',
       statusMessage
     };
@@ -479,7 +479,7 @@ export class InternalToolProvider extends ToolProvider {
       throw new Error('agent__task_status is disabled for this session');
     }
     if (name === TASK_STATUS_TOOL) {
-      const { status, done, pending, goal, taskStatusCompleted, statusMessage } = this.validateAndProcessTaskStatus(parameters);
+      const { status, done, pending, now, taskStatusCompleted, statusMessage } = this.validateAndProcessTaskStatus(parameters);
       this.opts.updateStatus(statusMessage);
 
       const taskStatusPayload = {
@@ -489,7 +489,7 @@ export class InternalToolProvider extends ToolProvider {
           status,
           done,
           pending,
-          goal,
+          now,
         },
       };
 
@@ -987,9 +987,9 @@ export class InternalToolProvider extends ToolProvider {
             this.validateAndProcessTaskStatus(callParameters);
             const done = typeof callParameters.done === 'string' ? callParameters.done : '';
             const pending = typeof callParameters.pending === 'string' ? callParameters.pending : '';
-            const goal = typeof callParameters.goal === 'string' ? callParameters.goal : '';
+            const now = typeof callParameters.now === 'string' ? callParameters.now : '';
             const status = typeof callParameters.status === 'string' ? callParameters.status : '';
-            const statusMessage = [done, pending, goal].filter(Boolean).join(' | ') || status;
+            const statusMessage = [status, done, pending, now].filter(Boolean).join(' | ');
             this.opts.updateStatus(statusMessage);
             return { id, tool, ok: true, elapsedMs: Date.now() - t0, output: 'status shown to user' };
           } catch (error) {
@@ -1075,12 +1075,12 @@ export class InternalToolProvider extends ToolProvider {
       pushSchema(TASK_STATUS_TOOL, {
         type: 'object',
         additionalProperties: false,
-        required: ['status', 'done', 'pending', 'goal'],
+        required: ['status', 'done', 'pending', 'now'],
         properties: {
           status: { type: 'string', enum: ['starting', 'in-progress', 'completed'] },
           done: { type: 'string' },
           pending: { type: 'string' },
-          goal: { type: 'string' }
+          now: { type: 'string' }
         }
       });
     }
