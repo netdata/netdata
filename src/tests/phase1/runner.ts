@@ -11667,8 +11667,7 @@ BASE_TEST_SCENARIOS.push({
   id: 'run-test-task-status-standalone-second',
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     // Test that progress-only turns (task_status without other tools) eventually fail when maxTurns is reached.
-    // Note: The task_status_standalone_limit slug requires actual tool execution (not patched executeTurn)
-    // to increment the standaloneTaskStatusCount. This test verifies the fallback behavior.
+    // The session fails with retries_exhausted when maxTurns is reached without a final_report.
     sessionConfig.maxTurns = 2;
     sessionConfig.maxRetries = 1;
     return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
@@ -11689,7 +11688,6 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(!result.success, 'Progress-only turns should eventually fail without final report');
-    // When using patched executeTurn, the standaloneTaskStatusCount is never incremented (requires actual tool execution).
     // The session fails with retries_exhausted when maxTurns is reached without a final_report.
     expectTurnFailureContains(result.logs, 'run-test-task-status-standalone-second', ['retries_exhausted', 'no_tools', 'final_report_missing']);
   },

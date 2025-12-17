@@ -46,7 +46,6 @@ import {
   isXmlFinalReportTagName,
   RETRY_EXHAUSTION_FINAL_MESSAGE,
   TASK_STATUS_COMPLETED_FINAL_MESSAGE,
-  TASK_STATUS_STANDALONE_LIMIT_FINAL_MESSAGE,
   toolReminderMessage,
   turnFailedPrefix,
 } from './llm-messages.js';
@@ -153,10 +152,9 @@ interface TurnRunnerState {
   pendingCtxTokens?: number;
   newCtxTokens?: number;
   schemaCtxTokens?: number;
-  forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_standalone_limit' | 'retry_exhaustion';
+  forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'retry_exhaustion';
   lastTurnError?: string;
   lastTurnErrorType?: string;
-  standaloneTaskStatusCount: number;
   lastTaskStatusCompleted?: boolean;
 }
 
@@ -207,7 +205,6 @@ export class TurnRunner {
             lastFinalReportStatus: undefined,
             finalReportInvalidFormat: false,
             finalReportSchemaFailed: false,
-            standaloneTaskStatusCount: 0,
             lastTaskStatusCompleted: undefined,
         };
     }
@@ -549,9 +546,6 @@ export class TurnRunner {
                             case 'task_status_completed':
                                 finalInstruction = TASK_STATUS_COMPLETED_FINAL_MESSAGE;
                                 break;
-                            case 'task_status_standalone_limit':
-                                finalInstruction = TASK_STATUS_STANDALONE_LIMIT_FINAL_MESSAGE;
-                                break;
                             case 'retry_exhaustion':
                                 finalInstruction = RETRY_EXHAUSTION_FINAL_MESSAGE;
                                 break;
@@ -566,13 +560,11 @@ export class TurnRunner {
                         });
                     }
                     if (isFinalTurn) {
-                        let logReason: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_standalone_limit' | 'retry_exhaustion' = 'max_turns';
+                        let logReason: 'context' | 'max_turns' | 'task_status_completed' | 'retry_exhaustion' = 'max_turns';
                         if (this.forcedFinalTurnReason === 'context') {
                             logReason = 'context';
                         } else if (this.forcedFinalTurnReason === 'task_status_completed') {
                             logReason = 'task_status_completed';
-                        } else if (this.forcedFinalTurnReason === 'task_status_standalone_limit') {
-                            logReason = 'task_status_standalone_limit';
                         } else if (this.forcedFinalTurnReason === 'retry_exhaustion') {
                             logReason = 'retry_exhaustion';
                         }
@@ -1411,11 +1403,6 @@ export class TurnRunner {
             this.ctx.contextGuard.setTaskCompletionReason();
         }
 
-        // Rule 2: Force final turn if standalone task status count >= 2
-        if (this.state.standaloneTaskStatusCount >= 2) {
-            this.ctx.contextGuard.setTaskStatusStandaloneLimitReason();
-        }
-
         // Sync final turn flags after task status reason setting
         syncFinalTurnFlags();
                         // Add new messages to conversation (skipped above for empty responses per CONTRACT)
@@ -1809,7 +1796,7 @@ export class TurnRunner {
     private set newCtxTokens(value: number) { this.ctx.contextGuard.setNewTokens(value); }
     private get schemaCtxTokens(): number { return this.ctx.contextGuard.getSchemaTokens(); }
     private set schemaCtxTokens(value: number) { this.ctx.contextGuard.setSchemaTokens(value); }
-    private get forcedFinalTurnReason(): 'context' | 'max_turns' | 'task_status_completed' | 'task_status_standalone_limit' | 'retry_exhaustion' | undefined { return this.ctx.contextGuard.getForcedFinalReason(); }
+    private get forcedFinalTurnReason(): 'context' | 'max_turns' | 'task_status_completed' | 'retry_exhaustion' | undefined { return this.ctx.contextGuard.getForcedFinalReason(); }
     private get finalReport() { return this.ctx.finalReportManager.getReport(); }
     private estimateTokensForCounters(messages: ConversationMessage[]): number {
         return this.ctx.contextGuard.estimateTokens(messages);
@@ -2630,7 +2617,6 @@ export class TurnRunner {
             executedNonProgressBatchTools: 0,
             executedProgressBatchTools: 0,
             unknownToolEncountered: false,
-            standaloneTaskStatusCount: this.state.standaloneTaskStatusCount,
             lastTaskStatusCompleted: this.state.lastTaskStatusCompleted,
             productiveToolExecutedThisTurn: false,
             onTaskCompletion: () => {
@@ -2932,7 +2918,6 @@ export class TurnRunner {
             executedNonProgressBatchTools: 0,
             executedProgressBatchTools: 0,
             unknownToolEncountered: false,
-            standaloneTaskStatusCount: this.state.standaloneTaskStatusCount,
             lastTaskStatusCompleted: this.state.lastTaskStatusCompleted,
             productiveToolExecutedThisTurn: false,
             onTaskCompletion: () => {
@@ -2948,12 +2933,7 @@ export class TurnRunner {
                 incompleteFinalReportDetected = executionState.incompleteFinalReportDetected;
                 this.state.toolLimitExceeded = executionState.toolLimitExceeded;
                 // Sync task status state back to main state
-                this.state.standaloneTaskStatusCount = executionState.standaloneTaskStatusCount;
                 this.state.lastTaskStatusCompleted = executionState.lastTaskStatusCompleted;
-                // Reset counter if productive tools were executed this turn (success path)
-                if (executionState.productiveToolExecutedThisTurn) {
-                    this.state.standaloneTaskStatusCount = 0;
-                }
                 if (executionState.finalReportToolFailed) {
                     this.state.finalReportToolFailedThisTurn = true;
                     this.state.finalReportToolFailedEver = true;
@@ -2964,12 +2944,7 @@ export class TurnRunner {
                 incompleteFinalReportDetected = executionState.incompleteFinalReportDetected;
                 this.state.toolLimitExceeded = executionState.toolLimitExceeded;
                 // Sync task status state back to main state
-                this.state.standaloneTaskStatusCount = executionState.standaloneTaskStatusCount;
                 this.state.lastTaskStatusCompleted = executionState.lastTaskStatusCompleted;
-                // Reset counter if productive tools were executed this turn
-                if (executionState.productiveToolExecutedThisTurn) {
-                    this.state.standaloneTaskStatusCount = 0;
-                }
                 if (executionState.finalReportToolFailed) {
                     this.state.finalReportToolFailedThisTurn = true;
                     this.state.finalReportToolFailedEver = true;

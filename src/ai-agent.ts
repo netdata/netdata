@@ -1743,7 +1743,7 @@ export class AIAgentSession {
   private set newCtxTokens(value: number) { this.contextGuard.setNewTokens(value); }
   private get schemaCtxTokens(): number { return this.contextGuard.getSchemaTokens(); }
   private set schemaCtxTokens(value: number) { this.contextGuard.setSchemaTokens(value); }
-  private get forcedFinalTurnReason(): 'context' | 'max_turns' | 'task_status_completed' | 'task_status_standalone_limit' | 'retry_exhaustion' | undefined { return this.contextGuard.getForcedFinalReason(); }
+  private get forcedFinalTurnReason(): 'context' | 'max_turns' | 'task_status_completed' | 'retry_exhaustion' | undefined { return this.contextGuard.getForcedFinalReason(); }
   private get contextLimitWarningLogged(): boolean { return this.contextGuard.hasLoggedContextWarning(); }
   private set contextLimitWarningLogged(value: boolean) { if (value) this.contextGuard.markContextWarningLogged(); }
 

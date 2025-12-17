@@ -76,16 +76,6 @@ export const FINAL_TURN_NOTICE =
 export const TASK_STATUS_COMPLETED_FINAL_MESSAGE = FINAL_TURN_NOTICE;
 
 /**
- * Injected when standalone task_status limit is reached.
- * Forces finalization when too many consecutive standalone calls occur.
- * Used in: session-turn-runner.ts (pushed to conversation)
- *
- * CONDITION: forcedFinalTurnReason === 'task_status_standalone_limit'
- * Where forcedFinalTurn is set after 2 consecutive standalone task_status calls
- */
-export const TASK_STATUS_STANDALONE_LIMIT_FINAL_MESSAGE = FINAL_TURN_NOTICE;
-
-/**
  * Injected when all retry attempts are exhausted.
  * Forces graceful finalization instead of session failure.
  * Used in: session-turn-runner.ts (pushed to conversation)

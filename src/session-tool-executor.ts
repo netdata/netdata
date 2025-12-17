@@ -30,7 +30,6 @@ export interface ToolExecutionState {
   executedNonProgressBatchTools: number;
   executedProgressBatchTools: number;
   unknownToolEncountered: boolean;
-  standaloneTaskStatusCount: number;
   lastTaskStatusCompleted?: boolean;
   productiveToolExecutedThisTurn: boolean;
   // Callback to signal task completion to TurnRunner for immediate final turn
@@ -237,10 +236,6 @@ export class SessionToolExecutor {
 
           // Track task status tool usage
           if (effectiveToolName === 'agent__task_status') {
-            // Only increment counter if this is a standalone call (no other tools executed this turn)
-            if (!state.productiveToolExecutedThisTurn) {
-              state.standaloneTaskStatusCount += 1;
-            }
             // Check completion status from the tool parameters (not response)
             const status = typeof parameters.status === 'string' ? parameters.status : '';
             const isCompleted = status === 'completed';
