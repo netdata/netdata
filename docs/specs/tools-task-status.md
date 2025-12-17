@@ -1,7 +1,7 @@
 # task_status Tool
 
 ## TL;DR
-Tool for reporting task execution state and tracking completion status. Supports standalone calls (allowed but turn-consuming) and can signal explicit task completion via `status: completed` to force final turn.
+Tool for reporting task execution state and tracking completion status. Standalone calls are allowed (turn-consuming). Can signal explicit task completion via `status: completed` to force final turn.
 
 ## Source Files
 - `src/tools/internal-provider.ts` - Tool definition and handler
@@ -53,27 +53,22 @@ Tool for reporting task execution state and tracking completion status. Supports
 
 ## Behavioral Rules
 
-### Rule 1: Standalone Tolerance (First Call)
+### Rule 1: Standalone Calls Allowed
 | Condition | Behavior |
 |-----------|----------|
 | `task_status` called alone (no other tools) | **Allowed** — display status, **turn consumed** |
 
-### Rule 2: Standalone Termination (Second Call)
-| Condition | Behavior |
-|-----------|----------|
-| `task_status` called alone for 2nd consecutive time | **Force final-turn** — model must conclude |
-
-### Rule 3: Explicit Completion
+### Rule 2: Explicit Completion
 | Condition | Behavior |
 |-----------|----------|
 | `task_status` with `status: completed` | **Force final-turn** immediately (regardless of other tools) |
 
-### Rule 4: Normal Usage
+### Rule 3: Normal Usage
 | Condition | Behavior |
 |-----------|----------|
-| `task_status` alongside real tools | Normal — just status reporting, standalone counter resets |
+| `task_status` alongside real tools | Normal — just status reporting |
 
-### Rule 5: Graceful Exhaustion
+### Rule 4: Graceful Exhaustion
 | Condition | Behavior |
 |-----------|----------|
 | Retry exhaustion (any cause) | **Force final-turn** instead of session failure |
@@ -92,7 +87,6 @@ Tool for reporting task execution state and tracking completion status. Supports
 ### TurnRunnerState Fields
 ```typescript
 interface TurnRunnerState {
-  standaloneTaskStatusCount: number;  // 0, 1, or triggers final-turn at 2
   lastTaskStatusCompleted?: boolean;  // true when status: completed received
 }
 ```
@@ -100,7 +94,6 @@ interface TurnRunnerState {
 ### ToolExecutionState Fields
 ```typescript
 interface ToolExecutionState {
-  standaloneTaskStatusCount: number;
   lastTaskStatusCompleted?: boolean;
 }
 ```
@@ -110,10 +103,9 @@ interface ToolExecutionState {
 | Reason | Trigger |
 |--------|---------|
 | `task_status_completed` | Model called with `status: completed` |
-| `task_status_standalone_limit` | 2nd consecutive standalone call |
 | `retry_exhaustion` | All retry attempts exhausted |
 
-**Precedence**: `task_status_completed` > `task_status_standalone_limit` > `retry_exhaustion`
+**Precedence**: `task_status_completed` > `retry_exhaustion`
 
 ## Execution Flow
 
@@ -131,13 +123,11 @@ interface ToolExecutionState {
 
 ### Session Tracking (`session-tool-executor.ts`)
 1. Track `taskStatusCompleted` from tool result extras
-2. Increment standalone counter only for standalone calls
-3. Do NOT reset completion flag when other tools run
+2. Do NOT reset completion flag when other tools run
 
 ### Final Turn Forcing (`session-turn-runner.ts`)
 1. Check `lastTaskStatusCompleted === true` → force final turn
-2. Check `standaloneTaskStatusCount >= 2` → force final turn
-3. Check retry exhaustion → force final turn (lowest precedence)
+2. Check retry exhaustion → force final turn (lowest precedence)
 
 ## Tool Response
 
@@ -207,7 +197,6 @@ interface ToolExecutionState {
 
 **FinalReportMetricsRecord.forcedFinalReason**:
 - `'task_status_completed'`
-- `'task_status_standalone_limit'`
 - `'retry_exhaustion'`
 
 ## Logging
@@ -222,23 +211,21 @@ interface ToolExecutionState {
 1. **Optional tool**: May not be available based on configuration
 2. **Non-blocking**: Does not block other tool execution
 3. **Completion is sticky**: Once `status: completed` is received, final turn is forced
-4. **Standalone tracking**: Counter resets only when productive tools succeed (but NOT completion flag)
-5. **Batch parity**: Batch handler validates and signals completion same as single call
+4. **Batch parity**: Batch handler validates and signals completion same as single call
 
 ## Business Logic Coverage
 
 - **Conditional enablement**: The tool is only registered when `headendWantsProgressUpdates !== false` *and* the agent exposes external tools or subagents (`src/ai-agent.ts:598-610`).
 - **OpTree + headend sync**: Every status update pushes a new opTree snapshot via `callbacks.onOpTree` (`src/ai-agent.ts:624-677`).
 - **Completion forcing**: When `status: completed` is received, `taskStatusCompleted` is set and forces final turn regardless of other tools in the same turn.
-- **Standalone limit**: Second consecutive standalone call forces final turn to prevent infinite loops.
 
 ## Test Coverage
 
 **Phase 1 Tests**:
-- `run-test-task-status-standalone-first` - First standalone allowed
-- `run-test-task-status-standalone-second` - Second standalone forces final
+- `run-test-task-status-standalone-first` - Standalone call allowed, session continues
+- `run-test-task-status-standalone-second` - Progress-only turns fail at maxTurns
 - `run-test-task-status-completed` - Completion forces final
-- `run-test-task-status-reset-on-real-tool` - Counter resets with real tools
+- `run-test-task-status-reset-on-real-tool` - Normal usage with real tools
 - `run-test-retry-exhaustion-forces-final` - Retry exhaustion forces final
 - `run-test-old-progress-report-rejected` - Old tool name rejected
 
@@ -254,7 +241,3 @@ interface ToolExecutionState {
 - Check that completion flag is propagated in extras
 - Verify batch handler returns completion signal
 
-### Standalone limit not triggering
-- Counter must reach 2 consecutive standalone calls
-- Productive tools reset the counter (but not completion flag)
-- Check state sync between executor and turn runner
