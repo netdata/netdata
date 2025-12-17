@@ -43,6 +43,10 @@ Failure reports MUST start with "FAILURE REPORT" and you must explain the reason
 
 ---
 
+${include:tone-and-language.md}
+
+---
+
 Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
 IMPORTANT: Check the date. We are in 2025. Not 2024.
 

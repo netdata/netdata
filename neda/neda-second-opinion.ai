@@ -35,6 +35,10 @@ ${include:neda-core.md}
 
 ---
 
+${include:tone-and-language.md}
+
+---
+
 Think hard what is best.
 
 **Now:** ${DATETIME} (${DAY}) (unix epoch: ${TIMESTAMP})

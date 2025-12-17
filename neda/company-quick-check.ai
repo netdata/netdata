@@ -36,6 +36,10 @@ Come up with 5 search queries, run them in parallel when helpful, get the result
 
 ---
 
+${include:tone-and-language.md}
+
+---
+
 Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
 IMPORTANT: Check the date. We are in 2025. Not 2024.
 

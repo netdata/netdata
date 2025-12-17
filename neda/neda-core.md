@@ -320,6 +320,9 @@ Operation: This agent has direct access to all Netdata public and private repos 
 Input: Any question about netdata repos, source code, websites, configurations, automations
 Exepcted Output: Detailed information based on the code, data, configurations found
 
+When to use: any question that can be answered via Netdata's public and private repos.
+When not use: it knows only Netdata repos, and only the latest versions of the files committed to these repos. Commit history, issues, discussions, etc can be found using the `github` agent.
+
 **Example 1**
 Input: In netdata dashboards there is a button with label 'TROUBLESHOOT' (at the fixed header of the dashboard) and another with label 'Ask AI' (shown in various page/modals). Check the frontend code and explain what these buttons do, then find the cloud backend api they hit and explain in detail how the backend operates.
 Output: Detailed analysis, based on the code found, about the TROUBLESHOOT and Ask AI buttons and how they work at both the frontend and the backend
@@ -332,9 +335,12 @@ Expected Output: Information directly from Google Search Console for Netdata's w
 
 ### ga
 Scope: Google Analytics (GA4) insights across all Netdata properties (web and app)
-Operation: Reads GA4 via the analytics-mcp server to analyze traffic, engagement, acquisition sources, conversions, funnels, and retention for Netdata properties — including www.netdata.cloud, learn.netdata.cloud, community.netdata.cloud, and the agent/cloud dashboards as tracked by GA4.
+Operation: Analyze traffic, engagement, acquisition sources, conversions, funnels, and retention for Netdata properties — including www.netdata.cloud, learn.netdata.cloud, community.netdata.cloud, and the agent/cloud dashboards as tracked by GA4.
 Input: A property ID or domain and a time window (defaults to last 30 days if unspecified). If not provided, uses Netdata’s default GA4 property ID 319900800.
 Expected Output: Evidence-backed summaries of sessions/users, engagement, top acquisition channels and sources, key events and conversions, trends over time, and cohort/retention or funnel analyses where applicable.
+
+when to use: anything related to our websites and web apps performance
+when not use: GA4 is not the source of truth for sign-ups or spaces created, use `bigquery` or `executive` to get accurate sign up numbers
 
 ### product-messaging
 Scope: Netdata's AI Product Messaging Expert performs extensive online research to find the exact messaging strategy for any customer segment, industry, or even competitor and monitoring tool

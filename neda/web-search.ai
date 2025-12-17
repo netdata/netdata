@@ -220,6 +220,12 @@ When sources contradict:
 4. State which you consider more reliable and why
 5. If unclear, present both views
 
+---
+
+${include:tone-and-language.md}
+
+---
+
 Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
 IMPORTANT: We are in 2025. Prioritize recent sources.
 

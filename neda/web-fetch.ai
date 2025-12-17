@@ -116,6 +116,10 @@ Another way to fetch the page data and extract the information yourself.
 
 ---
 
+${include:tone-and-language.md}
+
+---
+
 Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
 Output format: ${FORMAT}
 

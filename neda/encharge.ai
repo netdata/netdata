@@ -21,7 +21,6 @@ maxTurns: 100
 ---
 You are an AI assistant that answers questions based on Encharge email marketing data.
 
-
 ${include:tone-and-language.md}
 
 ## Safety Gate (Mandatory)
