@@ -31,15 +31,15 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^2.0.54",
-    "@ai-sdk/google": "^2.0.45",
-    "@ai-sdk/openai": "^2.0.80",
-    "@ai-sdk/provider-utils": "^3.0.18",
+    "@ai-sdk/anthropic": "^2.0.56",
+    "@ai-sdk/google": "^2.0.47",
+    "@ai-sdk/openai": "^2.0.88",
+    "@ai-sdk/provider-utils": "^3.0.19",
     "@anthropic-ai/tokenizer": "^0.0.4",
     "@dqbd/tiktoken": "^1.0.22",
     "@lenml/tokenizer-gemini": "^3.7.2",
-    "@modelcontextprotocol/sdk": "^1.24.3",
-    "@openrouter/ai-sdk-provider": "^1.5.3",
+    "@modelcontextprotocol/sdk": "^1.25.1",
+    "@openrouter/ai-sdk-provider": "^1.5.4",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/api-logs": "^0.208.0",
     "@opentelemetry/exporter-logs-otlp-grpc": "^0.208.0",
@@ -52,7 +52,7 @@
     "@opentelemetry/sdk-trace-node": "^2.2.0",
     "@opentelemetry/semantic-conventions": "^1.38.0",
     "@slack/bolt": "^4.6.0",
-    "ai": "^5.0.109",
+    "ai": "^5.0.114",
     "ajv": "^8.17.1",
     "async-mutex": "^0.5.0",
     "commander": "^14.0.2",
@@ -63,16 +63,16 @@
     "ollama-ai-provider-v2": "^1.5.5",
     "undici": "^7.16.0",
     "ws": "^8.18.3",
-    "zod": "^4.1.13"
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
-    "@types/node": "^25.0.0",
+    "@types/node": "^25.0.3",
     "@types/ws": "^8.18.1",
-    "@typescript-eslint/eslint-plugin": "^8.49.0",
-    "@typescript-eslint/parser": "^8.49.0",
-    "@vitest/coverage-v8": "^4.0.15",
-    "eslint": "^9.39.1",
+    "@typescript-eslint/eslint-plugin": "^8.50.0",
+    "@typescript-eslint/parser": "^8.50.0",
+    "@vitest/coverage-v8": "^4.0.16",
+    "eslint": "^9.39.2",
     "eslint-plugin-eslint-comments": "^3.2.0",
     "eslint-plugin-functional": "^9.0.2",
     "eslint-plugin-import": "^2.32.0",
@@ -85,9 +85,9 @@
     "eslint-plugin-security": "^3.0.1",
     "eslint-plugin-sonarjs": "^3.0.5",
     "eslint-plugin-unicorn": "^62.0.0",
-    "knip": "^5.73.1",
+    "knip": "^5.74.0",
     "prettier": "^3.7.4",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.15"
+    "vitest": "^4.0.16"
   }
 }
