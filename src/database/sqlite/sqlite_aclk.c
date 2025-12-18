@@ -848,6 +848,7 @@ static void aclk_synchronization_event_loop(void *arg)
                         *Pvalue = query;
                     else {
                         aclk_query_free(query);
+                        aclk_query_batch->count--;
                         break;
                     }
 
