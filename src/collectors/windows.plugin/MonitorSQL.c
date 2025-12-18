@@ -122,14 +122,6 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT stmt, const char *mask, 
 #define NETDATA_MSSQL_STATS_COMPILATIONS_METRIC "SQL Compilations/sec"
 #define NETDATA_MSSQL_STATS_RECOMPILATIONS_METRIC "SQL Re-Compilations/sec"
 
-void dict_mssql_fill_instance_transactions(struct mssql_db_instance *mdi)
-{
-    /* Instance buffer/compilation stats are now collected together with the
-     * per-database performance counters in dict_mssql_fill_performance_counters().
-     * Keep this function as a no-op to avoid changing external calls. */
-    (void)mdi;
-    return;
-}
 
 #define NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC "Active Transactions"
 #define NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC "Transactions/sec"
