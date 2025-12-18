@@ -34,36 +34,6 @@ pub fn compute_file_index(
 }
 
 // ============================================================================
-// Response Types
-// ============================================================================
-
-/// Response from indexing a journal file.
-#[derive(Debug)]
-pub struct FileIndexResponse {
-    /// The file and facets that were indexed
-    pub key: FileIndexKey,
-    /// The result of the indexing operation
-    pub result: Result<FileIndex>,
-}
-
-impl FileIndexResponse {
-    /// Creates a new file index response.
-    pub fn new(key: FileIndexKey, result: Result<FileIndex>) -> Self {
-        Self { key, result }
-    }
-
-    /// Returns true if the indexing was successful.
-    pub fn is_ok(&self) -> bool {
-        self.result.is_ok()
-    }
-
-    /// Returns true if the indexing failed.
-    pub fn is_err(&self) -> bool {
-        self.result.is_err()
-    }
-}
-
-// ============================================================================
 // Indexing Engine
 // ============================================================================
 
@@ -245,7 +215,7 @@ pub async fn batch_compute_file_indexes(
     source_timestamp_field: FieldName,
     bucket_duration: Seconds,
     time_budget: Duration,
-) -> Result<Vec<FileIndexResponse>> {
+) -> Result<Vec<(FileIndexKey, FileIndex)>> {
     let start_time = Instant::now();
 
     // Phase 1: Batch check cache for all keys upfront
@@ -280,7 +250,7 @@ pub async fn batch_compute_file_indexes(
                 if fresh && bucket_ok {
                     // Cache hit with fresh data and compatible granularity
                     cache_hits += 1;
-                    responses.push(FileIndexResponse::new(key, Ok(file_index)));
+                    responses.push((key, file_index));
                 } else {
                     if !fresh {
                         stale_entries += 1;
@@ -302,27 +272,17 @@ pub async fn batch_compute_file_indexes(
         }
     }
 
+    if start_time.elapsed() >= time_budget {
+        return Err(EngineError::TimeBudgetExceeded);
+    }
+
     debug!(
         "phase 2 summary: hits={}, misses={}, stale={}, incompatible_bucket={}",
         cache_hits, cache_misses, stale_entries, incompatible_bucket
     );
 
-    // Phase 3: Check time budget before spawning compute tasks
+    // Phase 3: Spawn single blocking task with rayon for parallel computation
     debug!("phase 3");
-    if start_time.elapsed() >= time_budget {
-        // Time budget already exceeded, fail remaining keys
-        for key in keys_to_compute {
-            responses.push(FileIndexResponse::new(
-                key,
-                Err(EngineError::TimeBudgetExceeded),
-            ));
-        }
-
-        return Ok(responses);
-    }
-
-    // Phase 4: Spawn single blocking task with rayon for parallel computation
-    debug!("phase 4");
     let source_timestamp_field_clone = source_timestamp_field.clone();
     let time_budget_remaining = time_budget.saturating_sub(start_time.elapsed());
 
@@ -340,7 +300,7 @@ pub async fn batch_compute_file_indexes(
                 // Check time budget before processing
                 if std::time::Instant::now() >= deadline || timed_out.load(Ordering::Relaxed) {
                     timed_out.store(true, Ordering::Relaxed);
-                    return FileIndexResponse::new(key, Err(EngineError::TimeBudgetExceeded));
+                    return (key, Err(EngineError::TimeBudgetExceeded));
                 }
 
                 // Compute index
@@ -351,13 +311,13 @@ pub async fn batch_compute_file_indexes(
                     bucket_duration,
                 );
 
-                FileIndexResponse::new(key, result)
+                (key, result)
             })
-            .collect::<Vec<FileIndexResponse>>()
+            .collect::<Vec<(FileIndexKey, Result<FileIndex>)>>()
     });
 
-    // Phase 5: Wait for blocking task to complete (with timeout)
-    debug!("phase 5");
+    // Phase 4: Wait for blocking task to complete (with timeout)
+    debug!("phase 4");
     let computed_results = match tokio::time::timeout(time_budget_remaining, compute_task).await {
         Ok(Ok(results)) => results,
         Ok(Err(e)) => {
@@ -369,21 +329,21 @@ pub async fn batch_compute_file_indexes(
         Err(_timeout) => {
             // Timeout exceeded - the blocking task continues running in background,
             // but we return early with whatever we've computed so far (cache hits only)
-            debug!("phase 5 timeout - returning cache hits only");
+            debug!("phase 4 timeout - returning cache hits only");
             return Ok(responses);
         }
     };
 
-    // Phase 6: Update registry and cache, then collect responses
-    debug!("phase 6");
-    for response in computed_results {
+    // Phase 5: Update registry and cache, then collect responses
+    debug!("phase 5");
+    for (key, response) in computed_results {
         // Update registry and cache on success
-        if let Ok(ref index) = response.result {
+        if let Ok(index) = response {
             let time_range = index.time_range();
-            let _ = registry.update_time_range(&response.key.file, time_range);
-            indexing_engine.insert(response.key.clone(), index.clone());
+            let _ = registry.update_time_range(&key.file, time_range);
+            indexing_engine.insert(key.clone(), index.clone());
+            responses.push((key, index));
         }
-        responses.push(response);
     }
 
     Ok(responses)

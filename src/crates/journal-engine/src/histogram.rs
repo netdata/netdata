@@ -317,71 +317,67 @@ impl HistogramEngine {
                 .await?;
 
                 // Process all file indexes and update responses
-                for file_index_response in file_index_responses {
-                    if let Ok(file_index) = file_index_response.result {
-                        // Get file's time range from the index
-                        let file_start = file_index.start_time();
-                        let file_end = file_index.end_time();
+                for (_, file_index) in file_index_responses {
+                    // Get file's time range from the index
+                    let file_start = file_index.start_time();
+                    let file_end = file_index.end_time();
 
-                        // Find all bucket requests that need data from this file
-                        for bucket_request in &buckets_to_compute {
-                            let response = match new_responses.get_mut(bucket_request) {
-                                Some(r) => r,
-                                None => continue,
-                            };
+                    // Find all bucket requests that need data from this file
+                    for bucket_request in &buckets_to_compute {
+                        let response = match new_responses.get_mut(bucket_request) {
+                            Some(r) => r,
+                            None => continue,
+                        };
 
-                            // Skip if file's time range doesn't overlap with bucket's time range
-                            if file_start >= bucket_request.end || file_end <= bucket_request.start
-                            {
-                                continue;
-                            }
+                        // Skip if file's time range doesn't overlap with bucket's time range
+                        if file_start >= bucket_request.end || file_end <= bucket_request.start {
+                            continue;
+                        }
 
-                            // Evaluate filter to bitmap
-                            let filter_bitmap = if !bucket_request.filter_expr.is_none() {
-                                Some(bucket_request.filter_expr.evaluate(&file_index))
-                            } else {
-                                None
-                            };
+                        // Evaluate filter to bitmap
+                        let filter_bitmap = if !bucket_request.filter_expr.is_none() {
+                            Some(bucket_request.filter_expr.evaluate(&file_index))
+                        } else {
+                            None
+                        };
 
-                            // Track unindexed fields
-                            for field in file_index.fields() {
-                                if !file_index.is_indexed(field) {
-                                    if let Some(field_name) = FieldName::new(field) {
-                                        response.unindexed_fields.insert(field_name);
-                                    }
+                        // Track unindexed fields
+                        for field in file_index.fields() {
+                            if !file_index.is_indexed(field) {
+                                if let Some(field_name) = FieldName::new(field) {
+                                    response.unindexed_fields.insert(field_name);
                                 }
                             }
+                        }
 
-                            // Count field=value pairs in this file for this bucket's time range
-                            for (indexed_field, field_bitmap) in file_index.bitmaps() {
-                                let unfiltered_count = file_index
+                        // Count field=value pairs in this file for this bucket's time range
+                        for (indexed_field, field_bitmap) in file_index.bitmaps() {
+                            let unfiltered_count = file_index
+                                .count_entries_in_time_range(
+                                    field_bitmap,
+                                    bucket_request.start,
+                                    bucket_request.end,
+                                )
+                                .unwrap_or(0);
+
+                            let filtered_count = if let Some(ref filter_bitmap) = filter_bitmap {
+                                let filtered_bitmap = field_bitmap & filter_bitmap;
+                                file_index
                                     .count_entries_in_time_range(
-                                        field_bitmap,
+                                        &filtered_bitmap,
                                         bucket_request.start,
                                         bucket_request.end,
                                     )
-                                    .unwrap_or(0);
+                                    .unwrap_or(0)
+                            } else {
+                                unfiltered_count
+                            };
 
-                                let filtered_count = if let Some(ref filter_bitmap) = filter_bitmap
-                                {
-                                    let filtered_bitmap = field_bitmap & filter_bitmap;
-                                    file_index
-                                        .count_entries_in_time_range(
-                                            &filtered_bitmap,
-                                            bucket_request.start,
-                                            bucket_request.end,
-                                        )
-                                        .unwrap_or(0)
-                                } else {
-                                    unfiltered_count
-                                };
-
-                                // Update counts
-                                if let Some(pair) = FieldValuePair::parse(indexed_field) {
-                                    let counts = response.fv_counts.entry(pair).or_insert((0, 0));
-                                    counts.0 += unfiltered_count;
-                                    counts.1 += filtered_count;
-                                }
+                            // Update counts
+                            if let Some(pair) = FieldValuePair::parse(indexed_field) {
+                                let counts = response.fv_counts.entry(pair).or_insert((0, 0));
+                                counts.0 += unfiltered_count;
+                                counts.1 += filtered_count;
                             }
                         }
                     }

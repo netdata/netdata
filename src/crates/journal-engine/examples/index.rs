@@ -119,29 +119,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let elapsed = start.elapsed();
 
-    // Print results
-    let mut success_count = 0;
-    let mut error_count = 0;
-
-    for (i, response) in responses.iter().enumerate() {
-        let _file_info = &files[i];
-        match &response.result {
-            Ok(_) => {
-                success_count += 1;
-            }
-            Err(_e) => {
-                error_count += 1;
-            }
-        }
-    }
-
-    info!(
-        "responses={}, computed={}, errors={}, duration={:?}",
-        responses.len(),
-        success_count,
-        error_count,
-        elapsed
-    );
+    info!("responses={}, duration={:?}", responses.len(), elapsed);
 
     // Close the indexing engine to flush cache and shut down I/O tasks gracefully
     indexing_engine.close().await?;
