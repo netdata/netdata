@@ -171,7 +171,7 @@ impl Default for IndexingEngineBuilder {
 
 /// Batch computes file indexes in parallel using rayon, with cache checking and time budget enforcement.
 ///
-/// This function implements the ideal scenario:
+/// This function:
 /// 1. Checks cache for all keys upfront
 /// 2. Identifies cache misses
 /// 3. Uses tokio::task to compute missing indexes in parallel
@@ -298,8 +298,6 @@ pub async fn batch_compute_file_indexes(
             .collect::<Vec<(FileIndexKey, Result<FileIndex>)>>()
     });
 
-    // Phase 4: Wait for blocking task to complete (with timeout)
-    debug!("phase 4");
     let computed_results = match tokio::time::timeout(time_budget_remaining, compute_task).await {
         Ok(Ok(results)) => results,
         Ok(Err(e)) => {
@@ -308,16 +306,16 @@ pub async fn batch_compute_file_indexes(
                 format!("Blocking task panicked: {}", e),
             )));
         }
-        Err(_timeout) => {
-            // Timeout exceeded - the blocking task continues running in background,
-            // but we return early with whatever we've computed so far (cache hits only)
-            debug!("phase 4 timeout - returning cache hits only");
-            return Ok(responses);
+        Err(timeout) => {
+            // Note: the blocking task will continue running in background but
+            // we will ignore the results
+            error!("computing file indexes timed out (elapsed={})", timeout);
+            return Err(EngineError::TimeBudgetExceeded);
         }
     };
 
-    // Phase 5: Update registry and cache, then collect responses
-    debug!("phase 5");
+    // Phase 4: Update registry and cache, then collect responses
+    debug!("phase 4");
     for (key, response) in computed_results {
         // Update registry and cache on success
         if let Ok(index) = response {

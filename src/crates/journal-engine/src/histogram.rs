@@ -304,7 +304,7 @@ impl HistogramEngine {
             if !file_index_keys.is_empty() {
                 let bucket_duration = bucket_requests.first().unwrap().duration();
                 let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
-                let time_budget = Duration::from_secs(4);
+                let time_budget = Duration::from_secs(5);
 
                 let file_index_responses = batch_compute_file_indexes(
                     &self.indexing_service,
