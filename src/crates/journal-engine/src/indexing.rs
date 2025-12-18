@@ -10,28 +10,9 @@ use crate::{
     error::{EngineError, Result},
 };
 use journal_index::{FieldName, FileIndex, FileIndexer, Seconds};
-use journal_registry::{File, Registry};
+use journal_registry::Registry;
 use std::time::{Duration, Instant};
 use tracing::{debug, error};
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/// Computes a file index by reading and indexing a journal file.
-pub fn compute_file_index(
-    file: &File,
-    facets: &[FieldName],
-    source_timestamp_field: &FieldName,
-    bucket_duration: Seconds,
-) -> Result<FileIndex> {
-    debug!("computing file index for {}", file.path());
-
-    let mut file_indexer = FileIndexer::default();
-    let file_index =
-        file_indexer.index(file, Some(source_timestamp_field), facets, bucket_duration)?;
-    Ok(file_index)
-}
 
 // ============================================================================
 // Indexing Engine
@@ -283,7 +264,6 @@ pub async fn batch_compute_file_indexes(
 
     // Phase 3: Spawn single blocking task with rayon for parallel computation
     debug!("phase 3");
-    let source_timestamp_field_clone = source_timestamp_field.clone();
     let time_budget_remaining = time_budget.saturating_sub(start_time.elapsed());
 
     let compute_task = tokio::task::spawn_blocking(move || {
@@ -303,13 +283,15 @@ pub async fn batch_compute_file_indexes(
                     return (key, Err(EngineError::TimeBudgetExceeded));
                 }
 
-                // Compute index
-                let result = compute_file_index(
-                    &key.file,
-                    key.facets.as_slice(),
-                    &source_timestamp_field_clone,
-                    bucket_duration,
-                );
+                let mut file_indexer = FileIndexer::default();
+                let result = file_indexer
+                    .index(
+                        &key.file,
+                        Some(&source_timestamp_field),
+                        key.facets.as_slice(),
+                        bucket_duration,
+                    )
+                    .map_err(|e| e.into());
 
                 (key, result)
             })
