@@ -27,31 +27,13 @@ By default, Netdata treats all nodes as permanent. To mark a node as ephemeral:
 
 1. Open the `netdata.conf` file on the target node.
 2. Add the following configuration:
-
    ```ini
-   [global]
-   is ephemeral node = yes
+      [global]
+      is ephemeral node = yes
    ```
-
 3. Restart the Netdata Agent.
 
-This applies the `_is_ephemeral` host label, which propagates to your Parents and Netdata Cloud.
-
-```mermaid
-flowchart TD
-    A("**Node is Permanent by Default**") -->|Step 1| B("**Open netdata.conf on Target Node**")
-    B -->|Step 2| C("**Add Configuration**")
-    C -->|Step 3| D("**Restart the Node**")
-    D --> E("**Node Now Marked as Ephemeral**")
-    E --> F("**_is_ephemeral Label Applied**")
-    F --> G("**Label Propagates to Parents and Cloud**")
-    classDef step fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
-    classDef label fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
-    classDef propagate fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
-    class A,B,C,D step
-    class E,F label
-    class G propagate
-```
+Once restarted, Netdata automatically applies the `_is_ephemeral` host label to the node. This label propagates to your Parent nodes and appears in Netdata Cloud, allowing the system to identify and handle the node as ephemeral.
 
 ## Alerts for Parent Nodes
 
@@ -64,27 +46,27 @@ Netdata v2.3.0 introduces two alerts specific to permanent nodes:
 
 ## Automatic Node Instance Cleanup in Netdata Cloud
 
-Netdata Cloud automatically removes offline child node instances (nodes connected through a Parent with hops > 0) to prevent clutter and maintain dashboard clarity.
+Netdata Cloud automatically removes inactive nodes to keep your dashboards clean and organized.
 
-:::warning
+### Cleanup Rules
 
-**Child node instances** (nodes streaming through Parents) are automatically deleted from Netdata Cloud after **48 hours** of being offline. This applies regardless of whether:
-- The child node itself went offline
-- The Parent node(s) went offline (causing child nodes to appear offline)
+| Node Type                    | Offline Duration | Description                                                                                                                        |
+|------------------------------|------------------|------------------------------------------------------------------------------------------------------------------------------------|
+| **Child nodes**              | 48 hours         | Nodes that connect through a Parent node. Deleted when:<br />• The child node goes offline, OR<br />• The Parent node goes offline |
+| **Directly connected nodes** | 60 days          | Nodes claimed directly to Netdata Cloud without going through a Parent.                                                            |
+| **Ephemeral nodes**          | Custom           | Temporary nodes (containers, auto-scaling VMs) with configurable cleanup periods. See configuration below.                         |
 
-If **all instances** of a node are deleted, the node itself is removed from Netdata Cloud entirely.
+:::info Important
+
+If a child node is deleted and later reconnects, it's automatically recreated in Netdata Cloud. Any historical data retained on the Parent node remains accessible.
 
 :::
 
-### Current Behavior
+:::warning Data Loss Risk
 
-- **Child nodes (hops > 0)**: Deleted after 48 hours offline
-- **Directly claimed nodes (hops = 0)**: Retained for 60 days offline
-- **Ephemeral nodes**: Can be configured for custom cleanup periods (see below)
+If **all instances** of a node are deleted from Cloud, the node entry itself is permanently removed. When the node reconnects, it will appear as a new node.
 
-### What Happens When Nodes Reconnect
-
-If a deleted child node reconnects (or its Parent comes back online), the node instance is automatically recreated in Netdata Cloud. Historical data remains available if retained on the Parent node.
+:::
 
 ## Monitoring and Managing Node Status
 
@@ -107,10 +89,16 @@ flowchart TD
     C --> F{"**Node Reconnects?**"}
     F -->|Yes - no config| G("**Reverts to Permanent**")
     F -->|No| H("**Remains Ephemeral**")
-    classDef step fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
-    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
-    class A,B,C,D,E step
-    class F,G,H alert
+    classDef step fill: #4caf50, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 16px
+    classDef alert fill: #ffeb3b, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 16px
+    class A step
+    class B step
+    class C step
+    class D step
+    class E step
+    class F alert
+    class G alert
+    class H alert
 ```
 
 ### Removing Offline Nodes
@@ -133,8 +121,12 @@ flowchart TD
     B --> C("**Node Removed from System**")
     C --> D("**Node No Longer Queryable**")
     C --> E("**Alerts for Node Cleared**")
-    classDef step fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
-    class A,B,C,D,E step
+    classDef step fill: #4caf50, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 16px
+    class A step
+    class B step
+    class C step
+    class D step
+    class E step
 ```
 
 ## Automatically Removing Ephemeral Nodes
@@ -162,10 +154,15 @@ flowchart TD
     D -->|No| F("**Node Remains in System**")
     E --> G{"**All Parents Removed Node?**"}
     G -->|Yes| H("**Node Removed from Cloud**")
-    classDef step fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
-    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
-    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
-    class A,B,C step
-    class D,E,F alert
-    class G,H database
+    classDef step fill: #4caf50, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 16px
+    classDef alert fill: #ffeb3b, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 16px
+    classDef database fill: #2196F3, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 16px
+    class A step
+    class B step
+    class C step
+    class D alert
+    class E alert
+    class F alert
+    class G database
+    class H database
 ```
