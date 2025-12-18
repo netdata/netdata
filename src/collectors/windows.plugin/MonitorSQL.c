@@ -124,113 +124,11 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT stmt, const char *mask, 
 
 void dict_mssql_fill_instance_transactions(struct mssql_db_instance *mdi)
 {
-    if (unlikely(!mdi || !mdi->parent || !mdi->parent->conn || !mdi->parent->conn->collect_buffer))
-        return;
-
-    char object_name[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
-    long value = 0;
-    SQLLEN col_object_len = 0, col_value_len = 0;
-
-    SQLRETURN ret =
-        SQLExecDirect(mdi->parent->conn->dbInstanceTransactionSTMT, (SQLCHAR *)NETDATA_QUERY_BUFFER_STATS, SQL_NTS);
-    if (likely(netdata_mssql_check_result(ret))) {
-        mdi->collecting_data = false;
-        netdata_MSSQL_error(
-            SQL_HANDLE_STMT,
-            mdi->parent->conn->dbInstanceTransactionSTMT,
-            NETDATA_MSSQL_ODBC_QUERY,
-            mdi->parent->instanceID);
-        goto enditransactions;
-    }
-
-    ret = SQLBindCol(
-        mdi->parent->conn->dbInstanceTransactionSTMT, 1, SQL_C_CHAR, object_name, sizeof(object_name), &col_object_len);
-    if (likely(netdata_mssql_check_result(ret))) {
-        netdata_MSSQL_error(
-            SQL_HANDLE_STMT,
-            mdi->parent->conn->dbInstanceTransactionSTMT,
-            NETDATA_MSSQL_ODBC_PREPARE,
-            mdi->parent->instanceID);
-        goto enditransactions;
-    }
-
-    ret =
-        SQLBindCol(mdi->parent->conn->dbInstanceTransactionSTMT, 2, SQL_C_LONG, &value, sizeof(value), &col_value_len);
-    if (likely(netdata_mssql_check_result(ret))) {
-        netdata_MSSQL_error(
-            SQL_HANDLE_STMT,
-            mdi->parent->conn->dbInstanceTransactionSTMT,
-            NETDATA_MSSQL_ODBC_PREPARE,
-            mdi->parent->instanceID);
-        goto enditransactions;
-    }
-
-    do {
-        ret = SQLFetch(mdi->parent->conn->dbInstanceTransactionSTMT);
-        switch (ret) {
-            case SQL_SUCCESS:
-            case SQL_SUCCESS_WITH_INFO:
-                break;
-            case SQL_NO_DATA:
-            default:
-                goto enditransactions;
-        }
-
-        if (col_object_len == SQL_NULL_DATA)
-            object_name[0] = '\0';
-        if (col_value_len == SQL_NULL_DATA)
-            value = 0;
-
-        // We cannot use strcmp, because buffer is filled with spaces instead NULL.
-        if (unlikely(!strncmp(
-                object_name,
-                NETDATA_MSSQL_BUFFER_PAGE_READS_METRIC,
-                sizeof(NETDATA_MSSQL_BUFFER_PAGE_READS_METRIC) - 1)))
-            mdi->MSSQLBufferPageReads.current.Data = (ULONGLONG)value;
-        else if (unlikely(!strncmp(
-                     object_name,
-                     NETDATA_MSSQL_BUFFER_PAGE_WRITES_METRIC,
-                     sizeof(NETDATA_MSSQL_BUFFER_PAGE_WRITES_METRIC) - 1)))
-            mdi->MSSQLBufferPageWrites.current.Data = (ULONGLONG)value;
-        else if (unlikely(!strncmp(
-                     object_name,
-                     NETDATA_MSSQL_BUFFER_PAGE_CACHE_METRIC,
-                     sizeof(NETDATA_MSSQL_BUFFER_PAGE_CACHE_METRIC) - 1)))
-            mdi->MSSQLBufferCacheHits.current.Data = (ULONGLONG)value;
-        else if (unlikely(!strncmp(
-                     object_name,
-                     NETDATA_MSSQL_BUFFER_CHECKPOINT_METRIC,
-                     sizeof(NETDATA_MSSQL_BUFFER_CHECKPOINT_METRIC) - 1)))
-            mdi->MSSQLBufferCheckpointPages.current.Data = (ULONGLONG)value;
-        else if (unlikely(!strncmp(
-                     object_name,
-                     NETDATA_MSSQL_BUFFER_PAGE_LIFE_METRIC,
-                     sizeof(NETDATA_MSSQL_BUFFER_PAGE_LIFE_METRIC) - 1)))
-            mdi->MSSQLBufferPageLifeExpectancy.current.Data = (ULONGLONG)value;
-        else if (unlikely(!strncmp(
-                     object_name,
-                     NETDATA_MSSQL_BUFFER_LAZY_WRITES_METRIC,
-                     sizeof(NETDATA_MSSQL_BUFFER_LAZY_WRITES_METRIC) - 1)))
-            mdi->MSSQLBufferLazyWrite.current.Data = (ULONGLONG)value;
-        else if (unlikely(!strncmp(
-                     object_name,
-                     NETDATA_MSSQL_BUFFER_PAGE_LOOKUPS_METRIC,
-                     sizeof(NETDATA_MSSQL_BUFFER_PAGE_LOOKUPS_METRIC) - 1)))
-            mdi->MSSQLBufferPageLookups.current.Data = (ULONGLONG)value;
-        else if (unlikely(!strncmp(
-                     object_name,
-                     NETDATA_MSSQL_STATS_COMPILATIONS_METRIC,
-                     sizeof(NETDATA_MSSQL_STATS_COMPILATIONS_METRIC) - 1)))
-            mdi->MSSQLCompilations.current.Data = (ULONGLONG)value;
-        else if (unlikely(!strncmp(
-                     object_name,
-                     NETDATA_MSSQL_STATS_RECOMPILATIONS_METRIC,
-                     sizeof(NETDATA_MSSQL_STATS_RECOMPILATIONS_METRIC) - 1)))
-            mdi->MSSQLRecompilations.current.Data = (ULONGLONG)value;
-    } while (true);
-
-enditransactions:
-    netdata_MSSQL_release_results(mdi->parent->conn->dbInstanceTransactionSTMT);
+    /* Instance buffer/compilation stats are now collected together with the
+     * per-database performance counters in dict_mssql_fill_performance_counters().
+     * Keep this function as a no-op to avoid changing external calls. */
+    (void)mdi;
+    return;
 }
 
 #define NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC "Active Transactions"
@@ -250,12 +148,109 @@ void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const c
     long value = 0;
     SQLLEN col_object_len = 0, col_value_len = 0;
 
-    if (unlikely(!mdi->parent->conn->collect_transactions))
+    if (unlikely(!mdi->parent->conn->collect_transactions && !mdi->parent->conn->collect_buffer))
         goto endtransactions;
 
-    if (likely(mdi->collect_instance))
-        dict_mssql_fill_instance_transactions(mdi);
+    if (likely(mdi->collect_instance)) {
+        /* Collect instance counters that were previously fetched with a separate
+         * buffer-stats query. */
+        char inst_obj[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
+        long inst_value = 0;
+        SQLLEN col_inst_obj_len = 0, col_inst_value_len = 0;
 
+        /* Execute the unified performance counter query targeting the instance
+         * (object_name=instance) to fetch buffer and compilation stats. */
+        SQLCHAR inst_query[sizeof(NETDATA_QUERY_PERFORMANCE_COUNTER) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
+        snprintfz(
+            (char *)inst_query,
+            sizeof(NETDATA_QUERY_PERFORMANCE_COUNTER) + 2 * NETDATA_MAX_INSTANCE_OBJECT,
+            NETDATA_QUERY_PERFORMANCE_COUNTER,
+            dbname,
+            dbname);
+
+        SQLRETURN inst_ret = SQLExecDirect(mdi->parent->conn->dbInstanceTransactionSTMT, (SQLCHAR *)inst_query, SQL_NTS);
+        if (likely(netdata_mssql_check_result(inst_ret))) {
+            /* don't fail whole collection for instance-level query */
+            netdata_MSSQL_error(
+                SQL_HANDLE_STMT,
+                mdi->parent->conn->dbInstanceTransactionSTMT,
+                NETDATA_MSSQL_ODBC_QUERY,
+                mdi->parent->instanceID);
+        } else {
+            if (!netdata_mssql_check_result(SQLBindCol(
+                    mdi->parent->conn->dbInstanceTransactionSTMT,
+                    1,
+                    SQL_C_CHAR,
+                    inst_obj,
+                    sizeof(inst_obj),
+                    &col_inst_obj_len))) {
+                (void)SQLBindCol(
+                    mdi->parent->conn->dbInstanceTransactionSTMT,
+                    2,
+                    SQL_C_LONG,
+                    &inst_value,
+                    sizeof(inst_value),
+                    &col_inst_value_len);
+
+                while (true) {
+                    SQLRETURN r = SQLFetch(mdi->parent->conn->dbInstanceTransactionSTMT);
+                    if (r == SQL_NO_DATA || r == SQL_ERROR)
+                        break;
+
+                    if (col_inst_obj_len == SQL_NULL_DATA)
+                        inst_obj[0] = '\0';
+                    if (col_inst_value_len == SQL_NULL_DATA)
+                        inst_value = 0;
+
+                    if (!strncmp(inst_obj, NETDATA_MSSQL_STATS_COMPILATIONS_METRIC, sizeof(NETDATA_MSSQL_STATS_COMPILATIONS_METRIC) - 1))
+                        mdi->MSSQLCompilations.current.Data = (ULONGLONG)inst_value;
+                    else if (!strncmp(
+                                 inst_obj,
+                                 NETDATA_MSSQL_STATS_RECOMPILATIONS_METRIC,
+                                 sizeof(NETDATA_MSSQL_STATS_RECOMPILATIONS_METRIC) - 1))
+                        mdi->MSSQLRecompilations.current.Data = (ULONGLONG)inst_value;
+                    else if (!strncmp(
+                                 inst_obj,
+                                 NETDATA_MSSQL_BUFFER_PAGE_READS_METRIC,
+                                 sizeof(NETDATA_MSSQL_BUFFER_PAGE_READS_METRIC) - 1))
+                        mdi->MSSQLBufferPageReads.current.Data = (ULONGLONG)inst_value;
+                    else if (!strncmp(
+                                 inst_obj,
+                                 NETDATA_MSSQL_BUFFER_PAGE_WRITES_METRIC,
+                                 sizeof(NETDATA_MSSQL_BUFFER_PAGE_WRITES_METRIC) - 1))
+                        mdi->MSSQLBufferPageWrites.current.Data = (ULONGLONG)inst_value;
+                    else if (!strncmp(
+                                 inst_obj,
+                                 NETDATA_MSSQL_BUFFER_PAGE_CACHE_METRIC,
+                                 sizeof(NETDATA_MSSQL_BUFFER_PAGE_CACHE_METRIC) - 1))
+                        mdi->MSSQLBufferCacheHits.current.Data = (ULONGLONG)inst_value;
+                    else if (!strncmp(
+                                 inst_obj,
+                                 NETDATA_MSSQL_BUFFER_CHECKPOINT_METRIC,
+                                 sizeof(NETDATA_MSSQL_BUFFER_CHECKPOINT_METRIC) - 1))
+                        mdi->MSSQLBufferCheckpointPages.current.Data = (ULONGLONG)inst_value;
+                    else if (!strncmp(
+                                 inst_obj,
+                                 NETDATA_MSSQL_BUFFER_PAGE_LIFE_METRIC,
+                                 sizeof(NETDATA_MSSQL_BUFFER_PAGE_LIFE_METRIC) - 1))
+                        mdi->MSSQLBufferPageLifeExpectancy.current.Data = (ULONGLONG)inst_value;
+                    else if (!strncmp(
+                                 inst_obj,
+                                 NETDATA_MSSQL_BUFFER_LAZY_WRITES_METRIC,
+                                 sizeof(NETDATA_MSSQL_BUFFER_LAZY_WRITES_METRIC) - 1))
+                        mdi->MSSQLBufferLazyWrite.current.Data = (ULONGLONG)inst_value;
+                    else if (!strncmp(
+                                 inst_obj,
+                                 NETDATA_MSSQL_BUFFER_PAGE_LOOKUPS_METRIC,
+                                 sizeof(NETDATA_MSSQL_BUFFER_PAGE_LOOKUPS_METRIC) - 1))
+                        mdi->MSSQLBufferPageLookups.current.Data = (ULONGLONG)inst_value;
+                }
+            }
+            netdata_MSSQL_release_results(mdi->parent->conn->dbInstanceTransactionSTMT);
+        }
+    }
+
+    /* Now fetch per-database metrics (transactions, locks, etc.) */
     SQLCHAR query[sizeof(NETDATA_QUERY_PERFORMANCE_COUNTER) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
     snprintfz(
             (char *)query,
