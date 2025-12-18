@@ -256,13 +256,13 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
     if (likely(mdi->collect_instance))
         dict_mssql_fill_instance_transactions(mdi);
 
-    SQLCHAR query[sizeof(NETDATA_QUERY_TRANSACTIONS_MASK) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
+    SQLCHAR query[sizeof(NETDATA_QUERY_PERFORMANCE_COUNTER) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
     snprintfz(
-        (char *)query,
-        sizeof(NETDATA_QUERY_TRANSACTIONS_MASK) + 2 * NETDATA_MAX_INSTANCE_OBJECT,
-        NETDATA_QUERY_TRANSACTIONS_MASK,
-        dbname,
-        dbname);
+            (char *)query,
+            sizeof(NETDATA_QUERY_PERFORMANCE_COUNTER) + 2 * NETDATA_MAX_INSTANCE_OBJECT,
+            NETDATA_QUERY_PERFORMANCE_COUNTER,
+            dbname,
+            dbname);
 
     SQLRETURN ret = SQLExecDirect(mdi->parent->conn->dbTransactionSTMT, (SQLCHAR *)query, SQL_NTS);
     if (likely(netdata_mssql_check_result(ret))) {
