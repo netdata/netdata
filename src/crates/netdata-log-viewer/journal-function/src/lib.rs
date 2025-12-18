@@ -10,9 +10,9 @@ pub mod netdata;
 
 // Re-export types from journal-query for convenience
 pub use journal_engine::{
-    BucketRequest, BucketResponse, Cache, CellValue, ColumnInfo, Facets, FileIndexKey, Histogram,
-    HistogramEngine, HistogramQueryBuilder, IndexingEngine, IndexingEngineBuilder, LogEntryData,
-    LogQuery, Result, Table, batch_compute_file_indexes, entry_data_to_table,
+    BucketRequest, BucketResponse, CellValue, ColumnInfo, Facets, FileIndexCache,
+    FileIndexCacheBuilder, FileIndexKey, Histogram, HistogramEngine, HistogramQueryBuilder,
+    LogEntryData, LogQuery, Result, Table, batch_compute_file_indexes, entry_data_to_table,
 };
 
 // Re-export Netdata-specific charts/metrics

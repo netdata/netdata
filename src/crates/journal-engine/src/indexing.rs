@@ -2,8 +2,7 @@
 //!
 //! This module provides infrastructure for indexing journal files:
 //! - Batch parallel indexing with time budget enforcement
-//! - Cache management for file indexes
-//! - Request/response types for indexing operations
+//! - Cache builder for file indexes
 
 use crate::{
     cache::{FileIndexCache, FileIndexKey},
@@ -15,62 +14,18 @@ use std::time::{Duration, Instant};
 use tracing::{debug, error};
 
 // ============================================================================
-// Indexing Engine
+// File Index Cache Builder
 // ============================================================================
 
-/// Service for file indexing with caching.
-///
-/// This service manages a cache for file indexes and provides batch parallel
-/// indexing capabilities with time budget enforcement.
-#[derive(Clone)]
-pub struct IndexingEngine {
-    cache: FileIndexCache,
-}
-
-impl IndexingEngine {
-    /// Creates a new IndexingEngine with the specified cache.
-    fn new(cache: FileIndexCache) -> Self {
-        Self { cache }
-    }
-
-    /// Gets a file index from the cache.
-    pub async fn get(&self, key: &FileIndexKey) -> Result<Option<FileIndex>> {
-        self.cache.get(key).await
-    }
-
-    /// Checks if the cache contains a key.
-    pub fn contains(&self, key: &FileIndexKey) -> bool {
-        self.cache.contains(key)
-    }
-
-    /// Inserts a file index into the cache.
-    pub fn insert(&self, key: FileIndexKey, value: FileIndex) {
-        self.cache.insert(key, value);
-    }
-
-    /// Closes the indexing engine, flushing all cached data to disk.
-    ///
-    /// This ensures that all background I/O tasks complete gracefully before
-    /// the cache is dropped. Should be called before the tokio runtime shuts down
-    /// to avoid task cancellation errors.
-    pub async fn close(&self) -> Result<()> {
-        self.cache.close().await
-    }
-}
-
-// ============================================================================
-// Indexing Engine Builder
-// ============================================================================
-
-/// Builder for constructing an IndexingEngine with custom configuration.
-pub struct IndexingEngineBuilder {
+/// Builder for constructing a FileIndexCache with custom configuration.
+pub struct FileIndexCacheBuilder {
     cache_path: Option<std::path::PathBuf>,
     memory_capacity: Option<usize>,
     disk_capacity: Option<usize>,
     block_size: Option<usize>,
 }
 
-impl IndexingEngineBuilder {
+impl FileIndexCacheBuilder {
     /// Creates a new builder with no configuration.
     ///
     /// All options use defaults if not explicitly set:
@@ -111,8 +66,8 @@ impl IndexingEngineBuilder {
         self
     }
 
-    /// Builds the IndexingEngine with the configured settings.
-    pub async fn build(self) -> Result<IndexingEngine> {
+    /// Builds the FileIndexCache with the configured settings.
+    pub async fn build(self) -> Result<FileIndexCache> {
         use foyer::{
             BlockEngineBuilder, DeviceBuilder, FsDeviceBuilder, HybridCacheBuilder,
             IoEngineBuilder, PsyncIoEngineBuilder,
@@ -135,7 +90,7 @@ impl IndexingEngineBuilder {
         })?;
 
         // Build Foyer hybrid cache
-        let foyer_cache = HybridCacheBuilder::new()
+        let cache = HybridCacheBuilder::new()
             .with_name("file-index-cache")
             .with_policy(foyer::HybridCachePolicy::WriteOnInsertion)
             .memory(memory_capacity)
@@ -153,13 +108,11 @@ impl IndexingEngineBuilder {
             .build()
             .await?;
 
-        let cache = FileIndexCache::new(foyer_cache);
-
-        Ok(IndexingEngine::new(cache))
+        Ok(cache)
     }
 }
 
-impl Default for IndexingEngineBuilder {
+impl Default for FileIndexCacheBuilder {
     fn default() -> Self {
         Self::new()
     }
@@ -179,7 +132,7 @@ impl Default for IndexingEngineBuilder {
 /// 5. Returns all results (cached + newly computed)
 ///
 /// # Arguments
-/// * `indexing_engine` - The indexing engine with cache access
+/// * `cache` - The file index cache
 /// * `registry` - Registry to update with file metadata
 /// * `keys` - Vector of (file, facets) pairs to fetch/compute indexes for
 /// * `source_timestamp_field` - Field name to use for timestamps when indexing
@@ -190,7 +143,7 @@ impl Default for IndexingEngineBuilder {
 /// Vector of responses for each key. Successful responses contain the file index.
 /// If time budget is exceeded, remaining keys will have TimeBudgetExceeded errors.
 pub async fn batch_compute_file_indexes(
-    indexing_engine: &IndexingEngine,
+    cache: &FileIndexCache,
     registry: &Registry,
     keys: Vec<FileIndexKey>,
     source_timestamp_field: FieldName,
@@ -204,7 +157,11 @@ pub async fn batch_compute_file_indexes(
     let cache_lookup_futures = keys.iter().map(|key| {
         let key_clone = key.clone();
         async move {
-            let cached = indexing_engine.get(&key_clone).await;
+            let cached = cache
+                .get(&key_clone)
+                .await
+                .map(|entry| entry.map(|e| e.value().clone()))
+                .map_err(|e| e.into());
             (key_clone, cached)
         }
     });
@@ -321,7 +278,7 @@ pub async fn batch_compute_file_indexes(
         if let Ok(index) = response {
             let time_range = index.time_range();
             let _ = registry.update_time_range(&key.file, time_range);
-            indexing_engine.insert(key.clone(), index.clone());
+            cache.insert(key.clone(), index.clone());
             responses.push((key, index));
         }
     }

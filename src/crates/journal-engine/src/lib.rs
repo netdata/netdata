@@ -26,11 +26,11 @@ pub mod indexing;
 pub mod logs;
 
 // Re-export key types for convenience
-pub use cache::{Cache, FileIndexKey};
+pub use cache::{FileIndexCache, FileIndexKey};
 pub use error::{EngineError, Result};
 pub use facets::Facets;
 pub use histogram::{
     BucketRequest, BucketResponse, Histogram, HistogramEngine, HistogramQueryBuilder,
 };
-pub use indexing::{IndexingEngine, IndexingEngineBuilder, batch_compute_file_indexes};
+pub use indexing::{FileIndexCacheBuilder, batch_compute_file_indexes};
 pub use logs::{CellValue, ColumnInfo, LogEntryData, LogQuery, Table, entry_data_to_table};

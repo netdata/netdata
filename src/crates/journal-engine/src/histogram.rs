@@ -4,10 +4,10 @@
 //! over time ranges, with support for filtering and faceted field indexing.
 
 use crate::{
-    cache::FileIndexKey,
+    cache::{FileIndexCache, FileIndexKey},
     error::Result,
     facets::Facets,
-    indexing::{IndexingEngine, batch_compute_file_indexes},
+    indexing::batch_compute_file_indexes,
 };
 use journal_core::collections::{HashMap, HashSet};
 use journal_index::{FieldName, FieldValuePair, Filter, Seconds};
@@ -232,16 +232,16 @@ impl Histogram {
 /// across multiple queries. It can be reused for multiple histogram computations.
 pub struct HistogramEngine {
     registry: Registry,
-    indexing_service: IndexingEngine,
+    cache: FileIndexCache,
     responses: RwLock<HashMap<BucketRequest, BucketResponse>>,
 }
 
 impl HistogramEngine {
     /// Creates a new HistogramEngine.
-    pub fn new(registry: Registry, indexing_service: IndexingEngine) -> Self {
+    pub fn new(registry: Registry, cache: FileIndexCache) -> Self {
         Self {
             registry,
-            indexing_service,
+            cache,
             responses: RwLock::new(HashMap::default()),
         }
     }
@@ -307,7 +307,7 @@ impl HistogramEngine {
                 let time_budget = Duration::from_secs(5);
 
                 let file_index_responses = batch_compute_file_indexes(
-                    &self.indexing_service,
+                    &self.cache,
                     &self.registry,
                     file_index_keys,
                     source_timestamp_field,

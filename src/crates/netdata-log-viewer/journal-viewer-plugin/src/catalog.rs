@@ -12,7 +12,7 @@ use tracing::{debug, error, info, instrument, warn};
 
 // Import types from journal-function crate
 use journal_function::{
-    Facets, FileIndexKey, Histogram, HistogramEngine, IndexingEngine, IndexingEngineBuilder,
+    Facets, FileIndexCache, FileIndexCacheBuilder, FileIndexKey, Histogram, HistogramEngine,
     Monitor, Registry, Result as CatalogResult, netdata,
 };
 
@@ -254,7 +254,7 @@ impl TransactionRegistry {
 /// Inner state for CatalogFunction (enables cloning)
 struct CatalogFunctionInner {
     registry: Registry,
-    indexing_engine: IndexingEngine,
+    cache: FileIndexCache,
     histogram_engine: Arc<HistogramEngine>,
     request_counter: AtomicU64,
     transaction_registry: TransactionRegistry,
@@ -315,7 +315,13 @@ impl CatalogFunction {
 
         for file_info in file_infos.iter() {
             let key = FileIndexKey::new(&file_info.file, &facets_obj);
-            match self.inner.indexing_engine.get(&key).await {
+            match self
+                .inner
+                .cache
+                .get(&key)
+                .await
+                .map(|entry| entry.map(|e| e.value().clone()))
+            {
                 Ok(Some(index)) => indexed_files.push(index),
                 Ok(None) => {
                     error!(
@@ -508,8 +514,8 @@ impl CatalogFunction {
     ) -> CatalogResult<Self> {
         let registry = Registry::new(monitor);
 
-        // Create indexing engine with disk-backed cache
-        let indexing_engine = IndexingEngineBuilder::new()
+        // Create file index cache with disk-backed storage
+        let cache = FileIndexCacheBuilder::new()
             .with_cache_path(cache_dir)
             .with_memory_capacity(memory_capacity)
             .with_disk_capacity(disk_capacity)
@@ -518,7 +524,7 @@ impl CatalogFunction {
             .await?;
 
         // Create histogram engine
-        let histogram_engine = HistogramEngine::new(registry.clone(), indexing_engine.clone());
+        let histogram_engine = HistogramEngine::new(registry.clone(), cache.clone());
 
         // Initialize response logging directory at info level
         if tracing::enabled!(tracing::Level::INFO) {
@@ -537,7 +543,7 @@ impl CatalogFunction {
 
         let inner = CatalogFunctionInner {
             registry,
-            indexing_engine,
+            cache,
             histogram_engine: Arc::new(histogram_engine),
             request_counter: AtomicU64::new(0),
             transaction_registry: TransactionRegistry::new(),

@@ -30,7 +30,7 @@
 // # Let's say it's 259:0, Set a 10MB/s read and write limit
 // echo "259:0 rbps=10485760 wbps=10485760" | sudo tee /sys/fs/cgroup/slow-io/io.max
 
-use journal_engine::{Facets, FileIndexKey, IndexingEngineBuilder, batch_compute_file_indexes};
+use journal_engine::{Facets, FileIndexCacheBuilder, FileIndexKey, batch_compute_file_indexes};
 use journal_index::FieldName;
 use journal_registry::{Monitor, Registry};
 use std::env;
@@ -75,8 +75,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     // files.truncate(1);
 
-    // Create indexing engine with cache
-    let indexing_engine = IndexingEngineBuilder::new()
+    // Create file index cache
+    let cache = FileIndexCacheBuilder::new()
         // .with_cache_path("/mnt/slow-disk/foyer-cache")
         .with_cache_path("/tmp/foyer-cache")
         .with_memory_capacity(1000)
@@ -85,7 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
-    info!("created indexing engine");
+    info!("created file index cache");
 
     // Configure indexing parameters (modify these as needed)
     let facets = Facets::new(&["log.severity_number".to_string()]);
@@ -108,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Run batch indexing
     let start = std::time::Instant::now();
     let responses = batch_compute_file_indexes(
-        &indexing_engine,
+        &cache,
         &registry,
         keys,
         source_timestamp_field,
@@ -121,8 +121,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("responses={}, duration={:?}", responses.len(), elapsed);
 
-    // Close the indexing engine to flush cache and shut down I/O tasks gracefully
-    indexing_engine.close().await?;
+    // Close the cache to flush and shut down I/O tasks gracefully
+    cache.close().await?;
 
     Ok(())
 }
