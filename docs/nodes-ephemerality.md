@@ -27,40 +27,13 @@ By default, Netdata treats all nodes as permanent. To mark a node as ephemeral:
 
 1. Open the `netdata.conf` file on the target node.
 2. Add the following configuration:
-
    ```ini
    [global]
-   is ephemeral node = yes
+       is ephemeral node = yes
    ```
-
 3. Restart the Netdata Agent.
 
-This applies the `_is_ephemeral` host label, which propagates to your Parents and Netdata Cloud.
-
-<details>
-<summary><strong>Click to see visual representation of configuration flow</strong></summary><br/>
-
-```mermaid
-flowchart TD
-    A[Node is Permanent by Default] -->|Step 1| B[Open netdata.conf on Target Node]
-    B -->|Step 2| C[Add Configuration]
-    C -->|Step 3| D[Restart the Node]
-    D --> E[Node Now Marked as Ephemeral]
-    E --> F[_is_ephemeral Label Applied]
-    F --> G[Label Propagates to Parents and Cloud]
-    classDef step fill: #e8f5e8, stroke: #27ae60, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-    classDef label fill: #f3e8ff, stroke: #9b59b6, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-    classDef subgraphStyle fill: #f8f9fa, stroke: #6c757d, stroke-width: 2px, color: #2c3e50, rx: 15, ry: 15
-    class A step
-    class B step
-    class C step
-    class D step
-    class E label
-    class F label
-    class G subgraphStyle
-```
-
-</details>
+Once restarted, Netdata automatically applies the `_is_ephemeral` host label to the node. This label propagates to your Parent nodes and appears in Netdata Cloud, allowing the system to identify and handle the node as ephemeral.
 
 ## Alerts for Parent Nodes
 
@@ -70,6 +43,24 @@ Netdata v2.3.0 introduces two alerts specific to permanent nodes:
 |-----------------------------|---------------------------------------------------------|
 | `streaming_never_connected` | A permanent node has never connected to a Parent.       |
 | `streaming_disconnected`    | A previously connected permanent node has disconnected. |
+
+## Automatic Node Instance Cleanup in Netdata Cloud
+
+Netdata Cloud automatically removes inactive nodes to keep your dashboards clean and organized.
+
+### Cleanup Rules
+
+| Node Type                    | Offline Duration | Description                                                                                                                        |
+|------------------------------|------------------|------------------------------------------------------------------------------------------------------------------------------------|
+| **Child nodes**              | 48 hours         | Nodes that connect through a Parent node. Deleted when:<br />• The child node goes offline, OR<br />• The Parent node goes offline |
+| **Directly connected nodes** | 60 days          | Nodes claimed directly to Netdata Cloud without going through a Parent.                                                            |
+| **Ephemeral nodes**          | Custom           | Temporary nodes (containers, auto-scaling VMs) with configurable cleanup periods. See configuration below.                         |
+
+:::info Important
+
+If a child node is deleted and later reconnects, it's automatically recreated in Netdata Cloud. Any historical data retained on the Parent node remains accessible.
+
+:::
 
 ## Monitoring and Managing Node Status
 
@@ -83,20 +74,17 @@ netdatacli mark-stale-nodes-ephemeral <node_id | machine_guid | hostname | ALL_N
 
 This keeps historical data queryable and clears active alerts.
 
-<details>
-<summary><strong>Click to see visual representation of CLI workflow</strong></summary><br/>
-
 ```mermaid
 flowchart TD
-    A[Offline Node Detected] -->|Run CLI Command| B[Use netdatacli mark-stale-nodes-ephemeral]
-    B --> C[Node Marked as Ephemeral]
-    C --> D[Metrics Remain Available]
-    C --> E[Active Alerts Cleared]
-    C --> F{Node Reconnects?}
-    F -->|Yes - no config| G[Reverts to Permanent]
-    F -->|No| H[Remains Ephemeral]
-    classDef step fill: #e8f5e8, stroke: #27ae60, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-    classDef alert fill: #ffe8e8, stroke: #e74c3c, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    A("**Offline Node Detected**") -->|Run CLI Command| B("**Use netdatacli mark-stale-nodes-ephemeral**")
+    B --> C("**Node Marked as Ephemeral**")
+    C --> D("**Metrics Remain Available**")
+    C --> E("**Active Alerts Cleared**")
+    C --> F{"**Node Reconnects?**"}
+    F -->|Yes - no config| G("**Reverts to Permanent**")
+    F -->|No| H("**Remains Ephemeral**")
+    classDef step fill: #4caf50, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 16px
+    classDef alert fill: #ffeb3b, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 16px
     class A step
     class B step
     class C step
@@ -106,8 +94,6 @@ flowchart TD
     class G alert
     class H alert
 ```
-
-</details>
 
 ### Removing Offline Nodes
 
@@ -123,25 +109,19 @@ For detailed instructions on removing nodes from Netdata Cloud (including **offl
 
 :::
 
-<details>
-<summary><strong>Click to see visual representation of node removal flow</strong></summary><br/>
-
 ```mermaid
 flowchart TD
-    A[Offline Node Detected] -->|Run CLI Tool| B[Execute remove-stale-node Command]
-    B --> C[Node Removed from System]
-    C --> D[Node No Longer Queryable]
-    C --> E[Alerts for Node Cleared]
-    classDef step fill: #e8f5e8, stroke: #27ae60, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-    classDef alert fill: #ffe8e8, stroke: #e74c3c, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    A("**Offline Node Detected**") -->|Run CLI Tool| B("**Execute remove-stale-node Command**")
+    B --> C("**Node Removed from System**")
+    C --> D("**Node No Longer Queryable**")
+    C --> E("**Alerts for Node Cleared**")
+    classDef step fill: #4caf50, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 16px
     class A step
     class B step
     class C step
     class D step
     class E step
 ```
-
-</details>
 
 ## Automatically Removing Ephemeral Nodes
 
@@ -159,28 +139,24 @@ To enable automatic cleanup of ephemeral nodes:
 
 This removes ephemeral nodes after 24 hours of disconnection. Once all Parents purge the node, it is automatically removed from Netdata Cloud.
 
-<details>
-<summary><strong>Click to see visual representation of auto-removal process</strong></summary><br/>
-
 ```mermaid
 flowchart TD
-    A[Configure Auto-Removal in netdata.conf] --> B[Restart Parent Nodes]
-    B --> C[Ephemeral Node Disconnects]
-    C --> D{Wait Period Elapsed?}
-    D -->|Yes| E[Node Automatically Removed]
-    D -->|No| F[Node Remains in System]
-    E --> G{All Parents Removed Node?}
-    G -->|Yes| H[Node Removed from Cloud]
-    classDef step fill: #e8f5e8, stroke: #27ae60, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-    classDef alert fill: #ffe8e8, stroke: #e74c3c, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    A("**Configure Auto-Removal in netdata.conf**") --> B("**Restart Parent Nodes**")
+    B --> C("**Ephemeral Node Disconnects**")
+    C --> D{"**Wait Period Elapsed?**"}
+    D -->|Yes| E("**Node Automatically Removed**")
+    D -->|No| F("**Node Remains in System**")
+    E --> G{"**All Parents Removed Node?**"}
+    G -->|Yes| H("**Node Removed from Cloud**")
+    classDef step fill: #4caf50, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 16px
+    classDef alert fill: #ffeb3b, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 16px
+    classDef database fill: #2196F3, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 16px
     class A step
     class B step
     class C step
-    class D step
-    class E step
-    class F step
-    class G step
-    class H step
+    class D alert
+    class E alert
+    class F alert
+    class G database
+    class H database
 ```
-
-</details>
