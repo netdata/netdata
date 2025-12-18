@@ -57,6 +57,15 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
     scope: 'masterOnly',
     groups: [G_MASTER_OVERRIDES],
   }),
+  strDef({
+    key: 'expectedOutputSchema',
+    default: undefined,
+    description: 'JSON schema for the expected JSON output (inline JSON or @path). Forces expectedOutput.format=json for the master agent.',
+    cli: { names: ['--schema'], showInHelp: true },
+    fm: { allowed: false },
+    scope: 'masterOnly',
+    groups: [G_MASTER_OVERRIDES],
+  }),
   strArrDef({
     key: 'tools',
     default: [],

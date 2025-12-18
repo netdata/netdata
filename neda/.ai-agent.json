@@ -2,7 +2,7 @@
   "providers": {
     "nova": {
       "type": "openai",
-      "apiKey": "sk-litellm-master-key",
+      "apiKey": "${NOVA_API_KEY}",
       "baseUrl": "http://nova:8090/v1",
       "openaiMode": "chat",
       "contextWindow": 131072,

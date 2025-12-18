@@ -160,6 +160,7 @@ export interface GlobalOverrides {
 export interface LoadAgentOptions {
   configPath?: string;
   configLayers?: ResolvedConfigLayer[];
+  expectedOutputOverride?: { format: 'json' | 'markdown' | 'text'; schema?: Record<string, unknown> };
   verbose?: boolean;
   targets?: { provider: string; model: string }[];
   tools?: string[];
@@ -527,9 +528,15 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
   const accountingFile: string | undefined = config.persistence?.billingFile ?? config.accounting?.file;
 
   const resolvedInput = resolveInputContract(fm?.inputSpec);
-  const resolvedExpectedOutput = fm?.expectedOutput !== undefined
+  let resolvedExpectedOutput = fm?.expectedOutput !== undefined
     ? { ...fm.expectedOutput, schema: cloneOptionalJsonSchema(fm.expectedOutput.schema) }
     : undefined;
+  if (options?.expectedOutputOverride !== undefined) {
+    resolvedExpectedOutput = {
+      ...options.expectedOutputOverride,
+      schema: cloneOptionalJsonSchema(options.expectedOutputOverride.schema),
+    };
+  }
   const resolvedOutputSchema = resolvedExpectedOutput?.format === 'json'
     ? cloneOptionalJsonSchema(resolvedExpectedOutput.schema)
     : undefined;

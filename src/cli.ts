@@ -1300,6 +1300,27 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
     // Share the same object so nested loads observe identical override identity.
     loadOptions.globalOverrides = globalOverrides;
   }
+  const schemaRaw = typeof config.options.expectedOutputSchema === 'string' && config.options.expectedOutputSchema.trim().length > 0
+    ? config.options.expectedOutputSchema.trim()
+    : undefined;
+  if (schemaRaw !== undefined) {
+    const parseSchema = (raw: string): Record<string, unknown> => {
+      const pathMaybe = raw.startsWith('@') ? raw.slice(1) : raw;
+      const absPath = path.isAbsolute(pathMaybe) ? pathMaybe : path.resolve(process.cwd(), pathMaybe);
+      if (fs.existsSync(absPath) && fs.statSync(absPath).isFile()) {
+        const content = fs.readFileSync(absPath, 'utf8');
+        return JSON.parse(content) as Record<string, unknown>;
+      }
+      return JSON.parse(raw) as Record<string, unknown>;
+    };
+    try {
+      const parsedSchema = parseSchema(schemaRaw);
+      loadOptions.expectedOutputOverride = { format: 'json', schema: parsedSchema };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      exitWith(4, `invalid --schema: ${message}`, 'EXIT-CLI-SCHEMA');
+    }
+  }
   if (parsedTargets !== undefined) {
     loadOptions.targets = parsedTargets;
   }
