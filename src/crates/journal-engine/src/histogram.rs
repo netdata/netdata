@@ -3,15 +3,9 @@
 //! This module provides types and services for computing histograms of journal log entries
 //! over time ranges, with support for filtering and faceted field indexing.
 
-use crate::{
-    cache::{FileIndexCache, FileIndexKey},
-    error::Result,
-    facets::Facets,
-    indexing::batch_compute_file_indexes,
-};
+use crate::{cache::FileIndexKey, error::Result, facets::Facets};
 use journal_core::collections::{HashMap, HashSet};
-use journal_index::{FieldName, FieldValuePair, Filter, Seconds};
-use journal_registry::Registry;
+use journal_index::{FieldName, FieldValuePair, FileIndex, Filter, Seconds};
 use parking_lot::RwLock;
 use std::time::Duration;
 
@@ -231,42 +225,37 @@ impl Histogram {
 /// The engine maintains caches and resources for efficiently computing histograms
 /// across multiple queries. It can be reused for multiple histogram computations.
 pub struct HistogramEngine {
-    registry: Registry,
-    cache: FileIndexCache,
     responses: RwLock<HashMap<BucketRequest, BucketResponse>>,
 }
 
 impl HistogramEngine {
     /// Creates a new HistogramEngine.
-    pub fn new(registry: Registry, cache: FileIndexCache) -> Self {
+    pub fn new() -> Self {
         Self {
-            registry,
-            cache,
             responses: RwLock::new(HashMap::default()),
         }
     }
 
-    /// Creates a new histogram query builder.
+    /// Compute a histogram from pre-indexed files.
     ///
-    /// # Example
+    /// This method allows you to compute histograms from file indexes that have
+    /// already been loaded, avoiding redundant cache lookups and file discoveries.
     ///
-    /// ```ignore
-    /// let histogram = engine.query()
-    ///     .with_time_range(start_time, end_time)
-    ///     .with_facets(&["PRIORITY", "_HOSTNAME"])
-    ///     .with_filter(&filter_expr)
-    ///     .execute()
-    ///     .await?;
-    /// ```
-    pub fn query(&self) -> HistogramQueryBuilder<'_> {
-        HistogramQueryBuilder::new(self)
-    }
-
-    /// Process a histogram request and return the histogram.
-    pub(crate) async fn get_histogram(
+    /// # Arguments
+    /// * `indexed_files` - Pre-computed file indexes
+    /// * `after` - Start time (inclusive) in seconds since Unix epoch
+    /// * `before` - End time (exclusive) in seconds since Unix epoch
+    /// * `facets` - Fields to index
+    /// * `filter_expr` - Filter expression to apply
+    pub fn compute_from_indexes(
         &self,
-        histogram_request: HistogramRequest,
+        indexed_files: &[(FileIndexKey, FileIndex)],
+        after: u32,
+        before: u32,
+        facets: &[String],
+        filter_expr: &Filter,
     ) -> Result<Histogram> {
+        let histogram_request = HistogramRequest::new(after, before, facets, filter_expr);
         let bucket_requests = histogram_request.bucket_requests();
 
         // Find buckets that need computation
@@ -281,104 +270,74 @@ impl HistogramEngine {
         };
 
         if !buckets_to_compute.is_empty() {
-            // Query registry once for entire histogram time range
-            let histogram_start = bucket_requests.first().unwrap().start;
-            let histogram_end = bucket_requests.last().unwrap().end;
-            let histogram_files = self
-                .registry
-                .find_files_in_range(histogram_start, histogram_end)?;
-
             // Initialize responses for buckets we need to compute
             let mut new_responses: HashMap<BucketRequest, BucketResponse> = buckets_to_compute
                 .iter()
                 .map(|br| (br.clone(), BucketResponse::new()))
                 .collect();
 
-            // Build file index keys
-            let file_index_keys: Vec<FileIndexKey> = histogram_files
-                .iter()
-                .map(|file_info| FileIndexKey::new(&file_info.file, &histogram_request.facets))
-                .collect();
+            // Process all file indexes and update responses
+            for (_, file_index) in indexed_files {
+                // Get file's time range from the index
+                let file_start = file_index.start_time();
+                let file_end = file_index.end_time();
 
-            // Batch compute all file indexes
-            if !file_index_keys.is_empty() {
-                let bucket_duration = bucket_requests.first().unwrap().duration();
-                let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
-                let time_budget = Duration::from_secs(5);
+                // Find all bucket requests that need data from this file
+                for bucket_request in &buckets_to_compute {
+                    let response = match new_responses.get_mut(bucket_request) {
+                        Some(r) => r,
+                        None => continue,
+                    };
 
-                let file_index_responses = batch_compute_file_indexes(
-                    &self.cache,
-                    &self.registry,
-                    file_index_keys,
-                    source_timestamp_field,
-                    bucket_duration,
-                    time_budget,
-                )
-                .await?;
+                    // Skip if file's time range doesn't overlap with bucket's time range
+                    if file_start >= bucket_request.end || file_end <= bucket_request.start {
+                        continue;
+                    }
 
-                // Process all file indexes and update responses
-                for (_, file_index) in file_index_responses {
-                    // Get file's time range from the index
-                    let file_start = file_index.start_time();
-                    let file_end = file_index.end_time();
+                    // Evaluate filter to bitmap
+                    let filter_bitmap = if !bucket_request.filter_expr.is_none() {
+                        Some(bucket_request.filter_expr.evaluate(file_index))
+                    } else {
+                        None
+                    };
 
-                    // Find all bucket requests that need data from this file
-                    for bucket_request in &buckets_to_compute {
-                        let response = match new_responses.get_mut(bucket_request) {
-                            Some(r) => r,
-                            None => continue,
-                        };
-
-                        // Skip if file's time range doesn't overlap with bucket's time range
-                        if file_start >= bucket_request.end || file_end <= bucket_request.start {
-                            continue;
-                        }
-
-                        // Evaluate filter to bitmap
-                        let filter_bitmap = if !bucket_request.filter_expr.is_none() {
-                            Some(bucket_request.filter_expr.evaluate(&file_index))
-                        } else {
-                            None
-                        };
-
-                        // Track unindexed fields
-                        for field in file_index.fields() {
-                            if !file_index.is_indexed(field) {
-                                if let Some(field_name) = FieldName::new(field) {
-                                    response.unindexed_fields.insert(field_name);
-                                }
+                    // Track unindexed fields
+                    for field in file_index.fields() {
+                        if !file_index.is_indexed(field) {
+                            if let Some(field_name) = FieldName::new(field) {
+                                response.unindexed_fields.insert(field_name);
                             }
                         }
+                    }
 
-                        // Count field=value pairs in this file for this bucket's time range
-                        for (indexed_field, field_bitmap) in file_index.bitmaps() {
-                            let unfiltered_count = file_index
+                    // Count field=value pairs in this file for this bucket's time range
+                    for (indexed_field, field_bitmap) in file_index.bitmaps() {
+                        let unfiltered_count = file_index
+                            .count_entries_in_time_range(
+                                field_bitmap,
+                                bucket_request.start,
+                                bucket_request.end,
+                            )
+                            .unwrap_or(0);
+
+                        let filtered_count = if let Some(ref filter_bitmap) = filter_bitmap {
+                            let filtered_bitmap = field_bitmap & filter_bitmap;
+                            file_index
                                 .count_entries_in_time_range(
-                                    field_bitmap,
+                                    &filtered_bitmap,
                                     bucket_request.start,
                                     bucket_request.end,
                                 )
-                                .unwrap_or(0);
+                                .unwrap_or(0)
+                        } else {
+                            unfiltered_count
+                        };
 
-                            let filtered_count = if let Some(ref filter_bitmap) = filter_bitmap {
-                                let filtered_bitmap = field_bitmap & filter_bitmap;
-                                file_index
-                                    .count_entries_in_time_range(
-                                        &filtered_bitmap,
-                                        bucket_request.start,
-                                        bucket_request.end,
-                                    )
-                                    .unwrap_or(0)
-                            } else {
-                                unfiltered_count
-                            };
-
-                            // Update counts
-                            if let Some(pair) = FieldValuePair::parse(indexed_field) {
-                                let counts = response.fv_counts.entry(pair).or_insert((0, 0));
-                                counts.0 += unfiltered_count;
-                                counts.1 += filtered_count;
-                            }
+                        // Update counts
+                        if let Some(pair) = FieldValuePair::parse(indexed_field) {
+                            let counts = response.fv_counts.entry(pair).or_insert((0, 0));
+                            counts.0 += unfiltered_count;
+                            counts.1 += filtered_count;
                         }
                     }
                 }
@@ -403,70 +362,5 @@ impl HistogramEngine {
             .collect();
 
         Ok(Histogram { buckets })
-    }
-}
-
-/// A builder for constructing and executing histogram queries.
-pub struct HistogramQueryBuilder<'a> {
-    engine: &'a HistogramEngine,
-    after: Option<u32>,
-    before: Option<u32>,
-    facets: Vec<String>,
-    filter_expr: Filter,
-}
-
-impl<'a> HistogramQueryBuilder<'a> {
-    fn new(engine: &'a HistogramEngine) -> Self {
-        Self {
-            engine,
-            after: None,
-            before: None,
-            facets: Vec::new(),
-            filter_expr: Filter::none(),
-        }
-    }
-
-    /// Sets the time range for the histogram.
-    ///
-    /// # Arguments
-    /// * `after` - Start time (inclusive) in seconds since Unix epoch
-    /// * `before` - End time (exclusive) in seconds since Unix epoch
-    pub fn with_time_range(mut self, after: u32, before: u32) -> Self {
-        self.after = Some(after);
-        self.before = Some(before);
-        self
-    }
-
-    /// Sets the facets (fields to index) for the histogram.
-    ///
-    /// If not specified or empty, default facets will be used.
-    pub fn with_facets<S: AsRef<str>>(mut self, facets: &[S]) -> Self {
-        self.facets = facets.iter().map(|s| s.as_ref().to_string()).collect();
-        self
-    }
-
-    /// Sets the filter expression to apply to log entries.
-    pub fn with_filter(mut self, filter_expr: &Filter) -> Self {
-        self.filter_expr = filter_expr.clone();
-        self
-    }
-
-    /// Executes the histogram query.
-    pub async fn execute(self) -> Result<Histogram> {
-        let after = self.after.ok_or_else(|| {
-            crate::error::EngineError::Io(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "after time must be specified",
-            ))
-        })?;
-        let before = self.before.ok_or_else(|| {
-            crate::error::EngineError::Io(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "before time must be specified",
-            ))
-        })?;
-
-        let request = HistogramRequest::new(after, before, &self.facets, &self.filter_expr);
-        self.engine.get_histogram(request).await
     }
 }

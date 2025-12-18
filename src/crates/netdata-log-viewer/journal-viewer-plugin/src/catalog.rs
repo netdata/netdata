@@ -12,8 +12,8 @@ use tracing::{debug, error, info, instrument, warn};
 
 // Import types from journal-function crate
 use journal_function::{
-    Facets, FileIndexCache, FileIndexCacheBuilder, FileIndexKey, Histogram, HistogramEngine,
-    Monitor, Registry, Result as CatalogResult, netdata,
+    Facets, FileIndexCache, FileIndexCacheBuilder, FileIndexKey, HistogramEngine, Monitor,
+    Registry, Result as CatalogResult, netdata,
 };
 
 /*
@@ -267,24 +267,73 @@ pub struct CatalogFunction {
 }
 
 impl CatalogFunction {
-    /// Query log entries from the indexed files (generic).
+    /// Calculate the appropriate bucket duration based on the time range.
+    ///
+    /// This uses the same logic as HistogramRequest::calculate_bucket_duration
+    /// to determine the bucket size that will result in approximately 50-100 buckets.
+    fn calculate_bucket_duration(time_range_duration: u32) -> u32 {
+        use std::time::Duration;
+
+        const MINUTE: Duration = Duration::from_secs(60);
+        const HOUR: Duration = Duration::from_secs(60 * MINUTE.as_secs());
+        const DAY: Duration = Duration::from_secs(24 * HOUR.as_secs());
+
+        const VALID_DURATIONS: &[Duration] = &[
+            // Seconds
+            Duration::from_secs(1),
+            Duration::from_secs(2),
+            Duration::from_secs(5),
+            Duration::from_secs(10),
+            Duration::from_secs(15),
+            Duration::from_secs(30),
+            // Minutes
+            MINUTE,
+            Duration::from_secs(2 * MINUTE.as_secs()),
+            Duration::from_secs(3 * MINUTE.as_secs()),
+            Duration::from_secs(5 * MINUTE.as_secs()),
+            Duration::from_secs(10 * MINUTE.as_secs()),
+            Duration::from_secs(15 * MINUTE.as_secs()),
+            Duration::from_secs(30 * MINUTE.as_secs()),
+            // Hours
+            HOUR,
+            Duration::from_secs(2 * HOUR.as_secs()),
+            Duration::from_secs(6 * HOUR.as_secs()),
+            Duration::from_secs(8 * HOUR.as_secs()),
+            Duration::from_secs(12 * HOUR.as_secs()),
+            // Days
+            DAY,
+            Duration::from_secs(2 * DAY.as_secs()),
+            Duration::from_secs(3 * DAY.as_secs()),
+            Duration::from_secs(5 * DAY.as_secs()),
+            Duration::from_secs(7 * DAY.as_secs()),
+            Duration::from_secs(14 * DAY.as_secs()),
+            Duration::from_secs(30 * DAY.as_secs()),
+        ];
+
+        VALID_DURATIONS
+            .iter()
+            .rev()
+            .find(|&&bucket_width| time_range_duration as u64 / bucket_width.as_secs() >= 50)
+            .map(|d| d.as_secs())
+            .unwrap_or(1) as u32
+    }
+
+    /// Query log entries from pre-indexed files.
     ///
     /// This method:
-    /// 1. Finds journal files in the time range
-    /// 2. Retrieves indexed files from cache
-    /// 3. Queries log entries using LogQuery
-    /// 4. Returns raw log entry data and pagination flags
+    /// 1. Queries log entries using LogQuery from pre-indexed files
+    /// 2. Returns raw log entry data and pagination flags
     ///
     /// Returns: (entries, has_before, has_after)
     /// - entries: The log entries matching the query
     /// - has_before: true if there are more entries before the returned window
     /// - has_after: true if there are more entries after the returned window
-    async fn query_logs(
+    fn query_logs_from_indexes(
         &self,
+        indexed_files: &[journal_index::FileIndex],
         after: u32,
         before: u32,
         anchor: Option<u64>,
-        facets: &[String],
         filter: &Filter,
         search_query: &str,
         limit: usize,
@@ -292,53 +341,7 @@ impl CatalogFunction {
     ) -> (Vec<journal_function::LogEntryData>, bool, bool) {
         use journal_function::LogQuery;
 
-        info!("querying logs for time range [{}, {})", after, before);
-
-        // Find files in the time range
-        let file_infos = match self
-            .inner
-            .registry
-            .find_files_in_range(Seconds(after), Seconds(before))
-        {
-            Ok(files) => files,
-            Err(e) => {
-                warn!("Failed to find files in range: {}", e);
-                return (Vec::new(), false, false);
-            }
-        };
-
-        info!("found {} files in range", file_infos.len());
-
-        // Collect indexed files from cache
-        let mut indexed_files = Vec::new();
-        let facets_obj = Facets::new(facets);
-
-        for file_info in file_infos.iter() {
-            let key = FileIndexKey::new(&file_info.file, &facets_obj);
-            match self
-                .inner
-                .cache
-                .get(&key)
-                .await
-                .map(|entry| entry.map(|e| e.value().clone()))
-            {
-                Ok(Some(index)) => indexed_files.push(index),
-                Ok(None) => {
-                    error!(
-                        "file index is not ready for logs querying: {}",
-                        file_info.file.path()
-                    );
-                    panic!("Adios");
-                    continue;
-                }
-                Err(e) => {
-                    error!("Failed to get index from cache: {}", e);
-                    continue;
-                }
-            }
-        }
-
-        info!("found {} indexed files in cache", indexed_files.len());
+        info!("querying logs from {} indexed files", indexed_files.len());
 
         if indexed_files.is_empty() {
             info!("no indexed files available for log query");
@@ -524,7 +527,7 @@ impl CatalogFunction {
             .await?;
 
         // Create histogram engine
-        let histogram_engine = HistogramEngine::new(registry.clone(), cache.clone());
+        let histogram_engine = HistogramEngine::new();
 
         // Initialize response logging directory at info level
         if tracing::enabled!(tracing::Level::INFO) {
@@ -552,24 +555,6 @@ impl CatalogFunction {
         Ok(Self {
             inner: Arc::new(inner),
         })
-    }
-
-    /// Get a histogram for the given parameters
-    pub async fn get_histogram(
-        &self,
-        after: u32,
-        before: u32,
-        facets: &[String],
-        filter: &Filter,
-    ) -> CatalogResult<Histogram> {
-        self.inner
-            .histogram_engine
-            .query()
-            .with_time_range(after, before)
-            .with_facets(facets)
-            .with_filter(filter)
-            .execute()
-            .await
     }
 
     /// Watch a directory for journal files
@@ -703,7 +688,7 @@ impl FunctionHandler for CatalogFunction {
         }
 
         info!(
-            "Creating histogram request: after={}, before={}",
+            "Processing request: after={}, before={}",
             request.after, request.before
         );
 
@@ -716,28 +701,79 @@ impl FunctionHandler for CatalogFunction {
             .cloned()
             .collect();
 
-        info!("getting histogram from catalog");
-        let histogram = self
-            .get_histogram(request.after, request.before, &facets, &filter_expr)
-            .await
+        // Step 1: Find files in the time range ONCE
+        info!("finding files in time range");
+        let files = self
+            .inner
+            .registry
+            .find_files_in_range(Seconds(request.after), Seconds(request.before))
             .map_err(|e| netdata_plugin_error::NetdataPluginError::Other {
-                message: format!("failed to get histogram: {}", e),
+                message: format!("failed to find files in range: {}", e),
+            })?;
+        info!("found {} files in range", files.len());
+
+        // Step 2: Build file index keys ONCE
+        let facets_obj = Facets::new(&facets);
+        let keys: Vec<FileIndexKey> = files
+            .iter()
+            .map(|f| FileIndexKey::new(&f.file, &facets_obj))
+            .collect();
+
+        // Step 3: Compute bucket duration for indexing
+        // We need to determine the appropriate bucket duration based on the time range
+        let time_range_duration = request.before - request.after;
+        let bucket_duration = Self::calculate_bucket_duration(time_range_duration);
+        info!("using bucket duration: {} seconds", bucket_duration);
+
+        // Step 4: Index all files ONCE
+        info!("indexing {} files", keys.len());
+        let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
+        let time_budget = std::time::Duration::from_secs(5);
+
+        let indexed_files = journal_function::batch_compute_file_indexes(
+            &self.inner.cache,
+            &self.inner.registry,
+            keys,
+            source_timestamp_field,
+            Seconds(bucket_duration),
+            time_budget,
+        )
+        .await
+        .map_err(|e| netdata_plugin_error::NetdataPluginError::Other {
+            message: format!("failed to index files: {}", e),
+        })?;
+        info!("indexed {} files", indexed_files.len());
+
+        // Step 5: Compute histogram from pre-indexed files
+        info!("computing histogram from indexed files");
+        let histogram = self
+            .inner
+            .histogram_engine
+            .compute_from_indexes(
+                &indexed_files,
+                request.after,
+                request.before,
+                &facets,
+                &filter_expr,
+            )
+            .map_err(|e| netdata_plugin_error::NetdataPluginError::Other {
+                message: format!("failed to compute histogram: {}", e),
             })?;
         info!("histogram computation complete");
 
+        // Step 6: Query logs from pre-indexed files
         let limit = request.last.unwrap_or(200);
-        let (log_entries, has_before, has_after) = self
-            .query_logs(
-                request.after,
-                request.before,
-                request.anchor,
-                &facets,
-                &filter_expr,
-                &request.query,
-                limit,
-                request.direction,
-            )
-            .await;
+        let file_indexes: Vec<_> = indexed_files.iter().map(|(_, idx)| idx.clone()).collect();
+        let (log_entries, has_before, has_after) = self.query_logs_from_indexes(
+            &file_indexes,
+            request.after,
+            request.before,
+            request.anchor,
+            &filter_expr,
+            &request.query,
+            limit,
+            request.direction,
+        );
 
         // Build Netdata UI response (columns + data)
         let (columns, data) = netdata::build_ui_response(&histogram, &log_entries);

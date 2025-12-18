@@ -29,8 +29,6 @@ pub mod logs;
 pub use cache::{FileIndexCache, FileIndexKey};
 pub use error::{EngineError, Result};
 pub use facets::Facets;
-pub use histogram::{
-    BucketRequest, BucketResponse, Histogram, HistogramEngine, HistogramQueryBuilder,
-};
+pub use histogram::{BucketRequest, BucketResponse, Histogram, HistogramEngine};
 pub use indexing::{FileIndexCacheBuilder, batch_compute_file_indexes};
 pub use logs::{CellValue, ColumnInfo, LogEntryData, LogQuery, Table, entry_data_to_table};
