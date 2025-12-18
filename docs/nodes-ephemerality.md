@@ -28,8 +28,8 @@ By default, Netdata treats all nodes as permanent. To mark a node as ephemeral:
 1. Open the `netdata.conf` file on the target node.
 2. Add the following configuration:
    ```ini
-      [global]
-      is ephemeral node = yes
+   [global]
+       is ephemeral node = yes
    ```
 3. Restart the Netdata Agent.
 
