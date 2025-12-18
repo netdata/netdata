@@ -62,12 +62,6 @@ If a child node is deleted and later reconnects, it's automatically recreated in
 
 :::
 
-:::warning Data Loss Risk
-
-If **all instances** of a node are deleted from Cloud, the node entry itself is permanently removed. When the node reconnects, it will appear as a new node.
-
-:::
-
 ## Monitoring and Managing Node Status
 
 ### Mark Permanently Offline Nodes as Ephemeral
