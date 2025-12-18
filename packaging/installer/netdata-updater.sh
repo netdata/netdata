@@ -1240,7 +1240,7 @@ update_binpkg() {
     fi
   fi
 
-  current_major="$(echo "${nd_version}" | cut -f 1 -d '.' | tr -d 'v')"
+  current_major="$(netdata -v | cut -f 2 -d ' ' | cut -f 1 -d '.' | tr -d 'v')"
   latest_major="$(get_new_binpkg_major)"
 
   if [ -n "${latest_major}" ] && [ "${latest_major}" -ne "${current_major}" ]; then
