@@ -669,7 +669,7 @@ struct netdata_mssql_conn {
     SQLHSTMT checkPermSTMT;
     SQLHSTMT databaseListSTMT;
     SQLHSTMT dataFileSizeSTMT;
-    SQLHSTMT dbTransactionSTMT;
+    SQLHSTMT dbPerfCounterSTMT;
     SQLHSTMT dbInstanceTransactionSTMT;
     SQLHSTMT dbWaitsSTMT;
     SQLHSTMT dbLocksSTMT;
