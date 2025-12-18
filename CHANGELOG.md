@@ -110,6 +110,10 @@
 - Regenerate integrations docs ([#21470](https://github.com/netdata/netdata/issues/21470))
 - Chore(go.d): include Go version in build info ([#21473](https://github.com/netdata/netdata/issues/21473))
 - Update windows.plugin ([#21466](https://github.com/netdata/netdata/issues/21466))
+- Remove Fedora 41 from CI and package builds. ([#21475](https://github.com/netdata/netdata/issues/21475))
+- Build(deps): bump actions/download-artifact from 4 to 7 ([#21464](https://github.com/netdata/netdata/issues/21464))
+- Fixes Windows.plugin (Part III) ([#21474](https://github.com/netdata/netdata/issues/21474))
+- Improve metadata storage stability ([#21468](https://github.com/netdata/netdata/issues/21468))
 
 ## [2.8.0] - 2025-11-19
 
