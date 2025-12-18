@@ -287,8 +287,15 @@ pub async fn batch_compute_file_indexes(
     let cache_results: Vec<(FileIndexKey, Option<FileIndex>)> =
         futures::future::join_all(cache_futures).await;
 
-    let found_count = cache_results.iter().filter(|(_, cached)| cached.is_some()).count();
-    debug!("phase 1 complete: found {} of {} entries in cache", found_count, keys.len());
+    let found_count = cache_results
+        .iter()
+        .filter(|(_, cached)| cached.is_some())
+        .count();
+    debug!(
+        "phase 1 complete: found {} of {} entries in cache",
+        found_count,
+        keys.len()
+    );
 
     // Phase 2: Separate cache hits from misses, check freshness and compatibility
     debug!("phase 2");

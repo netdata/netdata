@@ -51,8 +51,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dir = if let Some(arg) = env::args().nth(1) {
         PathBuf::from(arg)
     } else {
-        PathBuf::from("/mnt/slow-disk/otel-aws")
-        // PathBuf::from("/home/vk/repos/tmp/otel-aws")
+        // PathBuf::from("/mnt/slow-disk/otel-aws")
+        PathBuf::from("/home/vk/repos/tmp/otel-aws")
     };
 
     info!("scanning directory: {}", dir.display());
@@ -73,12 +73,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if files.is_empty() {
         return Ok(());
     }
-    files.truncate(1);
+    // files.truncate(1);
 
     // Create indexing engine with cache
     let indexing_engine = IndexingEngineBuilder::new()
-        .with_cache_path("/mnt/slow-disk/foyer-cache")
-        // .with_cache_path("/tmp/foyer-cache")
+        // .with_cache_path("/mnt/slow-disk/foyer-cache")
+        .with_cache_path("/tmp/foyer-cache")
         .with_memory_capacity(1000)
         .with_disk_capacity(2048 * 1024 * 1024)
         .with_block_size(4 * 1024 * 1024)
@@ -97,7 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let bucket_duration = journal_common::Seconds(60);
-    let time_budget = Duration::from_secs(2);
+    let time_budget = Duration::from_secs(60);
 
     info!(
         "computing {} file indexes with time budget {} seconds",
