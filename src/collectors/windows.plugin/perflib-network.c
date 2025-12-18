@@ -1063,8 +1063,7 @@ int do_PerflibNetwork(int update_every, usec_t dt __maybe_unused)
     usec_t now_ut = now_monotonic_usec();
     if (!do_network_interface(pDataBlock, update_every, true, now_ut))
         return -1;
-    if (!do_network_interface(pDataBlock, update_every, false, now_ut))
-        return -1;
+    do_network_interface(pDataBlock, update_every, false, now_ut);
 
     struct network_protocol *tcp4 = NULL, *tcp6 = NULL;
     for (size_t i = 0; networks[i].protocol; i++) {
