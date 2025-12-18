@@ -12,33 +12,11 @@ use crate::{
 use journal_index::{FieldName, FileIndex, FileIndexer, Seconds};
 use journal_registry::{File, Registry};
 use std::time::{Duration, Instant};
-use tracing::debug;
+use tracing::{debug, error};
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-/// Checks if a cached FileIndex is still fresh.
-///
-/// For files that were online (actively being written) when indexed, the cache
-/// is considered stale after 1 second. For archived/offline files, the cache
-/// is always fresh since they never change.
-fn is_fresh(index: &FileIndex) -> bool {
-    if index.online() {
-        // let now = Seconds::now();
-        // now.get() - index.indexed_at().get() < 1
-        let now = Seconds::now();
-        let age = now.get() - index.indexed_at().get();
-        let fresh = age < 1;
-        if !fresh {
-            debug!("Cache entry stale: age={}s", age);
-        }
-        fresh
-    } else {
-        // Archived/offline file: always fresh
-        true
-    }
-}
 
 /// Computes a file index by reading and indexing a journal file.
 pub fn compute_file_index(
@@ -272,30 +250,16 @@ pub async fn batch_compute_file_indexes(
 
     // Phase 1: Batch check cache for all keys upfront
     debug!("phase 1");
-    let cache_futures = keys.iter().enumerate().map(|(idx, key)| {
+    let cache_lookup_futures = keys.iter().map(|key| {
         let key_clone = key.clone();
         async move {
-            let cached = indexing_engine.get(&key_clone).await.ok().flatten();
-            if idx < 5 {
-                // Log first 5 lookups for debugging
-                debug!("cache lookup {}: {:?}", idx, cached.is_some());
-            }
+            let cached = indexing_engine.get(&key_clone).await;
             (key_clone, cached)
         }
     });
 
-    let cache_results: Vec<(FileIndexKey, Option<FileIndex>)> =
-        futures::future::join_all(cache_futures).await;
-
-    let found_count = cache_results
-        .iter()
-        .filter(|(_, cached)| cached.is_some())
-        .count();
-    debug!(
-        "phase 1 complete: found {} of {} entries in cache",
-        found_count,
-        keys.len()
-    );
+    let cache_lookup_results: Vec<(FileIndexKey, Result<Option<FileIndex>>)> =
+        futures::future::join_all(cache_lookup_futures).await;
 
     // Phase 2: Separate cache hits from misses, check freshness and compatibility
     debug!("phase 2");
@@ -306,10 +270,10 @@ pub async fn batch_compute_file_indexes(
     let mut stale_entries = 0;
     let mut incompatible_bucket = 0;
 
-    for (key, cached_index) in cache_results {
-        match cached_index {
-            Some(file_index) => {
-                let fresh = is_fresh(&file_index);
+    for (key, cache_lookup_result) in cache_lookup_results {
+        match cache_lookup_result {
+            Ok(Some(file_index)) => {
+                let fresh = file_index.is_fresh();
                 let bucket_ok = file_index.bucket_duration() <= bucket_duration
                     && bucket_duration.is_multiple_of(file_index.bucket_duration());
 
@@ -327,10 +291,13 @@ pub async fn batch_compute_file_indexes(
                     keys_to_compute.push(key);
                 }
             }
-            None => {
+            Ok(None) => {
                 // Cache miss - need to compute
                 cache_misses += 1;
                 keys_to_compute.push(key);
+            }
+            Err(e) => {
+                error!("cached file index lookup error {}", e);
             }
         }
     }

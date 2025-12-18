@@ -87,6 +87,22 @@ impl FileIndex {
         self.was_online
     }
 
+    /// Check if this index is still fresh.
+    ///
+    /// For files that were online (actively being written) when indexed, the cache
+    /// is considered stale after 1 second. For archived/offline files, the cache
+    /// is always fresh since they never change.
+    pub fn is_fresh(&self) -> bool {
+        if self.was_online {
+            let now = Seconds::now();
+            let age = now.get() - self.indexed_at.get();
+            age < 1
+        } else {
+            // Archived/offline file: always fresh
+            true
+        }
+    }
+
     /// Get the start time of this file's indexed time range.
     pub fn start_time(&self) -> Seconds {
         self.histogram.start_time()
