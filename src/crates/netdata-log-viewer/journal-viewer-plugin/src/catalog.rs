@@ -677,7 +677,7 @@ impl FunctionHandler for CatalogFunction {
         // Step 4: Index all files ONCE
         info!("indexing {} files", keys.len());
         let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
-        let time_budget = std::time::Duration::from_secs(12);
+        let timeout = journal_function::Timeout::new(std::time::Duration::from_secs(12));
 
         let indexed_files = journal_function::batch_compute_file_indexes(
             &self.inner.cache,
@@ -685,7 +685,7 @@ impl FunctionHandler for CatalogFunction {
             keys,
             source_timestamp_field,
             Seconds(bucket_duration),
-            time_budget,
+            timeout,
         )
         .await
         .map_err(|e| netdata_plugin_error::NetdataPluginError::Other {

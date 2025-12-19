@@ -30,7 +30,9 @@
 // # Let's say it's 259:0, Set a 10MB/s read and write limit
 // echo "259:0 rbps=10485760 wbps=10485760" | sudo tee /sys/fs/cgroup/slow-io/io.max
 
-use journal_engine::{Facets, FileIndexCacheBuilder, FileIndexKey, batch_compute_file_indexes};
+use journal_engine::{
+    Facets, FileIndexCacheBuilder, FileIndexKey, Timeout, batch_compute_file_indexes,
+};
 use journal_index::FieldName;
 use journal_registry::{Monitor, Registry};
 use std::env;
@@ -64,7 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     registry.watch_directory(dir.to_str().unwrap())?;
 
     // Find all files
-    let mut files = registry.find_files_in_range(
+    let files = registry.find_files_in_range(
         journal_common::Seconds(0),
         journal_common::Seconds(u32::MAX),
     )?;
@@ -97,12 +99,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let bucket_duration = journal_common::Seconds(60);
-    let time_budget = Duration::from_secs(60);
+    let timeout = Timeout::new(Duration::from_secs(60));
 
     info!(
-        "computing {} file indexes with time budget {} seconds",
+        "computing {} file indexes with timeout {:?}",
         keys.len(),
-        time_budget.as_secs()
+        timeout.remaining()
     );
 
     // Run batch indexing
@@ -113,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         keys,
         source_timestamp_field,
         bucket_duration,
-        time_budget,
+        timeout,
     )
     .await?;
 

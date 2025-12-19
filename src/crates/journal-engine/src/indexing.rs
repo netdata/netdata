@@ -7,10 +7,10 @@
 use crate::{
     cache::{FileIndexCache, FileIndexKey},
     error::{EngineError, Result},
+    timeout::Timeout,
 };
 use journal_index::{FieldName, FileIndex, FileIndexer, Seconds};
 use journal_registry::Registry;
-use std::time::{Duration, Instant};
 use tracing::{debug, error};
 
 // ============================================================================
@@ -137,21 +137,19 @@ impl Default for FileIndexCacheBuilder {
 /// * `keys` - Vector of (file, facets) pairs to fetch/compute indexes for
 /// * `source_timestamp_field` - Field name to use for timestamps when indexing
 /// * `bucket_duration` - Duration of histogram buckets in seconds
-/// * `time_budget` - Maximum total time to spend processing
+/// * `timeout` - Timeout for the entire operation (can be extended dynamically)
 ///
 /// # Returns
 /// Vector of responses for each key. Successful responses contain the file index.
-/// If time budget is exceeded, remaining keys will have TimeBudgetExceeded errors.
+/// If timeout expires, returns TimeBudgetExceeded error.
 pub async fn batch_compute_file_indexes(
     cache: &FileIndexCache,
     registry: &Registry,
     keys: Vec<FileIndexKey>,
     source_timestamp_field: FieldName,
     bucket_duration: Seconds,
-    time_budget: Duration,
+    timeout: Timeout,
 ) -> Result<Vec<(FileIndexKey, FileIndex)>> {
-    let start_time = Instant::now();
-
     // Phase 1: Batch check cache for all keys upfront
     debug!("phase 1");
     let cache_lookup_futures = keys.iter().map(|key| {
@@ -167,7 +165,7 @@ pub async fn batch_compute_file_indexes(
     });
 
     let cache_lookup_results: Vec<(FileIndexKey, Result<Option<FileIndex>>)> =
-        tokio::time::timeout(time_budget, futures::future::join_all(cache_lookup_futures))
+        tokio::time::timeout(timeout.remaining(), futures::future::join_all(cache_lookup_futures))
             .await
             .map_err(|_| EngineError::TimeBudgetExceeded)?;
 
@@ -212,7 +210,7 @@ pub async fn batch_compute_file_indexes(
         }
     }
 
-    if start_time.elapsed() >= time_budget {
+    if timeout.is_expired() {
         return Err(EngineError::TimeBudgetExceeded);
     }
 
@@ -223,7 +221,7 @@ pub async fn batch_compute_file_indexes(
 
     // Phase 3: Spawn single blocking task with rayon for parallel computation
     debug!("phase 3");
-    let time_budget_remaining = time_budget.saturating_sub(start_time.elapsed());
+    let time_budget_remaining = timeout.remaining();
 
     let compute_task = tokio::task::spawn_blocking(move || {
         use rayon::prelude::*;
