@@ -12,6 +12,63 @@ use std::time::Duration;
 #[allow(unused_imports)]
 use tracing::{debug, error};
 
+/// Calculate the appropriate bucket duration for a given time range.
+///
+/// This function determines the bucket size that will result in approximately
+/// 50-100 buckets for the given time range. The bucket durations are selected
+/// from a predefined set of "nice" values (1s, 2s, 5s, 10s, 1m, 5m, 1h, etc.)
+/// to make the resulting histograms easy to interpret.
+///
+/// # Arguments
+/// * `time_range_duration` - The duration of the time range in seconds
+///
+/// # Returns
+/// The bucket duration in seconds
+pub fn calculate_bucket_duration(time_range_duration: u32) -> u32 {
+    const MINUTE: Duration = Duration::from_secs(60);
+    const HOUR: Duration = Duration::from_secs(60 * MINUTE.as_secs());
+    const DAY: Duration = Duration::from_secs(24 * HOUR.as_secs());
+
+    const VALID_DURATIONS: &[Duration] = &[
+        // Seconds
+        Duration::from_secs(1),
+        Duration::from_secs(2),
+        Duration::from_secs(5),
+        Duration::from_secs(10),
+        Duration::from_secs(15),
+        Duration::from_secs(30),
+        // Minutes
+        MINUTE,
+        Duration::from_secs(2 * MINUTE.as_secs()),
+        Duration::from_secs(3 * MINUTE.as_secs()),
+        Duration::from_secs(5 * MINUTE.as_secs()),
+        Duration::from_secs(10 * MINUTE.as_secs()),
+        Duration::from_secs(15 * MINUTE.as_secs()),
+        Duration::from_secs(30 * MINUTE.as_secs()),
+        // Hours
+        HOUR,
+        Duration::from_secs(2 * HOUR.as_secs()),
+        Duration::from_secs(6 * HOUR.as_secs()),
+        Duration::from_secs(8 * HOUR.as_secs()),
+        Duration::from_secs(12 * HOUR.as_secs()),
+        // Days
+        DAY,
+        Duration::from_secs(2 * DAY.as_secs()),
+        Duration::from_secs(3 * DAY.as_secs()),
+        Duration::from_secs(5 * DAY.as_secs()),
+        Duration::from_secs(7 * DAY.as_secs()),
+        Duration::from_secs(14 * DAY.as_secs()),
+        Duration::from_secs(30 * DAY.as_secs()),
+    ];
+
+    VALID_DURATIONS
+        .iter()
+        .rev()
+        .find(|&&bucket_width| time_range_duration as u64 / bucket_width.as_secs() >= 50)
+        .map(|d| d.as_secs())
+        .unwrap_or(1) as u32
+}
+
 /// A bucket request contains a [start, end) time range along with the
 /// filter that should be applied.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -41,6 +98,8 @@ pub(crate) struct HistogramRequest {
     pub after: u32,
     /// End time
     pub before: u32,
+    /// Bucket duration in seconds
+    pub bucket_duration: u32,
     /// Facets to use for file indexes
     pub(crate) facets: Facets,
     /// Filter expression to apply
@@ -48,68 +107,26 @@ pub(crate) struct HistogramRequest {
 }
 
 impl HistogramRequest {
-    fn calculate_bucket_duration(&self) -> u32 {
-        const MINUTE: Duration = Duration::from_secs(60);
-        const HOUR: Duration = Duration::from_secs(60 * MINUTE.as_secs());
-        const DAY: Duration = Duration::from_secs(24 * HOUR.as_secs());
-
-        const VALID_DURATIONS: &[Duration] = &[
-            // Seconds
-            Duration::from_secs(1),
-            Duration::from_secs(2),
-            Duration::from_secs(5),
-            Duration::from_secs(10),
-            Duration::from_secs(15),
-            Duration::from_secs(30),
-            // Minutes
-            MINUTE,
-            Duration::from_secs(2 * MINUTE.as_secs()),
-            Duration::from_secs(3 * MINUTE.as_secs()),
-            Duration::from_secs(5 * MINUTE.as_secs()),
-            Duration::from_secs(10 * MINUTE.as_secs()),
-            Duration::from_secs(15 * MINUTE.as_secs()),
-            Duration::from_secs(30 * MINUTE.as_secs()),
-            // Hours
-            HOUR,
-            Duration::from_secs(2 * HOUR.as_secs()),
-            Duration::from_secs(6 * HOUR.as_secs()),
-            Duration::from_secs(8 * HOUR.as_secs()),
-            Duration::from_secs(12 * HOUR.as_secs()),
-            // Days
-            DAY,
-            Duration::from_secs(2 * DAY.as_secs()),
-            Duration::from_secs(3 * DAY.as_secs()),
-            Duration::from_secs(5 * DAY.as_secs()),
-            Duration::from_secs(7 * DAY.as_secs()),
-            Duration::from_secs(14 * DAY.as_secs()),
-            Duration::from_secs(30 * DAY.as_secs()),
-        ];
-
-        let duration = self.before - self.after;
-
-        VALID_DURATIONS
-            .iter()
-            .rev()
-            .find(|&&bucket_width| duration as u64 / bucket_width.as_secs() >= 50)
-            .map(|d| d.as_secs())
-            .unwrap_or(1) as u32
-    }
-
-    pub(crate) fn new(after: u32, before: u32, facets: &[String], filter_expr: &Filter) -> Self {
+    pub(crate) fn new(
+        after: u32,
+        before: u32,
+        bucket_duration: u32,
+        facets: &[String],
+        filter_expr: &Filter,
+    ) -> Self {
         Self {
             after,
             before,
+            bucket_duration,
             facets: Facets::new(facets),
             filter_expr: filter_expr.clone(),
         }
     }
 
     /// Returns the bucket requests that should be used in order to
-    /// generate data for this histogram. The bucket duration is automatically
-    /// determined by time range of the histogram request, and it's large
-    /// enough to return at least 100 bucket requests.
+    /// generate data for this histogram based on the specified bucket duration.
     pub(crate) fn bucket_requests(&self) -> Vec<BucketRequest> {
-        let bucket_duration = self.calculate_bucket_duration();
+        let bucket_duration = self.bucket_duration;
 
         // Buckets are aligned to their duration
         let aligned_start = (self.after / bucket_duration) * bucket_duration;
@@ -255,7 +272,9 @@ impl HistogramEngine {
         facets: &[String],
         filter_expr: &Filter,
     ) -> Result<Histogram> {
-        let histogram_request = HistogramRequest::new(after, before, facets, filter_expr);
+        let time_range_duration = before - after;
+        let bucket_duration = calculate_bucket_duration(time_range_duration);
+        let histogram_request = HistogramRequest::new(after, before, bucket_duration, facets, filter_expr);
         let bucket_requests = histogram_request.bucket_requests();
 
         // Find buckets that need computation

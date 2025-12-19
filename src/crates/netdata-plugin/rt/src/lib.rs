@@ -418,13 +418,21 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
                 }
             }
             Err(e) => {
-                error!("handler error: {}", e);
+                error!("function handler error: {}", e);
+                let error_json = json!({
+                    "error": format!("{}", e),
+                    "status": 500
+                });
                 FunctionResult {
                     transaction,
                     status: 500,
                     expires: 0,
-                    format: "text/plain".to_string(),
-                    payload: format!("Handler error: {}", e).as_bytes().to_vec(),
+                    format: "application/json".to_string(),
+                    payload: serde_json::to_vec_pretty(&error_json).unwrap_or_else(|_| {
+                        format!(r#"{{"error": "Failed to serialize error response"}}"#)
+                            .as_bytes()
+                            .to_vec()
+                    }),
                 }
             }
         }

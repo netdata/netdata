@@ -267,57 +267,6 @@ pub struct CatalogFunction {
 }
 
 impl CatalogFunction {
-    /// Calculate the appropriate bucket duration based on the time range.
-    ///
-    /// This uses the same logic as HistogramRequest::calculate_bucket_duration
-    /// to determine the bucket size that will result in approximately 50-100 buckets.
-    fn calculate_bucket_duration(time_range_duration: u32) -> u32 {
-        use std::time::Duration;
-
-        const MINUTE: Duration = Duration::from_secs(60);
-        const HOUR: Duration = Duration::from_secs(60 * MINUTE.as_secs());
-        const DAY: Duration = Duration::from_secs(24 * HOUR.as_secs());
-
-        const VALID_DURATIONS: &[Duration] = &[
-            // Seconds
-            Duration::from_secs(1),
-            Duration::from_secs(2),
-            Duration::from_secs(5),
-            Duration::from_secs(10),
-            Duration::from_secs(15),
-            Duration::from_secs(30),
-            // Minutes
-            MINUTE,
-            Duration::from_secs(2 * MINUTE.as_secs()),
-            Duration::from_secs(3 * MINUTE.as_secs()),
-            Duration::from_secs(5 * MINUTE.as_secs()),
-            Duration::from_secs(10 * MINUTE.as_secs()),
-            Duration::from_secs(15 * MINUTE.as_secs()),
-            Duration::from_secs(30 * MINUTE.as_secs()),
-            // Hours
-            HOUR,
-            Duration::from_secs(2 * HOUR.as_secs()),
-            Duration::from_secs(6 * HOUR.as_secs()),
-            Duration::from_secs(8 * HOUR.as_secs()),
-            Duration::from_secs(12 * HOUR.as_secs()),
-            // Days
-            DAY,
-            Duration::from_secs(2 * DAY.as_secs()),
-            Duration::from_secs(3 * DAY.as_secs()),
-            Duration::from_secs(5 * DAY.as_secs()),
-            Duration::from_secs(7 * DAY.as_secs()),
-            Duration::from_secs(14 * DAY.as_secs()),
-            Duration::from_secs(30 * DAY.as_secs()),
-        ];
-
-        VALID_DURATIONS
-            .iter()
-            .rev()
-            .find(|&&bucket_width| time_range_duration as u64 / bucket_width.as_secs() >= 50)
-            .map(|d| d.as_secs())
-            .unwrap_or(1) as u32
-    }
-
     /// Query log entries from pre-indexed files.
     ///
     /// This method:
@@ -722,13 +671,13 @@ impl FunctionHandler for CatalogFunction {
         // Step 3: Compute bucket duration for indexing
         // We need to determine the appropriate bucket duration based on the time range
         let time_range_duration = request.before - request.after;
-        let bucket_duration = Self::calculate_bucket_duration(time_range_duration);
+        let bucket_duration = journal_function::calculate_bucket_duration(time_range_duration);
         info!("using bucket duration: {} seconds", bucket_duration);
 
         // Step 4: Index all files ONCE
         info!("indexing {} files", keys.len());
         let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
-        let time_budget = std::time::Duration::from_secs(5);
+        let time_budget = std::time::Duration::from_secs(12);
 
         let indexed_files = journal_function::batch_compute_file_indexes(
             &self.inner.cache,
