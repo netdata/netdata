@@ -10,9 +10,12 @@ use std::time::{Duration, Instant};
 /// - Dynamic timeout extension (e.g., on progress updates)
 /// - Parallel checks across multiple async tasks
 /// - Future support for cancellation signals
+///
+/// Extensions are bounded: the remaining time will never exceed the initial budget.
 #[derive(Debug, Clone)]
 pub struct Timeout {
     start: Instant,
+    initial_budget_us: u64,
     deadline_us: Arc<AtomicU64>,
 }
 
@@ -20,11 +23,12 @@ impl Timeout {
     /// Create a new timeout with the given budget.
     pub fn new(budget: Duration) -> Self {
         let start = Instant::now();
-        let deadline_us = budget.as_micros() as u64;
+        let budget_us = budget.as_micros() as u64;
 
         Self {
             start,
-            deadline_us: Arc::new(AtomicU64::new(deadline_us)),
+            initial_budget_us: budget_us,
+            deadline_us: Arc::new(AtomicU64::new(budget_us)),
         }
     }
 
@@ -45,13 +49,17 @@ impl Timeout {
         }
     }
 
-    /// Extend the timeout by the given duration.
+    /// Reset the timeout to the initial budget from the current time.
     ///
     /// This is useful for operations that report progress and should
-    /// get additional time to complete.
-    pub fn extend(&self, additional: Duration) {
-        self.deadline_us
-            .fetch_add(additional.as_micros() as u64, Ordering::Relaxed);
+    /// get their full timeout budget again.
+    ///
+    /// For example, if the initial timeout was 10 seconds and we're at t=5s with 5s remaining,
+    /// calling reset() will give the operation another 10s (deadline becomes t=15s).
+    pub fn reset(&self) {
+        let elapsed_us = self.start.elapsed().as_micros() as u64;
+        let new_deadline_us = elapsed_us + self.initial_budget_us;
+        self.deadline_us.store(new_deadline_us, Ordering::Relaxed);
     }
 
     /// Get the elapsed time since the timeout was created.
@@ -81,18 +89,21 @@ mod tests {
     }
 
     #[test]
-    fn test_timeout_extend() {
-        let timeout = Timeout::new(Duration::from_millis(50));
-        thread::sleep(Duration::from_millis(30));
+    fn test_timeout_reset() {
+        let timeout = Timeout::new(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(60));
 
-        // Should be close to expiring
-        assert!(timeout.remaining() < Duration::from_millis(30));
+        // Should have ~40ms remaining
+        let remaining_before = timeout.remaining();
+        assert!(remaining_before < Duration::from_millis(50));
 
-        // Extend by 100ms
-        timeout.extend(Duration::from_millis(100));
+        // Reset the timeout
+        timeout.reset();
 
-        // Should now have plenty of time
-        assert!(timeout.remaining() > Duration::from_millis(100));
+        // Should now have the full initial budget (~100ms) remaining
+        let remaining_after = timeout.remaining();
+        assert!(remaining_after >= Duration::from_millis(90));
+        assert!(remaining_after <= Duration::from_millis(100));
     }
 
     #[test]
@@ -100,14 +111,17 @@ mod tests {
         let timeout1 = Timeout::new(Duration::from_secs(10));
         let timeout2 = timeout1.clone();
 
-        timeout1.extend(Duration::from_secs(5));
+        thread::sleep(Duration::from_millis(100));
 
-        // Both should see the extension
+        // Reset from one clone
+        timeout1.reset();
+
+        // Both should see the reset
         let remaining1 = timeout1.remaining();
         let remaining2 = timeout2.remaining();
 
         assert!((remaining1.as_secs() as i64 - remaining2.as_secs() as i64).abs() < 1);
-        assert!(remaining1.as_secs() >= 14); // ~15 seconds (10 + 5)
+        assert!(remaining1.as_secs() >= 9); // ~10 seconds (reset to initial budget)
     }
 
     #[tokio::test]

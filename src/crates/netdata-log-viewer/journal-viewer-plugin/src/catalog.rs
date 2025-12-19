@@ -116,6 +116,7 @@ struct TransactionInner {
     start_time: tokio::time::Instant,
     report_progress: bool,
     cancel_call: bool,
+    timeout: Option<journal_function::Timeout>,
 }
 
 /// Represents a tracked transaction for a function call.
@@ -129,13 +130,14 @@ struct Transaction {
 
 impl Transaction {
     /// Create a new transaction with the given ID.
-    fn new(id: String) -> Self {
+    fn new(id: String, timeout: Option<journal_function::Timeout>) -> Self {
         Self {
             inner: Arc::new(RwLock::new(TransactionInner {
                 id,
                 start_time: tokio::time::Instant::now(),
                 report_progress: false,
                 cancel_call: false,
+                timeout,
             })),
         }
     }
@@ -171,6 +173,15 @@ impl Transaction {
     fn elapsed(&self) -> std::time::Duration {
         self.inner.read().start_time.elapsed()
     }
+
+    /// Reset the timeout to the initial budget from the current time.
+    ///
+    /// This is called when progress is reported to give the operation its full timeout budget again.
+    fn reset_timeout(&self) {
+        if let Some(timeout) = &self.inner.read().timeout {
+            timeout.reset();
+        }
+    }
 }
 
 /// Registry for managing active transactions.
@@ -193,7 +204,7 @@ impl TransactionRegistry {
     /// Create and register a new transaction with the given ID.
     ///
     /// Returns None if a transaction with this ID already exists.
-    fn create(&self, id: String) -> Option<Transaction> {
+    fn create(&self, id: String, timeout: Option<journal_function::Timeout>) -> Option<Transaction> {
         let mut transactions = self.transactions.write();
 
         if transactions.contains_key(&id) {
@@ -201,7 +212,7 @@ impl TransactionRegistry {
             return None;
         }
 
-        let transaction = Transaction::new(id.clone());
+        let transaction = Transaction::new(id.clone(), timeout);
         transactions.insert(id, transaction.clone());
         debug!("Created transaction {} in registry", transaction.id());
 
@@ -606,8 +617,11 @@ impl FunctionHandler for CatalogFunction {
         num_selections = request.selections.len()
     ))]
     async fn on_call(&self, transaction: String, request: Self::Request) -> Result<Self::Response> {
-        // Register the transaction
-        let txn = self.inner.transaction_registry.create(transaction.clone());
+        // Create timeout for this operation (12 seconds initial budget)
+        let timeout = journal_function::Timeout::new(std::time::Duration::from_secs(12));
+
+        // Register the transaction with the timeout
+        let txn = self.inner.transaction_registry.create(transaction.clone(), Some(timeout.clone()));
         if txn.is_none() {
             warn!(
                 "Transaction {} already exists, continuing anyway",
@@ -677,7 +691,6 @@ impl FunctionHandler for CatalogFunction {
         // Step 4: Index all files ONCE
         info!("indexing {} files", keys.len());
         let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
-        let timeout = journal_function::Timeout::new(std::time::Duration::from_secs(12));
 
         let indexed_files = journal_function::batch_compute_file_indexes(
             &self.inner.cache,
@@ -807,11 +820,12 @@ impl FunctionHandler for CatalogFunction {
             transaction
         );
 
-        // Mark the transaction for progress reporting
+        // Mark the transaction for progress reporting and reset the timeout
         if let Some(txn) = self.inner.transaction_registry.get(&transaction) {
             txn.set_report_progress(true);
-            debug!(
-                "Transaction {} marked for progress reporting (elapsed: {:?})",
+            txn.reset_timeout();
+            info!(
+                "Transaction {} marked for progress reporting and timeout reset to initial budget (elapsed: {:?})",
                 transaction,
                 txn.elapsed()
             );
