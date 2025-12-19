@@ -434,7 +434,7 @@ Every Netdata Agent/Parent (v2.6.0+) is an MCP server:
 - Generic webhooks (`web`)
 - Custom script hook (`custom`)
 
-**Netdata Cloud centralized methods** — configured per Space in the Cloud UI (`cloud-netdata-assistant/docs/...`), with plan availability:
+**Netdata Cloud centralized methods** — configured per Space in the Cloud UI, with plan availability:
 - Email (personal channel, available on every plan)
 - Discord webhooks (Community+)
 - Generic webhook with signed payloads (Pro+)

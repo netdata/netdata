@@ -113,7 +113,7 @@ Cloud infrastructure and backend microservices (all actively maintained)
 - cloud-agent-data-ctrl-service: Agent data controller, relays data requests (private)
 - cloud-charts-service: Chart metadata storage and retrieval (private)
 - cloud-custom-dashboard-service: Custom dashboard management (private)
-- cloud-insights-service: Data insights and analytics service (private)
+- cloud-insights-service: AI investigations and reporting service (private)
 - cloud-feed-service: Activity feed service (private)
 
 ### MQTT/Messaging Services
@@ -146,7 +146,7 @@ Cloud infrastructure and backend microservices (all actively maintained)
 ### Specialized Services
 - cloud-licenser: License management service (private)
 - cloud-admin-panel: Administrative panel (private)
-- cloud-netdata-assistant: AI assistant service (private)
+- cloud-netdata-assistant: AI documentation assistant backend (private)
 - cloud-api-docs: API documentation (private)
 - cloud-kit: Cloud development kit (private)
 
@@ -162,7 +162,7 @@ AI-powered tools and machine learning
 
 - ask-netdata: AI documentation assistant integrated in learn.netdata.cloud (public)
 - ai-agent: AI agent framework powering Neda assistant (public)
-- cloud-netdata-assistant: Cloud AI assistant backend (private)
+- cloud-netdata-assistant: Cloud AI documentation assistant backend (private)
 
 ## DevOps & Infrastructure
 Infrastructure automation and deployment
