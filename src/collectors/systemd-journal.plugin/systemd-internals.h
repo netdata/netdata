@@ -88,6 +88,7 @@ struct nd_journal_file {
 
 extern DICTIONARY *nd_journal_files_registry;
 extern DICTIONARY *used_hashes_registry;
+extern DICTIONARY *column_order_registry;
 extern DICTIONARY *boot_ids_to_first_ut;
 
 int nd_journal_file_dict_items_backward_compar(const void *a, const void *b);

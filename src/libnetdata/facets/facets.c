@@ -2413,18 +2413,92 @@ static int facets_keys_reorder_compar(const void *a, const void *b) {
     return strcasecmp(an, bn);
 }
 
-void facets_sort_and_reorder_keys(FACETS *facets) {
-    size_t entries = facets->keys_with_values.used;
+// Comparator for sorting keys by their stable order from the registry
+static int facets_keys_stable_order_compar(const void *a, const void *b) {
+    const FACET_KEY *ak = *((const FACET_KEY **)a);
+    const FACET_KEY *bk = *((const FACET_KEY **)b);
+
+    // Sort by the stable order assigned from the registry
+    if(ak->order < bk->order) return -1;
+    if(ak->order > bk->order) return 1;
+
+    // Fallback to alphabetical for keys with same order (shouldn't happen)
+    return facets_keys_reorder_compar(a, b);
+}
+
+// Special key to store the next available order counter in the registry
+#define COLUMN_ORDER_REGISTRY_NEXT_KEY "_next_order_"
+
+// Spinlock to protect concurrent access to column_order_registry
+static SPINLOCK column_order_spinlock = SPINLOCK_INITIALIZER;
+
+void facets_sort_and_reorder_keys(FACETS *facets, DICTIONARY *column_order_registry) {
+    size_t entries = facets->keys.count;
     if(!entries)
         return;
 
-    FACET_KEY *keys[entries];
-    memcpy(keys, facets->keys_with_values.array, sizeof(FACET_KEY *) * entries);
+    // collect all keys from the linked list into an array
+    FACET_KEY **keys = callocz(entries, sizeof(FACET_KEY));
+    size_t i = 0;
+    for(FACET_KEY *k = facets->keys.ll; k && i < entries; k = k->next)
+        keys[i++] = k;
 
-    qsort(keys, entries, sizeof(FACET_KEY *), facets_keys_reorder_compar);
+    if(column_order_registry) {
+        // Lock to protect concurrent access to the registry
+        spinlock_lock(&column_order_spinlock);
 
-    for(size_t i = 0; i < entries ;i++)
-        keys[i]->order = i + 1;
+        // Get or initialize the next order counter from the registry
+        uint32_t *next_order_ptr = dictionary_get(column_order_registry, COLUMN_ORDER_REGISTRY_NEXT_KEY);
+        uint32_t next_order;
+        if(next_order_ptr)
+            next_order = *next_order_ptr;
+        else {
+            next_order = 1;
+            dictionary_set(column_order_registry, COLUMN_ORDER_REGISTRY_NEXT_KEY, &next_order, sizeof(next_order));
+        }
+
+        // Assign stable order values to each key
+        for(size_t j = 0; j < i; j++) {
+            FACET_KEY *k = keys[j];
+            if(!k->name) continue;
+
+            uint32_t *stored_order = dictionary_get(column_order_registry, k->name);
+            if(stored_order) {
+                // Use the stored stable order
+                k->order = *stored_order;
+            }
+            else {
+                // First time seeing this column - assign next available order
+                k->order = next_order++;
+                dictionary_set(column_order_registry, k->name, &k->order, sizeof(k->order));
+            }
+        }
+
+        // Update the next order counter in the registry
+        // We need to delete and re-set since DONT_OVERWRITE is set
+        dictionary_del(column_order_registry, COLUMN_ORDER_REGISTRY_NEXT_KEY);
+        dictionary_set(column_order_registry, COLUMN_ORDER_REGISTRY_NEXT_KEY, &next_order, sizeof(next_order));
+
+        spinlock_unlock(&column_order_spinlock);
+
+        // Sort by stable order from registry (outside lock - local data only)
+        qsort(keys, i, sizeof(FACET_KEY *), facets_keys_stable_order_compar);
+    }
+    else {
+        // No registry - fall back to alphabetical sort
+        qsort(keys, i, sizeof(FACET_KEY *), facets_keys_reorder_compar);
+        for(size_t j = 0; j < i; j++)
+            keys[j]->order = j + 1;
+    }
+
+    // rebuild the linked list in sorted order
+    facets->keys.ll = NULL;
+    for(size_t j = 0; j < i; j++) {
+        keys[j]->prev = NULL;
+        keys[j]->next = NULL;
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(facets->keys.ll, keys[j], prev, next);
+    }
+    freez(keys);
 }
 
 static int facets_key_values_reorder_by_name_compar(const void *a, const void *b) {

@@ -981,7 +981,7 @@ static int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs)
     if (!lqs->rq.data_only || lqs->rq.tail)
         buffer_json_member_add_uint64(wb, "last_modified", lqs->last_modified);
 
-    facets_sort_and_reorder_keys(facets);
+    facets_sort_and_reorder_keys(facets, column_order_registry);
     facets_report(facets, wb, used_hashes_registry);
 
     wb->expires = now_realtime_sec() + (lqs->rq.data_only ? 3600 : 0);

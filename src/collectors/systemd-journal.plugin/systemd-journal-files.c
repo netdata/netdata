@@ -9,6 +9,7 @@
 struct journal_directory journal_directories[MAX_JOURNAL_DIRECTORIES] = {0};
 DICTIONARY *nd_journal_files_registry = NULL;
 DICTIONARY *used_hashes_registry = NULL;
+DICTIONARY *column_order_registry = NULL;
 
 static usec_t systemd_journal_session = 0;
 
@@ -855,6 +856,12 @@ void nd_journal_init_files_and_directories(void)
     // initialize the used hashes files registry
 
     used_hashes_registry = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+
+    // ------------------------------------------------------------------------
+    // initialize the column order registry for stable column indices
+
+    column_order_registry = dictionary_create_advanced(
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(uint32_t));
 
     systemd_journal_session = (now_realtime_usec() / USEC_PER_SEC) * USEC_PER_SEC;
 

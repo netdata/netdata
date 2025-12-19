@@ -161,6 +161,7 @@ BITMAP_STR_DEFINE_FUNCTIONS(WEVT_SOURCE_TYPE, WEVTS_NONE, "");
 
 DICTIONARY *wevt_sources = NULL;
 DICTIONARY *used_hashes_registry = NULL;
+DICTIONARY *column_order_registry = NULL;
 static usec_t wevt_session = 0;
 
 void wevt_sources_del_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -209,6 +210,9 @@ void wevt_sources_init(void) {
     wevt_session = now_realtime_usec();
 
     used_hashes_registry = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+
+    column_order_registry = dictionary_create_advanced(
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(uint32_t));
 
     wevt_sources = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE | DICT_OPTION_DONT_OVERWRITE_VALUE,
                                               NULL, sizeof(LOGS_QUERY_SOURCE));

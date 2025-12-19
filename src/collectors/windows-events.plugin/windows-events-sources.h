@@ -64,6 +64,7 @@ typedef struct {
 
 extern DICTIONARY *wevt_sources;
 extern DICTIONARY *used_hashes_registry;
+extern DICTIONARY *column_order_registry;
 
 void wevt_sources_init(void);
 void wevt_sources_scan(void);

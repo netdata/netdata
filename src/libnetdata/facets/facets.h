@@ -136,7 +136,7 @@ bool facets_key_name_is_facet(FACETS *facets, const char *key);
 bool facets_key_name_value_length_is_selected(FACETS *facets, const char *key, size_t key_length, const char *value, size_t value_length);
 void facets_add_possible_value_name_to_key(FACETS *facets, const char *key, size_t key_length, const char *value, size_t value_length);
 
-void facets_sort_and_reorder_keys(FACETS *facets);
+void facets_sort_and_reorder_keys(FACETS *facets, DICTIONARY *column_order_registry);
 usec_t facets_row_oldest_ut(FACETS *facets);
 usec_t facets_row_newest_ut(FACETS *facets);
 uint32_t facets_rows(FACETS *facets);
