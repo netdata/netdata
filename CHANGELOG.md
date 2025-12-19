@@ -114,6 +114,14 @@
 - Build(deps): bump actions/download-artifact from 4 to 7 ([#21464](https://github.com/netdata/netdata/issues/21464))
 - Fixes Windows.plugin (Part III) ([#21474](https://github.com/netdata/netdata/issues/21474))
 - Improve metadata storage stability ([#21468](https://github.com/netdata/netdata/issues/21468))
+- Regenerate integrations docs ([#21477](https://github.com/netdata/netdata/issues/21477))
+- Update nodes-ephemerality.md ([#21471](https://github.com/netdata/netdata/issues/21471))
+- MSSQL Collection (windows.plugin) ([#21478](https://github.com/netdata/netdata/issues/21478))
+- Improve ACLK data transmission ([#21483](https://github.com/netdata/netdata/issues/21483))
+- Improve error handling and resource cleanup in ACLK query execution ([#21479](https://github.com/netdata/netdata/issues/21479))
+- Build(deps): bump github.com/axiomhq/hyperloglog from 0.2.5 to 0.2.6 in /src/go ([#21489](https://github.com/netdata/netdata/issues/21489))
+- Build(deps): bump github.com/ibm-messaging/mq-golang/v5 from 5.6.7 to 5.7.0 in /src/go ([#21490](https://github.com/netdata/netdata/issues/21490))
+- Fix(netdata-updater): fix major version detection for native packages ([#21485](https://github.com/netdata/netdata/issues/21485))
 
 ## [2.8.0] - 2025-11-19
 
