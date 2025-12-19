@@ -1,11 +1,13 @@
 /* eslint-disable import/order */
 /* eslint-disable perfectionist/sort-imports */
+import Ajv from 'ajv';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 import { performance } from 'node:perf_hooks';
 
+import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions, ValidateFunction } from 'ajv';
 import type { MCPServerConfig, MCPTool, MCPServer, LogEntry } from '../types.js';
 import type { ToolCancelOptions, ToolExecuteOptions, ToolExecuteResult } from './types.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -24,6 +26,12 @@ interface MCPProcessHandle {
 
 type LogSeverity = 'VRB' | 'WRN' | 'ERR' | 'TRC';
 export type LogFn = (severity: LogSeverity, message: string, remoteIdentifier: string, fatal?: boolean) => void;
+
+type AjvInstance = AjvClass;
+type AjvErrorObject = ErrorObject<string, Record<string, unknown>>;
+type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
+type AjvValidateFn = ValidateFunction;
+const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
 
 interface MCPRestartErrorOptions {
   serverName: string;
@@ -785,6 +793,8 @@ export class MCPProvider extends ToolProvider {
   private serverInitPromises = new Map<string, Promise<void>>();
   private toolNameMap = new Map<string, { serverName: string; originalName: string }>();
   private toolQueue = new Map<string, string>();
+  private readonly ajv: AjvInstance = new AjvCtor({ allErrors: true, strict: false });
+  private readonly toolValidators = new Map<string, AjvValidateFn | null>();
   private initialized = false;
   private initializationPromise?: Promise<void>;
   private trace = false;
@@ -837,6 +847,59 @@ export class MCPProvider extends ToolProvider {
     const sanitizedNamespace = name.includes('__') ? name.split('__')[0] : this.sanitizeNamespace(name);
     const tool = name.includes('__') ? name.slice(name.indexOf('__') + 2) : name;
     return { namespace: sanitizedNamespace, tool };
+  }
+
+  private buildValidatorKey(serverName: string, toolName: string): string {
+    return `${serverName}::${toolName}`;
+  }
+
+  private getToolSchema(serverName: string, toolName: string): Record<string, unknown> | undefined {
+    const server = this.servers.get(serverName);
+    if (server === undefined) return undefined;
+    const tool = server.tools.find((entry) => entry.name === toolName);
+    return tool?.inputSchema;
+  }
+
+  private formatAjvErrors(errors: AjvErrorObject[] | null | undefined): string {
+    const list = Array.isArray(errors) ? errors : [];
+    if (list.length === 0) return 'invalid arguments';
+    const messages = list.map((error) => {
+      const inst = typeof error.instancePath === 'string' ? error.instancePath : '';
+      const msg = typeof error.message === 'string' ? error.message : '';
+      const params = (() => {
+        try {
+          return ` ${JSON.stringify(error.params)}`;
+        } catch {
+          return '';
+        }
+      })();
+      return `${inst} ${msg}${params}`.trim();
+    }).filter((value) => value.length > 0);
+    return messages.length > 0 ? messages.join('; ') : 'invalid arguments';
+  }
+
+  private validateToolParameters(serverName: string, toolName: string, parameters: Record<string, unknown>): void {
+    const schema = this.getToolSchema(serverName, toolName);
+    if (schema === undefined) return;
+    const key = this.buildValidatorKey(serverName, toolName);
+    let validator = this.toolValidators.get(key);
+    if (validator === undefined) {
+      try {
+        validator = this.ajv.compile(schema) as AjvValidateFn;
+        this.toolValidators.set(key, validator);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.toolValidators.set(key, null);
+        this.log('WRN', `Skipping schema validation for '${toolName}' on '${serverName}': ${msg}`, `mcp:${serverName}`);
+        return;
+      }
+    }
+    if (validator === null) return;
+    const ok = validator(parameters);
+    if (!ok) {
+      const detail = this.formatAjvErrors(validator.errors as AjvErrorObject[] | null | undefined);
+      throw new Error(`Validation error: ${detail}`);
+    }
   }
 
   private sanitizeNamespace(name: string): string {
@@ -1220,6 +1283,7 @@ export class MCPProvider extends ToolProvider {
     if (mapping === undefined) throw new Error(`No server found for tool: ${name}`);
     const { serverName, originalName } = mapping;
     const sanitizedNamespace = name.includes('__') ? name.split('__')[0] : this.sanitizeNamespace(serverName);
+    this.validateToolParameters(serverName, originalName, parameters);
     const sharedHandle = this.sharedHandles.get(serverName);
     if (sharedHandle === undefined) {
       let client = this.clients.get(serverName);

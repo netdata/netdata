@@ -75,6 +75,7 @@ const DEFAULT_TOKEN_USAGE: TokenUsage = {
 
 const SYSTEM_PROMPT_MARKER = 'Phase 1 deterministic harness';
 const TOOL_NAME = 'test__test';
+const REQUIRED_TOOL_NAME = 'test__required';
 const SUBAGENT_TOOL = 'agent__pricing-subagent';
 const SUBAGENT_SUCCESS_TOOL = 'agent__pricing-subagent-success';
 const TOOL_FINISH_REASON = 'tool-calls';
@@ -310,6 +311,46 @@ const SCENARIOS: ScenarioDefinition[] = [
             inputTokens: 70,
             outputTokens: 25,
             totalTokens: 95,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-132',
+    description: 'MCP parameter validation failure for missing required args.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [REQUIRED_TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: TOOL_REQUEST_TEXT,
+          toolCalls: [
+            {
+              toolName: REQUIRED_TOOL_NAME,
+              callId: 'call-required-missing-1',
+              assistantText: 'Invoking required tool without parameters.',
+              arguments: {},
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Reporting validation failure outcome.',
+          reportContent: `${RESULT_HEADING}Validation failure surfaced as tool error.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_FAILURE,
+          tokenUsage: {
+            inputTokens: 68,
+            outputTokens: 24,
+            totalTokens: 92,
           },
         },
       },

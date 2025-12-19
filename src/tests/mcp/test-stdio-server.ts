@@ -4,6 +4,7 @@ import path from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ErrorCode, type CallToolResult, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
 
 const server = new McpServer({
   name: 'test-mcp-server',
@@ -33,6 +34,17 @@ server.registerTool(
   {
     description: 'Summarises values for deterministic tests.',
     inputSchema: {},
+  },
+  async () => noopResult,
+);
+
+server.registerTool(
+  'required',
+  {
+    description: 'Requires a start parameter for validation coverage.',
+    inputSchema: {
+      start: z.number().int().min(0),
+    },
   },
   async () => noopResult,
 );

@@ -103,6 +103,7 @@ interface ToolExecuteResult {
 - Connection management with reconnection
 - Tool discovery via `tools/list`
 - Tool execution via `tools/call`
+- Parameter validation via AJV against tool `inputSchema` (invalid args yield tool failures; schema compile errors warn and skip validation)
 - Server instructions via `server/get_prompt`
 - Concurrency queues per server or tool
 - Health probes (ping, listTools)

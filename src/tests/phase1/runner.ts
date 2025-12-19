@@ -1255,6 +1255,33 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
   },
   {
+    id: 'run-test-132',
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-132 expected success with validation failure surfaced as tool error.');
+      invariant(result.finalReport !== undefined, 'Final report missing for run-test-132.');
+
+      const toolEntries = result.accounting.filter(isToolAccounting);
+      const failureEntry = toolEntries.find((entry) => entry.command === 'test__required');
+      invariant(failureEntry !== undefined, 'Expected accounting entry for test__required in run-test-132.');
+      invariant(failureEntry.status === 'failed', 'Accounting entry must reflect validation failure for run-test-132.');
+
+      const failureLog = result.logs.find((entry) =>
+        entry.type === 'tool'
+        && typeof entry.message === 'string'
+        && entry.message.includes('test__required')
+        && entry.message.includes('Validation error')
+      );
+      invariant(failureLog !== undefined, 'Validation failure log expected for run-test-132.');
+
+      const toolFailureMessage = result.conversation.find((message) =>
+        message.role === 'tool'
+        && typeof message.content === 'string'
+        && message.content.includes('Validation error')
+      );
+      invariant(toolFailureMessage !== undefined, 'Tool failure message should include validation error for run-test-132.');
+    },
+  },
+  {
     id: 'run-test-3',
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-3 expected success after retry.');

@@ -76,7 +76,7 @@ Architecture
 
 - Rationale:
   - No custom planner: the AI SDK already streams tool calls and results, with provider‑native semantics (e.g., OpenAI parallel function calls). We simply supply tool definitions and perform the actual execution when requested.
-  - Validation "for free": the AI SDK uses the tool schema to coerce/validate model‑emitted arguments before executing.
+- Validation: tool schemas are sent to the model for guidance; runtime validation is enforced by MCPProvider (AJV) and REST/Internal providers. The AI SDK does **not** validate tool arguments unless a validator is supplied.
 
 4) LLM layer (Vercel AI SDK)
 
