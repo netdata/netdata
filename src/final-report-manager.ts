@@ -144,6 +144,18 @@ export class FinalReportManager {
   }
 
   /**
+   * Validate a pending payload against the expected JSON schema BEFORE committing.
+   * For 'json' format: validates against the provided user schema.
+   * For 'slack-block-kit' format: validates against the built-in Block Kit schema.
+   * Returns validation result with errors if invalid.
+   *
+   * Use this to validate before calling commit() to enable retry on validation failure.
+   */
+  validatePayload(payload: PendingFinalReportPayload, schema: Record<string, unknown> | undefined): ValidationResult {
+    return this.validateFinalReportData(payload, schema);
+  }
+
+  /**
    * Validate the committed final report against the expected JSON schema.
    * For 'json' format: validates against the provided user schema.
    * For 'slack-block-kit' format: validates against the built-in Block Kit schema.
@@ -154,7 +166,16 @@ export class FinalReportManager {
     if (fr === undefined) {
       return { valid: true };
     }
+    return this.validateFinalReportData(fr, schema);
+  }
 
+  /**
+   * Internal validation logic shared by validatePayload and validateSchema.
+   */
+  private validateFinalReportData(
+    fr: PendingFinalReportPayload,
+    schema: Record<string, unknown> | undefined
+  ): ValidationResult {
     // Determine what to validate based on format
     let dataToValidate: unknown;
     let schemaToUse: Record<string, unknown> | undefined;

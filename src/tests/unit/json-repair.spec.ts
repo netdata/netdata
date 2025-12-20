@@ -55,3 +55,64 @@ describe('parseJsonValueDetailed', () => {
     expect(result.repairs).not.toContain('backslashNewlineFix');
   });
 });
+
+describe('array extraction', () => {
+  it('extracts array from markdown code fence', () => {
+    const input = '```json\n[{"blocks": [{"type": "section"}]}]\n```';
+    const result = parseJsonValueDetailed(input);
+    expect(result.value).toEqual([{ blocks: [{ type: 'section' }] }]);
+    // jsonrepair handles code fence extraction internally
+    expect(result.repairs.length).toBeGreaterThan(0);
+  });
+
+  it('extracts array from text with leading non-JSON characters', () => {
+    // Use binary characters that jsonrepair can't interpret as JSON
+    const input = '\x00\x01\x02[{"blocks": [{"type": "section"}]}]';
+    const result = parseJsonValueDetailed(input);
+    // Should extract the array, not the inner object
+    expect(Array.isArray(result.value)).toBe(true);
+    expect((result.value as unknown[])[0]).toHaveProperty('blocks');
+    expect(result.repairs).toContain('extractFirstArray');
+  });
+
+  it('extracts array from XML wrapper', () => {
+    const input = '<ai-agent-final format="slack-block-kit">\n[{"blocks": [{"type": "section"}]}]\n</ai-agent-final>';
+    const result = parseJsonValueDetailed(input);
+    // Should extract the array, not the inner object
+    expect(Array.isArray(result.value)).toBe(true);
+    expect((result.value as unknown[])[0]).toHaveProperty('blocks');
+    expect(result.repairs).toContain('extractFirstArray');
+  });
+
+  it('extracts nested array from malformed wrapper', () => {
+    const input = 'Response: [{"items": [1, 2, 3]}, {"items": [4, 5]}] end';
+    const result = parseJsonValueDetailed(input);
+    // Should extract the full array with both elements
+    expect(Array.isArray(result.value)).toBe(true);
+    const arr = result.value as unknown[];
+    expect(arr.length).toBe(2);
+    expect(result.repairs).toContain('extractFirstArray');
+  });
+
+  it('extracts slack-block-kit array with nested blocks', () => {
+    const input = '```json\n[\n  {\n    "blocks": [\n      {\n        "type": "header",\n        "text": {"type": "plain_text", "text": "Report"}\n      }\n    ]\n  }\n]\n```';
+    const result = parseJsonValueDetailed(input);
+    expect(Array.isArray(result.value)).toBe(true);
+    expect((result.value as unknown[])[0]).toHaveProperty('blocks');
+  });
+
+  it('returns valid array untouched', () => {
+    const input = '[{"a": 1}, {"b": 2}]';
+    const result = parseJsonValueDetailed(input);
+    expect(result.value).toEqual([{ a: 1 }, { b: 2 }]);
+    expect(result.repairs).toHaveLength(0);
+  });
+
+  it('extracts array when both array and object are present', () => {
+    // Array extraction runs first in the queue, so arrays are preferred
+    const input = 'Prefix [1, 2, 3] then {"key": "value"} suffix';
+    const result = parseJsonValueDetailed(input);
+    expect(Array.isArray(result.value)).toBe(true);
+    expect(result.value).toEqual([1, 2, 3]);
+  });
+});

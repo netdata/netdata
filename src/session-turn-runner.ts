@@ -1318,12 +1318,46 @@ export class TurnRunner {
                                     finalContent = `${finalContent}\n\n[OUTPUT TRUNCATED: Response exceeded output token limit.]`;
                                 }
 
-                                this.commitFinalReport({
+                                // Build pending payload for pre-commit validation
+                                const pendingPayload: PendingFinalReportPayload = {
                                     format: finalFormat,
                                     content: finalContent,
                                     content_json: contentJson,
                                     metadata: Object.keys(commitMetadata).length > 0 ? commitMetadata : undefined,
-                                }, commitSource);
+                                };
+
+                                // Validate BEFORE commit to enable retry on validation failure
+                                const preCommitSchema = this.ctx.sessionConfig.expectedOutput?.schema;
+                                const preCommitValidation = this.ctx.finalReportManager.validatePayload(pendingPayload, preCommitSchema);
+                                if (!preCommitValidation.valid) {
+                                    const errs = preCommitValidation.errors ?? 'unknown validation error';
+                                    const preview = preCommitValidation.payloadPreview;
+                                    const failureMessage = `final_report schema validation failed: ${errs}${preview !== undefined ? ` (preview: ${preview})` : ''}`;
+                                    this.log({
+                                        timestamp: Date.now(),
+                                        severity: 'ERR' as const,
+                                        turn: currentTurn,
+                                        subturn: 0,
+                                        direction: 'response' as const,
+                                        type: 'llm' as const,
+                                        remoteIdentifier: 'agent:ajv',
+                                        fatal: false,
+                                        message: `pre-commit validation failed: ${failureMessage}`
+                                    });
+                                    setFinalReportFailureMessage(`${TOOL_FAILED_PREFIX} ${failureMessage}`);
+                                    this.addTurnFailure('final_report_schema_validation_failed');
+                                    this.state.finalReportToolFailedThisTurn = true;
+                                    this.state.finalReportToolFailedEver = true;
+                                    this.state.finalReportSchemaFailed = true;
+                                    toolFailureDetected = true;
+                                    // Set error flags to ensure retry even if other tools succeeded
+                                    lastError = `invalid_response: ${failureMessage}`;
+                                    lastErrorType = 'invalid_response';
+                                    // DON'T commit - return false to trigger retry
+                                    return false;
+                                }
+
+                                this.commitFinalReport(pendingPayload, commitSource);
                                 sanitizedHasToolCalls = true;
                                 return true;
                             };
@@ -1387,34 +1421,59 @@ export class TurnRunner {
                                 !msg.content.trim().toLowerCase().startsWith(TOOL_FAILED_PREFIX));
                             if (toolMessageFallback !== undefined) {
                                 const fallbackFormat = this.ctx.resolvedFormat ?? 'text';
-                                this.commitFinalReport({
+                                const fallbackPayload: PendingFinalReportPayload = {
                                     format: fallbackFormat,
                                     content: toolMessageFallback.content,
                                     metadata: { reason: 'tool_message_fallback' },
-                                }, FINAL_REPORT_SOURCE_TOOL_MESSAGE);
-                                this.log({
-                                    timestamp: Date.now(),
-                                    severity: 'WRN' as const,
-                                    turn: currentTurn,
-                                    subturn: 0,
-                                    direction: 'response' as const,
-                                    type: 'llm' as const,
-                                    remoteIdentifier: TEXT_EXTRACTION_REMOTE_ID,
-                                    fatal: false,
-                                    message: 'Adopted final report from tool message after invalid final_report call.',
-                                });
-                                this.log({
-                                    timestamp: Date.now(),
-                                    severity: 'WRN' as const,
-                                    turn: currentTurn,
-                                    subturn: 0,
-                                    direction: 'response' as const,
-                                    type: 'llm' as const,
-                                    remoteIdentifier: 'agent:fallback-report',
-                                    fatal: false,
-                                    message: 'Final report synthesized from tool message fallback.',
-                                    details: { source: FINAL_REPORT_SOURCE_TOOL_MESSAGE }
-                                });
+                                };
+                                // Validate fallback before commit
+                                const fallbackSchema = this.ctx.sessionConfig.expectedOutput?.schema;
+                                const fallbackValidation = this.ctx.finalReportManager.validatePayload(fallbackPayload, fallbackSchema);
+                                if (fallbackValidation.valid) {
+                                    this.commitFinalReport(fallbackPayload, FINAL_REPORT_SOURCE_TOOL_MESSAGE);
+                                    this.log({
+                                        timestamp: Date.now(),
+                                        severity: 'WRN' as const,
+                                        turn: currentTurn,
+                                        subturn: 0,
+                                        direction: 'response' as const,
+                                        type: 'llm' as const,
+                                        remoteIdentifier: TEXT_EXTRACTION_REMOTE_ID,
+                                        fatal: false,
+                                        message: 'Adopted final report from tool message after invalid final_report call.',
+                                    });
+                                    this.log({
+                                        timestamp: Date.now(),
+                                        severity: 'WRN' as const,
+                                        turn: currentTurn,
+                                        subturn: 0,
+                                        direction: 'response' as const,
+                                        type: 'llm' as const,
+                                        remoteIdentifier: 'agent:fallback-report',
+                                        fatal: false,
+                                        message: 'Final report synthesized from tool message fallback.',
+                                        details: { source: FINAL_REPORT_SOURCE_TOOL_MESSAGE }
+                                    });
+                                } else {
+                                    // Fallback also failed validation - log and set retry flags
+                                    const fallbackErrs = fallbackValidation.errors ?? 'unknown';
+                                    this.log({
+                                        timestamp: Date.now(),
+                                        severity: 'WRN' as const,
+                                        turn: currentTurn,
+                                        subturn: 0,
+                                        direction: 'response' as const,
+                                        type: 'llm' as const,
+                                        remoteIdentifier: 'agent:ajv',
+                                        fatal: false,
+                                        message: `tool_message_fallback validation failed: ${fallbackErrs}`,
+                                    });
+                                    // Set retry flags to ensure turn is not marked successful
+                                    this.state.finalReportToolFailedThisTurn = true;
+                                    this.state.finalReportToolFailedEver = true;
+                                    lastError = `invalid_response: fallback validation failed: ${fallbackErrs}`;
+                                    lastErrorType = 'invalid_response';
+                                }
                             }
                         }
                         const finalReportReady = this.finalReport !== undefined;
@@ -1463,8 +1522,9 @@ export class TurnRunner {
                         }
                         // Determine turn success based on tool execution or accepted final report
                         // Progress-only (standalone task_status) also succeeds - turn is consumed per TODO design
+                        // BUT: if final report validation failed, do NOT mark successful - retry instead
                         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-                        if (finalReportReady || hasNonProgressTools || hasProgressOnly) {
+                        if ((finalReportReady || hasNonProgressTools || hasProgressOnly) && lastErrorType !== 'invalid_response') {
                             turnSuccessful = true;
                             break;
                         }
@@ -2279,6 +2339,33 @@ export class TurnRunner {
             this.state.lastFinalReportStatus = 'failure';
             this.state.finalReportSchemaFailed = true;
             this.state.toolFailureMessages.set('final_report_schema', errMsg);
+            // Post-commit validation failure: replace with synthetic failure report.
+            // NOTE: This is a safety net. Pre-commit validation should catch most cases and trigger retry.
+            // Post-commit can't retry because finalizeWithCurrentFinalReport is called AFTER the retry
+            // loop decides to finalize. Phase 2 cleanup will centralize final report logic to fix this.
+            const source = this.ctx.finalReportManager.getSource();
+            if (source !== 'synthetic') {
+                this.log({
+                    timestamp: Date.now(),
+                    severity: 'ERR' as const,
+                    turn: currentTurn,
+                    subturn: 0,
+                    direction: 'response' as const,
+                    type: 'llm' as const,
+                    remoteIdentifier: 'agent:ajv',
+                    fatal: false,
+                    message: 'Post-commit validation failed; replacing with synthetic failure report.'
+                });
+                this.ctx.finalReportManager.clear();
+                const syntheticContent = `Final report validation failed: ${errs}`;
+                this.commitFinalReport({
+                    format: 'text',
+                    content: syntheticContent,
+                    metadata: { reason: 'schema_validation_failed', original_format: fr.format, validation_errors: errs }
+                }, 'synthetic');
+                this.state.finalReportToolFailedEver = true;
+                return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn);
+            }
         }
         if (this.ctx.sessionConfig.renderTarget !== 'sub-agent' && this.callbacks.onOutput !== undefined) {
             const finalOutput = (() => {

@@ -3372,10 +3372,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       };
     },
     expect: (result) => {
-      // Transport-layer success: model produced a final report.
-      // Schema validation warnings are logged but don't constitute transport failure.
-      invariant(result.success, 'Scenario run-test-47: transport succeeds with model-provided report.');
-      const schemaLog = result.logs.find((entry) => entry.severity === 'ERR' && typeof entry.message === 'string' && entry.message.includes('schema validation failed'));
+      // Pre-commit validation now rejects invalid payloads and triggers retries.
+      // Session fails because the LLM keeps returning invalid content and retries exhaust.
+      invariant(!result.success, 'Scenario run-test-47: schema validation failure triggers retries leading to session failure.');
+      const schemaLog = result.logs.find((entry) => entry.severity === 'ERR' && typeof entry.message === 'string' && entry.message.includes('validation failed'));
       invariant(schemaLog !== undefined, 'Schema validation log expected for run-test-47.');
     },
   },
@@ -6861,14 +6861,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       }
     },
     expect: (result: AIAgentResult) => {
-      // Transport-layer success: model produced a final report.
-      // Schema validation warnings are logged but don't constitute transport failure.
-      invariant(result.success, 'Scenario run-test-85: transport succeeds with model-provided report.');
+      // Pre-commit validation now rejects invalid payloads and triggers retries.
+      // Session fails because the LLM keeps returning invalid content and retries exhaust.
+      invariant(!result.success, 'Scenario run-test-85: schema validation failure triggers retries leading to session failure.');
       const ajvLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:ajv');
       invariant(ajvLog !== undefined, 'AJV warning expected for run-test-85.');
-      invariant(typeof ajvLog.message === 'string' && ajvLog.message.includes('payload preview='), 'Payload preview missing in AJV warning for run-test-85.');
-      const finalReport = result.finalReport!;
-      invariant(finalReport?.format === 'json', 'Final report should be json for run-test-85.');
+      invariant(typeof ajvLog.message === 'string' && ajvLog.message.includes('preview'), 'Payload preview missing in AJV warning for run-test-85.');
     },
   },
   {

@@ -161,6 +161,52 @@ const extractFirstJsonObject = (value: string): string | undefined => {
   return undefined;
 };
 
+const extractFirstJsonArray = (value: string): string | undefined => {
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escapeNext = false;
+  // eslint-disable-next-line functional/no-loop-statements
+  for (let i = 0; i < value.length; i += 1) {
+    const ch = value[i] ?? '';
+    if (inString) {
+      if (escapeNext) {
+        escapeNext = false;
+        continue;
+      }
+      if (ch === '\\') {
+        escapeNext = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === '[') {
+      if (depth === 0) {
+        start = i;
+      }
+      depth += 1;
+      continue;
+    }
+    if (ch === ']') {
+      if (depth === 0) {
+        return undefined;
+      }
+      depth -= 1;
+      if (depth === 0 && start !== -1) {
+        return value.slice(start, i + 1);
+      }
+    }
+  }
+  return undefined;
+};
+
 const closeDanglingJson = (value: string): string | undefined => {
   let inString = false;
   let escapeNext = false;
@@ -288,6 +334,13 @@ export const parseJsonValueDetailed = (raw: unknown): JsonParseDiagnostics => {
     }
 
     // Explore secondary transforms only if parse failed
+    // Try array extraction first - handles slack-block-kit and other array-based formats
+    // that might have objects inside them
+    const extractedArray = extractFirstJsonArray(candidate.text);
+    if (extractedArray !== undefined) {
+      const enriched = enqueue(extractedArray, [...candidate.steps, 'extractFirstArray']);
+      if (enriched !== undefined) queue.push(enriched);
+    }
     const extracted = extractFirstJsonObject(candidate.text);
     if (extracted !== undefined) {
       const enriched = enqueue(extracted, [...candidate.steps, 'extractFirstObject']);
