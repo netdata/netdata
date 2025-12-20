@@ -283,6 +283,8 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uin
 #endif
 
     metric = mrg_metric_dup(main_mrg, metric);
+    if(!metric)
+        return NULL;
 
     struct rrdeng_collect_handle *handle;
 

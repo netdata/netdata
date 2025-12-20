@@ -864,6 +864,14 @@ ALWAYS_INLINE_HOT void pg_cache_preload(struct rrdeng_query_handle *handle) {
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.currently_running_queries, 1, __ATOMIC_RELAXED);
     handle->pdc = pdc_get();
     handle->pdc->metric = mrg_metric_dup(main_mrg, handle->metric);
+    if(!handle->pdc->metric) {
+        // metric has been deleted, mark completions and return
+        completion_init(&handle->pdc->prep_completion);
+        completion_init(&handle->pdc->page_completion);
+        completion_mark_complete(&handle->pdc->prep_completion);
+        completion_mark_complete(&handle->pdc->page_completion);
+        return;
+    }
     handle->pdc->start_time_s = handle->start_time_s;
     handle->pdc->end_time_s = handle->end_time_s;
     handle->pdc->priority = handle->priority;
