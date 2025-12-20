@@ -60,7 +60,7 @@ toolResponseMaxBytes: 300000
 maxOutputTokens: 16384
 maxTurns: 5
 maxToolCallsPerTurn: 2
-caching: none
+caching: full
 reasoning: none
 ---
 You are a precision content extractor.
