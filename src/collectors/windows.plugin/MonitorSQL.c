@@ -175,14 +175,14 @@ void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const c
                     SQL_C_CHAR,
                     inst_obj,
                     sizeof(inst_obj),
-                    &col_inst_obj_len))) {
-                (void)SQLBindCol(
-                    mdi->parent->conn->dbInstanceTransactionSTMT,
-                    2,
-                    SQL_C_LONG,
-                    &inst_value,
-                    sizeof(inst_value),
-                    &col_inst_value_len);
+                    &col_inst_obj_len)) &&
+                    !netdata_mssql_check_result(SQLBindCol(
+                            mdi->parent->conn->dbInstanceTransactionSTMT,
+                            2,
+                            SQL_C_LONG,
+                            &inst_value,
+                            sizeof(inst_value),
+                            &col_inst_value_len))) {
 
                 while (true) {
                     SQLRETURN r = SQLFetch(mdi->parent->conn->dbInstanceTransactionSTMT);
