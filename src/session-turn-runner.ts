@@ -1174,7 +1174,8 @@ export class TurnRunner {
                                         if (typeof value === 'string') {
                                             const trimmed = value.trim();
                                             if (trimmed.length === 0) return undefined;
-                                            const parsed = parseJsonValueDetailed(trimmed).value;
+                                            // Use preferArrayExtraction for slack-block-kit to preserve outer array
+                                            const parsed = parseJsonValueDetailed(trimmed, { preferArrayExtraction: true }).value;
                                             if (isArray(parsed)) return parsed;
                                             if (parsed !== null && typeof parsed === 'object') {
                                                 const msgs = (parsed as { messages?: unknown }).messages;

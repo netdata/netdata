@@ -272,7 +272,8 @@ When pre-commit validation fails:
 - The turn is NOT marked successful
 - Error state is reset at the start of each attempt (line 390-393) to prevent poisoning later successful attempts
 - Retries continue until `maxRetries` is exhausted
-- If all retries fail, remaining turns are collapsed and a synthetic failure report is generated
+- If all retries fail, remaining turns are collapsed to force a final turn
+- A synthetic failure report is generated only when: no final report exists AND `finalReportToolFailedEver` is false (i.e., no prior final report attempt)
 
 ### Post-Commit Safety Net
 **Location**: `src/session-turn-runner.ts:2262-2282` (in `finalizeWithCurrentFinalReport`)
