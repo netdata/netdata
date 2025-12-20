@@ -6,6 +6,7 @@
 
 #include "../libnetdata.h"
 #include "nd_log-internals.h"
+#include "nd_log-queue.h"
 #include "../stacktrace/stacktrace.h"
 
 const char *program_name = "";
@@ -149,9 +150,10 @@ void nd_log_register_fatal_final_cb(fatal_event_t cb) {
 // --------------------------------------------------------------------------------------------------------------------
 // high level logger
 
-static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LOG_FIELD_PRIORITY priority,
-                                 ND_LOG_METHOD output, struct nd_log_source *source,
-                                 struct log_field *fields, size_t fields_max) {
+// Synchronous logging - used for critical messages and when async is not available
+static void nd_logger_log_fields_sync(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LOG_FIELD_PRIORITY priority,
+                                      ND_LOG_METHOD output, struct nd_log_source *source,
+                                      struct log_field *fields, size_t fields_max) {
     nd_log_fatal_hook(fields, fields_max);
 
     if(spinlock)
@@ -221,6 +223,109 @@ static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LO
 cleanup:
     if(spinlock)
         spinlock_unlock(spinlock);
+}
+
+// Async logging - formats message and enqueues for background writing
+static bool nd_logger_log_fields_async(FILE *fp, bool limit, ND_LOG_FIELD_PRIORITY priority,
+                                       ND_LOG_METHOD output, struct nd_log_source *source,
+                                       struct log_field *fields, size_t fields_max) {
+    // Check limits without holding spinlock - slightly racy but acceptable for logging
+    if(limit && nd_log_limit_reached(source))
+        return true;  // Rate limited, but successfully "handled"
+
+    // Pre-format the message into a queue entry (no locks held)
+    struct nd_log_queue_entry entry = {
+        .source = source - nd_log.sources,  // Calculate source index
+        .priority = priority,
+        .method = output,
+        .format = source->format,
+        .fp = fp,
+        .fd = nd_log.journal_direct.fd,
+        .message_len = 0,
+        .message_allocated = NULL,
+    };
+
+    // Format the message based on output method
+    BUFFER *wb = buffer_create(1024, NULL);
+
+    if(output == NDLM_JOURNAL) {
+        // For journal, we need special formatting
+        // Fall back to logfmt for now, journal direct needs special handling
+        nd_logger_logfmt(wb, fields, fields_max);
+    }
+    else if(output == NDLM_FILE || output == NDLM_STDOUT || output == NDLM_STDERR) {
+        if(source->format == NDLF_JSON)
+            nd_logger_json(wb, fields, fields_max);
+        else
+            nd_logger_logfmt(wb, fields, fields_max);
+    }
+    else if(output == NDLM_SYSLOG) {
+        // For syslog, use logfmt
+        nd_logger_logfmt(wb, fields, fields_max);
+    }
+    else {
+        buffer_free(wb);
+        return false;
+    }
+
+    // Get formatted message
+    size_t msg_len = buffer_strlen(wb);
+    const char *msg = buffer_tostring(wb);
+
+    // Clamp to maximum size
+    if(msg_len >= ND_LOG_QUEUE_MESSAGE_MAX_SIZE)
+        msg_len = ND_LOG_QUEUE_MESSAGE_MAX_SIZE - 1;
+
+    entry.message_len = msg_len;
+
+    // Decide: inline buffer or allocate
+    if(msg_len < ND_LOG_QUEUE_INLINE_SIZE) {
+        // Fits in inline buffer
+        memcpy(entry.message_inline, msg, msg_len);
+        entry.message_inline[msg_len] = '\0';
+        entry.message_allocated = NULL;
+    }
+    else {
+        // Need to allocate - use mallocz (will fatal on failure, which is acceptable)
+        entry.message_allocated = mallocz(msg_len + 1);
+        memcpy(entry.message_allocated, msg, msg_len);
+        entry.message_allocated[msg_len] = '\0';
+    }
+
+    buffer_free(wb);
+
+    // Enqueue the entry (transfers ownership of allocated pointer)
+    return nd_log_queue_enqueue(&entry);
+}
+
+// Main entry point - decides between sync and async logging
+static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LOG_FIELD_PRIORITY priority,
+                                 ND_LOG_METHOD output, struct nd_log_source *source,
+                                 struct log_field *fields, size_t fields_max) {
+    // Always call fatal hook first
+    nd_log_fatal_hook(fields, fields_max);
+
+    // Critical messages (ALERT and above) always go synchronously
+    // This ensures they are written immediately before potential crash
+    if(priority <= NDLP_ALERT) {
+        nd_logger_log_fields_sync(spinlock, fp, limit, priority, output, source, fields, fields_max);
+        return;
+    }
+
+    // Try async logging if available and appropriate
+    if(nd_log_queue_enabled()) {
+        // For methods we support asynchronously
+        if(output == NDLM_FILE || output == NDLM_STDOUT || output == NDLM_STDERR || output == NDLM_SYSLOG) {
+            if(nd_logger_log_fields_async(fp, limit, priority, output, source, fields, fields_max))
+                return;  // Successfully queued
+            // Fall through to sync if queue failed (full)
+        }
+        // Journal and Windows event log still use sync path for now
+        // They require special handling that's harder to serialize
+    }
+
+    // Fallback to synchronous logging
+    nd_logger_log_fields_sync(spinlock, fp, limit, priority, output, source, fields, fields_max);
 }
 
 static void nd_logger_unset_all_thread_fields(void) {
