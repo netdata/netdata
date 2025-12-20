@@ -777,6 +777,7 @@ export class ToolsOrchestrator {
       ? `${kind}:${providerLabel}`
       : logProviderLabel;
     let result = raw;
+    let truncatedForSize = false;
     if (!isBatchTool && typeof limit === 'number' && limit > 0 && sizeBytes > limit) {
       // Truncate first, because downstream token accounting (context guard) must
       // operate on the already-clamped payload; do not reorder this block.
@@ -812,6 +813,7 @@ export class ToolsOrchestrator {
       this.onLog(warnLog, { opId });
       // Try JSON-aware truncation first, fall back to byte truncation
       result = truncateJsonStrings(raw, limit) ?? truncateToBytes(raw, limit) ?? '(tool failed: response exceeded max size)';
+      truncatedForSize = true;
     }
 
     // Ensure non-empty result for downstream providers that expect a non-empty tool output
@@ -990,7 +992,7 @@ export class ToolsOrchestrator {
     }
     try {
       if (opId !== undefined) {
-        this.opTree.setResponse(opId, { payload: result.length > 0 ? result.slice(0, 4096) : '', size: resultBytes, truncated: result.length > 4096 });
+        this.opTree.setResponse(opId, { payload: result, size: resultBytes, truncated: truncatedForSize || truncatedForBudget });
       }
     } catch (e) { warn(`tools setResponse failed: ${toErrorMessage(e)}`); }
 

@@ -99,6 +99,7 @@ const dumpScenarioResultIfNeeded = (scenarioId: string, result: AIAgentResult): 
 };
 const TOOL_DROP_STUB = `(tool failed: ${CONTEXT_OVERFLOW_FRAGMENT})`;
 const TOOL_SIZE_CAP_STUB = '(tool failed: response exceeded max size)';
+const SNAPSHOT_FULL_MARKER = 'SNAPSHOT-FULL-PAYLOAD-END';
 const SHARED_REGISTRY_RESULT = 'shared-response';
 const SECOND_TURN_FINAL_ANSWER = 'Second turn final answer.';
 const RESTART_TRIGGER_PAYLOAD = 'restart-cycle';
@@ -3458,6 +3459,19 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.finalReport !== undefined, 'Final report should be present even on failure for run-test-50-snapshot.');
       const llmEntries = result.accounting.filter(isLlmAccounting);
       invariant(llmEntries.length >= 2, 'Retry attempts expected for run-test-50-snapshot.');
+    },
+  },
+  {
+    id: 'run-test-50-snapshot-full',
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-50-snapshot-full expected success.');
+      const tree = result.opTree;
+      invariant(tree !== undefined, 'opTree missing for run-test-50-snapshot-full.');
+      const payloads = tree.turns.flatMap((turn) => turn.ops)
+        .map((op) => op.response?.payload)
+        .filter((payload): payload is Record<string, unknown> => payload !== undefined && payload !== null && typeof payload === 'object' && !Array.isArray(payload));
+      const hasMarker = payloads.some((payload) => typeof payload.textPreview === 'string' && payload.textPreview.includes(SNAPSHOT_FULL_MARKER));
+      invariant(hasMarker, 'Snapshot payload should include full marker for run-test-50-snapshot-full.');
     },
   },
   {

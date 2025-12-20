@@ -149,8 +149,8 @@ interface OperationNode {
 
 ### Excluded Data
 1. Raw conversation (summarized in ops)
-2. Full tool parameters (may be truncated)
-3. Large response bodies (truncated)
+2. Tool parameters remain attached to opTree requests (not truncated at snapshot time)
+3. Response bodies are preserved in opTree responses; any shortening reflects upstream limits (e.g., toolResponseMaxBytes or token-budget truncation), not snapshot truncation
 
 ## Persistence Patterns
 
@@ -298,7 +298,7 @@ User-provided `persistence` config values override defaults. Custom callbacks (`
 - Check log attachment
 
 ### Large snapshot size
-- Check response truncation
+- Check upstream truncation settings (toolResponseMaxBytes, token-budget truncation)
 - Verify log pruning
 - Consider selective snapshots
 

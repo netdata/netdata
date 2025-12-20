@@ -880,7 +880,7 @@ export class TurnRunner {
                             const lastAssistant = [...sanitizedMessages].filter((m) => m.role === 'assistant').pop();
                             const respText = typeof lastAssistant?.content === 'string' ? lastAssistant.content : (turnResult.response ?? '');
                             const sz = respText.length > 0 ? Buffer.byteLength(respText, 'utf8') : 0;
-                            this.ctx.opTree.setResponse(llmOpId, { payload: { textPreview: respText.slice(0, 4096) }, size: sz, truncated: respText.length > 4096 });
+                            this.ctx.opTree.setResponse(llmOpId, { payload: { textPreview: respText }, size: sz, truncated: false });
                             this.ctx.opTree.endOp(llmOpId, (turnResult.status.type === 'success') ? 'ok' : 'failed', { latency: turnResult.latencyMs });
                             this.callbacks.onOpTree(this.ctx.opTree.getSession());
                         }
