@@ -250,6 +250,46 @@ adoptFromToolMessage() {
 }
 ```
 
+## Schema Validation and Retry Behavior
+
+### Pre-Commit Validation
+**Location**: `src/session-turn-runner.ts:1329-1358`
+
+Before committing a final report, the runner validates the payload against the expected schema:
+
+1. **Validation Check**: `ctx.finalReportManager.validatePayload()` validates before commit
+2. **On Failure**:
+   - Sets `finalReportToolFailedThisTurn = true`
+   - Sets `finalReportSchemaFailed = true`
+   - Sets `lastErrorType = 'invalid_response'`
+   - Returns `false` to trigger retry within the same turn
+3. **On Success**: Proceeds to `commitFinalReport()`
+
+### Retry Semantics
+**Location**: `src/session-turn-runner.ts:1500-1507`
+
+When pre-commit validation fails:
+- The turn is NOT marked successful
+- Error state is reset at the start of each attempt (line 390-393) to prevent poisoning later successful attempts
+- Retries continue until `maxRetries` is exhausted
+- If all retries fail, remaining turns are collapsed and a synthetic failure report is generated
+
+### Post-Commit Safety Net
+**Location**: `src/session-turn-runner.ts:2262-2282` (in `finalizeWithCurrentFinalReport`)
+
+If validation somehow fails after commit (shouldn't happen with pre-commit validation):
+1. Report is cleared: `ctx.finalReportManager.clear()`
+2. Replaced with synthetic failure report
+3. Session marked as failed
+
+### JSON Parsing for slack-block-kit
+**Location**: `src/session-turn-runner.ts:1195`
+
+When parsing slack-block-kit payloads wrapped in XML or markdown:
+- Uses `preferArrayExtraction: true` option in `parseJsonValueDetailed()`
+- This prioritizes extracting outer array `[...]` over inner objects `{...}`
+- Ensures the messages array wrapper is preserved, not stripped
+
 ## Final Turn Enforcement
 
 When `isFinalTurn === true`:

@@ -65,28 +65,31 @@ describe('array extraction', () => {
     expect(result.repairs.length).toBeGreaterThan(0);
   });
 
-  it('extracts array from text with leading non-JSON characters', () => {
+  it('extracts array from text with leading non-JSON characters (preferArrayExtraction)', () => {
     // Use binary characters that jsonrepair can't interpret as JSON
+    // preferArrayExtraction: true for slack-block-kit scenarios
     const input = '\x00\x01\x02[{"blocks": [{"type": "section"}]}]';
-    const result = parseJsonValueDetailed(input);
+    const result = parseJsonValueDetailed(input, { preferArrayExtraction: true });
     // Should extract the array, not the inner object
     expect(Array.isArray(result.value)).toBe(true);
     expect((result.value as unknown[])[0]).toHaveProperty('blocks');
     expect(result.repairs).toContain('extractFirstArray');
   });
 
-  it('extracts array from XML wrapper', () => {
+  it('extracts array from XML wrapper (preferArrayExtraction)', () => {
+    // preferArrayExtraction: true for slack-block-kit scenarios
     const input = '<ai-agent-final format="slack-block-kit">\n[{"blocks": [{"type": "section"}]}]\n</ai-agent-final>';
-    const result = parseJsonValueDetailed(input);
+    const result = parseJsonValueDetailed(input, { preferArrayExtraction: true });
     // Should extract the array, not the inner object
     expect(Array.isArray(result.value)).toBe(true);
     expect((result.value as unknown[])[0]).toHaveProperty('blocks');
     expect(result.repairs).toContain('extractFirstArray');
   });
 
-  it('extracts nested array from malformed wrapper', () => {
+  it('extracts nested array from malformed wrapper (preferArrayExtraction)', () => {
+    // preferArrayExtraction: true for slack-block-kit scenarios
     const input = 'Response: [{"items": [1, 2, 3]}, {"items": [4, 5]}] end';
-    const result = parseJsonValueDetailed(input);
+    const result = parseJsonValueDetailed(input, { preferArrayExtraction: true });
     // Should extract the full array with both elements
     expect(Array.isArray(result.value)).toBe(true);
     const arr = result.value as unknown[];
@@ -108,10 +111,17 @@ describe('array extraction', () => {
     expect(result.repairs).toHaveLength(0);
   });
 
-  it('extracts array when both array and object are present', () => {
-    // Array extraction runs first in the queue, so arrays are preferred
+  it('extracts object when both array and object are present (default)', () => {
+    // By default, object extraction runs first for backwards compatibility
     const input = 'Prefix [1, 2, 3] then {"key": "value"} suffix';
     const result = parseJsonValueDetailed(input);
+    expect(result.value).toEqual({ key: 'value' });
+  });
+
+  it('extracts array when preferArrayExtraction is true', () => {
+    // With preferArrayExtraction, array extraction runs first (for slack-block-kit)
+    const input = 'Prefix [1, 2, 3] then {"key": "value"} suffix';
+    const result = parseJsonValueDetailed(input, { preferArrayExtraction: true });
     expect(Array.isArray(result.value)).toBe(true);
     expect(result.value).toEqual([1, 2, 3]);
   });

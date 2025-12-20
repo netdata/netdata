@@ -262,6 +262,11 @@ export interface JsonParseDiagnostics {
   repairedText?: string;
 }
 
+export interface JsonParseOptions {
+  /** When true, try array extraction before object extraction. Useful for slack-block-kit. */
+  preferArrayExtraction?: boolean;
+}
+
 const attemptRepairs = (text: string): { value?: unknown; repairedText?: string; steps: string[] } => {
   const steps: string[] = [];
   const parsed = tryParseJson(text);
@@ -280,7 +285,8 @@ const attemptRepairs = (text: string): { value?: unknown; repairedText?: string;
   return { steps: [] };
 };
 
-export const parseJsonValueDetailed = (raw: unknown): JsonParseDiagnostics => {
+export const parseJsonValueDetailed = (raw: unknown, options?: JsonParseOptions): JsonParseDiagnostics => {
+  const preferArrayExtraction = options?.preferArrayExtraction ?? false;
   if (isPlainObject(raw) || Array.isArray(raw)) {
     return { value: normalizeHexEscapes(raw), repairs: [] };
   }
@@ -334,17 +340,31 @@ export const parseJsonValueDetailed = (raw: unknown): JsonParseDiagnostics => {
     }
 
     // Explore secondary transforms only if parse failed
-    // Try array extraction first - handles slack-block-kit and other array-based formats
-    // that might have objects inside them
-    const extractedArray = extractFirstJsonArray(candidate.text);
-    if (extractedArray !== undefined) {
-      const enriched = enqueue(extractedArray, [...candidate.steps, 'extractFirstArray']);
-      if (enriched !== undefined) queue.push(enriched);
-    }
-    const extracted = extractFirstJsonObject(candidate.text);
-    if (extracted !== undefined) {
-      const enriched = enqueue(extracted, [...candidate.steps, 'extractFirstObject']);
-      if (enriched !== undefined) queue.push(enriched);
+    // Extraction order depends on preferArrayExtraction option:
+    // - When true (slack-block-kit): try array first to preserve outer array wrapper
+    // - When false (default): try object first for backwards compatibility
+    if (preferArrayExtraction) {
+      const extractedArray = extractFirstJsonArray(candidate.text);
+      if (extractedArray !== undefined) {
+        const enriched = enqueue(extractedArray, [...candidate.steps, 'extractFirstArray']);
+        if (enriched !== undefined) queue.push(enriched);
+      }
+      const extracted = extractFirstJsonObject(candidate.text);
+      if (extracted !== undefined) {
+        const enriched = enqueue(extracted, [...candidate.steps, 'extractFirstObject']);
+        if (enriched !== undefined) queue.push(enriched);
+      }
+    } else {
+      const extracted = extractFirstJsonObject(candidate.text);
+      if (extracted !== undefined) {
+        const enriched = enqueue(extracted, [...candidate.steps, 'extractFirstObject']);
+        if (enriched !== undefined) queue.push(enriched);
+      }
+      const extractedArray = extractFirstJsonArray(candidate.text);
+      if (extractedArray !== undefined) {
+        const enriched = enqueue(extractedArray, [...candidate.steps, 'extractFirstArray']);
+        if (enriched !== undefined) queue.push(enriched);
+      }
     }
     const closed = closeDanglingJson(candidate.text);
     if (closed !== undefined) {

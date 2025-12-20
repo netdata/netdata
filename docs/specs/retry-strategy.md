@@ -24,7 +24,7 @@ interface TurnRetryDirective {
 ```
 
 ### Retry Loop Structure
-**Location**: `src/ai-agent.ts:1458-2011`
+**Location**: `src/session-turn-runner.ts:389-1552`
 
 ```
 for turn = 1 to maxTurns:
@@ -32,6 +32,10 @@ for turn = 1 to maxTurns:
   pairCursor = 0
 
   while attempts < maxRetries and not successful:
+    # Reset per-attempt error state (line 390-393)
+    lastError = undefined
+    lastErrorType = undefined
+
     pair = targets[pairCursor % targets.length]
     pairCursor += 1
     attempts += 1
@@ -48,6 +52,26 @@ for turn = 1 to maxTurns:
       maybe wait (backoff)
       continue to next attempt
 ```
+
+### Per-Attempt Error State Reset
+**Location**: `src/session-turn-runner.ts:390-393`
+
+At the start of each attempt within a turn, `lastError` and `lastErrorType` are reset to `undefined`. This prevents a failed attempt from poisoning later successful attempts within the same turn.
+
+**Example scenario**:
+1. Attempt 1: Final report validation fails → `lastErrorType = 'invalid_response'`
+2. Attempt 2: LLM runs tools successfully (no final report)
+3. Without reset: Tools would be blocked from marking turn successful
+4. With reset: Tools correctly mark turn successful
+
+### Final Report Validation Retry
+**Location**: `src/session-turn-runner.ts:1329-1358`
+
+When a final report fails schema validation:
+1. `validatePayload()` is called BEFORE `commitFinalReport()`
+2. On failure: Sets retry flags and returns `false`
+3. `lastErrorType = 'invalid_response'` triggers retry at line 1500-1507
+4. Turn is NOT marked successful until validation passes
 
 ## Error Classification
 

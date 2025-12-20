@@ -387,6 +387,10 @@ export class TurnRunner {
             // turnSuccessful starts false; checked on subsequent iterations after potential success at line ~1184
             // eslint-disable-next-line functional/no-loop-statements
             while (attempts < maxRetries && !turnSuccessful) {
+                // Reset per-attempt error state to avoid poisoning later attempts
+                // (e.g., validation failure on attempt 1 should not block success on attempt 2)
+                lastError = undefined;
+                lastErrorType = undefined;
                 if (Boolean(this.ctx.stopRef?.stopping)) {
                     return this.finalizeGracefulStopSession(conversation, logs, accounting);
                 }
@@ -1187,7 +1191,8 @@ export class TurnRunner {
                                     let messagesArray: unknown[] | undefined;
                                     if (rawPayload !== undefined) {
                                         // XML transport: parse JSON from raw payload
-                                        const parsedJson = parseJsonValueDetailed(rawPayload);
+                                        // Use preferArrayExtraction for slack-block-kit to preserve outer array
+                                        const parsedJson = parseJsonValueDetailed(rawPayload, { preferArrayExtraction: true });
                                         if (parsedJson.value !== undefined && parsedJson.value !== null && typeof parsedJson.value === 'object') {
                                             const parsed = parsedJson.value as Record<string, unknown>;
                                             // Could be {messages: [...]} or just [...]
