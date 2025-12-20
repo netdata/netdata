@@ -3454,19 +3454,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       sessionConfig.outputFormat = SLACK_OUTPUT_FORMAT;
     },
     expect: (result) => {
-      invariant(result.success, 'Scenario run-test-50-snapshot expected success.');
-      const finalReport = result.finalReport!;
-      invariant(finalReport?.format === SLACK_OUTPUT_FORMAT, 'Slack final report expected for run-test-50-snapshot.');
-      const metadataCandidate = finalReport.metadata;
-      const slackCandidate = (metadataCandidate !== undefined && typeof metadataCandidate === 'object' && !Array.isArray(metadataCandidate))
-        ? (metadataCandidate as { slack?: unknown }).slack
-        : undefined;
-      const slackMeta = (slackCandidate !== undefined && typeof slackCandidate === 'object' && !Array.isArray(slackCandidate))
-        ? (slackCandidate as { messages?: unknown[] })
-        : undefined;
-      const messagesValue = slackMeta !== undefined ? slackMeta.messages : undefined;
-      const messages = Array.isArray(messagesValue) ? messagesValue : [];
-      invariant(messages.length > 0, 'Normalized Slack messages expected for run-test-50-snapshot.');
+      invariant(!result.success, 'Scenario run-test-50-snapshot should fail after retries on invalid payload.');
+      invariant(result.finalReport !== undefined, 'Final report should be present even on failure for run-test-50-snapshot.');
+      const llmEntries = result.accounting.filter(isLlmAccounting);
+      invariant(llmEntries.length >= 2, 'Retry attempts expected for run-test-50-snapshot.');
     },
   },
   {
