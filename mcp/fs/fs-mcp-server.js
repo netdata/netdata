@@ -562,7 +562,7 @@ async function toolTree(args) {
   if (typeof dir !== 'string') throw new Error('dir must be a string');
   // Refuse to list entire tree for empty dir or '.'
   if (dir === '' || dir === '.') {
-    throw new Error('listing the entire tree is not allowed due to size limitations. Use ListDir to see all directories and select a directory to list.');
+    throw new Error('Traversing the entire tree from the root is not allowed due to size limitations. Use it on specific subdirectories.');
   }
   const abs = resolveRel(dir);
 
@@ -826,7 +826,7 @@ async function toolRGrep(args) {
   if (typeof regex !== 'string') throw new Error('regex must be a string');
   // Refuse to grep entire tree for empty dir or '.'
   if (dir === '' || dir === '.') {
-    throw new Error('recursive grep on the entire tree is not allowed due to size limitations. Use it on specific subdirectories.');
+    throw new Error('recursive grep on the entire tree from the root is not allowed due to size limitations. Use it on specific subdirectories.');
   }
   const cs = Boolean(caseSensitive);
   const maxFilesLimit = maxFiles || Infinity;
