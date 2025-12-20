@@ -151,7 +151,7 @@ void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const c
         SQLLEN col_inst_obj_len = 0, col_inst_value_len = 0;
 
         /* Execute the unified performance counter query targeting the instance
-         * (object_name=instance) to fetch buffer and compilation stats. */
+         to fetch buffer and compilation stats. */
         SQLCHAR inst_query[sizeof(NETDATA_QUERY_PERFORMANCE_COUNTER) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
         snprintfz(
             (char *)inst_query,
