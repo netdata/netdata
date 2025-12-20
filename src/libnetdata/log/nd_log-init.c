@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "nd_log-internals.h"
+#include "nd_log-queue.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -271,6 +272,15 @@ void nd_log_initialize(void) {
 #if defined(HAVE_LIBBACKTRACE)
     stacktrace_init();
 #endif
+
+    // Initialize async logging queue
+    // This starts the background logger thread
+    nd_log_queue_init();
+}
+
+void nd_log_shutdown(void) {
+    // Shutdown async logging queue, flushing pending messages
+    nd_log_queue_shutdown(true);
 }
 
 void nd_log_reopen_log_files(bool log) {
