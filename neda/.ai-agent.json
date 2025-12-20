@@ -3,7 +3,7 @@
     "nova": {
       "type": "openai",
       "apiKey": "${NOVA_API_KEY}",
-      "baseUrl": "http://nova:8090/v1",
+      "baseUrl": "http://10.20.4.21:8090/v1",
       "openaiMode": "chat",
       "contextWindow": 131072,
       "models": {
