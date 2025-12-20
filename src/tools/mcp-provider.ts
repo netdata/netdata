@@ -13,7 +13,7 @@ import type { ToolCancelOptions, ToolExecuteOptions, ToolExecuteResult } from '.
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 
 import { createWebSocketTransport } from '../websocket-transport.js';
-import { warn } from '../utils.js';
+import { UNKNOWN_TOOL_ERROR_PREFIX, warn } from '../utils.js';
 import { ToolProvider } from './types.js';
 import { killProcessTree } from '../utils/process-tree.js';
 
@@ -1280,7 +1280,7 @@ export class MCPProvider extends ToolProvider {
   async execute(name: string, parameters: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
     await this.ensureInitialized();
     const mapping = this.toolNameMap.get(name);
-    if (mapping === undefined) throw new Error(`No server found for tool: ${name}`);
+    if (mapping === undefined) throw new Error(`${UNKNOWN_TOOL_ERROR_PREFIX}${name}`);
     const { serverName, originalName } = mapping;
     const sanitizedNamespace = name.includes('__') ? name.split('__')[0] : this.sanitizeNamespace(serverName);
     this.validateToolParameters(serverName, originalName, parameters);

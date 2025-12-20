@@ -44,6 +44,7 @@ import {
   finalReportFormatMismatch,
   finalReportReminder,
   isXmlFinalReportTagName,
+  isUnknownToolFailureMessage,
   RETRY_EXHAUSTION_FINAL_MESSAGE,
   TASK_STATUS_COMPLETED_FINAL_MESSAGE,
   toolReminderMessage,
@@ -2103,7 +2104,7 @@ export class TurnRunner {
     if (lastErrorType === 'model_error') slugs.add('provider_error');
     // Tool error slugs inferred from toolFailureMessages/trimmed ids
     if (this.state.toolFailureMessages.size > 0 || this.state.toolFailureFallbacks.length > 0) slugs.add('tool_exec_failed');
-    const anyUnknown = (lastTurnResult?.executionStats?.unknownToolEncountered === true) || (lastTurnResult?.messages ?? []).some((m) => m.role === 'tool' && typeof m.content === 'string' && m.content.includes('No server found for tool'));
+    const anyUnknown = (lastTurnResult?.executionStats?.unknownToolEncountered === true) || (lastTurnResult?.messages ?? []).some((m) => m.role === 'tool' && typeof m.content === 'string' && isUnknownToolFailureMessage(m.content));
     if (anyUnknown) slugs.add('unknown_tool');
     if (this.state.trimmedToolCallIds.size > 0 || this.state.droppedInvalidToolCalls > 0 || (hadToolCalls && stats.executedTools === 0)) slugs.add('malformed_tool_call');
     if (this.state.finalReportToolFailedEver) {

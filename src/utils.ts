@@ -53,6 +53,7 @@ const TOOL_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_\-]*(?:__[A-Za-z0-9_\-]+)*/;
 const TOOL_NAME_INVALID_CHARS = /[^A-Za-z0-9_\-]+/g;
 const TOOL_NAME_FALLBACK = 'tool_call';
 export const TOOL_NAME_MAX_LENGTH = 200;
+export const UNKNOWN_TOOL_ERROR_PREFIX = 'unknown_tool:';
 
 export const sanitizeToolName = (raw: string): string => {
   const withoutPrefix = raw.replace(/<\|[^|]+\|>/g, '').trim();

@@ -8,12 +8,13 @@ import type {
 import type { XmlToolTransport } from './xml-transport.js';
 
 import { ContextGuard } from './context-guard.js';
-import { TOOL_NO_OUTPUT } from './llm-messages.js';
+import { TOOL_NO_OUTPUT, unknownToolFailureMessage } from './llm-messages.js';
 import { addSpanEvent } from './telemetry/index.js';
 import { truncateToBytes } from './truncation.js';
 import {
   clampToolName,
   estimateMessagesBytes,
+  UNKNOWN_TOOL_ERROR_PREFIX,
   parseJsonRecord,
   sanitizeToolName,
 } from './utils.js';
@@ -539,7 +540,7 @@ export class SessionToolExecutor {
           addSpanEvent('tool.call.unknown', {
             'ai.tool.name': effectiveToolName,
           });
-          throw new Error(`No server found for tool: ${effectiveToolName}`);
+          throw new Error(`${UNKNOWN_TOOL_ERROR_PREFIX}${effectiveToolName}`);
         }
       } catch (error) {
         const latency = Date.now() - startTime;
@@ -599,10 +600,15 @@ export class SessionToolExecutor {
 
         // Return error message instead of throwing
         const limitMessage = `execution not allowed because the per-turn tool limit (${String(maxToolCallsPerTurn)}) was reached; retry this tool on the next turn if available.`;
+        const unknownToolName = errorMsg.startsWith(UNKNOWN_TOOL_ERROR_PREFIX)
+          ? errorMsg.slice(UNKNOWN_TOOL_ERROR_PREFIX.length)
+          : undefined;
         const failureDetail =
           errorMsg === 'tool_calls_per_turn_limit_exceeded'
             ? limitMessage
-            : errorMsg;
+            : unknownToolName !== undefined && unknownToolName.length > 0
+              ? unknownToolFailureMessage(unknownToolName)
+              : errorMsg;
         const renderedFailure = `(tool failed: ${failureDetail})`;
 
         if (

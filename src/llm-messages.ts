@@ -266,6 +266,19 @@ export const XML_WRAPPER_CALLED_AS_TOOL_RESULT =
  */
 export const TOOL_NO_OUTPUT = '(tool failed: context window budget exceeded)';
 
+const UNKNOWN_TOOL_FAILURE_PREFIX = 'Unknown tool `';
+
+/**
+ * Unknown tool name (tool call does not match any available tool).
+ * Returned as tool result to the LLM.
+ * Used in: session-tool-executor.ts, session-turn-runner.ts, tests
+ */
+export const unknownToolFailureMessage = (name: string): string =>
+  `${UNKNOWN_TOOL_FAILURE_PREFIX}${name}\`: you called tool \`${name}\` but it does not match any of the tools in this session. Review carefully the tools available and copy the tool name verbatim. Tool names are usually composed of a namespace (or tool provider) + double underscore + the tool name of this namespace/provider. You may now repeat the call to the tool, but this time you MUST supply the exact tool name as given in your list of tools.`;
+
+export const isUnknownToolFailureMessage = (content: string): boolean =>
+  content.includes(UNKNOWN_TOOL_FAILURE_PREFIX);
+
 // =============================================================================
 // XML PROTOCOL ERRORS
 // Sent via onTurnFailure callback (become part of TURN-FAILED message)

@@ -26,7 +26,7 @@ import { parseFrontmatter, parseList, parsePairs } from '../../frontmatter.js';
 import { resolveIncludes } from '../../include-resolver.js';
 import { DEFAULT_TOOL_INPUT_SCHEMA } from '../../input-contract.js';
 import { LLMClient } from '../../llm-client.js';
-import { MAX_TURNS_FINAL_MESSAGE } from '../../llm-messages.js';
+import { MAX_TURNS_FINAL_MESSAGE, unknownToolFailureMessage } from '../../llm-messages.js';
 import { AnthropicProvider } from '../../llm-providers/anthropic.js';
 import { BaseLLMProvider, type ResponseMessage } from '../../llm-providers/base.js';
 import { OpenRouterProvider } from '../../llm-providers/openrouter.js';
@@ -11963,7 +11963,7 @@ BASE_TEST_SCENARIOS.push({
         {
           role: 'tool',
           toolCallId: 'call-1',
-          content: '(tool failed: No server found for tool: unknown_tool)',
+          content: `(tool failed: ${unknownToolFailureMessage('unknown_tool')})`,
         },
       ],
       tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
