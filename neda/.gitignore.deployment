@@ -1,0 +1,76 @@
+# This .gitignore is for the deployed /opt/neda local git repository
+# It tracks configuration and credentials for rollback capability
+# but excludes large binaries and third-party data
+
+# ai-agent runtime data (sessions and accounting)                                                                                                           
+# ================================================                                                                                                          
+/.ai-agent/sessions/                                                                                                                                        
+/.ai-agent/accounting*                                                                                                                                      
+
+# Large third-party directories
+# ==============================
+/netdata-repos/
+/google-cloud-sdk/
+
+# Large binaries
+# ==============
+/bin/toolbox
+/bin/gcloud
+/bin/bq
+/bin/gsutil
+
+# MCP servers (git repositories)
+# ================================
+/mcp/mcp-gsc/
+
+# Python virtual environments
+# ============================
+/mcp/*/.venv/
+/mcp/*/venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node modules (if MCP servers install them)
+# ===========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime and temporary data
+# ===========================
+/logs/
+/tmp/
+/cache/
+/.cache/
+*.log
+*.pid
+
+# Shell history files
+.bash_history
+.zsh_history
+.sh_history
+
+# Cache files (regenerated automatically)
+.channels_cache_v2.json
+.users_cache.json
+.gsc-client-secrets.json
+
+# System files
+# ============
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.#*
+*.tmp
+
+# IMPORTANT: We intentionally track these for rollback:
+# - .ai-agent.env (API keys)
+# - .ai-agent.json (configuration)
+# - .*.pem (certificates)
+# - .*.key (private keys)
+# - .*-service-account.json (Google service accounts)
+# - .github-app.json (GitHub app configuration)

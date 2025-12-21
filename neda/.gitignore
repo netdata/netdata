@@ -5,6 +5,7 @@
 .*
 !.ai-agent.json
 !.gitignore
+!.gitignore.deployment
 
 # Credential files - NEVER commit these to source
 .ai-agent.env
