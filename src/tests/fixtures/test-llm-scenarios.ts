@@ -1,6 +1,8 @@
 import type { ProviderTurnMetadata, TokenUsage } from '../../types.js';
 import type { ReasoningOutput } from 'ai';
 
+import { SLACK_BLOCK_KIT_MRKDWN_RULES_TITLE } from '../../llm-messages.js';
+
 export interface ScenarioToolCall {
   toolName: string;
   arguments: Record<string, unknown>;
@@ -2350,7 +2352,7 @@ const SCENARIOS: ScenarioDefinition[] = [
   {
     id: 'run-test-50',
     description: 'Slack block kit final report fallback.',
-    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER, SLACK_BLOCK_KIT_MRKDWN_RULES_TITLE],
     turns: [
       {
         turn: 1,

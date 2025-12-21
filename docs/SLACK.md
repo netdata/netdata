@@ -744,6 +744,18 @@ output:
 
 The bot will render these as native Slack blocks automatically.
 
+### Slack mrkdwn rules (NOT GitHub Markdown)
+
+When emitting `slack-block-kit`, the text inside `section` and `context` blocks must be Slack *mrkdwn*:
+
+- Do **not** use Markdown headings (`#`, `##`, `###`) or Markdown tables (`|---|`) — Slack will show them literally.
+- Use header blocks for titles. For subheadings inside a section, use a bold line (e.g., `*Section Title*`) and a newline.
+- Allowed formatting: `*bold*`, `_italic_`, `~strikethrough~`, `inline code`, fenced code blocks (```code```), bullets (`•` or `-`).
+- Links must use Slack format: `<https://example.com|link text>` — do not use `[text](url)`.
+- Escape special characters in text: `&` → `&amp;`, `<` → `&lt;`, `>` → `&gt;`.
+- Tables are **not** allowed in mrkdwn. For 2-column layouts, use Block Kit `section.fields` (max 10 fields) instead of Markdown tables.
+- Avoid HTML, Mermaid fences, or raw JSON inside text blocks.
+
 ### Concurrency Control
 
 The Slack headend has built-in concurrency limiting:

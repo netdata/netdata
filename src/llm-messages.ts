@@ -521,6 +521,9 @@ export const finalReportXmlInstructions = (
     : formatId === 'json'
       ? '{ ... your JSON here ... }'
       : '[Your final report/answer here]';
+  const slackMrkdwnGuidance = formatId === 'slack-block-kit'
+    ? `\n${SLACK_BLOCK_KIT_MRKDWN_RULES}\n`
+    : '';
   return `
 ## MANDATORY READ-FIRST: How to Provide Your Final Report/Answer
 
@@ -553,6 +556,7 @@ ${exampleContent}
 **Output Format: ${formatId}**
 ${formatDescription}
 ${schemaBlock}
+${slackMrkdwnGuidance}
 
 Your final report/answer content must follow any instructions provided to accurately and precisely reflect the information available. If you encountered limitations, tool failures that you couldn't overcome, or you were unable to complete certain aspects of the task, clearly state these limitations in your final report/answer.
 
@@ -573,6 +577,29 @@ export const FINAL_REPORT_FIELDS_JSON =
 
 export const FINAL_REPORT_FIELDS_SLACK =
   '  - `report_format`: "slack-block-kit".\n  - `messages`: array of Slack Block Kit messages (no plain `report_content`).\n    • Up to 20 messages, each with ≤50 blocks. Sections/context mrkdwn ≤2000 chars; headers plain_text ≤150.';
+
+export const SLACK_BLOCK_KIT_MRKDWN_RULES_TITLE = 'Slack mrkdwn rules (NOT GitHub Markdown)';
+
+export const SLACK_BLOCK_KIT_MRKDWN_RULES = `### ${SLACK_BLOCK_KIT_MRKDWN_RULES_TITLE}
+- All section/context text must be Slack *mrkdwn* (not GitHub Markdown).
+- Only use these block types: \`header\` (plain_text), \`section\` (mrkdwn), \`divider\`, \`context\` (mrkdwn elements). Do NOT emit other block types.
+- DO NOT use Markdown headings (\`#\`, \`##\`, \`###\`) or Markdown tables (\`|---|\`). Slack will render these literally.
+- Titles go in **header** blocks (plain_text). Subheadings inside sections must be bold lines (e.g., \`*Section Title*\`) followed by a newline.
+- Allowed formatting: \`*bold*\`, \`_italic_\`, \`~strikethrough~\`, \`inline code\`, fenced code blocks (\`\`\`code\`\`\`), bullets (\`•\` or \`-\`).
+- Links must use Slack format: \`<https://example.com|link text>\`. Do NOT use \`[text](url)\`.
+- Mentions are allowed when relevant: \`<@U...>\`, \`<#C...>\`, \`<!subteam^ID>\`, \`<!here>\`, \`<!channel>\`, \`<!everyone>\`. Avoid \`@here/@channel/@everyone\` unless explicitly asked.
+- Escape special characters in text: \`&\` → \`&amp;\`, \`<\` → \`&lt;\`, \`>\` → \`&gt;\`.
+- Tables are NOT allowed in mrkdwn. For 2-column layouts, use Block Kit \`section.fields\` (max 10 fields) instead of Markdown tables.
+- Avoid HTML tags, GitHub Markdown extensions, Mermaid fences, or raw JSON inside text blocks.
+
+**Quick templates (use these patterns):**
+- Header block:
+  \`{ "type": "header", "text": { "type": "plain_text", "text": "Title" } }\`
+- Section with subheading + bullets:
+  \`{ "type": "section", "text": { "type": "mrkdwn", "text": "*Section Title*\\n• Item one\\n• Item two" } }\`
+- 2-column key/value layout (fields):
+  \`{ "type": "section", "fields": [ { "type": "mrkdwn", "text": "*Key*\\nValue" }, { "type": "mrkdwn", "text": "*Key*\\nValue" } ] }\`
+`;
 
 export const finalReportFieldsText = (formatId: string): string =>
   `  - \`report_format\`: "${formatId}".\n  - \`report_content\`: the content of your final report, in the requested format.`;
