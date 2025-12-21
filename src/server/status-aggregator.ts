@@ -40,6 +40,24 @@ const formatClock = (elapsedSec: number): string => {
   return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
 };
 
+const clampText = (value: string, max: number): string => {
+  const trimmed = value.trim();
+  if (trimmed.length <= max) return trimmed;
+  const suffix = '...';
+  if (max <= suffix.length) return trimmed.slice(0, max);
+  return `${trimmed.slice(0, max - suffix.length).trimEnd()}${suffix}`;
+};
+
+const parseStatusParts = (latestStatus?: string): { status?: string; done?: string; pending?: string; now?: string } => {
+  if (typeof latestStatus !== 'string') return {};
+  const parts = latestStatus.split('|').map((p) => p.trim()).filter((p) => p.length > 0);
+  if (parts.length === 0) return {};
+  if (parts.length === 1) return { now: parts[0] };
+  if (parts.length === 2) return { status: parts[0], now: parts[1] };
+  if (parts.length === 3) return { status: parts[0], done: parts[1], now: parts[2] };
+  return { status: parts[0], done: parts[1], pending: parts[2], now: parts.slice(3).join(' | ') };
+};
+
 interface FooterFormat {
   lines: [string, string];
   text: string;
@@ -195,17 +213,29 @@ export function buildStatusBlocks(summary: SnapshotSummary, rootAgentId?: string
 
   // Title: For master agent, prefer latestStatus over title (since title is just "Working...")
   const master = typeof rootAgentId === 'string' ? summary.lines.find((l) => l.agentId === rootAgentId) : undefined;
-  // For master agent: use latestStatus if available, otherwise title, otherwise "Working..."
+  const masterStatus = parseStatusParts(master?.latestStatus);
+  // For master agent: prefer `now` from task_status, otherwise title, otherwise latestStatus, otherwise "Working..."
   const headerTitle = (() => {
-    if (master?.latestStatus && master.latestStatus.trim().length > 0) {
-      return master.latestStatus.trim();
+    if (typeof masterStatus.now === 'string' && masterStatus.now.trim().length > 0) {
+      return masterStatus.now.trim();
     }
     if (master?.title && master.title.trim().length > 0) {
       return master.title.trim();
     }
+    if (master?.latestStatus && master.latestStatus.trim().length > 0) {
+      return master.latestStatus.trim();
+    }
     return 'Working...';
   })();
-  blocks.push({ type: 'header', text: { type: 'plain_text', text: headerTitle } });
+  blocks.push({ type: 'header', text: { type: 'plain_text', text: clampText(headerTitle, 150) } });
+  const detailLines: string[] = [];
+  if (masterStatus.status) detailLines.push(`status: ${masterStatus.status}`);
+  if (masterStatus.done) detailLines.push(`done: ${masterStatus.done}`);
+  if (masterStatus.pending) detailLines.push(`pending: ${masterStatus.pending}`);
+  if (detailLines.length > 0) {
+    const detailText = clampText(detailLines.join('\n'), 2000);
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: detailText } });
+  }
   blocks.push({ type: 'divider' });
 
   

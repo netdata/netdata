@@ -657,6 +657,7 @@ The bot automatically shows live progress during agent execution:
 **Features:**
 - Updates every 2 seconds (configurable via `updateIntervalMs`)
 - Shows active tools and sub-agents
+- Progress header uses `task_status.now` (clamped to 150 chars); `status/done/pending` render as detail lines when present
 - Token usage tracking
 - Interactive Stop/Abort buttons
 
