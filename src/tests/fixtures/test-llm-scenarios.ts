@@ -2668,6 +2668,50 @@ const SCENARIOS: ScenarioDefinition[] = [
     ],
   },
   {
+    id: 'run-test-task-status-thinking-stability',
+    description: 'Thinking chunks must not overwrite task_status updates in opTree.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: ['agent__task_status'],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Reporting task status before reasoning stream.',
+          toolCalls: [
+            {
+              toolName: 'agent__task_status',
+              callId: 'call-progress-run-test-status-stability',
+              assistantText: 'Baseline progress update.',
+              arguments: {
+                status: STATUS_IN_PROGRESS,
+                done: 'Baseline progress recorded.',
+                pending: 'Continue processing.',
+                now: 'Prepare final report.',
+                ready_for_final_report: false,
+                need_to_run_more_tools: true,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Final report after reasoning stream.',
+          reportContent: `${RESULT_HEADING}Status stability verified.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          reasoningContent: 'thinking chunk **,** should not replace progress status',
+        },
+      },
+    ],
+  },
+  {
     id: 'run-test-59',
     description: 'Tool response size cap and truncation.',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],

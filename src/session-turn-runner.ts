@@ -3316,10 +3316,6 @@ export class TurnRunner {
                     }
                 }
                 else if (type === 'thinking') {
-                    const trimmedThinking = chunk.trim();
-                    if (isRootSession && trimmedThinking.length > 0) {
-                        this.ctx.opTree.setLatestStatus(trimmedThinking);
-                    }
                     if (!shownThinking && lastShownThinkingHeaderTurn !== currentTurn) {
                         const thinkingHeader = {
                             timestamp: Date.now(),

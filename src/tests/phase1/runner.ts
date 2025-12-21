@@ -11895,6 +11895,17 @@ BASE_TEST_SCENARIOS.push({
 } satisfies HarnessTest);
 
 BASE_TEST_SCENARIOS.push({
+  id: 'run-test-task-status-thinking-stability',
+  expect: (result: AIAgentResult) => {
+    invariant(result.success, 'Task status stability scenario should succeed.');
+    const tree = result.opTree;
+    invariant(tree !== undefined, 'opTree missing for task status stability scenario.');
+    const expected = 'in-progress | Baseline progress recorded. | Continue processing. | Prepare final report.';
+    invariant(tree.latestStatus === expected, `latestStatus should remain task_status, got: ${String(tree.latestStatus)}`);
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
   id: 'run-test-retry-exhaustion-forces-final',
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 1;

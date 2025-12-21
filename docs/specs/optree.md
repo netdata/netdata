@@ -31,6 +31,9 @@ interface SessionNode {
   turns: TurnNode[];
 }
 ```
+**Notes**
+- `latestStatus` is updated only by `agent__task_status` progress updates (not by thinking streams).
+- Thinking output is stored under `OperationNode.reasoning` chunks and streamed via the `onThinking` callback.
 
 ### TurnNode
 **Location**: `src/session-tree.ts:24-31`
