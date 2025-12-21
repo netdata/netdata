@@ -14,7 +14,7 @@ const SLACK_BLOCK_KIT_SCHEMA: Record<string, unknown> = {
   type: 'array',
   minItems: 1,
   maxItems: 20,
-  description: 'Array of Slack messages (no wrapper object). Each message must contain Block Kit blocks.',
+  description: 'Array of Slack messages (no wrapper object). Each message must contain Block Kit blocks. Formatted text must be Slack mrkdwn (not GitHub markdown). Critical: you MUST follow Slack Block Kit structure, formatting and limits precisely.',
   items: {
     type: 'object',
     required: ['blocks'],
@@ -24,12 +24,12 @@ const SLACK_BLOCK_KIT_SCHEMA: Record<string, unknown> = {
         type: 'array',
         minItems: 1,
         maxItems: 50,
-        description: 'Slack Block Kit blocks. EVERY block MUST have a "type" field.',
+        description: 'Slack Block Kit blocks. EVERY block MUST have a "type" field. When formatting text is allowed, use Slack mrkdwn formatting (not GitHub markdown). For types that accept formatted text, use Slack mrkdwn, not GitHub markdown.',
         items: {
           type: 'object',
           required: ['type'],
           additionalProperties: true,
-          description: 'REQUIRED: "type" field. Types: "section" (with text.type="mrkdwn", text.text ≤2900 chars), "header" (with text.type="plain_text", text.text ≤150 chars), "divider" (no other fields), "context" (with elements array of {type:"mrkdwn",text:string} ≤2000 chars each)',
+          description: 'REQUIRED: "type" field. Types: "section" (with text.type="mrkdwn", text.text ≤2900 chars), "header" (with text.type="plain_text" without formatting, text.text ≤150 chars), "divider" (no other fields), "context" (with elements array of {type:"mrkdwn",text:string} ≤2000 chars each). Critical: "mrkdwn" in these fields is Slack specific mrkdwn variant, not GitHub markdown. You MUST use the right formatting for Slack.',
         }
       }
     }
@@ -53,7 +53,7 @@ const OUTPUT_FORMATS: Record<OutputFormatId, OutputFormat> = {
     id: 'slack-block-kit',
     toolDescription: 'Slack Block Kit payload.',
     promptValue: 'Slack Block Kit JSON array of messages (not raw text or GitHub markdown).',
-    parameterDescription: 'Produce Slack Block Kit array of messages. CRITICAL: Every block MUST have a "type" field. Structure: [{blocks:[{type:"header",text:{type:"plain_text",text:"..."}},{type:"section",text:{type:"mrkdwn",text:"..."}},{type:"divider"},{type:"context",elements:[{type:"mrkdwn",text:"..."}]}]}]. Limits: section text ≤2900 chars, header text ≤150 chars, context element ≤2000 chars, max 10 fields per section. Do not emit raw text or GitHub markdown.',
+    parameterDescription: 'Produce Slack Block Kit array of messages. CRITICAL: Every block MUST have a "type" field. Structure: [{blocks:[{type:"header",text:{type:"plain_text",text:"..."}},{type:"section",text:{type:"mrkdwn",text:"..."}},{type:"divider"},{type:"context",elements:[{type:"mrkdwn",text:"..."}]}]}]. Limits: section text ≤2900 chars, header text ≤150 chars, context element ≤2000 chars, max 10 fields per section. Critical: "mrkdwn" in these fields is Slack specific mrkdwn variant, not GitHub markdown. Use the right formatting for Slack.',
     inputSchema: SLACK_BLOCK_KIT_SCHEMA
   },
   tty: {
