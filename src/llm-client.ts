@@ -17,6 +17,7 @@ import type {
 import { AnthropicProvider } from './llm-providers/anthropic.js';
 import { GoogleProvider } from './llm-providers/google.js';
 import { OllamaProvider } from './llm-providers/ollama.js';
+import { OpenAICompatibleProvider } from './llm-providers/openai-compatible.js';
 import { OpenAIProvider } from './llm-providers/openai.js';
 import { OpenRouterProvider } from './llm-providers/openrouter.js';
 import { TestLLMProvider } from './llm-providers/test-llm.js';
@@ -167,6 +168,8 @@ export class LLMClient {
     switch (config.type) {
       case 'openai':
         return new OpenAIProvider(config, tracedFetch);
+      case 'openai-compatible':
+        return new OpenAICompatibleProvider(name, config, tracedFetch);
       case 'anthropic':
         return new AnthropicProvider(config, tracedFetch);
       case 'google':

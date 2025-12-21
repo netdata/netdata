@@ -15,7 +15,7 @@ import unicorn from 'eslint-plugin-unicorn';
 
 const tsProject = ['./tsconfig.json'];
 
-const IGNORE_GLOBS = ['**/node_modules/**', '**/dist/**', '**/mcp/**', '**/tmp/**', '**/.venv/**', 'src/config-resolver.ts', 'src/agent-loader.ts', 'eslint.complexity.config.mjs'];
+const IGNORE_GLOBS = ['**/node_modules/**', '**/dist/**', '**/mcp/**', '**/tmp/**', '**/.venv/**', '**/coverage/**', 'src/config-resolver.ts', 'src/agent-loader.ts', 'eslint.complexity.config.mjs'];
 
 export default [
   // Global ignores - must be first
@@ -44,7 +44,7 @@ export default [
       'jsdoc/require-jsdoc': 'off',
       'eslint-comments/no-unused-disable': 'error',
       'n/no-missing-import': 'off',
-      'perfectionist/sort-imports': ['error', { type: 'natural', order: 'asc', groups: ['builtin','external','type','internal','parent','sibling','index','object'] }],
+      'perfectionist/sort-imports': ['error', { type: 'natural', order: 'asc', groups: ['builtin','external','type','internal','parent','sibling','index'] }],
       'regexp/no-dupe-characters-character-class': 'error',
       'no-restricted-syntax': [
         'error',
@@ -113,7 +113,7 @@ export default [
       'no-secrets/no-secrets': ['warn', { tolerance: 4.5 }],
       'promise/prefer-await-to-then': 'error',
       'eslint-comments/no-unused-disable': 'error',
-      'perfectionist/sort-imports': ['error', { type: 'natural', order: 'asc', groups: ['builtin','external','type','internal','parent','sibling','index','object'] }],
+      'perfectionist/sort-imports': ['error', { type: 'natural', order: 'asc', groups: ['builtin','external','type','internal','parent','sibling','index'] }],
       'no-restricted-syntax': [
         'error',
         { selector: "ImportAttribute[key.name='defer']", message: 'import defer is disabled until runtime support is complete.' },
@@ -162,7 +162,7 @@ export default [
       '@typescript-eslint/strict-boolean-expressions': 'off',
       'functional/no-loop-statements': 'off',
       'import/no-default-export': 'off',
-      'perfectionist/sort-imports': ['error', { type: 'natural', order: 'asc', groups: ['builtin','external','type','internal','parent','sibling','index','object'] }],
+      'perfectionist/sort-imports': ['error', { type: 'natural', order: 'asc', groups: ['builtin','external','type','internal','parent','sibling','index'] }],
       'promise/prefer-await-to-then': 'off',
       'eslint-comments/no-unused-disable': 'error',
     },

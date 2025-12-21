@@ -319,7 +319,7 @@ export interface ProviderConfig {
   headers?: Record<string, string>;
   custom?: Record<string, unknown>;
   mergeStrategy?: "overlay" | "override" | "deep";
-  type: 'openai' | 'anthropic' | 'google' | 'openrouter' | 'ollama' | 'test-llm';
+  type: 'openai' | 'openai-compatible' | 'anthropic' | 'google' | 'openrouter' | 'ollama' | 'test-llm';
   openaiMode?: 'responses' | 'chat';
   models?: Record<string, ProviderModelConfig>;
   toolsAllowed?: string[];

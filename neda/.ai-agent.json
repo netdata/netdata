@@ -1,7 +1,7 @@
 {
   "providers": {
     "nova": {
-      "type": "openai",
+      "type": "openai-compatible",
       "apiKey": "${NOVA_API_KEY}",
       "baseUrl": "http://10.20.4.21:8090/v1",
       "openaiMode": "chat",
@@ -37,7 +37,7 @@
       ]
     },
     "vllm1": {
-      "type": "openai",
+      "type": "openai-compatible",
       "apiKey": "vllm",
       "baseUrl": "http://nova:8345/v1",
       "openaiMode": "chat",
@@ -49,7 +49,7 @@
       ]
     },
     "vllm2": {
-      "type": "openai",
+      "type": "openai-compatible",
       "apiKey": "vllm",
       "baseUrl": "http://nova:8346/v1",
       "openaiMode": "chat",
@@ -61,7 +61,7 @@
       ]
     },
     "llama.cpp": {
-      "type": "openai",
+      "type": "openai-compatible",
       "apiKey": "localkey",
       "baseUrl": "http://nova:8234/v1",
       "openaiMode": "chat",

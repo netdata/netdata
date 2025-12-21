@@ -375,6 +375,8 @@ Values can be strings (Anthropic effort labels) or integers (token budgets). Use
   }
 }
 ```
+Provider `type` values: `openai`, `openai-compatible`, `anthropic`, `google`, `openrouter`, `ollama`, `test-llm`.
+OpenAI‑compatible providers enable `includeUsage` for streaming token usage by default; set `providers.<id>.custom.includeUsage=false` to disable.
 
 ### Context windows & tokenizer overrides
 - `contextWindow`: explicit token limit for a provider/model; used for budgeting when vendors omit metadata.

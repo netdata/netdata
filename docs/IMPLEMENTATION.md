@@ -82,10 +82,11 @@ Architecture
 
 - Providers used:
   - OpenAI: `createOpenAI({ apiKey, baseURL?, headers?, name?, fetch? })`
+  - OpenAI‑compatible: `createOpenAICompatible({ apiKey, baseURL, headers?, name, fetch? }).chatModel(model)` for self-hosted endpoints (vLLM/llama.cpp/nova).
   - Anthropic: `createAnthropic({ apiKey, baseURL?, headers?, fetch? })`
   - Google: `createGoogleGenerativeAI({ apiKey, baseURL?, headers?, fetch? })`
-  - OpenRouter (OpenAI‑compatible): `createOpenAI({ ... headers, name: 'openrouter' })`, and use `.chat(model)` to force Chat Completions API for best tool support.
-  - Ollama (OpenAI‑compatible): `createOpenAI({ apiKey: 'ollama', baseURL: 'http://localhost:11434/v1' })`
+  - OpenRouter: `createOpenRouter({ apiKey, headers?, fetch? })`
+  - Ollama: `createOllama({ baseURL, fetch? })`
 
 - Core call: `streamText({ model, tools, system, messages?, temperature, topP, topK, repeatPenalty, providerOptions })`
   - Inputs:
@@ -99,6 +100,7 @@ Architecture
     - `textStream` (async iterable of stream parts): we stream only `text-delta` to stdout to honor I/O rules.
     - `usage` (Promise): token usage object; providers differ (`inputTokens/promptTokens`, `outputTokens/completionTokens`, `cachedTokens`, etc.).
     - `response` (Promise): final response, including `messages` with tool call/results reflected by the provider.
+  - OpenAI‑compatible streaming sets `include_usage=true` by default (override via `providers.<id>.custom.includeUsage=false`).
 
 - Accounting:
   - On each successful step, compute `{ inputTokens, outputTokens, totalTokens, cachedTokens? }` and emit an `AccountingEntry` for `type: 'llm'`.

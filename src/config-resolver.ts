@@ -171,6 +171,7 @@ function resolveProvider(id: string, layers: ResolvedConfigLayer[], _opts?: Reso
         const fallback: ProviderConfig['type'] | undefined = (() => {
           const normalized = id.toLowerCase();
           if (normalized === 'openai') return 'openai';
+          if (normalized === 'openai-compatible') return 'openai-compatible';
           if (normalized === 'anthropic') return 'anthropic';
           if (normalized === 'google') return 'google';
           if (normalized === 'openrouter') return 'openrouter';
@@ -182,7 +183,7 @@ function resolveProvider(id: string, layers: ResolvedConfigLayer[], _opts?: Reso
           expanded.type = fallback;
           warn(`provider '${id}' at ${layer.jsonPath} missing "type"; defaulting to '${fallback}'. Update configuration to include "type" explicitly.`);
         } else {
-          throw new Error(`Provider '${id}' in ${layer.jsonPath} missing required "type" field. Add "type": "openai"|"anthropic"|"google"|"openrouter"|"ollama"|"test-llm".`);
+          throw new Error(`Provider '${id}' in ${layer.jsonPath} missing required "type" field. Add "type": "openai"|"openai-compatible"|"anthropic"|"google"|"openrouter"|"ollama"|"test-llm".`);
         }
       }
       return expanded as ProviderConfig;

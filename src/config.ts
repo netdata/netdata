@@ -100,7 +100,7 @@ const ProviderConfigSchema = z.object({
   headers: z.record(z.string(), z.string()).optional(),
   custom: z.record(z.string(), z.unknown()).optional(),
   mergeStrategy: z.enum(['overlay','override','deep']).optional(),
-  type: z.enum(['openai','anthropic','google','openrouter','ollama','test-llm']),
+  type: z.enum(['openai','openai-compatible','anthropic','google','openrouter','ollama','test-llm']),
   openaiMode: z.enum(['responses','chat']).optional(),
   models: z.record(z.string(), ProviderModelConfigSchema).optional(),
   toolsAllowed: z.array(z.string()).optional(),

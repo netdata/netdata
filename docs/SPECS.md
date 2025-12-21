@@ -84,6 +84,7 @@ System prompts can be passed inline, via `@file`, or `-` (stdin). The final posi
 ## Configuration File (.ai-agent.json)
 
 The configuration file must contain providers and MCP tools. Models are specified at runtime. The default local filename is `.ai-agent.json`.
+Provider `type` values: `openai`, `openai-compatible`, `anthropic`, `google`, `openrouter`, `ollama`, `test-llm`.
 
 ### Configuration File Resolution
 The configuration file is resolved in the following order:
