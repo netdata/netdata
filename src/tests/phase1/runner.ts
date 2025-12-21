@@ -1381,6 +1381,35 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
   },
   {
+    id: 'run-test-9-autocorrect',
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-9-autocorrect expected success.');
+      invariant(result.finalReport !== undefined, 'Final report should be present for run-test-9-autocorrect.');
+      const warnLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Auto-corrected tool name'));
+      invariant(warnLog !== undefined, 'Auto-correct warning log expected for run-test-9-autocorrect.');
+      const assistantWithTool = result.conversation.find((message) => message.role === 'assistant' && Array.isArray(message.toolCalls));
+      invariant(assistantWithTool !== undefined, 'Assistant message with tool calls expected for run-test-9-autocorrect.');
+      const toolCalls = assistantWithTool.toolCalls ?? [];
+      const correctedCall = toolCalls.find((call) => call.id === 'call-autocorrect');
+      invariant(correctedCall !== undefined, 'Auto-corrected tool call missing for run-test-9-autocorrect.');
+      invariant(correctedCall.name === 'test__test', 'Tool call name should be corrected for run-test-9-autocorrect.');
+    },
+  },
+  {
+    id: 'run-test-9-injected-missing-tool',
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-9-injected-missing-tool expected success.');
+      invariant(result.finalReport !== undefined, 'Final report should be present for run-test-9-injected-missing-tool.');
+      const injectedToolMessage = result.conversation.find(
+        (message) => message.role === 'tool' && message.toolCallId === 'call-missing'
+      );
+      invariant(injectedToolMessage !== undefined, 'Injected tool result expected for run-test-9-injected-missing-tool.');
+      const injectedMeta = injectedToolMessage.metadata;
+      invariant(injectedMeta?.injectedToolResult === true, 'Injected tool result metadata expected for run-test-9-injected-missing-tool.');
+      invariant(injectedMeta.injectedReason === 'tool_missing', 'Injected tool reason should be tool_missing for run-test-9-injected-missing-tool.');
+    },
+  },
+  {
     id: 'run-test-10',
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-10 expected success.');

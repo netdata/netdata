@@ -21,7 +21,7 @@ Our conversation schemas, reasoning payloads, tool definitions, and streaming ex
 ## Agentic Behavior
 
 - The agent is fully agentic: the LLM decides when to call tools, with repeated invocations across multiple turns.
-- Tool calls are preserved as assistant messages with `tool_calls` (id, name, arguments). Tool results are preserved as `tool` role messages with `tool_call_id`.
+- Tool calls are preserved as assistant messages with `tool_calls` (id, name, arguments). Tool results are preserved as `tool` role messages with `tool_call_id`. When the model calls an unqualified tool name that exactly matches a tool suffix and the payload validates against that tool’s schema, the agent auto-corrects the tool name, logs a warning, and records the corrected name in history. Missing tool results injected by the SDK are tagged with `metadata.injectedToolResult=true` and `metadata.injectedReason`; auto-correction only re-executes when the reason is `tool_missing`.
 - The next turn always includes all prior assistant/user/tool messages in order, giving the LLM full transparency into requests and responses.
 - A maximum tool-turns cap (`defaults.maxTurns`) is enforced. On the final allowed turn, tools are disabled and a single user message is appended instructing the LLM to conclude using existing tool results (see Hardcoded Strings). This guarantees a final answer without an error.
 - Stop-reason handling: if the upstream stop reason is exactly `refusal` or `content-filter`, the turn is treated as a hard failure (`invalid_response`); the truncated response is discarded, and the retry/fallback flow takes over.

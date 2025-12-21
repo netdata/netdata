@@ -54,6 +54,7 @@ export interface ScenarioTurn {
   failureError?: Record<string, unknown>;
   failureThrows?: boolean;
   allowMissingTools?: boolean;
+  suppressToolResults?: boolean;
   expectedTemperature?: number;
   expectedTopP?: number;
   failureRetryAfterMs?: number;
@@ -619,6 +620,92 @@ const SCENARIOS: ScenarioDefinition[] = [
           ],
           tokenUsage: DEFAULT_TOKEN_USAGE,
           finishReason: TOOL_FINISH_REASON,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-9-autocorrect',
+    description: 'Auto-correct unqualified tool name via schema validation.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Attempting unqualified tool name.',
+          toolCalls: [
+            {
+              toolName: 'test',
+              callId: 'call-autocorrect',
+              assistantText: 'Unqualified tool name call.',
+              arguments: {
+                text: TOOL_ARGUMENT_SUCCESS,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Report after auto-correction.',
+          reportContent: `${RESULT_HEADING}Auto-corrected tool call executed.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 70,
+            outputTokens: 25,
+            totalTokens: 95,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-9-injected-missing-tool',
+    description: 'Injected tool result metadata for missing tool calls.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        // Force missing tool results so injectMissingToolResults adds metadata in Phase 1.
+        suppressToolResults: true,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Attempting missing tool.',
+          toolCalls: [
+            {
+              toolName: 'missing__tool',
+              callId: 'call-missing',
+              assistantText: 'Missing tool call.',
+              arguments: {
+                text: 'irrelevant',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Report after injected tool result.',
+          reportContent: `${RESULT_HEADING}Injected tool result metadata verified.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 70,
+            outputTokens: 25,
+            totalTokens: 95,
+          },
         },
       },
     ],

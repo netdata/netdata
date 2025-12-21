@@ -128,7 +128,9 @@ interface TurnRunnerState {
   pendingRetryMessages: string[];
   toolFailureMessages: Map<string, string>;
   toolFailureFallbacks: string[];
+  toolNameCorrections: Map<string, string>;
   trimmedToolCallIds: Set<string>;
+  executedToolCallIds: Set<string>;
   finalReportToolFailedEver: boolean;
   finalReportToolFailedThisTurn: boolean;
   toolLimitExceeded: boolean;
@@ -194,7 +196,9 @@ export class TurnRunner {
             pendingRetryMessages: [],
             toolFailureMessages: new Map<string, string>(),
             toolFailureFallbacks: [],
+            toolNameCorrections: new Map<string, string>(),
             trimmedToolCallIds: new Set<string>(),
+            executedToolCallIds: new Set<string>(),
             finalReportToolFailedEver: false,
             finalReportToolFailedThisTurn: false,
             toolLimitExceeded: false,
@@ -689,6 +693,7 @@ export class TurnRunner {
                         message.content = override;
                         this.state.toolFailureMessages.delete(callId);
                     });
+                    this.applyToolNameCorrections(sanitizedMessages);
                     if (this.state.toolFailureFallbacks.length > 0) {
                         sanitizedMessages.forEach((message) => {
                             if (this.state.toolFailureFallbacks.length === 0)
@@ -995,6 +1000,7 @@ export class TurnRunner {
                                     executedProgressBatchTools: existingStats.executedProgressBatchTools + fbStats.executedProgressBatchTools,
                                     unknownToolEncountered: (existingStats.unknownToolEncountered === true) || fbStats.unknownToolEncountered,
                                 };
+                                this.applyToolNameCorrections(sanitizedMessages);
                                 const extractionMessage = `Retrying for proper tool call after extracting ${String(fallbackResult.toolCalls.length)} leaked call(s).`;
                                 this.log({
                                     timestamp: Date.now(),
@@ -2732,7 +2738,9 @@ export class TurnRunner {
         const executionState: ToolExecutionState = {
             toolFailureMessages: new Map(),
             toolFailureFallbacks: [],
+            toolNameCorrections: this.state.toolNameCorrections,
             trimmedToolCallIds: new Set(),
+            executedToolCallIds: this.state.executedToolCallIds,
             turnHasSuccessfulToolOutput: false,
             incompleteFinalReportDetected: false,
             toolLimitExceeded: false,
@@ -2758,6 +2766,34 @@ export class TurnRunner {
             executor,
             executionStatsRef: executionState,
         });
+    }
+
+    private applyToolNameCorrections(messages: ConversationMessage[]): void {
+        if (this.state.toolNameCorrections.size === 0) {
+            return;
+        }
+        messages.forEach((message) => {
+            if (message.role !== 'assistant') {
+                return;
+            }
+            const toolCalls = (message as { toolCalls?: ToolCall[] }).toolCalls;
+            if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
+                return;
+            }
+            toolCalls.forEach((call) => {
+                const callId = call.id;
+                if (typeof callId !== 'string' || callId.length === 0) {
+                    return;
+                }
+                const corrected = this.state.toolNameCorrections.get(callId);
+                if (corrected === undefined) {
+                    return;
+                }
+                call.name = corrected;
+                this.state.toolNameCorrections.delete(callId);
+            });
+        });
+        this.state.toolNameCorrections.clear();
     }
 
     private sanitizeTurnMessages(messages: ConversationMessage[], context: { turn: number; provider: string; model: string; stopReason?: string; maxOutputTokens?: number }): { messages: ConversationMessage[]; dropped: number; finalReportAttempted: boolean } {
@@ -3030,10 +3066,14 @@ export class TurnRunner {
         this.state.toolFailureMessages.clear();
         this.state.toolFailureFallbacks.length = 0;
         this.state.droppedInvalidToolCalls = 0;
+        this.state.toolNameCorrections.clear();
+        this.state.executedToolCallIds.clear();
         const executionState: ToolExecutionState = {
             toolFailureMessages: this.state.toolFailureMessages,
             toolFailureFallbacks: this.state.toolFailureFallbacks,
+            toolNameCorrections: this.state.toolNameCorrections,
             trimmedToolCallIds: this.state.trimmedToolCallIds,
+            executedToolCallIds: this.state.executedToolCallIds,
             turnHasSuccessfulToolOutput: false,
             incompleteFinalReportDetected: false,
             toolLimitExceeded: this.state.toolLimitExceeded,
@@ -3286,6 +3326,73 @@ export class TurnRunner {
             const responseBytes = typeof result.response === 'string' && result.response.length > 0
                 ? Buffer.byteLength(result.response, 'utf8')
                 : estimateMessagesBytes(result.messages);
+            if (result.status.type === 'success') {
+                const toolResultIndexById = new Map<string, number>();
+                result.messages.forEach((message, index) => {
+                    if (message.role !== 'tool')
+                        return;
+                    const callId = message.toolCallId;
+                    if (typeof callId !== 'string' || callId.length === 0)
+                        return;
+                    if (!toolResultIndexById.has(callId)) {
+                        toolResultIndexById.set(callId, index);
+                    }
+                });
+                const assistantToolCalls = result.messages
+                    .filter((message) => message.role === 'assistant' && Array.isArray((message as { toolCalls?: ToolCall[] }).toolCalls))
+                    .flatMap((message) => (message as { toolCalls?: ToolCall[] }).toolCalls ?? []);
+                const normalizedCalls = assistantToolCalls.map((call) => ({
+                    call,
+                    normalized: sanitizeToolName(call.name),
+                }));
+                const hasFinalReportCall = normalizedCalls.some(({ normalized }) => normalized === FINAL_REPORT_TOOL
+                    || FINAL_REPORT_TOOL_ALIASES.has(normalized)
+                    || normalized === 'final_report');
+                const shouldExecuteUnqualifiedCall = (call: ToolCall): boolean => {
+                    if (this.state.toolNameCorrections.has(call.id)) {
+                        return false;
+                    }
+                    if (this.state.executedToolCallIds.has(call.id)) {
+                        return false;
+                    }
+                    return true;
+                };
+                const unqualifiedCalls = normalizedCalls
+                    .filter(({ call }) => call.id.length > 0)
+                    .filter(({ call }) => call.name.trim().length > 0)
+                    .filter(({ call }) => !call.name.includes('__'))
+                    .filter(({ normalized }) => !allowedToolNames.has(normalized))
+                    .filter(({ normalized }) => !isXmlFinalReportTagName(normalized))
+                    .filter(({ call }) => shouldExecuteUnqualifiedCall(call))
+                    .filter(({ normalized }) => !hasFinalReportCall || normalized === FINAL_REPORT_TOOL
+                    || FINAL_REPORT_TOOL_ALIASES.has(normalized)
+                    || normalized === 'final_report')
+                    .map(({ call }) => call);
+                if (unqualifiedCalls.length > 0) {
+                    const uniqueCalls = new Map<string, ToolCall>();
+                    unqualifiedCalls.forEach((call) => {
+                        if (!uniqueCalls.has(call.id)) {
+                            uniqueCalls.set(call.id, call);
+                        }
+                    });
+                    const extraToolResults: ConversationMessage[] = [];
+                    // eslint-disable-next-line functional/no-loop-statements -- sequential execution preserves tool limits and ordering
+                    for (const call of uniqueCalls.values()) {
+                        const output = await toolExecutor(call.name, call.parameters, { toolCallId: call.id });
+                        const toolMessage: ConversationMessage = { role: 'tool', toolCallId: call.id, content: output };
+                        const existingIndex = toolResultIndexById.get(call.id);
+                        if (existingIndex !== undefined) {
+                            result.messages[existingIndex] = toolMessage;
+                        }
+                        else {
+                            extraToolResults.push(toolMessage);
+                        }
+                    }
+                    if (extraToolResults.length > 0) {
+                        result.messages.push(...extraToolResults);
+                    }
+                }
+            }
             const costInfo = this.ctx.llmClient.getLastCostInfo();
             const attempts = request.turnMetadata.attempt;
             const retries = attempts > 1 ? attempts - 1 : 0;

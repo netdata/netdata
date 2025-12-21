@@ -1,11 +1,15 @@
+import Ajv from 'ajv';
+
 import type { FinalReportManager } from './final-report-manager.js';
 import type { ToolsOrchestrator } from './tools/tools.js';
 import type {
   AccountingEntry,
   ConversationMessage,
   LogEntry,
+  MCPTool,
 } from './types.js';
 import type { XmlToolTransport } from './xml-transport.js';
+import type { Ajv as AjvClass, Options as AjvOptions, ValidateFunction } from 'ajv';
 
 import { ContextGuard } from './context-guard.js';
 import { TOOL_NO_OUTPUT, unknownToolFailureMessage } from './llm-messages.js';
@@ -19,10 +23,17 @@ import {
   sanitizeToolName,
 } from './utils.js';
 
+type AjvInstance = AjvClass;
+type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
+type AjvValidateFn = ValidateFunction;
+const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
+
 export interface ToolExecutionState {
   toolFailureMessages: Map<string, string>;
   toolFailureFallbacks: string[];
+  toolNameCorrections: Map<string, string>;
   trimmedToolCallIds: Set<string>;
+  executedToolCallIds: Set<string>;
   turnHasSuccessfulToolOutput: boolean;
   incompleteFinalReportDetected: boolean;
   toolLimitExceeded: boolean;
@@ -66,6 +77,8 @@ export type ToolExecutor = (
 export class SessionToolExecutor {
   private static readonly REMOTE_ORCHESTRATOR = 'agent:orchestrator';
   private static readonly REMOTE_AGENT_TOOLS = 'agent:tools';
+  private readonly ajv: AjvInstance = new AjvCtor({ allErrors: true, strict: false });
+  private readonly toolValidators = new Map<string, AjvValidateFn | null>();
 
   constructor(
     private readonly toolsOrchestrator: ToolsOrchestrator | undefined,
@@ -78,6 +91,57 @@ export class SessionToolExecutor {
     private readonly sessionContext: SessionContext,
     private readonly subAgents?: { hasTool: (name: string) => boolean; addInvoked: (name: string) => void }
   ) {}
+
+  private stripToolNamespace(name: string): string {
+    const idx = name.indexOf('__');
+    return idx === -1 ? name : name.slice(idx + 2);
+  }
+
+  private getToolValidator(tool: MCPTool): AjvValidateFn | null {
+    if (this.toolValidators.has(tool.name)) {
+      return this.toolValidators.get(tool.name) ?? null;
+    }
+    try {
+      const validator = this.ajv.compile(tool.inputSchema) as AjvValidateFn;
+      this.toolValidators.set(tool.name, validator);
+      return validator;
+    } catch {
+      this.toolValidators.set(tool.name, null);
+      return null;
+    }
+  }
+
+  private isToolParametersValid(tool: MCPTool, parameters: Record<string, unknown>): boolean {
+    const validator = this.getToolValidator(tool);
+    if (validator === null) return false;
+    try {
+      return validator(parameters);
+    } catch {
+      return false;
+    }
+  }
+
+  private resolveAutoCorrectedToolName(
+    requestedName: string,
+    parameters: Record<string, unknown>,
+    allowedToolNames?: Set<string>
+  ): string | undefined {
+    if (requestedName.includes('__')) return undefined;
+    const orchestrator = this.toolsOrchestrator;
+    if (orchestrator === undefined) return undefined;
+    const tools = orchestrator.listTools();
+    const candidate = tools.find((tool) => {
+      if (allowedToolNames !== undefined && !allowedToolNames.has(tool.name)) {
+        return false;
+      }
+      const unqualified = sanitizeToolName(this.stripToolNamespace(tool.name));
+      if (unqualified !== requestedName) {
+        return false;
+      }
+      return this.isToolParametersValid(tool, parameters);
+    });
+    return candidate?.name;
+  }
 
   public createExecutor(turn: number, provider: string, state: ToolExecutionState, allowedToolNames?: Set<string>): ToolExecutor {
     let subturnCounter = 0;
@@ -98,11 +162,40 @@ export class SessionToolExecutor {
         throw new Error('canceled');
       }
 
-      const normalizedToolName = sanitizeToolName(toolName);
+      let effectiveToolName = sanitizeToolName(toolName);
+      const shouldAttemptCorrection = !effectiveToolName.includes('__');
+      let resolvedCorrection: string | undefined;
+      if (shouldAttemptCorrection) {
+        resolvedCorrection = this.resolveAutoCorrectedToolName(effectiveToolName, parameters, allowedToolNames);
+        if (resolvedCorrection !== undefined && resolvedCorrection !== effectiveToolName) {
+          const original = effectiveToolName;
+          effectiveToolName = resolvedCorrection;
+          if (typeof options?.toolCallId === 'string' && options.toolCallId.length > 0) {
+            state.toolNameCorrections.set(options.toolCallId, resolvedCorrection);
+          }
+          const warn: LogEntry = {
+            timestamp: Date.now(),
+            severity: 'WRN',
+            turn,
+            subturn: subturnCounter + 1,
+            direction: 'response',
+            type: 'tool',
+            remoteIdentifier: SessionToolExecutor.REMOTE_AGENT_TOOLS,
+            fatal: false,
+            message: `Auto-corrected tool name '${original}' -> '${resolvedCorrection}' after schema validation.`,
+          };
+          this.log(warn);
+        }
+      }
       const isFinalReportTool =
-        normalizedToolName === this.sessionContext.finalReportToolName ||
-        normalizedToolName === 'final_report';
-      const isProgressTool = normalizedToolName === 'agent__task_status';
+        effectiveToolName === this.sessionContext.finalReportToolName ||
+        effectiveToolName === 'final_report';
+      const isProgressTool = effectiveToolName === 'agent__task_status';
+      const callId =
+        typeof options?.toolCallId === 'string' &&
+        options.toolCallId.length > 0
+          ? options.toolCallId
+          : undefined;
 
       const recordXmlEntry = (
         status: 'ok' | 'failed',
@@ -111,7 +204,7 @@ export class SessionToolExecutor {
       ): void => {
         if (this.xmlTransport !== undefined) {
           this.xmlTransport.recordToolResult(
-            normalizedToolName,
+            effectiveToolName,
             parameters,
             status,
             response,
@@ -160,16 +253,17 @@ export class SessionToolExecutor {
         throw new Error('tool_calls_per_turn_limit_exceeded');
       }
 
-      const effectiveToolName = normalizedToolName;
       addSpanEvent('tool.call.requested', {
         'ai.tool.name': effectiveToolName,
       });
       const startTime = Date.now();
 
       try {
+        const skipAllowedCheck = shouldAttemptCorrection && resolvedCorrection === undefined;
         if (
-          allowedToolNames !== undefined &&
-          !allowedToolNames.has(effectiveToolName)
+          !skipAllowedCheck
+          && allowedToolNames !== undefined
+          && !allowedToolNames.has(effectiveToolName)
         ) {
           const blocked: LogEntry = {
             timestamp: Date.now(),
@@ -202,6 +296,9 @@ export class SessionToolExecutor {
             state.executedNonProgressBatchTools += 1;
           }
           const isSubAgentTool = this.subAgents?.hasTool(effectiveToolName) === true;
+          if (callId !== undefined) {
+            state.executedToolCallIds.add(callId);
+          }
           
           const managed = await orchestrator.executeWithManagement(
             effectiveToolName,
@@ -260,12 +357,6 @@ export class SessionToolExecutor {
           const toolOutput = (this.applyToolResponseCap !== undefined && !isBatchTool)
             ? this.applyToolResponseCap(uncappedToolOutput, { server: providerLabel, tool: effectiveToolName, turn, subturn: subturnCounter })
             : uncappedToolOutput;
-          const callId =
-            typeof options?.toolCallId === 'string' &&
-            options.toolCallId.length > 0
-              ? options.toolCallId
-              : undefined;
-
           if (managed.dropped === true) {
             const failureReason = managed.reason ?? 'context_budget_exceeded';
             const failureTokens = this.estimateTokensForCounters([

@@ -11,6 +11,8 @@ import { BaseLLMProvider, type ResponseMessage } from './base.js';
 const PROVIDER_NAME = 'test-llm';
 const MARKDOWN_FORMAT = 'markdown' as const;
 const TOOL_CALL_KIND = 'tool-call' as const;
+const TOOL_RESULT_TYPE = 'tool-result' as const;
+const TOOL_ERROR_TYPE = 'tool-error' as const;
 const FINAL_REPORT_KIND = 'final-report' as const;
 
 type ToolCallStep = Extract<ScenarioStepResponse, { kind: typeof TOOL_CALL_KIND }>;
@@ -42,6 +44,7 @@ function extractXmlNonce(messages: ConversationMessage[]): string | undefined {
 export class TestLLMProvider extends BaseLLMProvider {
   name = PROVIDER_NAME;
   private readonly attemptCounters = new Map<string, number>();
+  private suppressToolResultsForTurn = false;
 
   constructor(_config: ProviderConfig) {
     super();
@@ -91,7 +94,31 @@ export class TestLLMProvider extends BaseLLMProvider {
   }
 
   protected convertResponseMessages(messages: ResponseMessage[], provider: string, model: string, tokens: TokenUsage): ConversationMessage[] {
-    return this.convertResponseMessagesGeneric(messages, provider, model, tokens);
+    const normalizedMessages = this.suppressToolResultsForTurn
+      ? this.filterToolResultMessages(messages)
+      : messages;
+    return this.convertResponseMessagesGeneric(normalizedMessages, provider, model, tokens);
+  }
+
+  private filterToolResultMessages(messages: ResponseMessage[]): ResponseMessage[] {
+    return messages
+      .map((message) => {
+        if (message.role === 'tool') {
+          return undefined;
+        }
+        if (!Array.isArray(message.content)) {
+          return message;
+        }
+        const filteredContent = message.content.filter((part) => {
+          const type = (part.type ?? '').replace('_', '-');
+          return type !== TOOL_RESULT_TYPE && type !== TOOL_ERROR_TYPE;
+        });
+        if (filteredContent.length === message.content.length) {
+          return message;
+        }
+        return { ...message, content: filteredContent };
+      })
+      .filter((message): message is ResponseMessage => message !== undefined);
   }
 
   async executeTurn(request: TurnRequest): Promise<TurnResult> {
@@ -236,14 +263,29 @@ export class TestLLMProvider extends BaseLLMProvider {
 
     const start = Date.now();
     const metadata = activeStep.response.providerMetadata;
+    const suppressToolResults = activeStep.suppressToolResults === true;
+    const runWithSuppressedToolResults = async (run: () => Promise<TurnResult>): Promise<TurnResult> => {
+      const previous = this.suppressToolResultsForTurn;
+      this.suppressToolResultsForTurn = suppressToolResults;
+      try {
+        return await run();
+      } finally {
+        this.suppressToolResultsForTurn = previous;
+      }
+    };
+
     if (request.stream === true) {
-      const result = await super.executeStreamingTurn(model, finalMessages, tools, request, start, undefined);
+      const result = await runWithSuppressedToolResults(
+        () => super.executeStreamingTurn(model, finalMessages, tools, request, start, undefined)
+      );
       if (metadata !== undefined) {
         result.providerMetadata = { ...metadata };
       }
       return result;
     }
-    const result = await super.executeNonStreamingTurn(model, finalMessages, tools, request, start, undefined);
+    const result = await runWithSuppressedToolResults(
+      () => super.executeNonStreamingTurn(model, finalMessages, tools, request, start, undefined)
+    );
     if (metadata !== undefined) {
       result.providerMetadata = { ...metadata };
     }

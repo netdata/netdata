@@ -253,6 +253,8 @@ export interface ConversationMessage {
     tokens?: TokenUsage;
     timestamp?: number;
     retryMessage?: string;
+    injectedToolResult?: boolean;
+    injectedReason?: 'tool_missing' | 'xml_wrapper';
   };
 }
 

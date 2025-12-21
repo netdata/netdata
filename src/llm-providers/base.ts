@@ -2162,7 +2162,10 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     for (const id of orphanedIds) {
       const toolName = toolCallNames.get(id) ?? 'unknown';
       const normalizedName = normalizeTool(toolName);
-      const errorMessage = isXmlFinalReportTagName(normalizedName)
+      const injectedReason = isXmlFinalReportTagName(normalizedName)
+        ? 'xml_wrapper'
+        : 'tool_missing';
+      const errorMessage = injectedReason === 'xml_wrapper'
         ? XML_WRAPPER_CALLED_AS_TOOL_RESULT
         : `Tool not available: ${toolName}`;
       injected.push({
@@ -2179,6 +2182,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
             totalTokens: tokens.totalTokens,
           },
           timestamp: Date.now(),
+          injectedToolResult: true,
+          injectedReason,
         },
       });
     }
