@@ -935,6 +935,8 @@ Volume discounts on yearly commitment:
 | 500 | $3.85 | $23,100 |
 | 501+ | contact us | contact us |
 
+Netdata does not offer Academic, Educational or Open-Source discounts. The standalone Netdata Agents and Parents are free for any use, and the long-term Community plan is available free of charge for non commercial use, limited to 5 nodes at a time on multi-node dashboards and no AI features (unlimited single-node dashboards, with ML-based anomaly detection available, without AI assistants).
+
 **Billing:**
 - Based on **active nodes only** (offline/stale excluded)
 - Charged on **P90 usage** (90th percentile, excludes daily spikes and the top 3 days per month)
