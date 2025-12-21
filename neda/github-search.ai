@@ -3,8 +3,10 @@
 description: Search GitHub issues, pull requests, code, users, discussions
 usage: Any search tearm you need to find on GitHub
 models:
-  - anthropic/claude-3-5-haiku-20241022
+  - nova/neda-coder
+  - openrouter/openai/gpt-oss-120b
   - anthropic/claude-haiku-4-5
+  - openai/gpt-5.1
 tools:
   - github
 toolResponseMaxBytes: 65536

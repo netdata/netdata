@@ -6,9 +6,9 @@ description: |
 usage: |
   company name or domain name
 models:
+  - nova/neda-searcher
+  - openrouter/openai/gpt-oss-120b
   - anthropic/claude-haiku-4-5
-  - anthropic/claude-sonnet-4-5
-#  - google/gemini-1.5-flash
   - openai/gpt-5.1
 tools:
 agents:

@@ -3,6 +3,8 @@
 description: Find code examples and patterns across any open-source project codebase on GitHub, GitLab, and other public repositories, using sourcegraph
 usage: Any question about any open-source codebases
 models:
+  - nova/neda-coder
+  - openrouter/openai/gpt-oss-120b
   - anthropic/claude-haiku-4-5
 tools:
   - sourcegraph

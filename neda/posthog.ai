@@ -6,11 +6,9 @@ description: |
 usage: |
   company or email and time period
 models:
-  - anthropic/claude-sonnet-4-5
-#  - anthropic/claude-haiku-4-5
-#  - openrouter/deepseek/deepseek-chat-v3.1
-#  - openrouter/openai/gpt-oss-120b
-#  - openrouter/openai/gpt-oss-20b
+  - nova/neda-searcher
+  - openrouter/openai/gpt-oss-120b
+  - anthropic/claude-haiku-4-5
   - openai/gpt-5.1
 tools:
   - posthog-query
@@ -24,7 +22,6 @@ Your Mission: Track in-app engagement to distinguish active users from tire-kick
 ${include:tone-and-language.md}
 
 ---
-
 
 Output Format: ${FORMAT}
 Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}

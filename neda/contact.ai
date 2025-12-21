@@ -5,12 +5,10 @@ description: |-
   verifiable information about individuals for sales engagement.
 usage: name and company (or other info) of the person to research
 models:
+  - nova/neda-searcher
+  - openrouter/openai/gpt-oss-120b
   - anthropic/claude-haiku-4-5
-  - anthropic/claude-sonnet-4-5
-#  - google/gemini-2.5-pro
-#  - openai/gpt-5.1
-#  - openrouter/openai/gpt-oss-120b
-#  - openrouter/openai/gpt-oss-20b
+  - openai/gpt-5.1
 tools:
 agents:
   - web-fetch.ai

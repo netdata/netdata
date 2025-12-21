@@ -7,9 +7,10 @@ description: |
 usage: |
   Ask infrastructure questions (metrics, alerts, nodes, anomalies, services, throughput) and desired time window.
 models:
-  - anthropic/claude-sonnet-4-5
-#  - google/gemini-2.5-pro
-#  - openai/gpt-5.1
+  - nova/neda-thinker
+  - openrouter/openai/gpt-oss-120b
+  - anthropic/claude-haiku-4-5
+  - openai/gpt-5.1
 tools:
 #  - netdata_costa
   - netdata_production

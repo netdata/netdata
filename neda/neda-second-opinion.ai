@@ -11,7 +11,10 @@ usage: |
   5. Explain the dilemma, the options, their pros and cons
 
 models:
+  - nova/neda-thinker
   - openai/gpt-5.1
+  - openrouter/openai/gpt-oss-120b
+  - anthropic/claude-haiku-4-5
 tools:
 #  - web-research
 agents:

@@ -5,7 +5,9 @@ description: |
 usage: |
   the target of the messaging (industry, segment, customer, competitor, monitoring tool)
 models:
-  - anthropic/claude-opus-4-5
+  - nova/neda-presenter
+  - openrouter/openai/gpt-oss-120b
+  - anthropic/claude-haiku-4-5
 agents:
   - web-research.ai
   - source-code.ai

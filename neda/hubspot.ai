@@ -3,7 +3,10 @@
 description: HubSpot Intelligence Agent - Extract comprehensive company data from HubSpot CRM
 usage: company name OR company domain OR contact email
 models:
-  - anthropic/claude-sonnet-4-5
+  - nova/neda-thinker
+  - openrouter/openai/gpt-oss-120b
+  - anthropic/claude-haiku-4-5
+  - openai/gpt-5.1
 tools:
   - hubspot
 toolResponseMaxBytes: 100000

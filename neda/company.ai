@@ -3,9 +3,9 @@
 description: "Company Researcher: runs web research to produce rigorous, evidence‑backed prospect intelligence."
 usage: Company name, domain or a contact email to reseach information for
 models:
+  - nova/neda-searcher
+  - openrouter/openai/gpt-oss-120b
   - anthropic/claude-haiku-4-5
-  - anthropic/claude-sonnet-4-5
-#  - google/gemini-1.5-flash
   - openai/gpt-5.1
 tools:
 agents:

@@ -3,6 +3,8 @@
 description: Answers any question using publicly available sources (web sites, PDF files, github repos, reddit posts, open source codebases, etc)
 usage: Provide the search term or question to search for. Provide as much relevant information as possible to steer the investigation, including any specific success criteria or expected details that can narrow down the scope of the search. The more details you provide, the more accurate results you will get.
 models:
+  - nova/neda-searcher
+  - openrouter/openai/gpt-oss-120b
   - anthropic/claude-haiku-4-5
   - openai/gpt-5-mini
   - google/gemini-2.5-flash

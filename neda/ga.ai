@@ -6,12 +6,10 @@ description: |
 usage: |
   property or domain (optional) and time window
 models:
+  - nova/neda-searcher
+  - openrouter/openai/gpt-oss-120b
   - anthropic/claude-haiku-4-5
-  - anthropic/claude-sonnet-4-5
-#  - openrouter/deepseek/deepseek-chat-v3.1
-#  - openrouter/openai/gpt-oss-120b
-#  - openrouter/openai/gpt-oss-20b
-#  - openai/gpt-5.1
+  - openai/gpt-5.1
 tools:
   - analytics-mcp
 toolResponseMaxBytes: 100000

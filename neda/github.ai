@@ -6,8 +6,10 @@ description: |
 usage: |
   repo/name or code search term or PR/issue URL
 models:
+  - nova/neda-coder
+  - openrouter/openai/gpt-oss-120b
   - anthropic/claude-haiku-4-5
-  - anthropic/claude-sonnet-4-5
+  - openai/gpt-5.1
 tools:
   - github
 toolResponseMaxBytes: 20000

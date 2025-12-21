@@ -3,10 +3,9 @@
 description: Deep research any subject using publicly available online resources
 usage: any query or topic to deep research online (do not ask about Netdata's private data - it does not have access to Netdata internals)
 models:
-  - anthropic/claude-sonnet-4-5
-#  - anthropic/claude-haiku-4-5
-#  - openrouter/openai/gpt-oss-120b
-#  - openrouter/openai/gpt-oss-20b
+  - nova/neda-thinker
+  - openrouter/openai/gpt-oss-120b
+  - anthropic/claude-haiku-4-5
 tools:
 agents:
   - web-search.ai

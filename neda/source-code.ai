@@ -3,7 +3,9 @@
 description: Answers anything that can be extracted from Netdata's public and private source code and documentation repos
 usage: Ask any question that can be answered from Netdata's public and private source code repos, documentation, CI/CD jobs, integrations and automations
 models:
-#  - anthropic/claude-haiku-4-5
+  - nova/neda-coder
+  - openrouter/openai/gpt-oss-120b
+  - anthropic/claude-haiku-4-5
   - anthropic/claude-sonnet-4-5
   - openai/gpt-5.1
 tools:

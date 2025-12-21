@@ -3,8 +3,10 @@
 description: Perform a quick company check to find basic information about a company
 usage: The company to check for (name, domain, email)
 models:
+  - nova/neda-searcher
+  - openrouter/openai/gpt-oss-120b
   - anthropic/claude-haiku-4-5
-  - anthropic/claude-sonnet-4-5
+  - openai/gpt-5.1
 tools:
   - jina-search
   - brave

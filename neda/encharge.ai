@@ -7,12 +7,10 @@ description: |
 usage: |
   Email campaign performance questions. Segment analysis and growth metrics. Customer lifecycle and funnel analysis. Automation flow effectiveness. Contact behavior and engagement patterns. Revenue attribution and conversion tracking. A/B testing results and optimization insights.
 models:
+  - nova/neda-searcher
+  - openrouter/openai/gpt-oss-120b
   - anthropic/claude-haiku-4-5
-  - anthropic/claude-sonnet-4-5
-#  - openrouter/deepseek/deepseek-chat-v3.1
-#  - openrouter/openai/gpt-oss-120b
-#  - openrouter/openai/gpt-oss-20b
-#  - openai/gpt-5.1
+  - openai/gpt-5.1
 tools:
   - openapi:encharge
 toolResponseMaxBytes: 20000
