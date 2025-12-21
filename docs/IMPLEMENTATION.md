@@ -21,7 +21,7 @@ Architecture
   - `providers[providerName]`: `{ apiKey?: string; baseUrl?: string }`
   - `providers[providerName].models[modelName]`: `{ contextWindow?: number; tokenizer?: string; contextWindowBufferTokens?: number; overrides?: ... }`
   - `mcpServers[name]`: `{ type: 'stdio'|'websocket'|'http'|'sse', command?: string|[string,...], args?: string[], url?: string, headers?: Record<string,string>, env?: Record<string,string>, enabled?: boolean }`
-  - `defaults`: `{ llmTimeout?: number; toolTimeout?: number; temperature?: number; topP?: number; contextWindowBufferTokens?: number }`
+  - `defaults`: `{ llmTimeout?: number; toolTimeout?: number; temperature?: number; topP?: number; topK?: number; repeatPenalty?: number; contextWindowBufferTokens?: number }`
 
 2) MCP client layer (libs/typescript-sdk)
 
@@ -87,13 +87,13 @@ Architecture
   - OpenRouter (OpenAI‑compatible): `createOpenAI({ ... headers, name: 'openrouter' })`, and use `.chat(model)` to force Chat Completions API for best tool support.
   - Ollama (OpenAI‑compatible): `createOpenAI({ apiKey: 'ollama', baseURL: 'http://localhost:11434/v1' })`
 
-- Core call: `streamText({ model, tools, system, messages?, temperature, topP, providerOptions })`
+- Core call: `streamText({ model, tools, system, messages?, temperature, topP, topK, repeatPenalty, providerOptions })`
   - Inputs:
     - `model`: from selected provider/model.
     - `tools`: map of tool name → { description?, inputSchema, execute }
     - `system`: system prompt with appended MCP instructions exactly once.
     - `messages`: conversation history + current user message.
-    - `temperature`, `topP`: taken from config/CLI.
+    - `temperature`, `topP`, `topK`, `repeatPenalty`: taken from config/CLI.
     - `providerOptions`:
   - Outputs:
     - `textStream` (async iterable of stream parts): we stream only `text-delta` to stdout to honor I/O rules.
@@ -174,7 +174,7 @@ AI SDK (provider + stream)
   - `jsonSchema(schema)` converts JSON Schema (from MCP) into AI SDK `FlexibleSchema` for tool input.
   - Tool shape provided to `streamText`: `{ description?: string, inputSchema, execute(parameters, options) }`.
 
-- `streamText({ model, tools, system, messages, temperature, topP, providerOptions })`
+- `streamText({ model, tools, system, messages, temperature, topP, topK, repeatPenalty, providerOptions })`
   - Returns `{ textStream, usage, response }`.
   - We stream only assistant `text-delta` to stdout; everything else stays internal.
   - After completion, we read `usage` and `response.messages` for accounting and history persistence.
@@ -233,7 +233,7 @@ Implementation checklist (end‑to‑end)
   - Build tool→server mapping
 - Build AI SDK tools: for each MCP tool, `jsonSchema(inputSchema)` + `execute` that delegates to MCP `callTool`.
 - Enhance system prompt with instructions once.
-- Execute `streamText` with model, tools, system, messages, temperature/topP, and any provider-specific tool-choice hints when applicable.
+- Execute `streamText` with model, tools, system, messages, temperature/topP/topK/repeatPenalty, and any provider-specific tool-choice hints when applicable.
 - Stream `text-delta` to stdout; on finish, record usage and append response messages to conversation with metadata.
 - Emit accounting entries for LLM and tools; write JSONL when configured.
 - Cleanup MCP clients and spawned processes.

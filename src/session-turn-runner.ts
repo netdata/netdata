@@ -2991,6 +2991,16 @@ export class TurnRunner {
                 result.topK = overrideTopKSnake ?? null;
             }
         }
+        const overrideRepeatPenaltyCamel = overrides.repeatPenalty;
+        if (overrideRepeatPenaltyCamel !== undefined) {
+            result.repeatPenalty = overrideRepeatPenaltyCamel ?? null;
+        }
+        else {
+            const overrideRepeatPenaltySnake = overrides.repeat_penalty;
+            if (overrideRepeatPenaltySnake !== undefined) {
+                result.repeatPenalty = overrideRepeatPenaltySnake ?? null;
+            }
+        }
         return result;
     }
     // executeSingleTurn delegates to internal implementation
@@ -3141,6 +3151,14 @@ export class TurnRunner {
             else
                 effectiveTopK = modelOverrides.topK;
         }
+        let effectiveRepeatPenalty = this.ctx.sessionConfig.repeatPenalty;
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety for dynamic key lookup
+        if (modelOverrides.repeatPenalty !== undefined) {
+            if (modelOverrides.repeatPenalty === null)
+                effectiveRepeatPenalty = undefined;
+            else
+                effectiveRepeatPenalty = modelOverrides.repeatPenalty;
+        }
         const fallbackReasoningLevel = this.ctx.sessionConfig.reasoning;
         let effectiveReasoningLevel = reasoningLevel ?? fallbackReasoningLevel;
         const targetMaxOutputTokens = this.ctx.sessionConfig.maxOutputTokens;
@@ -3165,6 +3183,27 @@ export class TurnRunner {
             }
             effectiveReasoningLevel = undefined;
             effectiveReasoningValue = undefined;
+        }
+        if (this.ctx.sessionConfig.verbose === true) {
+            const paramsLog: LogEntry = {
+                timestamp: Date.now(),
+                severity: 'VRB' as const,
+                turn: currentTurn,
+                subturn: 0,
+                direction: 'request' as const,
+                type: 'llm' as const,
+                remoteIdentifier: 'agent:llm-params',
+                fatal: false,
+                message: JSON.stringify({
+                    provider,
+                    model,
+                    temperature: effectiveTemperature ?? null,
+                    topP: effectiveTopP ?? null,
+                    topK: effectiveTopK ?? null,
+                    repeatPenalty: effectiveRepeatPenalty ?? null,
+                }),
+            };
+            this.log(paramsLog);
         }
         // Update context guard with current reasoning budget for accurate context evaluation
         this.ctx.contextGuard.setReasoningTokens(effectiveReasoningValue);
@@ -3251,7 +3290,7 @@ export class TurnRunner {
             topP: effectiveTopP,
             topK: effectiveTopK,
             maxOutputTokens: targetMaxOutputTokens,
-            repeatPenalty: this.ctx.sessionConfig.repeatPenalty,
+            repeatPenalty: effectiveRepeatPenalty,
             stream: effectiveStream,
             isFinalTurn,
             llmTimeout: this.ctx.sessionConfig.llmTimeout,

@@ -303,6 +303,7 @@ function buildFrontmatterTemplate(args): Record<string, unknown> {
 - `toolTimeout`: Tool timeout in ms
 - `temperature`: Sampling temperature
 - `topP`: Top-p sampling
+- `topK`: Top-k sampling
 - `maxOutputTokens`: Max output tokens
 - `repeatPenalty`: Frequency penalty
 - `toolResponseMaxBytes`: Max tool response size

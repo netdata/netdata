@@ -144,10 +144,11 @@ interface AIAgentSessionConfig {
   };
 
   // Optional LLM parameters
-  temperature?: number;                     // Sampling temperature
-  topP?: number;                            // Top-p sampling
+  temperature?: number | null;              // Sampling temperature
+  topP?: number | null;                     // Top-p sampling
+  topK?: number | null;                     // Top-k sampling
   maxOutputTokens?: number;                 // Max output tokens
-  repeatPenalty?: number;                   // Frequency penalty
+  repeatPenalty?: number | null;            // Frequency penalty
 
   // Optional limits
   maxRetries?: number;                      // Retry limit

@@ -69,10 +69,11 @@
 | `maxRetries` | int | `3` | Provider/model attempts per turn. |
 | `llmTimeout` | ms | `600000` | Reset per streamed chunk. |
 | `toolTimeout` | ms | `300000` | Per tool call timeout. |
-| `temperature` | number | `0.7` | Clamped `0-2`. |
-| `topP` | number | `1.0` | `0-1`. |
+| `temperature` | number | `0.0` | Clamped `0-2`. |
+| `topP` | number or null | `null` | `0-1`; `null` omits the parameter. |
+| `topK` | int or null | `null` | `>=1`; `null` omits the parameter. |
 | `maxOutputTokens` | int | `16384` | `undefined` disables explicit cap. |
-| `repeatPenalty` | number | `1.1` | >=0. |
+| `repeatPenalty` | number or null | `null` | `>=0`; `null` omits the parameter. |
 | `toolResponseMaxBytes` | bytes | `12288` | Over-limit responses are truncated. |
 | `stream` | boolean | `false` | CLI default is streaming off; headends opt-in. |
 | `reasoning` | enum | provider default | `none/minimal/low/medium/high/default/unset`. |
@@ -220,7 +221,7 @@ Use the research agent whenever you need canonical company data; use the sweeps 
 - **Providers (`providers.<name>`)**:
   - Required `type`: one of `openai`, `anthropic`, `google`, `openrouter`, `ollama`, `test-llm`.
   - Optional `apiKey`, `baseUrl`, `headers`, `custom` provider-specific payloads, `toolsAllowed/Denied`, `reasoning` mapping (single value or tuple per reasoning level), `contextWindow`, `tokenizer`, `contextWindowBufferTokens`.
-  - `models.<model>` supports `overrides.temperature/topP`, reasoning entries, `contextWindow`, `tokenizer`, `contextWindowBufferTokens`.
+  - `models.<model>` supports `overrides.temperature/topP/topK/repeatPenalty`, reasoning entries, `contextWindow`, `tokenizer`, `contextWindowBufferTokens`.
 - **MCP servers (`mcpServers.<name>`)**:
   - Fields: `type` (`stdio|websocket|http|sse`), `command` + `args` (for stdio), `url`, `headers`, `env`, `enabled`, `toolSchemas`, `toolsAllowed/Denied`.
   - Legacy aliases `type=local/remote` auto-normalize.
@@ -435,7 +436,7 @@ Values can be strings (Anthropic effort labels) or integers (token budgets). Use
 | 2 | `globalOverrides` passed to registry/headends | Applies to every agent/sub-agent (headend manager uses same object). |
 | 3 | Agent frontmatter | Agent-specific; overrides config defaults for that file + sub-agents loaded beneath it (unless child overrides). |
 | 4 | `.ai-agent.json` defaults | Resolved per config layer (Section 4). |
-| 5 | Internal hardcoded defaults | Temperature 0.7, topP 1.0, llmTimeout 600 000 ms, toolTimeout 300 000 ms, maxRetries 3, maxTurns 10, maxToolCallsPerTurn 10, toolResponseMaxBytes 12 288 bytes, stream false.
+| 5 | Internal hardcoded defaults | Temperature 0.0, topP null, topK null, repeatPenalty null, llmTimeout 600 000 ms, toolTimeout 300 000 ms, maxRetries 3, maxTurns 10, maxToolCallsPerTurn 10, toolResponseMaxBytes 12 288 bytes, stream false.
 
 - **Sub-agent propagation**: Parent sessions pass effective options (post-override) when launching child sessions unless the child frontmatter/CLI overrides them. `defaultsForUndefined` ensures missing knobs inherit the parent’s resolved values.
 - **Runtime overrides**: `--override key=value` (applies to all agents) and `--models`/`--tools` CLI args feed `globalOverrides`. Use sparingly.
@@ -530,10 +531,11 @@ Values can be strings (Anthropic effort labels) or integers (token budgets). Use
 
 | Knob | Default |
 | --- | --- |
-| `temperature` | `0.7` |
-| `topP` | `1.0` |
+| `temperature` | `0.0` |
+| `topP` | `null` |
+| `topK` | `null` |
 | `maxOutputTokens` | `16384` |
-| `repeatPenalty` | `1.1` |
+| `repeatPenalty` | `null` |
 | `llmTimeout` | `600000` ms |
 | `toolTimeout` | `300000` ms |
 | `maxRetries` | `3` |

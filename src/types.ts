@@ -298,6 +298,8 @@ export interface ProviderModelOverrides {
   top_p?: number | null;
   topK?: number | null;
   top_k?: number | null;
+  repeatPenalty?: number | null;
+  repeat_penalty?: number | null;
 }
 
 export type ToolChoiceMode = 'auto' | 'required';

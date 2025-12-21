@@ -187,7 +187,7 @@ export class AIAgentSession {
   private resolveModelOverrides(
     provider: string,
     model: string
-  ): { temperature?: number | null; topP?: number | null; topK?: number | null } {
+  ): { temperature?: number | null; topP?: number | null; topK?: number | null; repeatPenalty?: number | null } {
     const providers = this.sessionConfig.config.providers;
     const providerConfig = Object.prototype.hasOwnProperty.call(providers, provider)
       ? providers[provider]
@@ -196,7 +196,7 @@ export class AIAgentSession {
     const modelConfig = providerConfig.models?.[model];
     const overrides = modelConfig?.overrides;
     if (overrides === undefined) return {};
-    const result: { temperature?: number | null; topP?: number | null; topK?: number | null } = {};
+    const result: { temperature?: number | null; topP?: number | null; topK?: number | null; repeatPenalty?: number | null } = {};
 
     const overrideTemperature = overrides.temperature;
     if (overrideTemperature !== undefined) {
@@ -220,6 +220,16 @@ export class AIAgentSession {
       const overrideTopKSnake = overrides.top_k;
       if (overrideTopKSnake !== undefined) {
         result.topK = overrideTopKSnake ?? null;
+      }
+    }
+
+    const overrideRepeatPenaltyCamel = overrides.repeatPenalty;
+    if (overrideRepeatPenaltyCamel !== undefined) {
+      result.repeatPenalty = overrideRepeatPenaltyCamel ?? null;
+    } else {
+      const overrideRepeatPenaltySnake = overrides.repeat_penalty;
+      if (overrideRepeatPenaltySnake !== undefined) {
+        result.repeatPenalty = overrideRepeatPenaltySnake ?? null;
       }
     }
 
@@ -1126,6 +1136,8 @@ export class AIAgentSession {
           expectedOutput: this.sessionConfig.expectedOutput?.format,
           temperature: this.sessionConfig.temperature,
           topP: this.sessionConfig.topP,
+          topK: this.sessionConfig.topK,
+          repeatPenalty: this.sessionConfig.repeatPenalty,
           llmTimeout: this.sessionConfig.llmTimeout,
           toolTimeout: this.sessionConfig.toolTimeout,
           maxRetries: this.sessionConfig.maxRetries,

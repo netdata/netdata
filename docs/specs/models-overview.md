@@ -123,9 +123,11 @@ interface TurnRequest {
   model: string;
   messages: ConversationMessage[];
   tools?: MCPTool[];
-  temperature?: number;
-  topP?: number;
+  temperature?: number | null;
+  topP?: number | null;
+  topK?: number | null;
   maxOutputTokens?: number;
+  repeatPenalty?: number | null;
   reasoningLevel?: ReasoningLevel;
   reasoningValue?: ProviderReasoningValue | null;
   stream?: boolean;
@@ -258,6 +260,10 @@ interface ProviderModelOverrides {
   temperature?: number | null;
   topP?: number | null;
   top_p?: number | null;
+  topK?: number | null;
+  top_k?: number | null;
+  repeatPenalty?: number | null;
+  repeat_penalty?: number | null;
 }
 ```
 

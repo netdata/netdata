@@ -1753,6 +1753,8 @@ program
         // CLI overrides take precedence
         temperature: optSrc('temperature') === 'cli' ? Number(options.temperature) : undefined,
         topP: (optSrc('topP') === 'cli' || optSrc('top-p') === 'cli') ? Number(options.topP ?? options['top-p']) : undefined,
+        topK: (optSrc('topK') === 'cli' || optSrc('top-k') === 'cli') ? Math.trunc(Number(options.topK ?? options['top-k'])) : undefined,
+        repeatPenalty: (optSrc('repeatPenalty') === 'cli' || optSrc('repeat-penalty') === 'cli') ? Number(options.repeatPenalty ?? options['repeat-penalty']) : undefined,
         llmTimeout: (optSrc('llmTimeoutMs') === 'cli' || optSrc('llm-timeout-ms') === 'cli') ? Number(options.llmTimeoutMs ?? options['llm-timeout-ms']) : undefined,
         toolTimeout: (optSrc('toolTimeoutMs') === 'cli' || optSrc('tool-timeout-ms') === 'cli') ? Number(options.toolTimeoutMs ?? options['tool-timeout-ms']) : undefined,
         maxRetries: optSrc('maxRetries') === 'cli' ? Number(options.maxRetries) : undefined,

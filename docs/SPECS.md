@@ -142,8 +142,10 @@ All string values in the configuration support environment variable expansion us
   "defaults": {
     "llmTimeout": 120000,
     "toolTimeout": 60000,
-    "temperature": 0.7,
-    "topP": 1.0,
+    "temperature": 0.0,
+    "topP": null,
+    "topK": null,
+    "repeatPenalty": null,
     "stream": true
   }
 }
@@ -167,9 +169,10 @@ All string values in the configuration support environment variable expansion us
 ### Per-Model Parameter Overrides
 
 Some providers require bespoke sampling controls for specific models. Add a `models`
-block under the provider entry to override the `temperature` or `top_p`/`topP`
-values that will be sent to the LLM. Overrides take precedence over CLI options,
-frontmatter, and config defaults. Use `null` to omit a parameter entirely.
+block under the provider entry to override `temperature`, `top_p`/`topP`, `top_k`/`topK`,
+or `repeat_penalty`/`repeatPenalty` values that will be sent to the LLM. Overrides
+take precedence over CLI options, frontmatter, and config defaults. Use `null` to
+omit a parameter entirely.
 
 ```json
 {
@@ -179,7 +182,8 @@ frontmatter, and config defaults. Use `null` to omit a parameter entirely.
       "models": {
         "meta-llama/llama-3": {
           "overrides": {
-            "top_p": null
+            "top_p": null,
+            "repeat_penalty": null
           }
         },
         "openai/gpt-4o-mini": {

@@ -185,6 +185,7 @@ Defined in `src/ai-agent.ts:16-44`:
 - `maxRetries: number` - Max retries per turn (default: 3)
 - `temperature?: number` - Sampling temperature
 - `topP?: number` - Top-p sampling
+- `topK?: number` - Top-k sampling
 - `reasoning?: ReasoningLevel` - Extended thinking level
 - `reasoningValue?: ProviderReasoningValue | null` - Direct reasoning value
 - `stream?: boolean` - Enable streaming
