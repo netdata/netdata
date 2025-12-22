@@ -165,6 +165,7 @@ https://github.com/netdata/netdata/edit/master/src/health/REFERENCE.md,Alert Con
 https://github.com/netdata/netdata/edit/master/src/web/api/health/README.md,Health API Calls,Published,Alerts & Notifications,,
 ,,,,,
 https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md,Netdata AI,Published,Netdata AI,,
+https://github.com/netdata/netdata/edit/master/docs/ai-powered-alert-configuration/ai-powered-alert-configuration.md,AI-Powered Alert Configuration,Published,Netdata AI,,
 https://github.com/netdata/netdata/edit/master/docs/ml-ai/ai-insights.md,Insights,Published,Netdata AI/Insights,,
 https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/infrastructure-summary.md,Infrastructure Summary,Published,Netdata AI/Insights,,
 https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/performance-optimization.md,Performance Optimization,Published,Netdata AI/Insights,,
