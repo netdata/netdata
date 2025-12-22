@@ -491,10 +491,12 @@ const elog = (msg: string): void => { try { process.stderr.write(`[ERR] ← [0.0
       inFlight.add(key);
       try {
         const rendered = render();
+        if (closed.has(key)) return;
         if (typeof rendered === 'string') {
           await client.chat.update({ channel, ts, text: rendered });
         } else {
           const { text, blocks } = rendered;
+          if (closed.has(key)) return;
           if (Array.isArray(blocks) && blocks.length > 0) {
             const mergedBlocks = Array.isArray(prefixBlocks) && prefixBlocks.length > 0 ? [...prefixBlocks, ...blocks] : blocks;
             await client.chat.update({ channel, ts, text, blocks: mergedBlocks });
@@ -574,6 +576,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[ERR] ← [0.0
 
   const finalizeAndPost = async (sm: SessionManager, client: any, channel: string, ts: string, runId: string, meta: { error?: string; chName?: string; userName?: string }): Promise<void> => {
     const key = `${channel}:${ts}`;
+    if (closed.has(key)) return;
     closed.add(key);
     const pending = updating.get(key); if (pending) { clearTimeout(pending); updating.delete(key); }
     const result = sm.getResult(runId);

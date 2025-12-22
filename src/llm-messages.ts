@@ -594,6 +594,7 @@ export const SLACK_BLOCK_KIT_MRKDWN_RULES = `### ${SLACK_BLOCK_KIT_MRKDWN_RULES_
 - Only use these block types: \`header\` (plain_text), \`section\` (mrkdwn), \`divider\`, \`context\` (mrkdwn elements). Do NOT emit other block types.
 - DO NOT use Markdown headings (\`#\`, \`##\`, \`###\`) or Markdown tables (\`|---|\`). Slack will render these literally.
 - Titles go in **header** blocks (plain_text). Subheadings inside sections must be bold lines (e.g., \`*Section Title*\`) followed by a newline.
+- Headers are **plain_text**: do NOT use emoji shortcodes like \`:database:\` there. Use Unicode emoji only (e.g., \`🗄️\`).
 - Allowed formatting: \`*bold*\`, \`_italic_\`, \`~strikethrough~\`, \`inline code\`, fenced code blocks (\`\`\`code\`\`\`), bullets (\`•\` or \`-\`).
 - Links must use Slack format: \`<https://example.com|link text>\`. Do NOT use \`[text](url)\`.
 - Mentions are allowed when relevant: \`<@U...>\`, \`<#C...>\`, \`<!subteam^ID>\`, \`<!here>\`, \`<!channel>\`, \`<!everyone>\`. Avoid \`@here/@channel/@everyone\` unless explicitly asked.
