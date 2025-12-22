@@ -758,7 +758,7 @@ When emitting `slack-block-kit`, the text inside `section` and `context` blocks 
 - Avoid HTML, Mermaid fences, or raw JSON inside text blocks.
 
 **Automatic repair + validation**
-- Slack mrkdwn is sanitized on output (Markdown headings/links/strikethrough → mrkdwn equivalents, `**` → `*`, `~~` → `~`, code-fence language stripped).
+- Slack mrkdwn is sanitized on output (Markdown headings/links/strikethrough → mrkdwn equivalents, `**` → `*`, `~~` → `~`, code-fence language stripped, `\\n`/`\\t` escape sequences normalized).
 - `& < >` are escaped unless part of Slack entities (`<@U...>`, `<#C...>`, `<url|text>`).
 - Markdown tables are converted to code blocks.
 - Slack Block Kit parsing accepts either a top-level array or `{ "messages": [...] }` and normalizes to the array before validation.

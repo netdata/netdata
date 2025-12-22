@@ -334,7 +334,7 @@ When `isFinalTurn === true`:
 
 ## Business Logic Coverage (Verified 2025-11-16)
 
-- **Slack Block Kit repair**: Markdown is sanitized to Slack mrkdwn (headings → bold, `[text](url)` → `<url|text>`, `**`/`__` → `*`, `~~` → `~`, code-fence language stripped, tables → code blocks, `& < >` escaped) and text lengths are clamped (sections ≤2900 chars, headers ≤150, context/fields ≤2000). Normalization is shared across tool-call and XML final report paths (`src/slack-block-kit.ts`, `src/tools/internal-provider.ts`, `src/session-turn-runner.ts`).
+- **Slack Block Kit repair**: Markdown is sanitized to Slack mrkdwn (headings → bold, `[text](url)` → `<url|text>`, `**`/`__` → `*`, `~~` → `~`, code-fence language stripped, tables → code blocks, `& < >` escaped, `\\n`/`\\t` escape sequences normalized) and text lengths are clamped (sections ≤2900 chars, headers ≤150, context/fields ≤2000). Normalization is shared across tool-call and XML final report paths (`src/slack-block-kit.ts`, `src/tools/internal-provider.ts`, `src/session-turn-runner.ts`).
 - **Slack Block Kit schema**: Section blocks allow `text`, `fields`, or **both**; `text` is optional when fields are present (matches Slack).
 - **Format mismatch handling**: If `report_format` or `format` disagrees with the session’s expected format the tool logs an error and overwrites it, preventing downstream consumers from seeing inconsistent metadata (`src/tools/internal-provider.ts:398-410`).
 - **Slack content fallback**: If slack-block-kit payloads are invalid after repair, the system emits a safe single-section fallback message instead of sending invalid blocks to Slack (`src/tools/internal-provider.ts`, `src/session-turn-runner.ts`).

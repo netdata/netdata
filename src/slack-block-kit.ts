@@ -118,6 +118,7 @@ export type SlackMrkdwnRepair =
   | 'markdownHeading'
   | 'markdownLink'
   | 'markdownTable'
+  | 'escapedNewlines'
   | 'codeFenceLanguage'
   | 'escapeEntities'
   | 'stripFormatting'
@@ -187,6 +188,15 @@ const replaceWithRepair = (
   return next;
 };
 
+const normalizeEscapedNewlines = (value: string, repairs: Set<SlackMrkdwnRepair>): string => {
+  const next = value
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\\t/g, '\t');
+  if (next !== value) repairs.add('escapedNewlines');
+  return next;
+};
+
 const stripCodeFenceLanguage = (value: string, repairs: Set<SlackMrkdwnRepair>): string => {
   const next = value.replace(/```[a-zA-Z0-9_-]+/g, '```');
   if (next !== value) repairs.add('codeFenceLanguage');
@@ -234,7 +244,7 @@ const escapeSlackEntities = (value: string, repairs: Set<SlackMrkdwnRepair>): st
 
 export const sanitizeSlackMrkdwn = (input: string): SlackMrkdwnResult => {
   const repairs = new Set<SlackMrkdwnRepair>();
-  const base = stripCodeFenceLanguage(input, repairs);
+  const base = stripCodeFenceLanguage(normalizeEscapedNewlines(input, repairs), repairs);
   const segments = base.split('```');
   const sanitizedSegments = segments.map((segment, index) => {
     if (index % 2 === 1) {
@@ -254,7 +264,7 @@ export const sanitizeSlackMrkdwn = (input: string): SlackMrkdwnResult => {
 
 export const sanitizeSlackPlainText = (input: string): SlackMrkdwnResult => {
   const repairs = new Set<SlackMrkdwnRepair>();
-  let output = input;
+  let output = normalizeEscapedNewlines(input, repairs);
   output = replaceWithRepair(output, MARKDOWN_LINK, '$1', 'stripMarkdownLinks', repairs);
   output = replaceWithRepair(output, MARKDOWN_HEADING, '$1', 'stripHeadingMarkers', repairs);
   const stripped = output.replace(/[`*_~]/g, '');

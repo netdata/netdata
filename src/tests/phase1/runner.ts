@@ -11894,6 +11894,7 @@ BASE_TEST_SCENARIOS.push({
           } as ConversationMessage,
         ],
         tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+        executionStats: { executedTools: 1, executedNonProgressBatchTools: 1, executedProgressBatchTools: 0, unknownToolEncountered: false },
       });
     });
   },
