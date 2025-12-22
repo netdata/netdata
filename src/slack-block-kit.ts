@@ -130,7 +130,9 @@ export type SlackMrkdwnRepair =
   | 'truncateBlocks'
   | 'truncateMessages'
   | 'truncateFields'
-  | 'truncateContext';
+  | 'truncateContext'
+  | 'flattenMessages'
+  | 'placeholderMessage';
 
 export interface SlackMrkdwnResult {
   text: string;
@@ -161,6 +163,7 @@ const SLACK_ENTITY_ONLY = new RegExp(`^<${SLACK_ENTITY_INNER}>$`);
 
 const MARKDOWN_HEADING = /^\s{0,3}#{1,6}\s+(.+)$/gm;
 const MARKDOWN_LINK = /\[([^\]]+)\]\((https?:\/\/[^)\s]+|mailto:[^)\s]+)\)/g;
+const MARKDOWN_BOLD_ITALIC = /\*\*\*([^*]+)\*\*\*/g;
 const MARKDOWN_BOLD = /\*\*([^*]+)\*\*/g;
 const MARKDOWN_BOLD_UNDERLINE = /__([^_]+)__/g;
 const MARKDOWN_STRIKE = /~~([^~]+)~~/g;
@@ -254,6 +257,7 @@ export const sanitizeSlackMrkdwn = (input: string): SlackMrkdwnResult => {
     output = convertMarkdownTables(output, repairs);
     output = replaceWithRepair(output, MARKDOWN_HEADING, '*$1*', 'markdownHeading', repairs);
     output = replaceWithRepair(output, MARKDOWN_LINK, '<$2|$1>', 'markdownLink', repairs);
+    output = replaceWithRepair(output, MARKDOWN_BOLD_ITALIC, '*$1*', 'markdownBold', repairs);
     output = replaceWithRepair(output, MARKDOWN_BOLD, '*$1*', 'markdownBold', repairs);
     output = replaceWithRepair(output, MARKDOWN_BOLD_UNDERLINE, '*$1*', 'markdownBold', repairs);
     output = replaceWithRepair(output, MARKDOWN_STRIKE, '~$1~', 'markdownStrike', repairs);
@@ -269,8 +273,7 @@ export const sanitizeSlackPlainText = (input: string): SlackMrkdwnResult => {
   output = replaceWithRepair(output, MARKDOWN_HEADING, '$1', 'stripHeadingMarkers', repairs);
   const stripped = output.replace(/[`*_~]/g, '');
   if (stripped !== output) repairs.add('stripFormatting');
-  output = escapePlain(stripped);
-  return { text: output, repairs: Array.from(repairs) };
+  return { text: stripped, repairs: Array.from(repairs) };
 };
 
 const asRecord = (value: unknown): value is Record<string, unknown> => (
@@ -514,11 +517,44 @@ export const normalizeSlackMessages = (
   options?: { fallbackText?: string }
 ): SlackMessageNormalizationResult => {
   const repairs = new Set<SlackMrkdwnRepair>();
-  const normalized = inputMessages
-    .map((entry) => normalizeMessage(entry, repairs))
-    .filter((entry): entry is Record<string, unknown> => entry !== undefined)
-    .slice(0, SLACK_LIMITS.maxMessages);
-  if (inputMessages.length > SLACK_LIMITS.maxMessages) repairs.add('truncateMessages');
+  const normalized: Record<string, unknown>[] = [];
+  const placeholderText = '[invalid block dropped]';
+
+  const pushPlaceholder = () => {
+    if (normalized.length >= SLACK_LIMITS.maxMessages) return;
+    repairs.add('placeholderMessage');
+    normalized.push({ blocks: [{ type: 'section', text: { type: 'mrkdwn', text: placeholderText } }] });
+  };
+
+  const pushMessage = (entry: unknown) => {
+    if (normalized.length >= SLACK_LIMITS.maxMessages) {
+      repairs.add('truncateMessages');
+      return;
+    }
+    if (Array.isArray(entry)) {
+      repairs.add('flattenMessages');
+      entry.forEach((item) => {
+        pushMessage(item);
+      });
+      return;
+    }
+    const message = normalizeMessage(entry, repairs);
+    if (message === undefined) {
+      pushPlaceholder();
+      return;
+    }
+    normalized.push(message);
+  };
+
+  // eslint-disable-next-line functional/no-loop-statements
+  for (const entry of inputMessages) {
+    pushMessage(entry);
+    if (normalized.length >= SLACK_LIMITS.maxMessages) break;
+  }
+
+  if (inputMessages.length > SLACK_LIMITS.maxMessages && normalized.length >= SLACK_LIMITS.maxMessages) {
+    repairs.add('truncateMessages');
+  }
 
   if (normalized.length === 0) {
     const fallback = options?.fallbackText ?? '';

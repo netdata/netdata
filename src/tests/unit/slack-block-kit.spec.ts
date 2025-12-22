@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import Ajv, { type Ajv as AjvClass, type Options as AjvOptions } from 'ajv';
 import { describe, expect, it } from 'vitest';
 
@@ -10,11 +12,12 @@ interface SlackTestBlock {
 
 describe('sanitizeSlackMrkdwn', () => {
   it('converts common markdown to Slack mrkdwn', () => {
-    const input = '## Title\nSee [Docs](https://example.com) and **Bold** plus ~~Strike~~ & <tag>\n|A|B|\n|---|---|\n|1|2|\n```json\n{"a":1}\n```';
+    const input = '## Title\nSee [Docs](https://example.com) and **Bold** plus ***BoldItalic*** and ~~Strike~~ & <tag>\n|A|B|\n|---|---|\n|1|2|\n```json\n{"a":1}\n```';
     const result = sanitizeSlackMrkdwn(input);
     expect(result.text).toContain('*Title*');
     expect(result.text).toContain('<https://example.com|Docs>');
     expect(result.text).toContain('*Bold*');
+    expect(result.text).toContain('*BoldItalic*');
     expect(result.text).toContain('~Strike~');
     expect(result.text).toContain('&amp;');
     expect(result.text).toContain('&lt;tag&gt;');
@@ -39,7 +42,7 @@ describe('normalizeSlackMessages', () => {
       },
       {
         blocks: [
-          { type: 'header', text: { type: 'plain_text', text: '**Title**' } },
+          { type: 'header', text: { type: 'plain_text', text: '**Title** & Partners' } },
         ],
       },
     ]);
@@ -55,7 +58,7 @@ describe('normalizeSlackMessages', () => {
     const headerMessage = result.messages[1] as { blocks?: SlackTestBlock[] };
     const headerBlock = Array.isArray(headerMessage.blocks) ? headerMessage.blocks[0] : undefined;
     const headerText = typeof headerBlock?.text?.text === 'string' ? headerBlock.text.text : '';
-    expect(headerText).toBe('Title');
+    expect(headerText).toBe('Title & Partners');
   });
 
   it('creates fallback message when input is empty', () => {
@@ -65,6 +68,24 @@ describe('normalizeSlackMessages', () => {
     const firstBlock = Array.isArray(firstMessage.blocks) ? firstMessage.blocks[0] : undefined;
     const text = typeof firstBlock?.text?.text === 'string' ? firstBlock.text.text : '';
     expect(text).toContain('*Fallback*');
+  });
+
+  it('inserts a placeholder when a message is dropped', () => {
+    const result = normalizeSlackMessages([null]);
+    expect(result.messages.length).toBe(1);
+    const firstMessage = result.messages[0] as { blocks?: SlackTestBlock[] };
+    const firstBlock = Array.isArray(firstMessage.blocks) ? firstMessage.blocks[0] : undefined;
+    const text = typeof firstBlock?.text?.text === 'string' ? firstBlock.text.text : '';
+    expect(text).toBe('[invalid block dropped]');
+  });
+
+  it('keeps the full message set for the 2ea853ad payload', () => {
+    const rawPayload = readFileSync(new URL('../fixtures/slack-block-kit-2ea853ad.raw.txt', import.meta.url), 'utf-8');
+    const parsed = parseSlackBlockKitPayload({ rawPayload });
+    const normalized = normalizeSlackMessages(parsed.messages ?? [], { fallbackText: parsed.fallbackText });
+    const flattened = JSON.stringify(normalized.messages);
+    expect(flattened).toContain('Slack Block Kit Demo');
+    expect(flattened).toContain('Welcome to the Slack Block Kit Formatting Demonstration');
   });
 });
 
