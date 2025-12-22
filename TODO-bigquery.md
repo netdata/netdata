@@ -5,6 +5,7 @@
 - BigQuery agent must mirror Grafana charts exactly; bigquery.ai now includes the former executive2.ai prompt for parity.
 - Need a slimmer, guardrailed prompt that still preserves Grafana-fidelity (canonical formulas/templates) instead of raw dumps.
 - **Migration request (Costa):** Replace `bigquery.ai` with `executive2.ai` for production testing, remove executive.ai references, and rename harness/scripts/TODO from *executive* → *bigquery*.
+- **Latest (2025-12-22):** Expand user-intent map for signups/customers/spaces/churn, then re-run the full harness with extreme timeouts and debug remaining failures.
 
 ## Analysis (current state)
 - Frontmatter: single tool `bigquery`, `maxTurns: 50`, `reasoning: high`, `maxOutputTokens: 16384`; no expected output/schema; uses `${FORMAT}` placeholder.
@@ -160,17 +161,27 @@ Next actions to reach parity: promote 🟨 templates from scratch → prod after
 - Ability of `executive2.ai` (prod prompt) to answer natural-language KPI asks that correspond to Grafana-derived KPIs, without seeing panel IDs.
 - Numeric parity with BigQuery reference SQL for each KPI (top panels first, then long tail).
 - Correct window handling per the inclusive + cap-today rule.
+- Reliable top-10 delta answers (ARR and nodes) using SQL-only delta templates (no in-memory snapshot comparison).
+- Correct mapping of "users/customers/spaces signed up" and "churned customers/deleted spaces" per product taxonomy.
 
 ## Expected system prompt shape
 - Concise guardrails (tool usage, date rule, template-first, avoid macros/params).
 - KPI catalog with neutral names/descriptions (no panel numbers), each with exact SQL and expected JSON shape.
 - Clear instruction that the model must choose the right template from user intent alone.
+- Prominent, early user-intent mapping for signups/customers/spaces/churn (Business/Homelab/Trial/Community).
 
 ## Test suite requirements
 - One natural-language test per KPI/panel in scope.
 - Reference SQL mirrors Grafana logic (parameterized with from/to, no macros).
 - Agent called with JSON schema enforcement; outputs compared numerically/structurally.
 - No template/panel hints in test user prompts.
+- Harness must run with **extreme timeouts** (10h llm/tool) and **continue mode** + **jobs=3** for full-suite runs.
+- Use session snapshots (`~/.ai-agent/sessions/{txn}.json.gz`) via `neda/bigquery-snapshot-dump.sh` to debug failing cases.
+
+## Current focus (Dec 22)
+- Re-run full harness with `MODEL_OVERRIDE=nova/gpt-oss-20b`, `TEMPERATURE_OVERRIDE=0`, `--continue --jobs 3`, and **10h timeouts**.
+- For each failure: extract snapshot via `neda/bigquery-snapshot-dump.sh`, inspect SQL + final JSON, and determine whether the error is **format-only** or **wrong-query**.
+- If wrong-query: strengthen prompt rule at the earliest relevant section (avoid scattered exceptions).
 
 ### Top panels covered in parity harness (so far)
 - Panel 7: `$ Realized ARR - Forecasts` (discounted realized ARR incl. on-prem baseline)
@@ -305,6 +316,20 @@ Next actions to reach parity: promote 🟨 templates from scratch → prod after
   - Per-case logs under `tmp/bigquery-tests/logs/<case>.log`.
   - End-of-run summary with exit code (0 all pass, 1 any fail).
   - `--only-case` is supported as a flag (in addition to ONLY_CASE env).
+ - Full suite on `gpt-oss-20b` (MODEL_OVERRIDE default) completed: **51 total, 44 pass, 7 fail**.
+   - Failures: `business_nodes`, `business_subscriptions_deltas`, `nodes_reachable_growth_pct`, `homelab_nodes_growth_pct`, `on_prem_customers`, `business_nodes_delta_top10`, `active_users`.
+   - Root causes observed in logs:
+     - Invalid tool names (`bigquery__execute_sqlcommentary`, `bigquery__execute_sqljson`, `agent__task_statuscommentary`) causing no_tools failures.
+     - Stat KPIs returning timeseries (active_users, on_prem_customers) instead of LIMIT 1.
+     - Growth % window widened to compute lags (nodes_reachable/homelab nodes growth), contrary to template.
+     - Node delta status relabeled as won/lost instead of increase/decrease.
+     - Business subscriptions deltas swapped last_30_days and last_90_days.
+   - Prompt fixes applied in `neda/bigquery.ai`:
+     - Added tool-name hard stop (no suffixes), stat-only KPI list, and explicit mappings for business nodes/on-prem customers and growth % routes.
+     - Added `business_nodes_stat_last_not_null` and `business_subscriptions_deltas_latest` templates.
+     - Reinforced “no window widening” for growth % and “no relabeling” for node delta status.
+     - Added explicit mapping and rules for Business subscriptions deltas to preserve column labels.
+ - Re-run needed for the 7 previously failing cases after these prompt changes.
 
 ## Decisions (2025-12-18)
 - D1: Adopt KPI-first template catalog (no per-panel SQL in prompt). Maintain panel parity via harness instantiations. **Accepted (Costa)**.

@@ -44,6 +44,11 @@ Users may not explicitly ask using the right terminology. Use this table to map 
 | Revenue                   | realized ARR (discounted) total — use metrics_daily realized ARR templates |
 | Revenue per user/customer/account | ARR per space/account — use `watch_towers.spaces_asat_*` (or `spaces_latest` for current) and field `bq_arr_discount`; do NOT use metrics_daily aggregates |
 | Business revenue / Business ARR | business ARR discounted — use metrics_daily `arr_business_discount` templates (stat or timeseries) |
+| Users signed up | all spaces signed up (Business + Homelab + Business Trial + Community); do not filter unless user specifies paid/free |
+| Spaces signed up | all spaces signed up (Business + Homelab + Business Trial + Community); do not filter unless user specifies paid/free |
+| Customers signed up | paying spaces signed up only (Business + Homelab); filter by Business/Homelab if specified |
+| Churned customers | paying spaces that transitioned to Community (paid → free) |
+| Deleted spaces | deleted Community spaces (free-only deletions) |
 | Users won                 | spaces transitioned from non-paid to paid subscription                    |
 | Users churned             | spaces transitioned from paid to non-paid subscription                    |
 | Active users / active members | latest active members across spaces — use metrics_daily `spaces_active_members_sum` stat template (`active_users_stat_last_not_null`, ORDER BY date DESC LIMIT 1) |
@@ -52,9 +57,14 @@ Users may not explicitly ask using the right terminology. Use this table to map 
 | Customers/subscriptions growth % | use `metric_growth_pct_timeseries` with metric_expr = total_business_subscriptions + total_homelab_subscriptions (exact expression from FAQ) |
 | Business nodes growth % | use `metric_growth_pct_timeseries` with metric_expr = paid_nodes_business_annual + paid_nodes_business_monthly |
 | Business + Homelab nodes growth % | use `metric_growth_pct_timeseries` with metric_expr = paid_nodes_business_* + total_reachable_nodes_homelab |
+| Reachable nodes growth % | use `metric_growth_pct_timeseries` with metric_expr = `MAX(IF(metric_name = 'nodes_reachable', metric_value, NULL))` (no window widening) |
+| Homelab reachable nodes growth % | use `metric_growth_pct_timeseries` with metric_expr = `MAX(IF(metric_name = 'total_reachable_nodes_homelab', metric_value, NULL))` (no window widening) |
 | Top 10 ARR gains/losses by customer/space | use `space_arr_delta_top10` (single SQL); return all rows from SQL (top 10 positive + top 10 negative) |
 | Top 10 nodes gained/lost (Business/Homelab) | use `space_nodes_delta_top10_business` / `space_nodes_delta_top10_homelab` verbatim; return all rows from SQL |
 | ARR change between T0 and T1 (components) | use `realized_arr_kpi_delta_window` verbatim; do not rename `*_delta` keys |
+| Business subscriptions deltas (7/30/90 abs) | use `business_subscriptions_deltas_latest` verbatim; keep last_7/30/90 column names |
+| Business paid nodes (latest/current) | use `business_nodes_stat_last_not_null` (metrics_daily paid_nodes_business_annual + paid_nodes_business_monthly); ORDER BY date DESC LIMIT 1 |
+| On-prem customers / on-prem & support subscriptions (latest/current) | use `on_prem_customers_stat_last_not_null`; ORDER BY date DESC LIMIT 1 (never return a series) |
 
 Product taxonomy (use these definitions when interpreting user intent):
 - Business
@@ -70,6 +80,11 @@ Signup / churn terminology (must follow exactly):
 - "Churned customers" = paying spaces that transitioned to Community (paid → free).
 - "Deleted spaces" = deleted Community spaces (free-only deletions).
 - "Customers" always means paying spaces (Business + Homelab) unless the user explicitly includes trials or free.
+
+Stat-only KPIs (never return a timeseries for these when the ask is “latest/current/last” or the schema caps data to one row):
+- active users (`spaces_active_members_sum`)
+- on-prem customers (`onprem_customers` with legacy fallback)
+- business paid nodes (paid_nodes_business_annual + paid_nodes_business_monthly)
 - "Latest/now/most recent realized ARR" (optionally with a date window) → use the realized ARR **stat** template (last non-null, `ORDER BY date DESC LIMIT 1`); return a single row, not a per-day series.
 - "Latest/now/most recent realized ARR" (optionally with a date window) → use the realized ARR **stat** template (last non-null, `ORDER BY date DESC LIMIT 1`); return a single row, not a per-day series. If the query returns multiple rows, sort by date DESC and drop all but the first before emitting JSON (schemas with `maxItems: 1` **must** end with one element).
 
@@ -97,7 +112,8 @@ When you receive a user request, you MUST go through this process:
 ## How to run queries
 - Use `bigquery__execute_sql` with "dry_run": false; inline ISO dates (DATE 'YYYY-MM-DD'). Templates show `{{from_date}}`/`{{to_date}}`/`{{snapshot_date}}`: substitute concrete ISO dates before executing (no @parameters sent to the tool).
 - Use **only** `bigquery__execute_sql`. Do **not** invent or call non-existent tools (e.g., `bigquery__execute_sqljson`, `execute_sql_json`).
-- The **only valid BigQuery tool name** is exactly `bigquery__execute_sql`. Do not append suffixes like `commentary/json` (e.g., `bigquery__execute_sqlcommentary` is INVALID).
+- The **only valid BigQuery tool name** is exactly `bigquery__execute_sql`. Do not append any suffixes or extra characters.
+- **HARD STOP:** Tool names must match exactly. If you need extra explanation, put it in `notes` and still call `bigquery__execute_sql`.
 - Build a date spine for the requested window (inclusive) and use `run_date < CURRENT_DATE()` from `metrics.metrics_daily` by default. If (and only if) the user explicitly insists on “include today”, adapt the template to `run_date <= CURRENT_DATE()` for that request.
 - Respect the date-window rule: from/to inclusive; if `to` is today/future, cap at yesterday unless the user explicitly asks to include today. If only start date is given ("since X"), set to_date=yesterday.
 - **Never change an explicit `to_date` or `snapshot_date`.** Only cap `to_date` when it is today or in the future. If the user provides `to_date` and it is ≤ yesterday, use it as-is (do not subtract a day).
@@ -117,15 +133,18 @@ If the user does not specify an output schema/format, respond in clear prose. If
 - When a strict schema is provided, place the freshness note inside an allowed field (e.g., `notes[]`) and do not add extra top-level keys beyond the schema. In free-form, put the freshness line first, then the TL;DR.
 - **Schema compliance is mandatory**: every required property must be present in the JSON, even if the value is 0 or NULL. Do not move required fields (e.g., `check`) into notes or omit them to “simplify” the response. If a value is unavailable, set it to null (when allowed) but keep the key.
 - Never add extra keys like `status`, `partial`, or `error` to schema-constrained JSON. If data is empty, return `{ "data": [], "notes": [...] }` only.
+- If a tool call fails or no data is available, still return the schema shape `{ "data": [], "notes": [...] }`. **Never** emit a top-level `status` field.
 - **Never wrap the payload** (e.g., `{ "status": "...", "content_json": { ... } }`). The root object must be exactly what the schema requires, typically `{ "data": [...], "notes": [...] }`.
 - **Cardinality compliance**: if the schema caps `data` (e.g., `maxItems: 1`), you **must** return no more than that many rows. Add `ORDER BY date DESC LIMIT 1` to the SQL (or post-filter) so only the most recent row is emitted. Returning extra rows is invalid, even if the template normally yields a series.
 - Practical rule: when `maxItems: 1`, after you receive tool results, **always** slice `data` to one most-recent row before final_report. Implementation: if `data.length > 1`, sort by date DESC (when a `date` field exists) and set `data = [data[0]]`; otherwise keep the first element. Example: for `total_arr_plus_unrealized_arr` or `onprem_customers` stat asks, if a query accidentally returns multiple dates, sort by date DESC and keep only the first; never emit the full timeseries.
 
 ## Core execution rules (apply everywhere, even when templates exist)
+- **Tool name rule (hard):** only call `bigquery__execute_sql` (exact name). Do not add suffixes or extra characters to any tool name; invalid tool names will fail.
 - Date windows are inclusive. If `to` is today/future, cap at yesterday unless the user explicitly says “include today”; then change `< CURRENT_DATE()` to `<= CURRENT_DATE()`.
 - **“Since X” rule (hard):** treat X as the inclusive start date. Do not shift X backward. Set `to_date = yesterday` only when the user does not provide an end date.
 - **Explicit end-date rule (hard):** if the user provides `to_date` (or `snapshot_date`) and it is ≤ yesterday, use it as-is. Do not cap it, do not subtract a day, do not replace it with yesterday.
 - Stat / “latest/now/most recent/last” asks (even with a from/to window): always `ORDER BY date DESC LIMIT 1`, return one row. Obey schemas that cap `data` to one item.
+- **Stat-only KPIs rule:** for active users, on-prem customers, and business paid nodes, a latest/current ask **must** use the stat template and return exactly one row. If you produced multiple rows, it is wrong—re-run with `ORDER BY date DESC LIMIT 1`.
 - If the schema caps `data` to one item (e.g., `maxItems: 1`), enforce it in SQL with `LIMIT 1` and return exactly one element (or the empty array if allowed). Do **not** emit a timeseries when the schema requires a single element.
 - Hard stop: if your SQL still produces multiple rows under a maxItems=1 schema, you **MUST** post-filter to one most-recent row before emitting JSON (order by date DESC, keep the first). Never return more rows than the schema permits.
 - Final gate before responding: when a schema (or the intent “latest/stat/now”) requires a single row, **always** trim the result set to one most-recent row before serializing JSON. Never return more rows than the schema permits.
@@ -2192,6 +2211,23 @@ LIMIT 1;
 ```
 - Latest/current active users (members) across spaces; return one row only. Do **not** build a date spine or return a timeseries when the ask is “latest/current” or when the schema caps `data` to one item—just pick the most recent non-null run_date in-window.
 
+## Template: business_nodes_stat_last_not_null (use for current/latest Business paid nodes)
+```
+SELECT
+  run_date AS date,
+  COALESCE(MAX(IF(metric_name = 'paid_nodes_business_annual', metric_value, NULL)), 0)
+    + COALESCE(MAX(IF(metric_name = 'paid_nodes_business_monthly', metric_value, NULL)), 0) AS total
+FROM `netdata-analytics-bi.metrics.metrics_daily`
+WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+  AND run_date > DATE '2023-11-28'
+  AND run_date < CURRENT_DATE()
+GROUP BY run_date
+HAVING total IS NOT NULL
+ORDER BY date DESC
+LIMIT 1;
+```
+- Latest/current Business paid nodes; return one row only. Do **not** return a timeseries for stat/latest asks.
+
 ## Template: homelab_subscriptions_stat_last_not_null (use for current/latest Homelab subscriptions)
 ```
 SELECT
@@ -2234,7 +2270,8 @@ FROM final
 ORDER BY date DESC
 LIMIT 1;
 ```
-- Latest/current on-prem customer count; return one row only. Applies legacy fallback of **5 customers** only for dates ≤ 2025-10-04 when the metric is NULL.
+- Latest/current on-prem customer count; return **exactly one row only**. **HARD STOP:** do not output a timeseries for this KPI unless the user explicitly asks for a trend/over-time series. If you produced multiple rows, you must drop all but the most recent (date DESC).
+- Applies legacy fallback of **5 customers** only for dates ≤ 2025-10-04 when the metric is NULL.
 
 ## Template: realized_arr_components_timeseries (use verbatim for $ breakdown per day)
 ```
@@ -2557,6 +2594,39 @@ LIMIT 1;
 - Always use a 120-day lookback ending at `to_date` (default: yesterday), even if the user supplies a shorter window—otherwise 30/90-day lags become NULL.
 - Substitute `__METRIC_EXPR__` with the per-date MAX/aggregation for the metric (see FAQ recipes for subscriptions, business ARR, business nodes).
 - Keep ORDER BY date DESC LIMIT 1 to return the most recent row with all lags present; do not re-normalize or approximate missing lags.
+- **Do not swap or relabel** `last_7_days`, `last_30_days`, `last_90_days`. Emit these fields exactly as returned by the SQL.
+
+## Template: business_subscriptions_deltas_latest (alias; use verbatim for Business subscriptions 7/30/90 deltas)
+```
+WITH series AS (
+  SELECT
+    run_date AS date,
+    MAX(IF(metric_name IN ('subscriptions_total','total_business_subscriptions'), metric_value, NULL)) AS metric
+  FROM `netdata-analytics-bi.metrics.metrics_daily`
+  WHERE run_date BETWEEN DATE_SUB(DATE '{{to_date}}', INTERVAL 120 DAY) AND DATE '{{to_date}}'
+    AND run_date < CURRENT_DATE()
+  GROUP BY run_date
+  ORDER BY run_date
+),
+deltas AS (
+  SELECT
+    date,
+    metric - LAG(metric, 7)  OVER (ORDER BY date) AS last_7_days,
+    metric - LAG(metric, 30) OVER (ORDER BY date) AS last_30_days,
+    metric - LAG(metric, 90) OVER (ORDER BY date) AS last_90_days
+  FROM series
+)
+SELECT
+  date,
+  last_7_days,
+  last_30_days,
+  last_90_days
+FROM deltas
+WHERE last_7_days IS NOT NULL AND last_30_days IS NOT NULL AND last_90_days IS NOT NULL
+ORDER BY date DESC
+LIMIT 1;
+```
+- Use this alias when the user asks for **Business subscriptions deltas** (7/30/90). Do not swap the 30/90 labels.
 
 ## Template: business_arr_discount_timeseries (use verbatim for Business ARR discounted per day)
 ```
@@ -3240,6 +3310,7 @@ SELECT * FROM negative;
 - Same HARD STOP as ARR: compute top 10 positive/negative in SQL; do not fetch full snapshots.
 - Keep the Business filter **exactly** as written: `ax_trial_ends_at IS NULL` and `(ce_plan_class = 'Business' OR aw_sub_plan IN ('Business','Business2024.03'))`. Do **not** replace with `ce_plan_class LIKE 'Business%'`.
 - **Join rule (hard):** use `FULL OUTER JOIN` with `COALESCE` on nodes to capture spaces that appear only in one snapshot. Do **not** use INNER JOIN.
+- **Status labels are fixed:** use `increase`/`decrease` exactly as produced by the SQL. **Do not** relabel node changes as `won`/`lost`, even when nodes_t0 = 0 or nodes_t1 = 0.
 
 ## Template: space_nodes_delta_top10_homelab (reachable nodes change, Homelab)
 ```
@@ -3307,6 +3378,7 @@ SELECT * FROM positive
 UNION ALL
 SELECT * FROM negative;
 ```
+- **Status labels are fixed:** use `increase`/`decrease` exactly as produced by the SQL. **Do not** relabel node changes as `won`/`lost`, even when nodes_t0 = 0 or nodes_t1 = 0.
 - Same HARD STOP as ARR: compute top 10 positive/negative in SQL; do not fetch full snapshots.
 - `__METRIC_EXPR__` is a placeholder to be replaced with the metric expression (see FAQ growth recipes below).
 - Do not re-normalize or drop NULL rows; Grafana shows NULL when history is insufficient.

@@ -18,6 +18,8 @@
 #   ./neda/bigquery-test.sh --jobs 3              # run up to 3 cases in parallel
 #   ./neda/bigquery-test.sh --only-case realized_arr  # run a single case
 #   MODEL_OVERRIDE=nova/gpt-oss-20b ./neda/bigquery-test.sh  # override model used by ai-agent
+#   TEMPERATURE_OVERRIDE=0 ./neda/bigquery-test.sh          # override temperature (empty to disable)
+#   LLM_TIMEOUT_MS=36000000 TOOL_TIMEOUT_MS=36000000 ./neda/bigquery-test.sh  # override timeouts (default 10h)
 #
 set -euo pipefail
 
@@ -69,6 +71,9 @@ TO_DATE="${TO_DATE:-$(date -I -d '1 day ago')}"
 AI_AGENT_BIN="${AI_AGENT_BIN:-${SCRIPT_DIR}/../ai-agent}"
 SYSTEM_PROMPT="${SYSTEM_PROMPT:-${SCRIPT_DIR}/bigquery.ai}"
 MODEL_OVERRIDE="${MODEL_OVERRIDE:-nova/gpt-oss-20b}"
+TEMPERATURE_OVERRIDE="${TEMPERATURE_OVERRIDE:-0}"
+LLM_TIMEOUT_MS="${LLM_TIMEOUT_MS:-36000000}"
+TOOL_TIMEOUT_MS="${TOOL_TIMEOUT_MS:-36000000}"
 
 OUT_DIR="${OUT_DIR:-${SCRIPT_DIR}/../tmp/bigquery-tests}"
 run mkdir -p "${OUT_DIR}"
@@ -89,6 +94,9 @@ Usage: ./neda/bigquery-test.sh [--continue|--fail-fast] [--jobs N] [--only-case 
   --jobs N          Run up to N cases in parallel (default: 1)
   --only-case NAME  Run a single case by name (same as ONLY_CASE env)
   MODEL_OVERRIDE    Override model used by ai-agent (default: nova/gpt-oss-20b; set empty to disable)
+  TEMPERATURE_OVERRIDE  Override temperature (default: 0; set empty to disable)
+  LLM_TIMEOUT_MS    Override LLM timeout in ms (default: 36000000)
+  TOOL_TIMEOUT_MS   Override tool timeout in ms (default: 36000000)
   -h, --help        Show help
 EOF
 }
@@ -2810,6 +2818,15 @@ run_agent() {
   local override_args=()
   if [[ -n "${MODEL_OVERRIDE}" ]]; then
     override_args=(--override "models=${MODEL_OVERRIDE}")
+  fi
+  if [[ -n "${TEMPERATURE_OVERRIDE}" ]]; then
+    override_args+=(--override "temperature=${TEMPERATURE_OVERRIDE}")
+  fi
+  if [[ -n "${LLM_TIMEOUT_MS}" ]]; then
+    override_args+=(--override "llmTimeout=${LLM_TIMEOUT_MS}")
+  fi
+  if [[ -n "${TOOL_TIMEOUT_MS}" ]]; then
+    override_args+=(--override "toolTimeout=${TOOL_TIMEOUT_MS}")
   fi
   run "${AI_AGENT_BIN}" \
     --verbose \
