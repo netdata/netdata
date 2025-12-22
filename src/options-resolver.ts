@@ -243,8 +243,8 @@ export function resolveEffectiveOptions(args: {
 
   const out: ResolvedEffectiveOptions = {
     // Use readNullableNum for parameters that support "null" = don't send
-    // New defaults: temperature=0.0, topP/topK/repeatPenalty=null (don't send)
-    temperature: readNullableNum('temperature', fm?.temperature, 0.0),
+    // New defaults: temperature=0.2, topP/topK/repeatPenalty=null (don't send)
+    temperature: readNullableNum('temperature', fm?.temperature, 0.2),
     topP: readNullableNum('topP', fm?.topP, null),
     topK: ((): number | null => {
       const v = readNullableNum('topK', fm?.topK, null);

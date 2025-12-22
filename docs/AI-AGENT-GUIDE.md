@@ -69,7 +69,7 @@
 | `maxRetries` | int | `3` | Provider/model attempts per turn. |
 | `llmTimeout` | ms | `600000` | Reset per streamed chunk. |
 | `toolTimeout` | ms | `300000` | Per tool call timeout. |
-| `temperature` | number | `0.0` | Clamped `0-2`. |
+| `temperature` | number | `0.2` | Clamped `0-2`. |
 | `topP` | number or null | `null` | `0-1`; `null` omits the parameter. |
 | `topK` | int or null | `null` | `>=1`; `null` omits the parameter. |
 | `maxOutputTokens` | int | `16384` | `undefined` disables explicit cap. |
@@ -534,7 +534,7 @@ OpenAI‑compatible providers enable `includeUsage` for streaming token usage by
 
 | Knob | Default |
 | --- | --- |
-| `temperature` | `0.0` |
+| `temperature` | `0.2` |
 | `topP` | `null` |
 | `topK` | `null` |
 | `maxOutputTokens` | `16384` |

@@ -10936,7 +10936,7 @@ BASE_TEST_SCENARIOS.push({
 BASE_TEST_SCENARIOS.push({
   id: 'run-test-invalid-final-report-at-max-turns',
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
-    sessionConfig.maxTurns = 3;
+    sessionConfig.maxTurns = 6;
     sessionConfig.maxRetries = 2;
     return await runWithPatchedExecuteTurn(sessionConfig, ({ request }) => {
       const turnIndex = request.turnMetadata?.turn ?? 1;
@@ -11849,8 +11849,9 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(!result.success, 'Progress-only turns should eventually fail without final report');
-    // The session fails with retries_exhausted when maxTurns is reached without a final_report.
-    expectTurnFailureContains(result.logs, 'run-test-task-status-standalone-second', ['retries_exhausted', 'no_tools', 'final_report_missing']);
+    invariant(result.finalReport !== undefined, 'Synthetic final report expected when progress-only turns exhaust maxTurns.');
+    const failureLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FAILURE_REPORT);
+    invariant(failureLog !== undefined, 'Failure report log expected when progress-only turns exhaust maxTurns.');
   },
 } satisfies HarnessTest);
 
@@ -11860,7 +11861,7 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.maxTurns = 3;
     sessionConfig.maxRetries = 1;
     return await runWithPatchedExecuteTurn(sessionConfig, ({ invocation }) => {
-      if (invocation === 1 || invocation === 2) {
+      if (invocation >= 1 && invocation <= 5) {
         return Promise.resolve({
           status: { type: 'success', hasToolCalls: true, finalAnswer: false },
           latencyMs: 5,
@@ -11876,7 +11877,7 @@ BASE_TEST_SCENARIOS.push({
           executionStats: { executedTools: 1, executedNonProgressBatchTools: 0, executedProgressBatchTools: 1, unknownToolEncountered: false },
         });
       }
-      const toolCallId = 'final-report-call-3';
+      const toolCallId = 'final-report-call-6';
       return Promise.resolve({
         status: { type: 'success', hasToolCalls: true, finalAnswer: true },
         latencyMs: 5,
@@ -11931,8 +11932,9 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(!result.success, 'Task status with completed (but no final_report) should fail');
-    // The task_status_completed slug requires actual tool execution, so we verify fallback behavior
-    expectTurnFailureContains(result.logs, 'run-test-task-status-completed', ['retries_exhausted', 'no_tools', 'final_report_missing']);
+    invariant(result.finalReport !== undefined, 'Synthetic final report expected when task_status completed without final_report.');
+    const failureLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FAILURE_REPORT);
+    invariant(failureLog !== undefined, 'Failure report log expected when task_status completed without final_report.');
   },
 } satisfies HarnessTest);
 

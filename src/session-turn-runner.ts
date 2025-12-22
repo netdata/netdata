@@ -469,8 +469,12 @@ export class TurnRunner {
                 // Note: cycleIndex/cycleComplete tracking removed during extraction - may need to be reinstated
                 let forcedFinalTurn = this.forcedFinalTurnReason !== undefined;
                 let isFinalTurn = forcedFinalTurn || currentTurn === maxTurns;
+                let deferTaskStatusOnlyFinal = false;
                 const syncFinalTurnFlags = () => {
                     if (!forcedFinalTurn && this.forcedFinalTurnReason !== undefined) {
+                        if (this.forcedFinalTurnReason === 'task_status_only' && deferTaskStatusOnlyFinal) {
+                            return;
+                        }
                         forcedFinalTurn = true;
                         isFinalTurn = true;
                     }
@@ -1510,8 +1514,9 @@ export class TurnRunner {
         const nextProgressOnlyTurns = hasProgressOnly ? (this.state.consecutiveProgressOnlyTurns ?? 0) + 1 : 0;
         this.state.consecutiveProgressOnlyTurns = nextProgressOnlyTurns;
 
-        if (nextProgressOnlyTurns >= 2 && this.forcedFinalTurnReason === undefined) {
+        if (nextProgressOnlyTurns >= 5 && this.forcedFinalTurnReason === undefined) {
             this.ctx.contextGuard.setTaskStatusOnlyReason();
+            deferTaskStatusOnlyFinal = true;
             this.log({
                 timestamp: Date.now(),
                 severity: 'WRN' as const,
@@ -1522,7 +1527,7 @@ export class TurnRunner {
                 remoteIdentifier: REMOTE_ORCHESTRATOR,
                 fatal: false,
                 message: 'Consecutive standalone task_status calls detected; forcing final turn.',
-                details: { consecutiveProgressOnlyTurns: nextProgressOnlyTurns },
+                details: { consecutiveProgressOnlyTurns: nextProgressOnlyTurns, threshold: 5 },
             });
         }
 
@@ -3500,16 +3505,25 @@ export class TurnRunner {
             if (result.status.type !== 'success') {
                 addSpanAttributes({ 'ai.llm.status': result.status.type });
             }
+            const mergedExecutionStats = (() => {
+                const baseStats = result.executionStats ?? {
+                    executedTools: 0,
+                    executedNonProgressBatchTools: 0,
+                    executedProgressBatchTools: 0,
+                    unknownToolEncountered: false,
+                };
+                return {
+                    executedTools: baseStats.executedTools + executionState.executedTools,
+                    executedNonProgressBatchTools: baseStats.executedNonProgressBatchTools + executionState.executedNonProgressBatchTools,
+                    executedProgressBatchTools: baseStats.executedProgressBatchTools + executionState.executedProgressBatchTools,
+                    unknownToolEncountered: (baseStats.unknownToolEncountered ?? false) || executionState.unknownToolEncountered,
+                };
+            })();
             return {
                 ...result,
                 shownThinking,
                 incompleteFinalReportDetected,
-                executionStats: {
-                    executedTools: executionState.executedTools,
-                    executedNonProgressBatchTools: executionState.executedNonProgressBatchTools,
-                    executedProgressBatchTools: executionState.executedProgressBatchTools,
-                    unknownToolEncountered: executionState.unknownToolEncountered,
-                }
+                executionStats: mergedExecutionStats,
             };
         }
         catch (e) {

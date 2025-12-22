@@ -143,7 +143,7 @@ All string values in the configuration support environment variable expansion us
   "defaults": {
     "llmTimeout": 120000,
     "toolTimeout": 60000,
-    "temperature": 0.0,
+    "temperature": 0.2,
     "topP": null,
     "topK": null,
     "repeatPenalty": null,
