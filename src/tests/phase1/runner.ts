@@ -10985,7 +10985,7 @@ BASE_TEST_SCENARIOS.push({
 BASE_TEST_SCENARIOS.push({
   id: 'run-test-no-collapse-already-at-max',
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
-    sessionConfig.maxTurns = 3;
+    sessionConfig.maxTurns = 6;
     sessionConfig.maxRetries = 2;
     return await runWithPatchedExecuteTurn(sessionConfig, ({ request }) => {
       const turnIndex = request.turnMetadata?.turn ?? 1;
@@ -11858,7 +11858,7 @@ BASE_TEST_SCENARIOS.push({
 BASE_TEST_SCENARIOS.push({
   id: 'run-test-task-status-standalone-consecutive-final',
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
-    sessionConfig.maxTurns = 3;
+    sessionConfig.maxTurns = 6;
     sessionConfig.maxRetries = 1;
     return await runWithPatchedExecuteTurn(sessionConfig, ({ invocation }) => {
       if (invocation >= 1 && invocation <= 5) {
