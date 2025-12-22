@@ -294,7 +294,7 @@
   "defaults": {
     "llmTimeout": 600000,
     "toolTimeout": 300000,
-    "temperature": 0,
+    "temperature": 0.2,
     "topP": null,
     "maxOutputTokens": 8192,
     "repeatPenalty": null,
