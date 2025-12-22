@@ -220,8 +220,8 @@ When to use: looking for up to date information on any topic, available online p
 When not to use: looking for internal Netdata information - use `source-code` to examine our private repos and codebases, `github` to find issues, PRs and commits on our private repos, or the other specialized agents to access private company data, documents and code.
 
 ### bigquery
-Scope: query Netdata Cloud production data to validate customer infrastructure scale (nodes, cloud providers, Kubernetes), verify actual usage vs claims, access subscription history, per customer MRR and ARR, and identify expansion opportunities by analyzing space, node, and user data. Includes executive-level aggregations/trends (ARR, MRR, churn, subscriptions, nodes, trials) aligned with Executive Dashboard logic. The data are a few hours back.
-Input: A company name or domain name, or contact email.
+Scope: query Netdata Cloud production data to validate customer infrastructure scale (nodes, cloud providers, Kubernetes), verify actual usage vs claims, access subscription history, per customer MRR and ARR, and identify expansion opportunities by analyzing space, node, and user data. Includes executive-level aggregations/trends (ARR, MRR, churn, subscriptions, nodes, trials) aligned with Executive Dashboard logic. The data are a few hours back. This is the source of truth for all revenue, subscriptions, churn, etc.
+Input: A company name or domain name, or contact email, or a business metric like ARR/revenue/churn/subscriptions/etc.
 Output: Monitored infrastructure details.
 
 When to use: looking for any information from our production systems (individual users/customers/spaces, or revenue/ARR/churn/trends).

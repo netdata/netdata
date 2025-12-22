@@ -4,8 +4,17 @@ Neda is an AI-powered assistant that provides comprehensive business intelligenc
 
 ## Table of Contents
 
-- [Integration Options](#integration-options)
-- [Available Agents](#available-agents)
+- [Neda AI CRM Agent - User Configuration Guide](#neda-ai-crm-agent---user-configuration-guide)
+  - [Table of Contents](#table-of-contents)
+  - [Integration Options](#integration-options)
+  - [Available Agents](#available-agents)
+    - [Main Orchestrator](#main-orchestrator)
+    - [Sales \& CRM Agents](#sales--crm-agents)
+    - [Analytics \& Data Agents](#analytics--data-agents)
+    - [Technical \& Support Agents](#technical--support-agents)
+    - [Research \& Web Agents](#research--web-agents)
+    - [Messaging \& Strategy Agents](#messaging--strategy-agents)
+    - [Output Formats](#output-formats)
 - [Integration Methods](#integration-methods)
   - [Slack](#slack)
   - [Open WebUI](#open-webui)
@@ -15,15 +24,45 @@ Neda is an AI-powered assistant that provides comprehensive business intelligenc
   - [REST API Integration](#rest-api-integration)
 - [Client Configuration](#client-configuration)
   - [Claude Code](#claude-code)
+    - [Method 1: Command Line (Recommended)](#method-1-command-line-recommended)
+    - [Method 2: Configuration File](#method-2-configuration-file)
+    - [Usage](#usage)
   - [Claude Desktop](#claude-desktop)
+    - [Configuration](#configuration)
+    - [First-time Setup](#first-time-setup)
   - [Codex CLI](#codex-cli)
+    - [Configuration](#configuration-1)
   - [VS Code (GitHub Copilot)](#vs-code-github-copilot)
+    - [Configuration](#configuration-2)
   - [Python Applications (OpenAI SDK)](#python-applications-openai-sdk)
+    - [Installation](#installation)
+    - [Example Code](#example-code)
   - [JavaScript/TypeScript Applications (OpenAI SDK)](#javascripttypescript-applications-openai-sdk)
+    - [Installation](#installation-1)
+    - [Example Code](#example-code-1)
   - [Python Applications (Anthropic SDK)](#python-applications-anthropic-sdk)
+    - [Installation](#installation-2)
+    - [Example Code](#example-code-2)
   - [Shell Scripts / curl (REST API)](#shell-scripts--curl-rest-api)
-- [Testing & Verification](#testing--verification)
+    - [Health Check](#health-check)
+    - [Query Agents](#query-agents)
+    - [Shell Script Helper](#shell-script-helper)
+- [Testing \& Verification](#testing--verification)
+  - [Quick Connection Tests](#quick-connection-tests)
+    - [Test REST API](#test-rest-api)
+    - [Test MCP Endpoint](#test-mcp-endpoint)
+    - [Test OpenAI-Compatible API](#test-openai-compatible-api)
+    - [Test Anthropic-Compatible API](#test-anthropic-compatible-api)
+  - [Verify MCP Client Connection](#verify-mcp-client-connection)
+    - [Claude Code](#claude-code-1)
+    - [Test Query](#test-query)
 - [Troubleshooting](#troubleshooting)
+  - [Common Issues](#common-issues)
+    - [MCP Connection Failed](#mcp-connection-failed)
+    - ["401 Unauthorized" or Authentication Errors](#401-unauthorized-or-authentication-errors)
+    - [Slow Responses](#slow-responses)
+    - ["Agent not found" Error](#agent-not-found-error)
+    - [No Tools Available in MCP Client](#no-tools-available-in-mcp-client)
 - [Support](#support)
 
 ---
@@ -72,7 +111,6 @@ Neda provides 24 specialized agents for different business intelligence needs.
 |-------|---------|---------------|
 | `bigquery` | Netdata Cloud production data queries | "Infrastructure scale for space xyz" |
 | `posthog` | PostHog product usage analytics | "User activity for john@acme.com" |
-| `executive` | Business analytics (ARR, MRR, growth, churn) | "What is our current ARR?" |
 | `ga` | Google Analytics traffic insights | "Traffic trends last 30 days" |
 | `cloudflare` | Website performance and security analytics | "Cloudflare stats for learn.netdata.cloud" |
 | `encharge` | Email marketing analytics | "Email campaigns performance" |
@@ -605,12 +643,6 @@ curl -G "http://10.20.1.106:8800/v1/company-tech" \
 curl -G "http://10.20.1.106:8800/v1/web-research" \
   --data-urlencode "q=Latest observability trends 2024" \
   --data-urlencode "format=markdown"
-
-# Executive analytics
-curl -G "http://10.20.1.106:8800/v1/executive" \
-  --data-urlencode "q=What is our current ARR?" \
-  --data-urlencode "format=json"
-```
 
 ### Response Format
 
