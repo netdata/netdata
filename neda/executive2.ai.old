@@ -1,12 +1,9 @@
 #!/usr/bin/env ai-agent
 ---
 description: |
-  Query BigQuery production data from Netdata Cloud to validate customer infrastructure scale,
-  analyze space activity and subscription history, and derive ARR/MRR insights.
-usage: |
-  business metrics query (ARR, MRR, churn, nodes, subscriptions, trends, etc), or company domain, email, space slug/id, and time period
+  Executive BI agent (data-complete baseline).
 models:
-  - nova/neda-thinker
+  - nova/gpt-oss-20b
   - nova/neda-searcher
   - openrouter/openai/gpt-oss-120b
   - anthropic/claude-haiku-4-5

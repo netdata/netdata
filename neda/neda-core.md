@@ -80,7 +80,7 @@ Input: anything we know about a person or a company
 Output: a detailed analysis from hubspot about the customer or the prospect
 
 When to use: looking for customer communications, knowing a company name or a contact name
-When not to use: looking for aggregated statistics over a period of time (hubspot does not allow counting entries - use `executive` or `bigquery` to get aggregated stats)
+When not to use: looking for aggregated statistics over a period of time (hubspot does not allow counting entries - use `bigquery` to get aggregated stats)
 
 **Example 1**
 Input: find all information about a company called Ellusium
@@ -220,12 +220,12 @@ When to use: looking for up to date information on any topic, available online p
 When not to use: looking for internal Netdata information - use `source-code` to examine our private repos and codebases, `github` to find issues, PRs and commits on our private repos, or the other specialized agents to access private company data, documents and code.
 
 ### bigquery
-Scope: query Netdata Cloud production data to validate customer infrastructure scale (nodes, cloud providers, Kubernetes), verify actual usage vs claims, access subscription history, per customer MRR and ARR and identify expansion opportunities by analyzing space, node, and user data. The data are a few hours back.
+Scope: query Netdata Cloud production data to validate customer infrastructure scale (nodes, cloud providers, Kubernetes), verify actual usage vs claims, access subscription history, per customer MRR and ARR, and identify expansion opportunities by analyzing space, node, and user data. Includes executive-level aggregations/trends (ARR, MRR, churn, subscriptions, nodes, trials) aligned with Executive Dashboard logic. The data are a few hours back.
 Input: A company name or domain name, or contact email.
 Output: Monitored infrastructure details.
 
-When to use: looking for any information from our production systems.
-When not to use: although the backend dataset is the same, the `executive` agent knows how to do aggregations (e.g. number of users/spaces over a period of time).
+When to use: looking for any information from our production systems (individual users/customers/spaces, or revenue/ARR/churn/trends).
+When not to use: avoid this if you only need simple operational details from other systems (e.g., ticketing, conversations).
 
 **Example 1**
 Input: how many nodes and what kind of hardware the company Ellusium has?
@@ -254,32 +254,8 @@ Expected Output: comprehensive report of AI/LLM bots (ChatGPT, Claude, etc.) cra
 Input: show traffic statistics for all netdata.cloud properties for last 7 days
 Expected Output: breakdown of traffic by service category (Dashboard, API, Packages, Documentation, etc.) with request counts, percentages, and trends
 
-### executive
-Scope: Analyze business data to identify ARR, MRR, subscriptions added, churned, products used, migrations, billing info
-Operation: analyzes production data the same way the the Netdata Executive Dashboard does, to identify business performance
-Input: Anything related to business performance
-Output: metrics and related data for the question asked
-Note: executive is based on bigquery and it is a few hours back. It cannot find latest changes.
-Note: use executive for trends over whole customer segments - use bigquery for individual customer/space/email financial data
-
-**Example 1**
-Input: analyze overall churn over the last 90 days and how it has affected the company's ARR
-Expected Output: a report about explaining in detail churn and ARR progress over the last 90 days
-
-**Example 2**
-Input: find the top 3 (by ARR) customers that churned over the last 90 days
-Expected Output: the top 3 customers churned over the last 3 days
-
-**Example 3**
-Input: find the top 3 (by ARR) customers that subscribed to paid Business subscriptions over the last 90 days
-Expected Output: the top 3 business subscription customers over the last 3 days
-
 IMPORTANT: Billing in Netdata is per Netdata Cloud space, not per user or email address.
-The executive sub-agent has access to aggregated data (counts and sums) and detailed data (per space), but these are different datasets.
-If you want it to report specific customer names or spaces IDs, you have to ask for it.
-
-IMPORTANT: The executive subagent can be used for identifying specific customers or spaces that match some criteria,
-which you can then feed to other sub-agents to find users, nodes, user-activities, etc.
+The bigquery sub-agent supports both aggregated data (counts and sums) and detailed data (per space). If you want it to report specific customer names or space IDs, you have to ask for it.
 
 ### ask-netdata
 Scope: Answers questions based on Netdata's documentation.
@@ -340,7 +316,7 @@ Input: A property ID or domain and a time window (defaults to last 30 days if un
 Expected Output: Evidence-backed summaries of sessions/users, engagement, top acquisition channels and sources, key events and conversions, trends over time, and cohort/retention or funnel analyses where applicable.
 
 when to use: anything related to our websites and web apps performance
-when not use: GA4 is not the source of truth for sign-ups or spaces created, use `bigquery` or `executive` to get accurate sign up numbers
+when not use: GA4 is not the source of truth for sign-ups or spaces created, use `bigquery` to get accurate sign up numbers
 
 ### product-messaging
 Scope: Netdata's AI Product Messaging Expert performs extensive online research to find the exact messaging strategy for any customer segment, industry, or even competitor and monitoring tool
