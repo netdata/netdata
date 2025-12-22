@@ -24,7 +24,7 @@ Module: prometheus
 Track OpenWeatherMap weather data and air pollution metrics for efficient environmental monitoring and analysis.
 
 
-Metrics are gathered by periodically sending HTTP requests to [OpenWeatherMap Exporter](https://github.com/Tenzer/openweathermap-exporter).
+Metrics are gathered by periodically sending HTTP requests to [OpenWeatherMap Exporter](https://github.com/billykwooten/openweather-exporter).
 
 
 This collector is supported on all platforms.
@@ -97,7 +97,7 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Install Exporter
 
-Install [OpenWeatherMap Exporter](https://github.com/Tenzer/openweathermap-exporter) by following the instructions mentioned in the exporter README.
+Install [OpenWeatherMap Exporter](https://github.com/billykwooten/openweather-exporter) by following the instructions mentioned in the exporter README.
 
 
 
