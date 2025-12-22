@@ -807,6 +807,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "foundation"
+version = "0.1.0"
+dependencies = [
+ "tokio",
+]
+
+[[package]]
 name = "foyer"
 version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1552,6 +1559,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
+ "foundation",
  "foyer",
  "futures",
  "journal-common",
@@ -2642,6 +2650,7 @@ dependencies = [
  "async-trait",
  "bytes",
  "console-subscriber",
+ "foundation",
  "futures",
  "itoa",
  "netdata-plugin-charts-derive",

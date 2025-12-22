@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 #[derive(Debug, Clone)]
 pub struct Timeout {
     start: Instant,
-    initial_budget_us: u64,
+    budget_us: u64,
     deadline_us: Arc<AtomicU64>,
 }
 
@@ -27,7 +27,7 @@ impl Timeout {
 
         Self {
             start,
-            initial_budget_us: budget_us,
+            budget_us,
             deadline_us: Arc::new(AtomicU64::new(budget_us)),
         }
     }
@@ -58,13 +58,8 @@ impl Timeout {
     /// calling reset() will give the operation another 10s (deadline becomes t=15s).
     pub fn reset(&self) {
         let elapsed_us = self.start.elapsed().as_micros() as u64;
-        let new_deadline_us = elapsed_us + self.initial_budget_us;
-        self.deadline_us.store(new_deadline_us, Ordering::Relaxed);
-    }
-
-    /// Get the elapsed time since the timeout was created.
-    pub fn elapsed(&self) -> Duration {
-        self.start.elapsed()
+        let deadline_us = elapsed_us + self.budget_us;
+        self.deadline_us.store(deadline_us, Ordering::Relaxed);
     }
 }
 

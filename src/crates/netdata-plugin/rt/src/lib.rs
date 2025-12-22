@@ -131,6 +131,9 @@ pub use netdata_env::{LogFormat, LogLevel, LogMethod, NetdataEnv, SyslogFacility
 mod tracing_setup;
 pub use tracing_setup::init_tracing;
 
+// Re-export foundational utilities
+pub use foundation::Timeout;
+
 /// Internal control signals sent to running functions.
 enum RuntimeSignal {
     /// Signal to request progress update from a running function.

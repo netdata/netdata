@@ -7,8 +7,8 @@
 use crate::{
     cache::{FileIndexCache, FileIndexKey},
     error::{EngineError, Result},
-    timeout::Timeout,
 };
+use foundation::Timeout;
 use journal_index::{FieldName, FileIndex, FileIndexer, Seconds};
 use journal_registry::Registry;
 use tracing::{debug, error};

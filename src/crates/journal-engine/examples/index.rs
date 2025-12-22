@@ -31,8 +31,9 @@
 // echo "259:0 rbps=10485760 wbps=10485760" | sudo tee /sys/fs/cgroup/slow-io/io.max
 
 use journal_engine::{
-    Facets, FileIndexCacheBuilder, FileIndexKey, Timeout, batch_compute_file_indexes,
+    Facets, FileIndexCacheBuilder, FileIndexKey, batch_compute_file_indexes,
 };
+use foundation::Timeout;
 use journal_index::FieldName;
 use journal_registry::{Monitor, Registry};
 use std::env;
