@@ -10,9 +10,9 @@ To ensure accessibility for every member on your engineering team, we created th
 
 ### Creating production-ready alerts
 
-All you have to do to create production-ready alerts, is to simply describe your goal in plain English. For example, if you want to get ahead of a disk filling up:
+All you have to do to create production-ready alerts is to simply describe your goal in plain English. For example, if you want to get ahead of a disk filling up:
 
-**"Create an alert that warns me when a disk will be more than 85% full in the next 24 hours, and goes critical if it will be more than 95% full."**
+**"Create an alert that warns me when a disk will be more than 85% full in the next 24 hours, and goes critical if it is more than 95% full."**
 
 Netdata AI translates your request into a perfectly formatted, syntactically correct alert definition and presents it for your review.
 
@@ -53,6 +53,7 @@ You'll find these new AI capabilities directly within the alert configuration wo
 **Step 3:** Describe the alert you want to create
 
 You can now seamlessly:
+
 - Create alerts using natural language
 - Get AI suggestions for what to monitor
 - Explain existing alerts
@@ -63,7 +64,7 @@ Click on **"New Alert"** from the alerts tab to access the AI-powered alert crea
 
 ### Alternative: Manual configuration
 
-You always have the option to use the manual dynamic configuration alert wizard, which gives you full control over every parameter.
+You can always use the manual dynamic configuration alert wizard, which gives you full control over every parameter.
 
 ## Requirements
 
@@ -79,11 +80,10 @@ This feature is available today for all users on a Business plan or a free trial
 - [Alert Troubleshooting](/docs/troubleshooting/troubleshoot.md) - AI-powered alert investigation
 - [Netdata AI Overview](/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md) - Complete AI capabilities guide
 
-
 By letting Netdata AI handle the syntactic complexity, we're lowering the barrier to entry for effective alerting and freeing up your team to focus on what matters: building reliable, high-performance systems.
 
 :::note
 
-Despite our best efforts to eliminate inaccuracies, AI responses may sometimes be incorrect. Please review generated configurations before deploying to production systems.
+Despite our best efforts to reduce inaccuracies, AI responses may sometimes be incorrect. Please review generated configurations before deploying to production systems.
 
 :::
