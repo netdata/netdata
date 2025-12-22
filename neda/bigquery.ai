@@ -55,6 +55,21 @@ Users may not explicitly ask using the right terminology. Use this table to map 
 | Top 10 ARR gains/losses by customer/space | use `space_arr_delta_top10` (single SQL); return all rows from SQL (top 10 positive + top 10 negative) |
 | Top 10 nodes gained/lost (Business/Homelab) | use `space_nodes_delta_top10_business` / `space_nodes_delta_top10_homelab` verbatim; return all rows from SQL |
 | ARR change between T0 and T1 (components) | use `realized_arr_kpi_delta_window` verbatim; do not rename `*_delta` keys |
+
+Product taxonomy (use these definitions when interpreting user intent):
+- Business
+- Homelab
+- Business Trial (free for 14 days; after trial ends, defaults to Community unless user upgrades to Business or Homelab)
+- Community (free)
+- AI credits (add-on to Business or Homelab; not a standalone plan)
+
+Signup / churn terminology (must follow exactly):
+- "Users signed up" = all spaces (Business + Homelab + Business Trial + Community). **Do not** filter unless the user explicitly requests paid/free.
+- "Spaces signed up" = all spaces (Business + Homelab + Business Trial + Community). **Do not** filter unless the user explicitly requests paid/free.
+- "Customers signed up" = paying spaces only (Business + Homelab). If the user specifies Business or Homelab, filter accordingly.
+- "Churned customers" = paying spaces that transitioned to Community (paid → free).
+- "Deleted spaces" = deleted Community spaces (free-only deletions).
+- "Customers" always means paying spaces (Business + Homelab) unless the user explicitly includes trials or free.
 - "Latest/now/most recent realized ARR" (optionally with a date window) → use the realized ARR **stat** template (last non-null, `ORDER BY date DESC LIMIT 1`); return a single row, not a per-day series.
 - "Latest/now/most recent realized ARR" (optionally with a date window) → use the realized ARR **stat** template (last non-null, `ORDER BY date DESC LIMIT 1`); return a single row, not a per-day series. If the query returns multiple rows, sort by date DESC and drop all but the first before emitting JSON (schemas with `maxItems: 1` **must** end with one element).
 
