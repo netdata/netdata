@@ -239,18 +239,9 @@ static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
     SSL* ssl = X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
     mqtt_wss_client client = SSL_get_ex_data(ssl, 0);
 
-    // TODO handle depth as per https://www.openssl.org/docs/man1.0.2/man3/SSL_CTX_set_verify.html
-
     if (!preverify_ok) {
         err = X509_STORE_CTX_get_error(ctx);
-        int depth = X509_STORE_CTX_get_error_depth(ctx);
-        X509* err_cert = X509_STORE_CTX_get_current_cert(ctx);
-        char* err_str = X509_NAME_oneline(X509_get_subject_name(err_cert), NULL, 0);
-
-        nd_log(NDLS_DAEMON, NDLP_ERR, "verify error:num=%d:%s:depth=%d:%s", err,
-                 X509_verify_cert_error_string(err), depth, err_str);
-
-        freez(err_str);
+        netdata_ssl_log_verify_error(ctx);
     }
 
     if (!preverify_ok && err == X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT &&

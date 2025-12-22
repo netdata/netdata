@@ -858,3 +858,25 @@ int ssl_security_location_for_context(SSL_CTX *ctx, const char *file, const char
 
     return 0;
 }
+
+void netdata_ssl_log_verify_error(X509_STORE_CTX *ctx) {
+    int err = X509_STORE_CTX_get_error(ctx);
+    int depth = X509_STORE_CTX_get_error_depth(ctx);
+    X509 *err_cert = X509_STORE_CTX_get_current_cert(ctx);
+
+    BIO *bio = BIO_new(BIO_s_mem());
+    if (bio) {
+        X509_NAME_print_ex(bio, X509_get_subject_name(err_cert), 0, XN_FLAG_ONELINE);
+        char *data = NULL;
+        long len = BIO_get_mem_data(bio, &data);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "SSL: certificate verify error %d:%s at depth %d, subject: %.*s",
+               err, X509_verify_cert_error_string(err), depth, (int)len, data);
+        BIO_free(bio);
+    }
+    else {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "SSL: certificate verify error %d:%s at depth %d",
+               err, X509_verify_cert_error_string(err), depth);
+    }
+}
