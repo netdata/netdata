@@ -17,6 +17,7 @@
 #   ./neda/bigquery-test.sh --fail-fast           # stop on first failure (default)
 #   ./neda/bigquery-test.sh --jobs 3              # run up to 3 cases in parallel
 #   ./neda/bigquery-test.sh --only-case realized_arr  # run a single case
+#   MODEL_OVERRIDE=nova/gpt-oss-20b ./neda/bigquery-test.sh  # override model used by ai-agent
 #
 set -euo pipefail
 
@@ -67,6 +68,7 @@ TO_DATE="${TO_DATE:-$(date -I -d '1 day ago')}"
 
 AI_AGENT_BIN="${AI_AGENT_BIN:-${SCRIPT_DIR}/../ai-agent}"
 SYSTEM_PROMPT="${SYSTEM_PROMPT:-${SCRIPT_DIR}/bigquery.ai}"
+MODEL_OVERRIDE="${MODEL_OVERRIDE:-nova/gpt-oss-20b}"
 
 OUT_DIR="${OUT_DIR:-${SCRIPT_DIR}/../tmp/bigquery-tests}"
 run mkdir -p "${OUT_DIR}"
@@ -86,6 +88,7 @@ Usage: ./neda/bigquery-test.sh [--continue|--fail-fast] [--jobs N] [--only-case 
   --fail-fast       Stop on first failure (default)
   --jobs N          Run up to N cases in parallel (default: 1)
   --only-case NAME  Run a single case by name (same as ONLY_CASE env)
+  MODEL_OVERRIDE    Override model used by ai-agent (default: nova/gpt-oss-20b; set empty to disable)
   -h, --help        Show help
 EOF
 }
@@ -2804,12 +2807,17 @@ run_bq() {
 
 run_agent() {
   local out_file="$1" schema_file="$2" question="$3"
+  local override_args=()
+  if [[ -n "${MODEL_OVERRIDE}" ]]; then
+    override_args=(--override "models=${MODEL_OVERRIDE}")
+  fi
   run "${AI_AGENT_BIN}" \
     --verbose \
     "${SYSTEM_PROMPT}" \
     --no-stream \
     --format json \
     --schema "@${schema_file}" \
+    "${override_args[@]}" \
     "Return ONLY valid JSON matching the provided schema (no prose, no extra keys). ${question}" \
     >"${out_file}"
 }

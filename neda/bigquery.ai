@@ -6,7 +6,7 @@ description: |
 usage: |
   business metrics query (ARR, MRR, churn, nodes, subscriptions, trends, etc), or company domain, email, space slug/id, and time period
 models:
-  - nova/neda-thinker
+#  - nova/neda-thinker
   - nova/neda-searcher
   - openrouter/openai/gpt-oss-120b
   - anthropic/claude-haiku-4-5
