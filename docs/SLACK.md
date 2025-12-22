@@ -754,7 +754,15 @@ When emitting `slack-block-kit`, the text inside `section` and `context` blocks 
 - Links must use Slack format: `<https://example.com|link text>` — do not use `[text](url)`.
 - Escape special characters in text: `&` → `&amp;`, `<` → `&lt;`, `>` → `&gt;`.
 - Tables are **not** allowed in mrkdwn. For 2-column layouts, use Block Kit `section.fields` (max 10 fields) instead of Markdown tables.
+- Section blocks may include **both** `text` and `fields` (Slack allows this); `text` is optional when fields are present.
 - Avoid HTML, Mermaid fences, or raw JSON inside text blocks.
+
+**Automatic repair + validation**
+- Slack mrkdwn is sanitized on output (Markdown headings/links/strikethrough → mrkdwn equivalents, `**` → `*`, `~~` → `~`, code-fence language stripped).
+- `& < >` are escaped unless part of Slack entities (`<@U...>`, `<#C...>`, `<url|text>`).
+- Markdown tables are converted to code blocks.
+- Slack Block Kit parsing accepts either a top-level array or `{ "messages": [...] }` and normalizes to the array before validation.
+- Output is validated against a strict Block Kit schema; if it still fails, a safe single-section fallback message is emitted.
 
 ### Concurrency Control
 

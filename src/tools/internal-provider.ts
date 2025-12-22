@@ -21,6 +21,7 @@ import {
   TASK_STATUS_TOOL_BATCH_RULES,
   TASK_STATUS_TOOL_INSTRUCTIONS,
 } from '../llm-messages.js';
+import { normalizeSlackMessages, SLACK_BLOCK_KIT_SCHEMA } from '../slack-block-kit.js';
 import { truncateToBytes } from '../truncation.js';
 import { parseJsonRecord, parseJsonValueDetailed } from '../utils.js';
 
@@ -589,156 +590,33 @@ export class InternalToolProvider extends ToolProvider {
           this.opts.logError('final_report(slack-block-kit) requires `messages` or non-empty `content`.');
           throw new Error('final_report(slack-block-kit) requires `messages` or non-empty `content`.');
         }
-        const repairedMessages: Record<string, unknown>[] = (() => {
-          const normalizeMrkdwn = (input: string): string => {
-            if (input.includes('**')) {
-              const pairs = (input.match(/\*\*/g) ?? []).length;
-              if (pairs >= 2) return input.replace(/\*\*([^\*]+)\*\*/g, '*$1*');
-            }
-            return input;
-          };
-          const clamp = (s: unknown, max: number): string => {
-            const raw = typeof s === 'string' ? s : (typeof s === 'number' || typeof s === 'boolean') ? String(s) : '';
-            const normalized = normalizeMrkdwn(raw);
-            return normalized.length <= max ? normalized : `${normalized.slice(0, Math.max(0, max - 1))}…`;
-          };
-          const toMrkdwn = (v: unknown, max: number) => ({ type: 'mrkdwn', text: clamp(v, max) });
-          const asArr = (v: unknown): unknown[] => {
-            if (Array.isArray(v)) return v;
-            const str = asString(v);
-            if (str !== undefined && (str.startsWith('[') || str.startsWith('{'))) {
-              const parsed = safeParseJson(str);
-              if (Array.isArray(parsed)) return parsed;
-              if (isObj(parsed)) return [parsed];
-            }
-            return [];
-          };
-          const coerceBlock = (b: unknown): Record<string, unknown> | undefined => {
-            if (typeof b === 'string') {
-              const trimmed = asString(b);
-              if (trimmed !== undefined) {
-                const parsed = safeParseJson(trimmed);
-                if (isObj(parsed)) return coerceBlock(parsed);
-                if (Array.isArray(parsed)) {
-                  return parsed.map(coerceBlock).find((x) => x !== undefined);
-                }
-                const text = clamp(trimmed, 2900);
-                return text.length > 0 ? { type: 'section', text: { type: 'mrkdwn', text } } : undefined;
-              }
-            }
-            if (typeof b !== 'object' || b === null) {
-              const text = clamp(b, 2900);
-              return text.length > 0 ? { type: 'section', text: { type: 'mrkdwn', text } } : undefined;
-            }
-            const blk = isObj(b) ? b : {};
-            const bb = blk as { type?: unknown; text?: unknown; elements?: unknown; fields?: unknown };
-            const typ: string = (typeof bb.type === 'string') ? bb.type : '';
-            if (typ === 'divider') return { type: 'divider' };
-            if (typ === 'header') {
-              const raw = isObj(bb.text) ? (bb.text as { text?: unknown }).text : bb.text;
-              return { type: 'header', text: { type: 'plain_text', text: clamp(raw, 150) } };
-            }
-            if (typ === 'context') {
-              const elems = asArr(bb.elements).map((e) => toMrkdwn(isObj(e) ? (e as { text?: unknown }).text : e, 2000)).slice(0, 10);
-              if (elems.length === 0) return undefined;
-              return { type: 'context', elements: elems };
-            }
-            const textObj = isObj(bb.text) ? (bb.text as { text?: unknown }) : undefined;
-            const rawText = (textObj?.text !== undefined ? textObj.text : bb.text);
-            const fields = asArr(bb.fields).map((f) => toMrkdwn(isObj(f) ? (f as { text?: unknown }).text : f, 2000)).slice(0, 10);
-            const out: Record<string, unknown> = { type: 'section' };
-            const t = clamp(rawText, 2900);
-            const mergedFieldText = fields
-              .map((f) => (typeof f.text === 'string' ? f.text : ''))
-              .filter((s) => s.length > 0)
-              .join('\n');
-            if (mergedFieldText.length > 0) {
-              const combined = [t, mergedFieldText].filter((s) => s.length > 0).join('\n');
-              if (combined.length > 0) (out).text = { type: 'mrkdwn', text: clamp(combined, 2900) } as unknown;
-            } else if (t.length > 0) {
-              (out).text = { type: 'mrkdwn', text: t } as unknown;
-            }
-            if ((out as { text?: unknown }).text === undefined) return undefined;
-            return out;
-          };
-          const coerceMsg = (m: unknown): Record<string, unknown> | undefined => {
-            if (typeof m === 'string') {
-              const trimmed = asString(m);
-              if (trimmed !== undefined) {
-                const parsed = safeParseJson(trimmed);
-                if (isObj(parsed) || Array.isArray(parsed)) return coerceMsg(parsed);
-                const block = coerceBlock(trimmed);
-                return block !== undefined ? { blocks: [block] } : undefined;
-              }
-            }
-            const msg = isObj(m) ? m : {};
-            const mm = msg as { blocks?: unknown };
-            const blocksSource = mm.blocks !== undefined ? mm.blocks : msg;
-            const blocks = asArr(blocksSource)
-              .map(coerceBlock)
-              .filter((x): x is Record<string, unknown> => x !== undefined)
-              .slice(0, 50);
-            if (blocks.length === 0) return undefined;
-            return { blocks };
-          };
-          return normalizedMessages
-            .map(coerceMsg)
-            .filter((x): x is Record<string, unknown> => x !== undefined)
-            .slice(0, 20);
-        })();
-        const slackSchema: Record<string, unknown> = {
-          type: 'array', minItems: 1, maxItems: 20,
-          items: {
-            type: 'object', additionalProperties: true, required: ['blocks'],
-            properties: {
-              blocks: {
-                type: 'array', minItems: 1, maxItems: 50,
-                items: {
-                  oneOf: [
-                    { type: 'object', additionalProperties: true, required: ['type','text'], properties: { type: { const: 'section' }, text: { type: 'object', additionalProperties: true, required: ['type','text'], properties: { type: { const: 'mrkdwn' }, text: { type: 'string', maxLength: 2900 } } }, fields: { type: 'array', maxItems: 10, items: { type: 'object', additionalProperties: true, required: ['type','text'], properties: { type: { const: 'mrkdwn' }, text: { type: 'string', maxLength: 2000 } } } } } },
-                    { type: 'object', additionalProperties: true, required: ['type','fields'], properties: { type: { const: 'section' }, fields: { type: 'array', maxItems: 10, items: { type: 'object', additionalProperties: true, required: ['type','text'], properties: { type: { const: 'mrkdwn' }, text: { type: 'string', maxLength: 2000 } } } } } },
-                    { type: 'object', additionalProperties: true, required: ['type'], properties: { type: { const: 'divider' } } },
-                    { type: 'object', additionalProperties: true, required: ['type','text'], properties: { type: { const: 'header' }, text: { type: 'object', additionalProperties: true, required: ['type','text'], properties: { type: { const: 'plain_text' }, text: { type: 'string', maxLength: 150 } } } } },
-                    { type: 'object', additionalProperties: true, required: ['type','elements'], properties: { type: { const: 'context' }, elements: { type: 'array', minItems: 1, maxItems: 10, items: { type: 'object', additionalProperties: true, required: ['type','text'], properties: { type: { const: 'mrkdwn' }, text: { type: 'string', maxLength: 2000 } } } } } }
-                  ]
-                }
-              }
-            }
-          }
-        };
+        const slackSchema = getFormatSchema(SLACK_BLOCK_KIT_FORMAT) ?? SLACK_BLOCK_KIT_SCHEMA;
+        const normalization = normalizeSlackMessages(normalizedMessages, { fallbackText: typeof content === 'string' ? content : undefined });
+        const repairedMessages = normalization.messages;
+        if (normalization.repairs.length > 0) {
+          this.opts.logError(`agent__final_report slack-block-kit mrkdwn repaired via [${normalization.repairs.join('>')}]`);
+        }
+        if (repairedMessages.length === 0) {
+          this.opts.logError('final_report(slack-block-kit) produced empty messages after repair.');
+          throw new Error('final_report(slack-block-kit) produced empty messages after repair.');
+        }
         try {
           const validate = this.ajv.compile(slackSchema);
           let ok = validate(repairedMessages);
           let finalMsgs: Record<string, unknown>[] = repairedMessages;
-          if (!ok) { ok = validate(normalizedMessages); finalMsgs = normalizedMessages; }
+          if (!ok) {
+            const fallback = normalizeSlackMessages([], { fallbackText: 'Invalid Slack output. Falling back to sanitized text.' });
+            const fallbackOk = validate(fallback.messages);
+            if (fallbackOk) {
+              finalMsgs = fallback.messages;
+              this.opts.logError('slack-block-kit validation failed; using fallback message.');
+              ok = true;
+            }
+          }
           if (!ok) {
             const errsArr = Array.isArray(validate.errors) ? (validate.errors as AjvErrorObject[]) : [];
             const errs = errsArr.map((error) => `${error.instancePath} ${error.message ?? ''}`.trim()).join('; ');
-            const samples = errsArr
-              .map((error) => {
-                const path = typeof error.instancePath === 'string' ? error.instancePath : '';
-                const match = /^\/(\d+)\/blocks\/(\d+)/.exec(path);
-                if (match === null) return undefined;
-                const msgIdx = Number.parseInt(match[1], 10);
-                const blockIdx = Number.parseInt(match[2], 10);
-                if (!Number.isFinite(msgIdx) || !Number.isFinite(blockIdx)) return undefined;
-                const msg = Array.isArray(finalMsgs) && msgIdx >= 0 && msgIdx < finalMsgs.length ? finalMsgs[msgIdx] : undefined;
-                if (msg === undefined) return undefined;
-                const msgRecord = msg;
-                const blocksValueUnknown = Object.prototype.hasOwnProperty.call(msgRecord, 'blocks') ? msgRecord.blocks : undefined;
-                if (!Array.isArray(blocksValueUnknown) || blockIdx < 0 || blockIdx >= blocksValueUnknown.length) return undefined;
-                const blocksValue = blocksValueUnknown as unknown[];
-                const block = blocksValue[blockIdx];
-                try {
-                  const json = JSON.stringify(block);
-                  return `${path}=${json.slice(0, 300)}`;
-                } catch {
-                  return `${path}=[unserializable block]`;
-                }
-              })
-              .filter((v): v is string => typeof v === 'string' && v.length > 0);
-            const sampleStr = samples.length > 0 ? ` samples: ${samples.join(' | ')}` : '';
-            throw new Error(`slack_invalid_blocks: ${errs}${sampleStr}`);
+            throw new Error(`slack_invalid_blocks: ${errs}`);
           }
           normalizedMessages.splice(0, normalizedMessages.length, ...finalMsgs);
         } catch (error) {
@@ -746,6 +624,7 @@ export class InternalToolProvider extends ToolProvider {
           this.opts.logError(msg);
           throw new Error(msg);
         }
+        content = JSON.stringify(normalizedMessages);
         const metaBase: Record<string, unknown> = (metadata ?? {});
         const slackVal = (metaBase as Record<string, unknown> & { slack?: unknown }).slack;
         const slackExisting: Record<string, unknown> = (slackVal !== undefined && slackVal !== null && typeof slackVal === 'object' && !Array.isArray(slackVal)) ? (slackVal as Record<string, unknown>) : {};

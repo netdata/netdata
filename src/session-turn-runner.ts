@@ -46,10 +46,12 @@ import {
   isXmlFinalReportTagName,
   isUnknownToolFailureMessage,
   RETRY_EXHAUSTION_FINAL_MESSAGE,
+  TASK_STATUS_ONLY_FINAL_MESSAGE,
   TASK_STATUS_COMPLETED_FINAL_MESSAGE,
   toolReminderMessage,
   turnFailedPrefix,
 } from './llm-messages.js';
+import { normalizeSlackMessages, parseSlackBlockKitPayload } from './slack-block-kit.js';
 import { addSpanAttributes, addSpanEvent, recordContextGuardMetrics, recordFinalReportMetrics, recordLlmMetrics, recordRetryCollapseMetrics, runWithSpan } from './telemetry/index.js';
 import { processLeakedToolCalls } from './tool-call-fallback.js';
 import { truncateToBytes } from './truncation.js';
@@ -59,6 +61,28 @@ import { XmlFinalReportFilter } from './xml-transport.js';
 const TOOL_FAILED_PREFIX = '(tool failed:';
 const TEXT_EXTRACTION_REMOTE_ID = 'agent:text-extraction';
 const FINAL_REPORT_SOURCE_TOOL_MESSAGE: FinalReportSource = 'tool-message';
+const JSON_PARSE_ERROR_MAX = 200;
+
+const formatJsonParseHint = (error?: string): string => {
+  if (error === undefined || error.trim().length === 0) {
+    return 'unable to parse JSON (check quotes/braces)';
+  }
+  const trimmed = error.replace(/\s+/g, ' ').trim();
+  if (trimmed === 'empty') return 'empty JSON payload';
+  if (trimmed === 'non_string') return 'non-string JSON payload';
+  if (trimmed === 'parse_failed') return 'unable to parse JSON (check quotes/braces)';
+  if (trimmed === 'expected_json_object') return 'expected a JSON object';
+  if (trimmed === 'missing_json_payload') return 'missing JSON payload';
+  return trimmed.length > JSON_PARSE_ERROR_MAX ? `${trimmed.slice(0, JSON_PARSE_ERROR_MAX - 3)}...` : trimmed;
+};
+
+const buildInvalidJsonFailure = (base: string, error?: string): string => (
+  `${base} invalid_json: ${formatJsonParseHint(error)}`
+);
+
+const buildSchemaMismatchFailure = (errors: string, preview?: string): string => (
+  `schema_mismatch: ${errors}${preview !== undefined ? ` (preview: ${preview})` : ''}`
+);
 
 /**
  * Immutable configuration and collaborators passed to TurnRunner
@@ -155,10 +179,11 @@ interface TurnRunnerState {
   pendingCtxTokens?: number;
   newCtxTokens?: number;
   schemaCtxTokens?: number;
-  forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'retry_exhaustion';
+  forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion';
   lastTurnError?: string;
   lastTurnErrorType?: string;
   lastTaskStatusCompleted?: boolean;
+  consecutiveProgressOnlyTurns?: number;
 }
 
 // Static constants (non-LLM-facing)
@@ -213,6 +238,7 @@ export class TurnRunner {
             finalReportInvalidFormat: false,
             finalReportSchemaFailed: false,
             lastTaskStatusCompleted: undefined,
+            consecutiveProgressOnlyTurns: 0,
         };
     }
     private resetStreamedOutputTail(): void {
@@ -579,6 +605,9 @@ export class TurnRunner {
                             case 'task_status_completed':
                                 finalInstruction = TASK_STATUS_COMPLETED_FINAL_MESSAGE;
                                 break;
+                            case 'task_status_only':
+                                finalInstruction = TASK_STATUS_ONLY_FINAL_MESSAGE;
+                                break;
                             case 'retry_exhaustion':
                                 finalInstruction = RETRY_EXHAUSTION_FINAL_MESSAGE;
                                 break;
@@ -593,11 +622,13 @@ export class TurnRunner {
                         });
                     }
                     if (isFinalTurn) {
-                        let logReason: 'context' | 'max_turns' | 'task_status_completed' | 'retry_exhaustion' = 'max_turns';
+                        let logReason: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion' = 'max_turns';
                         if (this.forcedFinalTurnReason === 'context') {
                             logReason = 'context';
                         } else if (this.forcedFinalTurnReason === 'task_status_completed') {
                             logReason = 'task_status_completed';
+                        } else if (this.forcedFinalTurnReason === 'task_status_only') {
+                            logReason = 'task_status_only';
                         } else if (this.forcedFinalTurnReason === 'retry_exhaustion') {
                             logReason = 'retry_exhaustion';
                         }
@@ -1134,6 +1165,7 @@ export class TurnRunner {
                                     const jsonSource = rawPayload
                                         ?? (typeof contentJsonCandidate === 'string' ? contentJsonCandidate : undefined)
                                         ?? contentParam;
+                                    let jsonParseError: string | undefined;
                                     if (jsonSource !== undefined) {
                                         const parsedJson = parseJsonValueDetailed(jsonSource);
                                         if (parsedJson.value !== undefined && parsedJson.value !== null && typeof parsedJson.value === 'object' && !Array.isArray(parsedJson.value)) {
@@ -1151,15 +1183,29 @@ export class TurnRunner {
                                                     message: `agent__final_report JSON payload repaired via [${parsedJson.repairs.join('>')}]`,
                                                 });
                                             }
+                                        } else {
+                                            jsonParseError = parsedJson.error ?? 'expected_json_object';
                                         }
                                     } else if (contentJsonCandidate !== null && typeof contentJsonCandidate === 'object' && !Array.isArray(contentJsonCandidate)) {
                                         // Native: content_json already parsed as object
                                         contentJson = contentJsonCandidate as Record<string, unknown>;
                                     }
                                     if (contentJson === undefined) {
-                                        this.addTurnFailure(FINAL_REPORT_JSON_REQUIRED);
+                                        const parseHint = buildInvalidJsonFailure(FINAL_REPORT_JSON_REQUIRED, jsonParseError ?? 'missing_json_payload');
+                                        this.log({
+                                            timestamp: Date.now(),
+                                            severity: 'ERR' as const,
+                                            turn: currentTurn,
+                                            subturn: 0,
+                                            direction: 'response' as const,
+                                            type: 'llm' as const,
+                                            remoteIdentifier: REMOTE_ORCHESTRATOR,
+                                            fatal: false,
+                                            message: `final_report(json) ${parseHint}`
+                                        });
+                                        this.addTurnFailure(parseHint);
                                         this.logFinalReportDump(currentTurn, params, 'expected JSON content', rawContent);
-                                        const failureMessage = 'final_report(json) requires `content_json` (object).';
+                                        const failureMessage = `final_report(json) requires \`content_json\` (object). invalid_json: ${formatJsonParseHint(jsonParseError ?? 'missing_json_payload')}`;
                                         sanitizedMessages.push({
                                             role: 'tool',
                                             content: `${TOOL_FAILED_PREFIX} ${failureMessage})`,
@@ -1175,123 +1221,90 @@ export class TurnRunner {
                                     // SLACK-BLOCK-KIT: Parse JSON, expect messages array
                                     // Source: rawPayload (XML) > messages (native)
                                     const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
-                                    const coerceMessages = (value: unknown): unknown[] | undefined => {
-                                        const isArray = (v: unknown): v is unknown[] => Array.isArray(v);
-                                        if (isArray(value)) return value;
-                                        if (typeof value === 'string') {
-                                            const trimmed = value.trim();
-                                            if (trimmed.length === 0) return undefined;
-                                            // Use preferArrayExtraction for slack-block-kit to preserve outer array
-                                            const parsed = parseJsonValueDetailed(trimmed, { preferArrayExtraction: true }).value;
-                                            if (isArray(parsed)) return parsed;
-                                            if (parsed !== null && typeof parsed === 'object') {
-                                                const msgs = (parsed as { messages?: unknown }).messages;
-                                                if (isArray(msgs)) return msgs;
-                                            }
-                                        }
-                                        if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-                                            const msgs = (value as { messages?: unknown }).messages;
-                                            if (isArray(msgs)) return msgs;
-                                        }
-                                        return undefined;
-                                    };
+                                    const parsedSlack = parseSlackBlockKitPayload({
+                                        rawPayload,
+                                        messagesParam,
+                                        contentParam,
+                                    });
 
-                                    let messagesArray: unknown[] | undefined;
-                                    if (rawPayload !== undefined) {
-                                        // XML transport: parse JSON from raw payload
-                                        // Use preferArrayExtraction for slack-block-kit to preserve outer array
-                                        const parsedJson = parseJsonValueDetailed(rawPayload, { preferArrayExtraction: true });
-                                        if (parsedJson.value !== undefined && parsedJson.value !== null && typeof parsedJson.value === 'object') {
-                                            const parsed = parsedJson.value as Record<string, unknown>;
-                                            // Could be {messages: [...]} or just [...]
-                                            if (Array.isArray(parsed)) {
-                                                messagesArray = parsed;
-                                            } else if (Array.isArray(parsed.messages)) {
-                                                messagesArray = parsed.messages;
-                                            }
-                                            if (parsedJson.repairs.length > 0) {
-                                                this.log({
-                                                    timestamp: Date.now(),
-                                                    severity: 'WRN' as const,
-                                                    turn: currentTurn,
-                                                    subturn: 0,
-                                                    direction: 'response' as const,
-                                                    type: 'llm' as const,
-                                                    remoteIdentifier: REMOTE_SANITIZER,
-                                                    fatal: false,
-                                                    message: `agent__final_report slack-block-kit repaired via [${parsedJson.repairs.join('>')}]`,
-                                                });
-                                            }
-                                        }
-                                    }
-
-                                    // Native transport: coerce messages param (array or JSON string)
-                                    messagesArray ??= coerceMessages(messagesParam);
-                                    if (messagesArray === undefined || messagesArray.length === 0) {
-                                        const fallbackContent = rawPayload ?? contentParam;
-                                        const hasContent = typeof fallbackContent === 'string' && fallbackContent.trim().length > 0;
-                                        if (!hasContent) {
-                                            this.log({
-                                                timestamp: Date.now(),
-                                                severity: 'ERR' as const,
-                                                turn: currentTurn,
-                                                subturn: 0,
-                                                direction: 'response' as const,
-                                                type: 'llm' as const,
-                                                remoteIdentifier: REMOTE_ORCHESTRATOR,
-                                                fatal: false,
-                                                message: 'final_report(slack-block-kit) requires `messages` or non-empty `content`'
-                                            });
-                                            this.addTurnFailure(FINAL_REPORT_SLACK_MESSAGES_MISSING);
-                                            this.logFinalReportDump(currentTurn, params, 'expected messages array', rawContent);
-                                            this.state.finalReportToolFailedThisTurn = true;
-                                            this.state.finalReportToolFailedEver = true;
-                                            toolFailureDetected = true;
-                                            return false;
-                                        }
-                                        finalContent = fallbackContent;
-                                    }
-                                    else {
-                                        const normalizeBlocks = (value: unknown): unknown[] => {
-                                            if (typeof value === 'string') {
-                                                const parsed = parseJsonValueDetailed(value).value;
-                                                if (parsed !== undefined && parsed !== null && typeof parsed === 'object') return [parsed];
-                                                const trimmed = value.trim();
-                                                if (trimmed.length === 0)
-                                                    return [];
-                                                return [{ type: 'section', text: { type: 'mrkdwn', text: trimmed } }];
-                                            }
-                                            if (Array.isArray(value)) {
-                                                return value.flatMap((entry) => normalizeBlocks(entry));
-                                            }
-                                            if (value !== null && typeof value === 'object') {
-                                                return [value];
-                                            }
-                                            return [];
-                                        };
-                                        const normalizedMessages = messagesArray.map((entry) => {
-                                            // If entry already has a blocks field, normalize those blocks
-                                            if (entry !== null && typeof entry === 'object' && !Array.isArray(entry) && 'blocks' in entry) {
-                                                const existingBlocks = (entry as Record<string, unknown>).blocks;
-                                                const normalized = normalizeBlocks(existingBlocks);
-                                                if (normalized.length > 0) {
-                                                    return { blocks: normalized };
-                                                }
-                                                // Fallback: stringify the entry for display
-                                                const fallbackText = (() => { try { return JSON.stringify(entry); } catch { return '(invalid entry)'; } })();
-                                                return { blocks: [{ type: 'section', text: { type: 'mrkdwn', text: fallbackText } }] };
-                                            }
-                                            const blocks = normalizeBlocks(entry);
-                                            if (blocks.length === 0) {
-                                                return { blocks: [{ type: 'section', text: { type: 'mrkdwn', text: String(entry) } }] };
-                                            }
-                                            return { blocks };
+                                    const messagesArray = parsedSlack.messages;
+                                    if (parsedSlack.repairs.length > 0) {
+                                        this.log({
+                                            timestamp: Date.now(),
+                                            severity: 'WRN' as const,
+                                            turn: currentTurn,
+                                            subturn: 0,
+                                            direction: 'response' as const,
+                                            type: 'llm' as const,
+                                            remoteIdentifier: REMOTE_SANITIZER,
+                                            fatal: false,
+                                            message: `agent__final_report slack-block-kit repaired via [${parsedSlack.repairs.join('>')}]`,
                                         });
-                                        const slackValue = (commitMetadata as { slack?: unknown }).slack;
-                                        const slackMetaExisting = isRecord(slackValue) ? slackValue : {};
-                                        commitMetadata = { ...commitMetadata, slack: { ...slackMetaExisting, messages: normalizedMessages } };
-                                        finalContent = JSON.stringify(normalizedMessages);
                                     }
+
+                                    if ((messagesArray === undefined || messagesArray.length === 0) && parsedSlack.fallbackLooksInvalid) {
+                                        const failureMessage = buildInvalidJsonFailure(FINAL_REPORT_SLACK_MESSAGES_MISSING, parsedSlack.error);
+                                        this.log({
+                                            timestamp: Date.now(),
+                                            severity: 'ERR' as const,
+                                            turn: currentTurn,
+                                            subturn: 0,
+                                            direction: 'response' as const,
+                                            type: 'llm' as const,
+                                            remoteIdentifier: REMOTE_ORCHESTRATOR,
+                                            fatal: false,
+                                            message: `final_report(slack-block-kit) ${failureMessage}`
+                                        });
+                                        this.addTurnFailure(failureMessage);
+                                        this.logFinalReportDump(currentTurn, params, 'expected messages array', rawContent);
+                                        this.state.finalReportToolFailedThisTurn = true;
+                                        this.state.finalReportToolFailedEver = true;
+                                        toolFailureDetected = true;
+                                        return false;
+                                    }
+
+                                    const normalization = normalizeSlackMessages(messagesArray ?? [], {
+                                        fallbackText: parsedSlack.fallbackLooksInvalid ? undefined : (parsedSlack.fallbackText ?? undefined),
+                                    });
+                                    if (normalization.repairs.length > 0) {
+                                        this.log({
+                                            timestamp: Date.now(),
+                                            severity: 'WRN' as const,
+                                            turn: currentTurn,
+                                            subturn: 0,
+                                            direction: 'response' as const,
+                                            type: 'llm' as const,
+                                            remoteIdentifier: REMOTE_SANITIZER,
+                                            fatal: false,
+                                            message: `agent__final_report slack-block-kit mrkdwn repaired via [${normalization.repairs.join('>')}]`,
+                                        });
+                                    }
+
+                                    if (normalization.messages.length === 0) {
+                                        this.log({
+                                            timestamp: Date.now(),
+                                            severity: 'ERR' as const,
+                                            turn: currentTurn,
+                                            subturn: 0,
+                                            direction: 'response' as const,
+                                            type: 'llm' as const,
+                                            remoteIdentifier: REMOTE_ORCHESTRATOR,
+                                            fatal: false,
+                                            message: 'final_report(slack-block-kit) requires `messages` or non-empty `content`'
+                                        });
+                                        this.addTurnFailure(FINAL_REPORT_SLACK_MESSAGES_MISSING);
+                                        this.logFinalReportDump(currentTurn, params, 'expected messages array', rawContent);
+                                        this.state.finalReportToolFailedThisTurn = true;
+                                        this.state.finalReportToolFailedEver = true;
+                                        toolFailureDetected = true;
+                                        return false;
+                                    }
+
+                                    const slackValue = (commitMetadata as { slack?: unknown }).slack;
+                                    const slackMetaExisting = isRecord(slackValue) ? slackValue : {};
+                                    commitMetadata = { ...commitMetadata, slack: { ...slackMetaExisting, messages: normalization.messages } };
+                                    finalContent = JSON.stringify(normalization.messages);
+
                                 } else {
                                     if (finalFormat === 'json' && contentJson === undefined) {
                                         const failureMessage = 'final_report(json) requires `content_json` (object).';
@@ -1345,7 +1358,8 @@ export class TurnRunner {
                                 if (!preCommitValidation.valid) {
                                     const errs = preCommitValidation.errors ?? 'unknown validation error';
                                     const preview = preCommitValidation.payloadPreview;
-                                    const failureMessage = `final_report schema validation failed: ${errs}${preview !== undefined ? ` (preview: ${preview})` : ''}`;
+                                    const mismatchMessage = buildSchemaMismatchFailure(errs, preview);
+                                    const failureMessage = `final_report schema validation failed: ${mismatchMessage}`;
                                     this.log({
                                         timestamp: Date.now(),
                                         severity: 'ERR' as const,
@@ -1493,6 +1507,24 @@ export class TurnRunner {
         const executionStats = turnResult.executionStats ?? { executedTools: 0, executedNonProgressBatchTools: 0, executedProgressBatchTools: 0, unknownToolEncountered: false };
         const hasNonProgressTools = executionStats.executedNonProgressBatchTools > 0;
         const hasProgressOnly = executionStats.executedProgressBatchTools > 0 && executionStats.executedNonProgressBatchTools === 0;
+        const nextProgressOnlyTurns = hasProgressOnly ? (this.state.consecutiveProgressOnlyTurns ?? 0) + 1 : 0;
+        this.state.consecutiveProgressOnlyTurns = nextProgressOnlyTurns;
+
+        if (nextProgressOnlyTurns >= 2 && this.forcedFinalTurnReason === undefined) {
+            this.ctx.contextGuard.setTaskStatusOnlyReason();
+            this.log({
+                timestamp: Date.now(),
+                severity: 'WRN' as const,
+                turn: currentTurn,
+                subturn: 0,
+                direction: 'response' as const,
+                type: 'llm' as const,
+                remoteIdentifier: REMOTE_ORCHESTRATOR,
+                fatal: false,
+                message: 'Consecutive standalone task_status calls detected; forcing final turn.',
+                details: { consecutiveProgressOnlyTurns: nextProgressOnlyTurns },
+            });
+        }
 
         // Handle task status completion - force final turn if task is completed
         if (executionStats.executedProgressBatchTools > 0 && this.state.lastTaskStatusCompleted === true) {
@@ -1893,7 +1925,7 @@ export class TurnRunner {
     private set newCtxTokens(value: number) { this.ctx.contextGuard.setNewTokens(value); }
     private get schemaCtxTokens(): number { return this.ctx.contextGuard.getSchemaTokens(); }
     private set schemaCtxTokens(value: number) { this.ctx.contextGuard.setSchemaTokens(value); }
-    private get forcedFinalTurnReason(): 'context' | 'max_turns' | 'task_status_completed' | 'retry_exhaustion' | undefined { return this.ctx.contextGuard.getForcedFinalReason(); }
+    private get forcedFinalTurnReason(): 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion' | undefined { return this.ctx.contextGuard.getForcedFinalReason(); }
     private get finalReport() { return this.ctx.finalReportManager.getReport(); }
     private estimateTokensForCounters(messages: ConversationMessage[]): number {
         return this.ctx.contextGuard.estimateTokens(messages);
@@ -2336,7 +2368,8 @@ export class TurnRunner {
         if (!validationResult.valid) {
             const errs = validationResult.errors ?? 'unknown validation error';
             const payloadPreview = validationResult.payloadPreview;
-            const errMsg = `final_report schema validation failed: ${errs}${payloadPreview !== undefined ? `; payload preview=${payloadPreview}` : ''}`;
+            const mismatchMessage = buildSchemaMismatchFailure(errs, payloadPreview);
+            const errMsg = `final_report schema validation failed: ${mismatchMessage}`;
             const errLog = {
                 timestamp: Date.now(),
                 severity: 'ERR' as const,
@@ -2370,7 +2403,7 @@ export class TurnRunner {
                     message: 'Post-commit validation failed; replacing with synthetic failure report.'
                 });
                 this.ctx.finalReportManager.clear();
-                const syntheticContent = `Final report validation failed: ${errs}`;
+                const syntheticContent = `Final report validation failed: ${mismatchMessage}`;
                 this.commitFinalReport({
                     format: 'text',
                     content: syntheticContent,

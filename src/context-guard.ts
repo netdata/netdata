@@ -77,7 +77,7 @@ export class ContextGuard {
 
   // Budget state
   private toolBudgetExceeded = false;
-  private forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'retry_exhaustion';
+  private forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion';
   private contextLimitWarningLogged = false;
 
   // Current reasoning/thinking budget tokens (for extended thinking models)
@@ -530,13 +530,17 @@ export class ContextGuard {
   }
 
   /** Get the forced final turn reason, if any */
-  getForcedFinalReason(): 'context' | 'max_turns' | 'task_status_completed' | 'retry_exhaustion' | undefined {
+  getForcedFinalReason(): 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion' | undefined {
     return this.forcedFinalTurnReason;
   }
 
   /** Set forced final turn reason for task completion */
   setTaskCompletionReason(): void {
     this.forcedFinalTurnReason = 'task_status_completed';
+  }
+
+  setTaskStatusOnlyReason(): void {
+    this.forcedFinalTurnReason ??= 'task_status_only';
   }
 
   /** Set forced final turn reason for retry exhaustion */

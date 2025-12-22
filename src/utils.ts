@@ -79,11 +79,11 @@ export const isPlainObject = (value: unknown): value is Record<string, unknown> 
   value !== null && typeof value === 'object' && !Array.isArray(value)
 );
 
-const tryParseJson = (value: string): unknown => {
+const tryParseJsonDetailed = (value: string): { value?: unknown; error?: string } => {
   try {
-    return JSON.parse(value);
-  } catch {
-    return undefined;
+    return { value: JSON.parse(value) as unknown };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
   }
 };
 
@@ -268,22 +268,24 @@ export interface JsonParseOptions {
   preferArrayExtraction?: boolean;
 }
 
-const attemptRepairs = (text: string): { value?: unknown; repairedText?: string; steps: string[] } => {
+const attemptRepairs = (text: string): { value?: unknown; repairedText?: string; steps: string[]; error?: string } => {
   const steps: string[] = [];
-  const parsed = tryParseJson(text);
-  if (parsed !== undefined) {
-    return { value: parsed, repairedText: text, steps };
+  const parsed = tryParseJsonDetailed(text);
+  if (parsed.value !== undefined) {
+    return { value: parsed.value, repairedText: text, steps };
   }
+  let lastError = parsed.error;
   try {
     const repaired = jsonrepair(text);
-    const reparsed = tryParseJson(repaired);
-    if (reparsed !== undefined) {
-      return { value: reparsed, repairedText: repaired, steps: ['jsonrepair'] };
+    const reparsed = tryParseJsonDetailed(repaired);
+    if (reparsed.value !== undefined) {
+      return { value: reparsed.value, repairedText: repaired, steps: ['jsonrepair'] };
     }
+    lastError = reparsed.error ?? lastError;
   } catch {
     /* ignore jsonrepair failure; caller will handle */
   }
-  return { steps: [] };
+  return { steps: [], error: lastError };
 };
 
 export const parseJsonValueDetailed = (raw: unknown, options?: JsonParseOptions): JsonParseDiagnostics => {
@@ -339,6 +341,7 @@ export const parseJsonValueDetailed = (raw: unknown, options?: JsonParseOptions)
         repairedText: attempt.repairedText,
       };
     }
+    lastError = attempt.error ?? lastError;
 
     // Explore secondary transforms only if parse failed
     // Extraction order depends on preferArrayExtraction option:
@@ -372,7 +375,7 @@ export const parseJsonValueDetailed = (raw: unknown, options?: JsonParseOptions)
       const enriched = enqueue(closed, [...candidate.steps, 'closeDangling']);
       if (enriched !== undefined) queue.push(enriched);
     }
-    lastError = 'parse_failed';
+    lastError = lastError ?? 'parse_failed';
     if (queue.length > 40) {
       break; // safety cap
     }

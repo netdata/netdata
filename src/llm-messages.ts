@@ -76,6 +76,15 @@ export const FINAL_TURN_NOTICE =
 export const TASK_STATUS_COMPLETED_FINAL_MESSAGE = FINAL_TURN_NOTICE;
 
 /**
+ * Injected when consecutive standalone task_status calls are detected.
+ * Forces immediate finalization to prevent progress-only loops.
+ *
+ * CONDITION: forcedFinalTurnReason === 'task_status_only'
+ * Where forcedFinalTurn is set after consecutive standalone task_status calls
+ */
+export const TASK_STATUS_ONLY_FINAL_MESSAGE = FINAL_TURN_NOTICE;
+
+/**
  * Injected when all retry attempts are exhausted.
  * Forces graceful finalization instead of session failure.
  * Used in: session-turn-runner.ts (pushed to conversation)

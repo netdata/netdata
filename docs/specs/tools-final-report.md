@@ -207,6 +207,10 @@ Final report processing uses a 3-layer architecture to cleanly separate transpor
    - `slack-block-kit`: Parse JSON, expect the messages array directly (`[...]`). Legacy `{messages: [...]}` wrappers are tolerated for backwards compatibility but not instructed.
    - Text formats (`text`, `markdown`, `markdown+mermaid`, `tty`, `pipe`): Use raw payload directly as text content.
 
+**Error messaging (existing failures only):**
+- JSON parse failures surface `invalid_json: <hint>` in logs and model-facing retry notices.
+- Schema validation failures surface `schema_mismatch: <ajv errors>` in logs and model-facing retry notices.
+
 3. **Layer 3 (Final Report Construction)**:
    - Build clean final report object with: format, content, content_json (for json format), metadata
    - Wrapper fields never pollute payload content
@@ -284,12 +288,12 @@ If validation somehow fails after commit (shouldn't happen with pre-commit valid
 3. Session marked as failed
 
 ### JSON Parsing for slack-block-kit
-**Location**: `src/session-turn-runner.ts:1195`
+**Location**: `src/slack-block-kit.ts` (called from `src/session-turn-runner.ts`)
 
 When parsing slack-block-kit payloads wrapped in XML or markdown:
-- Uses `preferArrayExtraction: true` option in `parseJsonValueDetailed()`
-- This prioritizes extracting outer array `[...]` over inner objects `{...}`
-- Ensures the messages array wrapper is preserved, not stripped
+- Uses `preferArrayExtraction: true` in `parseJsonValueDetailed()` before schema validation.
+- Prioritizes extracting the outer array `[...]` over inner objects `{...}`.
+- Accepts legacy `{ "messages": [...] }` and normalizes to the array.
 
 ## Final Turn Enforcement
 
@@ -330,9 +334,10 @@ When `isFinalTurn === true`:
 
 ## Business Logic Coverage (Verified 2025-11-16)
 
-- **Slack Block Kit repair**: The handler normalizes Markdown, clamps text lengths (sections ≤2900 chars, headers ≤150, context ≤2000), and coerces message structures before returning them to Slack clients (`src/tools/internal-provider.ts:407-627`).
+- **Slack Block Kit repair**: Markdown is sanitized to Slack mrkdwn (headings → bold, `[text](url)` → `<url|text>`, `**`/`__` → `*`, `~~` → `~`, code-fence language stripped, tables → code blocks, `& < >` escaped) and text lengths are clamped (sections ≤2900 chars, headers ≤150, context/fields ≤2000). Normalization is shared across tool-call and XML final report paths (`src/slack-block-kit.ts`, `src/tools/internal-provider.ts`, `src/session-turn-runner.ts`).
+- **Slack Block Kit schema**: Section blocks allow `text`, `fields`, or **both**; `text` is optional when fields are present (matches Slack).
 - **Format mismatch handling**: If `report_format` or `format` disagrees with the session’s expected format the tool logs an error and overwrites it, preventing downstream consumers from seeing inconsistent metadata (`src/tools/internal-provider.ts:398-410`).
-- **Slack content fallback**: When Slack payloads omit `messages`, the provider falls back to `report_content` to avoid empty replies in Slack headend (`src/tools/internal-provider.ts:454-456`).
+- **Slack content fallback**: If slack-block-kit payloads are invalid after repair, the system emits a safe single-section fallback message instead of sending invalid blocks to Slack (`src/tools/internal-provider.ts`, `src/session-turn-runner.ts`).
 - **Parameter aliases**: Both `report_format`/`format` and `report_content`/`content` are accepted, but canonicalized before storing the final report (`src/tools/internal-provider.ts:398-402`).
 - **Early JSON validation**: JSON outputs are validated immediately during tool execution (before `AIAgentSession` validates again), so models receive AJV diagnostics per turn (`src/tools/internal-provider.ts:629-652`).
 - **Progress pairing warning**: If the agent tries to call `task_status` and `final_report` in the same turn, the tool logs a warning because finalization should not stream additional progress updates (`src/tools/internal-provider.ts:172-197`).

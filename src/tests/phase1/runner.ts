@@ -86,6 +86,8 @@ const CONTEXT_LIMIT_TURN_WARN = 'Context limit exceeded during turn execution; p
 const TASK_CONTINUE_PROCESSING = 'Continue processing';
 const TASK_COMPLETE_TASK = 'Complete task';
 const TASK_COMPLETED_RESPONSE = 'task completed';
+const TASK_ANALYSIS_COMPLETE = 'Task analysis complete';
+const STATUS_UPDATE_RESPONSE = 'reporting status update';
 const TASK_STATUS_COMPLETED = 'completed';
 const TASK_COMPLETE_REPORT = 'Task complete';
 const parseDumpList = (raw?: string): string[] => {
@@ -3476,6 +3478,54 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const messagesValue = slackMeta !== undefined ? slackMeta.messages : undefined;
       const messages = Array.isArray(messagesValue) ? messagesValue : [];
       invariant(messages.length >= 2, 'Multiple Slack messages expected for run-test-52.');
+    },
+  },
+  {
+    id: 'run-test-55',
+    configure: (_configuration, sessionConfig) => {
+      sessionConfig.outputFormat = SLACK_OUTPUT_FORMAT;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-55 expected success.');
+      const finalReport = result.finalReport!;
+      invariant(finalReport?.format === SLACK_OUTPUT_FORMAT, 'Slack final report expected for run-test-55.');
+      const metadataCandidate = finalReport.metadata;
+      const slackCandidate = (metadataCandidate !== undefined && typeof metadataCandidate === 'object' && !Array.isArray(metadataCandidate))
+        ? (metadataCandidate as { slack?: unknown }).slack
+        : undefined;
+      const slackMeta = (slackCandidate !== undefined && typeof slackCandidate === 'object' && !Array.isArray(slackCandidate))
+        ? (slackCandidate as { messages?: unknown[] })
+        : undefined;
+      const messagesValue = slackMeta !== undefined ? slackMeta.messages : undefined;
+      const messages = Array.isArray(messagesValue) ? messagesValue : [];
+      invariant(messages.length > 0, 'Slack messages expected for run-test-55.');
+      const firstMessage = messages.at(0);
+      const blocks = (firstMessage !== undefined && typeof firstMessage === 'object' && !Array.isArray(firstMessage))
+        ? (firstMessage as { blocks?: unknown[] }).blocks
+        : undefined;
+      const firstBlock = Array.isArray(blocks) ? blocks.at(0) : undefined;
+      const textValue = (() => {
+        if (firstBlock === undefined || typeof firstBlock !== 'object' || firstBlock === null) return '';
+        const blockRecord = firstBlock as { text?: unknown };
+        const raw = blockRecord.text;
+        if (typeof raw === 'string') return raw;
+        if (raw !== null && raw !== undefined && typeof raw === 'object') {
+          const nested = raw as { text?: unknown };
+          return typeof nested.text === 'string' ? nested.text : '';
+        }
+        return '';
+      })();
+      invariant(textValue.includes('*Title*'), 'Markdown heading should be converted to bold for run-test-55.');
+      invariant(textValue.includes('<https://example.com|Docs>'), 'Markdown link should be converted for run-test-55.');
+      invariant(textValue.includes('*Bold*'), 'Markdown bold should be converted for run-test-55.');
+      invariant(textValue.includes('~Strike~'), 'Markdown strikethrough should be converted for run-test-55.');
+      invariant(textValue.includes('&amp;'), 'Ampersand should be escaped for run-test-55.');
+      invariant(textValue.includes('&lt;tag&gt;'), 'Angle brackets should be escaped for run-test-55.');
+      invariant(textValue.includes('```'), 'Tables should be wrapped in code blocks for run-test-55.');
+      invariant(!textValue.includes('##'), 'Markdown heading markers should be removed for run-test-55.');
+      invariant(!textValue.includes('[Docs]('), 'Markdown link syntax should be removed for run-test-55.');
+      invariant(!textValue.includes('**'), 'Markdown bold markers should be removed for run-test-55.');
+      invariant(!textValue.includes('~~'), 'Markdown strike markers should be removed for run-test-55.');
     },
   },
   {
@@ -11754,12 +11804,12 @@ BASE_TEST_SCENARIOS.push({
           {
             role: 'assistant',
             content: '',
-            toolCalls: [{ id: toolCallId, name: 'agent__final_report', parameters: { report_format: 'markdown', report_content: 'Task analysis complete' } }],
+            toolCalls: [{ id: toolCallId, name: 'agent__final_report', parameters: { report_format: 'markdown', report_content: TASK_ANALYSIS_COMPLETE } }],
           },
           {
             role: 'tool',
             toolCallId: toolCallId,
-            content: 'Task analysis complete',
+            content: TASK_ANALYSIS_COMPLETE,
           } as ConversationMessage,
         ],
         tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
@@ -11784,11 +11834,11 @@ BASE_TEST_SCENARIOS.push({
     return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
       status: { type: 'success', hasToolCalls: true, finalAnswer: false },
       latencyMs: 5,
-      response: 'reporting status update',
+      response: STATUS_UPDATE_RESPONSE,
       messages: [
         {
           role: 'assistant',
-          content: 'reporting status update',
+          content: STATUS_UPDATE_RESPONSE,
           toolCalls: [{ id: 'call-1', name: 'agent__task_status', parameters: { status: TASK_STATUS_IN_PROGRESS, done: 'Still processing', pending: 'Final steps', now: TASK_COMPLETE_TASK } }],
         },
       ],
@@ -11801,6 +11851,56 @@ BASE_TEST_SCENARIOS.push({
     invariant(!result.success, 'Progress-only turns should eventually fail without final report');
     // The session fails with retries_exhausted when maxTurns is reached without a final_report.
     expectTurnFailureContains(result.logs, 'run-test-task-status-standalone-second', ['retries_exhausted', 'no_tools', 'final_report_missing']);
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-task-status-standalone-consecutive-final',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.maxTurns = 3;
+    sessionConfig.maxRetries = 1;
+    return await runWithPatchedExecuteTurn(sessionConfig, ({ invocation }) => {
+      if (invocation === 1 || invocation === 2) {
+        return Promise.resolve({
+          status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+          latencyMs: 5,
+          response: STATUS_UPDATE_RESPONSE,
+          messages: [
+            {
+              role: 'assistant',
+              content: STATUS_UPDATE_RESPONSE,
+              toolCalls: [{ id: `call-${String(invocation)}`, name: 'agent__task_status', parameters: { status: TASK_STATUS_IN_PROGRESS, done: 'Still processing', pending: 'Final steps', now: TASK_COMPLETE_TASK } }],
+            },
+          ],
+          tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+          executionStats: { executedTools: 1, executedNonProgressBatchTools: 0, executedProgressBatchTools: 1, unknownToolEncountered: false },
+        });
+      }
+      const toolCallId = 'final-report-call-3';
+      return Promise.resolve({
+        status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+        latencyMs: 5,
+        response: TASK_COMPLETED_RESPONSE,
+        messages: [
+          {
+            role: 'assistant',
+            content: '',
+            toolCalls: [{ id: toolCallId, name: 'agent__final_report', parameters: { report_format: 'markdown', report_content: TASK_ANALYSIS_COMPLETE } }],
+          },
+          {
+            role: 'tool',
+            toolCallId,
+            content: TASK_ANALYSIS_COMPLETE,
+          } as ConversationMessage,
+        ],
+        tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+      });
+    });
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(result.success, 'Session should succeed after consecutive task_status updates and final report');
+    const logHit = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes('Consecutive standalone task_status calls detected'));
+    invariant(logHit !== undefined, 'Expected log for consecutive standalone task_status forcing final turn');
   },
 } satisfies HarnessTest);
 

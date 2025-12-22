@@ -40,7 +40,7 @@ When processing XML final reports, the system uses a 3-layer architecture:
 2. **Layer 2 (Format Processing)**: Process payload based on expected format:
    - `sub-agent`: Opaque blob passthrough (no validation, no parsing)
    - `json`: Parse JSON, validate against schema if provided
-   - `slack-block-kit`: Parse JSON, expect the messages array directly (`[...]`); legacy `{messages: [...]}` wrappers are tolerated but not recommended.
+   - `slack-block-kit`: Parse JSON, expect the messages array directly (`[...]`); legacy `{messages: [...]}` wrappers are tolerated but not recommended. Payload is sanitized to Slack mrkdwn and validated against the strict Block Kit schema; invalid payloads fall back to a safe single-section message.
    - Text formats (`text`, `markdown`, `tty`, `pipe`): Use raw payload directly
 3. **Layer 3 (Final Report)**: Construct clean final report object with status, format, content, and optional metadata.
 

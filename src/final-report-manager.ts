@@ -197,7 +197,7 @@ export class FinalReportManager {
         } catch {
           return {
             valid: false,
-            errors: `${FORMAT_SLACK_BLOCK_KIT} content is not valid JSON`,
+            errors: `invalid_json: ${FORMAT_SLACK_BLOCK_KIT} content is not valid JSON`,
             payloadPreview: fr.content.length > 200 ? `${fr.content.slice(0, 200)}…` : fr.content
           };
         }
