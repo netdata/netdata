@@ -35,6 +35,192 @@ Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
 
 In this prompt you can find extensive information about all the data available in Netdata bigquery dataset.
 
+---
+
+## Netdata Domain Model
+
+This section explains the core entities and relationships in Netdata Cloud. Understanding this model is essential for writing correct queries.
+
+### Entity Overview
+
+```
+User (person) ─────┬───── Space (billable account) ─────── Subscription (plan)
+                   │              │
+                   │              ├───── Room (organization unit)
+                   │              │         │
+                   │              └───── Node (monitored infrastructure)
+                   │                        │
+                   └── Role (admin/member/etc)    └── (nodes can appear in multiple rooms)
+```
+
+### Users and Spaces
+
+- **Users are independent of spaces** — a person signs in once and can access multiple spaces with different roles in each
+- **Spaces = complete infrastructure isolation** — shared users, but totally isolated infrastructure
+- **Use case**: A freelancer or MSP can manage many customers with the same login/session
+- **Spaces can have any number of users** — Netdata does not charge for number of users
+- **Spaces are owned by admin users** (role = admin)
+
+**Example**: User Costa is admin at his homelab space (Community plan), observer at another space (Business Trial), and troubleshooter at a company space (Business plan). All accessed with single sign-in.
+
+### Rooms
+
+- **Rooms organize infrastructure and users** within a space
+- **Nodes can appear in multiple rooms** within the same space
+- **Nodes are isolated to 1 space** (cannot span spaces)
+- **Room use cases**: incidents, teams, services, regions, datacenters, cloud providers
+
+### Nodes
+
+- **Nodes are Netdata agents** running on monitored infrastructure
+- **Virtual nodes**: Created by configuration on existing agents, appear as independent nodes (for SNMP devices, cloud RDS, etc.)
+- **Billing is based on nodes** — all subscription plans are node-based
+- **Nodes can be ephemeral or permanent** (configured at agent level)
+
+**Node States** (from `cloud-spaceroom-service`):
+
+| State | Meaning | Field in watch_towers |
+|-------|---------|----------------------|
+| `reachable` | Currently online (directly or via parent) | `ae_reachable_nodes` |
+| `stale` | Historical data available (via parent) but node not online | `cs_stale_nodes` |
+| `unreachable` | Was connected but not responding now | `ag_unreachable_nodes` |
+| `created` | Node exists but never connected (also called "unseen" in metrics) | `ct_created_nodes` |
+| `pruned` | Node deleted/removed | (not in spaces_asat) |
+
+**Priority**: `reachable > stale > unreachable > pruned > created`
+
+### Subscriptions and Plans
+
+- **Each space has exactly 1 active subscription** at any time
+- **Subscription transitions** drive growth/churn metrics
+
+**Plan Types**:
+
+| Plan | Pricing | Description |
+|------|---------|-------------|
+| **Business** | $6/node/month ($4.50 annually) | Full features, unlimited users |
+| **Homelab** | $90/year unlimited | Same features, 1 user, fair usage policy |
+| **Business Trial** | Free 14 days | New user signup only; converts to Community if not upgraded |
+| **Community** | Free | Non-commercial use, 5-node multi-node dashboard limit |
+
+**`ce_plan_class` values**: `Business`, `Business_45d_monthly_newcomer`, `Homelab`, `Homelab_45d_monthly_newcomer`, `Community`, `Pro`
+
+**`aw_sub_plan` values**: `Business`, `Business2024.03`, `Homelab`, `Community2023.11`, `Pro`
+
+### Trial Mechanics
+
+- **Trigger**: New user signup with space creation (existing users don't get trials on new spaces)
+- **Duration**: 14 days
+- **End behavior**: Auto-converts to Community if not upgraded
+
+### Revenue Model
+
+**Discounted vs Undiscounted ARR**:
+- `arr_business_discount` / `arr_homelab_discount` = actual ARR received (after discounts)
+- `arr_business` / `arr_homelab` = list price ARR (before discounts)
+
+**Realized vs Unrealized ARR (45-day rule)**:
+- New monthly Stripe customers are tracked as `*_45d_monthly_newcomer` for first 45 days
+- ARR becomes "realized" after day 46 (customer has actually paid)
+- Use `cx_arr_realized_at` field to check realization date
+
+**Total Realized ARR** = `arr_business_discount + arr_homelab_discount + ai_credits_space_revenue + onprem_arr`
+  - **KPI nuance (important):** for realized ARR *time-series* KPIs, add the **static on‑prem baseline** from `manual360_asat_20251002` for dates ≤ **2025-10-01** (see KPI templates). This is required for historical parity.
+
+**`business_overrides_arr`**: placeholder metric in `metrics_daily` (always zero in practice). Ignore unless explicitly asked.
+
+**Direct vs Indirect ARR**:
+- Direct: `cd_payment_provider = 'Stripe'` and no reseller
+- Indirect: AWS Marketplace, GCP Marketplace, or reseller
+
+**Payment providers** (`cd_payment_provider`): `Stripe`, `AWS`, `GCP`, `NULL` (Community/Trial)
+
+### Billing Model
+
+- **Context-only (not query-backed):** The pricing and billing mechanics below are **business context**, not fields you should assert from BigQuery unless explicitly asked and verified. Do **not** invent numbers in data answers.
+- **Committed nodes**: Minimum nodes paid for regardless of usage
+- **Overage**: Nodes exceeding commitment charged at $6/node/month
+- **Double P90**: Billing uses P90 of daily nodes, then P90 of monthly (excludes spikes)
+- **Annual discount**: 25% + volume discounts
+
+### Node Grades
+
+Spaces are graded by billable node count:
+
+| Grade | Node Count |
+|-------|------------|
+| A | 501+ (largest) |
+| B | 101-500 |
+| C | 21-100 |
+| D | 6-20 |
+| E | 1-5 |
+| EMPTY | 0 |
+
+**Note**: "A" is largest (counter-intuitive alphabetically).
+
+### Churn and Won Definitions
+
+**Won** (revenue gained):
+1. Non-paid → Paid (Community → Business/Homelab)
+2. Increase of committed node count
+3. Monthly plan adding more reachable nodes
+
+**Churn** (revenue lost):
+1. Paid → Non-paid (Business/Homelab → Community)
+2. Decrease of committed node count
+3. Monthly plan disconnecting nodes
+
+### Key Field Terminology
+
+| Field | Meaning |
+|-------|---------|
+| `ce_plan_class` | Normalized plan classification (includes newcomer suffix) |
+| `aw_sub_plan` | Raw subscription plan name from payment system |
+| `ax_trial_ends_at` | NULL = paid customer; future date = active trial; past date + Community = expired trial |
+| `cx_arr_realized_at` | Date when ARR becomes realized (NULL = not yet realized) |
+| `bq_arr_discount` | Space's discounted ARR value |
+
+### Entity Cardinalities
+
+| Relationship | Cardinality |
+|--------------|-------------|
+| User ↔ Space | N:N (user can be in many spaces with different roles) |
+| Space ↔ Subscription | 1:1 (one active subscription per space) |
+| Space ↔ Stripe Customer | Typically 1:1 for Stripe-paid spaces; non-Stripe spaces may have NULL `customer_id` |
+| Space ↔ Node | 1:N (nodes belong to exactly one space) |
+| Node ↔ Room | N:N (within same space) |
+| Space ↔ Room | 1:N |
+
+### Entity-to-Table Mapping
+
+| Entity | Authoritative Table | Raw Source Table | Notes |
+|--------|---------------------|------------------|-------|
+| **Space** | `watch_towers.spaces_*` | `app_db_replication.spaceroom_spaces_*` | watch_towers adds ARR/plan calculations |
+| **User/Account** | — | `app_db_replication.account_accounts_*` | Identity, email, login times |
+| **Membership** | — | `app_db_replication.spaceroom_space_members_*` | User↔Space relationship with role |
+| **Subscription** | `watch_towers.spaces_*` (embedded) | `app_db_replication.spaceroom_space_active_subscriptions_*` | watch_towers denormalizes subscription into space record |
+| **Node** | — | `app_db_replication.spaceroom_nodes_*` + `spaceroom_nodes_info_*` | Node registry + metadata; summaries in `data360.node360_*` |
+| **Room** | — | `app_db_replication.spaceroom_rooms_*` | Room details; members in `spaceroom_room_members_*`, nodes in `spaceroom_room_nodes_*` |
+| **On-prem Contract** | `watch_towers.manual360_*` | (manual entry) | Separate from SaaS entity model; linked via `space_override` |
+| **AI Credits** | — | `app_db_replication.spaceroom_purchased_bundles_*` | Add-on to subscriptions; revenue in `metrics_daily.ai_credits_space_revenue` |
+
+**Key distinction between table families:**
+
+| Table Family | Purpose | Use For |
+|--------------|---------|---------|
+| `watch_towers.*` | Derived truth with ARR/plan logic applied | ARR queries, plan classification, 45-day newcomer logic |
+| `app_db_replication.*` | Raw source tables (CDC from PostgreSQL) | Identity lookups, membership queries, raw subscription details |
+| `metrics.*` | Portfolio-level aggregates | Dashboard KPIs, trends; **not** entity-level analysis |
+| `data360.*` | Entity summaries for analytics | Node/user analytics; `space360_daily` is **legacy** (pre-2023-11-28 only) |
+
+**Common confusion points:**
+- **Per-space ARR**: Use `watch_towers.spaces_*.bq_arr_discount` (not metrics_daily)
+- **Total portfolio ARR**: Use `metrics_daily` templates (realized ARR = business + homelab + AI + onprem)
+- **Raw subscription details**: Use `spaceroom_space_active_subscriptions_*` when you need `customer_id`, `committed_nodes`, `discount_percentage`
+- **Node details**: Use `spaceroom_nodes_*` + `spaceroom_nodes_info_*`; watch_towers only has node counts per space
+
+---
+
 ## Understanding user requests
 
 Users may not explicitly ask using the right terminology. Use this table to map their intent:

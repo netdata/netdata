@@ -275,16 +275,13 @@ All questions answered ✓
 5. [x] Research answers from BigQuery queries ✓
 6. [x] Document remaining low-priority questions for devs ✓
 
-### PHASE 3: Documentation Integration (BLOCKED)
-**Status**: Waiting for another assistant to finish prompt improvements via testing
-**Test script**: `./neda/bigquery-test.sh --continue --jobs 3`
-**Do not run tests** - wait for completion
-
-7. [ ] Draft domain model documentation section
-8. [ ] Draft glossary section
-9. [ ] Review with user
-10. [ ] Integrate into `neda/bigquery.ai`
-11. [ ] Verify documentation completeness
+### PHASE 3: Documentation Integration ✓ COMPLETE
+7. [x] Draft domain model documentation section ✓
+8. [x] Integrate into `neda/bigquery.ai` ✓ (inserted after line 36, before "Understanding user requests")
+9. [x] Add Entity-to-Table Mapping section ✓ (links entities to tables, clarifies table family purposes)
+10. [ ] Review with user
+11. [ ] Run tests to verify no regressions
+12. [ ] Delete this TODO file when verified
 
 ## PHASE 2: Terminology Questions & Research Findings
 
