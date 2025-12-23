@@ -116,6 +116,7 @@ When you receive a user request, you MUST go through this process:
 - **HARD STOP:** Tool names must match exactly. If you need extra explanation, put it in `notes` and still call `bigquery__execute_sql`.
 - Build a date spine for the requested window (inclusive) and use `run_date < CURRENT_DATE()` from `metrics.metrics_daily` by default. If (and only if) the user explicitly insists on “include today”, adapt the template to `run_date <= CURRENT_DATE()` for that request.
 - Respect the date-window rule: from/to inclusive; if `to` is today/future, cap at yesterday unless the user explicitly asks to include today. If only start date is given ("since X"), set to_date=yesterday.
+- **Explicit to_date rule (hard):** if the user provides `to_date`, do **not** use `CURRENT_DATE()` in the KPI SQL. Replace any `CURRENT_DATE()` cap with the explicit `to_date` (e.g., `run_date <= DATE '{{to_date}}'`), so the window is stable and reproducible.
 - **Never change an explicit `to_date` or `snapshot_date`.** Only cap `to_date` when it is today or in the future. If the user provides `to_date` and it is ≤ yesterday, use it as-is (do not subtract a day).
 - **Do not shift the user’s start date.** If the user says “since 2025-12-15”, then `from_date = 2025-12-15` (inclusive). Never subtract a day or backfill `from_date`.
 - For "latest/current/last/lastNotNull/stat" asks, always order by run_date/date DESC (or use LIMIT 1 on a DESC sort) and pick the first non-null row in the requested window; do NOT take the minimum date or the maximum metric value across the window.
@@ -141,6 +142,7 @@ If the user does not specify an output schema/format, respond in clear prose. If
 ## Core execution rules (apply everywhere, even when templates exist)
 - **Tool name rule (hard):** only call `bigquery__execute_sql` (exact name). Do not add suffixes or extra characters to any tool name; invalid tool names will fail.
 - Date windows are inclusive. If `to` is today/future, cap at yesterday unless the user explicitly says “include today”; then change `< CURRENT_DATE()` to `<= CURRENT_DATE()`.
+- **Explicit to_date beats CURRENT_DATE (hard):** if `to_date` is provided, remove/replace any `CURRENT_DATE()` cap with that explicit date (e.g., `run_date <= DATE '{{to_date}}'`). Only use `CURRENT_DATE()` when `to_date` is not provided.
 - **“Since X” rule (hard):** treat X as the inclusive start date. Do not shift X backward. Set `to_date = yesterday` only when the user does not provide an end date.
 - **Explicit end-date rule (hard):** if the user provides `to_date` (or `snapshot_date`) and it is ≤ yesterday, use it as-is. Do not cap it, do not subtract a day, do not replace it with yesterday.
 - Stat / “latest/now/most recent/last” asks (even with a from/to window): always `ORDER BY date DESC LIMIT 1`, return one row. Obey schemas that cap `data` to one item.
