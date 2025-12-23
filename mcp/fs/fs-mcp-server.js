@@ -2,7 +2,7 @@
 /**
  * Minimal MCP stdio server (no external deps).
  *
- * Usage: node fs-mcp-server.js <ROOT_DIR>
+ * Usage: node fs-mcp-server.js [--no-rgrep-root] <ROOT_DIR>
  * - All tool paths are relative to <ROOT_DIR>
  * - '..' segments are forbidden in any input path
  * - Absolute paths are not allowed
@@ -44,11 +44,39 @@ function respondError(id, code, message, data) {
 }
 
 // -------------------------- Root and path safety --------------------------
+const USAGE = 'Usage: node fs-mcp-server.js [--no-rgrep-root] <ROOT_DIR>';
+
+function parseArgs(argv) {
+  let allowRGrepRoot = true;
+  let rootArg;
+  for (const arg of argv) {
+    if (arg === '--no-rgrep-root') {
+      allowRGrepRoot = false;
+      continue;
+    }
+    if (arg.startsWith('-')) {
+      console.error(`Unknown flag: ${arg}`);
+      console.error(USAGE);
+      process.exit(1);
+    }
+    if (rootArg === undefined) {
+      rootArg = arg;
+      continue;
+    }
+    console.error(`Unexpected extra argument: ${arg}`);
+    console.error(USAGE);
+    process.exit(1);
+  }
+  return { allowRGrepRoot, rootArg };
+}
+
+const { allowRGrepRoot, rootArg } = parseArgs(process.argv.slice(2));
+
 const ROOT = (() => {
   // console.error('MCP: Starting fs-mcp-server.js with args:', process.argv.slice(2));
-  const arg = process.argv[2];
+  const arg = rootArg;
   if (!arg || typeof arg !== 'string') {
-    console.error('Usage: node fs-mcp-server.js <ROOT_DIR>');
+    console.error(USAGE);
     process.exit(1);
   }
   const abs = path.resolve(arg);
@@ -74,6 +102,8 @@ const ROOT = (() => {
   // console.error(`MCP: Root directory: ${canonRoot}`);
   return canonRoot;
 })();
+
+const ALLOW_RGREP_ROOT = allowRGrepRoot;
 
 function assertNoDotDot(raw) {
   if (typeof raw !== 'string') throw new Error('path must be a string');
@@ -825,12 +855,13 @@ async function toolRGrep(args) {
   if (typeof dir !== 'string') throw new Error('dir must be a string');
   if (typeof regex !== 'string') throw new Error('regex must be a string');
   // Refuse to grep entire tree for empty dir or '.'
-  if (dir === '' || dir === '.') {
-    throw new Error('recursive grep on the entire tree from the root is not allowed due to size limitations. Use it on specific subdirectories.');
+  const normalizedDir = dir === '.' ? '' : dir;
+  if (!ALLOW_RGREP_ROOT && normalizedDir === '') {
+    throw new Error('recursive grep on the entire tree from the root is disabled by --no-rgrep-root. Use it on specific subdirectories or start the server without --no-rgrep-root.');
   }
   const cs = Boolean(caseSensitive);
   const maxFilesLimit = maxFiles || Infinity;
-  const abs = resolveRel(dir);
+  const abs = resolveRel(normalizedDir);
 
   // Validate the directory itself
   const dirValidation = await validatePath(abs);
@@ -841,7 +872,7 @@ async function toolRGrep(args) {
   const re = buildRegex(regex, cs);
   const hits = [];
   const warnings = [];
-  const stack = [[abs, dir === '' ? '' : dir.replace(/\\/g, '/')]];
+  const stack = [[abs, normalizedDir === '' ? '' : normalizedDir.replace(/\\/g, '/')]];
 
   // Statistics tracking
   let filesExamined = 0;
@@ -940,7 +971,7 @@ async function toolRGrep(args) {
   }
 
   // Strip the base directory from matches if we're searching within a subdirectory
-  const baseDir = dir === '' ? '' : dir.replace(/\\/g, '/');
+  const baseDir = normalizedDir === '' ? '' : normalizedDir.replace(/\\/g, '/');
   const strippedHits = hits.map(hit => {
     if (baseDir && hit.startsWith(baseDir + '/')) {
       return hit.substring(baseDir.length + 1);
@@ -949,7 +980,7 @@ async function toolRGrep(args) {
   });
 
   // Build output with statistics
-  const summary = `${hits.length} match${hits.length !== 1 ? 'es' : ''} found in ${hits.length} file${hits.length !== 1 ? 's' : ''} across ${dirsExamined} director${dirsExamined !== 1 ? 'ies' : 'y'} under ${dir || 'root'} (examined ${filesExamined} file${filesExamined !== 1 ? 's' : ''})`;
+  const summary = `${hits.length} match${hits.length !== 1 ? 'es' : ''} found in ${hits.length} file${hits.length !== 1 ? 's' : ''} across ${dirsExamined} director${dirsExamined !== 1 ? 'ies' : 'y'} under ${normalizedDir || 'root'} (examined ${filesExamined} file${filesExamined !== 1 ? 's' : ''})`;
 
   const output = [];
 
@@ -977,7 +1008,7 @@ const tools = [
   { name: 'Find', description: 'Find entries by simple glob under a directory and its subdirectories. Supported glob: * and ? only (match across path separators). No character classes, braces, or **. Includes symlinks in results but never follows them. Paths are relative to ROOT; ".." and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { dir: { type: 'string', description: 'Directory path relative to ROOT (empty string for root, no leading slash)' }, glob: { type: 'string', description: 'Simple glob pattern (* and ? only, matches across path separators)' } }, required: ['dir', 'glob'] }, handler: toolFind },
   { name: 'Read', description: "Read file by lines with numbering. Can follow symlinks to valid files. headOrTail='head' returns lines [start, start+lines); 'tail' treats start as offset from end (start=0 => last lines). Lines are multi-byte aware; invalid UTF-8 bytes are hex-escaped as \\u00NN (strict JSON). Each line is prefixed with a 4-char right-aligned line number and a space.", inputSchema: { type: 'object', properties: { file: { type: 'string', description: 'File path relative to ROOT' }, start: { type: 'integer', minimum: 0, description: 'Starting line (0-based for head, offset from end for tail)' }, lines: { type: 'integer', minimum: 0, description: 'Number of lines to read' }, headOrTail: { type: 'string', enum: ['head', 'tail'], description: "'head' reads from start, 'tail' reads from end" } }, required: ['file', 'start', 'lines', 'headOrTail'] }, handler: toolRead },
   { name: 'Grep', description: 'MULTI-LINE grep in a file. Can follow symlinks to valid files. The regex uses JavaScript syntax with dotAll (. matches newlines). Returns blocks per match with before/after context and line-numbered text. Control case sensitivity via caseSensitive flag. Paths are relative to ROOT; ".." and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { file: { type: 'string', description: 'File path relative to ROOT' }, regex: { type: 'string', description: 'JavaScript regular expression pattern' }, before: { type: 'integer', minimum: 0, description: 'Lines of context before match' }, after: { type: 'integer', minimum: 0, description: 'Lines of context after match' }, caseSensitive: { type: 'boolean', description: 'true for case-sensitive matching' } }, required: ['file', 'regex', 'before', 'after', 'caseSensitive'] }, handler: toolGrep },
-  { name: 'RGrep', description: 'MULTI-LINE grep across files under a directory. The regex uses JavaScript syntax with dotAll (. matches newlines). Returns paths of files that match. Cannot be used on root directory due to performance. Control case sensitivity via caseSensitive flag. Paths are relative to ROOT; ".." and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { dir: { type: 'string', description: 'Directory path relative to ROOT (cannot be empty/root)' }, regex: { type: 'string', description: 'JavaScript regular expression pattern' }, caseSensitive: { type: 'boolean', description: 'true for case-sensitive matching' }, maxFiles: { type: 'integer', minimum: 1, description: 'Optional: Maximum number of matching files to return' } }, required: ['dir', 'regex', 'caseSensitive'] }, handler: toolRGrep },
+  { name: 'RGrep', description: 'MULTI-LINE grep across files under a directory. The regex uses JavaScript syntax with dotAll (. matches newlines). Returns paths of files that match. Root directory search is allowed unless the server is started with --no-rgrep-root. Control case sensitivity via caseSensitive flag. Paths are relative to ROOT; ".." and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { dir: { type: 'string', description: 'Directory path relative to ROOT (empty string or "." for root unless --no-rgrep-root is set)' }, regex: { type: 'string', description: 'JavaScript regular expression pattern' }, caseSensitive: { type: 'boolean', description: 'true for case-sensitive matching' }, maxFiles: { type: 'integer', minimum: 1, description: 'Optional: Maximum number of matching files to return' } }, required: ['dir', 'regex', 'caseSensitive'] }, handler: toolRGrep },
 ];
 
 function listToolsResponse() { return { tools: tools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema })) }; }

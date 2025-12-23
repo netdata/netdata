@@ -615,7 +615,8 @@
       "command": "node",
       "args": [
         "/opt/ai-agent/mcp/fs/fs-mcp-server.js",
-        "${NETDATA_REPOS_DIR}"
+        "${NETDATA_REPOS_DIR}",
+        "--no-rgrep-root"
       ],
       "enabled": true,
       "toolsAllowed": [

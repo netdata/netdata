@@ -37,6 +37,9 @@ node fs-mcp-server.js
 # Serve specific directory
 node fs-mcp-server.js /path/to/directory
 
+# Disable root RGrep (safer for large trees)
+node fs-mcp-server.js --no-rgrep-root /path/to/directory
+
 # Use environment variable
 MCP_ROOT=/path/to/directory node fs-mcp-server.js
 ```
@@ -177,7 +180,7 @@ file.txt: 3 matches found. Total lines in file: 100
 Recursively search directory contents.
 
 **Parameters:**
-- `dir` (string, required) - Directory to search (not root)
+- `dir` (string, required) - Directory to search (root allowed by default; start the server with `--no-rgrep-root` to disable)
 - `regex` (string, required) - Regular expression pattern
 - `caseSensitive` (boolean, required) - Case sensitivity
 - `maxFiles` (number) - Maximum files to search
@@ -231,7 +234,7 @@ Clear, actionable error messages:
 "not a regular file"
 "broken symlink -> target.txt"
 "symlink target outside root: /etc/passwd"
-"recursive grep on entire tree not allowed"
+"recursive grep on the entire tree from the root is disabled by --no-rgrep-root"
 ```
 
 ## Performance Characteristics
