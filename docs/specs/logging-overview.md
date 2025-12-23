@@ -254,13 +254,15 @@ createStructuredLogger({
 }
 ```
 
-- Enabling these flags causes `StructuredLogger` to attach redacted request/response payloads to `llmRequestPayload`, `llmResponsePayload`, etc.
+- Trace flags control **extra TRC diagnostics** (SDK request/response dumps, MCP traces, verbose session logs).
+- **LLM request/response payloads are captured unconditionally** and attached to `llmRequestPayload` / `llmResponsePayload` for logs, then encoded into opTree snapshots as base64 under `payload.raw` (full HTTP/SSE body capture) and `payload.sdk` (serialized SDK request/response for verification). If `payload.raw` ever contains `[unavailable]`, treat it as a capture bug. Trace flags only add TRC lines.
+- Tool payload capture remains tool-specific and may still depend on tracing hooks.
 - `verbose` toggles additional session logs (settings, prompts, etc.) for human troubleshooting.
 
 ## Business Logic Coverage (Verified 2025-11-16)
 
 - **Severity mapping**: `structured-logger` maps VRB/THK/TRC/WRN/ERR/FIN to both console and OTLP severities so downstream log systems can filter consistently (`src/logging/structured-logger.ts:40-120`).
-- **Payload capture**: When tracing flags (`traceLLM`, `traceMCP`, `traceSdk`) are enabled the logger attaches redacted request/response payloads to `llmRequestPayload` etc., but truncates large payloads to keep memory bounded (`src/logging/structured-logger.ts:180-320`).
+- **Payload capture**: LLM payloads are attached to `llmRequestPayload` / `llmResponsePayload` for every turn, with no truncation. Trace flags only affect extra diagnostic TRC lines (`src/llm-client.ts`, `src/ai-agent.ts`).
 - **FIN summaries**: Every session ends with `FIN` logs summarizing counts/costs and includes a JSON payload inside `details` for machine parsing (`src/ai-agent.ts:2100-2180`).
 - **Headend attribution**: Headends inject `headendId` into every log entry they emit, allowing multi-headend deployments to filter logs per surface (`src/headends/*-headend.ts:180-260`).
 

@@ -4,7 +4,7 @@
 Per-turn retry with provider cycling, exponential backoff for rate limits, synthetic retries for invalid responses, context-aware final turn enforcement.
 
 ## Source Files
-- `src/ai-agent.ts:1390-2600+` - executeAgentLoop retry logic
+- `src/session-turn-runner.ts` - executeAgentLoop retry logic
 - `src/llm-providers/base.ts` - mapError(), retry directives
 - `src/types.ts:57-63` - TurnRetryDirective
 
@@ -18,7 +18,6 @@ interface TurnRetryDirective {
   action: 'retry' | 'skip-provider' | 'abort';
   backoffMs?: number;
   logMessage?: string;
-  systemMessage?: string;
   sources?: string[];
 }
 ```
@@ -105,27 +104,26 @@ When a final report fails schema validation:
 ## Synthetic Retries
 
 ### Content Without Tools
-**Location**: `src/ai-agent.ts:1973-2011`
+**Location**: `src/session-turn-runner.ts`
 
 **Trigger**: LLM returns text content but no tool calls and no final_report
 
 **Behavior**:
 1. Log warning: "Synthetic retry: assistant returned content without tool calls"
-2. Do NOT add to conversation
-3. Inject system message: "System notice: plain text responses are ignored..."
-4. Continue to next attempt
+2. Add TURN-FAILED guidance describing the exact issue
+3. Continue to next attempt
 
 **Purpose**: Force model to use tools or call final_report
 
 ### Invalid Tool Parameters
-**Location**: `src/ai-agent.ts:1951-1970`
+**Location**: `src/session-turn-runner.ts`
 
 **Trigger**: Tool call has malformed JSON parameters
 
 **Behavior**:
 1. Drop invalid tool call
 2. Log warning: "Invalid tool call dropped due to malformed payload"
-3. Inject system message about JSON requirements
+3. Add TURN-FAILED guidance explaining the malformed tool payload
 4. Continue to next attempt
 
 ## Provider Cycling
@@ -237,36 +235,16 @@ const fallbackWait = Math.min(Math.max(attempts * 1_000, RATE_LIMIT_MIN_WAIT_MS)
 
 ## Conversation Mutation During Retry
 
-### System Messages Injection
-**Location**: `pushSystemRetryMessage()` helper
+- Retry guidance is persisted via TURN-FAILED user messages in the conversation history.
+- Provider throttling and transport errors are **not** surfaced to the model; they are logged and handled by provider cycling/backoff.
 
-**Used for**:
-- Final turn instructions
-- Tool usage reminders
-- JSON parameter guidance
-- Final report reminders
+## Business Logic Coverage (Verified 2025-12-23)
 
-## Business Logic Coverage (Verified 2025-11-16)
-
-- **Cycle-scoped rate-limit waits**: `rateLimitedInCycle` counts per-target failures and waits only after *every* provider in the rotation returns `rate_limit`, preventing unnecessary sleeps when at least one path remains (`src/ai-agent.ts:1456-2511`).
-- **Fallback retry directives**: When providers omit retry guidance, `buildFallbackRetryDirective` maps error types to deterministic actions (`retry`, `skip-provider`, `abort`) and optional backoff windows (`src/ai-agent.ts:3298-3338`).
-- **Backoff cancellation**: All waits use `sleepWithAbort`, which returns `'aborted_stop'`/`'aborted_cancel'` markers so the loop can exit instead of sleeping when users stop sessions (`src/ai-agent.ts:2470-2545`).
-- **Pending retry dedupe**: `pushSystemRetryMessage` ignores duplicate text, so repeated reminders (JSON schema, final report) appear once even when multiple providers fail in succession (`src/ai-agent.ts:2959-3042`).
-- **Retry-after harmonization**: Provider metadata can supply `retryAfterMs`; the loop selects the maximum observed delay per cycle and logs it before waiting (`src/ai-agent.ts:2451-2493`).
-
-**Messages are temporary**:
-- Added to attempt conversation
-- Not persisted to main conversation on retry
-- Only persisted on success
-
-### Metadata Tagging
-```typescript
-{
-  role: 'user',
-  content: 'System notice: ...',
-  metadata: { retryMessage: 'retry-reason' }
-}
-```
+- **Cycle-scoped rate-limit waits**: `rateLimitedInCycle` counts per-target failures and waits only after *every* provider in the rotation returns `rate_limit`, preventing unnecessary sleeps when at least one path remains (`src/session-turn-runner.ts`).
+- **Fallback retry directives**: When providers omit retry guidance, `buildFallbackRetryDirective` maps error types to deterministic actions (`retry`, `skip-provider`, `abort`) and optional backoff windows (`src/session-turn-runner.ts`).
+- **Backoff cancellation**: All waits use `sleepWithAbort`, which returns `'aborted_stop'`/`'aborted_cancel'` markers so the loop can exit instead of sleeping when users stop sessions (`src/session-turn-runner.ts`).
+- **Retry-after harmonization**: Provider metadata can supply `retryAfterMs`; the loop selects the maximum observed delay per cycle and logs it before waiting (`src/session-turn-runner.ts`).
+- **TURN-FAILED persistence**: All retry-triggering invalid responses push TURN-FAILED guidance into the conversation so the model sees the failure reasons on subsequent attempts.
 
 ## Configuration Effects
 
@@ -320,34 +298,35 @@ const fallbackWait = Math.min(Math.max(attempts * 1_000, RATE_LIMIT_MIN_WAIT_MS)
 
 1. **Empty response retry** (distinct from content-without-tools):
    - Triggers when response has no content AND no tools
-   - Location: `src/ai-agent.ts:2280-2299`
+   - Adds TURN-FAILED guidance (`TURN_FAILED_EMPTY_RESPONSE`)
+   - Location: `src/session-turn-runner.ts`
 
 2. **Final turn retry exhaustion fallback**:
    - Synthesizes failure report when final turn exhausts retries
    - Records last error in metadata
-   - Location: `src/ai-agent.ts:2640-2665`
+   - Location: `src/session-turn-runner.ts`
 
 3. **Rate limit cycle backoff**:
    - Sleeps only after ALL providers in cycle are rate-limited
    - Uses `maxRateLimitWaitMs` across cycle
    - `rateLimitedInCycle` counter tracks this
-   - Location: `src/ai-agent.ts:2487-2513`
+   - Location: `src/session-turn-runner.ts`
 
 4. **buildFallbackRetryDirective()**:
    - Generates retry directives when provider doesn't supply one
    - Includes exponential backoff calculation
-   - Location: `src/ai-agent.ts:3298-3338`
+   - Location: `src/session-turn-runner.ts`
 
-5. **System message deduplication**:
-   - `pendingRetryMessages` array accumulates messages
-   - Deduplication via `pushSystemRetryMessage()` helper
-   - Location: `src/ai-agent.ts:2956-2961`
+5. **TURN-FAILED reason selection**:
+   - Prioritized, capped list (critical/high/normal)
+   - Ensures final-turn and truncation guidance is retained
+   - Location: `src/session-turn-runner.ts`
 
 6. **Invalid tool parameter retry**:
    - Logs "Invalid tool call dropped due to malformed payload"
-   - Injects system message about JSON requirements
+   - Adds TURN-FAILED guidance (`TOOL_CALL_MALFORMED`)
    - Continues to next attempt without adding invalid call
-   - Location: `src/ai-agent.ts:1951-1970`
+   - Location: `src/session-turn-runner.ts`
 
 ## Test Coverage
 

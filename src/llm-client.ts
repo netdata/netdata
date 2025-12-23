@@ -43,6 +43,7 @@ export class LLMClient {
   private pricing?: Partial<Record<string, Partial<Record<string, { unit?: 'per_1k'|'per_1m'; currency?: 'USD'; prompt?: number; completion?: number; cacheRead?: number; cacheWrite?: number }>>>>;
   private lastMetadataTask?: Promise<void>;
   private lastTraceTask?: Promise<void>;
+  private lastResponsePayloadTask?: Promise<void>;
   private activeHttpContext?: {
     request: TurnRequest;
     requestLogged: boolean;
@@ -113,6 +114,7 @@ export class LLMClient {
     try {
       const result = await provider.executeTurn(request);
       await this.awaitLastMetadataTask();
+      await this.awaitLastResponsePayloadTask();
       if (result.status.type === 'success') {
         const extraCacheWrite = this.lastCacheWriteInputTokens;
         if (typeof extraCacheWrite === 'number' && extraCacheWrite > 0) {
@@ -135,6 +137,7 @@ export class LLMClient {
       return result;
     } catch (error) {
       await this.awaitLastMetadataTask();
+      await this.awaitLastResponsePayloadTask();
       const latencyMs = Date.now() - startTime;
       const errorResult: TurnResult = {
         status: provider.mapError(error),
@@ -157,6 +160,7 @@ export class LLMClient {
 
   async waitForMetadataCapture(): Promise<void> {
     await this.awaitLastMetadataTask();
+    await this.awaitLastResponsePayloadTask();
     await this.awaitLastTraceTask();
   }
 
@@ -236,6 +240,7 @@ export class LLMClient {
           }
         }
 
+        const unavailablePayload = '[unavailable]';
         const requestInit = { ...init, headers };
         const requestObject = new Request(input, requestInit);
         try {
@@ -243,7 +248,16 @@ export class LLMClient {
           const bodyText = await cloned.text();
           this.captureLlmRequestPayload(bodyText, 'http');
         } catch {
-          this.captureLlmRequestPayload('[unavailable]', 'http');
+          const fallbackBody = (() => {
+            if (typeof requestInit.body === 'string') return requestInit.body;
+            if (requestInit.body === undefined) return unavailablePayload;
+            try {
+              return JSON.stringify(requestInit.body);
+            } catch {
+              return unavailablePayload;
+            }
+          })();
+          this.captureLlmRequestPayload(fallbackBody, 'http');
         }
 
         // Log request details
@@ -288,14 +302,28 @@ export class LLMClient {
 
         const isSse = contentType.includes(LLMClient.CONTENT_TYPE_EVENT_STREAM);
         if (isSse) {
-          this.captureLlmResponsePayload('[streaming]', 'sse');
+          try {
+            const cloneForPayload = response.clone();
+            const payloadTask = (async () => {
+              try {
+                const responseText = await cloneForPayload.text();
+                this.captureLlmResponsePayload(responseText, 'sse');
+              } catch {
+                this.captureLlmResponsePayload(unavailablePayload, 'sse');
+              }
+            })();
+            this.queueResponsePayloadTask(payloadTask);
+          } catch (cloneError) {
+            this.handleCloneFailure('payload', cloneError);
+            this.captureLlmResponsePayload(unavailablePayload, 'sse');
+          }
         } else {
           try {
             const cloneForPayload = response.clone();
             const responseText = await cloneForPayload.text();
             this.captureLlmResponsePayload(responseText, 'http');
           } catch {
-            this.captureLlmResponsePayload('[unavailable]', 'http');
+            this.captureLlmResponsePayload(unavailablePayload, 'http');
           }
         }
 
@@ -483,7 +511,37 @@ export class LLMClient {
     }
   }
 
-  private handleCloneFailure(context: 'metadata' | 'trace', error: unknown): void {
+  private async awaitLastResponsePayloadTask(): Promise<void> {
+    const pending = this.lastResponsePayloadTask;
+    if (pending === undefined) {
+      return;
+    }
+    try {
+      await pending;
+    } catch {
+      /* ignore payload capture errors */
+    } finally {
+      if (this.lastResponsePayloadTask === pending) {
+        this.lastResponsePayloadTask = undefined;
+      }
+    }
+  }
+
+  private queueResponsePayloadTask(task: Promise<void>): void {
+    const wrapperRef: { current?: Promise<void> } = {};
+    wrapperRef.current = (async () => {
+      try {
+        await task;
+      } finally {
+        if (this.lastResponsePayloadTask === wrapperRef.current) {
+          this.lastResponsePayloadTask = undefined;
+        }
+      }
+    })();
+    this.lastResponsePayloadTask = wrapperRef.current;
+  }
+
+  private handleCloneFailure(context: 'metadata' | 'trace' | 'payload', error: unknown): void {
     try {
       warn(`traced fetch ${context} clone failed: ${error instanceof Error ? error.message : String(error)}`);
     } catch {

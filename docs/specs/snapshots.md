@@ -146,11 +146,14 @@ interface OperationNode {
 4. Logs attached to operations
 5. Accounting entries per operation
 6. Session totals
+7. LLM request/response payloads under `opTree.turns[].ops[].request.payload` and `opTree.turns[].ops[].response.payload`:
+   - `payload.raw` = base64 of the full HTTP/SSE body capture (no placeholders; `[unavailable]` indicates a capture bug)
+   - `payload.sdk` = base64 of serialized SDK request/response (verification copy)
 
 ### Excluded Data
 1. Raw conversation (summarized in ops)
 2. Tool parameters remain attached to opTree requests (not truncated at snapshot time)
-3. Response bodies are preserved in opTree responses; any shortening reflects upstream limits (e.g., toolResponseMaxBytes or token-budget truncation), not snapshot truncation
+3. Response bodies are preserved in opTree responses via `payload.raw` (full HTTP/SSE capture) and `payload.sdk` (SDK snapshot); any shortening reflects upstream limits (e.g., toolResponseMaxBytes or token-budget truncation), not snapshot truncation.
 
 ## Persistence Patterns
 
@@ -271,6 +274,7 @@ User-provided `persistence` config values override defaults. Custom callbacks (`
 3. **Version tagged**: Snapshot includes version number
 4. **ID preservation**: Session/origin IDs maintained
 5. **Final snapshot**: Always attempted at end
+6. **Raw payload retention**: LLM request/response payloads are always preserved in opTree (base64, full body, including streaming SSE).
 
 ## Test Coverage
 
@@ -296,6 +300,7 @@ User-provided `persistence` config values override defaults. Custom callbacks (`
 - Check opTree state
 - Verify operation completion
 - Check log attachment
+- Confirm payload capture completed (LLM responses are recorded in full, even for streaming).
 
 ### Large snapshot size
 - Check upstream truncation settings (toolResponseMaxBytes, token-budget truncation)

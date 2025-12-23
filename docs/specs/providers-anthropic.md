@@ -96,7 +96,7 @@ segmentHasSignature(segment) {
 
 ### Strategy
 1. Strip cache control from all messages first
-2. Find last non-system-notice message
+2. Find last non-XML-notice message
 3. Apply ephemeral cache control to that message
 
 ### Implementation
@@ -227,21 +227,20 @@ if (status.type === 'rate_limit') {
   return {
     action: 'retry',
     backoffMs: wait,
-    logMessage: `Anthropic rate limit; waiting ${wait ?? 'briefly'} before retry.`,
-    systemMessage: `System notice: Anthropic (${remoteId}) rate-limited the prior request...`
+    logMessage: `Anthropic rate limit; waiting ${wait ?? 'briefly'} before retry.`
   };
 }
 ```
 
-This surfaces a user-facing `system notice` explaining the throttle and mirrors the log message so operators know why execution paused.
+Rate limits are logged and retried; no model-facing system notice is injected for provider throttling.
 
 ## Business Logic Coverage (Verified 2025-11-16)
 
-- **Cache target selection**: Cache control is applied only to the last user message that isn’t an internal system notice so Anthropic’s ephemeral cache is used exactly once per turn (`src/llm-providers/anthropic.ts:45-102`).
+- **Cache target selection**: Cache control is applied only to the last user message that isn’t an XML protocol notice (`# System Notice`) so Anthropic’s ephemeral cache is used exactly once per turn (`src/llm-providers/anthropic.ts:45-102`).
 - **Reasoning signature enforcement**: Turns after the first must include Anthropic signatures on reasoning segments; otherwise the provider strips the reasoning content to avoid leaking unsigned internal thoughts (`src/llm-providers/anthropic.ts:158-214`).
 - **Reasoning + tool choice**: When reasoning is active the provider refuses to force `tool_choice='required'` because Anthropic disallows simultaneous tool forcing and thinking. When reasoning is disabled the base class behavior applies (`src/llm-providers/anthropic.ts:151-156`).
 - **Reasoning value handling**: Manual `reasoningValue` inputs are only truncated; the provider intentionally does **not** clamp them, relying on the context guard/options resolver to reject negatives so high budgets can flow through for Claude Thinking models (`src/llm-providers/anthropic.ts:104-149`, `src/options-resolver.ts:120-210`).
-- **Rate limit messaging**: Custom retry directives inject a `system notice` plus consistent log text so operators and end users know Anthropic throttled the turn without having to inspect raw logs (`src/llm-providers/anthropic.ts:203-216`).
+- **Rate limit messaging**: Custom retry directives emit consistent log text; provider throttling is not sent to the model (`src/llm-providers/anthropic.ts:203-216`).
 
 ## Invariants
 
@@ -271,7 +270,7 @@ This surfaces a user-facing `system notice` explaining the throttle and mirrors 
 ### Cache not applied
 - Check caching mode setting
 - Verify non-empty message list
-- Check system notice filtering
+- Check XML notice filtering
 
 ### Reasoning disabled unexpectedly
 - Check signature presence

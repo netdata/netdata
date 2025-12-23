@@ -28,16 +28,13 @@ Our conversation schemas, reasoning payloads, tool definitions, and streaming ex
 
 ## Hardcoded Strings (LLM-facing)
 
-The application only injects the following LLM-facing strings:
+LLM-facing strings are centralized in `src/llm-messages.ts` and the XML templates it renders (XML-NEXT/XML-PAST). This includes:
+- Final-turn instructions
+- TURN-FAILED guidance
+- Tool-result failure text for malformed tool calls
+- XML protocol notices and examples
 
-1. `## TOOLS' INSTRUCTIONS`
-2. `## TOOL {name} INSTRUCTIONS` (per tool instructions)
-3. Final-turn message when tools are no longer permitted: "You are not allowed to run any more tools. Use the tool responses you have so far to answer my original question. If you failed to find answers for something, please state the areas you couldn't investigate"
-4. Tool-result failure when the model calls the XML final wrapper as a tool: `(tool failed: You called the XML wrapper tag as if it were a tool. The XML wrapper is NOT a tool — it is plain text you output directly in your response. Do NOT use tool calling for your final report/answer. Instead, write the XML tags directly in your response text, exactly as instructed.)`
-5. TURN-FAILED guidance when the XML final wrapper is called as a tool: `You called the XML wrapper tag (ai-agent-{nonce}-FINAL) as a tool... Example: <ai-agent-{nonce}-FINAL format="{format}">YOUR CONTENT HERE</ai-agent-{nonce}-FINAL>`
-6. Tool-result failure when `agent__final_report` is called without text content: `(tool failed: final_report requires non-empty report_content.)`
-
-No other hardcoded content is sent to the LLM.
+There is no separate “short list” of hardcoded strings; treat `src/llm-messages.ts` as the canonical source of truth.
 
 ## Command Line Interface
 

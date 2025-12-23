@@ -68,6 +68,8 @@ interface OperationNode {
   response?: { payload: unknown; size?: number; truncated?: boolean };
 }
 ```
+**Notes**
+- LLM op payloads store both **HTTP/SSE capture** and **SDK snapshots** under `payload.raw` and `payload.sdk` (base64-encoded strings with `format` and `encoding` metadata). `payload.raw` is the full HTTP/SSE body; `payload.sdk` is the serialized SDK request/response used to verify payload integrity. If `payload.raw` ever shows `[unavailable]`, treat it as a capture bug.
 
 ### SessionTotals
 **Location**: `src/session-tree.ts:46-54`
@@ -326,7 +328,7 @@ Features:
 - **Reasoning capture**: `appendReasoningChunk` timestamps thinking deltas per operation and `setReasoningFinal` stores the merged summary so headends can render thinking transcripts after the fact (`src/session-tree.ts:200-260`).
 - **Child embedding**: `attachChildSession` nests sub-agent SessionNodes, preserving their entire turn/op trees; totals recomputation aggregates child tokens/costs into the parent (`src/session-tree.ts:300-446`).
 - **Status/title publishing**: `setLatestStatus` and `setSessionTitle` update the root node and trigger callback invocations so UI clients see live progress (`src/session-tree.ts:120-190`).
-- **Operation payload retention**: Request/response payloads are stored in full; `truncated` is only set when upstream limits already shortened the payload (e.g., toolResponseMaxBytes or token-budget truncation) (`src/session-tree.ts:230-320`, `src/tools/tools.ts:780-1020`).
+- **Operation payload retention**: Request/response payloads are stored in base64 under `payload.raw` (full HTTP/SSE capture) and `payload.sdk` (serialized SDK request/response). `truncated` is only set when upstream limits already shortened the payload (e.g., toolResponseMaxBytes or token-budget truncation) (`src/session-tree.ts:230-320`, `src/ai-agent.ts`, `src/session-turn-runner.ts`, `src/llm-client.ts`).
 
 ## Use Cases
 

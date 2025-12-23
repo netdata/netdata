@@ -333,6 +333,139 @@ Next actions to reach parity: promote 🟨 templates from scratch → prod after
 
 ### Progress update (2025-12-23)
 - Costa requested a full harness re-run. Next action: run the full suite with extreme timeouts using `--continue --jobs 3` (gpt-oss-20b; consider `TEMPERATURE_OVERRIDE=0` if tool-name hallucinations persist).
+- Full suite run completed: **51 total, 45 pass, 6 fail**.
+  - Failures: `nodes_total_view_percent_snapshot`, `homelab_nodes_growth_pct`, `on_prem_customers`, `windows_reachable_nodes_breakdown`, `realized_arr_kpi_delta`, `active_users`.
+  - Logs: `tmp/bigquery-tests/logs/<case>.log`.
+- Decision needed (2025-12-23): Next step to resolve the 6 failing cases.
+  - A) Inspect the 6 log files and propose prompt/template fixes. Pros: fastest root-cause visibility; Cons: takes manual review time. **Recommendation: A**.
+  - B) Re-run only the 6 failing cases to confirm flakiness before any changes. Pros: quick signal on stability; Cons: may repeat failures without new insight.
+  - C) Re-run the full suite with a different override (e.g., temperature/model) before investigation. Pros: might reduce tool-name hallucinations; Cons: higher time cost and may mask real issues.
+- Log inspection summary (2025-12-23):
+  - `nodes_total_view_percent_snapshot`: agent returned fractions (0–1) instead of % (0–100). Likely missing `* 100` or wrong denominator scaling in template.
+  - `homelab_nodes_growth_pct`: agent queried outside the requested window to fill LAGs, producing non-null pct values; ref expects nulls inside the 7-day window.
+  - `on_prem_customers`: agent returned full timeseries; expected latest only (`ORDER BY date DESC LIMIT 1`).
+  - `windows_reachable_nodes_breakdown`: agent returned `data: []` / “Data not available” without running the KPI query; should always run the metrics_daily breakdown.
+  - `realized_arr_kpi_delta`: tool call never executed; model exhausted retries with `no_tools` and returned `status: partial` + empty data.
+  - `active_users`: agent returned full timeseries; expected latest only (single row).
+- New requirement (2025-12-23): **Prompt must explicitly explain entity meanings and entity-linking rules** (e.g., Space vs Customer, how subscriptions/users/nodes connect) so the model can answer arbitrary questions without guessing. This requires updating `neda/bigquery.ai` and relevant docs.
+- Added Source Selection Matrix section to `neda/bigquery.ai` with deterministic routing rules and examples (per D12–D14).
+- Added top‑100 customers >= $2K ARR harness case to `neda/bigquery-test.sh` (schema + reference SQL + compare function).
+- Manual query executed for top‑100 customers >= $2K ARR; results saved to `tmp/top_customers_arr_2k.json` (contains admin contact emails).
+- New test request (2025-12-23): add a harness case for **Top 100 customers paying >= $2K ARR** with fields:
+  - Primary Contact (space owner/admin), Subscription Renewal Date, Current ARR, Nodes committed, Nodes connected.
+  - Renewal date rule: annual = start_date + 1 year; forecast ARR equals current ARR.
+  - Question from Costa: can we provide this result manually (needs BigQuery execution).
+
+### Progress update (2025-12-23, latest run)
+- Full suite run completed: **52 total, 47 pass, 5 fail**.
+  - Failures: `customers_growth_pct`, `on_prem_customers`, `top_customers_arr_2k`, `aws_arr`, `realized_arr_kpi_customer_diff`.
+  - Logs: `tmp/bigquery-tests/logs/<case>.log`.
+- Root causes (from logs/diffs):
+  - `customers_growth_pct`: agent ran extra queries and emitted non-null pct_7 despite null lags; must return template results with NULLs preserved.
+  - `on_prem_customers`: agent returned a full timeseries and kept earliest row; must ORDER BY date DESC LIMIT 1 and emit a single row.
+  - `top_customers_arr_2k`: harness crashed due to unescaped `$2K` in echo banner (case did not execute).
+  - `aws_arr`: agent returned `data: []` without executing KPI SQL; needs explicit AWS ARR routing + hard stop.
+  - `realized_arr_kpi_customer_diff`: agent dropped one negative-row result after correct SQL; must return all rows from SQL (expect up to 20 when gains+losses asked).
+- Fixes applied (pending re-run):
+  - `neda/bigquery-test.sh`: escape `$2K` in the case banner.
+  - `neda/bigquery.ai`: add AWS ARR routing, hard-stop on growth % output to preserve NULLs, reinforce on-prem latest-row rule, and require full row retention for ARR delta top-10.
+  - `docs/AI-AGENT-GUIDE.md`: record growth % null-preservation and AWS ARR routing requirements.
+- Next step: re-run full harness after these edits.
+
+### Decisions needed (2025-12-23) — new test case
+1) **Source tables and fields**
+   - Option A: Use `watch_towers.spaces_latest` + `watch_towers.spaces_asat_YYYYMMDD` for ARR + subscription fields; join to app DB for contacts.
+     - Pros: aligns with existing KPI patterns; Cons: may need joins for primary contact and subscription dates.
+   - Option B: Use `watch_towers.spaces_latest` only, if it already embeds owner/admin and subscription dates.
+     - Pros: simpler, fewer joins; Cons: may be incomplete or missing contact fields.
+   - Recommendation: **A** unless we confirm B has all required fields.
+2) **Definition of “customer”**
+   - Option A: Space = customer (1 space = 1 customer).
+   - Option B: Stripe customer ID = customer (may span spaces).
+   - Recommendation: **A** unless BI prefers Stripe-level consolidation.
+3) **Nodes committed vs connected**
+   - Option A: `committed_nodes` from subscription record; connected = `ae_reachable_nodes` from spaces snapshot.
+   - Option B: Use reachable nodes for both if committed is not available.
+   - Recommendation: **A** if committed field exists.
+4) **Subscription start date source + renewal rule**
+   - Option A: Use `spaces_latest.ca_cur_plan_start_date` as start date; renewal = +1 year if annual, +1 month if monthly.
+     - Pros: typed DATE field; already in watch_towers; simple.
+     - Cons: assumes it maps to subscription start exactly.
+   - Option B: Use `space_active_subscriptions_latest.created_at` as start date; renewal = +1 year if annual, +1 month if monthly.
+     - Pros: raw subscription record; likely closest to “start”.
+     - Cons: stored as STRING; needs parsing.
+   - Option C: Use `spaces_latest.ay_billing_period_start` as start date; renewal based on `space_active_subscriptions_latest.period`.
+     - Pros: uses explicit billing period.
+     - Cons: string parsing + more joins/logic.
+   - Recommendation: **A** unless we see evidence it’s wrong.
+5) **Primary contact display format**
+   - Option A: Comma-separated admin **emails**.
+   - Option B: Comma-separated `Name <email>` when name exists, otherwise email.
+   - Recommendation: **B** (more readable, still deterministic).
+6) **Paid plan classes for “customer” filter**
+   - Option A: Include `Business`, `Homelab`, `Business_45d_monthly_newcomer`, `Homelab_45d_monthly_newcomer`.
+   - Option B: Only `Business`, `Homelab` (exclude newcomer variants).
+   - Recommendation: **A** (newcomer variants are still paid).
+
+### Decisions locked (2025-12-23) — new test case
+- D6: **Source tables**: use `watch_towers.spaces_latest` + app DB joins for contacts/subscription dates (not `spaces_latest` alone).
+- D7: **Customer definition**: customer = space with **paid subscription**; a space with Stripe customer ID can still be **Community** and is **not** a customer.
+- D8: **Nodes**: committed nodes from subscription; connected nodes from reachable nodes.
+- D9: **Owner/primary contact**: `owner` = `admin`. A space may have multiple admins; all are owners. If schema requires a single field, return a **comma-separated list** of all admin contacts.
+- D10: **Subscription start date**: use `watch_towers.spaces_latest.ca_cur_plan_start_date` (Option 1A).
+- D11: **Missing period**: if subscription period is missing/blank, report `"unknown"` (do not infer).
+
+### New requirement (2025-12-23)
+- Prompt must explicitly teach **differences between overlapping data sources** and **rules for which source to use when**, so the model can answer arbitrary questions. The prompt should surface the alternatives (e.g., `spaces_latest` vs `spaces_asat_*` vs `spaceroom_space_active_subscriptions_*`) with a deterministic selection matrix, not hide them.
+
+### Decisions needed (2025-12-23) — source comparison detail in prompt
+1) **Where to place the source comparison rules**
+   - Option A: Add a new “Source Selection Matrix” section near the top (after Domain Model).
+     - Pros: highly visible; deterministic routing.
+     - Cons: increases prompt size.
+   - Option B: Expand “Entity Cheat Sheet” with per-entity source alternatives + rules.
+     - Pros: keeps all entity info together.
+     - Cons: less prominent for routing.
+   - Recommendation: **A** (clearest for arbitrary questions).
+2) **Depth of comparison**
+   - Option A: Short table: *source → when to use → caveats* for each overlapping entity (spaces, subscriptions, members, nodes, ARR).
+   - Option B: Short table + 2–3 concrete example questions per source.
+   - Recommendation: **B** (reduces ambiguity).
+3) **Conflict resolution rule**
+   - Option A: “watch_towers wins” for ARR/plan/trial truth; raw app_db_replication only for identity/contacts/committed_nodes.
+   - Option B: Allow overrides when raw data is fresher and the user explicitly asks for raw.
+   - Recommendation: **A** unless you want explicit raw overrides.
+
+### Decisions locked (2025-12-23) — source comparison detail in prompt
+- D12: **Placement**: add a “Source Selection Matrix” near the top (after Domain Model).
+- D13: **Depth**: include a short table + 2–3 example questions per source.
+- D14: **Conflict rule**: `watch_towers` is authoritative for ARR/plan/trial truth; raw app_db_replication only for identity/contacts/committed_nodes unless the user explicitly asks for raw.
+
+### Decisions needed (2025-12-23) — prompt entity definitions
+1) **Entity definitions to codify in the prompt**
+   - Option A: Use the existing Netdata domain model plus the new “Customer” definition (paid spaces only) and primary-contact rule (owner/admin).
+     - Pros: consistent with current prompt; minimal divergence.
+     - Cons: requires careful edits to avoid conflicts with existing wording.
+   - Option B: Replace the domain model section with a short, explicit “entity glossary + linking rules” table.
+     - Pros: clearer and shorter for the model.
+     - Cons: potential loss of context if we remove too much.
+   - Recommendation: **B** (clearer, less ambiguous, easier to keep correct).
+2) **Documentation sync for prompt changes**
+   - Option A: Update `docs/AI-AGENT-GUIDE.md` (and any referenced prompt docs) in the same pass.
+     - Pros: complies with doc-sync requirement; avoids drift.
+     - Cons: extra edits now.
+   - Option B: Defer doc updates until after the new test case lands.
+     - Pros: fewer changes now.
+     - Cons: violates doc-sync requirement; higher drift risk.
+   - Recommendation: **A** (required by repo rules).
+3) **Primary contact selection when a single value is required by schema**
+   - Option A: If schema needs one field, return a **comma-separated list** of all admins (owners).
+     - Pros: faithful to “owner = admin” and captures all owners.
+     - Cons: field contains multiple values.
+   - Option B: Return a single admin (deterministic ordering).
+     - Pros: single value; stable.
+     - Cons: drops other owners.
+   - Recommendation: **A** per Costa.
 
 ## Decisions (2025-12-18)
 - D1: Adopt KPI-first template catalog (no per-panel SQL in prompt). Maintain panel parity via harness instantiations. **Accepted (Costa)**.

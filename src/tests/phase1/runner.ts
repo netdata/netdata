@@ -956,6 +956,22 @@ function expectRecord(value: unknown, message: string): Record<string, unknown> 
   return value;
 }
 
+function decodeBase64(value: unknown): string | undefined {
+  if (typeof value !== 'string' || value.length === 0) return undefined;
+  try {
+    return Buffer.from(value, 'base64').toString('utf8');
+  } catch {
+    return undefined;
+  }
+}
+
+function findTurnFailedMessage(conversation: ConversationMessage[], fragment: string): ConversationMessage | undefined {
+  return conversation.find((message) => message.role === 'user'
+    && typeof message.content === 'string'
+    && message.content.includes('TURN-FAILED')
+    && message.content.includes(fragment));
+}
+
 
 function isToolAccounting(entry: AccountingEntry): entry is AccountingEntry & { type: 'tool' } {
   return entry.type === 'tool';
@@ -3230,6 +3246,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success && finalReport.format === 'json', 'Final report should indicate JSON success for run-test-32.');
       const toolFailureMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes('final_report(json) requires'));
       invariant(toolFailureMessage !== undefined, 'Final report failure message expected for run-test-32.');
+      const turnFailed = findTurnFailedMessage(result.conversation, 'Final report must be a JSON object');
+      invariant(turnFailed !== undefined, 'TURN-FAILED JSON guidance expected for run-test-32.');
       const llmAttempts = result.accounting.filter(isLlmAccounting).length;
       invariant(llmAttempts >= 2, 'Retry attempt expected for run-test-32.');
     },
@@ -3546,11 +3564,29 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success, 'Scenario run-test-50-snapshot-full expected success.');
       const tree = result.opTree;
       invariant(tree !== undefined, 'opTree missing for run-test-50-snapshot-full.');
-      const payloads = tree.turns.flatMap((turn) => turn.ops)
+      const ops = tree.turns.flatMap((turn) => turn.ops);
+      const payloads = ops
         .map((op) => op.response?.payload)
         .filter((payload): payload is Record<string, unknown> => payload !== undefined && payload !== null && typeof payload === 'object' && !Array.isArray(payload));
       const hasMarker = payloads.some((payload) => typeof payload.textPreview === 'string' && payload.textPreview.includes(SNAPSHOT_FULL_MARKER));
       invariant(hasMarker, 'Snapshot payload should include full marker for run-test-50-snapshot-full.');
+      const llmOps = ops.filter((op) => op.kind === 'llm');
+      const sdkResponses = llmOps
+        .map((op) => op.response?.payload)
+        .filter((payload): payload is Record<string, unknown> => payload !== undefined && payload !== null && typeof payload === 'object' && !Array.isArray(payload))
+        .map((payload) => payload.sdk)
+        .filter((sdk): sdk is Record<string, unknown> => sdk !== undefined && sdk !== null && typeof sdk === 'object' && !Array.isArray(sdk));
+      const sdkResponse = sdkResponses.find((sdk) => (sdk as { encoding?: unknown }).encoding === 'base64' && typeof (sdk as { value?: unknown }).value === 'string');
+      invariant(sdkResponse !== undefined, 'SDK response payload missing for run-test-50-snapshot-full.');
+      const decodedSdkResponse = decodeBase64((sdkResponse as { value?: unknown }).value);
+      invariant(decodedSdkResponse?.includes(SNAPSHOT_FULL_MARKER) === true, 'SDK response payload should include full marker for run-test-50-snapshot-full.');
+      const sdkRequests = llmOps
+        .map((op) => op.request?.payload)
+        .filter((payload): payload is Record<string, unknown> => payload !== undefined && payload !== null && typeof payload === 'object' && !Array.isArray(payload))
+        .map((payload) => payload.sdk)
+        .filter((sdk): sdk is Record<string, unknown> => sdk !== undefined && sdk !== null && typeof sdk === 'object' && !Array.isArray(sdk));
+      const sdkRequest = sdkRequests.find((sdk) => (sdk as { encoding?: unknown }).encoding === 'base64' && typeof (sdk as { value?: unknown }).value === 'string');
+      invariant(sdkRequest !== undefined, 'SDK request payload missing for run-test-50-snapshot-full.');
     },
   },
   {
@@ -8056,6 +8092,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(emptyWarning === undefined, 'Reasoning-only response must not trigger empty-response warning for run-test-93.');
       const retryNotice = result.logs.find((entry) => entry.remoteIdentifier === RETRY_REMOTE);
       invariant(retryNotice === undefined, 'Reasoning-only response should not schedule retry for run-test-93.');
+      const turnFailed = findTurnFailedMessage(result.conversation, 'Reasoning-only output detected');
+      invariant(turnFailed !== undefined, 'TURN-FAILED reasoning-only guidance expected for run-test-93.');
     },
   },
   {
@@ -12115,6 +12153,8 @@ BASE_TEST_SCENARIOS.push({
   expect: (result: AIAgentResult) => {
     invariant(!result.success, 'unknown tool should fail session');
     expectTurnFailureContains(result.logs, 'run-test-unknown-tool-fails', [...UNKNOWN_TOOL_FAILURE_SLUGS]);
+    const turnFailed = findTurnFailedMessage(result.conversation, 'Unknown tool name detected');
+    invariant(turnFailed !== undefined, 'TURN-FAILED unknown tool guidance expected for run-test-unknown-tool-fails.');
   },
 } satisfies HarnessTest);
 
@@ -12164,7 +12204,7 @@ BASE_TEST_SCENARIOS.push({
         {
           role: 'assistant',
           content: 'calling tool with invalid schema',
-          toolCalls: [{ id: 'call-1', name: 'mock_tool', parameters: { invalid: "not-json-serializable" } as unknown as Record<string, unknown> }],
+          toolCalls: [{ id: 'call-1', name: 'agent__task_status', parameters: null as unknown as Record<string, unknown> }],
         },
       ],
       tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
@@ -12173,6 +12213,8 @@ BASE_TEST_SCENARIOS.push({
   expect: (result: AIAgentResult) => {
     invariant(!result.success, 'invalid schema tool should fail session');
     expectTurnFailureContains(result.logs, 'run-test-invalid-schema-tool-fails', ['malformed_tool_call', 'final_report_missing', 'retries_exhausted']);
+    const turnFailed = findTurnFailedMessage(result.conversation, 'Tool call payload is not valid JSON');
+    invariant(turnFailed !== undefined, 'TURN-FAILED malformed tool guidance expected for run-test-invalid-schema-tool-fails.');
   },
 } satisfies HarnessTest);
 
@@ -12195,6 +12237,103 @@ BASE_TEST_SCENARIOS.push({
   expect: (result: AIAgentResult) => {
     invariant(!result.success, 'final-turn invalid response should fail session');
     expectTurnFailureContains(result.logs, 'run-test-single-provider-final-turn-invalid-response', ['no_tools', 'final_report_missing', 'retries_exhausted']);
+    const turnFailedFinal = findTurnFailedMessage(result.conversation, 'Final turn ended without a valid final report');
+    invariant(turnFailedFinal !== undefined, 'TURN-FAILED final turn guidance expected for run-test-single-provider-final-turn-invalid-response.');
+    const turnFailedText = findTurnFailedMessage(result.conversation, 'Text output detected without any tool calls');
+    invariant(turnFailedText !== undefined, 'TURN-FAILED text-without-tools guidance expected for run-test-single-provider-final-turn-invalid-response.');
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-empty-response-final-turn',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+    sessionConfig.maxTurns = 1;
+    sessionConfig.maxRetries = 1;
+    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+      latencyMs: 5,
+      response: '',
+      messages: [
+        { role: 'assistant', content: '' },
+      ],
+      tokens: { inputTokens: 5, outputTokens: 0, totalTokens: 5 },
+    }));
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(!result.success, 'empty response on final turn should fail session');
+    const turnFailed = findTurnFailedMessage(result.conversation, 'Empty response detected');
+    invariant(turnFailed !== undefined, 'TURN-FAILED empty response guidance expected for run-test-empty-response-final-turn.');
+  },
+} satisfies HarnessTest);
+
+const STOP_REASON_LENGTH_SCENARIO_ID = 'run-test-stop-reason-length-structured-truncation';
+
+BASE_TEST_SCENARIOS.push({
+  id: STOP_REASON_LENGTH_SCENARIO_ID,
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+    sessionConfig.maxTurns = 1;
+    sessionConfig.maxRetries = 1;
+    sessionConfig.outputFormat = 'json';
+    return await runWithPatchedExecuteTurn(sessionConfig, ({ request }) => {
+      const nonce = extractNonceFromMessages(request.messages, STOP_REASON_LENGTH_SCENARIO_ID);
+      const xml = `<ai-agent-${nonce}-FINAL status=\"success\" format=\"json\">{\"ok\":true}`;
+      return Promise.resolve({
+        status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+        latencyMs: 5,
+        response: xml,
+        messages: [
+          { role: 'assistant', content: xml },
+        ],
+        stopReason: 'length',
+        tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+      });
+    });
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(!result.success, 'structured truncation with stopReason=length should fail session');
+    expectTurnFailureContains(result.logs, STOP_REASON_LENGTH_SCENARIO_ID, ['stop_reason_length', 'retries_exhausted']);
+    const turnFailed = findTurnFailedMessage(result.conversation, 'stopReason=length');
+    invariant(turnFailed !== undefined, 'TURN-FAILED truncation guidance expected for run-test-stop-reason-length-structured-truncation.');
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-tool-message-fallback-validation-fails',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+    sessionConfig.maxTurns = 1;
+    sessionConfig.maxRetries = 1;
+    sessionConfig.outputFormat = SLACK_OUTPUT_FORMAT;
+    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+      latencyMs: 5,
+      messages: [
+        {
+          role: 'assistant',
+          content: 'attempting final report',
+          toolCalls: [
+            {
+              id: 'call-final',
+              name: 'agent__final_report',
+              parameters: { report_format: SLACK_OUTPUT_FORMAT, status: 'success', messages: 'not-json' },
+            },
+          ],
+        },
+        {
+          role: 'tool',
+          toolCallId: 'call-final',
+          content: 'not-json',
+        },
+      ],
+      tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+    }));
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(!result.success, 'tool message fallback validation failure should fail session');
+    const turnFailed = findTurnFailedMessage(result.conversation, 'Fallback final report from tool output failed schema validation');
+    invariant(turnFailed !== undefined, 'TURN-FAILED tool_message_fallback guidance expected for run-test-tool-message-fallback-validation-fails.');
   },
 } satisfies HarnessTest);
 

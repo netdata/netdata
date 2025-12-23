@@ -283,7 +283,6 @@ buildRetryDirective(request, status): TurnRetryDirective | undefined {
       action: 'retry',
       backoffMs: status.retryAfterMs,
       logMessage: `OpenRouter rate limit; backing off...`,
-      systemMessage: `System notice: OpenRouter (${request.provider}:${request.model}) rate-limited...`,
       sources: status.sources,
     };
   }
@@ -291,7 +290,7 @@ buildRetryDirective(request, status): TurnRetryDirective | undefined {
 }
 ```
 
-Custom rate limit handling with provider hint.
+Custom rate limit handling with provider hint; rate-limit retries are logged but not sent to the model.
 
 ## Response Conversion
 

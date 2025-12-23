@@ -60,6 +60,16 @@
 - **Input/Output contracts**:
   - `input.format`: `text` (default) or `json`; provide `schema` or `schemaRef` (YAML/JSON) when set to `json`.
   - `output.format`: `markdown` (default), `text`, or `json`. JSON outputs should include `schema` or `schemaRef` so headends can attach `response_format`.
+
+### Prompt Contract Notes (BI/BigQuery Agents)
+- **Entity meaning + linking must be explicit** in the prompt (not implied across sections). For Netdata BI: Space = any space; Customer = paid space only; Stripe customer_id alone does **not** imply paid; Owner = Admin; spaces can have multiple admins.
+- **Source selection matrix required**: prompt must explain overlapping sources (watch_towers vs app_db_replication vs metrics) and deterministic rules for when to use each, including examples.
+- **Primary contact rule**: when a schema requires a single field for admins, return a comma-separated list of admin contacts (deterministic ordering if possible).
+- **Growth % templates**: must use the single KPI SQL, preserve NULL lags, and never widen the date window or compute pct_* in the model.
+- **AWS ARR**: must route to `aws_arr_stat_last_not_null` and always run the KPI SQL (no freshness-only responses).
+- **AWS subscriptions**: must route to `aws_subscriptions_stat_last_not_null` and always run the KPI SQL (no freshness-only responses).
+- **Tool usage**: BI agents must not call `agent__task_status`; use only `bigquery__execute_sql` and report progress via `notes`.
+- **JSON-only output**: when a schema is provided, return only the JSON object (no prose/reasoning) to avoid truncation.
 - **Operational knobs** (frontmatter keys → defaults):
 
 | Key | Type | Default | Notes |
@@ -492,7 +502,7 @@ OpenAI‑compatible providers enable `includeUsage` for streaming token usage by
 - **Prompt formatting**: CLI builds `${FORMAT}` based on `--format` (choices: `markdown`, `markdown+mermaid`, `slack-block-kit`, `tty`, `pipe`, `json`, `sub-agent`). If omitted, it selects `tty` when stdout is a TTY and `markdown` otherwise, auto-switching to JSON when `output.format=json` is declared.
 - **Slack Block Kit formatting**: `slack-block-kit` requires Slack *mrkdwn* inside `section`/`context` blocks (not GitHub Markdown). Avoid `#` headings and Markdown tables; use header blocks or bold lines instead, format links as `<url|text>`, escape `& < >`, and use `section.fields` for 2‑column layouts. Output is sanitized (Markdown → mrkdwn, escape entities, table → code block) and validated against a strict Block Kit schema; invalid payloads fall back to a safe single-section message.
 - **Output schema override**: `--schema <inline-json | @schema.json>` forces `expectedOutput.format=json` and validates the final response against the provided JSON Schema. This **overrides** any `expectedOutput` declared in `.ai` frontmatter for the current run (useful for deterministic test harnesses).
-- **Persistence & tracing**: `--dry-run` validates config + MCP servers without contacting LLMs. `--trace-llm`, `--trace-mcp`, `--trace-sdk`, `--verbose`, `--show-tree` mirror the logging descriptions in Section 1.
+- **Persistence & tracing**: `--dry-run` validates config + MCP servers without contacting LLMs. `--trace-llm`, `--trace-mcp`, `--trace-sdk`, `--verbose`, `--show-tree` mirror the logging descriptions in Section 1. Snapshots always retain raw LLM request/response payloads (base64), including streaming SSE bodies.
 - **Debug tip**: Always smoke-test sub-agents with `--verbose` before invoking higher-level orchestrators. The verbose stream shows per-turn indices and tool names so you can confirm the planner is calling the expected tools (e.g., look for `agent:web.sweeps` before `agent:analysis` proceeds).
 - **Overrides**: Any CLI option seen in `OPTIONS_REGISTRY` (temperature, timeouts, tool limits, reasoning tokens, caching, etc.) takes top priority (Section 8). Use `--override key=value` for batch overrides across every agent in the run.
 - **Default reasoning fallback**: Use `--default-reasoning <none|minimal|low|medium|high>` (or `defaults.reasoning` in `.ai-agent.json`) to change the level applied only when prompts say `default`/`unset` or omit `reasoning`. Explicit `reasoning: none|minimal|...` always wins over the fallback.

@@ -62,12 +62,10 @@ export class OpenRouterProvider extends BaseLLMProvider {
   protected override buildRetryDirective(request: TurnRequest, status: TurnStatus): TurnRetryDirective | undefined {
     if (status.type === 'rate_limit') {
       const wait = typeof status.retryAfterMs === 'number' && Number.isFinite(status.retryAfterMs) ? status.retryAfterMs : undefined;
-      const providerHint = `${request.provider}:${request.model}`;
       return {
         action: 'retry',
         backoffMs: wait,
         logMessage: `OpenRouter rate limit; backing off ${wait !== undefined ? `${String(wait)}ms` : 'briefly'} before retry.${(status.sources ?? []).length > 0 ? ` Sources: ${(status.sources ?? []).join(' | ')}` : ''}`.trim(),
-        systemMessage: `OpenRouter rate limit for ${providerHint}; retrying.`,
         sources: status.sources,
       };
     }

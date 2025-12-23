@@ -24,6 +24,7 @@ interface SlackHeadendOptions {
 const stripBotMention = (text: string, botUserId: string): string => text.replace(new RegExp(`<@${botUserId}>`, 'g'), '').trim();
 const containsBotMention = (text: string, botUserId: string): boolean => new RegExp(`<@${botUserId}>`).test(text);
 const truncate = (s: string, max: number): string => (s.length <= max ? s : `${s.slice(0, max)}…`);
+const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 const STOPPING_TEXT = '🛑 Stopping…';
 const fmtTs = (ts: unknown): string => {
   if (typeof ts !== 'string' && typeof ts !== 'number') return '';
@@ -79,7 +80,6 @@ function extractSlackMessages(result: AIAgentResult | undefined): { blocks?: unk
   if (!slack || typeof slack !== 'object') return undefined;
   const msgs = (slack as Record<string, unknown>).messages;
   if (!Array.isArray(msgs)) return undefined;
-  const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
   const arr = msgs.filter(isRecord) as { blocks?: unknown[] }[];
   return arr.length > 0 ? arr : undefined;
 }
@@ -99,7 +99,6 @@ function extractSlackMessagesFromContent(result: AIAgentResult | undefined): { b
     return undefined;
   })();
   if (!Array.isArray(candidate)) return undefined;
-  const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
   const arr = candidate.filter(isRecord) as { blocks?: unknown[] }[];
   return arr.length > 0 ? arr : undefined;
 }
@@ -164,6 +163,41 @@ const extractTextFromBlocks = (blocks: unknown): string => {
     if (fallback.length > 0) parts.push(fallback);
   }
   return parts.join('\n').trim();
+};
+
+const buildSlackFallbackText = (params: {
+  result?: AIAgentResult;
+  opTree?: unknown;
+  metaError?: string;
+}): string => {
+  const { result, opTree, metaError } = params;
+  const opTreeError = (isRecord(opTree) && typeof opTree.error === 'string') ? opTree.error : undefined;
+  const errorText = metaError ?? result?.error ?? opTreeError;
+  const frMeta = isRecord(result?.finalReport?.metadata) ? result?.finalReport?.metadata : undefined;
+  const status = (isRecord(frMeta) && typeof frMeta.status === 'string') ? frMeta.status : undefined;
+  const reason = (isRecord(frMeta) && typeof frMeta.reason === 'string') ? frMeta.reason : undefined;
+  const slugs = (isRecord(frMeta) && Array.isArray(frMeta.slugs)) ? frMeta.slugs : undefined;
+  const turnsCompleted = (isRecord(frMeta) && typeof frMeta.turns_completed === 'number') ? frMeta.turns_completed : undefined;
+  const attempts = (isRecord(frMeta) && typeof frMeta.final_report_attempts === 'number') ? frMeta.final_report_attempts : undefined;
+  const lastStop = (isRecord(frMeta) && typeof frMeta.last_stop_reason === 'string') ? frMeta.last_stop_reason : undefined;
+  const opTurns = (isRecord(opTree) && Array.isArray(opTree.turns)) ? opTree.turns.length : undefined;
+  const isFailureStatus = status === 'failure';
+  const isFailure = isFailureStatus || result?.success === false || typeof metaError === 'string' || typeof opTreeError === 'string';
+
+  if (!isFailure) {
+    return 'Report ready — see blocks below.';
+  }
+
+  const parts: string[] = ['❌ FAILURE'];
+  parts.push(`error=${errorText ?? 'unknown'}`);
+  if (typeof reason === 'string' && reason.length > 0) parts.push(`reason=${reason}`);
+  if (Array.isArray(slugs) && slugs.length > 0) parts.push(`slugs=${slugs.join(',')}`);
+  const turns = turnsCompleted ?? opTurns;
+  if (typeof turns === 'number') parts.push(`turns_completed=${String(turns)}`);
+  if (typeof attempts === 'number') parts.push(`final_report_attempts=${String(attempts)}`);
+  if (typeof status === 'string' && status.length > 0) parts.push(`final_report_status=${status}`);
+  if (typeof lastStop === 'string' && lastStop.length > 0) parts.push(`last_stop_reason=${lastStop}`);
+  return truncate(parts.join(' | '), 3500);
 };
 
 const extractTextFromAttachments = (attachments: unknown): string => {
@@ -580,8 +614,10 @@ const elog = (msg: string): void => { try { process.stderr.write(`[ERR] ← [0.0
     closed.add(key);
     const pending = updating.get(key); if (pending) { clearTimeout(pending); updating.delete(key); }
     const result = sm.getResult(runId);
+    const opTree = sm.getOpTree(runId);
     let slackMessages = extractSlackMessages(result) ?? extractSlackMessagesFromContent(result);
     let finalText = extractFinalText(sm, runId);
+    const fallbackText = buildSlackFallbackText({ result, opTree, metaError: meta.error });
 
     if ((!slackMessages || slackMessages.length === 0) && typeof finalText === 'string' && finalText.trim().length > 0) {
       const parsed = parseSlackJson(finalText);
@@ -594,12 +630,12 @@ const elog = (msg: string): void => { try { process.stderr.write(`[ERR] ← [0.0
     const hasSlackMessages = slackMessages && slackMessages.length > 0;
     if (!finalText && !hasSlackMessages) {
       if (meta.error === 'stopped') finalText = '🛑 Stopped';
-      else finalText = meta.error ? `❌ ${meta.error}` : '✅ Done';
+      else finalText = fallbackText;
     }
     // Additional check: Ensure we have something to post
     if (!finalText && !hasSlackMessages) {
       elog('Warning: No content to post (both finalText and slackMessages are empty)');
-      finalText = '⚠️ No response content was generated. Please check the logs for details.';
+      finalText = fallbackText;
     }
 
     // CONSOLIDATED POST-AGENT LOG
@@ -658,7 +694,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[ERR] ← [0.0
           return out;
         };
         const firstBlocks = repairBlocks(firstBlocksRaw.slice(0, MAX_BLOCKS));
-        const fallback = 'Report posted as Block Kit messages.';
+        const fallback = fallbackText;
         try {
           await client.chat.update({ channel, ts, text: fallback, blocks: firstBlocks });
         } catch (e1) {

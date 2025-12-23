@@ -58,7 +58,6 @@ export interface TurnRetryDirective {
   action: 'retry' | 'skip-provider' | 'abort';
   backoffMs?: number;
   logMessage?: string;
-  systemMessage?: string;
   sources?: string[];
 }
 

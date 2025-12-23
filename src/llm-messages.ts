@@ -11,7 +11,6 @@
  * Categories:
  * - TURN_CONTROL: Messages injected to control turn flow
  * - TURN_FAILURE: Validation errors sent via TURN-FAILED feedback
- * - SYSTEM_NOTICES: Provider state notices (rate limits, auth, quotas)
  * - FINAL_REPORT_REMINDER: Guidance for calling final_report
  * - TOOL_RESULTS: Messages returned as tool execution results
  * - XML_PROTOCOL: Errors for the XML final-report transport (via TURN-FAILED)
@@ -63,7 +62,7 @@ export const toolReminderMessage = (excludeProgress: string): string =>
  * (final turn reached, but response has no final report)
  */
 export const FINAL_TURN_NOTICE =
-  'System notice: this is the final turn. You **MUST NOW** provide your final report/answer. Do NOT attempt to call any other tool. Read carefully the final report/answer instructions and provide your final report/answer based on the information already gathered. If the information is insufficient, provide the best possible answer based on what you have and note the limitation in your final report/answer.';
+  'This is the final turn. You **MUST NOW** provide your final report/answer and you are not allowed to call any other tool. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation explicitly in your final report.';
 
 /**
  * Injected when task completion is signaled via task_status tool.
@@ -105,7 +104,37 @@ export const RETRY_EXHAUSTION_FINAL_MESSAGE = FINAL_TURN_NOTICE;
  * Used in: session-turn-runner.ts (sent as user message)
  */
 export const turnFailedPrefix = (reasons: string[]): string =>
-  `TURN-FAILED: ${reasons.join(' | ')}.`;
+  `TURN-FAILED: ${reasons.join(' | ')}`;
+
+const JSON_PARSE_ERROR_MAX = 200;
+
+export const formatJsonParseHint = (error?: string): string => {
+  if (error === undefined || error.trim().length === 0) {
+    return 'unable to parse JSON (check quotes/braces)';
+  }
+  const trimmed = error.replace(/\s+/g, ' ').trim();
+  if (trimmed === 'empty') return 'empty JSON payload';
+  if (trimmed === 'non_string') return 'non-string JSON payload';
+  if (trimmed === 'parse_failed') return 'unable to parse JSON (check quotes/braces)';
+  if (trimmed === 'expected_json_object') return 'expected a JSON object';
+  if (trimmed === 'missing_json_payload') return 'missing JSON payload';
+  return trimmed.length > JSON_PARSE_ERROR_MAX ? `${trimmed.slice(0, JSON_PARSE_ERROR_MAX - 3)}...` : trimmed;
+};
+
+export const buildInvalidJsonFailure = (base: string, error?: string): string => (
+  `${base} invalid_json: ${formatJsonParseHint(error)}`
+);
+
+export const buildSchemaMismatchFailure = (errors: string, preview?: string): string => (
+  `schema_mismatch: ${errors}${preview !== undefined ? ` (preview: ${preview})` : ''}`
+);
+
+export const formatSchemaMismatchSummary = (value?: string): string => {
+  if (value === undefined || value.trim().length === 0) return 'unknown validation error';
+  const trimmed = value.replace(/\s+/g, ' ').trim();
+  const limit = 160;
+  return trimmed.length > limit ? `${trimmed.slice(0, limit - 3)}...` : trimmed;
+};
 
 /**
  * When final report format doesn't match expected.
@@ -114,7 +143,7 @@ export const turnFailedPrefix = (reasons: string[]): string =>
  * CONDITION: final_report tool called && report_format !== expectedFormat
  */
 export const finalReportFormatMismatch = (expected: string, received: string): string =>
-  `Final report format must be ${expected}. Received ${received}.`;
+  `Final report format mismatch: expected "${expected}", received "${received}". Use the required format and resend your final report/answer.`;
 
 /**
  * When final report content is empty or missing.
@@ -124,7 +153,7 @@ export const finalReportFormatMismatch = (expected: string, received: string): s
  *            && (rawPayload ?? contentParam) is undefined or empty
  */
 export const FINAL_REPORT_CONTENT_MISSING =
-  'Final report content missing; provide your final report in the requested format.';
+  'Final report content is missing or empty. Provide non-empty content in the required format and resend your final report/answer.';
 
 /**
  * When JSON format expected but got non-JSON.
@@ -134,7 +163,7 @@ export const FINAL_REPORT_CONTENT_MISSING =
  *            && content_json is undefined after parsing attempts
  */
 export const FINAL_REPORT_JSON_REQUIRED =
-  'Final report must be JSON per schema; received non-JSON content.';
+  'Final report must be a JSON object that matches the provided schema. Provide a JSON object (not a string) and retry.';
 
 /**
  * When Slack Block Kit messages array is missing.
@@ -144,7 +173,25 @@ export const FINAL_REPORT_JSON_REQUIRED =
  *            && messagesArray is undefined or empty
  */
 export const FINAL_REPORT_SLACK_MESSAGES_MISSING =
-  'Final report missing messages array; provide Slack Block Kit messages.';
+  'Slack Block Kit final report is missing a `messages` array. Provide valid Block Kit messages and retry.';
+
+/**
+ * When final report fails schema validation.
+ * Used in: session-turn-runner.ts via addTurnFailure
+ *
+ * CONDITION: final_report tool called && payload fails schema validation
+ */
+export const finalReportSchemaValidationFailed = (summary: string): string =>
+  `Final report failed schema validation: ${summary}. Fix the payload to match the schema and resend your final report/answer.`;
+
+/**
+ * When tool message fallback fails schema validation.
+ * Used in: session-turn-runner.ts via addTurnFailure
+ *
+ * CONDITION: tool_message_fallback validation failed
+ */
+export const toolMessageFallbackValidationFailed = (summary: string): string =>
+  `Fallback final report from tool output failed schema validation: ${summary}. Provide your valid final report/answer in the required format.`;
 
 /**
  * When response has content but no valid tool calls and no final report.
@@ -159,7 +206,37 @@ export const FINAL_REPORT_SLACK_MESSAGES_MISSING =
  *       assistantForAdoption.content, not reasoning blocks)
  */
 export const TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT =
-  'No progress made in this turn: No tools called, no final report/answer provided, but unexpected content is present in your output.\n- If you believe you called tools, the system did not detect any tool calls. This usually means tool calls were not recognized at all and they leaked to your output.\n- If you believe you provided a final report/answer, it was not detected either. Ensure the final report is correctly formatted as instructed.\nRetry NOW: pay attention to the required syntax for tool calls and your final report/answer. Try again NOW';
+  'Text output detected without any tool calls or final report/answer. Call tool(s) or provide your final report/answer in the required wrapper exactly as instructed.';
+
+/**
+ * When response is empty (no tools, no final report).
+ * Used in: session-turn-runner.ts via addTurnFailure
+ */
+export const TURN_FAILED_EMPTY_RESPONSE =
+  'Empty response detected: no tool calls and no final report/answer were received. Call a tool or output your final report/answer in the required XML wrapper.';
+
+/**
+ * When response contains only reasoning (no visible content, no tools).
+ * Used in: session-turn-runner.ts via addTurnFailure
+ */
+export const TURN_FAILED_REASONING_ONLY =
+  'Reasoning-only output detected with no visible answer, tool calls, or final report. Call tools or provide your final report/answer.';
+
+/**
+ * When response is truncated due to stopReason=length/max_tokens.
+ * Used in: session-turn-runner.ts via addTurnFailure
+ */
+export const turnFailedOutputTruncated = (maxOutputTokens?: number): string => {
+  const tokenLimit = maxOutputTokens !== undefined ? ` (maxOutputTokens=${String(maxOutputTokens)})` : '';
+  return `Output was truncated (stopReason=length${tokenLimit}). Retry with a shorter response that still includes the required tool calls or a complete final report.`;
+};
+
+/**
+ * When final turn has no valid final report.
+ * Used in: session-turn-runner.ts via addTurnFailure
+ */
+export const TURN_FAILED_FINAL_TURN_NO_REPORT =
+  'Final turn ended without a valid final report. Provide the final report/answer now using the required XML wrapper and do not call any tools.';
 
 /**
  * When tool call parameters are malformed.
@@ -169,7 +246,34 @@ export const TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT =
  * (one or more tool calls had malformed JSON payloads and were dropped)
  */
 export const TOOL_CALL_MALFORMED =
-  'Tool call payload malformed; provide JSON arguments matching the schema.';
+  'Tool call payload is not valid JSON for the tool schema. Fix the arguments to match the schema and retry the tool call.';
+
+/**
+ * When an unknown tool is called.
+ * Used in: session-turn-runner.ts via addTurnFailure
+ *
+ * CONDITION: executionStats.unknownToolEncountered === true
+ */
+export const TURN_FAILED_UNKNOWN_TOOL =
+  'Unknown tool name detected. Use only the tool names shown in your tools list (including the full namespace prefix) and retry. If this is the final turn, do not call tools; provide your final report/answer in the required wrapper.';
+
+/**
+ * When tool calls exist but none executed.
+ * Used in: session-turn-runner.ts via addTurnFailure
+ *
+ * CONDITION: had tool calls && executedTools === 0 && not unknown && not dropped-invalid
+ */
+export const TURN_FAILED_TOOL_CALL_NOT_EXECUTED =
+  'Tool calls were not executed. This usually means the tool name is missing its namespace prefix or is not permitted on this turn. Retry with an allowed tool name exactly as listed, or provide your final report/answer if tools are not allowed.';
+
+/**
+ * When per-turn tool limit blocks execution.
+ * Used in: session-turn-runner.ts via addTurnFailure
+ *
+ * CONDITION: toolLimitExceeded === true
+ */
+export const TURN_FAILED_TOOL_LIMIT_EXCEEDED =
+  'Per-turn tool limit reached, so tool calls were rejected. Reduce the number of tool calls in a single turn and retry. If you are done, provide your final report/answer in the required wrapper.';
 
 /**
  * When only task_status was called without any productive tools.
@@ -179,7 +283,7 @@ export const TOOL_CALL_MALFORMED =
  * (task_status was called but no other tools)
  */
 export const TURN_FAILED_PROGRESS_ONLY =
-  'You called agent__task_status without calling any other tools together with it. agent__task_status only reports status to the user — it does NOT perform any actions. You must either:\n\n1. call other tools to collect data or perform actions (following their schemas precisely), or\n2. if your task is complete, call agent__task_status with status="completed" and then provide your final report/answer (using the XML wrapper as instructed).\n\n**NOTE:** agent__task_status can be called standalone, but consecutive standalone calls will force you to provide your final report.';
+  'You called agent__task_status without any other tools, so no work was performed. Call other tools to make progress, or if the task is complete, provide your final report/answer in the required XML wrapper.';
 
 /**
  * When model calls XML wrapper tag as a tool instead of outputting it as text.
@@ -188,63 +292,7 @@ export const TURN_FAILED_PROGRESS_ONLY =
  * CONDITION: Model emits tool_use with name matching ai-agent-{nonce}-FINAL pattern
  */
 export const turnFailedXmlWrapperAsTool = (sessionNonce: string, format: string): string =>
-  `You called the XML wrapper tag (ai-agent-${sessionNonce}-FINAL) as a tool. This is incorrect — the XML wrapper is NOT a tool, it is plain text that you output directly in your response.\n\nTo provide your final report/answer:\n1. Do NOT use tool calling syntax\n2. Write the XML wrapper directly in your response text\n3. Example: <ai-agent-${sessionNonce}-FINAL format="${format}">YOUR CONTENT HERE</ai-agent-${sessionNonce}-FINAL>\n\nThe system is waiting for your final report/answer as XML text output, not as a tool call.`;
-
-// =============================================================================
-// SYSTEM NOTICES (LLM-facing only)
-// =============================================================================
-
-/**
- * After empty response - no tools called and no final report.
- * Used in: session-turn-runner.ts (pushed as system retry message)
- *
- * CONDITION: isEmptyWithoutTools && turnResult.hasReasoning !== true
- * Where isEmptyWithoutTools = !turnResult.status.finalAnswer
- *                             && !turnResult.status.hasToolCalls
- *                             && (turnResult.response === undefined || turnResult.response.trim().length === 0)
- *
- * NOTE: Reasoning-only responses skip this check (hasReasoning === true bypasses)
- */
-export const EMPTY_RESPONSE_RETRY_NOTICE =
-  'System notice: No progress made in this turn: no tools called and no final report/answer provided. To advance you MUST call tools or provide your final report/answer. Review carefully the provided instructions and tools (if any), decide your next action(s), and follow the instructions precisely to continue. If you believe you called tools or provided a final report, it did not work: ensure the tool calls and final report are correctly formatted as per the instructions. Try again NOW.';
-
-// =============================================================================
-// FINAL REPORT REMINDER
-// Injected to guide correct final_report usage
-// =============================================================================
-
-/**
- * Builds a detailed reminder for how to call final_report correctly.
- * Used in: session-turn-runner.ts buildFinalReportReminder (system retry message)
- *
- * CONDITION: Called when final report validation fails or on final turn without final answer
- * - After FINAL_TURN_NOTICE (isFinalTurn && !turnResult.status.finalAnswer)
- * - After final report validation errors (format mismatch, content missing, etc.)
- */
-export const finalReportReminder = (
-  format: string,
-  formatDescription: string,
-  contentGuidance: string
-): string =>
-  `System notice: provide your final report/answer in the required XML wrapper with format="${format}" (${formatDescription}), and ${contentGuidance}.`;
-
-/**
- * Content guidance for JSON format.
- */
-export const CONTENT_GUIDANCE_JSON =
-  'include a `content_json` object that matches the expected schema';
-
-/**
- * Content guidance for Slack Block Kit format.
- */
-export const CONTENT_GUIDANCE_SLACK =
-  'include a `messages` array populated with the final Slack Block Kit blocks';
-
-/**
- * Content guidance for text formats.
- */
-export const CONTENT_GUIDANCE_TEXT =
-  'include `report_content` containing the full final answer';
+  `You called the XML wrapper tag (ai-agent-${sessionNonce}-FINAL) as a tool, but it must be plain text in your response. Do NOT use tool-calling syntax; output the XML wrapper directly. Example: <ai-agent-${sessionNonce}-FINAL format="${format}">YOUR CONTENT HERE</ai-agent-${sessionNonce}-FINAL>`;
 
 /**
  * Check if a tool name matches the XML final report tag pattern.
@@ -300,7 +348,7 @@ export const isUnknownToolFailureMessage = (content: string): boolean =>
  * CONDITION: XML mode && final_report tag found && JSON.parse(payload) fails
  */
 export const XML_FINAL_REPORT_NOT_JSON =
-  'final-report payload is not valid JSON. Provide the correct JSON object according to the final-report/answer instructions and schema.';
+  'Final report payload is not valid JSON. Provide a JSON object that matches the final-report schema and retry.';
 
 /**
  * Tool payload is not valid JSON (XML mode).
@@ -309,7 +357,7 @@ export const XML_FINAL_REPORT_NOT_JSON =
  * CONDITION: XML mode && tool tag found && JSON.parse(payload) fails
  */
 export const xmlToolPayloadNotJson = (toolName: string): string =>
-  `Tool \`${toolName}\` payload is not valid JSON. Provide a JSON object.`;
+  `Tool \`${toolName}\` payload is not valid JSON. Provide a JSON object for the tool parameters and retry.`;
 
 /**
  * XML tag slot mismatch.
@@ -318,7 +366,7 @@ export const xmlToolPayloadNotJson = (toolName: string): string =>
  * CONDITION: XML mode && tag slot attribute !== expected nonce/slot for this turn
  */
 export const xmlSlotMismatch = (capturedSlot: string): string =>
-  `Tag ignored: slot '${capturedSlot}' does not match the current nonce/slot for this turn.`;
+  `Tag ignored: slot '${capturedSlot}' does not match the current nonce/slot for this turn. Use the exact slot id from XML-NEXT and retry.`;
 
 /**
  * XML missing closing tag.
@@ -327,7 +375,7 @@ export const xmlSlotMismatch = (capturedSlot: string): string =>
  * CONDITION: XML mode && opening tag found && corresponding closing tag not found
  */
 export const xmlMissingClosingTag = (capturedSlot: string): string =>
-  `Malformed XML: missing closing tag for '${capturedSlot}'.`;
+  `Malformed XML: missing closing tag for '${capturedSlot}'. Close the tag exactly as shown and retry.`;
 
 /**
  * XML malformed - nonce/slot/tool mismatch.
@@ -336,7 +384,7 @@ export const xmlMissingClosingTag = (capturedSlot: string): string =>
  * CONDITION: XML mode && tag validation fails (nonce/slot mismatch or empty content)
  */
 export const xmlMalformedMismatch = (slotInfo: string): string =>
-  `Malformed XML: nonce/slot/tool mismatch or empty content for '${slotInfo}'.`;
+  `Malformed XML: nonce/slot/tool mismatch or empty content for '${slotInfo}'. Use the exact nonce and slot, include non-empty content, and retry.`;
 
 /**
  * Structured output (json, slack-block-kit) truncated due to stopReason=length.
@@ -348,7 +396,7 @@ export const xmlMalformedMismatch = (slotInfo: string): string =>
 export const turnFailedStructuredOutputTruncated = (maxOutputTokens?: number): string => {
   const tokenLimit = maxOutputTokens !== undefined ? ` (${String(maxOutputTokens)} tokens)` : '';
   return `Your response was truncated (stopReason=length) because it exceeded the output token limit${tokenLimit}. ` +
-    `Repeat the same final-report, but this time keep your output within the required token count limit.`;
+    'Retry with a shorter output that still delivers your complete final report/answer in the required XML wrapper.';
 };
 
 

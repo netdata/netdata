@@ -14,7 +14,6 @@ import { ContextGuard, type ContextGuardBlockedEntry, type ContextGuardEvaluatio
 import { FinalReportManager, type PendingFinalReportPayload } from './final-report-manager.js';
 import { parseFrontmatter, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
 import { LLMClient } from './llm-client.js';
-import { CONTEXT_FINAL_MESSAGE } from './llm-messages.js';
 import { buildPromptVars, applyFormat, expandVars } from './prompt-builder.js';
 import { SessionProgressReporter } from './session-progress-reporter.js';
 import { SessionToolExecutor, type SessionContext } from './session-tool-executor.js';
@@ -139,7 +138,6 @@ export class AIAgentSession {
   // Finalization state managed by FinalReportManager
   private readonly finalReportManager: FinalReportManager;
   private pendingToolSelection?: ToolSelection;
-  private pendingRetryMessages: string[] = [];
   private trimmedToolCallIds = new Set<string>();
 
   // Counters for summary
@@ -1667,13 +1665,6 @@ export class AIAgentSession {
       this.log(finMcp);
     } catch { /* swallow summary errors */ }
   }
-  private pushSystemRetryMessage(conversation: ConversationMessage[], message: string): void {
-    const trimmed = message.trim();
-    if (trimmed.length === 0) return;
-    if (this.pendingRetryMessages.includes(trimmed)) return;
-    this.pendingRetryMessages.push(trimmed);
-  }
-
   private reportContextGuardEvent(params: {
     provider: string;
     model: string;
@@ -1719,18 +1710,6 @@ export class AIAgentSession {
       attributes['ai.context.remaining_tokens'] = computedRemaining;
     }
     addSpanEvent('context.guard', attributes);
-  }
-
-  private mergePendingRetryMessages(conversation: ConversationMessage[]): ConversationMessage[] {
-    const cleaned = conversation.filter((msg) => msg.metadata?.retryMessage === undefined);
-    if (cleaned.length !== conversation.length) {
-      conversation.splice(0, conversation.length, ...cleaned);
-    }
-    if (this.pendingRetryMessages.length === 0) {
-      return conversation;
-    }
-    const retryMessages = this.pendingRetryMessages.map((text) => ({ role: 'user' as const, content: text }));
-    return [...conversation, ...retryMessages];
   }
 
   // Context guard delegation methods
@@ -1793,7 +1772,6 @@ export class AIAgentSession {
 
     // AIAgentSession-specific side effects
     this.logEnteringFinalTurn('context', this.currentTurn);
-    this.pushSystemRetryMessage(this.conversation, CONTEXT_FINAL_MESSAGE);
 
     // Log warning if not already logged
     if (this.contextLimitWarningLogged) {

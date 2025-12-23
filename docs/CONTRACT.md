@@ -139,8 +139,8 @@ Note: Exit codes map to failure categories, not specific error types. Check `res
 ### Empty or Invalid LLM Responses
 
 **Empty content without tool calls:**
-- If the assistant returns only reasoning (non-empty `reasoning` field) and no tool calls or text content, the turn is allowed to proceed; the reasoning is preserved in the conversation for the next turn.
-- Otherwise (no content, no tools, no reasoning), the response is NOT added to the conversation, and a synthetic retry is triggered with the ephemeral message: `"System notice: plain text responses without tool calls are ignored. Use final_report to provide your answer."`
+- If the assistant returns only reasoning (non-empty `reasoning` field) and no tool calls or text content, the reasoning is preserved in the conversation but the turn is retried with TURN-FAILED guidance (`reasoning_only`).
+- Otherwise (no content, no tools, no reasoning), the response is NOT added to the conversation, and a synthetic retry is triggered with TURN-FAILED guidance (`empty_response`).
 - Counts as one attempt toward `maxRetries` budget
 
 **Invalid tool call parameters:**
@@ -322,10 +322,8 @@ The `conversation` array in `AIAgentResult` contains the full message history.
 
 ### Ephemeral Messages
 
-**Synthetic retry messages:**
-- NOT added to permanent conversation
-- Used only for single retry attempt
-- Example: "System notice: plain text responses are ignored..."
+- Retry guidance is persisted as TURN-FAILED user messages in the conversation.
+- XML protocol notices (XML-NEXT/XML-PAST) are injected per attempt and are not persisted as permanent conversation history.
 
 ---
 

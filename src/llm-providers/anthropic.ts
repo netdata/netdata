@@ -72,11 +72,6 @@ export class AnthropicProvider extends BaseLLMProvider {
         msg.providerOptions = Object.keys(nextOptions).length > 0 ? nextOptions : undefined;
       }
 
-      const isSystemNotice = (msg: ResponseMessage): boolean => {
-        const content = (msg as { content?: unknown }).content;
-        return typeof content === 'string' && content.trim().startsWith('System notice:');
-      };
-
       // Check if message is ephemeral (changes every turn, should not be cached)
       // noticeType is lost during convertMessages, so check content patterns
       const isEphemeralMessage = (msg: ResponseMessage): boolean => {
@@ -94,7 +89,7 @@ export class AnthropicProvider extends BaseLLMProvider {
         for (let i = extendedMessages.length - 1; i >= 0; i -= 1) {
           const candidate = extendedMessages[i] as ResponseMessage;
           // Skip ephemeral messages that change every turn (breaks cache reads)
-          if (!isSystemNotice(candidate) && !isEphemeralMessage(candidate)) {
+          if (!isEphemeralMessage(candidate)) {
             return i;
           }
         }
@@ -216,13 +211,11 @@ export class AnthropicProvider extends BaseLLMProvider {
   protected override buildRetryDirective(request: TurnRequest, status: TurnStatus): TurnRetryDirective | undefined {
     if (status.type === 'rate_limit') {
       const wait = typeof status.retryAfterMs === 'number' && Number.isFinite(status.retryAfterMs) ? status.retryAfterMs : undefined;
-      const remoteId = `${request.provider}:${request.model}`;
       const message = `Anthropic rate limit; waiting ${wait !== undefined ? `${String(wait)}ms` : 'briefly'} before retry.`;
       return {
         action: 'retry',
         backoffMs: wait,
         logMessage: message,
-        systemMessage: `Anthropic rate limit for ${remoteId}; retrying.`,
         sources: status.sources,
       };
     }
