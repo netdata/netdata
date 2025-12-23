@@ -108,17 +108,18 @@ async function setupTestEnvironment() {
 
 // MCP client implementation
 class MCPTestClient {
-  constructor() {
+  constructor(serverArgs = []) {
     this.server = null;
     this.buffer = '';
     this.messageId = 1;
     this.pendingRequests = new Map();
     this.errorOutput = '';
+    this.serverArgs = Array.isArray(serverArgs) ? serverArgs : [];
   }
 
   async start() {
     return new Promise((resolve, reject) => {
-      this.server = spawn('node', [SERVER_PATH, TEST_DIR], {
+      this.server = spawn('node', [SERVER_PATH, ...this.serverArgs, TEST_DIR], {
         stdio: ['pipe', 'pipe', 'pipe']
       });
 
@@ -200,7 +201,7 @@ class MCPTestClient {
 }
 
 // Test runner
-async function runTest(name, testFn) {
+async function runTest(name, testFn, serverArgs = []) {
   const testNum = testsPassed + testsFailed + 1;
 
   if (verbose) {
@@ -209,7 +210,7 @@ async function runTest(name, testFn) {
     process.stdout.write(`${GRAY}[${testNum}/${testResults.length}] ${name}...${NC} `);
   }
 
-  const client = new MCPTestClient();
+  const client = new MCPTestClient(serverArgs);
   try {
     await client.start();
     await testFn(client);
@@ -745,6 +746,74 @@ const tests = [
   },
 
   {
+    name: 'RGrep root allowed by default',
+    fn: async (client) => {
+      const result = await client.callTool('RGrep', {
+        dir: '',
+        regex: 'content',
+        caseSensitive: true
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: RGrep${NC}`);
+        console.log(`${GRAY}Parameters: ${JSON.stringify({
+          dir: '',
+          regex: 'content',
+          caseSensitive: true
+        })}${NC}`);
+        console.log('Output:');
+        console.log(result);
+      }
+      if (!result.includes('under root')) throw new Error('RGrep root summary should mention root');
+    }
+  },
+
+  {
+    name: 'RGrep respects maxFiles',
+    fn: async (client) => {
+      const result = await client.callTool('RGrep', {
+        dir: '',
+        regex: 'content',
+        caseSensitive: true,
+        maxFiles: 1
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: RGrep${NC}`);
+        console.log(`${GRAY}Parameters: ${JSON.stringify({
+          dir: '',
+          regex: 'content',
+          caseSensitive: true,
+          maxFiles: 1
+        })}${NC}`);
+        console.log('Output:');
+        console.log(result);
+      }
+      if (!result.includes('1 match found in 1 file')) throw new Error('RGrep maxFiles should stop after one file');
+    }
+  },
+
+  {
+    name: 'RGrep root blocked with --no-rgrep-root',
+    serverArgs: ['--no-rgrep-root'],
+    fn: async (client) => {
+      try {
+        await client.callTool('RGrep', {
+          dir: '',
+          regex: 'content',
+          caseSensitive: true
+        });
+        throw new Error('Should have failed on root RGrep with --no-rgrep-root');
+      } catch (e) {
+        if (verbose) {
+          console.log(`${GRAY}Expected error: ${e.message}${NC}`);
+        }
+        if (!String(e.message).includes('--no-rgrep-root')) {
+          throw new Error('Error should mention --no-rgrep-root');
+        }
+      }
+    }
+  },
+
+  {
     name: 'RGrep with symlinks shows warnings',
     fn: async (client) => {
       const result = await client.callTool('RGrep', {
@@ -935,6 +1004,41 @@ const tests = [
   },
 
   {
+    name: 'Regex safety guard - catastrophic pattern',
+    fn: async (client) => {
+      try {
+        await client.callTool('Grep', { file: 'file1.txt', regex: '.*.*', caseSensitive: true, before: 0, after: 0 });
+        throw new Error('Should have failed on catastrophic regex');
+      } catch (e) {
+        if (verbose) {
+          console.log(`${GRAY}Expected error: ${e.message}${NC}`);
+        }
+        if (!String(e.message).includes('catastrophic backtracking')) {
+          throw new Error('Error should mention catastrophic backtracking');
+        }
+      }
+    }
+  },
+
+  {
+    name: 'Regex safety guard - pattern length',
+    fn: async (client) => {
+      const longPattern = 'a'.repeat(10001);
+      try {
+        await client.callTool('Grep', { file: 'file1.txt', regex: longPattern, caseSensitive: true, before: 0, after: 0 });
+        throw new Error('Should have failed on overly long regex');
+      } catch (e) {
+        if (verbose) {
+          console.log(`${GRAY}Expected error: ${e.message}${NC}`);
+        }
+        if (!String(e.message).includes('Regex pattern too long')) {
+          throw new Error('Error should mention regex length limit');
+        }
+      }
+    }
+  },
+
+  {
     name: 'Relative symlink support',
     fn: async (client) => {
       const result = await client.callTool('ListDir', { dir: 'dir2' });
@@ -1093,7 +1197,7 @@ async function main() {
 
     // Run all tests and collect results
     for (const test of tests) {
-      const result = await runTest(test.name, test.fn);
+      const result = await runTest(test.name, test.fn, test.serverArgs);
       testResults.push(result);
     }
 
