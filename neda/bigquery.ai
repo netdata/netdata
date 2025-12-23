@@ -257,6 +257,7 @@ Users may not explicitly ask using the right terminology. Use this table to map 
 | Revenue                   | realized ARR (discounted) total — use metrics_daily realized ARR templates |
 | Revenue per user/customer/account | ARR per space/account — use `watch_towers.spaces_asat_*` (or `spaces_latest` for current) and field `bq_arr_discount`; do NOT use metrics_daily aggregates |
 | Business revenue / Business ARR | business ARR discounted — use metrics_daily `arr_business_discount` templates (stat or timeseries) |
+| AWS ARR / AWS Marketplace ARR (latest/current) | use `aws_arr_stat_last_not_null` (metrics_daily aws_*); return one row (ORDER BY date DESC LIMIT 1) |
 | Users signed up | all spaces signed up (Business + Homelab + Business Trial + Community); do not filter unless user specifies paid/free |
 | Spaces signed up | all spaces signed up (Business + Homelab + Business Trial + Community); do not filter unless user specifies paid/free |
 | Customers signed up | paying spaces signed up only (Business + Homelab); filter by Business/Homelab if specified |
@@ -299,6 +300,7 @@ Signup / churn terminology (must follow exactly):
 Stat-only KPIs (never return a timeseries for these when the ask is “latest/current/last” or the schema caps data to one row):
 - active users (`spaces_active_members_sum`)
 - on-prem customers (`onprem_customers` with legacy fallback)
+- AWS ARR (aws_business_arr / aws_annual_business_arr / aws_monthly_business_arr)
 - business paid nodes (paid_nodes_business_annual + paid_nodes_business_monthly)
 - "Latest/now/most recent realized ARR" (optionally with a date window) → use the realized ARR **stat** template (last non-null, `ORDER BY date DESC LIMIT 1`); return a single row, not a per-day series.
 - "Latest/now/most recent realized ARR" (optionally with a date window) → use the realized ARR **stat** template (last non-null, `ORDER BY date DESC LIMIT 1`); return a single row, not a per-day series. If the query returns multiple rows, sort by date DESC and drop all but the first before emitting JSON (schemas with `maxItems: 1` **must** end with one element).
@@ -2379,6 +2381,7 @@ ORDER BY date DESC
 LIMIT 1;
 ```
 - Latest/current AWS ARR; return one row only. Do not include today unless user explicitly asks (then change `< CURRENT_DATE()` to `<= CURRENT_DATE()`).
+- **HARD STOP:** always run this query for AWS ARR questions; never return `data: []` or freshness-only notes without executing the KPI SQL.
 
 ## Template: aws_subscriptions_stat_last_not_null (use for current/latest AWS subscription counts)
 ```
@@ -2489,7 +2492,7 @@ FROM final
 ORDER BY date DESC
 LIMIT 1;
 ```
-- Latest/current on-prem customer count; return **exactly one row only**. **HARD STOP:** do not output a timeseries for this KPI unless the user explicitly asks for a trend/over-time series. If you produced multiple rows, you must drop all but the most recent (date DESC).
+- Latest/current on-prem customer count; return **exactly one row only**. **HARD STOP:** do not output a timeseries for this KPI unless the user explicitly asks for a trend/over-time series. If you produced multiple rows, you must drop all but the most recent (date DESC) and **never** keep the earliest row.
 - Applies legacy fallback of **5 customers** only for dates ≤ 2025-10-04 when the metric is NULL.
 - **HARD STOP:** never use `GENERATE_DATE_ARRAY` or a date spine for this KPI. It is a stat-only query.
 
@@ -3331,6 +3334,7 @@ ORDER BY d.date;
 - **ABSOLUTE HARD STOP on widening the window:** never include any date < `{{from_date}}` in the series or in any helper/pre-query. If the 7/30/90-day prior point is outside the requested window, pct_* **must** stay NULL. Do not backfill, do not interpolate, do not default to 0, do not set `from_date` to `to_date - 7/30/90`, and keep the WHERE clause exactly as written. Do not reuse historical rows before `{{from_date}}` even if they exist.
 - Run exactly **one** query (this template). Do not issue any extra “lookback” or “helper” query with earlier dates. If lags are missing, return NULL and note the missing history in `notes`. Never compute pct_* for the first 7/30/90 days of the window when the lag is out of range—leave them NULL.
 - **Output rule:** return the SQL results as-is. Do not recompute pct_* from any other query, do not override NULLs, and do not substitute any values in the model.
+- **HARD STOP:** if you accidentally ran any other query, discard it; the only valid output is the rows produced by this template, including NULL pct_* values.
 
 ## Template: customers_growth_pct_timeseries (alias; use verbatim for customers/subscriptions growth %)
 ```
@@ -3513,6 +3517,7 @@ SELECT * FROM negative;
 - Do **not** apply manual on-prem baseline here; this is per-space ARR from snapshots only.
 - **Do not shift the start date.** If the user says “since 2025-12-15”, then `from_date = 2025-12-15` (inclusive).
 - **Return exactly the rows produced by this SQL.** Do not drop negative rows, do not filter to gains only, and do not re-rank in the model. If fewer than 10 gains/losses exist, return fewer rows and note it.
+- If the user asks for gains **and** losses, expect up to **20 rows** (10 positive + 10 negative). Do not drop any row returned by SQL, even if the delta is small.
 
 ## Template: space_nodes_delta_top10_business (reachable nodes change, Business)
 ```

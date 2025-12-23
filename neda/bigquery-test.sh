@@ -5306,7 +5306,7 @@ JSON
 }
 
 run_case_top_customers_arr_2k() {
-  echo -e "${GREEN}=== CASE: Top 100 customers >= $2K ARR (current) ===${NC}"
+  echo -e "${GREEN}=== CASE: Top 100 customers >= \\$2K ARR (current) ===${NC}"
 
   local case_name="top_customers_arr_2k"
   local ref_file="${OUT_DIR}/${case_name}.ref.json"
