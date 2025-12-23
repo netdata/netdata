@@ -248,6 +248,8 @@ Users may not explicitly ask using the right terminology. Use this table to map 
 | Top 10 ARR gains/losses by customer/space | use `space_arr_delta_top10` (single SQL); return all rows from SQL (top 10 positive + top 10 negative) |
 | Top 10 nodes gained/lost (Business/Homelab) | use `space_nodes_delta_top10_business` / `space_nodes_delta_top10_homelab` verbatim; return all rows from SQL |
 | ARR change between T0 and T1 (components) | use `realized_arr_kpi_delta_window` verbatim; do not rename `*_delta` keys |
+| Realized ARR per product + total (latest/current) | use `realized_arr_components_stat_last_not_null` (stat template, ORDER BY date DESC LIMIT 1) |
+| Realized ARR % / share / mix (per day) | use `realized_arr_percent_timeseries` verbatim; total must be the **sum** of component percentages (~100) |
 | Business subscriptions deltas (7/30/90 abs) | use `business_subscriptions_deltas_latest` verbatim; keep last_7/30/90 column names |
 | Business paid nodes (latest/current) | use `business_nodes_stat_last_not_null` (metrics_daily paid_nodes_business_annual + paid_nodes_business_monthly); ORDER BY date DESC LIMIT 1 |
 | On-prem customers / on-prem & support subscriptions (latest/current) | use `on_prem_customers_stat_last_not_null`; ORDER BY date DESC LIMIT 1 (never return a series) |
@@ -323,6 +325,7 @@ If the user does not specify an output schema/format, respond in clear prose. If
 - If a tool call fails or no data is available, still return the schema shape `{ "data": [], "notes": [...] }`. **Never** emit a top-level `status` field.
 - **Never wrap the payload** (e.g., `{ "status": "...", "content_json": { ... } }`). The root object must be exactly what the schema requires, typically `{ "data": [...], "notes": [...] }`.
 - **Cardinality compliance**: if the schema caps `data` (e.g., `maxItems: 1`), you **must** return no more than that many rows. Add `ORDER BY date DESC LIMIT 1` to the SQL (or post-filter) so only the most recent row is emitted. Returning extra rows is invalid, even if the template normally yields a series.
+- **Identifier integrity (hard):** never truncate or abbreviate IDs (e.g., `space_id`, `customer_id`). Copy identifiers exactly as returned by SQL—no ellipses, no shortening, no dropped characters.
 - Practical rule: when `maxItems: 1`, after you receive tool results, **always** slice `data` to one most-recent row before final_report. Implementation: if `data.length > 1`, sort by date DESC (when a `date` field exists) and set `data = [data[0]]`; otherwise keep the first element. Example: for `total_arr_plus_unrealized_arr` or `onprem_customers` stat asks, if a query accidentally returns multiple dates, sort by date DESC and keep only the first; never emit the full timeseries.
 
 ## Core execution rules (apply everywhere, even when templates exist)
@@ -332,6 +335,7 @@ If the user does not specify an output schema/format, respond in clear prose. If
 - **“Since X” rule (hard):** treat X as the inclusive start date. Do not shift X backward. Set `to_date = yesterday` only when the user does not provide an end date.
 - **Explicit end-date rule (hard):** if the user provides `to_date` (or `snapshot_date`) and it is ≤ yesterday, use it as-is. Do not cap it, do not subtract a day, do not replace it with yesterday.
 - Stat / “latest/now/most recent/last” asks (even with a from/to window): always `ORDER BY date DESC LIMIT 1`, return one row. Obey schemas that cap `data` to one item.
+- **Stat KPI guard (hard):** when the required output is a **single row**, do **not** build a date spine (no `GENERATE_DATE_ARRAY`/`UNNEST`); use the stat template and `ORDER BY date DESC LIMIT 1`. Date spines are only for timeseries outputs.
 - **Stat-only KPIs rule:** for active users, on-prem customers, and business paid nodes, a latest/current ask **must** use the stat template and return exactly one row. If you produced multiple rows, it is wrong—re-run with `ORDER BY date DESC LIMIT 1`.
 - If the schema caps `data` to one item (e.g., `maxItems: 1`), enforce it in SQL with `LIMIT 1` and return exactly one element (or the empty array if allowed). Do **not** emit a timeseries when the schema requires a single element.
 - Hard stop: if your SQL still produces multiple rows under a maxItems=1 schema, you **MUST** post-filter to one most-recent row before emitting JSON (order by date DESC, keep the first). Never return more rows than the schema permits.
@@ -2460,6 +2464,7 @@ LIMIT 1;
 ```
 - Latest/current on-prem customer count; return **exactly one row only**. **HARD STOP:** do not output a timeseries for this KPI unless the user explicitly asks for a trend/over-time series. If you produced multiple rows, you must drop all but the most recent (date DESC).
 - Applies legacy fallback of **5 customers** only for dates ≤ 2025-10-04 when the metric is NULL.
+- **HARD STOP:** never use `GENERATE_DATE_ARRAY` or a date spine for this KPI. It is a stat-only query.
 
 ## Template: realized_arr_components_timeseries (use verbatim for $ breakdown per day)
 ```
@@ -2510,6 +2515,58 @@ ORDER BY date;
 ```
 - Use this when the user wants realized ARR broken down by on_prem/business/homelab/ai_bundles in currency, not percentages.
 - Do not substitute or drop components. Baseline applies only for dates ≤ 2025-10-01.
+
+## Template: realized_arr_components_stat_last_not_null (use verbatim for latest per-product + total)
+```
+WITH dates AS (
+  SELECT date
+  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '{{from_date}}', DATE '{{to_date}}')) AS date
+),
+realized AS (
+  SELECT
+    run_date AS date,
+    MAX(IF(metric_name = 'arr_business_discount', metric_value, NULL)) AS business,
+    MAX(IF(metric_name = 'onprem_arr', metric_value, NULL)) AS onprem_arr,
+    MAX(IF(metric_name = 'arr_homelab_discount', metric_value, NULL)) AS homelab,
+    MAX(IF(metric_name = 'ai_credits_space_revenue', metric_value, NULL)) AS ai_bundles
+  FROM `netdata-analytics-bi.metrics.metrics_daily`
+  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+    AND run_date > DATE '2023-11-28'
+    AND run_date < CURRENT_DATE()
+  GROUP BY run_date
+),
+manual_total AS (
+  SELECT IFNULL(SUM(annual_price), 0) AS manual_total
+  FROM `netdata-analytics-bi.watch_towers.manual360_asat_20251002`
+  WHERE expiry_date > DATE '2025-10-01'
+    AND start_date <= DATE '2025-10-01'
+),
+combined AS (
+  SELECT
+    d.date,
+    COALESCE(r.business, 0) AS business,
+    COALESCE(r.homelab, 0) AS homelab,
+    COALESCE(r.ai_bundles, 0) AS ai_bundles,
+    COALESCE(r.onprem_arr, 0) + CASE WHEN d.date <= DATE '2025-10-01' THEN m.manual_total ELSE 0 END AS on_prem,
+    COALESCE(r.onprem_arr, 0) + CASE WHEN d.date <= DATE '2025-10-01' THEN m.manual_total ELSE 0 END
+      + COALESCE(r.business, 0) + COALESCE(r.homelab, 0) + COALESCE(r.ai_bundles, 0) AS total
+  FROM dates d
+  LEFT JOIN realized r ON d.date = r.date
+  CROSS JOIN manual_total m
+)
+SELECT
+  date,
+  on_prem,
+  business,
+  homelab,
+  ai_bundles,
+  total
+FROM combined
+WHERE date < CURRENT_DATE()
+ORDER BY date DESC
+LIMIT 1;
+```
+- Latest/current per-product realized ARR + total. **Return exactly one row** (ORDER BY date DESC LIMIT 1). Do **not** use the timeseries template for a stat ask.
 
 
 ## Template: realized_arr_timeseries (use verbatim when asked for realized ARR per day/series)
@@ -2687,6 +2744,7 @@ ORDER BY date;
 ```
 - Use this when the user asks for realized ARR component shares/percent mix (on-prem, business, homelab, AI bundles) over a date range.
 - Do not change the component list. Use SAFE_DIVIDE to avoid NaN. Total should be ~100%; return all dates < CURRENT_DATE().
+- **HARD STOP:** `total` must equal the **sum of all four component percentages** (≈100). Never set `total = on_prem` or any single component; if `total` is not ~100, you used the wrong formula—re-run with the template verbatim.
 
 ## Template: realized_arr_deltas_7_30_90 (use verbatim for 7/30/90-day realized ARR deltas)
 ```
@@ -3109,7 +3167,7 @@ FROM sums;
 - Return every bucket **and the `check` column** exactly as in the query; if total = 0, SAFE_DIVIDE yields NULL—return NULL/0 rather than fabricating values. **HARD STOP:** Never drop `check` from the JSON payload (even if 0); keep it in `data` alongside the other buckets.
 - Use this template for any “nodes total view percent / reachable nodes mix %” style question (e.g., Grafana “nodes total view %” panel).
 
-## Template: onprem_customers_latest (use verbatim for latest on-prem customers)
+## Template: onprem_customers_latest (DEPRECATED — do NOT use; kept only for historical reference)
 ```
 WITH dates AS (
   SELECT date
@@ -3142,7 +3200,7 @@ WHERE date < CURRENT_DATE()
 ORDER BY date DESC
 LIMIT 1;
 ```
-- Use for any “on-prem customers / support subscriptions” stat ask. Default to this template when the schema caps `data` to 1 item or the wording is “latest/current/now/stat”.
+- **Do NOT use this template.** Use `on_prem_customers_stat_last_not_null` instead (stat template with `ORDER BY date DESC LIMIT 1`). This deprecated version can produce a date spine and is not acceptable for stat asks.
 - Always return a **single** row (most recent in-window). Do **not** return a timeseries unless explicitly requested; if you ever adapt another template, still `ORDER BY date DESC LIMIT 1` or post-filter to one row.
 - Apply the static baseline of 5 customers only for dates ≤ 2025-10-04; otherwise use `onprem_customers`.
 
@@ -3583,6 +3641,9 @@ Use these patterns directly; they align with the canonical definitions above. Wh
 
 1a) **Realized ARR ($ components per day)**  
    - Use `realized_arr_components_timeseries`; returns on_prem, business, homelab, ai_bundles, total in currency.
+
+1a‑stat) **Realized ARR ($ components latest)**  
+   - Use `realized_arr_components_stat_last_not_null` (ORDER BY date DESC LIMIT 1). Return exactly one row.
 
 1b) **Realized ARR % (component shares per day)**  
    - Use `realized_arr_percent_timeseries`; returns on_prem/business/homelab/ai_bundles/total percent per date.
