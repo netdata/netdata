@@ -139,7 +139,7 @@ Note: Exit codes map to failure categories, not specific error types. Check `res
 ### Empty or Invalid LLM Responses
 
 **Empty content without tool calls:**
-- If the assistant returns only reasoning (non-empty `reasoning` field) and no tool calls or text content, the reasoning is preserved in the conversation but the turn is retried with TURN-FAILED guidance (`reasoning_only`).
+- If the assistant returns only reasoning (non-empty `reasoning` field) and no tool calls or text content, the reasoning is preserved in the conversation but the turn is retried with TURN-FAILED guidance (`reasoning_only`). On final turns, the guidance is final-turn specific (no tools; output the final report in the required wrapper).
 - Otherwise (no content, no tools, no reasoning), the response is NOT added to the conversation, and a synthetic retry is triggered with TURN-FAILED guidance (`empty_response`).
 - Counts as one attempt toward `maxRetries` budget
 

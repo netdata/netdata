@@ -34,6 +34,7 @@ import {
   TURN_FAILED_EMPTY_RESPONSE,
   TURN_FAILED_FINAL_TURN_NO_REPORT,
   TURN_FAILED_REASONING_ONLY,
+  TURN_FAILED_REASONING_ONLY_FINAL,
   TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT,
   TURN_FAILED_TOOL_CALL_NOT_EXECUTED,
   TURN_FAILED_TOOL_LIMIT_EXCEEDED,
@@ -1451,7 +1452,8 @@ export class TurnRunner {
                             continue;
                         }
                         if (isReasoningOnly) {
-                            this.addTurnFailure(TURN_FAILED_REASONING_ONLY);
+                            const reasoningOnlyFailure = isFinalTurn ? TURN_FAILED_REASONING_ONLY_FINAL : TURN_FAILED_REASONING_ONLY;
+                            this.addTurnFailure(reasoningOnlyFailure);
                         }
                         if (isFinalTurn && this.finalReport === undefined && turnHadFinalReportAttempt && sanitizedHasToolCalls) {
                             const toolMessageFallback = sanitizedMessages.find((msg) => msg.role === 'tool' &&

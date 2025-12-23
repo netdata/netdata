@@ -220,7 +220,16 @@ export const TURN_FAILED_EMPTY_RESPONSE =
  * Used in: session-turn-runner.ts via addTurnFailure
  */
 export const TURN_FAILED_REASONING_ONLY =
-  'Reasoning-only output detected with no visible answer, tool calls, or final report. Call tools or provide your final report/answer.';
+  'Reasoning-only output detected with no visible answer, tool calls, or final report. Call tools or provide your final report/answer in the required wrapper.';
+
+/**
+ * When response contains only reasoning on a final turn (no visible content, no tools).
+ * Used in: session-turn-runner.ts via addTurnFailure
+ */
+export const TURN_FAILED_REASONING_ONLY_FINAL =
+  'Reasoning-only output detected with no visible final report/answer. Relax. This is easy. You must now summarize and provide your final report/answer. Output now the XML wrapper exactly as instructed, and then summarize your work in the requested format.';
+
+/**You MUST provide the final report/answer now using the required XML wrapper and do not call any tools.';
 
 /**
  * When response is truncated due to stopReason=length/max_tokens.
