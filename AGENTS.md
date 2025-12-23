@@ -162,3 +162,24 @@ All conversation structures, reasoning payloads, and tool schemas MUST stay alig
 
 PR-004:
 "Silent failures" and "tolerance to errors" is not justified. We want a "fail fast and make boom" approach. Of course, the application should gracefully handle many error conditions and continue. "Make boom" = ALL ERROR CONDITIONS MUST BE LOGGED. The application should stop and exit ONLY DUE TO USER CONFIGURATION ERRORS. All other errors must be logged and the application should insist in reaching a healthy state (reconnect, retry, etc).
+
+PR-005:
+When models do mistakes, they must always get detailed feedback with specific instructions on how to overcome/bypass the issue. This includes ALL KINDS of possible errors, including empty responses, invalid structured responses, schema validation errors, unknown tools, garbage/excess output, etc.
+
+Why? It is totally stupid to believe that you can say to the model "sorry, something went wrong with your previous response" and expect the model to figure out what exactly went wrong and what it should now fix.
+
+The error messages the model sees MUST be extremely detailed and descriptive of the issue detected, and provide direct instructions on how the model should bypass/overcome the problem. These messages are the most crucial detail that can keep sessions running or failing.
+
+All model facing errors must be in llm-messages.ts - Because every time we face an issue, we MUST IMPROVE THE ERROR DESCRIPTIONS in order to keep the model running.
+
+Ideally, there should be NO fallback case to a generic error message. The fallback itself should be a distinct cases that needs to be handled.
+
+This rule is the most crucial part of our work. Without it ai-agents will not be reliable.
+
+PR-006:
+It is extremely important to keep the main orchestration loops thin and lean. I understand it is easy for you to inject 10 more lines into the turn session runner or other core components, but by doing so you are introducing significant technical debt we will have to deal with.
+
+The current status of the core session orchestration loops is not clean. I expect that everything we do from now on will gradually improve the clarity and simplicity of the main orchestrator loops by MOVING away parts.
+
+Separation of concerns is of paramount importance here: the main orchestrator loops DO NOT NEED TO KNOW how exactly a final report is parsed or extracted, how tools are orchestrated and what failure cases exist, etc. All non-core functionality should be moved AWAY from the core orchestrator loops.
+
