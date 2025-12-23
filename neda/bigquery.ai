@@ -257,7 +257,9 @@ Users may not explicitly ask using the right terminology. Use this table to map 
 | Revenue                   | realized ARR (discounted) total — use metrics_daily realized ARR templates |
 | Revenue per user/customer/account | ARR per space/account — use `watch_towers.spaces_asat_*` (or `spaces_latest` for current) and field `bq_arr_discount`; do NOT use metrics_daily aggregates |
 | Business revenue / Business ARR | business ARR discounted — use metrics_daily `arr_business_discount` templates (stat or timeseries) |
+| Business professional services (latest/current) | use the **Business Professional Services** stat template (business_plan_services_money; ORDER BY date DESC LIMIT 1) |
 | AWS ARR / AWS Marketplace ARR (latest/current) | use `aws_arr_stat_last_not_null` (metrics_daily aws_*); return one row (ORDER BY date DESC LIMIT 1) |
+| AWS subscriptions (latest/current) | use `aws_subscriptions_stat_last_not_null` (metrics_daily aws_*); return one row (ORDER BY date DESC LIMIT 1) |
 | Users signed up | all spaces signed up (Business + Homelab + Business Trial + Community); do not filter unless user specifies paid/free |
 | Spaces signed up | all spaces signed up (Business + Homelab + Business Trial + Community); do not filter unless user specifies paid/free |
 | Customers signed up | paying spaces signed up only (Business + Homelab); filter by Business/Homelab if specified |
@@ -268,6 +270,9 @@ Users may not explicitly ask using the right terminology. Use this table to map 
 | Active users / active members | latest active members across spaces — use metrics_daily `spaces_active_members_sum` stat template (`active_users_stat_last_not_null`, ORDER BY date DESC LIMIT 1) |
 | Total ARR incl. unrealized (latest) | use `total_arr_plus_unrealized_arr_latest` stat template (ORDER BY date DESC LIMIT 1); return one row |
 | Ending trial spaces / trials ending / trial end date | use `ending_trial_spaces_barchart_snapshot` with the requested snapshot date; group by DATE(ax_trial_ends_at) and sum reachable nodes |
+| SaaS spaces (counts by segment, snapshot) | use `spaces_segment_counts_snapshot` verbatim for the snapshot date; return counts per bucket |
+| SaaS spaces (percent mix by segment, snapshot) | use `spaces_segment_percent_snapshot` verbatim; values already in 0–100 scale + `check` |
+| Nodes total view % / reachable nodes mix % (snapshot) | use `nodes_segment_percent_snapshot` verbatim; values already in 0–100 scale + `check` |
 | Customers/subscriptions growth % | use `metric_growth_pct_timeseries` with metric_expr = total_business_subscriptions + total_homelab_subscriptions (exact expression from FAQ) |
 | Business nodes growth % | use `metric_growth_pct_timeseries` with metric_expr = paid_nodes_business_annual + paid_nodes_business_monthly |
 | Business + Homelab nodes growth % | use `metric_growth_pct_timeseries` with metric_expr = paid_nodes_business_* + total_reachable_nodes_homelab |
@@ -331,6 +336,7 @@ When you receive a user request, you MUST go through this process:
 - Use **only** `bigquery__execute_sql`. Do **not** invent or call non-existent tools (e.g., `bigquery__execute_sqljson`, `execute_sql_json`).
 - The **only valid BigQuery tool name** is exactly `bigquery__execute_sql`. Do not append any suffixes or extra characters.
 - **HARD STOP:** Tool names must match exactly. If you need extra explanation, put it in `notes` and still call `bigquery__execute_sql`.
+- **Do not call** `agent__task_status` or any other non-BigQuery tools. They cause early finalization and missing queries. If you need to report progress, use `notes` in the final JSON.
 - Build a date spine for the requested window (inclusive) and use `run_date < CURRENT_DATE()` from `metrics.metrics_daily` by default. If (and only if) the user explicitly insists on “include today”, adapt the template to `run_date <= CURRENT_DATE()` for that request.
 - Respect the date-window rule: from/to inclusive; if `to` is today/future, cap at yesterday unless the user explicitly asks to include today. If only start date is given ("since X"), set to_date=yesterday.
 - **Explicit to_date rule (hard):** if the user provides `to_date`, do **not** use `CURRENT_DATE()` in the KPI SQL. Replace any `CURRENT_DATE()` cap with the explicit `to_date` (e.g., `run_date <= DATE '{{to_date}}'`), so the window is stable and reproducible.
@@ -343,6 +349,7 @@ When you receive a user request, you MUST go through this process:
 
 ## Output contract
 If the user does not specify an output schema/format, respond in clear prose. If the user (or tooling) supplies format/schema instructions (e.g., JSON with specific keys), follow them exactly.
+- **JSON-only rule:** when a schema is provided, emit **only** the JSON object (no analysis, no prose, no restated prompt). Keep the output minimal to avoid truncation.
 
 - Free-form order: freshness line first, then TL;DR/summary, then details.
 - State confidence: high (verbatim template), medium (adapted per instructions), low (improvised).
@@ -3335,6 +3342,7 @@ ORDER BY d.date;
 - Run exactly **one** query (this template). Do not issue any extra “lookback” or “helper” query with earlier dates. If lags are missing, return NULL and note the missing history in `notes`. Never compute pct_* for the first 7/30/90 days of the window when the lag is out of range—leave them NULL.
 - **Output rule:** return the SQL results as-is. Do not recompute pct_* from any other query, do not override NULLs, and do not substitute any values in the model.
 - **HARD STOP:** if you accidentally ran any other query, discard it; the only valid output is the rows produced by this template, including NULL pct_* values.
+- If the SQL returns rows (even if all pct_* are NULL), you **must** return those rows. Do **not** output `data: []` for growth %.
 
 ## Template: customers_growth_pct_timeseries (alias; use verbatim for customers/subscriptions growth %)
 ```
@@ -3589,6 +3597,7 @@ SELECT * FROM negative;
 - Keep the Business filter **exactly** as written: `ax_trial_ends_at IS NULL` and `(ce_plan_class = 'Business' OR aw_sub_plan IN ('Business','Business2024.03'))`. Do **not** replace with `ce_plan_class LIKE 'Business%'`.
 - **Join rule (hard):** use `FULL OUTER JOIN` with `COALESCE` on nodes to capture spaces that appear only in one snapshot. Do **not** use INNER JOIN.
 - **Status labels are fixed:** use `increase`/`decrease` exactly as produced by the SQL. **Do not** relabel node changes as `won`/`lost`, even when nodes_t0 = 0 or nodes_t1 = 0.
+- **Return all rows from SQL.** If the user asks for both adds and removes, include both positive and negative rows (up to 20 total); do not drop the decreases.
 
 ## Template: space_nodes_delta_top10_homelab (reachable nodes change, Homelab)
 ```
@@ -3657,6 +3666,7 @@ UNION ALL
 SELECT * FROM negative;
 ```
 - **Status labels are fixed:** use `increase`/`decrease` exactly as produced by the SQL. **Do not** relabel node changes as `won`/`lost`, even when nodes_t0 = 0 or nodes_t1 = 0.
+- **Return all rows from SQL.** If the user asks for both adds and removes, include both positive and negative rows (up to 20 total); do not drop the decreases.
 - Same HARD STOP as ARR: compute top 10 positive/negative in SQL; do not fetch full snapshots.
 - `__METRIC_EXPR__` is a placeholder to be replaced with the metric expression (see FAQ growth recipes below).
 - Do not re-normalize or drop NULL rows; Grafana shows NULL when history is insufficient.
