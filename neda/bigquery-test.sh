@@ -2947,6 +2947,81 @@ compare_timeseries_fields() {
   '
 }
 
+compare_keyed_rows_fields() {
+  local ref_file="$1" agent_file="$2" key_field="$3" num_fields_json="$4" str_fields_json="$5" eps="${6:-0.01}"
+  jq -n \
+    --slurpfile ref "${ref_file}" \
+    --slurpfile agent "${agent_file}" \
+    --arg key_field "${key_field}" \
+    --argjson num_fields "${num_fields_json}" \
+    --argjson str_fields "${str_fields_json}" \
+    --argjson eps "${eps}" '
+    def to_num($v):
+      if $v == null then null else ($v | tonumber) end;
+    def num_match($rv; $av):
+      if ($rv == null and $av == null) then true
+      elif ($rv == null or $av == null) then false
+      else ((to_num($av) - to_num($rv)) | abs) <= $eps
+      end;
+    def str_match($rv; $av):
+      if ($rv == null and $av == null) then true
+      elif ($rv == null or $av == null) then false
+      else ($rv | tostring) == ($av | tostring)
+      end;
+    def to_map(arr): (arr // [])
+      | map({ key: (.[$key_field] | tostring), value: . })
+      | from_entries;
+    def agent_obj:
+      if ($agent | length) == 0 then
+        error("agent output is empty")
+      elif ($agent[0] | type) == "object" then
+        $agent[0]
+      elif ($agent[0] | type) == "array" then
+        { data: $agent[0], notes: [] }
+      elif (($agent | length) >= 2) and (($agent[0] | type) == "array") and (($agent[1] | type) == "array") then
+        { data: $agent[0], notes: $agent[1] }
+      else
+        error("agent output must be a single object {data,notes} or two JSON values: <data-array> then <notes-array>")
+      end;
+    (to_map($ref[0]) as $r
+      | to_map((agent_obj).data) as $a
+      | ($r | keys_unsorted) as $keys
+      | ($a | keys_unsorted) as $akeys
+      | {
+          ok: (
+            ($keys | length) > 0
+            and ($keys == $akeys)
+            and ($keys | all(. as $k |
+              ($num_fields | all(. as $f | num_match($r[$k][$f]; $a[$k][$f])))
+              and ($str_fields | all(. as $f | str_match($r[$k][$f]; $a[$k][$f])))
+            ))
+          ),
+          missing_in_agent: ($keys - $akeys),
+          extra_in_agent: ($akeys - $keys),
+          diffs: ($keys | map(. as $k | {
+            key: $k,
+            fields: (
+              ($num_fields | map(. as $f | {
+                field: $f,
+                ref: $r[$k][$f],
+                agent: $a[$k][$f],
+                diff: (if ($r[$k][$f] != null and $a[$k][$f] != null)
+                  then ((to_num($a[$k][$f]) - to_num($r[$k][$f])) | tostring)
+                  else null end)
+              }))
+              + ($str_fields | map(. as $f | {
+                field: $f,
+                ref: $r[$k][$f],
+                agent: $a[$k][$f],
+                diff: (if ($r[$k][$f] == $a[$k][$f]) then "0" else "diff" end)
+              }))
+            )
+          }))
+        }
+    )
+  '
+}
+
 compare_single_row_fields() {
   local ref_file="$1" agent_file="$2" fields_json="$3" eps="${4:-0.01}"
   jq -n \
@@ -5103,6 +5178,164 @@ LIMIT 1;
 SQL
 }
 
+case_top_customers_arr_2k_sql() {
+  cat <<'SQL'
+WITH sub_latest AS (
+  SELECT
+    space_id,
+    ARRAY_AGG(STRUCT(
+      DATE(SAFE_CAST(created_at AS TIMESTAMP)) AS created_date,
+      LOWER(NULLIF(period, '')) AS period,
+      SAFE_CAST(committed_nodes AS INT64) AS committed_nodes
+    ) ORDER BY SAFE_CAST(created_at AS TIMESTAMP) DESC LIMIT 1)[OFFSET(0)] AS sub
+  FROM `netdata-analytics-bi.app_db_replication.spaceroom_space_active_subscriptions_latest`
+  GROUP BY space_id
+),
+admins AS (
+  SELECT
+    space_id,
+    STRING_AGG(contact, ', ' ORDER BY contact) AS admin_contacts
+  FROM (
+    SELECT DISTINCT
+      m.space_id,
+      CASE
+        WHEN a.name IS NOT NULL AND a.name != '' THEN CONCAT(a.name, ' <', a.email, '>')
+        ELSE a.email
+      END AS contact
+    FROM `netdata-analytics-bi.app_db_replication.spaceroom_space_members_latest` m
+    JOIN `netdata-analytics-bi.app_db_replication.account_accounts_latest` a
+      ON a.id = m.account_id
+    WHERE m.role = 'admin'
+  )
+  GROUP BY space_id
+),
+base AS (
+  SELECT
+    s.aa_space_id AS space_id,
+    s.ab_space_name AS space_name,
+    s.ce_plan_class AS plan_class,
+    COALESCE(s.bq_arr_discount, 0) AS current_arr,
+    s.ca_cur_plan_start_date AS start_date,
+    LOWER(NULLIF(s.bc_period, '')) AS wt_period,
+    s.ae_reachable_nodes AS connected_nodes,
+    sub_latest.sub.period AS sub_period,
+    sub_latest.sub.committed_nodes AS committed_nodes,
+    COALESCE(admins.admin_contacts, 'unknown') AS primary_contact
+  FROM `netdata-analytics-bi.watch_towers.spaces_latest` s
+  LEFT JOIN sub_latest
+    ON sub_latest.space_id = s.aa_space_id
+  LEFT JOIN admins
+    ON admins.space_id = s.aa_space_id
+  WHERE s.ce_plan_class IN (
+    'Business',
+    'Homelab',
+    'Business_45d_monthly_newcomer',
+    'Homelab_45d_monthly_newcomer'
+  )
+    AND (s.ax_trial_ends_at IS NULL OR s.ax_trial_ends_at = '')
+)
+SELECT
+  space_id,
+  space_name,
+  plan_class,
+  primary_contact,
+  CASE
+    WHEN start_date IS NULL THEN 'unknown'
+    WHEN COALESCE(sub_period, wt_period) = 'year'
+      THEN FORMAT_DATE('%Y-%m-%d', DATE_ADD(start_date, INTERVAL 1 YEAR))
+    WHEN COALESCE(sub_period, wt_period) = 'month'
+      THEN FORMAT_DATE('%Y-%m-%d', DATE_ADD(start_date, INTERVAL 1 MONTH))
+    ELSE 'unknown'
+  END AS renewal_date,
+  current_arr,
+  committed_nodes,
+  connected_nodes,
+  current_arr AS renewal_forecast_arr
+FROM base
+WHERE current_arr >= 2000
+ORDER BY current_arr DESC, space_id
+LIMIT 100;
+SQL
+}
+
+case_top_customers_arr_2k_schema() {
+  cat <<'JSON'
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["data", "notes"],
+  "properties": {
+    "data": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "space_id",
+          "space_name",
+          "plan_class",
+          "primary_contact",
+          "renewal_date",
+          "current_arr",
+          "committed_nodes",
+          "connected_nodes",
+          "renewal_forecast_arr"
+        ],
+        "properties": {
+          "space_id": { "type": "string" },
+          "space_name": { "type": "string" },
+          "plan_class": { "type": "string" },
+          "primary_contact": { "type": "string" },
+          "renewal_date": { "type": "string" },
+          "current_arr": { "type": "number" },
+          "committed_nodes": { "type": ["number", "null"] },
+          "connected_nodes": { "type": "number" },
+          "renewal_forecast_arr": { "type": "number" }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}
+JSON
+}
+
+run_case_top_customers_arr_2k() {
+  echo -e "${GREEN}=== CASE: Top 100 customers >= $2K ARR (current) ===${NC}"
+
+  local case_name="top_customers_arr_2k"
+  local ref_file="${OUT_DIR}/${case_name}.ref.json"
+  local agent_file="${OUT_DIR}/${case_name}.agent.json"
+  local schema_file="${OUT_DIR}/${case_name}.schema.json"
+  local diff_file="${OUT_DIR}/${case_name}.diff.json"
+
+  case_top_customers_arr_2k_schema >"${schema_file}"
+
+  echo -e "${YELLOW}-- BigQuery reference (current) --${NC}"
+  run_bq "${ref_file}" "$(case_top_customers_arr_2k_sql)"
+  run jq -e . "${ref_file}" >/dev/null
+
+  echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
+  run_agent "${agent_file}" "${schema_file}" $'Return ONLY valid JSON matching the provided schema (no prose, no extra keys).\\n\\nCan you create a list of the top 100 customers paying $2K or more in ARR for Netdata subscriptions and identifying the following:\\n- Primary Contact\\n- Subscription Renewal Date\\n- Current ARR\\n- Number of Nodes committed\\n- Number of Nodes connected\\nFor annual subscriptions, use 1 year after the subscription start date as the renewal date and the renewal forecast ARR should be same as the current ARR. The space owner or the admins in the space can be marked as primary contacts for the customer.\\n\\nReturn JSON with data[{space_id,space_name,plan_class,primary_contact,renewal_date,current_arr,committed_nodes,connected_nodes,renewal_forecast_arr}] and notes[].'
+  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+
+  echo -e "${YELLOW}-- Compare --${NC}"
+  compare_keyed_rows_fields "${ref_file}" "${agent_file}" "space_id" '["current_arr","committed_nodes","connected_nodes","renewal_forecast_arr"]' '["space_name","plan_class","primary_contact","renewal_date"]' 0.0001 | tee "${diff_file}" >/dev/null
+  local ok; ok="$(jq -r '.ok' "${diff_file}")"
+  if [[ "${ok}" == "true" ]]; then
+    echo -e "${GREEN}[PASS]${NC} ${case_name}"
+  else
+    echo -e "${RED}[FAIL]${NC} ${case_name} (see ${diff_file})" >&2
+    run jq . "${diff_file}"
+    exit 1
+  fi
+}
+
 case_active_users_schema() {
   cat <<'JSON'
 {
@@ -5212,6 +5445,7 @@ ALL_CASES=(
   realized_arr_kpi_customer_diff_since_only
   business_nodes_delta_top10
   homelab_nodes_delta_top10
+  top_customers_arr_2k
   aws_arr
   aws_subscriptions
   virtual_nodes
