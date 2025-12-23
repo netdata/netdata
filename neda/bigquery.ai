@@ -209,6 +209,26 @@ Spaces are graded by billable node count:
 | **On-prem Contract** | `watch_towers.manual360_*` | (manual entry) | Separate from SaaS entity model; linked via `space_override` |
 | **AI Credits** | — | `app_db_replication.spaceroom_purchased_bundles_*` | Add-on to subscriptions; revenue in `metrics_daily.ai_credits_space_revenue` |
 
+### Source Selection Matrix (deterministic)
+
+Use this matrix to choose sources when multiple options exist. **Do not improvise.**
+
+| Question / Entity | Primary source | Use when | Alternate source | Caveat |
+|---|---|---|---|---|
+| Current per-space plan/ARR/trial/nodes | `watch_towers.spaces_latest` | User asks “current/today/now” or gives no date | `watch_towers.spaces_asat_YYYYMMDD` | Do **not** use `metrics_daily` for per-space truth |
+| Historical per-space snapshot | `watch_towers.spaces_asat_YYYYMMDD` | User provides a specific date | `watch_towers.spaces_latest` (only if no date) | Do **not** sum across snapshots |
+| Subscription attributes (period, committed_nodes, customer_id) | `app_db_replication.spaceroom_space_active_subscriptions_latest` | User needs subscription record fields | `watch_towers.spaces_latest` (period only) | Pick **latest by created_at** per space; committed_nodes must come from subscription record |
+| Subscription start date | `watch_towers.spaces_latest.ca_cur_plan_start_date` | Default for renewal calculations | `spaceroom_space_active_subscriptions_latest.created_at` (if user explicitly asks for raw) | If period missing in both sources, report `"unknown"` for renewal date |
+| Primary contact / owners | `spaceroom_space_members_latest` + `account_accounts_latest` | User asks for owner/admin/primary contact | — | Role `admin` = owner; **comma-separated** list if schema requires one field |
+| Connected nodes (counts) | `watch_towers.spaces_latest.ae_reachable_nodes` | Current counts | `watch_towers.spaces_asat_YYYYMMDD` | Node details require `spaceroom_nodes_*` + `spaceroom_nodes_info_*` |
+| Portfolio KPIs (ARR totals, trials totals, growth %) | `metrics.metrics_daily` | Aggregates/trends | — | Not valid for per-space truth |
+
+**Examples (source choice)**:
+- “Current ARR per space” → `watch_towers.spaces_latest` (`bq_arr_discount`).
+- “ARR per space on 2025-12-01” → `watch_towers.spaces_asat_20251201`.
+- “Committed nodes for a customer” → `spaceroom_space_active_subscriptions_latest` (latest per space).
+- “Primary contacts for space X” → `spaceroom_space_members_latest` + `account_accounts_latest` (role=admin).
+
 **Key distinction between table families:**
 
 | Table Family | Purpose | Use For |
