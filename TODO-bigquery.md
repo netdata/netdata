@@ -324,12 +324,15 @@ Next actions to reach parity: promote 🟨 templates from scratch → prod after
      - Growth % window widened to compute lags (nodes_reachable/homelab nodes growth), contrary to template.
      - Node delta status relabeled as won/lost instead of increase/decrease.
      - Business subscriptions deltas swapped last_30_days and last_90_days.
-   - Prompt fixes applied in `neda/bigquery.ai`:
+ - Prompt fixes applied in `neda/bigquery.ai`:
      - Added tool-name hard stop (no suffixes), stat-only KPI list, and explicit mappings for business nodes/on-prem customers and growth % routes.
      - Added `business_nodes_stat_last_not_null` and `business_subscriptions_deltas_latest` templates.
      - Reinforced “no window widening” for growth % and “no relabeling” for node delta status.
      - Added explicit mapping and rules for Business subscriptions deltas to preserve column labels.
  - Re-run needed for the 7 previously failing cases after these prompt changes.
+
+### Progress update (2025-12-23)
+- Costa requested a full harness re-run. Next action: run the full suite with extreme timeouts using `--continue --jobs 3` (gpt-oss-20b; consider `TEMPERATURE_OVERRIDE=0` if tool-name hallucinations persist).
 
 ## Decisions (2025-12-18)
 - D1: Adopt KPI-first template catalog (no per-panel SQL in prompt). Maintain panel parity via harness instantiations. **Accepted (Costa)**.

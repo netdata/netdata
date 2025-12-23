@@ -189,6 +189,12 @@
 - Slack: @dimitris391 (U063AT5SW77)
 - HubSpot: 64776617
 
+**Shimon Hason** - GTM Advisor and Costa's Advisor
+- Shimon is currently CEO of incredibuild.com, and he was Corporate Development at Datadog after they acquired his company OzCode.
+- shimon@netdata.cloud, shimonhason@gmail.com, (also Shimon.Hason@incredibuild.com, but do not share it)
+- Slack: @shimon (U0A5GLESSV7)
+- HubSpot: N/A
+
 ## Personal Information and GPDR compliance
 
 During your researches, you may encounter personal information of Netdata employees or contractors, like family issues, personal issues, home addresses, spouces and kids names, and similar.
