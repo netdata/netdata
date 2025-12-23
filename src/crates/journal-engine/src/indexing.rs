@@ -165,9 +165,12 @@ pub async fn batch_compute_file_indexes(
     });
 
     let cache_lookup_results: Vec<(FileIndexKey, Result<Option<FileIndex>>)> =
-        tokio::time::timeout(timeout.remaining(), futures::future::join_all(cache_lookup_futures))
-            .await
-            .map_err(|_| EngineError::TimeBudgetExceeded)?;
+        tokio::time::timeout(
+            timeout.remaining(),
+            futures::future::join_all(cache_lookup_futures),
+        )
+        .await
+        .map_err(|_| EngineError::TimeBudgetExceeded)?;
 
     // Phase 2: Separate cache hits from misses, check freshness and compatibility
     debug!("phase 2");

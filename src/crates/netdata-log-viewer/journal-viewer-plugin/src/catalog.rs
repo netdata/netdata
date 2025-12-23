@@ -204,7 +204,11 @@ impl TransactionRegistry {
     /// Create and register a new transaction with the given ID.
     ///
     /// Returns None if a transaction with this ID already exists.
-    fn create(&self, id: String, timeout: Option<journal_function::Timeout>) -> Option<Transaction> {
+    fn create(
+        &self,
+        id: String,
+        timeout: Option<journal_function::Timeout>,
+    ) -> Option<Transaction> {
         let mut transactions = self.transactions.write();
 
         if transactions.contains_key(&id) {
@@ -611,17 +615,26 @@ impl FunctionHandler for CatalogFunction {
     type Request = CatalogRequest;
     type Response = CatalogResponse;
 
-    #[instrument(name = "catalog_function_call", skip_all, fields(
-        after = request.after,
-        before = request.before,
-        num_selections = request.selections.len()
-    ))]
     async fn on_call(&self, transaction: String, request: Self::Request) -> Result<Self::Response> {
+        // Validate time range
+        if request.after >= request.before {
+            error!(
+                "[{}] invalid time range: after={} >= before={}",
+                transaction, request.after, request.before
+            );
+            return Err(netdata_plugin_error::NetdataPluginError::Other {
+                message: "invalid time range: after must be less than before".to_string(),
+            });
+        }
+
         // Create timeout for this operation (12 seconds initial budget)
         let timeout = journal_function::Timeout::new(std::time::Duration::from_secs(12));
 
         // Register the transaction with the timeout
-        let txn = self.inner.transaction_registry.create(transaction.clone(), Some(timeout.clone()));
+        let txn = self
+            .inner
+            .transaction_registry
+            .create(transaction.clone(), Some(timeout.clone()));
         if txn.is_none() {
             warn!(
                 "Transaction {} already exists, continuing anyway",
@@ -629,31 +642,7 @@ impl FunctionHandler for CatalogFunction {
             );
         }
 
-        info!("Got function call for transaction {}", transaction);
-
-        // Log if regex search is being used
-        if !request.query.is_empty() {
-            info!("regex search query provided: {:?}", request.query);
-        } else {
-            debug!("no regex search query provided");
-        }
-
         let filter_expr = build_filter_from_selections(&request.selections);
-
-        if request.after >= request.before {
-            error!(
-                "invalid time range: after={} >= before={}",
-                request.after, request.before
-            );
-            return Err(netdata_plugin_error::NetdataPluginError::Other {
-                message: "invalid time range: after must be less than before".to_string(),
-            });
-        }
-
-        info!(
-            "Processing request: after={}, before={}",
-            request.after, request.before
-        );
 
         // Get facets from request or use empty list
         // FIXME: Need to review this
@@ -665,7 +654,6 @@ impl FunctionHandler for CatalogFunction {
             .collect();
 
         // Step 1: Find files in the time range ONCE
-        info!("finding files in time range");
         let files = self
             .inner
             .registry
@@ -673,7 +661,6 @@ impl FunctionHandler for CatalogFunction {
             .map_err(|e| netdata_plugin_error::NetdataPluginError::Other {
                 message: format!("failed to find files in range: {}", e),
             })?;
-        info!("found {} files in range", files.len());
 
         // Step 2: Build file index keys ONCE
         let facets_obj = Facets::new(&facets);
@@ -687,6 +674,14 @@ impl FunctionHandler for CatalogFunction {
         let time_range_duration = request.before - request.after;
         let bucket_duration = journal_function::calculate_bucket_duration(time_range_duration);
         info!("using bucket duration: {} seconds", bucket_duration);
+
+        // Align time boundaries to bucket_duration to ensure consistency between
+        // histogram computation and log queries. This prevents discrepancies where
+        // histogram buckets use aligned boundaries but log queries use unaligned ones.
+        // - aligned_after: rounds down to nearest bucket boundary
+        // - aligned_before: rounds up to nearest bucket boundary
+        let aligned_after = (request.after / bucket_duration) * bucket_duration;
+        let aligned_before = request.before.div_ceil(bucket_duration) * bucket_duration;
 
         // Step 4: Index all files ONCE
         info!("indexing {} files", keys.len());
@@ -713,8 +708,8 @@ impl FunctionHandler for CatalogFunction {
             .histogram_engine
             .compute_from_indexes(
                 &indexed_files,
-                request.after,
-                request.before,
+                aligned_after,
+                aligned_before,
                 &facets,
                 &filter_expr,
             )
@@ -728,8 +723,8 @@ impl FunctionHandler for CatalogFunction {
         let file_indexes: Vec<_> = indexed_files.iter().map(|(_, idx)| idx.clone()).collect();
         let (log_entries, has_before, has_after) = self.query_logs_from_indexes(
             &file_indexes,
-            request.after,
-            request.before,
+            aligned_after,
+            aligned_before,
             request.anchor,
             &filter_expr,
             &request.query,

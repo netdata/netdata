@@ -204,6 +204,14 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL)
         corrosion_import_crate(MANIFEST_PATH src/crates/Cargo.toml
                                CRATES otel-plugin)
     endif()
+
+    if(ENABLE_NETDATA_JOURNAL_FILE_READER)
+      corrosion_add_target_rustflags(journal-viewer-plugin --cfg=tracing_unstable)
+    endif()
+
+    if(ENABLE_PLUGIN_OTEL)
+      corrosion_add_target_rustflags(otel-plugin --cfg=tracing_unstable)
+    endif()
 endif()
 
 option(ENABLE_MIMALLOC "Enable mimalloc allocator" OFF)

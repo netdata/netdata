@@ -1,12 +1,13 @@
 use crate::repository::RepositoryError;
 use crate::repository::error::Result;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::path::Path;
 use std::sync::Arc;
 use uuid::Uuid;
 
 /// Status of a journal file
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub enum Status {
     /// Active journal file currently being written to
@@ -131,7 +132,7 @@ impl Status {
 }
 
 /// Source of journal entries
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub enum Source {
     /// System-wide journal (system.journal)
@@ -169,7 +170,7 @@ impl Source {
 }
 
 /// Origin identifies where a journal file comes from
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct Origin {
     /// Machine ID from which the journal originates
@@ -181,7 +182,7 @@ pub struct Origin {
     pub source: Source,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub(crate) struct FileInner {
     pub(crate) path: String,

@@ -79,8 +79,9 @@ serde_regex = "1.1.0"
 tokio = { version = "1.45", features = ["full"] }
 
 # Tracing
-tracing = "0.1"
+tracing = { version = "0.1" }
 tracing-journald = "0.3"
+tracing-appender = "0.2"
 tracing-futures = { version = "0.2.5" }
 tracing-opentelemetry = "0.32.0"
 tracing-subscriber = "0.3"
