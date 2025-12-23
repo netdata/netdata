@@ -122,6 +122,10 @@
 - Build(deps): bump github.com/axiomhq/hyperloglog from 0.2.5 to 0.2.6 in /src/go ([#21489](https://github.com/netdata/netdata/issues/21489))
 - Build(deps): bump github.com/ibm-messaging/mq-golang/v5 from 5.6.7 to 5.7.0 in /src/go ([#21490](https://github.com/netdata/netdata/issues/21490))
 - Fix(netdata-updater): fix major version detection for native packages ([#21485](https://github.com/netdata/netdata/issues/21485))
+- Build(deps): bump github.com/godbus/dbus/v5 from 5.2.0 to 5.2.1 in /src/go ([#21497](https://github.com/netdata/netdata/issues/21497))
+- Docs(go.d/prometheus): cleanup metadata.yaml ([#21498](https://github.com/netdata/netdata/issues/21498))
+- Regenerate integrations docs ([#21499](https://github.com/netdata/netdata/issues/21499))
+- Add AI-Powered Alert Configuration docs entry ([#21482](https://github.com/netdata/netdata/issues/21482))
 
 ## [2.8.0] - 2025-11-19
 
