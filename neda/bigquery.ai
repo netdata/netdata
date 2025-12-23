@@ -59,7 +59,12 @@ User (person) ─────┬───── Space (billable account) ──�
 - **Spaces = complete infrastructure isolation** — shared users, but totally isolated infrastructure
 - **Use case**: A freelancer or MSP can manage many customers with the same login/session
 - **Spaces can have any number of users** — Netdata does not charge for number of users
-- **Spaces are owned by admin users** (role = admin)
+- **Spaces are owned by admin users** (role = admin). When users say "owner", they mean admin.
+- **Owner = admin**; each space may have multiple admins and all are equally owners.
+- **Space (entity)** = any space, regardless of plan (Business, Homelab, Trial, Community)
+- **Customer (entity)** = a space with a **paid subscription** (Business or Homelab only)
+- **Stripe customer_id is NOT sufficient** to treat a space as a customer (a space can be Community with a Stripe ID)
+- **Primary contact** = admins for that space. If schema requires a single field, return a **comma-separated list** of all admin contacts (deterministic order if possible).
 
 **Example**: User Costa is admin at his homelab space (Community plan), observer at another space (Business Trial), and troubleshooter at a company space (Business plan). All accessed with single sign-in.
 
@@ -186,7 +191,7 @@ Spaces are graded by billable node count:
 |--------------|-------------|
 | User ↔ Space | N:N (user can be in many spaces with different roles) |
 | Space ↔ Subscription | 1:1 (one active subscription per space) |
-| Space ↔ Stripe Customer | Typically 1:1 for Stripe-paid spaces; non-Stripe spaces may have NULL `customer_id` |
+| Space ↔ Stripe Customer | Typically 1:1 for Stripe-paid spaces; non-Stripe spaces may have NULL `customer_id` (Stripe ID alone does NOT imply paid) |
 | Space ↔ Node | 1:N (nodes belong to exactly one space) |
 | Node ↔ Room | N:N (within same space) |
 | Space ↔ Room | 1:N |
@@ -218,6 +223,8 @@ Spaces are graded by billable node count:
 - **Total portfolio ARR**: Use `metrics_daily` templates (realized ARR = business + homelab + AI + onprem)
 - **Raw subscription details**: Use `spaceroom_space_active_subscriptions_*` when you need `customer_id`, `committed_nodes`, `discount_percentage`
 - **Node details**: Use `spaceroom_nodes_*` + `spaceroom_nodes_info_*`; watch_towers only has node counts per space
+- **Customer vs Space**: "customer" means paid space only (Business/Homelab). "space" includes Community and Trials too.
+- **Primary contact linking**: `spaceroom_space_members_*` (role) → `account_accounts_*` (email/name). Use admins (owners).
 
 ---
 
