@@ -147,6 +147,11 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
     if (unlikely(!localhost))
         return 1;
 
+    char default_port_str[16];
+    uint16_t default_port = (web_server_mode == WEB_SERVER_MODE_NONE) ? 0 : web_server_get_default_port();
+    snprintf(default_port_str, sizeof(default_port_str), "%u", default_port);
+    rrdlabels_add(localhost->rrdlabels, "_web_listen_port", default_port_str, RRDLABEL_SRC_AUTO);
+
     rrdhost_flag_set(localhost, RRDHOST_FLAG_COLLECTOR_ONLINE);
     object_state_activate(&localhost->state_id);
     pulse_host_status(localhost, 0, 0); // this will detect the receiver status
