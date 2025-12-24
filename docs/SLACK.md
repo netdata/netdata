@@ -665,8 +665,8 @@ The bot automatically shows live progress during agent execution:
 
 During execution, users can control the agent:
 
-- **Stop** (graceful): Allows current tool to finish, then stops
-- **Abort** (immediate): Cancels immediately, interrupting current tool
+- **Stop** (graceful): Forces a final turn across all agents and completes normally (final report still posted)
+- **Abort** (immediate): Cancels immediately, interrupts current work, and posts `Request aborted by user.`
 
 The buttons disappear once execution completes.
 

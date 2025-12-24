@@ -615,11 +615,18 @@ const elog = (msg: string): void => { try { process.stderr.write(`[ERR] ← [0.0
     const pending = updating.get(key); if (pending) { clearTimeout(pending); updating.delete(key); }
     const result = sm.getResult(runId);
     const opTree = sm.getOpTree(runId);
+    const runMeta = sm.getRun(runId);
+    const canceledByUser = runMeta?.status === 'canceled';
     let slackMessages = extractSlackMessages(result) ?? extractSlackMessagesFromContent(result);
     let finalText = extractFinalText(sm, runId);
     const fallbackText = buildSlackFallbackText({ result, opTree, metaError: meta.error });
 
-    if ((!slackMessages || slackMessages.length === 0) && typeof finalText === 'string' && finalText.trim().length > 0) {
+    if (canceledByUser) {
+      slackMessages = undefined;
+      finalText = 'Request aborted by user.';
+    }
+
+    if (!canceledByUser && (!slackMessages || slackMessages.length === 0) && typeof finalText === 'string' && finalText.trim().length > 0) {
       const parsed = parseSlackJson(finalText);
       if (parsed && parsed.length > 0) {
         slackMessages = parsed;

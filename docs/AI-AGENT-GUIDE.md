@@ -65,6 +65,9 @@
 - **Entity meaning + linking must be explicit** in the prompt (not implied across sections). For Netdata BI: Space = any space; Customer = paid space only; Stripe customer_id alone does **not** imply paid; Owner = Admin; spaces can have multiple admins.
 - **Source selection matrix required**: prompt must explain overlapping sources (watch_towers vs app_db_replication vs metrics) and deterministic rules for when to use each, including examples.
 - **Primary contact rule**: when a schema requires a single field for admins, return a comma-separated list of admin contacts (deterministic ordering if possible).
+- **Top customers >= $2K ARR list**: use `watch_towers.spaces_latest` + `spaceroom_space_active_subscriptions_latest` + admin joins; renewal date = start_date + (year/month) else `"unknown"`; committed_nodes from subscription; primary_contact is the admin list.
+- **Large list outputs**: ensure `toolResponseMaxBytes` is high enough to return 100-row customer lists with admin contacts (current baseline: `120000`).
+- **Data freshness field**: when schemas are used, include `data_freshness { last_ingested_at, age_minutes, source_table }` and avoid embedding freshness only in notes.
 - **Growth % templates**: must use the single KPI SQL, preserve NULL lags, and never widen the date window or compute pct_* in the model.
 - **AWS ARR**: must route to `aws_arr_stat_last_not_null` and always run the KPI SQL (no freshness-only responses).
 - **AWS subscriptions**: must route to `aws_subscriptions_stat_last_not_null` and always run the KPI SQL (no freshness-only responses).

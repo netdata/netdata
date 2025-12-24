@@ -4222,7 +4222,7 @@ run_agent() {
     --format json \
     --schema "@${schema_file}" \
     "${override_args[@]}" \
-    "Return ONLY valid JSON matching the provided schema (no prose, no extra keys). If the schema defines data as an object, return a single object (not an array). Include data_freshness{last_ingested_at,age_minutes,source_table}. ${question}" \
+    "${question}" \
     >"${out_file}"
 }
 

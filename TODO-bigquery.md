@@ -372,6 +372,31 @@ Next actions to reach parity: promote 🟨 templates from scratch → prod after
   - `docs/AI-AGENT-GUIDE.md`: record growth % null-preservation and AWS ARR routing requirements.
 - Next step: re-run full harness after these edits.
 
+### Progress update (2025-12-24)
+- Full suite run completed: **52 total, 45 pass, 7 fail**.
+  - Failures: `trial_6plus_nodes_est_value`, `nodes_combined_growth_pct`, `homelab_nodes_growth_pct`, `on_prem_customers`, `windows_reachable_nodes_breakdown`, `top_customers_arr_2k`, `active_users`.
+- Root causes (facts from logs):
+  - `trial_6plus_nodes_est_value`: model returned full timeseries; expected latest row only.
+  - `nodes_combined_growth_pct` / `homelab_nodes_growth_pct`: model widened the window and computed non‑NULL pct_* from extra history; must keep NULL lags within requested window and return template rows only.
+  - `on_prem_customers` / `active_users`: model returned timeseries; expected single latest row.
+  - `windows_reachable_nodes_breakdown`: model used `spaces_asat_*` reachable nodes by plan, not `metrics_daily` windows metrics (values off by ~10–30x).
+  - `top_customers_arr_2k`: tool response exceeded `toolResponseMaxBytes` (15000) causing truncated data; committed_nodes/connected_nodes mismatches.
+- Fixes applied (prompt + docs; surgical):
+  - Added `top_customers_arr_2k_current` template + routing; clarified paid‑plan classes incl. 45d newcomers; updated customer definition and signup wording.
+  - Added `trial_6plus_nodes_est_value_stat_last_not_null` template + routing; added to stat‑only KPI list.
+  - Added `windows_reachable_nodes_breakdown_timeseries` template + routing; forbid spaces_asat for Windows breakdown.
+  - Added explicit “growth % guard” hard‑stop (no extra queries, no window widening).
+  - Increased `toolResponseMaxBytes` in `neda/bigquery.ai` to `120000` for 100‑row customer lists.
+- Updated docs (`docs/AI-AGENT-GUIDE.md`) to note larger tool response size requirement.
+- Next step: re-run full harness after the prompt edits to confirm 52/52.
+
+### Progress update (2025-12-24, later)
+- Implemented **stat schema shape** change: `data` is now a **single object** (no `maxItems:1` arrays) for all stat KPIs.
+- Added **data_freshness** to **all schemas** and updated prompt rules to populate it when present.
+- Removed schema-indicator phrases from **all test questions** (e.g., “Return JSON with data[…]”), leaving only natural-language asks.
+- Updated comparators and harness guards to accept `data` as object or array (for backwards compatibility during transition).
+- Lint/build were run before these edits; need another run after the latest changes.
+
 ### Decisions needed (2025-12-23) — new test case
 1) **Source tables and fields**
    - Option A: Use `watch_towers.spaces_latest` + `watch_towers.spaces_asat_YYYYMMDD` for ARR + subscription fields; join to app DB for contacts.
@@ -440,6 +465,21 @@ Next actions to reach parity: promote 🟨 templates from scratch → prod after
 - D12: **Placement**: add a “Source Selection Matrix” near the top (after Domain Model).
 - D13: **Depth**: include a short table + 2–3 example questions per source.
 - D14: **Conflict rule**: `watch_towers` is authoritative for ARR/plan/trial truth; raw app_db_replication only for identity/contacts/committed_nodes unless the user explicitly asks for raw.
+
+### Decisions locked (2025-12-24) — schema enforcement for stat vs timeseries
+- D15: **Enforce single-value via schema for stat KPIs** (Option 2). Tests must use strict schemas so timeseries responses fail schema validation. For free-text (no schema), timeseries is acceptable; for schema runs, the model must reduce to a single latest value (not sum unless the question explicitly asks for a sum).
+- D16: **Schema shape for stat KPIs**: use `{ data: <object>, notes: [], data_freshness: {...} }` (Option 1A). Avoid `data[]` + `maxItems: 1`.
+- D17: **Data freshness field**: add `data_freshness { last_ingested_at, age_minutes, source_table }` to all schema responses to avoid embedding freshness in notes.
+
+### Decisions needed (2025-12-24) — stat KPI schema shape
+1) **Schema shape for single-value KPIs**
+   - 1A: Keep root `{ data, notes }`, but make `data` a **single object** (not an array).
+     - Pros: minimal disruption; keeps existing `notes`; aligns with “object of what you expect.”
+     - Cons: requires comparator updates for stat cases.
+   - 1B: Flatten to root object `{ ...fields, notes }` (no `data` wrapper).
+     - Pros: simplest shape for strict single values.
+     - Cons: bigger refactor (schemas, comparators, prompt contract, and callers).
+   - Recommendation: **1A** to keep consistency with existing contract while removing array confusion.
 
 ### Decisions needed (2025-12-23) — prompt entity definitions
 1) **Entity definitions to codify in the prompt**
