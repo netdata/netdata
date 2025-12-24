@@ -67,8 +67,10 @@
 - **Primary contact rule**: when a schema requires a single field for admins, return a comma-separated list of admin contacts (deterministic ordering if possible).
 - **Top customers >= $2K ARR list**: use `watch_towers.spaces_latest` + `spaceroom_space_active_subscriptions_latest` + admin joins; renewal date = start_date + (year/month) else `"unknown"`; committed_nodes from subscription; primary_contact is the admin list.
 - **Large list outputs**: ensure `toolResponseMaxBytes` is high enough to return 100-row customer lists with admin contacts (current baseline: `120000`).
-- **Data freshness field**: when schemas are used, include `data_freshness { last_ingested_at, age_minutes, source_table }` and avoid embedding freshness only in notes.
+- **Schema authority**: when a schema is provided, output keys and shapes must match exactly; use SQL aliases to align field names and never invent extra keys.
+- **Data freshness field**: when schemas are used, include `data_freshness { last_ingested_at, age_minutes, source_table }`; if that field exists, do not also add freshness notes elsewhere.
 - **Growth % templates**: must use the single KPI SQL, preserve NULL lags, and never widen the date window or compute pct_* in the model.
+- **Realized ARR (latest stat)**: route to the **components stat** template (business/homelab/AI/on‑prem/total); avoid total‑only stat outputs unless a schema explicitly expects `realized_arr`.
 - **AWS ARR**: must route to `aws_arr_stat_last_not_null` and always run the KPI SQL (no freshness-only responses).
 - **AWS subscriptions**: must route to `aws_subscriptions_stat_last_not_null` and always run the KPI SQL (no freshness-only responses).
 - **Tool usage**: BI agents must not call `agent__task_status`; use only `bigquery__execute_sql` and report progress via `notes`.
@@ -85,7 +87,7 @@
 | `temperature` | number | `0.2` | Clamped `0-2`. |
 | `topP` | number or null | `null` | `0-1`; `null` omits the parameter. |
 | `topK` | int or null | `null` | `>=1`; `null` omits the parameter. |
-| `maxOutputTokens` | int | `16384` | `undefined` disables explicit cap. |
+| `maxOutputTokens` | int | `32768` | `undefined` disables explicit cap. |
 | `repeatPenalty` | number or null | `null` | `>=0`; `null` omits the parameter. |
 | `toolResponseMaxBytes` | bytes | `12288` | Over-limit responses are truncated. |
 | `stream` | boolean | `false` | CLI default is streaming off; headends opt-in. |
@@ -550,7 +552,7 @@ OpenAI‑compatible providers enable `includeUsage` for streaming token usage by
 | `temperature` | `0.2` |
 | `topP` | `null` |
 | `topK` | `null` |
-| `maxOutputTokens` | `16384` |
+| `maxOutputTokens` | `32768` |
 | `repeatPenalty` | `null` |
 | `llmTimeout` | `600000` ms |
 | `toolTimeout` | `300000` ms |

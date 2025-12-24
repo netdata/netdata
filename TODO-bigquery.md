@@ -402,6 +402,67 @@ Next actions to reach parity: promote 🟨 templates from scratch → prod after
 - Replaced placeholder questions (empty/JSON/dot) with natural language.
 - Removed explicit formula hints and internal metric names from questions where possible.
 
+### Progress update (2025-12-24, latest run)
+- ✅ Reintroduced schema reinforcement: `run_agent` now embeds the full JSON schema in the question (per D18).
+- ✅ Switched `realized_arr_stat` to breakdown+total (uses KPI stat schema/SQL); updated question + comparator.
+- ✅ Added schema‑authority rules + stricter freshness placement in `neda/bigquery.ai`.
+- ✅ Added `ai_credits_spaces_stat_last_not_null` template + hard‑stop rules; strengthened growth‑% guard.
+- ✅ Added hard‑stop rules for on‑prem customers (metrics_daily only), realized ARR delta window, and node‑delta top10 templates.
+- ✅ Updated docs (`docs/AI-AGENT-GUIDE.md`) with schema‑authority + realized ARR stat behavior.
+- ✅ Full harness run completed: **52 total, 45 pass, 7 fail**.
+  - Failures: `unrealized_arr_barchart_snapshot`, `ai_credits_spaces`, `business_nodes_growth_pct`, `on_prem_customers`, `realized_arr_kpi_delta`, `business_nodes_delta_top10`, `top_customers_arr_2k`.
+  - Root causes (from logs):
+    - `unrealized_arr_barchart_snapshot`: used snapshot date ≠ `to_date` → missing/incorrect rows.
+    - `ai_credits_spaces`: used `spaces_asat_*` count instead of metrics_daily `ai_credits_space_count`.
+    - `business_nodes_growth_pct`: widened window (started at `to_date-30`), producing non‑NULL pct values.
+    - `on_prem_customers`: used manual360 snapshot counting on‑prem/support instead of metrics_daily `onprem_customers`.
+    - `realized_arr_kpi_delta`: ran timeseries and computed deltas in‑model; must use delta template.
+    - `business_nodes_delta_top10`: did not use the top‑10 SQL template verbatim (filters/order differ).
+    - `top_customers_arr_2k`: returned only 10 rows instead of 100.
+
+### Progress update (2025-12-24, latest run #2)
+- Ran full harness with `--continue --jobs 3`; local command timed out after ~1h while starting `top_customers_arr_2k`.
+- Completed remaining cases individually: `aws_arr`, `aws_subscriptions`, `virtual_nodes`, `active_users` **PASS**; `top_customers_arr_2k` **FAIL**.
+- Current failures (4): `realized_arr`, `business_subscriptions`, `homelab_nodes`, `top_customers_arr_2k`.
+- Root causes (from logs):
+  - `realized_arr`: agent output constant **72978** for each day vs ref **~1.36M**; dry‑run error occurred before a re‑try (likely wrong SQL).
+  - `business_subscriptions`: agent used `aws_business_subscriptions` (14) instead of `total_business_subscriptions` (1328).
+  - `homelab_nodes`: agent used `watch_towers.spaces_asat_*` reachable sum (7954) instead of `metrics_daily.total_reachable_nodes_homelab` (7775).
+  - `top_customers_arr_2k`: model output truncated (`stop_reason=length`), schema validation failed; needs higher output cap or shorter response.
+- Non‑fatal noise: repeated toolbox stderr `invalid method prompts/list` on MCP init (doesn’t block queries but pollutes logs).
+
+### Decisions needed (2025-12-24) — schema compliance + realized ARR stat shape
+1) **Schema compliance enforcement in prompt**
+   - Option A: Add a global rule: when a JSON schema is provided, output must **exactly** match it (top-level keys, field names, and shapes); **never** rename SQL aliases; include `data_freshness` only when the schema includes it.
+     - Pros: keeps current schemas; fixes most failures from renamed keys and missing `data`.
+     - Cons: relies on the model to follow strict rules (still possible drift).
+   - Option B: Reintroduce minimal schema hints in harness questions (contrary to the “no schema hints” preference).
+     - Pros: strongest compliance signal.
+     - Cons: violates the “no schema hints in user questions” requirement.
+   - Recommendation: **A** (keeps questions clean while reinforcing schema compliance).
+2) **“Latest realized ARR” stat output shape**
+   - Option A: Keep **total-only** output (`realized_arr`) for the stat case; add a dedicated total-only template + routing in `neda/bigquery.ai`.
+     - Pros: matches the “Realized ARR $” stat expectation; keeps breakdown separate.
+     - Cons: adds another template and routing.
+   - Option B: Switch the stat case to **breakdown + total** (align with existing realized ARR components stat template), and retire the total-only stat case.
+     - Pros: fewer templates; aligns with existing prompt.
+     - Cons: changes the current stat contract.
+   - Recommendation: **A** (keeps stat total and breakdown as separate, explicit cases).
+3) **Output key naming for mismatched KPIs**
+   - Option A: Keep current schema keys (e.g., `discounted_arr`, `windows_nodes`, `churn_business_subs`, `to_be_realized`) and enforce alias usage in the prompt.
+     - Pros: minimal code churn; aligns with existing harness comparisons.
+     - Cons: keys are less natural; model must learn them.
+   - Option B: Rename schema + SQL aliases to more descriptive keys (e.g., `business_arr_discount`, `windows_reachable_nodes`, `churned_business_subs`, `unrealized_arr`, `realization_date`).
+     - Pros: more human‑readable; aligns with model’s natural outputs.
+     - Cons: wider edits (SQL, schemas, comparators, prompt).
+   - Recommendation: **A** for now; we can revisit renames after stabilizing.
+
+### Decisions (2025-12-24) — chosen
+- D18: Enforce schema compliance in prompt; additionally **embed the full JSON schema inside the user question** to reinforce it. (Costa: “1A but also include the entire schema in the question.”)
+- D19: Switch “latest realized ARR” stat to **breakdown + total** (retire total-only stat behavior in routing/tests). (Costa: 2B)
+- D20: Keep existing schema key names; enforce alias usage rather than renaming schemas. (Costa: 3A)
+- D21: Increase `maxOutputTokens` to **32768** to accommodate 100-row outputs with long admin lists (Costa: “increase it to 32768”).
+
 ### Decisions needed (2025-12-23) — new test case
 1) **Source tables and fields**
    - Option A: Use `watch_towers.spaces_latest` + `watch_towers.spaces_asat_YYYYMMDD` for ARR + subscription fields; join to app DB for contacts.

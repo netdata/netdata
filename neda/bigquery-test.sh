@@ -2210,101 +2210,11 @@ JSON
 }
 
 case_realized_arr_stat_sql() {
-  cat <<'SQL'
-WITH realized AS (
-  SELECT
-    run_date AS date,
-    (
-      MAX(IF(metric_name = 'arr_business_discount', metric_value, NULL))
-      + COALESCE(MAX(IF(metric_name = 'arr_homelab_discount', metric_value, NULL)), 0)
-      + COALESCE(MAX(IF(metric_name = 'ai_credits_space_revenue', metric_value, NULL)), 0)
-      + COALESCE(MAX(IF(metric_name = 'onprem_arr', metric_value, NULL)), 0)
-    ) AS total_arr_discounted
-  FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN @from_date AND @to_date
-    AND run_date > DATE '2023-11-28'
-    AND run_date < CURRENT_DATE()
-  GROUP BY run_date
-),
-manual_total AS (
-  SELECT IFNULL(SUM(annual_price), 0) AS manual_total
-  FROM `netdata-analytics-bi.watch_towers.manual360_asat_20251002`
-  WHERE expiry_date > DATE '2025-10-01'
-    AND start_date <= DATE '2025-10-01'
-),
-combined AS (
-  SELECT
-    r.date,
-    COALESCE(r.total_arr_discounted, 0)
-      + CASE WHEN r.date <= DATE '2025-10-01' THEN m.manual_total ELSE 0 END AS realized_arr
-  FROM realized r
-  CROSS JOIN manual_total m
-)
-SELECT
-  date,
-  realized_arr
-FROM combined
-ORDER BY date DESC
-LIMIT 1;
-SQL
+  case_realized_arr_kpi_stat_sql
 }
 
 case_realized_arr_stat_schema() {
-  cat <<'JSON'
-{
-  "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "data",
-    "notes",
-    "data_freshness"
-  ],
-  "properties": {
-    "data": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "date",
-        "realized_arr"
-      ],
-      "properties": {
-        "date": {
-          "type": "string"
-        },
-        "realized_arr": {
-          "type": "number"
-        }
-      }
-    },
-    "notes": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "data_freshness": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "last_ingested_at",
-        "age_minutes",
-        "source_table"
-      ],
-      "properties": {
-        "last_ingested_at": {
-          "type": "string"
-        },
-        "age_minutes": {
-          "type": "number"
-        },
-        "source_table": {
-          "type": "string"
-        }
-      }
-    }
-  }
-}
-JSON
+  case_realized_arr_kpi_stat_schema
 }
 
 case_realized_arr_deltas_sql() {
@@ -4203,6 +4113,8 @@ run_bq() {
 run_agent() {
   local out_file="$1" schema_file="$2" question="$3"
   local override_args=()
+  local schema_json
+  local question_payload
   if [[ -n "${MODEL_OVERRIDE}" ]]; then
     override_args=(--override "models=${MODEL_OVERRIDE}")
   fi
@@ -4215,6 +4127,12 @@ run_agent() {
   if [[ -n "${TOOL_TIMEOUT_MS}" ]]; then
     override_args+=(--override "toolTimeout=${TOOL_TIMEOUT_MS}")
   fi
+  if command -v jq >/dev/null 2>&1; then
+    schema_json="$(jq -c '.' "${schema_file}")"
+  else
+    schema_json="$(cat "${schema_file}")"
+  fi
+  question_payload="$(printf 'Use the following JSON schema exactly; your response must match it with no extra keys.\nSchema:\n%s\n\nQuestion:\n%s' "${schema_json}" "${question}")"
   run "${AI_AGENT_BIN}" \
     --verbose \
     "${SYSTEM_PROMPT}" \
@@ -4222,7 +4140,7 @@ run_agent() {
     --format json \
     --schema "@${schema_file}" \
     "${override_args[@]}" \
-    "${question}" \
+    "${question_payload}" \
     >"${out_file}"
 }
 
@@ -5356,7 +5274,7 @@ run_case_unrealized_arr_barchart_snapshot() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Show unrealized ARR amounts grouped by expected realization date."
+  run_agent "${agent_file}" "${schema_file}" "From the spaces snapshot as of ${TO_DATE}, show unrealized ARR amounts grouped by expected realization date."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -5388,11 +5306,11 @@ run_case_realized_arr_stat() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest realized ARR (discounted) within ${FROM_DATE}..${TO_DATE}."
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest realized ARR (discounted) broken down by business, homelab, AI bundles, on-prem, and total within ${FROM_DATE}..${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
-  compare_single_row_fields "${ref_file}" "${agent_file}" '["realized_arr"]' 0.01 | tee "${diff_file}" >/dev/null
+  compare_single_row_fields "${ref_file}" "${agent_file}" '["business","homelab","ai_bundles","on_prem","total"]' 0.01 | tee "${diff_file}" >/dev/null
   local ok
   ok="$(jq -r '.ok' "${diff_file}")"
   if [[ "${ok}" == "true" ]]; then
@@ -5836,7 +5754,7 @@ run_case_on_prem_customers() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest on-prem and support subscriptions within ${FROM_DATE}..${TO_DATE}."
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest on-prem customer count (on-prem + support subscriptions) within ${FROM_DATE}..${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
