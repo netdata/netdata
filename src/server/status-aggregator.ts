@@ -3,6 +3,8 @@ import type { SessionNode } from '../session-tree.js';
 interface AgentStatusLine {
   agentId: string;
   callPath?: string;
+  traceId?: string;
+  startedAt?: number;
   status: 'Working' | 'Thinking' | 'Finished' | 'Failed';
   turn?: number;
   maxTurns?: number;
@@ -104,7 +106,7 @@ export function buildSnapshotFromOpTree(root: SessionNode, nowTs: number): Snaps
     const status: AgentStatusLine['status'] = (typeof ended === 'number') ? 'Finished' : 'Working';
     const title = node.sessionTitle && node.sessionTitle.trim().length > 0 ? node.sessionTitle : undefined;
     const latestStatus = node.latestStatus && node.latestStatus.trim().length > 0 ? node.latestStatus : undefined;
-    lines.push({ agentId, callPath, status, elapsedSec, title, latestStatus });
+    lines.push({ agentId, callPath, traceId: node.traceId, startedAt: node.startedAt, status, elapsedSec, title, latestStatus });
 
     // Walk turns/ops, aggregate tools + tokens
     const turns = Array.isArray(node.turns) ? node.turns : [];
@@ -247,16 +249,22 @@ export function buildStatusBlocks(summary: SnapshotSummary, rootAgentId?: string
     const ss = n % 60;
     return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
   };
-  // Newest first ⇒ smaller elapsedSec first (dedup keeps the most recent entry)
-  const ordered = running.sort((a, b) => (a.elapsedSec ?? 0) - (b.elapsedSec ?? 0));
-  const seen = new Set<string>();
-  const deduped = ordered.filter((line) => {
-    const key = line.callPath ?? line.agentId ?? '';
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+  // Oldest first (largest elapsedSec first); keep newest at bottom.
+  // Tie-breaker: startedAt (older first), then traceId for deterministic ordering.
+  const ordered = running.sort((a, b) => {
+    const elapsedA = a.elapsedSec ?? 0;
+    const elapsedB = b.elapsedSec ?? 0;
+    if (elapsedA !== elapsedB) return elapsedB - elapsedA;
+    const startedA = a.startedAt ?? 0;
+    const startedB = b.startedAt ?? 0;
+    if (startedA !== startedB) return startedA - startedB;
+    const traceA = a.traceId ?? '';
+    const traceB = b.traceId ?? '';
+    return traceA.localeCompare(traceB);
   });
-  const entries = deduped
+  // Keep only the newest 10 (bottom of the list).
+  const limited = ordered.length > 10 ? ordered.slice(-10) : ordered;
+  const entries = limited
     .flatMap((l) => {
       if (typeof rootAgentId === 'string' && l.agentId === rootAgentId) return []; // drop master
       const cpRaw = typeof l.callPath === 'string' && l.callPath.length > 0 ? l.callPath : l.agentId;
