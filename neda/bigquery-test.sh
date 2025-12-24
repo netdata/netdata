@@ -4687,7 +4687,7 @@ run_case_realized_arr_components() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Break down realized ARR (discounted) per day between ${FROM_DATE} and ${TO_DATE} into on_prem, business, homelab, ai_bundles, and total."
+  run_agent "${agent_file}" "${schema_file}" "Break down realized ARR (discounted) per day between ${FROM_DATE} and ${TO_DATE} into on-prem, business, homelab, AI bundles, and total."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -4719,7 +4719,7 @@ run_case_realized_arr_percent() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Show realized ARR component shares (%) per day between ${FROM_DATE} and ${TO_DATE} for on_prem, business, homelab, ai_bundles, and total %."
+  run_agent "${agent_file}" "${schema_file}" "Show realized ARR component shares (%) per day between ${FROM_DATE} and ${TO_DATE} for on-prem, business, homelab, AI bundles, and total %."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -4751,7 +4751,7 @@ run_case_trials_total() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest trials_total value within ${FROM_DATE}..${TO_DATE}."
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest total trials count within ${FROM_DATE}..${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -4974,7 +4974,7 @@ SQL
   run_bq "${ref_file}" "${sql_ref}"
   run jq -e . "${ref_file}" >/dev/null
 
-  run_agent "${agent_file}" "${schema_file}" "Show % growth over 7/30/90 days for business paid nodes plus homelab reachable nodes, per day, between ${FROM_DATE} and ${TO_DATE}."
+  run_agent "${agent_file}" "${schema_file}" "Show % growth over 7/30/90 days for total nodes (business paid + homelab reachable), per day, between ${FROM_DATE} and ${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -5124,7 +5124,7 @@ SQL
   run_bq "${ref_file}" "${sql_ref}"
   run jq -e . "${ref_file}" >/dev/null
 
-  run_agent "${agent_file}" "${schema_file}" "Show % growth over 7/30/90 days for customers/subscriptions (business + homelab), per day, between ${FROM_DATE} and ${TO_DATE}."
+  run_agent "${agent_file}" "${schema_file}" "Show % growth over 7/30/90 days for paying customers (business + homelab), per day, between ${FROM_DATE} and ${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -5260,7 +5260,7 @@ run_case_business_plan_services_money() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest business_plan_services_money value within ${FROM_DATE}..${TO_DATE}."
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest business professional services amount within ${FROM_DATE}..${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -5292,7 +5292,7 @@ run_case_total_arr_plus_unrealized_arr() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Provide the latest total ARR (realized discounted + unrealized newcomer ARR) within ${FROM_DATE}..${TO_DATE}."
+  run_agent "${agent_file}" "${schema_file}" "Provide the latest total ARR including unrealized ARR within ${FROM_DATE}..${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -5388,7 +5388,7 @@ run_case_realized_arr_stat() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" ""
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest realized ARR (discounted) within ${FROM_DATE}..${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -5420,7 +5420,7 @@ run_case_realized_arr_deltas() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Calculate realized ARR deltas as of ${TO_DATE}: last_7_days, last_30_days, last_90_days."
+  run_agent "${agent_file}" "${schema_file}" "Calculate realized ARR deltas over 7/30/90 days as of ${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -5452,7 +5452,7 @@ run_case_ending_trial_spaces_barchart_snapshot() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "."
+  run_agent "${agent_file}" "${schema_file}" "Show ending trial spaces grouped by trial end date as of ${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -5548,7 +5548,7 @@ run_case_ai_bundle_metrics() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Show daily AI bundle metrics between ${FROM_DATE} and ${TO_DATE}: bundle_625, bundle_300, bundle_1100, bundle_2000."
+  run_agent "${agent_file}" "${schema_file}" "Show daily AI bundle metrics for the 625, 300, 1100, and 2000 bundles between ${FROM_DATE} and ${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -5676,7 +5676,7 @@ run_case_business_nodes() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest business paid nodes (annual + monthly) within ${FROM_DATE}..${TO_DATE}."
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest business paid nodes within ${FROM_DATE}..${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -5836,7 +5836,7 @@ run_case_on_prem_customers() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest on-prem & support subscriptions within ${FROM_DATE}..${TO_DATE}; for dates <= 2025-10-04 use 5, otherwise use onprem_customers metric."
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest on-prem and support subscriptions within ${FROM_DATE}..${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -6060,7 +6060,7 @@ run_case_realized_arr_kpi_stat() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" ""
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest realized ARR breakdown (business, homelab, AI bundles, on-prem, total) within ${FROM_DATE}..${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -6092,7 +6092,7 @@ run_case_realized_arr_kpi_timeseries() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "JSON data[{date,business,homelab,ai_bundles,on_prem,total}], notes[]."
+  run_agent "${agent_file}" "${schema_file}" "Show realized ARR per day between ${FROM_DATE} and ${TO_DATE}, broken out by business, homelab, AI bundles, on-prem, and total."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -6124,7 +6124,7 @@ run_case_realized_arr_kpi_delta() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" ""
+  run_agent "${agent_file}" "${schema_file}" "For ${FROM_DATE}..${TO_DATE}, show the start value, end value, and delta for realized ARR by business, homelab, AI bundles, on-prem, and total."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -6156,7 +6156,7 @@ run_case_realized_arr_kpi_customer_diff() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Show the top 10 customers with ARR gains (won or increased) and top 10 with ARR losses (lost or decreased) between ${FROM_DATE} and ${TO_DATE} (arr_t0 vs arr_t1). Sort gains by descending delta, losses by ascending delta."
+  run_agent "${agent_file}" "${schema_file}" "Show the top 10 customers with ARR gains (won or increased) and top 10 with ARR losses (lost or decreased) between ${FROM_DATE} and ${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -6284,7 +6284,7 @@ run_case_business_subscriptions_deltas() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Compute business subscriptions deltas as of ${TO_DATE}: last_7_days, last_30_days, last_90_days."
+  run_agent "${agent_file}" "${schema_file}" "Compute business subscription deltas over 7/30/90 days as of ${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -6316,7 +6316,7 @@ run_case_business_arr_discount_deltas() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Compute business ARR (discounted) deltas as of ${TO_DATE}: last_7_days, last_30_days, last_90_days."
+  run_agent "${agent_file}" "${schema_file}" "Compute business ARR deltas over 7/30/90 days as of ${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -6348,7 +6348,7 @@ run_case_business_nodes_deltas() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Compute business nodes deltas (paid_nodes_business_annual + paid_nodes_business_monthly) as of ${TO_DATE}: last_7_days, last_30_days, last_90_days."
+  run_agent "${agent_file}" "${schema_file}" "Compute business paid-nodes deltas over 7/30/90 days as of ${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -6465,7 +6465,7 @@ run_case_aws_arr() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest AWS ARR (total, annual, monthly) within ${FROM_DATE}..${TO_DATE}."
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest AWS ARR (total, annual, and monthly) within ${FROM_DATE}..${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -6581,7 +6581,7 @@ run_case_aws_subscriptions() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest AWS business subscriptions (total, annual, monthly) within ${FROM_DATE}..${TO_DATE}."
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest AWS business subscriptions (total, annual, and monthly) within ${FROM_DATE}..${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
@@ -6998,7 +6998,7 @@ run_case_active_users() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest active users (spaces_active_members_sum) within ${FROM_DATE}..${TO_DATE}."
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest active users within ${FROM_DATE}..${TO_DATE}."
   run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"

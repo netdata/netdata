@@ -397,6 +397,11 @@ Next actions to reach parity: promote 🟨 templates from scratch → prod after
 - Updated comparators and harness guards to accept `data` as object or array (for backwards compatibility during transition).
 - Lint/build were run before these edits; need another run after the latest changes.
 
+### Progress update (2025-12-24, latest)
+- Removed schema-instruction prefix from `run_agent` so prompts are plain user questions.
+- Replaced placeholder questions (empty/JSON/dot) with natural language.
+- Removed explicit formula hints and internal metric names from questions where possible.
+
 ### Decisions needed (2025-12-23) — new test case
 1) **Source tables and fields**
    - Option A: Use `watch_towers.spaces_latest` + `watch_towers.spaces_asat_YYYYMMDD` for ARR + subscription fields; join to app DB for contacts.
