@@ -70,7 +70,7 @@ TO_DATE="${TO_DATE:-$(date -I -d '1 day ago')}"
 
 AI_AGENT_BIN="${AI_AGENT_BIN:-${SCRIPT_DIR}/../ai-agent}"
 SYSTEM_PROMPT="${SYSTEM_PROMPT:-${SCRIPT_DIR}/bigquery.ai}"
-MODEL_OVERRIDE="${MODEL_OVERRIDE:-nova/gpt-oss-20b}"
+MODEL_OVERRIDE="${MODEL_OVERRIDE:-vllm3/gpt-oss-20b}"
 TEMPERATURE_OVERRIDE="${TEMPERATURE_OVERRIDE:-0}"
 LLM_TIMEOUT_MS="${LLM_TIMEOUT_MS:-36000000}"
 TOOL_TIMEOUT_MS="${TOOL_TIMEOUT_MS:-36000000}"
@@ -206,23 +206,56 @@ case_realized_arr_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["date", "realized_arr"],
+        "required": [
+          "date",
+          "realized_arr"
+        ],
         "properties": {
-          "date": { "type": "string" },
-          "realized_arr": { "type": "number" }
+          "date": {
+            "type": "string"
+          },
+          "realized_arr": {
+            "type": "number"
+          }
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -284,27 +317,72 @@ case_realized_arr_components_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["date", "on_prem", "business", "homelab", "ai_bundles", "total"],
+        "required": [
+          "date",
+          "on_prem",
+          "business",
+          "homelab",
+          "ai_bundles",
+          "total"
+        ],
         "properties": {
-          "date": { "type": "string" },
-          "on_prem": { "type": "number" },
-          "business": { "type": "number" },
-          "homelab": { "type": "number" },
-          "ai_bundles": { "type": "number" },
-          "total": { "type": "number" }
+          "date": {
+            "type": "string"
+          },
+          "on_prem": {
+            "type": "number"
+          },
+          "business": {
+            "type": "number"
+          },
+          "homelab": {
+            "type": "number"
+          },
+          "ai_bundles": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -375,27 +453,72 @@ case_realized_arr_percent_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["date", "on_prem", "business", "homelab", "ai_bundles", "total"],
+        "required": [
+          "date",
+          "on_prem",
+          "business",
+          "homelab",
+          "ai_bundles",
+          "total"
+        ],
         "properties": {
-          "date": { "type": "string" },
-          "on_prem": { "type": "number" },
-          "business": { "type": "number" },
-          "homelab": { "type": "number" },
-          "ai_bundles": { "type": "number" },
-          "total": { "type": "number" }
+          "date": {
+            "type": "string"
+          },
+          "on_prem": {
+            "type": "number"
+          },
+          "business": {
+            "type": "number"
+          },
+          "homelab": {
+            "type": "number"
+          },
+          "ai_bundles": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -428,25 +551,53 @@ case_trials_total_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "trials_total"],
-        "properties": {
-          "date": { "type": "string" },
-          "trials_total": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "trials_total"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "trials_total": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -479,27 +630,34 @@ case_trial_6plus_nodes_est_value_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": ["data", "notes", "data_freshness"],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "est_value"],
-        "properties": {
-          "date": { "type": "string" },
-          "est_value": { "type": "number" }
-        }
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["date", "est_value"],
+      "properties": {
+        "date": { "type": "string" },
+        "est_value": { "type": "number" }
       }
     },
     "notes": {
       "type": "array",
       "items": { "type": "string" }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["last_ingested_at", "age_minutes", "source_table"],
+      "properties": {
+        "last_ingested_at": { "type": "string" },
+        "age_minutes": { "type": "number" },
+        "source_table": { "type": "string" }
+      }
     }
   }
+}
+JSON
 }
 
 # Growth metrics (discounted ARR % growth)
@@ -536,7 +694,7 @@ case_arr_growth_pct_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": ["data", "notes", "data_freshness"],
   "properties": {
     "data": {
       "type": "array",
@@ -552,7 +710,17 @@ case_arr_growth_pct_schema() {
         }
       }
     },
-    "notes": { "type": "array", "items": { "type": "string" } }
+    "notes": { "type": "array", "items": { "type": "string" } },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["last_ingested_at", "age_minutes", "source_table"],
+      "properties": {
+        "last_ingested_at": { "type": "string" },
+        "age_minutes": { "type": "number" },
+        "source_table": { "type": "string" }
+      }
+    }
   }
 }
 JSON
@@ -638,25 +806,53 @@ case_business_plan_services_money_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "business_plan_services_money"],
-        "properties": {
-          "date": { "type": "string" },
-          "business_plan_services_money": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "business_plan_services_money"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "business_plan_services_money": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -720,25 +916,53 @@ case_total_arr_plus_unrealized_arr_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "total_arr_discounted"],
-        "properties": {
-          "date": { "type": "string" },
-          "total_arr_discounted": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "total_arr_discounted"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "total_arr_discounted": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -772,26 +996,57 @@ case_unrealized_arr_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "business", "homelab"],
-        "properties": {
-          "date": { "type": "string" },
-          "business": { "type": "number" },
-          "homelab": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "business",
+        "homelab"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "business": {
+          "type": "number"
+        },
+        "homelab": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -816,23 +1071,59 @@ case_new_business_subscriptions_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["date", "new_business_subs"],
+        "required": [
+          "date",
+          "new_business_subs"
+        ],
         "properties": {
-          "date": { "type": "string" },
-          "new_business_subs": { "type": ["number", "null"] }
+          "date": {
+            "type": "string"
+          },
+          "new_business_subs": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -857,23 +1148,59 @@ case_churned_business_subscriptions_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["date", "churn_business_subs"],
+        "required": [
+          "date",
+          "churn_business_subs"
+        ],
         "properties": {
-          "date": { "type": "string" },
-          "churn_business_subs": { "type": ["number", "null"] }
+          "date": {
+            "type": "string"
+          },
+          "churn_business_subs": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -901,26 +1228,80 @@ case_ai_bundle_metrics_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["date", "bundle_625", "bundle_300", "bundle_1100", "bundle_2000"],
+        "required": [
+          "date",
+          "bundle_625",
+          "bundle_300",
+          "bundle_1100",
+          "bundle_2000"
+        ],
         "properties": {
-          "date": { "type": "string" },
-          "bundle_625": { "type": ["number", "null"] },
-          "bundle_300": { "type": ["number", "null"] },
-          "bundle_1100": { "type": ["number", "null"] },
-          "bundle_2000": { "type": ["number", "null"] }
+          "date": {
+            "type": "string"
+          },
+          "bundle_625": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "bundle_300": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "bundle_1100": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "bundle_2000": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -953,25 +1334,53 @@ case_ai_credits_space_count_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "spaces"],
-        "properties": {
-          "date": { "type": "string" },
-          "spaces": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "spaces"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "spaces": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -1003,25 +1412,53 @@ case_business_subscriptions_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "cloud_subscriptions"],
-        "properties": {
-          "date": { "type": "string" },
-          "cloud_subscriptions": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "cloud_subscriptions"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "cloud_subscriptions": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -1054,25 +1491,53 @@ case_business_arr_discount_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "discounted_arr"],
-        "properties": {
-          "date": { "type": "string" },
-          "discounted_arr": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "discounted_arr"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "discounted_arr": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -1105,25 +1570,53 @@ case_business_nodes_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "total"],
-        "properties": {
-          "date": { "type": "string" },
-          "total": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "total"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "total": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -1156,25 +1649,53 @@ case_windows_reachable_nodes_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "windows_nodes"],
-        "properties": {
-          "date": { "type": "string" },
-          "windows_nodes": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "windows_nodes"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "windows_nodes": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -1206,25 +1727,53 @@ case_homelab_subscriptions_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "homelab_subs"],
-        "properties": {
-          "date": { "type": "string" },
-          "homelab_subs": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "homelab_subs"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "homelab_subs": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -1256,25 +1805,53 @@ case_homelab_arr_discount_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "discounted_arr"],
-        "properties": {
-          "date": { "type": "string" },
-          "discounted_arr": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "discounted_arr"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "discounted_arr": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -1306,25 +1883,53 @@ case_homelab_nodes_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "total"],
-        "properties": {
-          "date": { "type": "string" },
-          "total": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "total"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "total": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -1371,25 +1976,53 @@ case_on_prem_customers_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "customers"],
-        "properties": {
-          "date": { "type": "string" },
-          "customers": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "customers"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "customers": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -1422,25 +2055,53 @@ case_on_prem_arr_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "onprem_arr"],
-        "properties": {
-          "date": { "type": "string" },
-          "onprem_arr": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "onprem_arr"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "onprem_arr": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -1468,26 +2129,80 @@ case_windows_reachable_nodes_breakdown_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["date", "business", "trial", "community", "homelab"],
+        "required": [
+          "date",
+          "business",
+          "trial",
+          "community",
+          "homelab"
+        ],
         "properties": {
-          "date": { "type": "string" },
-          "business": { "type": ["number", "null"] },
-          "trial": { "type": ["number", "null"] },
-          "community": { "type": ["number", "null"] },
-          "homelab": { "type": ["number", "null"] }
+          "date": {
+            "type": "string"
+          },
+          "business": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "trial": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "community": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "homelab": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -1539,25 +2254,53 @@ case_realized_arr_stat_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "realized_arr"],
-        "properties": {
-          "date": { "type": "string" },
-          "realized_arr": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "realized_arr"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "realized_arr": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -1625,27 +2368,61 @@ case_realized_arr_deltas_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "last_7_days", "last_30_days", "last_90_days"],
-        "properties": {
-          "date": { "type": "string" },
-          "last_7_days": { "type": "number" },
-          "last_30_days": { "type": "number" },
-          "last_90_days": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "last_7_days",
+        "last_30_days",
+        "last_90_days"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "last_7_days": {
+          "type": "number"
+        },
+        "last_30_days": {
+          "type": "number"
+        },
+        "last_90_days": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -1688,27 +2465,70 @@ case_business_subscriptions_deltas_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "last_7_days", "last_30_days", "last_90_days"],
-        "properties": {
-          "date": { "type": "string" },
-          "last_7_days": { "type": ["number", "null"] },
-          "last_30_days": { "type": ["number", "null"] },
-          "last_90_days": { "type": ["number", "null"] }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "last_7_days",
+        "last_30_days",
+        "last_90_days"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "last_7_days": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "last_30_days": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "last_90_days": {
+          "type": [
+            "number",
+            "null"
+          ]
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -1752,27 +2572,70 @@ case_business_arr_discount_deltas_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "last_7_days", "last_30_days", "last_90_days"],
-        "properties": {
-          "date": { "type": "string" },
-          "last_7_days": { "type": ["number", "null"] },
-          "last_30_days": { "type": ["number", "null"] },
-          "last_90_days": { "type": ["number", "null"] }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "last_7_days",
+        "last_30_days",
+        "last_90_days"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "last_7_days": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "last_30_days": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "last_90_days": {
+          "type": [
+            "number",
+            "null"
+          ]
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -1816,27 +2679,70 @@ case_business_nodes_deltas_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "last_7_days", "last_30_days", "last_90_days"],
-        "properties": {
-          "date": { "type": "string" },
-          "last_7_days": { "type": ["number", "null"] },
-          "last_30_days": { "type": ["number", "null"] },
-          "last_90_days": { "type": ["number", "null"] }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "last_7_days",
+        "last_30_days",
+        "last_90_days"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "last_7_days": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "last_30_days": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "last_90_days": {
+          "type": [
+            "number",
+            "null"
+          ]
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -1879,44 +2785,85 @@ case_saas_spaces_counts_snapshot_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "Business",
-          "Business_<45d",
-          "Homelab",
-          "Homelab_<45d",
-          "Trials_0_nodes",
-          "Trials_1-5_nodes",
-          "Trials_6+_nodes",
-          "Community_0_nodes",
-          "Community_w_nodes",
-          "Total"
-        ],
-        "properties": {
-          "Business": { "type": "number" },
-          "Business_<45d": { "type": "number" },
-          "Homelab": { "type": "number" },
-          "Homelab_<45d": { "type": "number" },
-          "Trials_0_nodes": { "type": "number" },
-          "Trials_1-5_nodes": { "type": "number" },
-          "Trials_6+_nodes": { "type": "number" },
-          "Community_0_nodes": { "type": "number" },
-          "Community_w_nodes": { "type": "number" },
-          "Total": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "Business",
+        "Business_<45d",
+        "Homelab",
+        "Homelab_<45d",
+        "Trials_0_nodes",
+        "Trials_1-5_nodes",
+        "Trials_6+_nodes",
+        "Community_0_nodes",
+        "Community_w_nodes",
+        "Total"
+      ],
+      "properties": {
+        "Business": {
+          "type": "number"
+        },
+        "Business_<45d": {
+          "type": "number"
+        },
+        "Homelab": {
+          "type": "number"
+        },
+        "Homelab_<45d": {
+          "type": "number"
+        },
+        "Trials_0_nodes": {
+          "type": "number"
+        },
+        "Trials_1-5_nodes": {
+          "type": "number"
+        },
+        "Trials_6+_nodes": {
+          "type": "number"
+        },
+        "Community_0_nodes": {
+          "type": "number"
+        },
+        "Community_w_nodes": {
+          "type": "number"
+        },
+        "Total": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -1971,44 +2918,85 @@ case_saas_spaces_percent_snapshot_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "Business",
-          "Business_<45d",
-          "Homelab",
-          "Homelab_<45d",
-          "Trials_0_nodes",
-          "Trials_1-5_nodes",
-          "Trials_6+_nodes",
-          "Community_0_nodes",
-          "Community_w_nodes",
-          "check"
-        ],
-        "properties": {
-          "Business": { "type": "number" },
-          "Business_<45d": { "type": "number" },
-          "Homelab": { "type": "number" },
-          "Homelab_<45d": { "type": "number" },
-          "Trials_0_nodes": { "type": "number" },
-          "Trials_1-5_nodes": { "type": "number" },
-          "Trials_6+_nodes": { "type": "number" },
-          "Community_0_nodes": { "type": "number" },
-          "Community_w_nodes": { "type": "number" },
-          "check": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "Business",
+        "Business_<45d",
+        "Homelab",
+        "Homelab_<45d",
+        "Trials_0_nodes",
+        "Trials_1-5_nodes",
+        "Trials_6+_nodes",
+        "Community_0_nodes",
+        "Community_w_nodes",
+        "check"
+      ],
+      "properties": {
+        "Business": {
+          "type": "number"
+        },
+        "Business_<45d": {
+          "type": "number"
+        },
+        "Homelab": {
+          "type": "number"
+        },
+        "Homelab_<45d": {
+          "type": "number"
+        },
+        "Trials_0_nodes": {
+          "type": "number"
+        },
+        "Trials_1-5_nodes": {
+          "type": "number"
+        },
+        "Trials_6+_nodes": {
+          "type": "number"
+        },
+        "Community_0_nodes": {
+          "type": "number"
+        },
+        "Community_w_nodes": {
+          "type": "number"
+        },
+        "check": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -2059,40 +3047,77 @@ case_nodes_total_view_percent_snapshot_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "Business",
-          "Business_<45d",
-          "Homelab",
-          "Homelab_<45d",
-          "Trials_1-5_nodes",
-          "Trials_6+_nodes",
-          "Community_w_nodes",
-          "check"
-        ],
-        "properties": {
-          "Business": { "type": "number" },
-          "Business_<45d": { "type": "number" },
-          "Homelab": { "type": "number" },
-          "Homelab_<45d": { "type": "number" },
-          "Trials_1-5_nodes": { "type": "number" },
-          "Trials_6+_nodes": { "type": "number" },
-          "Community_w_nodes": { "type": "number" },
-          "check": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "Business",
+        "Business_<45d",
+        "Homelab",
+        "Homelab_<45d",
+        "Trials_1-5_nodes",
+        "Trials_6+_nodes",
+        "Community_w_nodes",
+        "check"
+      ],
+      "properties": {
+        "Business": {
+          "type": "number"
+        },
+        "Business_<45d": {
+          "type": "number"
+        },
+        "Homelab": {
+          "type": "number"
+        },
+        "Homelab_<45d": {
+          "type": "number"
+        },
+        "Trials_1-5_nodes": {
+          "type": "number"
+        },
+        "Trials_6+_nodes": {
+          "type": "number"
+        },
+        "Community_w_nodes": {
+          "type": "number"
+        },
+        "check": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -2131,40 +3156,77 @@ case_nodes_counts_snapshot_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "Business",
-          "Business_<45d",
-          "Homelab",
-          "Homelab_<45d",
-          "Trials_1-5_nodes",
-          "Trials_6+_nodes",
-          "Community_w_nodes",
-          "Total"
-        ],
-        "properties": {
-          "Business": { "type": "number" },
-          "Business_<45d": { "type": "number" },
-          "Homelab": { "type": "number" },
-          "Homelab_<45d": { "type": "number" },
-          "Trials_1-5_nodes": { "type": "number" },
-          "Trials_6+_nodes": { "type": "number" },
-          "Community_w_nodes": { "type": "number" },
-          "Total": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "Business",
+        "Business_<45d",
+        "Homelab",
+        "Homelab_<45d",
+        "Trials_1-5_nodes",
+        "Trials_6+_nodes",
+        "Community_w_nodes",
+        "Total"
+      ],
+      "properties": {
+        "Business": {
+          "type": "number"
+        },
+        "Business_<45d": {
+          "type": "number"
+        },
+        "Homelab": {
+          "type": "number"
+        },
+        "Homelab_<45d": {
+          "type": "number"
+        },
+        "Trials_1-5_nodes": {
+          "type": "number"
+        },
+        "Trials_6+_nodes": {
+          "type": "number"
+        },
+        "Community_w_nodes": {
+          "type": "number"
+        },
+        "Total": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -2225,29 +3287,69 @@ case_realized_arr_kpi_stat_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "business", "homelab", "ai_bundles", "on_prem", "total"],
-        "properties": {
-          "date": { "type": "string" },
-          "business": { "type": "number" },
-          "homelab": { "type": "number" },
-          "ai_bundles": { "type": "number" },
-          "on_prem": { "type": "number" },
-          "total": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "business",
+        "homelab",
+        "ai_bundles",
+        "on_prem",
+        "total"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "business": {
+          "type": "number"
+        },
+        "homelab": {
+          "type": "number"
+        },
+        "ai_bundles": {
+          "type": "number"
+        },
+        "on_prem": {
+          "type": "number"
+        },
+        "total": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -2303,27 +3405,72 @@ case_realized_arr_kpi_timeseries_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["date", "business", "homelab", "ai_bundles", "on_prem", "total"],
+        "required": [
+          "date",
+          "business",
+          "homelab",
+          "ai_bundles",
+          "on_prem",
+          "total"
+        ],
         "properties": {
-          "date": { "type": "string" },
-          "business": { "type": "number" },
-          "homelab": { "type": "number" },
-          "ai_bundles": { "type": "number" },
-          "on_prem": { "type": "number" },
-          "total": { "type": "number" }
+          "date": {
+            "type": "string"
+          },
+          "business": {
+            "type": "number"
+          },
+          "homelab": {
+            "type": "number"
+          },
+          "ai_bundles": {
+            "type": "number"
+          },
+          "on_prem": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -2404,47 +3551,113 @@ case_realized_arr_kpi_delta_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "start_date","end_date",
-          "business_start","business_end","business_delta",
-          "homelab_start","homelab_end","homelab_delta",
-          "ai_bundles_start","ai_bundles_end","ai_bundles_delta",
-          "on_prem_start","on_prem_end","on_prem_delta",
-          "total_start","total_end","total_delta"
-        ],
-        "properties": {
-          "start_date": { "type": "string" },
-          "end_date": { "type": "string" },
-          "business_start": { "type": "number" },
-          "business_end": { "type": "number" },
-          "business_delta": { "type": "number" },
-          "homelab_start": { "type": "number" },
-          "homelab_end": { "type": "number" },
-          "homelab_delta": { "type": "number" },
-          "ai_bundles_start": { "type": "number" },
-          "ai_bundles_end": { "type": "number" },
-          "ai_bundles_delta": { "type": "number" },
-          "on_prem_start": { "type": "number" },
-          "on_prem_end": { "type": "number" },
-          "on_prem_delta": { "type": "number" },
-          "total_start": { "type": "number" },
-          "total_end": { "type": "number" },
-          "total_delta": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_date",
+        "end_date",
+        "business_start",
+        "business_end",
+        "business_delta",
+        "homelab_start",
+        "homelab_end",
+        "homelab_delta",
+        "ai_bundles_start",
+        "ai_bundles_end",
+        "ai_bundles_delta",
+        "on_prem_start",
+        "on_prem_end",
+        "on_prem_delta",
+        "total_start",
+        "total_end",
+        "total_delta"
+      ],
+      "properties": {
+        "start_date": {
+          "type": "string"
+        },
+        "end_date": {
+          "type": "string"
+        },
+        "business_start": {
+          "type": "number"
+        },
+        "business_end": {
+          "type": "number"
+        },
+        "business_delta": {
+          "type": "number"
+        },
+        "homelab_start": {
+          "type": "number"
+        },
+        "homelab_end": {
+          "type": "number"
+        },
+        "homelab_delta": {
+          "type": "number"
+        },
+        "ai_bundles_start": {
+          "type": "number"
+        },
+        "ai_bundles_end": {
+          "type": "number"
+        },
+        "ai_bundles_delta": {
+          "type": "number"
+        },
+        "on_prem_start": {
+          "type": "number"
+        },
+        "on_prem_end": {
+          "type": "number"
+        },
+        "on_prem_delta": {
+          "type": "number"
+        },
+        "total_start": {
+          "type": "number"
+        },
+        "total_end": {
+          "type": "number"
+        },
+        "total_delta": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -2522,28 +3735,82 @@ case_realized_arr_kpi_customer_diff_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["space_id", "space_name", "plan_class", "arr_t0", "arr_t1", "delta", "status"],
+        "required": [
+          "space_id",
+          "space_name",
+          "plan_class",
+          "arr_t0",
+          "arr_t1",
+          "delta",
+          "status"
+        ],
         "properties": {
-          "space_id": { "type": "string" },
-          "space_name": { "type": ["string", "null"] },
-          "plan_class": { "type": ["string", "null"] },
-          "arr_t0": { "type": "number" },
-          "arr_t1": { "type": "number" },
-          "delta": { "type": "number" },
-          "status": { "type": "string" }
+          "space_id": {
+            "type": "string"
+          },
+          "space_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plan_class": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "arr_t0": {
+            "type": "number"
+          },
+          "arr_t1": {
+            "type": "number"
+          },
+          "delta": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string"
+          }
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -2571,23 +3838,56 @@ case_unrealized_arr_barchart_snapshot_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["date", "to_be_realized"],
+        "required": [
+          "date",
+          "to_be_realized"
+        ],
         "properties": {
-          "date": { "type": "string" },
-          "to_be_realized": { "type": "number" }
+          "date": {
+            "type": "string"
+          },
+          "to_be_realized": {
+            "type": "number"
+          }
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -2735,28 +4035,82 @@ case_space_nodes_delta_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["space_id", "space_name", "plan_class", "nodes_t0", "nodes_t1", "delta", "status"],
+        "required": [
+          "space_id",
+          "space_name",
+          "plan_class",
+          "nodes_t0",
+          "nodes_t1",
+          "delta",
+          "status"
+        ],
         "properties": {
-          "space_id": { "type": "string" },
-          "space_name": { "type": ["string", "null"] },
-          "plan_class": { "type": ["string", "null"] },
-          "nodes_t0": { "type": "number" },
-          "nodes_t1": { "type": "number" },
-          "delta": { "type": "number" },
-          "status": { "type": "string" }
+          "space_id": {
+            "type": "string"
+          },
+          "space_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plan_class": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nodes_t0": {
+            "type": "number"
+          },
+          "nodes_t1": {
+            "type": "number"
+          },
+          "delta": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string"
+          }
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -2782,23 +4136,56 @@ case_ending_trial_spaces_barchart_snapshot_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["date", "reachable_nodes_sum"],
+        "required": [
+          "date",
+          "reachable_nodes_sum"
+        ],
         "properties": {
-          "date": { "type": "string" },
-          "reachable_nodes_sum": { "type": "number" }
+          "date": {
+            "type": "string"
+          },
+          "reachable_nodes_sum": {
+            "type": "number"
+          }
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -2835,7 +4222,7 @@ run_agent() {
     --format json \
     --schema "@${schema_file}" \
     "${override_args[@]}" \
-    "Return ONLY valid JSON matching the provided schema (no prose, no extra keys). ${question}" \
+    "Return ONLY valid JSON matching the provided schema (no prose, no extra keys). If the schema defines data as an object, return a single object (not an array). Include data_freshness{last_ingested_at,age_minutes,source_table}. ${question}" \
     >"${out_file}"
 }
 
@@ -3053,8 +4440,13 @@ compare_single_row_fields() {
       elif (arr | length) < 1 then error(name + " has no rows")
       else arr[0]
       end;
+    def row_from_data(d; name):
+      if (d | type) == "object" then d
+      elif (d | type) == "array" then first_row(d; name)
+      else error(name + " must be object or array")
+      end;
     (first_row($ref[0]; "ref") as $r
-      | first_row((agent_obj).data; "agent.data") as $a
+      | row_from_data((agent_obj).data; "agent.data") as $a
       | {
           ok: (
             ($r.date | tostring) == ($a.date | tostring)
@@ -3098,8 +4490,13 @@ compare_single_row_fields_no_date() {
       elif (arr | length) < 1 then error(name + " has no rows")
       else arr[0]
       end;
+    def row_from_data(d; name):
+      if (d | type) == "object" then d
+      elif (d | type) == "array" then first_row(d; name)
+      else error(name + " must be object or array")
+      end;
     (first_row($ref[0]; "ref") as $r
-      | first_row((agent_obj).data; "agent.data") as $a
+      | row_from_data((agent_obj).data; "agent.data") as $a
       | {
           ok: ($fields | all(. as $f | values_match(to_num($r[$f]); to_num($a[$f])))),
           ref: $r,
@@ -3258,8 +4655,8 @@ run_case_realized_arr() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me realized ARR (discounted) per day between ${FROM_DATE} and ${TO_DATE}, including on-prem. Return JSON with data[{date,realized_arr}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me realized ARR (discounted) per day between ${FROM_DATE} and ${TO_DATE}, including on-prem."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_realized_arr_timeseries "${ref_file}" "${agent_file}" 0.01 | tee "${diff_file}" >/dev/null
@@ -3290,8 +4687,8 @@ run_case_realized_arr_components() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Break down realized ARR (discounted) per day between ${FROM_DATE} and ${TO_DATE} into on_prem, business, homelab, ai_bundles, and total. On-prem adds the static manual baseline for dates <= 2025-10-01. Return JSON with data[{date,on_prem,business,homelab,ai_bundles,total}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Break down realized ARR (discounted) per day between ${FROM_DATE} and ${TO_DATE} into on_prem, business, homelab, ai_bundles, and total."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_timeseries_fields "${ref_file}" "${agent_file}" '["on_prem","business","homelab","ai_bundles","total"]' 0.01 | tee "${diff_file}" >/dev/null
@@ -3322,8 +4719,8 @@ run_case_realized_arr_percent() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Show realized ARR component shares (%) per day between ${FROM_DATE} and ${TO_DATE} for on_prem, business, homelab, ai_bundles, and total %. On-prem includes the static baseline for dates <= 2025-10-01. Return JSON with data[{date,on_prem,business,homelab,ai_bundles,total}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Show realized ARR component shares (%) per day between ${FROM_DATE} and ${TO_DATE} for on_prem, business, homelab, ai_bundles, and total %."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_timeseries_fields "${ref_file}" "${agent_file}" '["on_prem","business","homelab","ai_bundles","total"]' 0.01 | tee "${diff_file}" >/dev/null
@@ -3354,8 +4751,8 @@ run_case_trials_total() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest trials_total value within ${FROM_DATE}..${TO_DATE} (stat lastNotNull). Return JSON with data[{date,trials_total}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest trials_total value within ${FROM_DATE}..${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["trials_total"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -3386,8 +4783,8 @@ run_case_trial_6plus_nodes_est_value() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest estimated value for trials with 6+ reachable nodes in ${FROM_DATE}..${TO_DATE}: est_value = trial_6_or_more_nodes_reachable_sum * 2 * 12 (stat lastNotNull). Return JSON with data[{date,est_value}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest estimated value for trials with 6+ reachable nodes in ${FROM_DATE}..${TO_DATE}"
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["est_value"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -3409,25 +4806,73 @@ case_arr_growth_pct_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["date", "pct_7", "pct_30", "pct_90"],
+        "required": [
+          "date",
+          "pct_7",
+          "pct_30",
+          "pct_90"
+        ],
         "properties": {
-          "date": { "type": "string" },
-          "pct_7": { "type": ["number", "null"] },
-          "pct_30": { "type": ["number", "null"] },
-          "pct_90": { "type": ["number", "null"] }
+          "date": {
+            "type": "string"
+          },
+          "pct_7": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "pct_30": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "pct_90": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -3478,8 +4923,8 @@ SQL
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Return ONLY valid JSON matching the provided schema (no prose, no extra keys). Show discounted ARR % growth over 7/30/90 days, per day, between ${FROM_DATE} and ${TO_DATE}. Return JSON with data[{date,pct_7,pct_30,pct_90}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Show discounted ARR % growth over 7/30/90 days, per day, between ${FROM_DATE} and ${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_timeseries_fields "${ref_file}" "${agent_file}" '["pct_7","pct_30","pct_90"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -3529,8 +4974,8 @@ SQL
   run_bq "${ref_file}" "${sql_ref}"
   run jq -e . "${ref_file}" >/dev/null
 
-  run_agent "${agent_file}" "${schema_file}" "Return ONLY valid JSON matching the provided schema (no prose, no extra keys). Show % growth over 7/30/90 days for business paid nodes plus homelab reachable nodes, per day, between ${FROM_DATE} and ${TO_DATE}. Return JSON with data[{date,pct_7,pct_30,pct_90}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Show % growth over 7/30/90 days for business paid nodes plus homelab reachable nodes, per day, between ${FROM_DATE} and ${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_timeseries_fields "${ref_file}" "${agent_file}" '["pct_7","pct_30","pct_90"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -3579,8 +5024,8 @@ SQL
   run_bq "${ref_file}" "${sql_ref}"
   run jq -e . "${ref_file}" >/dev/null
 
-  run_agent "${agent_file}" "${schema_file}" "Return ONLY valid JSON matching the provided schema (no prose, no extra keys). Show % growth over 7/30/90 days for reachable nodes, per day, between ${FROM_DATE} and ${TO_DATE}. Return JSON with data[{date,pct_7,pct_30,pct_90}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Show % growth over 7/30/90 days for reachable nodes, per day, between ${FROM_DATE} and ${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_timeseries_fields "${ref_file}" "${agent_file}" '["pct_7","pct_30","pct_90"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -3629,8 +5074,8 @@ SQL
   run_bq "${ref_file}" "${sql_ref}"
   run jq -e . "${ref_file}" >/dev/null
 
-  run_agent "${agent_file}" "${schema_file}" "Return ONLY valid JSON matching the provided schema (no prose, no extra keys). Show % growth over 7/30/90 days for business paid nodes, per day, between ${FROM_DATE} and ${TO_DATE}. Return JSON with data[{date,pct_7,pct_30,pct_90}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Show % growth over 7/30/90 days for business paid nodes, per day, between ${FROM_DATE} and ${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_timeseries_fields "${ref_file}" "${agent_file}" '["pct_7","pct_30","pct_90"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -3679,8 +5124,8 @@ SQL
   run_bq "${ref_file}" "${sql_ref}"
   run jq -e . "${ref_file}" >/dev/null
 
-  run_agent "${agent_file}" "${schema_file}" "Return ONLY valid JSON matching the provided schema (no prose, no extra keys). Show % growth over 7/30/90 days for customers/subscriptions (business + homelab), per day, between ${FROM_DATE} and ${TO_DATE}. Return JSON with data[{date,pct_7,pct_30,pct_90}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Show % growth over 7/30/90 days for customers/subscriptions (business + homelab), per day, between ${FROM_DATE} and ${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_timeseries_fields "${ref_file}" "${agent_file}" '["pct_7","pct_30","pct_90"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -3729,8 +5174,8 @@ SQL
   run_bq "${ref_file}" "${sql_ref}"
   run jq -e . "${ref_file}" >/dev/null
 
-  run_agent "${agent_file}" "${schema_file}" "Return ONLY valid JSON matching the provided schema (no prose, no extra keys). Show % growth over 7/30/90 days for homelab reachable nodes, per day, between ${FROM_DATE} and ${TO_DATE}. Return JSON with data[{date,pct_7,pct_30,pct_90}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Show % growth over 7/30/90 days for homelab reachable nodes, per day, between ${FROM_DATE} and ${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_timeseries_fields "${ref_file}" "${agent_file}" '["pct_7","pct_30","pct_90"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -3785,8 +5230,8 @@ SQL
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Return ONLY valid JSON matching the provided schema (no prose, no extra keys). Show undiscounted ARR % growth over 7/30/90 days, per day, between ${FROM_DATE} and ${TO_DATE}. Return JSON with data[{date,pct_7,pct_30,pct_90}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Show undiscounted ARR % growth over 7/30/90 days, per day, between ${FROM_DATE} and ${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_timeseries_fields "${ref_file}" "${agent_file}" '["pct_7","pct_30","pct_90"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -3815,8 +5260,8 @@ run_case_business_plan_services_money() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest business_plan_services_money value within ${FROM_DATE}..${TO_DATE} (stat lastNotNull). Return JSON with data[{date,business_plan_services_money}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest business_plan_services_money value within ${FROM_DATE}..${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["business_plan_services_money"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -3847,8 +5292,8 @@ run_case_total_arr_plus_unrealized_arr() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Provide the latest total ARR (realized discounted + unrealized newcomer ARR) within ${FROM_DATE}..${TO_DATE}. Return JSON with data[{date,total_arr_discounted}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Provide the latest total ARR (realized discounted + unrealized newcomer ARR) within ${FROM_DATE}..${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["total_arr_discounted"]' 0.01 | tee "${diff_file}" >/dev/null
@@ -3879,8 +5324,8 @@ run_case_unrealized_arr() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest unrealized ARR (business and homelab newcomer ARR) within ${FROM_DATE}..${TO_DATE}. Return JSON with data[{date,business,homelab}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest unrealized ARR (business and homelab newcomer ARR) within ${FROM_DATE}..${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["business","homelab"]' 0.01 | tee "${diff_file}" >/dev/null
@@ -3911,8 +5356,8 @@ run_case_unrealized_arr_barchart_snapshot() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Show unrealized ARR amounts grouped by expected realization date using the snapshot for ${TO_DATE}. Return JSON with data[{date,to_be_realized}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Show unrealized ARR amounts grouped by expected realization date."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_timeseries_fields "${ref_file}" "${agent_file}" '["to_be_realized"]' 0.01 | tee "${diff_file}" >/dev/null
@@ -3943,8 +5388,8 @@ run_case_realized_arr_stat() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest realized ARR (discounted) within ${FROM_DATE}..${TO_DATE}, including on-prem with baseline added for dates <= 2025-10-01. Return JSON with data[{date,realized_arr}] and notes[], with data containing exactly one latest row (ORDER BY date DESC LIMIT 1)."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" ""
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["realized_arr"]' 0.01 | tee "${diff_file}" >/dev/null
@@ -3975,8 +5420,8 @@ run_case_realized_arr_deltas() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Calculate realized ARR deltas as of ${TO_DATE}: last_7_days, last_30_days, last_90_days using the realized ARR series (with on-prem baseline for dates <= 2025-10-01). Return JSON with data[{date,last_7_days,last_30_days,last_90_days}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Calculate realized ARR deltas as of ${TO_DATE}: last_7_days, last_30_days, last_90_days."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["last_7_days","last_30_days","last_90_days"]' 0.01 | tee "${diff_file}" >/dev/null
@@ -4007,8 +5452,8 @@ run_case_ending_trial_spaces_barchart_snapshot() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Using the snapshot for ${TO_DATE}, show ending trial spaces: sum reachable nodes grouped by trial end date. Return JSON with data[{date,reachable_nodes_sum}] (limit 50 ordered by date) and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_timeseries_fields "${ref_file}" "${agent_file}" '["reachable_nodes_sum"]' 0.01 | tee "${diff_file}" >/dev/null
@@ -4039,8 +5484,8 @@ run_case_new_business_subscriptions() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Show daily new business subscriptions between ${FROM_DATE} and ${TO_DATE}. Return JSON with data[{date,new_business_subs}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Show daily new business subscriptions between ${FROM_DATE} and ${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_timeseries_fields "${ref_file}" "${agent_file}" '["new_business_subs"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -4071,8 +5516,8 @@ run_case_churned_business_subscriptions() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Show daily churned business subscriptions between ${FROM_DATE} and ${TO_DATE}. Return JSON with data[{date,churn_business_subs}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Show daily churned business subscriptions between ${FROM_DATE} and ${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_timeseries_fields "${ref_file}" "${agent_file}" '["churn_business_subs"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -4103,8 +5548,8 @@ run_case_ai_bundle_metrics() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Show daily AI bundle metrics between ${FROM_DATE} and ${TO_DATE}: bundle_625, bundle_300, bundle_1100, bundle_2000. Return JSON with data[{date,bundle_625,bundle_300,bundle_1100,bundle_2000}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Show daily AI bundle metrics between ${FROM_DATE} and ${TO_DATE}: bundle_625, bundle_300, bundle_1100, bundle_2000."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_timeseries_fields "${ref_file}" "${agent_file}" '["bundle_625","bundle_300","bundle_1100","bundle_2000"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -4135,8 +5580,8 @@ run_case_ai_credits_spaces() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest count of spaces with AI credits within ${FROM_DATE}..${TO_DATE} (stat lastNotNull). Return JSON with data[{date,spaces}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest count of spaces with AI credits within ${FROM_DATE}..${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["spaces"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -4167,8 +5612,8 @@ run_case_business_subscriptions() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest business subscriptions count within ${FROM_DATE}..${TO_DATE} (stat lastNotNull). Return JSON with data[{date,cloud_subscriptions}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest business subscriptions count within ${FROM_DATE}..${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["cloud_subscriptions"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -4199,8 +5644,8 @@ run_case_business_arr_discount() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest business ARR (discounted) within ${FROM_DATE}..${TO_DATE}. Return JSON with data[{date,discounted_arr}] and notes[], with data containing exactly one latest row (ORDER BY date DESC LIMIT 1)."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest business ARR (discounted) within ${FROM_DATE}..${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["discounted_arr"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -4231,8 +5676,8 @@ run_case_business_nodes() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest business paid nodes (annual + monthly) within ${FROM_DATE}..${TO_DATE} (stat last/lastNotNull). Return JSON with data[{date,total}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest business paid nodes (annual + monthly) within ${FROM_DATE}..${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["total"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -4263,8 +5708,8 @@ run_case_windows_reachable_nodes() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest reachable Windows nodes within ${FROM_DATE}..${TO_DATE} (stat lastNotNull). Return JSON with data[{date,windows_nodes}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest reachable Windows nodes within ${FROM_DATE}..${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["windows_nodes"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -4295,8 +5740,8 @@ run_case_homelab_subscriptions() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest homelab subscriptions count within ${FROM_DATE}..${TO_DATE} (stat lastNotNull). Return JSON with data[{date,homelab_subs}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest homelab subscriptions count within ${FROM_DATE}..${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["homelab_subs"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -4327,8 +5772,8 @@ run_case_homelab_arr_discount() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest homelab ARR (discounted) within ${FROM_DATE}..${TO_DATE} (stat lastNotNull). Return JSON with data[{date,discounted_arr}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest homelab ARR (discounted) within ${FROM_DATE}..${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["discounted_arr"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -4359,8 +5804,8 @@ run_case_homelab_nodes() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest homelab reachable nodes within ${FROM_DATE}..${TO_DATE} (stat lastNotNull). Return JSON with data[{date,total}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest homelab reachable nodes within ${FROM_DATE}..${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["total"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -4391,8 +5836,8 @@ run_case_on_prem_customers() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest on-prem & support subscriptions within ${FROM_DATE}..${TO_DATE}; for dates <= 2025-10-04 use 5, otherwise use onprem_customers metric. Return JSON with data[{date,customers}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest on-prem & support subscriptions within ${FROM_DATE}..${TO_DATE}; for dates <= 2025-10-04 use 5, otherwise use onprem_customers metric."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["customers"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -4423,8 +5868,8 @@ run_case_on_prem_arr() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me the latest on-prem ARR within ${FROM_DATE}..${TO_DATE} (stat lastNotNull). Return JSON with data[{date,onprem_arr}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest on-prem ARR within ${FROM_DATE}..${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["onprem_arr"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -4455,8 +5900,8 @@ run_case_windows_reachable_nodes_breakdown() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Show daily reachable Windows nodes by segment (business, trial, community, homelab) between ${FROM_DATE} and ${TO_DATE}. Return JSON with data[{date,business,trial,community,homelab}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Show daily reachable Windows nodes by segment (business, trial, community, homelab) between ${FROM_DATE} and ${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_timeseries_fields "${ref_file}" "${agent_file}" '["business","trial","community","homelab"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -4487,8 +5932,8 @@ run_case_saas_spaces_counts_snapshot() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "From the spaces snapshot of ${TO_DATE}, return counts of spaces by segment (Business, Business_<45d, Homelab, Homelab_<45d, Trials_0_nodes, Trials_1-5_nodes, Trials_6+_nodes, Community_0_nodes, Community_w_nodes, Total). Return JSON with data[{...}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "From the spaces snapshot of ${TO_DATE}, return counts of spaces by segment (Business, Business_<45d, Homelab, Homelab_<45d, Trials_0_nodes, Trials_1-5_nodes, Trials_6+_nodes, Community_0_nodes, Community_w_nodes, Total)."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields_no_date "${ref_file}" "${agent_file}" '["Business","Business_<45d","Homelab","Homelab_<45d","Trials_0_nodes","Trials_1-5_nodes","Trials_6+_nodes","Community_0_nodes","Community_w_nodes","Total"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -4519,8 +5964,8 @@ run_case_saas_spaces_percent_snapshot() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "From the spaces snapshot of ${TO_DATE}, return percentage share of spaces by segment (Business, Business_<45d, Homelab, Homelab_<45d, Trials_0_nodes, Trials_1-5_nodes, Trials_6+_nodes, Community_0_nodes, Community_w_nodes) and a check field. Return JSON with data[{...}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "From the spaces snapshot of ${TO_DATE}, return percentage share of spaces by segment (Business, Business_<45d, Homelab, Homelab_<45d, Trials_0_nodes, Trials_1-5_nodes, Trials_6+_nodes, Community_0_nodes, Community_w_nodes) and a check field."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields_no_date "${ref_file}" "${agent_file}" '["Business","Business_<45d","Homelab","Homelab_<45d","Trials_0_nodes","Trials_1-5_nodes","Trials_6+_nodes","Community_0_nodes","Community_w_nodes","check"]' 0.01 | tee "${diff_file}" >/dev/null
@@ -4551,8 +5996,8 @@ run_case_nodes_total_view_percent_snapshot() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "From the spaces snapshot of ${TO_DATE}, return reachable nodes percentage by segment (Business, Business_<45d, Homelab, Homelab_<45d, Trials_1-5_nodes, Trials_6+_nodes, Community_w_nodes) and a check field. Return JSON with data[{...}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "From the spaces snapshot of ${TO_DATE}, return reachable nodes percentage by segment (Business, Business_<45d, Homelab, Homelab_<45d, Trials_1-5_nodes, Trials_6+_nodes, Community_w_nodes) and a check field."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields_no_date "${ref_file}" "${agent_file}" '["Business","Business_<45d","Homelab","Homelab_<45d","Trials_1-5_nodes","Trials_6+_nodes","Community_w_nodes","check"]' 0.01 | tee "${diff_file}" >/dev/null
@@ -4583,8 +6028,8 @@ run_case_nodes_counts_snapshot() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "From the spaces snapshot of ${TO_DATE}, return reachable nodes totals by segment (Business, Business_<45d, Homelab, Homelab_<45d, Trials_1-5_nodes, Trials_6+_nodes, Community_w_nodes, Total). Return JSON with data[{...}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "From the spaces snapshot of ${TO_DATE}, return reachable nodes totals by segment (Business, Business_<45d, Homelab, Homelab_<45d, Trials_1-5_nodes, Trials_6+_nodes, Community_w_nodes, Total)."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields_no_date "${ref_file}" "${agent_file}" '["Business","Business_<45d","Homelab","Homelab_<45d","Trials_1-5_nodes","Trials_6+_nodes","Community_w_nodes","Total"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -4615,8 +6060,8 @@ run_case_realized_arr_kpi_stat() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Give me realized ARR per product and total (latest in ${FROM_DATE}..${TO_DATE}), including on-prem baseline for dates <= 2025-10-01. Return JSON with data[{date,business,homelab,ai_bundles,on_prem,total}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" ""
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["business","homelab","ai_bundles","on_prem","total"]' 0.01 | tee "${diff_file}" >/dev/null
@@ -4647,8 +6092,8 @@ run_case_realized_arr_kpi_timeseries() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Show daily realized ARR per product and total between ${FROM_DATE} and ${TO_DATE}, including on-prem baseline for dates <= 2025-10-01. JSON data[{date,business,homelab,ai_bundles,on_prem,total}], notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "JSON data[{date,business,homelab,ai_bundles,on_prem,total}], notes[]."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_timeseries_fields "${ref_file}" "${agent_file}" '["business","homelab","ai_bundles","on_prem","total"]' 0.01 | tee "${diff_file}" >/dev/null
@@ -4679,8 +6124,8 @@ run_case_realized_arr_kpi_delta() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Compute realized ARR deltas between the start and end of ${FROM_DATE}..${TO_DATE} for business, homelab, ai_bundles, on_prem (baseline <= 2025-10-01), and totals. Return JSON with data[{...}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" ""
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["business_delta","homelab_delta","ai_bundles_delta","on_prem_delta","total_delta"]' 0.01 | tee "${diff_file}" >/dev/null
@@ -4711,8 +6156,8 @@ run_case_realized_arr_kpi_customer_diff() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Show the top 10 customers with ARR gains (won or increased) and top 10 with ARR losses (lost or decreased) between ${FROM_DATE} and ${TO_DATE} (arr_t0 vs arr_t1). Sort gains by descending delta, losses by ascending delta. On-prem baseline is aggregate only, not per customer. Return JSON with data[{space_id,space_name,plan_class,arr_t0,arr_t1,delta,status}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Show the top 10 customers with ARR gains (won or increased) and top 10 with ARR losses (lost or decreased) between ${FROM_DATE} and ${TO_DATE} (arr_t0 vs arr_t1). Sort gains by descending delta, losses by ascending delta."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_customer_delta_fields "${ref_file}" "${agent_file}" 0.01 | tee "${diff_file}" >/dev/null
@@ -4743,8 +6188,8 @@ run_case_realized_arr_kpi_customer_diff_since_only() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Since ${FROM_DATE}, give me the top 10 customers with ARR gains (won or increased) and top 10 with ARR losses (lost or decreased); use yesterday as the end date if I did not provide one. Return JSON with data[{space_id,space_name,plan_class,arr_t0,arr_t1,delta,status}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Since ${FROM_DATE}, give me the top 10 customers with ARR gains (won or increased) and top 10 with ARR losses (lost or decreased); use yesterday as the end date if I did not provide one."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_customer_delta_fields "${ref_file}" "${agent_file}" 0.01 | tee "${diff_file}" >/dev/null
@@ -4775,8 +6220,8 @@ run_case_business_nodes_delta_top10() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Show top 10 business spaces adding reachable nodes and top 10 removing reachable nodes between ${FROM_DATE} and ${TO_DATE}. Use business spaces only, no trials. Return JSON with data[{space_id,space_name,plan_class,nodes_t0,nodes_t1,delta,status}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Show top 10 business spaces adding reachable nodes and top 10 removing reachable nodes between ${FROM_DATE} and ${TO_DATE}. Use business spaces only, no trials."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_space_nodes_delta_fields "${ref_file}" "${agent_file}" 0.01 | tee "${diff_file}" >/dev/null
@@ -4807,8 +6252,8 @@ run_case_homelab_nodes_delta_top10() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Show top 10 homelab spaces adding reachable nodes and top 10 removing reachable nodes between ${FROM_DATE} and ${TO_DATE}. Use homelab spaces only, no trials. Return JSON with data[{space_id,space_name,plan_class,nodes_t0,nodes_t1,delta,status}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Show top 10 homelab spaces adding reachable nodes and top 10 removing reachable nodes between ${FROM_DATE} and ${TO_DATE}. Use homelab spaces only, no trials."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_space_nodes_delta_fields "${ref_file}" "${agent_file}" 0.01 | tee "${diff_file}" >/dev/null
@@ -4839,8 +6284,8 @@ run_case_business_subscriptions_deltas() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Compute business subscriptions deltas as of ${TO_DATE}: last_7_days, last_30_days, last_90_days, using cloud_subscriptions (subscriptions_total/total_business_subscriptions). Return JSON with data[{date,last_7_days,last_30_days,last_90_days}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Compute business subscriptions deltas as of ${TO_DATE}: last_7_days, last_30_days, last_90_days."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["last_7_days","last_30_days","last_90_days"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -4871,8 +6316,8 @@ run_case_business_arr_discount_deltas() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Compute business ARR (discounted) deltas as of ${TO_DATE}: last_7_days, last_30_days, last_90_days, using arr_business_discount. Return JSON with data[{date,last_7_days,last_30_days,last_90_days}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Compute business ARR (discounted) deltas as of ${TO_DATE}: last_7_days, last_30_days, last_90_days."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["last_7_days","last_30_days","last_90_days"]' 0.01 | tee "${diff_file}" >/dev/null
@@ -4903,8 +6348,8 @@ run_case_business_nodes_deltas() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Compute business nodes deltas (paid_nodes_business_annual + paid_nodes_business_monthly) as of ${TO_DATE}: last_7_days, last_30_days, last_90_days. Return JSON with data[{date,last_7_days,last_30_days,last_90_days}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Compute business nodes deltas (paid_nodes_business_annual + paid_nodes_business_monthly) as of ${TO_DATE}: last_7_days, last_30_days, last_90_days."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["last_7_days","last_30_days","last_90_days"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -4943,27 +6388,61 @@ case_aws_arr_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "total", "annual", "monthly"],
-        "properties": {
-          "date": { "type": "string" },
-          "total": { "type": "number" },
-          "annual": { "type": "number" },
-          "monthly": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "total",
+        "annual",
+        "monthly"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "total": {
+          "type": "number"
+        },
+        "annual": {
+          "type": "number"
+        },
+        "monthly": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -4986,8 +6465,8 @@ run_case_aws_arr() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Return ONLY valid JSON matching the provided schema (no prose, no extra keys). Give me the latest AWS ARR (total, annual, monthly) within ${FROM_DATE}..${TO_DATE}. Return JSON with data[{date,total,annual,monthly}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest AWS ARR (total, annual, monthly) within ${FROM_DATE}..${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["total","annual","monthly"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -5025,27 +6504,61 @@ case_aws_subscriptions_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "total", "annual", "monthly"],
-        "properties": {
-          "date": { "type": "string" },
-          "total": { "type": "number" },
-          "annual": { "type": "number" },
-          "monthly": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "total",
+        "annual",
+        "monthly"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "total": {
+          "type": "number"
+        },
+        "annual": {
+          "type": "number"
+        },
+        "monthly": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -5068,8 +6581,8 @@ run_case_aws_subscriptions() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Return ONLY valid JSON matching the provided schema (no prose, no extra keys). Give me the latest AWS business subscriptions (total, annual, monthly) within ${FROM_DATE}..${TO_DATE}. Return JSON with data[{date,total,annual,monthly}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest AWS business subscriptions (total, annual, monthly) within ${FROM_DATE}..${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["total","annual","monthly"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -5105,25 +6618,53 @@ case_virtual_nodes_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "total_virtual_nodes_count"],
-        "properties": {
-          "date": { "type": "string" },
-          "total_virtual_nodes_count": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "total_virtual_nodes_count"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "total_virtual_nodes_count": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -5146,8 +6687,8 @@ run_case_virtual_nodes() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Return ONLY valid JSON matching the provided schema (no prose, no extra keys). Give me the latest virtual node count within ${FROM_DATE}..${TO_DATE}. Return JSON with data[{date,total_virtual_nodes_count}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest virtual node count within ${FROM_DATE}..${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["total_virtual_nodes_count"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -5263,7 +6804,11 @@ case_top_customers_arr_2k_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
       "type": "array",
@@ -5284,21 +6829,64 @@ case_top_customers_arr_2k_schema() {
           "renewal_forecast_arr"
         ],
         "properties": {
-          "space_id": { "type": "string" },
-          "space_name": { "type": "string" },
-          "plan_class": { "type": "string" },
-          "primary_contact": { "type": "string" },
-          "renewal_date": { "type": "string" },
-          "current_arr": { "type": "number" },
-          "committed_nodes": { "type": ["number", "null"] },
-          "connected_nodes": { "type": "number" },
-          "renewal_forecast_arr": { "type": "number" }
+          "space_id": {
+            "type": "string"
+          },
+          "space_name": {
+            "type": "string"
+          },
+          "plan_class": {
+            "type": "string"
+          },
+          "primary_contact": {
+            "type": "string"
+          },
+          "renewal_date": {
+            "type": "string"
+          },
+          "current_arr": {
+            "type": "number"
+          },
+          "committed_nodes": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "connected_nodes": {
+            "type": "number"
+          },
+          "renewal_forecast_arr": {
+            "type": "number"
+          }
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -5321,8 +6909,8 @@ run_case_top_customers_arr_2k() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" $'Return ONLY valid JSON matching the provided schema (no prose, no extra keys).\\n\\nCan you create a list of the top 100 customers paying $2K or more in ARR for Netdata subscriptions and identifying the following:\\n- Primary Contact\\n- Subscription Renewal Date\\n- Current ARR\\n- Number of Nodes committed\\n- Number of Nodes connected\\nFor annual subscriptions, use 1 year after the subscription start date as the renewal date and the renewal forecast ARR should be same as the current ARR. The space owner or the admins in the space can be marked as primary contacts for the customer.\\n\\nReturn JSON with data[{space_id,space_name,plan_class,primary_contact,renewal_date,current_arr,committed_nodes,connected_nodes,renewal_forecast_arr}] and notes[].'
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" $'\\n\\nCan you create a list of the top 100 customers paying $2K or more in ARR for Netdata subscriptions and identifying the following:\\n- Primary Contact\\n- Subscription Renewal Date\\n- Current ARR\\n- Number of Nodes committed\\n- Number of Nodes connected\\nFor annual subscriptions, use 1 year after the subscription start date as the renewal date and the renewal forecast ARR should be same as the current ARR. The space owner or the admins in the space can be marked as primary contacts for the customer.\\n\\n'
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_keyed_rows_fields "${ref_file}" "${agent_file}" "space_id" '["current_arr","committed_nodes","connected_nodes","renewal_forecast_arr"]' '["space_name","plan_class","primary_contact","renewal_date"]' 0.0001 | tee "${diff_file}" >/dev/null
@@ -5341,25 +6929,53 @@ case_active_users_schema() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["data", "notes"],
+  "required": [
+    "data",
+    "notes",
+    "data_freshness"
+  ],
   "properties": {
     "data": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["date", "active_members"],
-        "properties": {
-          "date": { "type": "string" },
-          "active_members": { "type": "number" }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "active_members"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "active_members": {
+          "type": "number"
         }
       }
     },
     "notes": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_ingested_at",
+        "age_minutes",
+        "source_table"
+      ],
+      "properties": {
+        "last_ingested_at": {
+          "type": "string"
+        },
+        "age_minutes": {
+          "type": "number"
+        },
+        "source_table": {
+          "type": "string"
+        }
+      }
     }
   }
 }
@@ -5382,8 +6998,8 @@ run_case_active_users() {
   run jq -e . "${ref_file}" >/dev/null
 
   echo -e "${YELLOW}-- Agent response (schema-enforced JSON) --${NC}"
-  run_agent "${agent_file}" "${schema_file}" "Return ONLY valid JSON matching the provided schema (no prose, no extra keys). Give me the latest active users (spaces_active_members_sum) within ${FROM_DATE}..${TO_DATE}. Return JSON with data[{date,active_members}] and notes[]."
-  run jq -e '.data | length >= 1' "${agent_file}" >/dev/null
+  run_agent "${agent_file}" "${schema_file}" "Give me the latest active users (spaces_active_members_sum) within ${FROM_DATE}..${TO_DATE}."
+  run jq -e 'if (.data | type) == "array" then (.data | length >= 1) elif (.data | type) == "object" then true else false end' "${agent_file}" >/dev/null
 
   echo -e "${YELLOW}-- Compare --${NC}"
   compare_single_row_fields "${ref_file}" "${agent_file}" '["active_members"]' 0.0001 | tee "${diff_file}" >/dev/null

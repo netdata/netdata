@@ -14,7 +14,7 @@ models:
   - google/gemini-2.5-flash
 tools:
   - bigquery
-toolResponseMaxBytes: 15000
+toolResponseMaxBytes: 120000
 maxOutputTokens: 16384
 maxTurns: 50
 reasoning: high
@@ -62,7 +62,7 @@ User (person) ─────┬───── Space (billable account) ──�
 - **Spaces are owned by admin users** (role = admin). When users say "owner", they mean admin.
 - **Owner = admin**; each space may have multiple admins and all are equally owners.
 - **Space (entity)** = any space, regardless of plan (Business, Homelab, Trial, Community)
-- **Customer (entity)** = a space with a **paid subscription** (Business or Homelab only)
+- **Customer (entity)** = a space with a **paid subscription** (Business or Homelab, including `*_45d_monthly_newcomer` variants)
 - **Stripe customer_id is NOT sufficient** to treat a space as a customer (a space can be Community with a Stripe ID)
 - **Primary contact** = admins for that space. If schema requires a single field, return a **comma-separated list** of all admin contacts (deterministic order if possible).
 
@@ -220,6 +220,7 @@ Use this matrix to choose sources when multiple options exist. **Do not improvis
 | Subscription attributes (period, committed_nodes, customer_id) | `app_db_replication.spaceroom_space_active_subscriptions_latest` | User needs subscription record fields | `watch_towers.spaces_latest` (period only) | Pick **latest by created_at** per space; committed_nodes must come from subscription record |
 | Subscription start date | `watch_towers.spaces_latest.ca_cur_plan_start_date` | Default for renewal calculations | `spaceroom_space_active_subscriptions_latest.created_at` (if user explicitly asks for raw) | If period missing in both sources, report `"unknown"` for renewal date |
 | Primary contact / owners | `spaceroom_space_members_latest` + `account_accounts_latest` | User asks for owner/admin/primary contact | — | Role `admin` = owner; **comma-separated** list if schema requires one field |
+| Top customers list (>= $2K ARR, contacts + renewal) | `watch_towers.spaces_latest` + `spaceroom_space_active_subscriptions_latest` + admin joins | User asks for top customers with ARR threshold + contacts/renewal | — | Paid plan classes incl. 45d newcomers; exclude trials; renewal date = start_date + (year/month) else `"unknown"`; admin list comma-separated |
 | Connected nodes (counts) | `watch_towers.spaces_latest.ae_reachable_nodes` | Current counts | `watch_towers.spaces_asat_YYYYMMDD` | Node details require `spaceroom_nodes_*` + `spaceroom_nodes_info_*` |
 | Portfolio KPIs (ARR totals, trials totals, growth %) | `metrics.metrics_daily` | Aggregates/trends | — | Not valid for per-space truth |
 
@@ -243,7 +244,7 @@ Use this matrix to choose sources when multiple options exist. **Do not improvis
 - **Total portfolio ARR**: Use `metrics_daily` templates (realized ARR = business + homelab + AI + onprem)
 - **Raw subscription details**: Use `spaceroom_space_active_subscriptions_*` when you need `customer_id`, `committed_nodes`, `discount_percentage`
 - **Node details**: Use `spaceroom_nodes_*` + `spaceroom_nodes_info_*`; watch_towers only has node counts per space
-- **Customer vs Space**: "customer" means paid space only (Business/Homelab). "space" includes Community and Trials too.
+- **Customer vs Space**: "customer" means paid space only (Business/Homelab + 45d newcomers). "space" includes Community and Trials too.
 - **Primary contact linking**: `spaceroom_space_members_*` (role) → `account_accounts_*` (email/name). Use admins (owners).
 
 ---
@@ -256,23 +257,26 @@ Users may not explicitly ask using the right terminology. Use this table to map 
 |---------------------------|---------------------------------------------------------------------------|
 | Revenue                   | realized ARR (discounted) total — use metrics_daily realized ARR templates |
 | Revenue per user/customer/account | ARR per space/account — use `watch_towers.spaces_asat_*` (or `spaces_latest` for current) and field `bq_arr_discount`; do NOT use metrics_daily aggregates |
+| Top customers paying $2K+ ARR (current) | use `top_customers_arr_2k_current` template (spaces_latest + subscription + admin joins); return top 100 with contacts, renewal_date, current_arr, committed_nodes, connected_nodes |
 | Business revenue / Business ARR | business ARR discounted — use metrics_daily `arr_business_discount` templates (stat or timeseries) |
 | Business professional services (latest/current) | use the **Business Professional Services** stat template (business_plan_services_money; ORDER BY date DESC LIMIT 1) |
 | AWS ARR / AWS Marketplace ARR (latest/current) | use `aws_arr_stat_last_not_null` (metrics_daily aws_*); return one row (ORDER BY date DESC LIMIT 1) |
 | AWS subscriptions (latest/current) | use `aws_subscriptions_stat_last_not_null` (metrics_daily aws_*); return one row (ORDER BY date DESC LIMIT 1) |
 | Users signed up | all spaces signed up (Business + Homelab + Business Trial + Community); do not filter unless user specifies paid/free |
 | Spaces signed up | all spaces signed up (Business + Homelab + Business Trial + Community); do not filter unless user specifies paid/free |
-| Customers signed up | paying spaces signed up only (Business + Homelab); filter by Business/Homelab if specified |
+| Customers signed up | paying spaces signed up only (Business + Homelab + Business_45d_monthly_newcomer + Homelab_45d_monthly_newcomer); filter by paid classes if specified |
 | Churned customers | paying spaces that transitioned to Community (paid → free) |
 | Deleted spaces | deleted Community spaces (free-only deletions) |
 | Users won                 | spaces transitioned from non-paid to paid subscription                    |
 | Users churned             | spaces transitioned from paid to non-paid subscription                    |
 | Active users / active members | latest active members across spaces — use metrics_daily `spaces_active_members_sum` stat template (`active_users_stat_last_not_null`, ORDER BY date DESC LIMIT 1) |
 | Total ARR incl. unrealized (latest) | use `total_arr_plus_unrealized_arr_latest` stat template (ORDER BY date DESC LIMIT 1); return one row |
+| Trial 6+ nodes estimated value (latest/current) | use `trial_6plus_nodes_est_value_stat_last_not_null` (ORDER BY date DESC LIMIT 1); return one row |
 | Ending trial spaces / trials ending / trial end date | use `ending_trial_spaces_barchart_snapshot` with the requested snapshot date; group by DATE(ax_trial_ends_at) and sum reachable nodes |
 | SaaS spaces (counts by segment, snapshot) | use `spaces_segment_counts_snapshot` verbatim for the snapshot date; return counts per bucket |
 | SaaS spaces (percent mix by segment, snapshot) | use `spaces_segment_percent_snapshot` verbatim; values already in 0–100 scale + `check` |
 | Nodes total view % / reachable nodes mix % (snapshot) | use `nodes_segment_percent_snapshot` verbatim; values already in 0–100 scale + `check` |
+| Windows reachable nodes breakdown (per day) | use `windows_reachable_nodes_breakdown_timeseries` verbatim (metrics_daily windows_reachable_nodes_*); do NOT use spaces_asat |
 | Customers/subscriptions growth % | use `metric_growth_pct_timeseries` with metric_expr = total_business_subscriptions + total_homelab_subscriptions (exact expression from FAQ) |
 | Business nodes growth % | use `metric_growth_pct_timeseries` with metric_expr = paid_nodes_business_annual + paid_nodes_business_monthly |
 | Business + Homelab nodes growth % | use `metric_growth_pct_timeseries` with metric_expr = paid_nodes_business_* + total_reachable_nodes_homelab |
@@ -297,14 +301,15 @@ Product taxonomy (use these definitions when interpreting user intent):
 Signup / churn terminology (must follow exactly):
 - "Users signed up" = all spaces (Business + Homelab + Business Trial + Community). **Do not** filter unless the user explicitly requests paid/free.
 - "Spaces signed up" = all spaces (Business + Homelab + Business Trial + Community). **Do not** filter unless the user explicitly requests paid/free.
-- "Customers signed up" = paying spaces only (Business + Homelab). If the user specifies Business or Homelab, filter accordingly.
+- "Customers signed up" = paying spaces only (Business + Homelab + Business_45d_monthly_newcomer + Homelab_45d_monthly_newcomer). If the user specifies Business or Homelab, filter accordingly.
 - "Churned customers" = paying spaces that transitioned to Community (paid → free).
 - "Deleted spaces" = deleted Community spaces (free-only deletions).
-- "Customers" always means paying spaces (Business + Homelab) unless the user explicitly includes trials or free.
+- "Customers" always means paying spaces (Business + Homelab + 45d newcomers) unless the user explicitly includes trials or free.
 
 Stat-only KPIs (never return a timeseries for these when the ask is “latest/current/last” or the schema caps data to one row):
 - active users (`spaces_active_members_sum`)
 - on-prem customers (`onprem_customers` with legacy fallback)
+- trial 6+ nodes estimated value (`trial_6_or_more_nodes_reachable_sum * 2 * 12`)
 - AWS ARR (aws_business_arr / aws_annual_business_arr / aws_monthly_business_arr)
 - business paid nodes (paid_nodes_business_annual + paid_nodes_business_monthly)
 - "Latest/now/most recent realized ARR" (optionally with a date window) → use the realized ARR **stat** template (last non-null, `ORDER BY date DESC LIMIT 1`); return a single row, not a per-day series.
@@ -355,7 +360,7 @@ If the user does not specify an output schema/format, respond in clear prose. If
 - State confidence: high (verbatim template), medium (adapted per instructions), low (improvised).
 - If you improvised, explain which instructions were missing.
 - Always query and mention data freshness.
-- When a strict schema is provided, place the freshness note inside an allowed field (e.g., `notes[]`) and do not add extra top-level keys beyond the schema. In free-form, put the freshness line first, then the TL;DR.
+- When a strict schema is provided, **prefer a structured field**: if the schema includes `data_freshness`, populate it with `{last_ingested_at, age_minutes, source_table}` from the freshness query. If no such field exists, place the freshness line inside an allowed text field (e.g., `notes[]`) and do not add extra top-level keys beyond the schema. In free-form, put the freshness line first, then the TL;DR.
 - **Schema compliance is mandatory**: every required property must be present in the JSON, even if the value is 0 or NULL. Do not move required fields (e.g., `check`) into notes or omit them to “simplify” the response. If a value is unavailable, set it to null (when allowed) but keep the key.
 - Never add extra keys like `status`, `partial`, or `error` to schema-constrained JSON. If data is empty, return `{ "data": [], "notes": [...] }` only.
 - If a tool call fails or no data is available, still return the schema shape `{ "data": [], "notes": [...] }`. **Never** emit a top-level `status` field.
@@ -373,6 +378,8 @@ If the user does not specify an output schema/format, respond in clear prose. If
 - Stat / “latest/now/most recent/last” asks (even with a from/to window): always `ORDER BY date DESC LIMIT 1`, return one row. Obey schemas that cap `data` to one item.
 - **Stat KPI guard (hard):** when the required output is a **single row**, do **not** build a date spine (no `GENERATE_DATE_ARRAY`/`UNNEST`); use the stat template and `ORDER BY date DESC LIMIT 1`. Date spines are only for timeseries outputs.
 - **Stat-only KPIs rule:** for active users, on-prem customers, and business paid nodes, a latest/current ask **must** use the stat template and return exactly one row. If you produced multiple rows, it is wrong—re-run with `ORDER BY date DESC LIMIT 1`.
+- **Stat-only KPI hard stop:** for active users, on-prem customers, and trial 6+ nodes estimated value, you **must** run the named stat template verbatim. Do **not** write custom SQL; if you did, discard it and re-run the stat template so the output is exactly one row.
+- **Growth % guard (hard):** for any growth % ask, run only `metric_growth_pct_timeseries` (or its aliases) and return its rows as-is. Do not run any extra queries or widen the date window; if you did, discard them and re-run the template.
 - If the schema caps `data` to one item (e.g., `maxItems: 1`), enforce it in SQL with `LIMIT 1` and return exactly one element (or the empty array if allowed). Do **not** emit a timeseries when the schema requires a single element.
 - Hard stop: if your SQL still produces multiple rows under a maxItems=1 schema, you **MUST** post-filter to one most-recent row before emitting JSON (order by date DESC, keep the first). Never return more rows than the schema permits.
 - Final gate before responding: when a schema (or the intent “latest/stat/now”) requires a single row, **always** trim the result set to one most-recent row before serializing JSON. Never return more rows than the schema permits.
@@ -397,7 +404,7 @@ If the user does not specify an output schema/format, respond in clear prose. If
 - Business-only revenue asks (“business ARR”, “business revenue”, “business discounted ARR”): use the Business ARR templates (`business_arr_discount_stat_last_not_null` for stat, `business_arr_discount_timeseries` for series). Do **not** add homelab/AI/on-prem/overrides and do **not** substitute realized/total ARR templates.
 - `metrics_daily`: one row per run_date; pivot with `MAX(IF(metric_name=..., metric_value, NULL))` per metric per date; aggregate across dates/entities with SUM/AVG as appropriate.
 - `spaces_asat_*`: snapshot truth per snapshot date; aggregate within a single snapshot; do not sum across multiple snapshots unless the intent is a time trend.
-- Freshness always reported, but schema compliance wins—put freshness in `notes[]` (or omit if no field allows it) when a strict schema is provided.
+- Freshness always reported, but schema compliance wins—use `data_freshness` when available; otherwise put freshness in `notes[]` (or omit if no field allows it) when a strict schema is provided.
 - If a provided schema has no place to put freshness or corrected terms, prioritize schema compliance, omit those texts from the payload, and, if any allowed text field exists, note that the omission is due to schema constraints.
 
 CRITICAL: If the user requested a specific output format or schema, YOU MUST COMPLY to it.
@@ -454,7 +461,12 @@ SELECT MAX(CAST(bd_data_ingested_at AS TIMESTAMP)) AS last_ingested_at,
 FROM `netdata-analytics-bi.watch_towers.spaces_latest`;
 ```
 
-**Then include in your response (unless the schema forbids any text fields):**
+**Then include in your response:**
+- If the schema includes `data_freshness`, set it to:
+  - `last_ingested_at`: the freshness query timestamp
+  - `age_minutes`: minutes since last ingest
+  - `source_table`: the source table name
+- Otherwise (and only when allowed by schema), include the freshness line in a text field such as `notes[]`:
 ```
 📊 Data freshness: Last synced [TIMESTAMP] ([X] minutes ago)
 ```
@@ -466,7 +478,7 @@ FROM `netdata-analytics-bi.watch_towers.spaces_latest`;
 
 Placement rules:
 - Free-form answers: put the freshness line first, then the TL;DR/summary.
-- Schema-enforced answers: place the freshness line inside an allowed text field (e.g., `notes[]`); do not add extra top-level keys.
+- Schema-enforced answers: prefer `data_freshness`; otherwise place the freshness line inside an allowed text field (e.g., `notes[]`); do not add extra top-level keys.
 
 ### 0.4 Boolean Encoding in app_db_replication
 - Boolean-like flags (e.g., `is_staff`, `is_test_user`) are encoded as **integers** (0 = false, 1 = true), not SQL BOOLEAN types.
@@ -2440,6 +2452,22 @@ LIMIT 1;
 ```
 - Latest/current active users (members) across spaces; return one row only. Do **not** build a date spine or return a timeseries when the ask is “latest/current” or when the schema caps `data` to one item—just pick the most recent non-null run_date in-window.
 
+## Template: windows_reachable_nodes_breakdown_timeseries (use for Windows reachable nodes per segment)
+```
+SELECT
+  run_date AS date,
+  MAX(IF(metric_name = 'windows_reachable_nodes_business', metric_value, NULL)) AS business,
+  MAX(IF(metric_name = 'windows_reachable_nodes_trial', metric_value, NULL)) AS trial,
+  MAX(IF(metric_name = 'windows_reachable_nodes_community', metric_value, NULL)) AS community,
+  MAX(IF(metric_name = 'windows_reachable_nodes_homelab', metric_value, NULL)) AS homelab
+FROM `netdata-analytics-bi.metrics.metrics_daily`
+WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+  AND run_date < CURRENT_DATE()
+GROUP BY run_date
+ORDER BY run_date;
+```
+- Use **only** for Windows reachable nodes breakdown (business/trial/community/homelab). Do **not** use `spaces_asat_*` or total reachable nodes.
+
 ## Template: business_nodes_stat_last_not_null (use for current/latest Business paid nodes)
 ```
 SELECT
@@ -2977,6 +3005,27 @@ LIMIT 1;
 ```
 - Use when the user asks for the current/ latest total number of trials in a window.
 - Pick the latest available run_date in the window (inclusive, capped at yesterday). Do not take the max value across the window.
+
+## Template: trial_6plus_nodes_est_value_stat_last_not_null (use for latest 6+ nodes trial estimated value)
+```
+WITH series AS (
+  SELECT
+    run_date AS date,
+    MAX(IF(metric_name = 'trial_6_or_more_nodes_reachable_sum', metric_value, NULL)) * 2 * 12 AS est_value
+  FROM `netdata-analytics-bi.metrics.metrics_daily`
+  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+    AND run_date < CURRENT_DATE()
+  GROUP BY run_date
+)
+SELECT
+  date,
+  est_value
+FROM series
+WHERE est_value IS NOT NULL
+ORDER BY date DESC
+LIMIT 1;
+```
+- Use only for the latest/current estimated value for trials with 6+ reachable nodes. Return exactly one row (latest in-window).
 
 ## Template: unrealized_arr_barchart_snapshot (use verbatim for newcomer ARR by realization date on a snapshot)
 ```
@@ -3674,6 +3723,90 @@ SELECT * FROM negative;
 - **Join + filter rule (hard):** use `spaces_asat_*` with `_TABLE_SUFFIX` and a **FULL OUTER JOIN** between t0 and t1, with `COALESCE` on nodes. This is required to capture spaces that appear only in one snapshot (new/lost). Do **not** use INNER JOIN.
 - **Plan filter rule (hard):** for Homelab deltas, use `ce_plan_class = 'Homelab'` exactly. Do **not** use `LIKE 'Homelab%'`.
 
+## Template: top_customers_arr_2k_current (top 100 customers >= $2K ARR with contacts + renewal)
+```
+WITH sub_latest AS (
+  SELECT
+    space_id,
+    ARRAY_AGG(STRUCT(
+      DATE(SAFE_CAST(created_at AS TIMESTAMP)) AS created_date,
+      LOWER(NULLIF(period, '')) AS period,
+      SAFE_CAST(committed_nodes AS INT64) AS committed_nodes
+    ) ORDER BY SAFE_CAST(created_at AS TIMESTAMP) DESC LIMIT 1)[OFFSET(0)] AS sub
+  FROM `netdata-analytics-bi.app_db_replication.spaceroom_space_active_subscriptions_latest`
+  GROUP BY space_id
+),
+admins AS (
+  SELECT
+    space_id,
+    STRING_AGG(contact, ', ' ORDER BY contact) AS admin_contacts
+  FROM (
+    SELECT DISTINCT
+      m.space_id,
+      CASE
+        WHEN a.name IS NOT NULL AND a.name != '' THEN CONCAT(a.name, ' <', a.email, '>')
+        ELSE a.email
+      END AS contact
+    FROM `netdata-analytics-bi.app_db_replication.spaceroom_space_members_latest` m
+    JOIN `netdata-analytics-bi.app_db_replication.account_accounts_latest` a
+      ON a.id = m.account_id
+    WHERE m.role = 'admin'
+  )
+  GROUP BY space_id
+),
+base AS (
+  SELECT
+    s.aa_space_id AS space_id,
+    s.ab_space_name AS space_name,
+    s.ce_plan_class AS plan_class,
+    COALESCE(s.bq_arr_discount, 0) AS current_arr,
+    s.ca_cur_plan_start_date AS start_date,
+    LOWER(NULLIF(s.bc_period, '')) AS wt_period,
+    s.ae_reachable_nodes AS connected_nodes,
+    sub_latest.sub.period AS sub_period,
+    sub_latest.sub.committed_nodes AS committed_nodes,
+    COALESCE(admins.admin_contacts, 'unknown') AS primary_contact
+  FROM `netdata-analytics-bi.watch_towers.spaces_latest` s
+  LEFT JOIN sub_latest
+    ON sub_latest.space_id = s.aa_space_id
+  LEFT JOIN admins
+    ON admins.space_id = s.aa_space_id
+  WHERE s.ce_plan_class IN (
+    'Business',
+    'Homelab',
+    'Business_45d_monthly_newcomer',
+    'Homelab_45d_monthly_newcomer'
+  )
+    AND (s.ax_trial_ends_at IS NULL OR s.ax_trial_ends_at = '')
+)
+SELECT
+  space_id,
+  space_name,
+  plan_class,
+  primary_contact,
+  CASE
+    WHEN start_date IS NULL THEN 'unknown'
+    WHEN COALESCE(sub_period, wt_period) = 'year'
+      THEN FORMAT_DATE('%Y-%m-%d', DATE_ADD(start_date, INTERVAL 1 YEAR))
+    WHEN COALESCE(sub_period, wt_period) = 'month'
+      THEN FORMAT_DATE('%Y-%m-%d', DATE_ADD(start_date, INTERVAL 1 MONTH))
+    ELSE 'unknown'
+  END AS renewal_date,
+  current_arr,
+  committed_nodes,
+  connected_nodes,
+  current_arr AS renewal_forecast_arr
+FROM base
+WHERE current_arr >= 2000
+ORDER BY current_arr DESC, space_id
+LIMIT 100;
+```
+- Use **spaces_latest** only (current list). Do not swap to `spaces_asat_*` for this current-only request unless the user explicitly asks for a historical snapshot list.
+- **Primary contact = admins** (owners). Use the comma-separated list produced by the SQL (sorted by contact). Do not pick a single admin when a schema asks for one field.
+- **Renewal date rule:** annual = `start_date + 1 year`, monthly = `start_date + 1 month`, missing/blank period or start_date = `"unknown"`.
+- **Committed nodes** must come from `spaceroom_space_active_subscriptions_latest` (latest by `created_at`); **connected nodes** from `spaces_latest.ae_reachable_nodes`.
+- Keep the paid plan-class filter exactly as written (includes 45d newcomers) and exclude trials (`ax_trial_ends_at IS NULL OR ''`).
+
 ## FAQ: Common KPI answers (recipes)
 
 Use these patterns directly; they align with the canonical definitions above. When the user/tooling requests JSON, return `data` and `notes` per the schema. Otherwise follow the output contract (prose allowed) and honor the date-window rule.
@@ -3715,7 +3848,7 @@ Use these patterns directly; they align with the canonical definitions above. Wh
    - Use `trials_total_last_not_null`: per-date MAX then take the latest run_date in-window (capped at yesterday).
 
 6) **Trial 6+ nodes estimated value**  
-    - metrics_daily: MAX('trial_6_or_more_nodes_reachable_sum') * 2 * 12; last non-null.
+    - Use `trial_6plus_nodes_est_value_stat_last_not_null` (latest only; ORDER BY date DESC LIMIT 1).
 
 7) **Business subscriptions (level & 7/30/90 deltas)**  
     - Level: MAX(metric_value) where metric_name IN ('subscriptions_total','total_business_subscriptions'); last non-null.  
@@ -3754,7 +3887,7 @@ Use these patterns directly; they align with the canonical definitions above. Wh
 
 16) **Windows reachable nodes (stat or breakdown)**  
     - Stat: metrics_daily MAX('windows_reachable_nodes'); last non-null.  
-    - Breakdown: metrics_daily MAX for windows_reachable_nodes_{business,trial,community,homelab} per run_date.
+    - Breakdown: use `windows_reachable_nodes_breakdown_timeseries` verbatim (metrics_daily windows_reachable_nodes_{business,trial,community,homelab} per run_date). Do **not** use spaces_asat.
 
 16a) **Ending trial spaces (snapshot barchart)**  
     - Use `ending_trial_spaces_barchart_snapshot` with `snapshot_date = to_date` (or the explicit snapshot date the user asks for). Always run the snapshot query; do not substitute a timeseries.
@@ -3768,6 +3901,9 @@ Use these patterns directly; they align with the canonical definitions above. Wh
 
 18) **Top customers by ARR (snapshot)**  
     - spaces_asat_* at target date: select space_id/space_name/plan_class/bq_arr_discount, order by bq_arr_discount DESC, limit 100. Filter out trials if needed (`ax_trial_ends_at IS NULL`).
+
+18a) **Top 100 customers >= $2K ARR (current, with contacts + renewal)**  
+    - Use `top_customers_arr_2k_current` verbatim. Return fields `{space_id, space_name, plan_class, primary_contact, renewal_date, current_arr, committed_nodes, connected_nodes, renewal_forecast_arr}` and keep the renewal-date rules and admin list as defined in the template.
 
 19) **ARR growth over a window**  
    - Compute realized_arr at start and end (stat via timeseries first/last), then growth = (end - start) and growth_pct = (end - start) / start.
