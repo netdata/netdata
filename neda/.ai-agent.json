@@ -6,29 +6,6 @@
       "baseUrl": "http://10.20.4.21:8090/v1",
       "openaiMode": "chat",
       "contextWindow": 131072,
-      "models": {
-        "gpt-oss-20b": {
-          "contextWindow": 131072
-        },
-        "gpt-oss-120b": {
-          "contextWindow": 131072
-        },
-        "minimax-m2": {
-          "contextWindow": 196608
-        },
-        "glm-4.5-air": {
-          "contextWindow": 131072
-        },
-        "qwen3-next-80b-a3b-instruct": {
-          "contextWindow": 262144
-        },
-        "qwen3-next-80b-a3b-thinking": {
-          "contextWindow": 262144
-        },
-        "qwen3-235b-a22b-instruct-2507": {
-          "contextWindow": 262144
-        }
-      },
       "stringSchemaFormatsAllowed": [
         "*"
       ],
@@ -39,7 +16,7 @@
     "vllm1": {
       "type": "openai-compatible",
       "apiKey": "vllm",
-      "baseUrl": "http://nova:8345/v1",
+      "baseUrl": "http://10.20.4.21:8345/v1",
       "openaiMode": "chat",
       "stringSchemaFormatsAllowed": [
         "*"
@@ -51,7 +28,19 @@
     "vllm2": {
       "type": "openai-compatible",
       "apiKey": "vllm",
-      "baseUrl": "http://nova:8346/v1",
+      "baseUrl": "http://10.20.4.21:8346/v1",
+      "openaiMode": "chat",
+      "stringSchemaFormatsAllowed": [
+        "*"
+      ],
+      "stringSchemaFormatsDenied": [
+        "uri"
+      ]
+    },
+    "vllm3": {
+      "type": "openai-compatible",
+      "apiKey": "vllm",
+      "baseUrl": "http://10.20.4.205:8345/v1",
       "openaiMode": "chat",
       "stringSchemaFormatsAllowed": [
         "*"
