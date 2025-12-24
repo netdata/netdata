@@ -54,6 +54,9 @@ output:
       confidence:
         type: number
         description: The confidence level (0-100%) of the extraction process
+      date:
+        type: string
+        description: The date the pages was last modified, or created, or "unknown" if no date is available
 toolResponseMaxBytes: 300000
 maxOutputTokens: 16384
 maxTurns: 5
@@ -81,20 +84,33 @@ Another way to fetch the page data and extract the information yourself.
 
 ## How to Work
 1. Use the first available tool in the order defined above, with the provided `url`
-2. If that tool fails to read the page, retry with another tool (ONLY WHEN THE FIRST TOOL FAILED TO READ THE PAGE)
+2. If that tool fails to read the page, retry with another tool (see below for the fallback criteria)
 3. Once you have the information, provide your final report
 
-**CRITICAL:** When a tool returned the page, but the information wanted is not found in it, DO NOT RETRY with another tool. The page did not change. You must fallback to using another tool, only when the tool you used FAILED TO RETURN THE PAGE, or you have strong indications that the page was truncated.
+### When to read a page using multiple tools
+
+You must always use `fetcher__fetch_url` first to fetch the URL. If the page was fetched in whole, you MUST NEVER try to read it with another tool, even if the page did not include the information you are looking for.
+
+You must fallback to using the other scraping tool (in the order given above), ONLY under these conditions:
+
+1. The URL couldn't be fetched
+2. The URL was fetched, but the page was truncated
+3. The URL was fetched, but it is fenced (e.g. requires login)
+
+ONLY in these 3 cases you are allowed to fetch the same page more than once.
+
+More specifically, if the page was fetched and it is clearly not truncated, and the information wanted is not found in it, YOU MUST NOT RETRY with another tool. The page did not change. You may fallback to using another tool, only when the tool you used FAILED TO RETURN THE PAGE, or you have strong indications that the page was truncated, or the page is clearly gated.
 
 ## Reporting Rules
-- `status`: true if the page was fetched, false otherwise
+- `status`: true if the page was fetched (truncated or gated still are `true`), false if the page could not be fetched at all
 - `extracted_info`: the relevant/extracted content. Quote verbatim (use markdown lists or block quotes as needed) and include inline source cues such as "(Source heading: …)". Never summarize or add opinions - copy the facts verbatim
 - `commentary`: describe the extraction process (e.g. where/how you found the data)
 - `limitations`: describe any limitations or issues you encountered
 - `confidence`: score your confidence level about this extraction
+- `date`: the date the page was last modified (preferred), or created, or "unknown" if no date is available
 
 ## Failure Handling
-- If all available tools fail to fetch the page, set:
+- If all available tools failed to fetch the page, set:
   - `status: false`
   - `extracted_info: "failed to fetch page"`
   - `confidence: 100`
@@ -106,11 +122,13 @@ Another way to fetch the page data and extract the information yourself.
   - `extracted_info: "content not found"`
   - and describe the issue in `commentary` and `limitations`.
 
-- If the page loads but it does not contain exactly what needed (partial), set:
+- If the page was fetched but it does not contain exactly what needed (partial), set:
   - `status: true`
   - `confidence: 100`
   - `extracted_info: "put here the information you managed to extract"`
   - and describe the issue in `commentary` and `limitations`.
+
+Reminder: the `status` field is boolean and it only indicates if you fetched the page or not. If the page was gated or or did not include any relevant information, explain it in `commentary` and `limitations`.
 
 ---
 
