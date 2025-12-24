@@ -64,9 +64,9 @@
 ### Prompt Contract Notes (BI/BigQuery Agents)
 - **Entity meaning + linking must be explicit** in the prompt (not implied across sections). For Netdata BI: Space = any space; Customer = paid space only; Stripe customer_id alone does **not** imply paid; Owner = Admin; spaces can have multiple admins.
 - **Source selection matrix required**: prompt must explain overlapping sources (watch_towers vs app_db_replication vs metrics) and deterministic rules for when to use each, including examples.
-- **Primary contact rule**: when a schema requires a single field for admins, return a comma-separated list of admin contacts (deterministic ordering if possible).
-- **Top customers >= $2K ARR list**: use `watch_towers.spaces_latest` + `spaceroom_space_active_subscriptions_latest` + admin joins; renewal date = start_date + (year/month) else `"unknown"`; committed_nodes from subscription; primary_contact is the admin list.
-- **Large list outputs**: ensure `toolResponseMaxBytes` is high enough to return 100-row customer lists with admin contacts (current baseline: `120000`).
+- **Primary contact rule**: when a schema requires a single field for admins, return a comma-separated list of admin contacts (deterministic ordering if possible). For large list outputs (e.g., top customers list), return **only the first 3 admins** per space.
+- **Top customers >= $2K ARR list**: use `watch_towers.spaces_latest` + `spaceroom_space_active_subscriptions_latest` + admin joins; renewal date = start_date + (year/month) else `"unknown"`; committed_nodes from subscription; **primary_contact = first 3 admins**.
+- **Large list outputs**: ensure `toolResponseMaxBytes` is high enough to return 100-row customer lists (current baseline: `120000`).
 - **Schema authority**: when a schema is provided, output keys and shapes must match exactly; use SQL aliases to align field names and never invent extra keys.
 - **Data freshness field**: when schemas are used, include `data_freshness { last_ingested_at, age_minutes, source_table }`; if that field exists, do not also add freshness notes elsewhere.
 - **Growth % templates**: must use the single KPI SQL, preserve NULL lags, and never widen the date window or compute pct_* in the model.

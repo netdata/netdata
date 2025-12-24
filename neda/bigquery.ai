@@ -64,7 +64,7 @@ User (person) ─────┬───── Space (billable account) ──�
 - **Space (entity)** = any space, regardless of plan (Business, Homelab, Trial, Community)
 - **Customer (entity)** = a space with a **paid subscription** (Business or Homelab, including `*_45d_monthly_newcomer` variants)
 - **Stripe customer_id is NOT sufficient** to treat a space as a customer (a space can be Community with a Stripe ID)
-- **Primary contact** = admins for that space. If schema requires a single field, return a **comma-separated list** of all admin contacts (deterministic order if possible).
+- **Primary contact** = admins for that space. If schema requires a single field, return a **comma-separated list** of admin contacts (deterministic order if possible). For large list outputs (e.g., top customers list), return **only the first 3 admins** per space.
 
 **Example**: User Costa is admin at his homelab space (Community plan), observer at another space (Business Trial), and troubleshooter at a company space (Business plan). All accessed with single sign-in.
 
@@ -219,8 +219,8 @@ Use this matrix to choose sources when multiple options exist. **Do not improvis
 | Historical per-space snapshot | `watch_towers.spaces_asat_YYYYMMDD` | User provides a specific date | `watch_towers.spaces_latest` (only if no date) | Do **not** sum across snapshots |
 | Subscription attributes (period, committed_nodes, customer_id) | `app_db_replication.spaceroom_space_active_subscriptions_latest` | User needs subscription record fields | `watch_towers.spaces_latest` (period only) | Pick **latest by created_at** per space; committed_nodes must come from subscription record |
 | Subscription start date | `watch_towers.spaces_latest.ca_cur_plan_start_date` | Default for renewal calculations | `spaceroom_space_active_subscriptions_latest.created_at` (if user explicitly asks for raw) | If period missing in both sources, report `"unknown"` for renewal date |
-| Primary contact / owners | `spaceroom_space_members_latest` + `account_accounts_latest` | User asks for owner/admin/primary contact | — | Role `admin` = owner; **comma-separated** list if schema requires one field |
-| Top customers list (>= $2K ARR, contacts + renewal) | `watch_towers.spaces_latest` + `spaceroom_space_active_subscriptions_latest` + admin joins | User asks for top customers with ARR threshold + contacts/renewal | — | Paid plan classes incl. 45d newcomers; exclude trials; renewal date = start_date + (year/month) else `"unknown"`; admin list comma-separated |
+| Primary contact / owners | `spaceroom_space_members_latest` + `account_accounts_latest` | User asks for owner/admin/primary contact | — | Role `admin` = owner; **comma-separated** list if schema requires one field (deterministic order). |
+| Top customers list (>= $2K ARR, contacts + renewal) | `watch_towers.spaces_latest` + `spaceroom_space_active_subscriptions_latest` + admin joins | User asks for top customers with ARR threshold + contacts/renewal | — | Paid plan classes incl. 45d newcomers; exclude trials; renewal date = start_date + (year/month) else `"unknown"`; **primary_contact = first 3 admins** (comma-separated, deterministic order) |
 | Connected nodes (counts) | `watch_towers.spaces_latest.ae_reachable_nodes` | Current counts | `watch_towers.spaces_asat_YYYYMMDD` | Node details require `spaceroom_nodes_*` + `spaceroom_nodes_info_*` |
 | Portfolio KPIs (ARR totals, trials totals, growth %) | `metrics.metrics_daily` | Aggregates/trends | — | Not valid for per-space truth |
 
@@ -257,7 +257,7 @@ Users may not explicitly ask using the right terminology. Use this table to map 
 |---------------------------|---------------------------------------------------------------------------|
 | Revenue                   | realized ARR (discounted) total — use metrics_daily realized ARR templates |
 | Revenue per user/customer/account | ARR per space/account — use `watch_towers.spaces_asat_*` (or `spaces_latest` for current) and field `bq_arr_discount`; do NOT use metrics_daily aggregates |
-| Top customers paying $2K+ ARR (current) | use `top_customers_arr_2k_current` template (spaces_latest + subscription + admin joins); return top 100 with contacts, renewal_date, current_arr, committed_nodes, connected_nodes |
+| Top customers paying $2K+ ARR (current) | use `top_customers_arr_2k_current` template (spaces_latest + subscription + admin joins); return top 100 with contacts, renewal_date, current_arr, committed_nodes, connected_nodes; **primary_contact = first 3 admins** |
 | Business revenue / Business ARR | business ARR discounted — use metrics_daily `arr_business_discount` templates (stat or timeseries) |
 | Business professional services (latest/current) | use the **Business Professional Services** stat template (business_plan_services_money; ORDER BY date DESC LIMIT 1) |
 | AWS ARR / AWS Marketplace ARR (latest/current) | use `aws_arr_stat_last_not_null` (metrics_daily aws_*); return one row (ORDER BY date DESC LIMIT 1) |
@@ -3760,7 +3760,7 @@ WITH sub_latest AS (
 admins AS (
   SELECT
     space_id,
-    STRING_AGG(contact, ', ' ORDER BY contact) AS admin_contacts
+    ARRAY_TO_STRING(ARRAY_AGG(contact ORDER BY contact LIMIT 3), ', ') AS admin_contacts
   FROM (
     SELECT DISTINCT
       m.space_id,
@@ -3824,7 +3824,7 @@ LIMIT 100;
 ```
 - Use **spaces_latest** only (current list). Do not swap to `spaces_asat_*` for this current-only request unless the user explicitly asks for a historical snapshot list.
 - **HARD STOP:** respect the requested count (top 100). Do **not** default to top 10.
-- **Primary contact = admins** (owners). Use the comma-separated list produced by the SQL (sorted by contact). Do not pick a single admin when a schema asks for one field.
+- **Primary contact = admins** (owners). Use the comma-separated list produced by the SQL (sorted by contact, **first 3 only**). Do not pick a single admin when a schema asks for one field.
 - **Renewal date rule:** annual = `start_date + 1 year`, monthly = `start_date + 1 month`, missing/blank period or start_date = `"unknown"`.
 - **Committed nodes** must come from `spaceroom_space_active_subscriptions_latest` (latest by `created_at`); **connected nodes** from `spaces_latest.ae_reachable_nodes`.
 - Keep the paid plan-class filter exactly as written (includes 45d newcomers) and exclude trials (`ax_trial_ends_at IS NULL OR ''`).

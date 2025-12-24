@@ -431,6 +431,17 @@ Next actions to reach parity: promote 🟨 templates from scratch → prod after
   - `top_customers_arr_2k`: model output truncated (`stop_reason=length`), schema validation failed; needs higher output cap or shorter response.
 - Non‑fatal noise: repeated toolbox stderr `invalid method prompts/list` on MCP init (doesn’t block queries but pollutes logs).
 
+### Progress update (2025-12-24, latest run #3)
+- Implemented D21: `maxOutputTokens` set to **32768** in `neda/bigquery.ai`; docs updated.
+- Re-ran `top_customers_arr_2k` only: **still FAILS** with `stop_reason=length` (output_tokens=32768); response truncated mid‑JSON.
+- Result: 32k is still insufficient for 100 rows with full admin lists; need a higher cap or output reduction/pagination.
+
+### Progress update (2025-12-24, latest run #4)
+- Implemented D22: **limit primary_contact to first 3 admins** per space (prompt + SQL + docs).
+- Ran `npm run lint` and `npm run build` (both OK).
+- Re-ran `top_customers_arr_2k`: **FAIL** because the tool output was **dropped by context guard** (projected tokens exceeded limit); agent returned `UNKNOWN` row.
+- Root cause: bigquery tool output (~10k tokens) + large prompt still exceeds context budget; tool output dropped before final response.
+
 ### Decisions needed (2025-12-24) — schema compliance + realized ARR stat shape
 1) **Schema compliance enforcement in prompt**
    - Option A: Add a global rule: when a JSON schema is provided, output must **exactly** match it (top-level keys, field names, and shapes); **never** rename SQL aliases; include `data_freshness` only when the schema includes it.
@@ -462,6 +473,7 @@ Next actions to reach parity: promote 🟨 templates from scratch → prod after
 - D19: Switch “latest realized ARR” stat to **breakdown + total** (retire total-only stat behavior in routing/tests). (Costa: 2B)
 - D20: Keep existing schema key names; enforce alias usage rather than renaming schemas. (Costa: 3A)
 - D21: Increase `maxOutputTokens` to **32768** to accommodate 100-row outputs with long admin lists (Costa: “increase it to 32768”).
+- D22: For the **top customers >= $2K ARR** list, return **only the first 3 admins per space** (comma-separated, deterministic order) to reduce output size. (Costa: “Return the first 3 admins per space.”)
 
 ### Decisions needed (2025-12-23) — new test case
 1) **Source tables and fields**

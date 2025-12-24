@@ -6653,7 +6653,7 @@ WITH sub_latest AS (
 admins AS (
   SELECT
     space_id,
-    STRING_AGG(contact, ', ' ORDER BY contact) AS admin_contacts
+    ARRAY_TO_STRING(ARRAY_AGG(contact ORDER BY contact LIMIT 3), ', ') AS admin_contacts
   FROM (
     SELECT DISTINCT
       m.space_id,
