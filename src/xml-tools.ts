@@ -3,6 +3,7 @@ import type { ToolCall } from './types.js';
 
 import { buildXmlNextEvents, buildXmlNextNotice } from './llm-messages-xml-next.js';
 import { renderXmlPastTemplate } from './llm-messages.js';
+import { stripLeadingThinkBlock } from './think-tag-filter.js';
 import { TRUNCATE_PREVIEW_BYTES, truncateToBytes } from './truncation.js';
 
 export interface XmlSlotTemplate {
@@ -66,14 +67,9 @@ export function createXmlParser(): { parseChunk: (chunk: string, nonce: string, 
    * which would confuse the parser. We skip the thinking content entirely.
    */
   const stripLeadingThink = (): void => {
-    const thinkOpen = '<think>';
-    const thinkClose = '</think>';
-    if (state.buffer.startsWith(thinkOpen)) {
-      const closeIdx = state.buffer.indexOf(thinkClose);
-      if (closeIdx !== -1) {
-        state.buffer = state.buffer.slice(closeIdx + thinkClose.length);
-      }
-      // If </think> not found yet, keep the buffer as-is (incomplete)
+    const stripped = stripLeadingThinkBlock(state.buffer);
+    if (stripped.removed) {
+      state.buffer = stripped.stripped;
     }
   };
 

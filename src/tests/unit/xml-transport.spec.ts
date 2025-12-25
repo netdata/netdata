@@ -326,5 +326,37 @@ describe('XmlToolTransport', () => {
       expect(onFailure).not.toHaveBeenCalled();
       expect(onLog).not.toHaveBeenCalled();
     });
+
+    it('ignores <think> block when extracting unclosed final report', () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue(MOCK_UUID);
+      const transport = new XmlToolTransport();
+      transport.buildMessages({
+        turn: 1,
+        maxTurns: 2,
+        tools: baseTools,
+        maxToolCallsPerTurn: 1,
+        taskStatusToolEnabled: false,
+        finalReportToolName: 'agent__final_report',
+        resolvedFormat: 'markdown',
+        expectedJsonSchema: undefined,
+        attempt: 1,
+        maxRetries: 3,
+        contextPercentUsed: 8,
+      });
+
+      const finalSlot = `${NONCE}-FINAL`;
+      const onFailure = vi.fn();
+      const onLog = vi.fn();
+
+      const parse = transport.parseAssistantMessage(
+        `  <think>Example <ai-agent-${finalSlot} format="markdown">not real</think>`,
+        { turn: 1, resolvedFormat: 'markdown', stopReason: 'tool-calls' },
+        { onTurnFailure: onFailure, onLog }
+      );
+
+      expect(parse.toolCalls).toBeUndefined();
+      expect(parse.errors).toHaveLength(0);
+      expect(onFailure).not.toHaveBeenCalled();
+    });
   });
 });

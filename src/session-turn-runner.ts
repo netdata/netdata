@@ -44,6 +44,7 @@ import {
 } from './session-tool-executor.js';
 import { normalizeSlackMessages, parseSlackBlockKitPayload } from './slack-block-kit.js';
 import { addSpanAttributes, addSpanEvent, recordContextGuardMetrics, recordFinalReportMetrics, recordLlmMetrics, recordRetryCollapseMetrics, runWithSpan } from './telemetry/index.js';
+import { ThinkTagStreamFilter } from './think-tag-filter.js';
 import { processLeakedToolCalls, type LeakedToolFallbackResult } from './tool-call-fallback.js';
 import { TRUNCATE_PREVIEW_BYTES, truncateToBytes } from './truncation.js';
 import { estimateMessagesBytes, formatToolRequestCompact, parseJsonValueDetailed, sanitizeToolName, warn } from './utils.js';
@@ -3417,6 +3418,7 @@ export class TurnRunner {
         }
         const llmTools = toolsForTurn;
         let xmlFilter: XmlFinalReportFilter | undefined;
+        const thinkFilter = new ThinkTagStreamFilter();
         const nonce = this.ctx.xmlTransport.getNonce();
         if (nonce !== undefined) {
             xmlFilter = new XmlFinalReportFilter(nonce);
@@ -3424,6 +3426,36 @@ export class TurnRunner {
         // Reset streaming flag for this attempt
         this.finalReportStreamed = false;
         this.resetStreamedOutputTail();
+
+        const emitThinking = (thinkingChunk: string, isRootSession: boolean): void => {
+            if (thinkingChunk.length === 0) return;
+            if (!shownThinking && lastShownThinkingHeaderTurn !== currentTurn) {
+                const thinkingHeader = {
+                    timestamp: Date.now(),
+                    severity: 'THK' as const,
+                    turn: currentTurn,
+                    subturn: 0,
+                    direction: 'response' as const,
+                    type: 'llm' as const,
+                    remoteIdentifier: 'thinking',
+                    fatal: false,
+                    message: 'reasoning output stream'
+                };
+                this.log(thinkingHeader);
+                shownThinking = true;
+            }
+            if (isRootSession) {
+                this.callbacks.onThinking?.(thinkingChunk, callbackMeta);
+            }
+            try {
+                const opId = this.callbacks.getCurrentLlmOpId();
+                if (typeof opId === 'string')
+                    this.ctx.opTree.appendReasoningChunk(opId, thinkingChunk);
+            }
+            catch (e) {
+                warn(`appendReasoningChunk failed: ${e instanceof Error ? e.message : String(e)}`);
+            }
+        };
 
         const request = {
             messages: requestMessages,
@@ -3444,10 +3476,15 @@ export class TurnRunner {
             sendReasoning,
             onChunk: (chunk: string, type: 'content' | 'thinking') => {
                 const isRootSession = this.ctx.parentTxnId === undefined;
-                if (type === 'content' && this.callbacks.onOutput !== undefined) {
+                if (type === 'content') {
+                    const split = thinkFilter.process(chunk);
+                    if (split.thinking.length > 0) {
+                        emitThinking(split.thinking, isRootSession);
+                    }
+                    if (split.content.length === 0) return;
                     if (xmlFilter !== undefined) {
-                        const filtered = xmlFilter.process(chunk);
-                        if (filtered.length > 0) {
+                        const filtered = xmlFilter.process(split.content);
+                        if (filtered.length > 0 && this.callbacks.onOutput !== undefined) {
                             this.callbacks.onOutput(filtered, callbackMeta);
                             this.appendStreamedOutputTail(filtered);
                             // Only mark as streamed if we actually emitted content (and are inside the tag)
@@ -3455,39 +3492,14 @@ export class TurnRunner {
                                 this.finalReportStreamed = true;
                             }
                         }
-                    } else {
-                        this.callbacks.onOutput(chunk, callbackMeta);
-                        this.appendStreamedOutputTail(chunk);
                     }
+                    else if (this.callbacks.onOutput !== undefined) {
+                        this.callbacks.onOutput(split.content, callbackMeta);
+                        this.appendStreamedOutputTail(split.content);
+                    }
+                    return;
                 }
-                else if (type === 'thinking') {
-                    if (!shownThinking && lastShownThinkingHeaderTurn !== currentTurn) {
-                        const thinkingHeader = {
-                            timestamp: Date.now(),
-                            severity: 'THK' as const,
-                            turn: currentTurn,
-                            subturn: 0,
-                            direction: 'response' as const,
-                            type: 'llm' as const,
-                            remoteIdentifier: 'thinking',
-                            fatal: false,
-                            message: 'reasoning output stream'
-                        };
-                        this.log(thinkingHeader);
-                        shownThinking = true;
-                    }
-                    if (isRootSession) {
-                        this.callbacks.onThinking?.(chunk, callbackMeta);
-                    }
-                    try {
-                        const opId = this.callbacks.getCurrentLlmOpId();
-                        if (typeof opId === 'string')
-                            this.ctx.opTree.appendReasoningChunk(opId, chunk);
-                    }
-                    catch (e) {
-                        warn(`appendReasoningChunk failed: ${e instanceof Error ? e.message : String(e)}`);
-                    }
-                }
+                emitThinking(chunk, isRootSession);
             },
             reasoningLevel: effectiveReasoningLevel,
             reasoningValue: effectiveReasoningValue ?? null,

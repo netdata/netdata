@@ -15,6 +15,7 @@ import type { OutputFormatId } from './formats.js';
 import type { ConversationMessage, MCPTool, ToolCall } from './types.js';
 
 import { renderTurnFailedSlug, type TurnFailedSlug } from './llm-messages-turn-failed.js';
+import { stripLeadingThinkBlock, ThinkTagStreamFilter } from './think-tag-filter.js';
 import { TRUNCATE_PREVIEW_BYTES, truncateToBytes, truncateToChars } from './truncation.js';
 import { sanitizeToolName } from './utils.js';
 import {
@@ -231,24 +232,25 @@ export class XmlToolTransport {
 
     const finalSlotId = `${this.nonce}-FINAL`;
     const finalReportOpenTag = `<ai-agent-${finalSlotId}`;
+    const sanitizedContent = stripLeadingThinkBlock(content).stripped;
 
     // Check if content has an unclosed final report opening tag
-    const openTagIdx = content.indexOf(finalReportOpenTag);
+    const openTagIdx = sanitizedContent.indexOf(finalReportOpenTag);
     if (openTagIdx === -1) return undefined;
 
     // Check if there's a closing tag
     const closeTag = `</ai-agent-${finalSlotId}>`;
-    if (content.includes(closeTag)) return undefined; // Has closing tag, let normal parsing handle it
+    if (sanitizedContent.includes(closeTag)) return undefined; // Has closing tag, let normal parsing handle it
 
     // Extract the opening tag to find where content starts
-    const afterOpenTag = content.slice(openTagIdx);
+    const afterOpenTag = sanitizedContent.slice(openTagIdx);
     const openTagEndMatch = /^<ai-agent-[A-Za-z0-9\-]+[^>]*>/.exec(afterOpenTag);
     if (openTagEndMatch === null) return undefined; // Incomplete opening tag
     // Tag name already identifies final report via -FINAL suffix, no need for tool attribute
 
     // Extract content after the opening tag
     const contentStart = openTagIdx + openTagEndMatch[0].length;
-    const extractedContent = content.slice(contentStart).trim();
+    const extractedContent = sanitizedContent.slice(contentStart).trim();
 
     if (extractedContent.length === 0) return undefined; // No content to extract
 
@@ -558,18 +560,16 @@ export class XmlToolTransport {
  * Strips <ai-agent-{nonce}-FINAL ...> tags and passes through content.
  *
  * Handles reasoning models that embed <think>...</think> inline in content.
- * If the first content starts with <think>, we skip past </think> before
- * processing XML tags. This prevents matching XML tags mentioned as examples
- * inside the thinking block.
+ * Leading whitespace is tolerated; the <think> block is excluded before
+ * processing XML tags so examples inside thinking are never parsed.
  */
 export class XmlFinalReportFilter {
   private readonly openTagPrefix: string;
   private readonly closeTag: string;
   private buffer = '';
-  private state: 'check_think' | 'skip_think' | 'search_open' | 'buffering_open' | 'inside' | 'buffering_close' | 'done' = 'check_think';
+  private state: 'search_open' | 'buffering_open' | 'inside' | 'buffering_close' | 'done' = 'search_open';
   private _hasStreamedContent = false;
-  private thinkBuffer = '';
-  private readonly thinkCloseTag = '</think>';
+  private readonly thinkFilter = new ThinkTagStreamFilter();
 
   constructor(nonce: string) {
     this.openTagPrefix = `<ai-agent-${nonce}-FINAL`;
@@ -582,55 +582,10 @@ export class XmlFinalReportFilter {
 
   process(chunk: string): string {
     let output = '';
+    const split = this.thinkFilter.process(chunk);
+    if (split.content.length === 0) return '';
     // eslint-disable-next-line functional/no-loop-statements
-    for (const char of chunk) {
-      // Phase 1: Check if content starts with <think>
-      if (this.state === 'check_think') {
-        this.thinkBuffer += char;
-        const thinkOpenTag = '<think>';
-        if (this.thinkBuffer === thinkOpenTag) {
-          // Found <think>, skip until </think>
-          this.state = 'skip_think';
-          this.thinkBuffer = '';
-        } else if (this.thinkBuffer.length < thinkOpenTag.length) {
-          // Still building buffer - check if prefix matches
-          if (!thinkOpenTag.startsWith(this.thinkBuffer)) {
-            // Not starting with <think>, process buffered content normally
-            this.state = 'search_open';
-            // Re-process thinkBuffer through normal state machine
-            // eslint-disable-next-line functional/no-loop-statements
-            for (const bufferedChar of this.thinkBuffer) {
-              output += this.processNormalChar(bufferedChar);
-            }
-            this.thinkBuffer = '';
-          }
-        } else {
-          // Buffer exceeded <think> length without matching - not a think block
-          this.state = 'search_open';
-          // eslint-disable-next-line functional/no-loop-statements
-          for (const bufferedChar of this.thinkBuffer) {
-            output += this.processNormalChar(bufferedChar);
-          }
-          this.thinkBuffer = '';
-        }
-        continue;
-      }
-
-      // Phase 2: Skip content inside <think>...</think>
-      if (this.state === 'skip_think') {
-        this.thinkBuffer += char;
-        if (this.thinkBuffer.endsWith(this.thinkCloseTag)) {
-          // Found </think>, switch to normal processing
-          this.state = 'search_open';
-          this.thinkBuffer = '';
-        } else if (this.thinkBuffer.length > 100000) {
-          // Safety: truncate buffer to prevent memory issues (keep last N chars for matching)
-          this.thinkBuffer = this.thinkBuffer.slice(-this.thinkCloseTag.length + 1);
-        }
-        continue;
-      }
-
-      // Normal XML processing states
+    for (const char of split.content) {
       output += this.processNormalChar(char);
     }
     return output;

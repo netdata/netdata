@@ -94,6 +94,14 @@ describe('XML streaming parser', () => {
     expect(res[0].rawPayload).toBe('real content');
   });
 
+  it('skips <think> block with leading whitespace', () => {
+    const parser = createXmlParser();
+    const content = `  \n\t<think>Example <ai-agent-${SLOT_ONE} tool="echo"> wrapper.</think><ai-agent-${SLOT_ONE} tool="echo">real content</ai-agent-${SLOT_ONE}>`;
+    const res = parser.parseChunk(content, NONCE, ALLOWED_SLOTS, ALLOWED_TOOLS);
+    expect(res).toHaveLength(1);
+    expect(res[0].rawPayload).toBe('real content');
+  });
+
   it('handles content not starting with <think>', () => {
     const parser = createXmlParser();
     // Normal content without <think>

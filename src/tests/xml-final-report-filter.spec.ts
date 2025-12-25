@@ -89,6 +89,14 @@ describe('XmlFinalReportFilter', () => {
     expect(filter.hasStreamedContent).toBe(true);
   });
 
+  it('skips <think> block with leading whitespace', () => {
+    const filter = new XmlFinalReportFilter(nonce);
+    const content = 'Whitespace think content';
+    const chunk = `  \n\t<think>Example ${openTag} in thinking.</think>${openTag}${content}${closeTag}`;
+    expect(filter.process(chunk)).toBe(content);
+    expect(filter.hasStreamedContent).toBe(true);
+  });
+
   it('skips <think> block split across chunks', () => {
     const filter = new XmlFinalReportFilter(nonce);
     const content = 'Report after thinking';
