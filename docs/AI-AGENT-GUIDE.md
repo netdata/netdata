@@ -505,7 +505,22 @@ OpenAI‑compatible providers enable `includeUsage` for streaming token usage by
   - `--sessions-dir <path>` — overrides the default `~/.ai-agent/sessions` snapshot directory used by persistence callbacks.
   - `--billing-file <path>` — overrides accounting ledger target (`~/.ai-agent/accounting.jsonl` by default).
 - **Prompt formatting**: CLI builds `${FORMAT}` based on `--format` (choices: `markdown`, `markdown+mermaid`, `slack-block-kit`, `tty`, `pipe`, `json`, `sub-agent`). If omitted, it selects `tty` when stdout is a TTY and `markdown` otherwise, auto-switching to JSON when `output.format=json` is declared.
-- **Slack Block Kit formatting**: `slack-block-kit` requires Slack *mrkdwn* inside `section`/`context` blocks (not GitHub Markdown). Avoid `#` headings and Markdown tables; use header blocks or bold lines instead, format links as `<url|text>`, escape `& < >`, and use `section.fields` for 2‑column layouts. Output is sanitized (Markdown → mrkdwn, escape entities, table → code block) and validated against a strict Block Kit schema; invalid payloads fall back to a safe single-section message.
+- **Slack Block Kit formatting**: `slack-block-kit` requires Slack *mrkdwn* inside `section`/`context` blocks (not GitHub Markdown). Avoid `#` headings and Markdown tables; use header blocks or bold lines instead, format links as `<url|text>`, escape `& < >`, and use `section.fields` for 2‑column layouts where **each field is ONE key/value pair** (`*Label*\nValue`) and fields wrap in a 2‑column grid. Output is sanitized (Markdown → mrkdwn, escape entities, table → code block) and validated against a strict Block Kit schema; invalid payloads fall back to a safe single-section message.
+  - **Tables (read carefully)**: Slack mrkdwn does not support tables — never use Markdown tables (e.g., `|---|`).
+  - Use `section.fields` (max 10 fields) for 2-column layouts; each field is ONE key/value pair.
+  - Fields render in a 2-column grid: field 1 left, field 2 right, field 3 wraps to next row left, field 4 next row right.
+  - Example:
+    ```json
+    {
+      "type": "section",
+      "fields": [
+        { "type": "mrkdwn", "text": "*Monthly Revenue*\n$2.4M" },
+        { "type": "mrkdwn", "text": "*Active Users*\n45,000" },
+        { "type": "mrkdwn", "text": "*Support Tickets*\n23 (resolved)" },
+        { "type": "mrkdwn", "text": "*System Health*\n98.5%" }
+      ]
+    }
+    ```
 - **Output schema override**: `--schema <inline-json | @schema.json>` forces `expectedOutput.format=json` and validates the final response against the provided JSON Schema. This **overrides** any `expectedOutput` declared in `.ai` frontmatter for the current run (useful for deterministic test harnesses).
 - **Persistence & tracing**: `--dry-run` validates config + MCP servers without contacting LLMs. `--trace-llm`, `--trace-mcp`, `--trace-sdk`, `--verbose`, `--show-tree` mirror the logging descriptions in Section 1. Snapshots always retain raw LLM request/response payloads (base64), including streaming SSE bodies.
 - **Debug tip**: Always smoke-test sub-agents with `--verbose` before invoking higher-level orchestrators. The verbose stream shows per-turn indices and tool names so you can confirm the planner is calling the expected tools (e.g., look for `agent:web.sweeps` before `agent:analysis` proceeds).

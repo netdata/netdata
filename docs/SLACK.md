@@ -753,9 +753,28 @@ When emitting `slack-block-kit`, the text inside `section` and `context` blocks 
 - Allowed formatting: `*bold*`, `_italic_`, `~strikethrough~`, `inline code`, fenced code blocks (```code```), bullets (`•` or `-`).
 - Links must use Slack format: `<https://example.com|link text>` — do not use `[text](url)`.
 - Escape special characters in text: `&` → `&amp;`, `<` → `&lt;`, `>` → `&gt;`.
-- Tables are **not** allowed in mrkdwn. For 2-column layouts, use Block Kit `section.fields` (max 10 fields) instead of Markdown tables.
 - Section blocks may include **both** `text` and `fields` (Slack allows this); `text` is optional when fields are present.
 - Avoid HTML, Mermaid fences, or raw JSON inside text blocks.
+
+#### Tables (read carefully)
+Slack mrkdwn does **not** support tables — never use Markdown tables (e.g., `|---|`).
+
+- For 2-column layouts, use Block Kit `section.fields` (max 10 fields).
+- Each field MUST contain ONE key/value pair (`*Label*\nValue`). Do NOT put all labels in one field and all values in another.
+- Fields render in a 2-column grid: field 1 left, field 2 right, field 3 wraps to next row left, field 4 next row right.
+
+Example:
+```json
+{
+  "type": "section",
+  "fields": [
+    { "type": "mrkdwn", "text": "*Monthly Revenue*\n$2.4M" },
+    { "type": "mrkdwn", "text": "*Active Users*\n45,000" },
+    { "type": "mrkdwn", "text": "*Support Tickets*\n23 (resolved)" },
+    { "type": "mrkdwn", "text": "*System Health*\n98.5%" }
+  ]
+}
+```
 
 **Automatic repair + validation**
 - Slack mrkdwn is sanitized on output (Markdown headings/links/strikethrough → mrkdwn equivalents, `**` → `*`, `~~` → `~`, code-fence language stripped, `\\n`/`\\t` escape sequences normalized).

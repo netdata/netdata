@@ -687,16 +687,20 @@ export const SLACK_BLOCK_KIT_MRKDWN_RULES = `### ${SLACK_BLOCK_KIT_MRKDWN_RULES_
 - Links must use Slack format: \`<https://example.com|link text>\`. Do NOT use \`[text](url)\`.
 - Mentions are allowed when relevant: \`<@U...>\`, \`<#C...>\`, \`<!subteam^ID>\`, \`<!here>\`, \`<!channel>\`, \`<!everyone>\`. Avoid \`@here/@channel/@everyone\` unless explicitly asked.
 - Escape special characters in text: \`&\` → \`&amp;\`, \`<\` → \`&lt;\`, \`>\` → \`&gt;\`.
-- Tables are NOT allowed in mrkdwn. For 2-column layouts, use Block Kit \`section.fields\` (max 10 fields) instead of Markdown tables.
-- Avoid HTML tags, GitHub Markdown extensions, Mermaid fences, or raw JSON inside text blocks.
+- **Tables (read carefully)**:
+  - Slack mrkdwn does not support tables — never use Markdown tables (e.g., \`|---|\`).
+  - For 2-column layouts, use Block Kit \`section.fields\` (max 10 fields).
+  - Each field MUST contain ONE key/value pair (\`*Label*\\nValue\`). Do NOT put all keys in one field and all values in another.
+  - Fields render in a 2-column grid (field 1 left, field 2 right, field 3 wraps to next row left, field 4 next row right).
+- Never use HTML tags, GitHub Markdown extensions, Mermaid fences, or raw JSON inside text blocks.
 
 **Quick templates (use these patterns):**
 - Header block:
   \`{ "type": "header", "text": { "type": "plain_text", "text": "Title" } }\`
 - Section with subheading + bullets:
   \`{ "type": "section", "text": { "type": "mrkdwn", "text": "*Section Title*\\n• Item one\\n• Item two" } }\`
-- 2-column key/value layout (fields):
-  \`{ "type": "section", "fields": [ { "type": "mrkdwn", "text": "*Key*\\nValue" }, { "type": "mrkdwn", "text": "*Key*\\nValue" } ] }\`
+- 2-column key/value layout (fields). Fields wrap in a 2-column grid (1 left, 2 right, 3 next row left, 4 next row right):
+  \`{ "type": "section", "fields": [ { "type": "mrkdwn", "text": "*Monthly Revenue*\\n$2.4M" }, { "type": "mrkdwn", "text": "*Active Users*\\n45,000" }, { "type": "mrkdwn", "text": "*Support Tickets*\\n23 (resolved)" }, { "type": "mrkdwn", "text": "*System Health*\\n98.5%" } ] }\`
 `;
 
 export const finalReportFieldsText = (formatId: string): string =>
