@@ -16,15 +16,15 @@ export const TURN_FAILED_SLUGS: Record<string, TurnFailedSlugConfig> = {
     priority: 'high',
   },
   final_report_json_required: {
-    message: 'Final report must be a JSON object that matches the provided schema. Provide a JSON object (not a string) and retry.',
+    message: 'Final report must be a JSON object that matches the final-report/answer schema. Provide a JSON object (not a string) and retry.',
     priority: 'high',
   },
   final_report_slack_messages_missing: {
-    message: 'Slack Block Kit final report is missing a `messages` array. Provide valid Block Kit messages and retry.',
+    message: 'Slack Block Kit final report is missing the messages array. Provide valid Block Kit messages and retry.',
     priority: 'high',
   },
   final_report_schema_validation_failed: {
-    message: 'Final report failed schema validation. Fix the payload to match the schema and resend your final report/answer.',
+    message: 'Final report failed schema validation. Fix the payload to match the final-report/answer schema and resend your final report/answer.',
     priority: 'high',
   },
   tool_message_fallback_schema_failed: {
@@ -40,7 +40,7 @@ export const TURN_FAILED_SLUGS: Record<string, TurnFailedSlugConfig> = {
     priority: 'normal',
   },
   reasoning_only: {
-    message: 'Reasoning-only output detected with no visible answer, tool calls, or final report. Call tools or provide your final report/answer in the required wrapper.',
+    message: 'Reasoning-only output detected with no visible answer, tool calls, or final report. Call tools or provide your final report/answer in the required XML wrapper.',
     priority: 'normal',
   },
   reasoning_only_final: {
@@ -60,7 +60,7 @@ export const TURN_FAILED_SLUGS: Record<string, TurnFailedSlugConfig> = {
     priority: 'high',
   },
   xml_final_report_not_json: {
-    message: 'Final report payload is not valid JSON. Provide a JSON object that matches the final-report schema and retry.',
+    message: 'Final report payload is not valid JSON. Provide a JSON object that matches the final-report/answer schema and retry.',
     priority: 'high',
   },
   xml_tool_payload_not_json: {
@@ -68,7 +68,7 @@ export const TURN_FAILED_SLUGS: Record<string, TurnFailedSlugConfig> = {
     priority: 'high',
   },
   xml_slot_mismatch: {
-    message: 'Tag ignored: slot does not match the current nonce/slot for this turn. Use the exact slot id from XML-NEXT and retry.',
+    message: 'XML wrapper ignored: the XML wrapper you used does not match the expected wrapper. Use the correct XML wrapper and retry.',
     priority: 'normal',
   },
   xml_missing_closing_tag: {

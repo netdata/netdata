@@ -33,27 +33,27 @@ export const XML_NEXT_SLUGS: Record<string, XmlNextSlugConfig> = {
     priority: 0,
   },
   final_turn_context: {
-    message: 'Final turn forced by context window limit. You MUST NOW provide your final report/answer and you are not allowed to call any other tool. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation explicitly in your final report.',
+    message: 'Final turn forced by context window limit. You MUST NOW provide your final report/answer and you are not allowed to call any other tool. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation in your final report.',
     priority: 1,
     stop: true,
   },
   final_turn_max_turns: {
-    message: 'Final turn reached (max turns). You MUST NOW provide your final report/answer and you are not allowed to call any other tool. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation explicitly in your final report.',
+    message: 'Final turn reached (max turns). You MUST NOW provide your final report/answer and you are not allowed to call any other tool. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation in your final report.',
     priority: 1,
     stop: true,
   },
   final_turn_task_status_completed: {
-    message: 'Task marked completed. You MUST NOW provide your final report/answer and you are not allowed to call any other tool. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation explicitly in your final report.',
+    message: 'Task marked completed. You MUST NOW provide your final report/answer and you are not allowed to call any other tool. Use the required XML wrapper and format instructions to deliver your final report/answer.',
     priority: 1,
     stop: true,
   },
   final_turn_task_status_only: {
-    message: 'Repeated progress-only task status calls detected. You MUST NOW provide your final report/answer and you are not allowed to call any other tool. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation explicitly in your final report.',
+    message: 'Repeated standalone task status calls detected without calling any other tools, so final turn has been enforced. You MUST NOW provide your final report/answer and you are not allowed to call any other tool. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation explicitly in your final report/answer.',
     priority: 1,
     stop: true,
   },
   final_turn_retry_exhaustion: {
-    message: 'All retry attempts exhausted. You MUST NOW provide your final report/answer and you are not allowed to call any other tool. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation explicitly in your final report.',
+    message: 'All retry attempts exhausted, so final turn has been enforced. You MUST NOW provide your final report/answer and you are not allowed to call any other tool. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation explicitly in your final report.',
     priority: 1,
     stop: true,
   },
@@ -62,7 +62,7 @@ export const XML_NEXT_SLUGS: Record<string, XmlNextSlugConfig> = {
     priority: 5,
   },
   tools_available_task_status_line: {
-    message: '- Together with these tool calls, also call `agent__task_status` to explain what you are doing and why you are calling these tools.',
+    message: '- Together with these tool calls, also call `agent__task_status` to inform your user about what you are doing and why you are calling these tools.',
     priority: 6,
   },
   tools_available_or: {
@@ -70,7 +70,7 @@ export const XML_NEXT_SLUGS: Record<string, XmlNextSlugConfig> = {
     priority: 7,
   },
   tools_available_task_status_footer: {
-    message: 'Call `agent__task_status` to track your progress and mark tasks as complete.',
+    message: 'Call `agent__task_status` to inform the user about your progress and mark tasks as complete.',
     priority: 8,
   },
   tools_unavailable: {
