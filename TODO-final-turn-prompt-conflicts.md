@@ -3,6 +3,7 @@
 - All injected non-tool messages must be consolidated into XML-NEXT or TURN-FAILED; no other system notices should be appended to requests.
 - XML-NEXT must cover every case; TURN-FAILED must cover every failure case; synthetic tool responses remain separate and must still be emitted.
 - Requirement: every tool call emitted by the model must be preserved in messages and must always have a tool response; therefore no tool-related TURN-FAILED slugs are needed.
+- Add the standalone task_status counter to the “forcing final turn” log message for visibility.
 
 # Analysis
 - Inventory of synthetic **user** messages injected into LLM requests (non-tool):
@@ -107,6 +108,8 @@
   Evidence: /tmp/session-response-content.txt.
 - SSE confirms the model itself emitted the JSON wrapper (not a capture artifact): the stream switches from `reasoning_content` to `content` and begins with `{ "role": "assistant", "content": "<ai-agent-7b5c4660-FINAL ...` then streams the XML body.
   Evidence: /tmp/session-response.sse (around lines ~3208+).
+- Standalone task_status final-turn log currently omits the count in the human-readable message (only available in structured details).
+  - Source: `src/session-turn-runner.ts` warning log “Consecutive standalone task_status calls detected; forcing final turn.”
 
 # Decisions
 - Scope decision (user): Only two system notice types are allowed — XML-NEXT (ephemeral) and TURN-FAILED (permanent). No other system notices may be injected into requests.
@@ -136,8 +139,9 @@
 - ✅ Remove tool-related TURN-FAILED reasons and ensure tool calls always emit tool responses (including malformed tool calls).
 - ✅ Sanitize invalid tool calls into sentinel params and short-circuit execution with a tool failure response.
 - ✅ Add ERR logging for each invalid tool call with full payload.
-- ⏳ Update Phase 1 harness expectations for XML-NEXT and tool-failure behavior.
-- ⏳ Run `npm run lint`, `npm run build`, and `npm run test:phase1`.
+- ✅ Update Phase 1 harness expectations for XML-NEXT and tool-failure behavior.
+- ✅ Run `npm run lint`, `npm run build`, and `npm run test:phase1`.
+- ✅ Update task_status “forcing final turn” log message to include the standalone count.
 
 # Implied Decisions
 - None.
@@ -145,6 +149,7 @@
 # Testing Requirements
 - Completed: Phase 1 harness updated for XML-NEXT final-turn content and tool-failure responses (no TURN-FAILED for malformed tool payloads).
 - Completed: `npm run lint` (pass), `npm run build` (pass), `npm run test:phase1` (pass; 252/252, warnings expected).
+- Completed: Re-run `npm run lint`, `npm run build`, and `npm run test:phase1` after updating the task_status log message.
 
 # Documentation Updates Required
 - Completed: docs/CONTRACT.md, docs/AI-AGENT-GUIDE.md, docs/AI-AGENT-INTERNAL-API.md, docs/SPECS.md, docs/specs/retry-strategy.md, docs/specs/session-lifecycle.md.

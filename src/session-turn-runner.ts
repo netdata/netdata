@@ -1518,7 +1518,7 @@ export class TurnRunner {
                 type: 'llm' as const,
                 remoteIdentifier: REMOTE_ORCHESTRATOR,
                 fatal: false,
-                message: 'Consecutive standalone task_status calls detected; forcing final turn.',
+                message: `Consecutive standalone task_status calls detected (count=${String(nextProgressOnlyTurns)}, threshold=5); forcing final turn.`,
                 details: { consecutiveProgressOnlyTurns: nextProgressOnlyTurns, threshold: 5 },
             });
         }
