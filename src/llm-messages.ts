@@ -687,20 +687,37 @@ export const SLACK_BLOCK_KIT_MRKDWN_RULES = `### ${SLACK_BLOCK_KIT_MRKDWN_RULES_
 - Links must use Slack format: \`<https://example.com|link text>\`. Do NOT use \`[text](url)\`.
 - Mentions are allowed when relevant: \`<@U...>\`, \`<#C...>\`, \`<!subteam^ID>\`, \`<!here>\`, \`<!channel>\`, \`<!everyone>\`. Avoid \`@here/@channel/@everyone\` unless explicitly asked.
 - Escape special characters in text: \`&\` → \`&amp;\`, \`<\` → \`&lt;\`, \`>\` → \`&gt;\`.
-- **Tables (read carefully)**:
-  - Slack mrkdwn does not support tables — never use Markdown tables (e.g., \`|---|\`).
-  - For 2-column layouts, use Block Kit \`section.fields\` (max 10 fields).
-  - Each field MUST contain ONE key/value pair (\`*Label*\\nValue\`). Do NOT put all keys in one field and all values in another.
-  - Fields render in a 2-column grid (field 1 left, field 2 right, field 3 wraps to next row left, field 4 next row right).
-- Never use HTML tags, GitHub Markdown extensions, Mermaid fences, or raw JSON inside text blocks.
+- Never use HTML tags, GitHub Markdown extensions, Mermaid fences, or raw JSON inside mrkdwn messages.
 
 **Quick templates (use these patterns):**
-- Header block:
+Header block:
   \`{ "type": "header", "text": { "type": "plain_text", "text": "Title" } }\`
-- Section with subheading + bullets:
+Section with subheading + bullets:
   \`{ "type": "section", "text": { "type": "mrkdwn", "text": "*Section Title*\\n• Item one\\n• Item two" } }\`
-- 2-column key/value layout (fields). Fields wrap in a 2-column grid (1 left, 2 right, 3 next row left, 4 next row right):
+
+**Tables in slack-block-kit**:
+Slack does not support tables. Never use Markdown tables (e.g., \`|---|\`), or HTML tables.
+
+For up to 10 key-value pairs use Block Kit \`section.fields\` (do not add more than 10 fields):
+- Each field MUST contain ONE key/value pair (\`*Label*\\nValue\`). Do NOT put all keys in one field and all values in another.
+- Fields render in a single column grid (field 1 label above, field 1 value below,field 2 label 3rd, field 2 key 4th and so on). So, they are rendered vertically, not horizontally.
+Example: simple vertical key/value layout (fields). Fields shown one below the other:
   \`{ "type": "section", "fields": [ { "type": "mrkdwn", "text": "*Monthly Revenue*\\n$2.4M" }, { "type": "mrkdwn", "text": "*Active Users*\\n45,000" }, { "type": "mrkdwn", "text": "*Support Tickets*\\n23 (resolved)" }, { "type": "mrkdwn", "text": "*System Health*\\n98.5%" } ] }\`
+
+To show a small multi-column and multi-row table, use code blocks and emulate with spaces and ASCII art some tabular data:
+- keep them simple and short
+- assume a monospace font
+Example:
+\`\`\`
+┌──────────┬─────────┬────────┬────────┐
+│ Month    │ Revenue │ Users  │ Growth │
+├──────────┼─────────┼────────┼────────┤
+│ January  │ $2.1M   │ 42,000 │ +5.0%  │
+│ February │ $2.4M   │ 45,000 │ +7.0%  │
+│ March    │ $2.5M   │ 47,500 │ +5.5%  │
+└──────────┴─────────┴────────┴────────┘
+\`\`\`
+Do not make this too wide; keep it within 50 characters width and up to 10 rows.
 `;
 
 export const finalReportFieldsText = (formatId: string): string =>
