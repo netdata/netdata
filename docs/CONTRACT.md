@@ -461,7 +461,7 @@ Any deviation from the guarantees above is a **contract violation** and must be 
 
 **Messages**
 - XML-PAST (permanent): a user message containing prior turn tool results (slot id, tool, status, duration, request, response). Suppressed in `xml-final` mode. Intended for the model’s context; may be capped to last turn.
-- XML-NEXT (ephemeral, not stored/cached): per-turn instructions with the current nonce, available tools and their JSON schemas, slot templates, progress slot (optional), and final-report slot. In forced-final turns it only advertises the final-report slot (and optional progress).
+- XML-NEXT (ephemeral, not stored/cached): the **only** per-turn system notice. It carries the current nonce, the XML final wrapper, and tool-vs-final guidance. In forced-final turns it only advertises the final-report wrapper. Tool schemas remain in native tool definitions, not in XML-NEXT.
 
 **Final-report via XML**
 - Final-report uses a reserved slot in XML-NEXT (`tool="agent__final_report"`, format attribute, raw content).
@@ -506,7 +506,7 @@ Any deviation from the guarantees above is a **contract violation** and must be 
 - Missing or invalid tags follow the existing retry logic for missing final-report/tool calls; empty/reasoning-only outputs are treated as missing. Retry budgets and provider cycling are unchanged.
 
 **Prompting and schemas**
-- The system prompt contains no tool/final-report text in XML modes; all instructions/schemas live in XML-NEXT. This allows forced-final turns to hide non-final tools by omitting them from XML-NEXT.
+- The system prompt contains no tool/final-report text in XML modes; all per-turn instructions live in XML-NEXT. This allows forced-final turns to hide non-final tools by omitting them from XML-NEXT. No other system notices are injected beyond XML-NEXT (ephemeral) and TURN-FAILED (persistent).
 
 **Accounting/telemetry**
 - Accounting entries use the real tool name with `source: xml`. Final-report emits `command: agent__final_report_xml` with status from the tag. Metrics/histograms remain, now distinguishable by source.

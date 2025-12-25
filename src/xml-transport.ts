@@ -14,15 +14,8 @@ import crypto from 'node:crypto';
 import type { OutputFormatId } from './formats.js';
 import type { ConversationMessage, MCPTool, ToolCall } from './types.js';
 
-import {
-  turnFailedStructuredOutputTruncated,
-  XML_FINAL_REPORT_NOT_JSON,
-  xmlMalformedMismatch,
-  xmlMissingClosingTag,
-  xmlSlotMismatch,
-  xmlToolPayloadNotJson,
-} from './llm-messages.js';
-import { truncateToBytes, truncateToChars } from './truncation.js';
+import { renderTurnFailedSlug, type TurnFailedSlug } from './llm-messages-turn-failed.js';
+import { TRUNCATE_PREVIEW_BYTES, truncateToBytes, truncateToChars } from './truncation.js';
 import { sanitizeToolName } from './utils.js';
 import {
   buildToolCallFromParsed,
@@ -69,6 +62,8 @@ export interface XmlBuildMessagesConfig {
   maxRetries: number;
   // Context window info (for percentage calculation)
   contextPercentUsed: number;
+  forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion';
+  noticeContent?: string;
 }
 
 // Result from building messages
@@ -90,7 +85,7 @@ export interface XmlParseContext {
 
 // Callback for logging/errors during parsing
 export interface XmlParseCallbacks {
-  onTurnFailure: (reason: string) => void;
+  onTurnFailure: (slug: TurnFailedSlug, reason?: string) => void;
   onLog: (entry: { severity: 'WRN'; message: string }) => void;
 }
 
@@ -174,7 +169,9 @@ export class XmlToolTransport {
     // Agent can call tools if anything besides final_report is available
     const hasExternalTools = config.tools.some(t => t.name !== 'agent__final_report');
 
-    const nextContent = renderXmlNext({
+    const nextContent = typeof config.noticeContent === 'string' && config.noticeContent.trim().length > 0
+      ? config.noticeContent
+      : renderXmlNext({
       nonce,
       turn: config.turn,
       maxTurns: config.maxTurns,
@@ -187,6 +184,7 @@ export class XmlToolTransport {
       maxRetries: config.maxRetries,
       contextPercentUsed: config.contextPercentUsed,
       hasExternalTools,
+      forcedFinalTurnReason: config.forcedFinalTurnReason,
     });
 
     const nextMessage: ConversationMessage = {
@@ -265,7 +263,8 @@ export class XmlToolTransport {
           severity: 'WRN',
           message: `Final report truncated (stopReason=${stopReason ?? 'unknown'}, format=${resolvedFormat}, length=${String(extractedContent.length)} chars). Will retry.\nTruncated output:\n${preview}`
         });
-        callbacks.onTurnFailure(turnFailedStructuredOutputTruncated(maxOutputTokens));
+        const reason = typeof maxOutputTokens === 'number' ? `token_limit: ${String(maxOutputTokens)}` : undefined;
+        callbacks.onTurnFailure('xml_structured_output_truncated', reason);
         return { truncatedRejected: true };
       } else {
         // Unstructured format: Accept - log without dump (content visible in final report)
@@ -333,16 +332,17 @@ export class XmlToolTransport {
         // Not JSON - wrap as text content
         if (expectedFormat === 'json') {
           // JSON expected but got text - this is an error even for unclosed tags
-          callbacks.onTurnFailure(XML_FINAL_REPORT_NOT_JSON);
-          callbacks.onLog({ severity: 'WRN', message: XML_FINAL_REPORT_NOT_JSON });
+          const failureMessage = renderTurnFailedSlug('xml_final_report_not_json');
+          callbacks.onTurnFailure('xml_final_report_not_json');
+          callbacks.onLog({ severity: 'WRN', message: failureMessage });
           return {
             toolCalls: undefined,
             errors: [{
               slotId: unclosedFinal.slotId,
               tool: finalReportToolName,
               status: 'failed',
-              request: truncateToBytes(unclosedFinal.content, 4096) ?? unclosedFinal.content,
-              response: XML_FINAL_REPORT_NOT_JSON,
+              request: truncateToBytes(unclosedFinal.content, TRUNCATE_PREVIEW_BYTES) ?? unclosedFinal.content,
+              response: failureMessage,
             }]
           };
         }
@@ -378,23 +378,23 @@ export class XmlToolTransport {
       const hasClosing = flushResult.leftover.includes('</ai-agent-');
       const slotMatch = /<ai-agent-([A-Za-z0-9\-]+)/.exec(flushResult.leftover);
       const capturedSlot = slotMatch?.[1] ?? `(partial: ${flushResult.leftover.slice(0, 60).replace(/\n/g, ' ')})`;
-      const reason = hasClosing
-        ? xmlSlotMismatch(capturedSlot)
-        : xmlMissingClosingTag(capturedSlot);
+      const slug: TurnFailedSlug = hasClosing ? 'xml_slot_mismatch' : 'xml_missing_closing_tag';
+      const reasonDetail = `slot: ${capturedSlot}`;
+      const reasonMessage = renderTurnFailedSlug(slug, reasonDetail);
 
-      callbacks.onTurnFailure(reason);
+      callbacks.onTurnFailure(slug, reasonDetail);
 
       const errorEntry: XmlPastEntry = {
         slotId: slotMatch?.[1] ?? 'malformed',
         tool: 'agent__final_report',
         status: 'failed',
-        request: truncateToBytes(flushResult.leftover, 4096) ?? flushResult.leftover,
-        response: reason,
+        request: truncateToBytes(flushResult.leftover, TRUNCATE_PREVIEW_BYTES) ?? flushResult.leftover,
+        response: reasonMessage,
       };
       errors.push(errorEntry);
       this.thisTurnEntries.push(errorEntry);
 
-      callbacks.onLog({ severity: 'WRN', message: reason });
+      callbacks.onLog({ severity: 'WRN', message: reasonMessage });
     }
 
     if (parsedSlots.length === 0) {
@@ -406,19 +406,19 @@ export class XmlToolTransport {
         const tagIdx = content.indexOf(XML_TAG_PREFIX);
         const snippet = content.slice(tagIdx, tagIdx + 60).replace(/\n/g, ' ');
         const slotInfo = slotMatch?.[1] ?? `(partial: ${snippet})`;
-        const reason = missingClosing
-          ? xmlMissingClosingTag(slotInfo)
-          : xmlMalformedMismatch(slotInfo);
+        const slug: TurnFailedSlug = missingClosing ? 'xml_missing_closing_tag' : 'xml_malformed_mismatch';
+        const reasonDetail = `slot: ${slotInfo}`;
+        const reasonMessage = renderTurnFailedSlug(slug, reasonDetail);
 
-        callbacks.onTurnFailure(reason);
-        callbacks.onLog({ severity: 'WRN', message: reason });
+        callbacks.onTurnFailure(slug, reasonDetail);
+        callbacks.onLog({ severity: 'WRN', message: reasonMessage });
 
         const errorEntry: XmlPastEntry = {
           slotId: slotMatch?.[1] ?? 'malformed',
           tool: 'agent__final_report',
           status: 'failed',
-          request: truncateToBytes(content, 4096) ?? content,
-          response: reason,
+          request: truncateToBytes(content, TRUNCATE_PREVIEW_BYTES) ?? content,
+          response: reasonMessage,
         };
         errors.push(errorEntry);
         this.thisTurnEntries.push(errorEntry);
@@ -462,15 +462,16 @@ export class XmlToolTransport {
         if (parsedJson !== undefined) {
           call.parameters = parsedJson;
         } else {
-          const baseReason = xmlToolPayloadNotJson(call.name);
-          callbacks.onTurnFailure(baseReason);
+          const reasonDetail = `tool: ${call.name}`;
+          const reasonMessage = renderTurnFailedSlug('xml_tool_payload_not_json', reasonDetail);
+          callbacks.onTurnFailure('xml_tool_payload_not_json', reasonDetail);
 
           const errorEntry: XmlPastEntry = {
             slotId: slot.slotId,
             tool: call.name,
             status: 'failed',
-            request: truncateToBytes(asString, 4096) ?? asString,
-            response: baseReason,
+            request: truncateToBytes(asString, TRUNCATE_PREVIEW_BYTES) ?? asString,
+            response: reasonMessage,
           };
           errors.push(errorEntry);
           this.thisTurnEntries.push(errorEntry);
@@ -505,10 +506,10 @@ export class XmlToolTransport {
     const safeRequest = (() => {
       try {
         const json = JSON.stringify(parameters);
-        return truncateToBytes(json, 4096) ?? json;
+        return truncateToBytes(json, TRUNCATE_PREVIEW_BYTES) ?? json;
       } catch { return '[unserializable]'; }
     })();
-    const safeResponse = truncateToBytes(response, 4096) ?? response;
+    const safeResponse = truncateToBytes(response, TRUNCATE_PREVIEW_BYTES) ?? response;
 
     this.thisTurnEntries.push({
       slotId,

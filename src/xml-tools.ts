@@ -1,8 +1,9 @@
 import type { OutputFormatId } from './formats.js';
 import type { ToolCall } from './types.js';
 
-import { renderXmlNextTemplate, renderXmlPastTemplate } from './llm-messages.js';
-import { truncateToBytes } from './truncation.js';
+import { buildXmlNextEvents, buildXmlNextNotice } from './llm-messages-xml-next.js';
+import { renderXmlPastTemplate } from './llm-messages.js';
+import { TRUNCATE_PREVIEW_BYTES, truncateToBytes } from './truncation.js';
 
 export interface XmlSlotTemplate {
   slotId: string;            // NONCE-0001 or NONCE-FINAL/PROGRESS
@@ -25,6 +26,7 @@ export interface XmlNextPayload {
   contextPercentUsed: number;
   // Whether external tools (MCP, REST, etc.) are available
   hasExternalTools: boolean;
+  forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion';
 }
 
 export interface XmlPastEntry {
@@ -142,7 +144,19 @@ export function buildToolCallFromParsed(slot: ParsedXmlSlot, toolCallId: string)
 }
 
 export function renderXmlNext(payload: XmlNextPayload): string {
-  return renderXmlNextTemplate(payload);
+  const { events } = buildXmlNextEvents({
+    nonce: payload.nonce,
+    turn: payload.turn,
+    maxTurns: payload.maxTurns,
+    attempt: payload.attempt,
+    maxRetries: payload.maxRetries,
+    contextPercentUsed: payload.contextPercentUsed,
+    expectedFinalFormat: payload.expectedFinalFormat,
+    hasExternalTools: payload.hasExternalTools,
+    taskStatusToolEnabled: payload.taskStatusToolEnabled,
+    forcedFinalTurnReason: payload.forcedFinalTurnReason,
+  }, 0);
+  return buildXmlNextNotice(events);
 }
 
 export function renderXmlPast(past: XmlPastPayload): string {
@@ -152,8 +166,8 @@ export function renderXmlPast(past: XmlPastPayload): string {
       tool: entry.tool,
       status: entry.status,
       durationText: entry.durationMs !== undefined ? ` duration="${(entry.durationMs / 1000).toFixed(2)}s"` : undefined,
-      request: truncateToBytes(entry.request, 4096) ?? entry.request,
-      response: truncateToBytes(entry.response, 4096) ?? entry.response,
+      request: truncateToBytes(entry.request, TRUNCATE_PREVIEW_BYTES) ?? entry.request,
+      response: truncateToBytes(entry.response, TRUNCATE_PREVIEW_BYTES) ?? entry.response,
     })),
   };
   return renderXmlPastTemplate(truncated);

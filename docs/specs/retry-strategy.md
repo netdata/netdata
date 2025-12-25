@@ -121,10 +121,10 @@ When a final report fails schema validation:
 **Trigger**: Tool call has malformed JSON parameters
 
 **Behavior**:
-1. Drop invalid tool call
-2. Log warning: "Invalid tool call dropped due to malformed payload"
-3. Add TURN-FAILED guidance explaining the malformed tool payload
-4. Continue to next attempt
+1. Preserve the tool call with a sanitization marker (no drop)
+2. Log `ERR` with the full original payload for that tool call
+3. Short-circuit execution and return a tool failure response that includes the original payload
+4. Do **not** add TURN-FAILED for malformed tool payloads; continue to next attempt
 
 ## Provider Cycling
 
@@ -235,7 +235,7 @@ const fallbackWait = Math.min(Math.max(attempts * 1_000, RATE_LIMIT_MIN_WAIT_MS)
 
 ## Conversation Mutation During Retry
 
-- Retry guidance is persisted via TURN-FAILED user messages in the conversation history.
+- Retry guidance is persisted via TURN-FAILED user messages in the conversation history (except malformed tool payloads, which surface as tool failure responses instead).
 - Provider throttling and transport errors are **not** surfaced to the model; they are logged and handled by provider cycling/backoff.
 
 ## Business Logic Coverage (Verified 2025-12-23)
@@ -244,7 +244,7 @@ const fallbackWait = Math.min(Math.max(attempts * 1_000, RATE_LIMIT_MIN_WAIT_MS)
 - **Fallback retry directives**: When providers omit retry guidance, `buildFallbackRetryDirective` maps error types to deterministic actions (`retry`, `skip-provider`, `abort`) and optional backoff windows (`src/session-turn-runner.ts`).
 - **Backoff cancellation**: All waits use `sleepWithAbort`, which returns `'aborted_stop'`/`'aborted_cancel'` markers so the loop can exit instead of sleeping when users stop sessions (`src/session-turn-runner.ts`).
 - **Retry-after harmonization**: Provider metadata can supply `retryAfterMs`; the loop selects the maximum observed delay per cycle and logs it before waiting (`src/session-turn-runner.ts`).
-- **TURN-FAILED persistence**: All retry-triggering invalid responses push TURN-FAILED guidance into the conversation so the model sees the failure reasons on subsequent attempts.
+- **TURN-FAILED persistence**: Retry-triggering invalid responses push TURN-FAILED guidance into the conversation so the model sees the failure reasons on subsequent attempts (malformed tool payloads are excluded and are returned as tool failures).
 
 ## Configuration Effects
 
@@ -323,9 +323,10 @@ const fallbackWait = Math.min(Math.max(attempts * 1_000, RATE_LIMIT_MIN_WAIT_MS)
    - Location: `src/session-turn-runner.ts`
 
 6. **Invalid tool parameter retry**:
-   - Logs "Invalid tool call dropped due to malformed payload"
-   - Adds TURN-FAILED guidance (`TOOL_CALL_MALFORMED`)
-   - Continues to next attempt without adding invalid call
+   - Logs `ERR` with the full original payload for each invalid tool call
+   - Returns a tool failure response that echoes the original payload
+   - Does **not** add TURN-FAILED for malformed tool payloads
+   - Continues to next attempt while preserving the sanitized tool call in history
    - Location: `src/session-turn-runner.ts`
 
 ## Test Coverage

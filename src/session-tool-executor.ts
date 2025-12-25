@@ -1,4 +1,6 @@
-import Ajv from 'ajv';
+import crypto from 'node:crypto';
+
+import Ajv, { type Ajv as AjvClass, type Options as AjvOptions, type ValidateFunction } from 'ajv';
 
 import type { FinalReportManager } from './final-report-manager.js';
 import type { ToolsOrchestrator } from './tools/tools.js';
@@ -9,12 +11,11 @@ import type {
   MCPTool,
 } from './types.js';
 import type { XmlToolTransport } from './xml-transport.js';
-import type { Ajv as AjvClass, Options as AjvOptions, ValidateFunction } from 'ajv';
 
 import { ContextGuard } from './context-guard.js';
 import { TOOL_NO_OUTPUT, unknownToolFailureMessage } from './llm-messages.js';
 import { addSpanEvent } from './telemetry/index.js';
-import { truncateToBytes } from './truncation.js';
+import { TRUNCATE_PREVIEW_BYTES, truncateToBytes } from './truncation.js';
 import {
   clampToolName,
   estimateMessagesBytes,
@@ -27,6 +28,34 @@ type AjvInstance = AjvClass;
 type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
 type AjvValidateFn = ValidateFunction;
 const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
+
+export const TOOL_SANITIZATION_FAILED_KEY = '__sanitization_failed';
+export const TOOL_SANITIZATION_REASON_KEY = '__sanitization_reason';
+export const TOOL_SANITIZATION_ORIGINAL_PAYLOAD_KEY = '__sanitization_original_payload';
+export const TOOL_SANITIZATION_ORIGINAL_PAYLOAD_TRUNCATED_KEY = '__sanitization_original_payload_truncated';
+export const TOOL_SANITIZATION_ORIGINAL_PAYLOAD_SHA256_KEY = '__sanitization_original_payload_sha256';
+
+export interface SanitizationFailureDetails {
+  reason: string;
+  originalPayload: string;
+  truncated: boolean;
+  sha256?: string;
+}
+
+export const readSanitizationFailureDetails = (parameters: Record<string, unknown>): SanitizationFailureDetails | undefined => {
+  if (parameters[TOOL_SANITIZATION_FAILED_KEY] !== true) {
+    return undefined;
+  }
+  const reasonRaw = parameters[TOOL_SANITIZATION_REASON_KEY];
+  const payloadRaw = parameters[TOOL_SANITIZATION_ORIGINAL_PAYLOAD_KEY];
+  const truncatedRaw = parameters[TOOL_SANITIZATION_ORIGINAL_PAYLOAD_TRUNCATED_KEY];
+  const shaRaw = parameters[TOOL_SANITIZATION_ORIGINAL_PAYLOAD_SHA256_KEY];
+  const reason = typeof reasonRaw === 'string' && reasonRaw.trim().length > 0 ? reasonRaw.trim() : 'invalid tool call payload';
+  const originalPayload = typeof payloadRaw === 'string' ? payloadRaw : '[missing original payload]';
+  const truncated = truncatedRaw === true;
+  const sha256 = typeof shaRaw === 'string' && shaRaw.trim().length > 0 ? shaRaw.trim() : undefined;
+  return { reason, originalPayload, truncated, sha256 };
+};
 
 export interface ToolExecutionState {
   toolFailureMessages: Map<string, string>;
@@ -162,7 +191,79 @@ export class SessionToolExecutor {
         throw new Error('canceled');
       }
 
+      const callId =
+        typeof options?.toolCallId === 'string' &&
+        options.toolCallId.length > 0
+          ? options.toolCallId
+          : undefined;
       let effectiveToolName = sanitizeToolName(toolName);
+
+      const recordXmlEntry = (
+        status: 'ok' | 'failed',
+        response: string,
+        latency: number
+      ): void => {
+        if (this.xmlTransport !== undefined) {
+          this.xmlTransport.recordToolResult(
+            effectiveToolName,
+            parameters,
+            status,
+            response,
+            latency,
+            options?.toolCallId
+          );
+        }
+      };
+
+      const safeStringify = (value: unknown): string => {
+        if (typeof value === 'string') return value;
+        try {
+          return JSON.stringify(value);
+        } catch {
+          return String(value);
+        }
+      };
+
+      const buildSanitizationFailureDetail = (details: SanitizationFailureDetails): string => {
+        const truncationNote = details.truncated
+          ? ` (truncated${details.sha256 !== undefined ? `, sha256=${details.sha256}` : ''})`
+          : '';
+        return `invalid tool call payload. ${details.reason}. Original payload${truncationNote}: ${details.originalPayload}`;
+      };
+
+      const isPlainObject = (value: unknown): value is Record<string, unknown> => (
+        value !== null && typeof value === 'object' && !Array.isArray(value)
+      );
+      const sanitizationFailure = (() => {
+        if (!isPlainObject(parameters)) {
+          const payload = safeStringify(parameters);
+          const truncated = truncateToBytes(payload, TRUNCATE_PREVIEW_BYTES);
+          const fullPayload = truncated ?? payload;
+          const needsHash = truncated !== undefined && truncated !== payload;
+          const sha256 = needsHash
+            ? crypto.createHash('sha256').update(payload, 'utf8').digest('hex')
+            : undefined;
+          return {
+            reason: 'parameters must be a JSON object',
+            originalPayload: fullPayload,
+            truncated: needsHash,
+            sha256,
+          };
+        }
+        return readSanitizationFailureDetails(parameters);
+      })();
+
+      if (sanitizationFailure !== undefined) {
+        const renderedFailure = `(tool failed: ${buildSanitizationFailureDetail(sanitizationFailure)})`;
+        if (callId !== undefined) {
+          state.toolFailureMessages.set(callId, renderedFailure);
+        } else {
+          state.toolFailureFallbacks.push(renderedFailure);
+        }
+        recordXmlEntry('failed', renderedFailure, 0);
+        return renderedFailure;
+      }
+
       const shouldAttemptCorrection = !effectiveToolName.includes('__');
       let resolvedCorrection: string | undefined;
       if (shouldAttemptCorrection) {
@@ -191,29 +292,6 @@ export class SessionToolExecutor {
         effectiveToolName === this.sessionContext.finalReportToolName ||
         effectiveToolName === 'final_report';
       const isProgressTool = effectiveToolName === 'agent__task_status';
-      const callId =
-        typeof options?.toolCallId === 'string' &&
-        options.toolCallId.length > 0
-          ? options.toolCallId
-          : undefined;
-
-      const recordXmlEntry = (
-        status: 'ok' | 'failed',
-        response: string,
-        latency: number
-      ): void => {
-        if (this.xmlTransport !== undefined) {
-          this.xmlTransport.recordToolResult(
-            effectiveToolName,
-            parameters,
-            status,
-            response,
-            latency,
-            options?.toolCallId
-          );
-        }
-      };
-
       if (isFinalReportTool) {
         this.finalReportManager.incrementAttempts();
         const nestedCalls = this.parseNestedCallsFromFinalReport(

@@ -16,6 +16,7 @@ const MARKER_OVERHEAD = 50;
 // Minimum payload size for truncation - below this, truncation is not attempted
 const MIN_PAYLOAD_BYTES = 512;
 const MIN_JSON_STRING_BYTES = 128; // Minimum string size for JSON truncation
+export const TRUNCATE_PREVIEW_BYTES = 4096;
 
 // Middle dot character for marker (U+00B7)
 const MIDDLE_DOT = '·';

@@ -98,7 +98,7 @@ for turn = 1 to maxTurns:
   while attempts < maxRetries and not successful:
     select provider/model from targets (round-robin)
     check context guard
-    inject final turn instruction if needed
+    XML-NEXT carries final-turn instruction if needed (no other system notices)
 
     execute single turn (LLM request)
     sanitize messages

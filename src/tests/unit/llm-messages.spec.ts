@@ -3,10 +3,10 @@ import { describe, expect, it } from 'vitest';
 import type { ResponseMessage } from '../../llm-providers/base.js';
 import type { ConversationMessage, TokenUsage, TurnRequest, TurnResult } from '../../types.js';
 
+import { renderTurnFailedSlug } from '../../llm-messages-turn-failed.js';
 import {
   XML_WRAPPER_CALLED_AS_TOOL_RESULT,
   isXmlFinalReportTagName,
-  turnFailedXmlWrapperAsTool,
 } from '../../llm-messages.js';
 import { BaseLLMProvider } from '../../llm-providers/base.js';
 
@@ -43,7 +43,7 @@ describe('llm-messages helpers', () => {
   });
 
   it('builds TURN-FAILED message with nonce and format', () => {
-    const message = turnFailedXmlWrapperAsTool('cafebabe', 'markdown');
+    const message = renderTurnFailedSlug('xml_wrapper_as_tool', 'wrapper: <ai-agent-cafebabe-FINAL format=\"markdown\">');
     expect(message).toContain('ai-agent-cafebabe-FINAL');
     expect(message).toContain('format="markdown"');
   });

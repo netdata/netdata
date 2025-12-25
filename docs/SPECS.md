@@ -23,18 +23,18 @@ Our conversation schemas, reasoning payloads, tool definitions, and streaming ex
 - The agent is fully agentic: the LLM decides when to call tools, with repeated invocations across multiple turns.
 - Tool calls are preserved as assistant messages with `tool_calls` (id, name, arguments). Tool results are preserved as `tool` role messages with `tool_call_id`. When the model calls an unqualified tool name that exactly matches a tool suffix and the payload validates against that tool’s schema, the agent auto-corrects the tool name, logs a warning, and records the corrected name in history. Missing tool results injected by the SDK are tagged with `metadata.injectedToolResult=true` and `metadata.injectedReason`; auto-correction only re-executes when the reason is `tool_missing`.
 - The next turn always includes all prior assistant/user/tool messages in order, giving the LLM full transparency into requests and responses.
-- A maximum tool-turns cap (`defaults.maxTurns`) is enforced. On the final allowed turn, tools are disabled and a single user message is appended instructing the LLM to conclude using existing tool results (see Hardcoded Strings). This guarantees a final answer without an error.
+- A maximum tool-turns cap (`defaults.maxTurns`) is enforced. On the final allowed turn, tools are disabled and XML-NEXT carries the final-turn instruction; no additional system notices are injected outside XML-NEXT and TURN-FAILED. This guarantees a final answer without an error.
 - Stop-reason handling: if the upstream stop reason is exactly `refusal` or `content-filter`, the turn is treated as a hard failure (`invalid_response`); the truncated response is discarded, and the retry/fallback flow takes over.
 
 ## Hardcoded Strings (LLM-facing)
 
-LLM-facing strings are centralized in `src/llm-messages.ts` and the XML templates it renders (XML-NEXT/XML-PAST). This includes:
-- Final-turn instructions
+LLM-facing strings are centralized in `src/llm-messages.ts`, `src/llm-messages-xml-next.ts`, and `src/llm-messages-turn-failed.ts` (plus XML templates they render). This includes:
+- XML-NEXT notices (per-turn instructions + final-turn guidance)
 - TURN-FAILED guidance
 - Tool-result failure text for malformed tool calls
 - XML protocol notices and examples
 
-There is no separate “short list” of hardcoded strings; treat `src/llm-messages.ts` as the canonical source of truth.
+There is no separate “short list” of hardcoded strings; treat these files as the canonical source of truth.
 
 ## Command Line Interface
 

@@ -11,59 +11,43 @@
  */
 import crypto from 'node:crypto';
 
-import type { ContextGuardBlockedEntry, ContextGuardEvaluation } from './context-guard.js';
-import type { FinalReportManager, FinalReportSource, PendingFinalReportPayload } from './final-report-manager.js';
 import type { OutputFormatId } from './formats.js';
 import type { LLMClient } from './llm-client.js';
 import type { SessionProgressReporter } from './session-progress-reporter.js';
-import type { SessionToolExecutor, ToolExecutionState } from './session-tool-executor.js';
 import type { SessionNode, SessionTreeBuilder } from './session-tree.js';
 import type { SubAgentRegistry } from './subagent-registry.js';
-import type { LeakedToolFallbackResult } from './tool-call-fallback.js';
 import type { ToolsOrchestrator } from './tools/tools.js';
 import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, CallbackMeta, Configuration, ConversationMessage, LogDetailValue, LogEntry, MCPTool, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, ToolCall, TurnResult, TurnRetryDirective, TurnStatus } from './types.js';
-import type { XmlToolTransport } from './xml-transport.js';
 
-import { ContextGuard } from './context-guard.js';
-import { FINAL_REPORT_FORMAT_VALUES } from './final-report-manager.js';
+import { ContextGuard, type ContextGuardBlockedEntry, type ContextGuardEvaluation } from './context-guard.js';
+import { FINAL_REPORT_FORMAT_VALUES, type FinalReportManager, type FinalReportSource, type PendingFinalReportPayload } from './final-report-manager.js';
+import { buildTurnFailedNotice, type TurnFailedNoticeEvent, type TurnFailedSlug } from './llm-messages-turn-failed.js';
+import { buildXmlNextEvents, buildXmlNextNotice, type XmlNextNoticeEvent } from './llm-messages-xml-next.js';
 import {
-  CONTEXT_FINAL_MESSAGE,
-  FINAL_REPORT_CONTENT_MISSING,
   FINAL_REPORT_JSON_REQUIRED,
   FINAL_REPORT_SLACK_MESSAGES_MISSING,
-  TURN_FAILED_EMPTY_RESPONSE,
-  TURN_FAILED_FINAL_TURN_NO_REPORT,
-  TURN_FAILED_REASONING_ONLY,
-  TURN_FAILED_REASONING_ONLY_FINAL,
-  TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT,
-  TURN_FAILED_TOOL_CALL_NOT_EXECUTED,
-  TURN_FAILED_TOOL_LIMIT_EXCEEDED,
-  TURN_FAILED_UNKNOWN_TOOL,
-  buildInvalidJsonFailure,
   buildSchemaMismatchFailure,
+  formatJsonParseHint,
   formatSchemaMismatchSummary,
-  turnFailedOutputTruncated,
-  turnFailedXmlWrapperAsTool,
-  MAX_TURNS_FINAL_MESSAGE,
-  TOOL_CALL_MALFORMED,
-  TOOL_NO_OUTPUT,
-  finalReportFormatMismatch,
-  finalReportSchemaValidationFailed,
-  toolMessageFallbackValidationFailed,
-  isXmlFinalReportTagName,
   isUnknownToolFailureMessage,
-  RETRY_EXHAUSTION_FINAL_MESSAGE,
-  TASK_STATUS_ONLY_FINAL_MESSAGE,
-  TASK_STATUS_COMPLETED_FINAL_MESSAGE,
-  toolReminderMessage,
-  turnFailedPrefix,
+  isXmlFinalReportTagName,
+  TOOL_NO_OUTPUT,
 } from './llm-messages.js';
+import {
+  TOOL_SANITIZATION_FAILED_KEY,
+  TOOL_SANITIZATION_ORIGINAL_PAYLOAD_KEY,
+  TOOL_SANITIZATION_ORIGINAL_PAYLOAD_SHA256_KEY,
+  TOOL_SANITIZATION_ORIGINAL_PAYLOAD_TRUNCATED_KEY,
+  TOOL_SANITIZATION_REASON_KEY,
+  type SessionToolExecutor,
+  type ToolExecutionState,
+} from './session-tool-executor.js';
 import { normalizeSlackMessages, parseSlackBlockKitPayload } from './slack-block-kit.js';
 import { addSpanAttributes, addSpanEvent, recordContextGuardMetrics, recordFinalReportMetrics, recordLlmMetrics, recordRetryCollapseMetrics, runWithSpan } from './telemetry/index.js';
-import { processLeakedToolCalls } from './tool-call-fallback.js';
-import { truncateToBytes } from './truncation.js';
+import { processLeakedToolCalls, type LeakedToolFallbackResult } from './tool-call-fallback.js';
+import { TRUNCATE_PREVIEW_BYTES, truncateToBytes } from './truncation.js';
 import { estimateMessagesBytes, formatToolRequestCompact, parseJsonValueDetailed, sanitizeToolName, warn } from './utils.js';
-import { XmlFinalReportFilter } from './xml-transport.js';
+import { XmlFinalReportFilter, type XmlToolTransport } from './xml-transport.js';
 
 const TOOL_FAILED_PREFIX = '(tool failed:';
 const TEXT_EXTRACTION_REMOTE_ID = 'agent:text-extraction';
@@ -133,8 +117,10 @@ interface TurnRunnerState {
   conversation: ConversationMessage[];
   logs: LogEntry[];
   accounting: AccountingEntry[];
-  turnFailureReasons: TurnFailureEntry[];
-  turnFailureCounter: number;
+  turnFailedEvents: TurnFailedNoticeEvent[];
+  turnFailedCounter: number;
+  xmlNextEvents: XmlNextNoticeEvent[];
+  xmlNextCounter: number;
   toolFailureMessages: Map<string, string>;
   toolFailureFallbacks: string[];
   toolNameCorrections: Map<string, string>;
@@ -182,21 +168,7 @@ const SLACK_BLOCK_KIT_FORMAT = 'slack-block-kit';
 const FINAL_REPORT_TOOL_ALIASES = new Set(['agent__final_report', 'agent-final-report']);
 const RETRY_ACTION_SKIP_PROVIDER = 'skip-provider';
 const STREAMED_OUTPUT_DEDUPE_MAX_CHARS = 200_000;
-type TurnFailurePriority = 'critical' | 'high' | 'normal';
 
-interface TurnFailureEntry {
-    reason: string;
-    priority: TurnFailurePriority;
-    order: number;
-}
-
-const TURN_FAILURE_PRIORITY_WEIGHT: Record<TurnFailurePriority, number> = {
-    critical: 3,
-    high: 2,
-    normal: 1,
-};
-
-const MAX_TURN_FAILURE_REASONS = 2;
 export { FINAL_REPORT_TOOL };
 /**
  * TurnRunner encapsulates all turn iteration logic
@@ -217,8 +189,10 @@ export class TurnRunner {
             conversation: [],
             logs: [],
             accounting: [],
-            turnFailureReasons: [],
-            turnFailureCounter: 0,
+            turnFailedEvents: [],
+            turnFailedCounter: 0,
+            xmlNextEvents: [],
+            xmlNextCounter: 0,
             toolFailureMessages: new Map<string, string>(),
             toolFailureFallbacks: [],
             toolNameCorrections: new Map<string, string>(),
@@ -325,8 +299,10 @@ export class TurnRunner {
                 return this.finalizeGracefulStopSession(conversation, logs, accounting);
             }
             this.ctx.xmlTransport.beginTurn();
-            this.state.turnFailureReasons = [];
-            this.state.turnFailureCounter = 0;
+            this.state.turnFailedEvents = [];
+            this.state.turnFailedCounter = 0;
+            this.state.xmlNextEvents = [];
+            this.state.xmlNextCounter = 0;
             this.state.currentTurn = currentTurn;
             this.callbacks.setCurrentTurn(currentTurn);
             this.logTurnStart(currentTurn);
@@ -558,6 +534,7 @@ export class TurnRunner {
                 }
                 try {
                     // Build per-attempt conversation with optional guidance injection
+                    this.flushTurnFailureReasons(conversation);
                     let attemptConversation = [...conversation];
                     const allTools = this.ctx.toolsOrchestrator?.listTools() ?? [];
                     // Calculate context window usage percentage
@@ -568,6 +545,24 @@ export class TurnRunner {
                     const contextWindow = ctxGuard.getTargets()[0]?.contextWindow ?? ContextGuard.DEFAULT_CONTEXT_WINDOW_TOKENS;
                     const contextPercentUsed = Math.min(100, Math.round((currentTokens + pendingTokens + newTokens) * 100 / contextWindow));
 
+                    const xmlNextForcedReason = isFinalTurn
+                        ? (this.forcedFinalTurnReason ?? 'max_turns')
+                        : undefined;
+                    const { events: xmlNextEvents, nextOrder } = buildXmlNextEvents({
+                        nonce: this.ctx.xmlTransport.getSessionNonce(),
+                        turn: currentTurn,
+                        maxTurns,
+                        attempt: attempts + 1,
+                        maxRetries,
+                        contextPercentUsed,
+                        expectedFinalFormat: this.ctx.resolvedFormat ?? 'markdown',
+                        hasExternalTools: allTools.some((tool) => tool.name !== FINAL_REPORT_TOOL),
+                        taskStatusToolEnabled: this.ctx.taskStatusToolEnabled,
+                        forcedFinalTurnReason: xmlNextForcedReason,
+                    }, this.state.xmlNextCounter);
+                    this.state.xmlNextEvents = xmlNextEvents;
+                    this.state.xmlNextCounter = nextOrder;
+                    const xmlNextContent = buildXmlNextNotice(xmlNextEvents);
                     const xmlResult = this.ctx.xmlTransport.buildMessages({
                         turn: currentTurn,
                         maxTurns,
@@ -580,46 +575,12 @@ export class TurnRunner {
                         attempt: attempts + 1,  // attempts is 0-based, but we want 1-based for display
                         maxRetries,
                         contextPercentUsed,
+                        forcedFinalTurnReason: xmlNextForcedReason,
+                        noticeContent: xmlNextContent,
                     });
                     if (xmlResult.pastMessage !== undefined)
                         attemptConversation.push(xmlResult.pastMessage);
                     attemptConversation.push(xmlResult.nextMessage);
-                    // On the last allowed attempt within this turn, nudge the model to use tools
-                    if ((attempts === maxRetries - 1) && currentTurn < (maxTurns - 1)) {
-                        const excludeProgress = this.ctx.taskStatusToolEnabled ? ' (excluding `agent__task_status`)' : '';
-                        attemptConversation.push({
-                            role: 'user',
-                            content: toolReminderMessage(excludeProgress)
-                        });
-                    }
-                    // Force the final-report instruction onto the conversation once we enter the last turn
-                    if (isFinalTurn) {
-                        let finalInstruction: string;
-                        switch (this.forcedFinalTurnReason) {
-                            case 'context':
-                                finalInstruction = CONTEXT_FINAL_MESSAGE;
-                                break;
-                            case 'max_turns':
-                                finalInstruction = MAX_TURNS_FINAL_MESSAGE;
-                                break;
-                            case 'task_status_completed':
-                                finalInstruction = TASK_STATUS_COMPLETED_FINAL_MESSAGE;
-                                break;
-                            case 'task_status_only':
-                                finalInstruction = TASK_STATUS_ONLY_FINAL_MESSAGE;
-                                break;
-                            case 'retry_exhaustion':
-                                finalInstruction = RETRY_EXHAUSTION_FINAL_MESSAGE;
-                                break;
-                            default:
-                                finalInstruction = MAX_TURNS_FINAL_MESSAGE;
-                        }
-                        attemptConversation.push({
-                            role: 'user',
-                            content: finalInstruction,
-                            metadata: { retryMessage: 'final-turn-instruction' },
-                        });
-                    }
                     if (isFinalTurn) {
                         let logReason: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion' = 'max_turns';
                         if (this.forcedFinalTurnReason === 'context') {
@@ -703,7 +664,7 @@ export class TurnRunner {
                 }
                     const turnResult = await this.executeSingleTurn(attemptConversation, provider, model, isFinalTurn, currentTurn, logs, accounting, lastShownThinkingHeaderTurn, attempts, maxRetries, sessionReasoningLevel, sessionReasoningValue ?? undefined);
                     lastTurnResult = turnResult;
-                    const { messages: sanitizedMessages, dropped: droppedInvalidToolCalls, finalReportAttempted } = this.sanitizeTurnMessages(turnResult.messages, { turn: currentTurn, provider, model, stopReason: turnResult.stopReason, maxOutputTokens: this.ctx.sessionConfig.maxOutputTokens });
+                    const { messages: sanitizedMessages, dropped: droppedInvalidToolCalls, finalReportAttempted, syntheticToolMessages } = this.sanitizeTurnMessages(turnResult.messages, { turn: currentTurn, provider, model, stopReason: turnResult.stopReason, maxOutputTokens: this.ctx.sessionConfig.maxOutputTokens });
                     this.state.droppedInvalidToolCalls = droppedInvalidToolCalls;
                     // Mark turnResult with finalReportAttempted flag but defer collapseRemainingTurns
                     // until we know if the final report was actually accepted (done later in the flow)
@@ -723,6 +684,31 @@ export class TurnRunner {
                         message.content = override;
                         this.state.toolFailureMessages.delete(callId);
                     });
+                    if (syntheticToolMessages.length > 0) {
+                        const existingToolResults = new Set<string>();
+                        sanitizedMessages.forEach((message) => {
+                            if (message.role !== 'tool')
+                                return;
+                            const callId = message.toolCallId;
+                            if (typeof callId === 'string' && callId.length > 0) {
+                                existingToolResults.add(callId);
+                            }
+                        });
+                        syntheticToolMessages.forEach((message) => {
+                            const callId = message.toolCallId;
+                            if (typeof callId !== 'string' || callId.length === 0)
+                                return;
+                            if (existingToolResults.has(callId))
+                                return;
+                            const override = this.state.toolFailureMessages.get(callId);
+                            if (override !== undefined) {
+                                message.content = override;
+                                this.state.toolFailureMessages.delete(callId);
+                            }
+                            sanitizedMessages.push(message);
+                            existingToolResults.add(callId);
+                        });
+                    }
                     this.applyToolNameCorrections(sanitizedMessages);
                     if (this.state.toolFailureFallbacks.length > 0) {
                         sanitizedMessages.forEach((message) => {
@@ -819,7 +805,9 @@ export class TurnRunner {
                     }
                     if (xmlWrapperCalledAsTool) {
                         const formatValue = this.ctx.resolvedFormat ?? 'markdown';
-                        this.addTurnFailure(turnFailedXmlWrapperAsTool(sessionNonce, formatValue), { priority: 'high' });
+                        const wrapperTag = `ai-agent-${sessionNonce}-FINAL`;
+                        const reason = `wrapper: <${wrapperTag} format="${formatValue}">`;
+                        this.addTurnFailure('xml_wrapper_as_tool', reason);
                         collapseRemainingTurns('xml_wrapper_as_tool');
                     }
                     // Record accounting for every attempt
@@ -1135,7 +1123,8 @@ export class TurnRunner {
                                 const formatCandidate = formatParam ?? expectedFormat;
                                 const finalFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === formatCandidate) ?? expectedFormat;
                                 if (finalFormat !== expectedFormat) {
-                                    this.addTurnFailure(finalReportFormatMismatch(expectedFormat, formatCandidate), { priority: 'high' });
+                                    const reason = `expected \"${expectedFormat}\", received \"${formatCandidate}\".`;
+                                    this.addTurnFailure('final_report_format_mismatch', reason);
                                     this.logFinalReportDump(currentTurn, params, `format mismatch: expected ${expectedFormat}, got ${formatCandidate}`, rawContent);
                                     return false;
                                 }
@@ -1155,7 +1144,7 @@ export class TurnRunner {
                                     // Whatever the model returns is passed through unchanged
                                     finalContent = rawPayload ?? contentParam ?? '';
                                     if (finalContent.length === 0) {
-                                        this.addTurnFailure(FINAL_REPORT_CONTENT_MISSING, { priority: 'high' });
+                                        this.addTurnFailure('final_report_content_missing');
                                         this.logFinalReportDump(currentTurn, params, 'empty sub-agent payload', rawContent);
                                         return false;
                                     }
@@ -1191,7 +1180,12 @@ export class TurnRunner {
                                         contentJson = contentJsonCandidate as Record<string, unknown>;
                                     }
                                     if (contentJson === undefined) {
-                                        const parseHint = buildInvalidJsonFailure(FINAL_REPORT_JSON_REQUIRED, jsonParseError ?? 'missing_json_payload');
+                                        const safeJsonParseError: string | undefined = typeof jsonParseError === 'string' ? jsonParseError : undefined;
+                                        const parseErrorValue: string = typeof safeJsonParseError === 'string' ? safeJsonParseError : 'missing_json_payload';
+                                        const parseErrorHint: string = formatJsonParseHint(parseErrorValue);
+                                        const finalReportJsonRequired = FINAL_REPORT_JSON_REQUIRED;
+                                        const parseHint = `${finalReportJsonRequired} invalid_json: ${parseErrorHint}`;
+                                        const parseReason = `invalid_json: ${parseErrorHint}`;
                                         this.log({
                                             timestamp: Date.now(),
                                             severity: 'ERR' as const,
@@ -1203,9 +1197,9 @@ export class TurnRunner {
                                             fatal: false,
                                             message: `final_report(json) ${parseHint}`
                                         });
-                                        this.addTurnFailure(parseHint, { priority: 'high' });
+                                        this.addTurnFailure('final_report_json_required', parseReason);
                                         this.logFinalReportDump(currentTurn, params, 'expected JSON content', rawContent);
-                                        const failureMessage = buildInvalidJsonFailure('final_report(json) requires `content_json` (object).', jsonParseError ?? 'missing_json_payload');
+                                        const failureMessage = `final_report(json) requires \`content_json\` (object). invalid_json: ${parseErrorHint}`;
                                         sanitizedMessages.push({
                                             role: 'tool',
                                             content: `${TOOL_FAILED_PREFIX} ${failureMessage})`,
@@ -1243,7 +1237,12 @@ export class TurnRunner {
                                     }
 
                                     if ((messagesArray === undefined || messagesArray.length === 0) && parsedSlack.fallbackLooksInvalid) {
-                                        const failureMessage = buildInvalidJsonFailure(FINAL_REPORT_SLACK_MESSAGES_MISSING, parsedSlack.error);
+                                        const slackError: string | undefined = typeof parsedSlack.error === 'string' ? parsedSlack.error : undefined;
+                                        const slackErrorValue = slackError;
+                                        const slackErrorHint: string = formatJsonParseHint(slackErrorValue);
+                                        const finalReportSlackMissing = FINAL_REPORT_SLACK_MESSAGES_MISSING;
+                                        const failureMessage = `${finalReportSlackMissing} invalid_json: ${slackErrorHint}`;
+                                        const parseReason = `invalid_json: ${slackErrorHint}`;
                                         this.log({
                                             timestamp: Date.now(),
                                             severity: 'ERR' as const,
@@ -1255,7 +1254,7 @@ export class TurnRunner {
                                             fatal: false,
                                             message: `final_report(slack-block-kit) ${failureMessage}`
                                         });
-                                        this.addTurnFailure(failureMessage, { priority: 'high' });
+                                        this.addTurnFailure('final_report_slack_messages_missing', parseReason);
                                         this.logFinalReportDump(currentTurn, params, 'expected messages array', rawContent);
                                         this.state.finalReportToolFailedThisTurn = true;
                                         this.state.finalReportToolFailedEver = true;
@@ -1292,7 +1291,7 @@ export class TurnRunner {
                                             fatal: false,
                                             message: 'final_report(slack-block-kit) requires `messages` or non-empty `content`'
                                         });
-                                        this.addTurnFailure(FINAL_REPORT_SLACK_MESSAGES_MISSING, { priority: 'high' });
+                                        this.addTurnFailure('final_report_slack_messages_missing');
                                         this.logFinalReportDump(currentTurn, params, 'expected messages array', rawContent);
                                         this.state.finalReportToolFailedThisTurn = true;
                                         this.state.finalReportToolFailedEver = true;
@@ -1310,7 +1309,7 @@ export class TurnRunner {
                                         const failureMessage = 'final_report(json) requires `content_json` (object).';
                                         const failureToolMessage = `${TOOL_FAILED_PREFIX} ${failureMessage})`;
                                         setFinalReportFailureMessage(failureToolMessage);
-                                        this.addTurnFailure(FINAL_REPORT_CONTENT_MISSING, { priority: 'high' });
+                                        this.addTurnFailure('final_report_content_missing');
                                         this.state.finalReportToolFailedThisTurn = true;
                                         this.state.finalReportToolFailedEver = true;
                                         toolFailureDetected = true;
@@ -1323,7 +1322,7 @@ export class TurnRunner {
                                         const failureMessage = 'final_report requires non-empty report_content.';
                                         const failureToolMessage = `${TOOL_FAILED_PREFIX} ${failureMessage})`;
                                         setFinalReportFailureMessage(failureToolMessage);
-                                        this.addTurnFailure(FINAL_REPORT_CONTENT_MISSING, { priority: 'high' });
+                                        this.addTurnFailure('final_report_content_missing');
                                         this.state.finalReportToolFailedThisTurn = true;
                                         this.state.finalReportToolFailedEver = true;
                                         toolFailureDetected = true;
@@ -1373,7 +1372,7 @@ export class TurnRunner {
                                     });
                                     setFinalReportFailureMessage(`${TOOL_FAILED_PREFIX} ${failureMessage}`);
                                     const schemaSummary = formatSchemaMismatchSummary(errs);
-                                    this.addTurnFailure(finalReportSchemaValidationFailed(schemaSummary), { priority: 'high' });
+                                    this.addTurnFailure('final_report_schema_validation_failed', schemaSummary);
                                     this.state.finalReportToolFailedThisTurn = true;
                                     this.state.finalReportToolFailedEver = true;
                                     this.state.finalReportSchemaFailed = true;
@@ -1395,32 +1394,12 @@ export class TurnRunner {
                                 }
                             }
                         }
-                        if (droppedInvalidToolCalls > 0) {
-                            const warnEntry = {
-                                timestamp: Date.now(),
-                                severity: 'WRN' as const,
-                                turn: currentTurn,
-                                subturn: 0,
-                                direction: 'response' as const,
-                                type: 'llm' as const,
-                                remoteIdentifier: REMOTE_SANITIZER,
-                                fatal: false,
-                                message: `Dropped ${String(droppedInvalidToolCalls)} invalid tool call(s) due to malformed payload. Will retry.`,
-                            };
-                            this.log(warnEntry);
-                            this.addTurnFailure(TOOL_CALL_MALFORMED, { priority: 'high' });
-                            lastError = 'invalid_response: malformed_tool_call';
-                            lastErrorType = 'invalid_response';
-                            if (finalReportAttempted) {
-                                collapseRemainingTurns('final_report_attempt');
-                            }
-                        }
                         // Synthetic error: success with content but no tools and no final_report
                         if (this.finalReport === undefined) {
                         if (!sanitizedHasToolCalls && sanitizedHasText) {
                             lastError = 'invalid_response: content_without_tools_or_final';
                             lastErrorType = 'invalid_response';
-                            this.addTurnFailure(TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT);
+                            this.addTurnFailure('content_without_tools_or_report');
                             textWithoutToolsFailureAdded = true;
                         }
                         }
@@ -1433,7 +1412,9 @@ export class TurnRunner {
                         const appendTruncationFailure = (): void => {
                             if (!isStopReasonLength)
                                 return;
-                            this.addTurnFailure(turnFailedOutputTruncated(this.ctx.sessionConfig.maxOutputTokens), { priority: 'critical' });
+                            const tokenLimit = this.ctx.sessionConfig.maxOutputTokens;
+                            const reason = typeof tokenLimit === 'number' ? `token_limit: ${String(tokenLimit)}` : undefined;
+                            this.addTurnFailure('output_truncated', reason);
                         };
                         if (isEmptyWithoutTools && !isReasoningOnly) {
                             // Log warning and retry this turn on another provider/model
@@ -1446,14 +1427,13 @@ export class TurnRunner {
                                 maxRateLimitWaitMs = 0;
                             }
                             appendTruncationFailure();
-                            this.addTurnFailure(TURN_FAILED_EMPTY_RESPONSE);
-                            this.flushTurnFailureReasons(conversation);
+                            this.addTurnFailure('empty_response');
                             // do not mark turnSuccessful; continue retry loop
                             continue;
                         }
                         if (isReasoningOnly) {
-                            const reasoningOnlyFailure = isFinalTurn ? TURN_FAILED_REASONING_ONLY_FINAL : TURN_FAILED_REASONING_ONLY;
-                            this.addTurnFailure(reasoningOnlyFailure);
+                            const reasoningOnlySlug = isFinalTurn ? 'reasoning_only_final' : 'reasoning_only';
+                            this.addTurnFailure(reasoningOnlySlug);
                         }
                         if (isFinalTurn && this.finalReport === undefined && turnHadFinalReportAttempt && sanitizedHasToolCalls) {
                             const toolMessageFallback = sanitizedMessages.find((msg) => msg.role === 'tool' &&
@@ -1510,7 +1490,7 @@ export class TurnRunner {
                                         message: `tool_message_fallback validation failed: ${fallbackErrs}`,
                                     });
                                     const fallbackSummary = formatSchemaMismatchSummary(fallbackErrs);
-                                    this.addTurnFailure(toolMessageFallbackValidationFailed(fallbackSummary), { priority: 'critical' });
+                                    this.addTurnFailure('tool_message_fallback_schema_failed', fallbackSummary);
                                     // Set retry flags to ensure turn is not marked successful
                                     this.state.finalReportToolFailedThisTurn = true;
                                     this.state.finalReportToolFailedEver = true;
@@ -1523,20 +1503,6 @@ export class TurnRunner {
         const executionStats = turnResult.executionStats ?? { executedTools: 0, executedNonProgressBatchTools: 0, executedProgressBatchTools: 0, unknownToolEncountered: false };
         const hasNonProgressTools = executionStats.executedNonProgressBatchTools > 0;
         const hasProgressOnly = executionStats.executedProgressBatchTools > 0 && executionStats.executedNonProgressBatchTools === 0;
-        const appendToolExecutionFailures = (): void => {
-            if (!sanitizedHasToolCalls) {
-                return;
-            }
-            if (executionStats.unknownToolEncountered === true) {
-                this.addTurnFailure(TURN_FAILED_UNKNOWN_TOOL, { priority: 'high' });
-            }
-            if (this.state.toolLimitExceeded) {
-                this.addTurnFailure(TURN_FAILED_TOOL_LIMIT_EXCEEDED, { priority: 'high' });
-            }
-            if (executionStats.executedTools === 0 && executionStats.unknownToolEncountered !== true && !this.state.toolLimitExceeded && this.state.droppedInvalidToolCalls === 0) {
-                this.addTurnFailure(TURN_FAILED_TOOL_CALL_NOT_EXECUTED, { priority: 'high' });
-            }
-        };
         const nextProgressOnlyTurns = hasProgressOnly ? (this.state.consecutiveProgressOnlyTurns ?? 0) + 1 : 0;
         this.state.consecutiveProgressOnlyTurns = nextProgressOnlyTurns;
 
@@ -1566,7 +1532,6 @@ export class TurnRunner {
         syncFinalTurnFlags();
                         // Add new messages to conversation (skipped above for empty responses per CONTRACT)
                         conversation.push(...sanitizedMessages);
-                        this.flushTurnFailureReasons(conversation);
                         // If we encountered an invalid response and still have retries in this turn, retry
                         // Skip retry if progress tools succeeded (standalone task_status consumes the turn per TODO design)
                         if (!finalReportReady && !hasNonProgressTools && !hasProgressOnly && lastErrorType === 'invalid_response' && attempts < maxRetries) {
@@ -1576,7 +1541,6 @@ export class TurnRunner {
                             }
                             appendTruncationFailure();
                             logAttemptFailure();
-                            this.flushTurnFailureReasons(conversation);
                             continue;
                         }
                         // Check for retryFlags from turnResult (incompleteFinalReportDetected comes from tool execution)
@@ -1606,7 +1570,6 @@ export class TurnRunner {
                         // Note: empty response check moved earlier (before conversation.push) per CONTRACT
                         // No final report yet
                         if (isFinalTurn) {
-                            appendToolExecutionFailures();
                             lastError = 'invalid_response: final_turn_no_final_answer';
                             lastErrorType = 'invalid_response';
                             logAttemptFailure();
@@ -1615,22 +1578,19 @@ export class TurnRunner {
                                 maxRateLimitWaitMs = 0;
                             }
                             appendTruncationFailure();
-                            this.addTurnFailure(TURN_FAILED_FINAL_TURN_NO_REPORT, { priority: 'critical' });
-                            this.flushTurnFailureReasons(conversation);
+                            this.addTurnFailure('final_turn_no_report');
                             continue;
                         }
                         // Non-final turns: no tools executed (progress-only already succeeded above)
-                        appendToolExecutionFailures();
                         lastError = 'invalid_response: no_tools';
                         if (!sanitizedHasText && isReasoningOnly) {
-                            this.addTurnFailure(TURN_FAILED_REASONING_ONLY);
+                            this.addTurnFailure('reasoning_only');
                         } else if (sanitizedHasText && !textWithoutToolsFailureAdded) {
-                            this.addTurnFailure(TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT);
+                            this.addTurnFailure('content_without_tools_or_report');
                         }
                         lastErrorType = 'invalid_response';
                         appendTruncationFailure();
                         logAttemptFailure();
-                        this.flushTurnFailureReasons(conversation);
                         continue;
                     }
                     else {
@@ -2079,54 +2039,29 @@ export class TurnRunner {
         }
         addSpanEvent('context.guard', attributes);
     }
-    private addTurnFailure(reason: string, options?: { priority?: TurnFailurePriority }): void {
-        const trimmed = reason.trim();
-        if (trimmed.length === 0)
-            return;
-        const inferredPriority = (() => {
-            if (trimmed.startsWith('Your response was truncated (stopReason=length)'))
-                return 'critical';
-            return options?.priority ?? 'normal';
-        })();
-        const existing = this.state.turnFailureReasons.find((entry) => entry.reason === trimmed);
+    private addTurnFailure(slug: TurnFailedSlug, reason?: string): void {
+        const normalizedReason = typeof reason === 'string' ? reason.trim() : undefined;
+        const existing = this.state.turnFailedEvents.find((entry) => entry.slug === slug);
         if (existing !== undefined) {
-            if (TURN_FAILURE_PRIORITY_WEIGHT[inferredPriority] > TURN_FAILURE_PRIORITY_WEIGHT[existing.priority]) {
-                existing.priority = inferredPriority;
+            if ((existing.reason === undefined || existing.reason.trim().length === 0) && normalizedReason !== undefined && normalizedReason.length > 0) {
+                existing.reason = normalizedReason;
             }
             return;
         }
-        this.state.turnFailureReasons.push({
-            reason: trimmed,
-            priority: inferredPriority,
-            order: this.state.turnFailureCounter,
+        this.state.turnFailedEvents.push({
+            slug,
+            reason: normalizedReason,
+            order: this.state.turnFailedCounter,
         });
-        this.state.turnFailureCounter += 1;
-        if (this.state.turnFailureReasons.length <= MAX_TURN_FAILURE_REASONS)
-            return;
-        const sorted = [...this.state.turnFailureReasons].sort((a, b) => {
-            const priorityDiff = TURN_FAILURE_PRIORITY_WEIGHT[b.priority] - TURN_FAILURE_PRIORITY_WEIGHT[a.priority];
-            if (priorityDiff !== 0)
-                return priorityDiff;
-            return b.order - a.order;
-        });
-        const keep = new Set(sorted.slice(0, MAX_TURN_FAILURE_REASONS).map((entry) => entry.reason));
-        this.state.turnFailureReasons = this.state.turnFailureReasons.filter((entry) => keep.has(entry.reason));
+        this.state.turnFailedCounter += 1;
     }
     private flushTurnFailureReasons(conversation: ConversationMessage[]): void {
-        if (this.state.turnFailureReasons.length === 0)
+        if (this.state.turnFailedEvents.length === 0)
             return;
-        const ordered = [...this.state.turnFailureReasons].sort((a, b) => {
-            const priorityDiff = TURN_FAILURE_PRIORITY_WEIGHT[b.priority] - TURN_FAILURE_PRIORITY_WEIGHT[a.priority];
-            if (priorityDiff !== 0)
-                return priorityDiff;
-            return a.order - b.order;
-        });
-        const reasons = ordered
-            .slice(0, MAX_TURN_FAILURE_REASONS)
-            .map((entry) => entry.reason);
-        const feedback = turnFailedPrefix(reasons);
+        const feedback = buildTurnFailedNotice(this.state.turnFailedEvents);
         conversation.push({ role: 'user', content: feedback });
-        this.state.turnFailureReasons = [];
+        this.state.turnFailedEvents = [];
+        this.state.turnFailedCounter = 0;
     }
     private encodeSnapshotPayload(payload: unknown, format: string): { format: string; encoding: 'base64'; value: string } | undefined {
         try {
@@ -2306,6 +2241,7 @@ export class TurnRunner {
     failureInfo: { slugs: string[]; message: string; rawResponse?: string; rawResponseTruncated?: boolean },
     currentTurn: number
   ): AIAgentResult {
+    this.flushTurnFailureReasons(conversation);
     const toolFailureNote = this.state.finalReportToolFailedEver ? ' The final_report tool failed.' : '';
     const summary = `${failureInfo.message}; slugs=${failureInfo.slugs.join(',')}.${toolFailureNote}`;
     this.logFailureReport(summary, currentTurn, {
@@ -2911,17 +2847,64 @@ export class TurnRunner {
         this.state.toolNameCorrections.clear();
     }
 
-    private sanitizeTurnMessages(messages: ConversationMessage[], context: { turn: number; provider: string; model: string; stopReason?: string; maxOutputTokens?: number }): { messages: ConversationMessage[]; dropped: number; finalReportAttempted: boolean } {
+    private sanitizeTurnMessages(messages: ConversationMessage[], context: { turn: number; provider: string; model: string; stopReason?: string; maxOutputTokens?: number }): { messages: ConversationMessage[]; dropped: number; finalReportAttempted: boolean; syntheticToolMessages: ConversationMessage[] } {
         let dropped = 0;
         let finalReportAttempted = false;
+        const syntheticToolMessages: ConversationMessage[] = [];
         const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
+        const formatPayload = (value: unknown): string => {
+            if (typeof value === 'string') {
+                return value;
+            }
+            try {
+                return JSON.stringify(value);
+            } catch {
+                return String(value);
+            }
+        };
+        const buildSanitizationParams = (reason: string, payload: string): { params: Record<string, unknown>; failureDetail: string } => {
+            const truncated = truncateToBytes(payload, TRUNCATE_PREVIEW_BYTES);
+            const safePayload = truncated ?? payload;
+            const truncatedApplied = truncated !== undefined && truncated !== payload;
+            const sha256 = truncatedApplied
+                ? crypto.createHash('sha256').update(payload, 'utf8').digest('hex')
+                : undefined;
+            const truncationNote = truncatedApplied
+                ? ` (truncated${sha256 !== undefined ? `, sha256=${sha256}` : ''})`
+                : '';
+            const failureDetail = `invalid tool call payload. ${reason}. Original payload${truncationNote}: ${safePayload}`;
+            const params: Record<string, unknown> = {
+                [TOOL_SANITIZATION_FAILED_KEY]: true,
+                [TOOL_SANITIZATION_REASON_KEY]: reason,
+                [TOOL_SANITIZATION_ORIGINAL_PAYLOAD_KEY]: safePayload,
+                ...(truncatedApplied ? {
+                    [TOOL_SANITIZATION_ORIGINAL_PAYLOAD_TRUNCATED_KEY]: true,
+                    ...(sha256 !== undefined ? { [TOOL_SANITIZATION_ORIGINAL_PAYLOAD_SHA256_KEY]: sha256 } : {}),
+                } : {}),
+            };
+            return { params, failureDetail };
+        };
+        const logInvalidToolCall = (reason: string, payload: string, name: string, id: string): void => {
+            this.callbacks.log({
+                timestamp: Date.now(),
+                severity: 'ERR' as const,
+                turn: context.turn,
+                subturn: 0,
+                direction: 'response' as const,
+                type: 'llm' as const,
+                remoteIdentifier: REMOTE_SANITIZER,
+                fatal: false,
+                message: `Invalid tool call payload sanitized: ${reason}`,
+                details: { toolName: name, toolCallId: id, payload },
+            });
+        };
         const sanitized = messages.map((msg, _msgIndex) => {
             let rawToolCalls = msg.toolCalls;
             let parsedToolCalls;
             // XML transport parsing
             if (msg.role === 'assistant' && typeof msg.content === 'string') {
                 const parseResult = this.ctx.xmlTransport.parseAssistantMessage(msg.content, { turn: context.turn, resolvedFormat: this.ctx.resolvedFormat, stopReason: context.stopReason, maxOutputTokens: context.maxOutputTokens }, {
-                    onTurnFailure: (reason) => { this.addTurnFailure(reason); },
+                    onTurnFailure: (slug, reason) => { this.addTurnFailure(slug, reason); },
                     onLog: (entry) => {
                         this.callbacks.log({
                             timestamp: Date.now(),
@@ -2950,7 +2933,20 @@ export class TurnRunner {
                 const calls: { name: string; id: string; parameters: Record<string, unknown> }[] = [];
                 rawToolCalls.forEach((tc) => {
                     if (!isRecord(tc)) {
+                        const id = crypto.randomUUID();
+                        const payload = formatPayload(tc);
+                        const reason = 'tool_call_not_object';
                         dropped++;
+                        logInvalidToolCall(reason, payload, 'unknown', id);
+                        const sanitized = buildSanitizationParams(reason, payload);
+                        const failureMessage = `(tool failed: ${sanitized.failureDetail})`;
+                        this.state.toolFailureMessages.set(id, failureMessage);
+                        syntheticToolMessages.push({ role: 'tool', toolCallId: id, content: failureMessage });
+                        calls.push({
+                            name: 'unknown_tool',
+                            id,
+                            parameters: sanitized.params,
+                        });
                         return;
                     }
                     const name = typeof tc.name === 'string' ? tc.name : '';
@@ -2962,43 +2958,62 @@ export class TurnRunner {
                     if (isFinalReportCall) {
                         finalReportAttempted = true;
                     }
-                    let parameters = {};
+                    if (normalizedName.length === 0) {
+                        const payload = formatPayload(tc);
+                        const reason = 'tool_name_missing_or_invalid';
+                        dropped++;
+                        logInvalidToolCall(reason, payload, 'unknown', id);
+                        if (isFinalReportCall) {
+                            this.ctx.finalReportManager.incrementAttempts();
+                        }
+                        const sanitized = buildSanitizationParams(reason, payload);
+                        const failureMessage = `(tool failed: ${sanitized.failureDetail})`;
+                        this.state.toolFailureMessages.set(id, failureMessage);
+                        syntheticToolMessages.push({ role: 'tool', toolCallId: id, content: failureMessage });
+                        calls.push({
+                            name: 'unknown_tool',
+                            id,
+                            parameters: sanitized.params,
+                        });
+                        return;
+                    }
+                    let parameters: Record<string, unknown> = {};
+                    let invalidReason: string | undefined;
                     if (isRecord(tc.parameters)) {
                         parameters = tc.parameters;
                     }
                     else if (typeof tc.parameters === 'string') {
-                        try {
-                            const parsed = parseJsonValueDetailed(tc.parameters);
-                            if (parsed.value !== null && isRecord(parsed.value)) {
-                                parameters = parsed.value;
-                            }
-                            else {
-                                // JSON parsed but result is not an object (e.g., string, number, array)
-                                // Increment attempts for final_report calls that are being dropped
-                                if (isFinalReportCall) {
-                                    this.ctx.finalReportManager.incrementAttempts();
-                                }
-                                dropped++;
-                                return;
-                            }
+                        const parsed = (() => {
+                            try { return parseJsonValueDetailed(tc.parameters); } catch { return { value: null, error: 'parse_failed', repairs: [] }; }
+                        })();
+                        if (parsed.value !== null && isRecord(parsed.value)) {
+                            parameters = parsed.value;
                         }
-                        catch {
-                            // Increment attempts for final_report calls that are being dropped
-                            if (isFinalReportCall) {
-                                this.ctx.finalReportManager.incrementAttempts();
-                            }
-                            dropped++;
-                            return;
+                        else {
+                            invalidReason = `parameters_json_invalid: ${formatJsonParseHint(parsed.error ?? 'expected_json_object')}`;
                         }
                     }
                     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety for untrusted JSON
                     else if (tc.parameters !== undefined) {
-                        // Non-string, non-object parameters that aren't undefined are invalid (including null)
-                        // Increment attempts for final_report calls that are being dropped
+                        invalidReason = `parameters_type_invalid: ${typeof tc.parameters}`;
+                    }
+                    if (invalidReason !== undefined) {
+                        const payload = formatPayload(tc.parameters);
+                        const reason = `tool=${normalizedName}; ${invalidReason}`;
+                        dropped++;
+                        logInvalidToolCall(reason, payload, normalizedName, id);
                         if (isFinalReportCall) {
                             this.ctx.finalReportManager.incrementAttempts();
                         }
-                        dropped++;
+                        const sanitized = buildSanitizationParams(reason, payload);
+                        const failureMessage = `(tool failed: ${sanitized.failureDetail})`;
+                        this.state.toolFailureMessages.set(id, failureMessage);
+                        syntheticToolMessages.push({ role: 'tool', toolCallId: id, content: failureMessage });
+                        calls.push({
+                            name: normalizedName,
+                            id,
+                            parameters: sanitized.params,
+                        });
                         return;
                     }
                     calls.push({ name: normalizedName, id, parameters });
@@ -3011,7 +3026,7 @@ export class TurnRunner {
             }
             return result;
         });
-        return { messages: sanitized, dropped, finalReportAttempted };
+        return { messages: sanitized, dropped, finalReportAttempted, syntheticToolMessages };
     }
     private emitReasoningChunks(chunks: string[]): void {
         chunks.forEach((chunk: string) => {

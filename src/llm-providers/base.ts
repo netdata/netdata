@@ -1124,25 +1124,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     return tools.filter((t) => t.name !== 'agent__final_report');
   }
 
-  protected buildFinalTurnMessages(messages: ModelMessage[], isFinalTurn?: boolean): ModelMessage[] {
-    if (isFinalTurn === true) {
-      const content = [
-        '**CRITICAL**: You cannot collect more data!\n',
-        '\n',
-        'You MUST NOW provide your report.\n',
-        '\n',
-        'Review the collected data, check your instructions, and provide your final report as instructed:\n',
-        '\n',
-        '- If the data is completely irrelevant or missing, set `status` to `failure` and describe the situation.\n',
-        '- If the data is incomplete, set `status` to `partial` and describe what you found.\n',
-        '- If the data is rich, set `status` to `success` and provide a detailed report.\n',
-        '\n',
-        'Follow your instructions carefully, think hard, ensure your final report is accurate.\n',
-        '\n',
-        'Provide your final report NOW.'
-      ].join(' ');
-      return messages.concat({ role: 'user', content } as ModelMessage);
-    }
+  protected buildFinalTurnMessages(messages: ModelMessage[], _isFinalTurn?: boolean): ModelMessage[] {
     return messages;
   }
 

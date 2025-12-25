@@ -12,7 +12,7 @@ import type { StructuredLogEvent } from '../../logging/structured-log-event.js';
 import type { PreloadedSubAgent } from '../../subagent-registry.js';
 import type { MCPRestartFailedError, LogFn, SharedAcquireOptions, SharedRegistry, SharedRegistryHandle } from '../../tools/mcp-provider.js';
 import type { ToolExecuteResult } from '../../tools/types.js';
-import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogDetailValue, LogEntry, LogPayload, MCPServer, MCPServerConfig, MCPTool, ProviderConfig, ProviderReasoningValue, ReasoningLevel, TokenUsage, ToolCall, TurnRequest, TurnResult, TurnStatus, ToolChoiceMode } from '../../types.js';
+import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogDetailValue, LogEntry, LogPayload, MCPServer, MCPServerConfig, MCPTool, ProviderConfig, ProviderReasoningValue, ReasoningLevel, TokenUsage, TurnRequest, TurnResult, TurnStatus, ToolChoiceMode } from '../../types.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { ModelMessage, LanguageModel, ToolSet } from 'ai';
 import type { ChildProcess } from 'node:child_process';
@@ -26,7 +26,8 @@ import { parseFrontmatter, parseList, parsePairs } from '../../frontmatter.js';
 import { resolveIncludes } from '../../include-resolver.js';
 import { DEFAULT_TOOL_INPUT_SCHEMA } from '../../input-contract.js';
 import { LLMClient } from '../../llm-client.js';
-import { MAX_TURNS_FINAL_MESSAGE, unknownToolFailureMessage } from '../../llm-messages.js';
+import { XML_NEXT_SLUGS } from '../../llm-messages-xml-next.js';
+import { unknownToolFailureMessage } from '../../llm-messages.js';
 import { AnthropicProvider } from '../../llm-providers/anthropic.js';
 import { BaseLLMProvider, type ResponseMessage } from '../../llm-providers/base.js';
 import { OpenRouterProvider } from '../../llm-providers/openrouter.js';
@@ -580,7 +581,7 @@ const LONG_TOOL_NAME = `tool-${'x'.repeat(140)}`;
 const FINAL_REPORT_RETRY_MESSAGE = 'Final report completed after mixed tools.';
 const SANITIZER_VALID_ARGUMENT = 'sanitizer-valid-call';
 const SANITIZER_REMOTE_IDENTIFIER = 'agent:sanitizer';
-const SANITIZER_DROPPED_MESSAGE = 'Dropped 1 invalid tool call';
+const SANITIZER_DROPPED_MESSAGE = 'Invalid tool call payload sanitized';
 const EXIT_FINAL_REPORT_IDENTIFIER = 'agent:EXIT-FINAL-ANSWER';
 
 const GITHUB_SERVER_PATH = path.resolve(__dirname, '../mcp/github-stdio-server.js');
@@ -4577,7 +4578,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     };
   })(),
   (() => {
-    const FINAL_TURN_INSTRUCTION = MAX_TURNS_FINAL_MESSAGE;
+    const FINAL_TURN_INSTRUCTION = XML_NEXT_SLUGS.final_turn_max_turns.message;
     let capturedRequests: TurnRequest[] = [];
     let capturedLogs: LogEntry[] = [];
     return {
@@ -4618,20 +4619,22 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       expect: (result: AIAgentResult) => {
         // Model provided a final report, so status is success
         invariant(result.success, `Scenario ${RUN_TEST_MAX_TURN_LIMIT} should have success=true when model provides final report.`);
-        const conversationHasInstruction = result.conversation.some((message) => message.role === 'user' && message.content === FINAL_TURN_INSTRUCTION);
-        if (conversationHasInstruction && process.env.CONTEXT_DEBUG === 'true') {
+        const conversationHasXmlNext = result.conversation.some((message) => message.noticeType === 'xml-next');
+        if (conversationHasXmlNext && process.env.CONTEXT_DEBUG === 'true') {
           console.log(`${RUN_TEST_MAX_TURN_LIMIT} conversation:`, JSON.stringify(result.conversation, null, 2));
         }
-        invariant(!conversationHasInstruction, `Final turn instruction should remain ephemeral and not persist in conversation for ${RUN_TEST_MAX_TURN_LIMIT}.`);
+        invariant(!conversationHasXmlNext, `XML-NEXT should remain ephemeral and not persist in conversation for ${RUN_TEST_MAX_TURN_LIMIT}.`);
         invariant(capturedRequests.length >= 2, `At least two LLM requests expected for ${RUN_TEST_MAX_TURN_LIMIT}.`);
         const finalTurnRequest = capturedRequests.at(-1);
         invariant(finalTurnRequest !== undefined, `Final turn request missing for ${RUN_TEST_MAX_TURN_LIMIT}.`);
         const requestMessages = Array.isArray(finalTurnRequest.messages) ? finalTurnRequest.messages : [];
-        const instructionOccurrences = requestMessages.filter((message) => message.role === 'user' && message.content === FINAL_TURN_INSTRUCTION);
-        if (instructionOccurrences.length !== 1 && process.env.CONTEXT_DEBUG === 'true') {
+        const xmlNextMessages = requestMessages.filter((message) => message.noticeType === 'xml-next');
+        if (xmlNextMessages.length !== 1 && process.env.CONTEXT_DEBUG === 'true') {
           console.log(`${RUN_TEST_MAX_TURN_LIMIT} final request messages:`, JSON.stringify(requestMessages, null, 2));
         }
-        invariant(instructionOccurrences.length === 1, `Final turn instruction should be present exactly once in the final LLM request for ${RUN_TEST_MAX_TURN_LIMIT}.`);
+        invariant(xmlNextMessages.length === 1, `XML-NEXT should be present exactly once in the final LLM request for ${RUN_TEST_MAX_TURN_LIMIT}.`);
+        const xmlNextContent = typeof xmlNextMessages[0]?.content === 'string' ? xmlNextMessages[0].content : '';
+        invariant(xmlNextContent.includes(FINAL_TURN_INSTRUCTION), `XML-NEXT should include the final turn instruction for ${RUN_TEST_MAX_TURN_LIMIT}.`);
         const toolNames = Array.isArray(finalTurnRequest.tools)
           ? finalTurnRequest.tools.map((tool) => sanitizeToolName(tool.name))
           : [];
@@ -7222,15 +7225,20 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(sanitizerLog !== undefined, 'Sanitizer log expected for run-test-89.');
       invariant(
         typeof sanitizerLog.message === 'string' && sanitizerLog.message.includes(SANITIZER_DROPPED_MESSAGE),
-        'Sanitizer log should report dropped tool call for run-test-89.'
+        'Sanitizer log should report invalid tool payload for run-test-89.'
       );
 
       const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
       const firstAssistant = assistantMessages.at(0);
       invariant(firstAssistant !== undefined, 'Missing assistant message for run-test-89.');
       const sanitizedCalls = firstAssistant.toolCalls ?? [];
-      invariant(sanitizedCalls.length === 1, 'Exactly one tool call should remain after sanitization for run-test-89.');
-      const retainedCall = sanitizedCalls[0];
+      invariant(sanitizedCalls.length === 2, 'Expected invalid + valid tool calls after sanitization for run-test-89.');
+      const invalidCall = sanitizedCalls.find((call) => call.id === 'call-invalid-1');
+      invariant(invalidCall !== undefined, 'Missing sanitized invalid tool call for run-test-89.');
+      const invalidParams = invalidCall.parameters;
+      invariant(invalidParams.__sanitization_failed === true, 'Invalid tool call should carry sanitization marker for run-test-89.');
+      const retainedCall = sanitizedCalls.find((call) => call.id === 'call-valid-1');
+      invariant(retainedCall !== undefined, 'Missing retained valid tool call for run-test-89.');
       invariant(retainedCall.name === 'test__test', 'Retained tool call name mismatch for run-test-89.');
       const params = retainedCall.parameters;
       const textValue = (params as { text?: unknown }).text;
@@ -7338,31 +7346,24 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const sanitizerLog = result.logs.find((entry) => entry.remoteIdentifier === SANITIZER_REMOTE_IDENTIFIER);
       invariant(sanitizerLog !== undefined, 'Sanitizer log expected for run-test-90.');
       invariant(
-        typeof sanitizerLog.message === 'string' && (
-          sanitizerLog.message.includes('Invalid tool call dropped') ||
-          sanitizerLog.message.includes(SANITIZER_DROPPED_MESSAGE)
-        ),
+        typeof sanitizerLog.message === 'string' && sanitizerLog.message.includes(SANITIZER_DROPPED_MESSAGE),
         'Sanitizer message mismatch for run-test-90.',
       );
       const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
       invariant(assistantMessages.length >= 2, 'At least two assistant messages expected after retry for run-test-90.');
-      const firstAssistantWithTools = assistantMessages.find(
-        (message) => {
-          const toolCalls = (message as { toolCalls?: unknown }).toolCalls;
-          return Array.isArray(toolCalls) && toolCalls.length > 0;
-        },
-      );
-      invariant(firstAssistantWithTools !== undefined, 'Assistant message with tool calls expected for run-test-90.');
-      const toolCalls = (firstAssistantWithTools as { toolCalls: ToolCall[] }).toolCalls;
-      invariant(toolCalls.length === 1, 'Single sanitized tool call expected for run-test-90.');
-      const retainedCall = toolCalls[0];
+      const toolCalls = assistantMessages
+        .map((message) => message.toolCalls ?? [])
+        .flat();
+      const invalidCall = toolCalls.find((call) => call.id === 'call-invalid-only');
+      invariant(invalidCall !== undefined, 'Sanitized invalid tool call expected for run-test-90.');
+      const invalidParams = invalidCall.parameters;
+      invariant(invalidParams.__sanitization_failed === true, 'Invalid tool call should carry sanitization marker for run-test-90.');
+      const retainedCall = toolCalls.find((call) => call.id === 'call-valid-after-sanitizer');
+      invariant(retainedCall !== undefined, 'Retained tool call expected for run-test-90.');
       invariant(retainedCall.name === 'test__test', 'Retained tool call name mismatch for run-test-90.');
       const textValue = (retainedCall.parameters as { text?: unknown }).text;
       invariant(textValue === SANITIZER_VALID_ARGUMENT, 'Retained tool call arguments mismatch for run-test-90.');
-      const retryLog = result.logs.find((entry) => typeof entry.message === 'string' && (
-        entry.message.includes('Invalid tool call dropped') ||
-        entry.message.includes(SANITIZER_DROPPED_MESSAGE)
-      ));
+      const retryLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes(SANITIZER_DROPPED_MESSAGE));
       invariant(retryLog !== undefined, 'Retry warning log missing for run-test-90.');
       const llmAttempts = result.accounting.filter(isLlmAccounting).length;
       invariant(llmAttempts === 3, 'Three LLM attempts expected for run-test-90.');
@@ -10236,8 +10237,12 @@ BASE_TEST_SCENARIOS.push({
     invariant(result.success, `Scenario ${FINAL_REPORT_RETRY_TEXT_SCENARIO} expected success.`);
     const finalReport = result.finalReport!;
     invariant(finalReport?.content === FINAL_REPORT_AFTER_RETRY, `Final report content mismatch for ${FINAL_REPORT_RETRY_TEXT_SCENARIO}.`);
+    const sanitizerLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_SANITIZER
+      && typeof entry.message === 'string'
+      && entry.message.includes(SANITIZER_DROPPED_MESSAGE));
+    invariant(sanitizerLog !== undefined, `Sanitizer log expected for ${FINAL_REPORT_RETRY_TEXT_SCENARIO}.`);
     const textExtractionLogs = result.logs.filter((entry) => entry.remoteIdentifier === LOG_TEXT_EXTRACTION);
-    invariant(textExtractionLogs.length === 1, `Text extraction log missing for ${FINAL_REPORT_RETRY_TEXT_SCENARIO}.`);
+    invariant(textExtractionLogs.length === 0, `Text extraction log should not appear for ${FINAL_REPORT_RETRY_TEXT_SCENARIO}.`);
     const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes(COLLAPSING_REMAINING_TURNS_FRAGMENT));
     invariant(collapseLog !== undefined, `Turn collapse log expected for ${FINAL_REPORT_RETRY_TEXT_SCENARIO}.`);
     const fallbackLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FALLBACK_REPORT);
@@ -10473,11 +10478,11 @@ BASE_TEST_SCENARIOS.push({
     invariant(finalReport?.content === TEXT_EXTRACTION_RETRY_RESULT, `Final report content mismatch for ${scenarioId}.`);
     const sanitizerLog = findLogByIdentifier(result.logs, LOG_SANITIZER);
     invariant(sanitizerLog !== undefined, `Sanitizer log expected for ${scenarioId}.`);
+    expectLogIncludes(result.logs, LOG_SANITIZER, SANITIZER_DROPPED_MESSAGE, scenarioId);
     const textExtractionLogs = getLogsByIdentifier(result.logs, LOG_TEXT_EXTRACTION);
-    invariant(textExtractionLogs.length === 1, `Text extraction log expected once for ${scenarioId}.`);
+    invariant(textExtractionLogs.length === 0, `Text extraction should not occur for ${scenarioId}.`);
     const fallbackLog = findLogByIdentifier(result.logs, LOG_FALLBACK_REPORT);
     invariant(fallbackLog === undefined, `Fallback log should not appear before the final turn for ${scenarioId}.`);
-    expectLogIncludes(result.logs, LOG_TEXT_EXTRACTION, 'Retrying for proper tool call', scenarioId);
     const collapseLog = findLogByIdentifier(result.logs, LOG_ORCHESTRATOR, (entry) => typeof entry.message === 'string' && entry.message.includes(COLLAPSING_REMAINING_TURNS_FRAGMENT));
     invariant(collapseLog !== undefined, `Turn collapse log expected for ${scenarioId}.`);
     const acceptanceLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FINAL_REPORT_ACCEPTED);
@@ -10841,7 +10846,10 @@ BASE_TEST_SCENARIOS.push({
     },
     expect: (result: AIAgentResult) => {
       invariant(result.success, `Scenario ${scenarioId} expected success.`);
-      expectLogIncludes(result.logs, LOG_SANITIZER, 'Dropped 3 invalid tool call(s)', scenarioId);
+      const sanitizerLogs = result.logs.filter((entry) => entry.remoteIdentifier === LOG_SANITIZER
+        && typeof entry.message === 'string'
+        && entry.message.includes(SANITIZER_DROPPED_MESSAGE));
+      invariant(sanitizerLogs.length >= 3, `Expected sanitizer logs for each invalid tool call in ${scenarioId}.`);
       expectLogIncludes(result.logs, LOG_ORCHESTRATOR, COLLAPSING_REMAINING_TURNS_FRAGMENT, scenarioId);
     },
   } satisfies HarnessTest);
@@ -12153,8 +12161,10 @@ BASE_TEST_SCENARIOS.push({
   expect: (result: AIAgentResult) => {
     invariant(!result.success, 'unknown tool should fail session');
     expectTurnFailureContains(result.logs, 'run-test-unknown-tool-fails', [...UNKNOWN_TOOL_FAILURE_SLUGS]);
+    const toolFailure = result.conversation.find((msg) => msg.role === 'tool' && typeof msg.content === 'string' && msg.content.includes(unknownToolFailureMessage('unknown_tool')));
+    invariant(toolFailure !== undefined, 'Tool failure message expected for run-test-unknown-tool-fails.');
     const turnFailed = findTurnFailedMessage(result.conversation, 'Unknown tool name detected');
-    invariant(turnFailed !== undefined, 'TURN-FAILED unknown tool guidance expected for run-test-unknown-tool-fails.');
+    invariant(turnFailed === undefined, 'TURN-FAILED unknown tool guidance should not be emitted for run-test-unknown-tool-fails.');
   },
 } satisfies HarnessTest);
 
@@ -12213,8 +12223,10 @@ BASE_TEST_SCENARIOS.push({
   expect: (result: AIAgentResult) => {
     invariant(!result.success, 'invalid schema tool should fail session');
     expectTurnFailureContains(result.logs, 'run-test-invalid-schema-tool-fails', ['malformed_tool_call', 'final_report_missing', 'retries_exhausted']);
+    const toolFailure = result.conversation.find((msg) => msg.role === 'tool' && typeof msg.content === 'string' && msg.content.includes('invalid tool call payload'));
+    invariant(toolFailure !== undefined, 'Tool failure message expected for run-test-invalid-schema-tool-fails.');
     const turnFailed = findTurnFailedMessage(result.conversation, 'Tool call payload is not valid JSON');
-    invariant(turnFailed !== undefined, 'TURN-FAILED malformed tool guidance expected for run-test-invalid-schema-tool-fails.');
+    invariant(turnFailed === undefined, 'TURN-FAILED malformed tool guidance should not be emitted for run-test-invalid-schema-tool-fails.');
   },
 } satisfies HarnessTest);
 

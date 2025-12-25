@@ -131,7 +131,7 @@ How it is enforced:
   - `json`: `{ format: { const: 'json' }, content_json: <schema> }`
   - `markdown`: `{ format: { const: 'markdown' }, content: string }`
   - `text`: `{ format: { const: 'text' }, content: string }`
-- Final turn restriction: On the final turn, all providers filter tools down to only `agent_final_report`, and an instructional message is appended forcing a single call to it.
+- Final turn restriction: On the final turn, all providers filter tools down to only `agent_final_report`; XML-NEXT carries the final-turn instruction (no extra system notices).
 - Synthetic retry: If the assistant returns plain content without tool calls and without a `final_report`, the library logs a warning and retries with the next provider/model within the turn.
 - JSON validation: In `json` mode, if `content_json` does not match the schema, the library logs a `WRN` with AJV error details but does not abort; it still completes.
 
