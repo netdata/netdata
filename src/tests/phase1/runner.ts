@@ -84,6 +84,7 @@ const TASK_STATUS_IN_PROGRESS = 'in-progress';
 const RETRY_EXHAUSTED_MESSAGE = 'retry exhausted';
 const COLLAPSING_REMAINING_TURNS_FRAGMENT = 'Collapsing remaining turns';
 const CONTEXT_LIMIT_TURN_WARN = 'Context limit exceeded during turn execution; proceeding with final turn.';
+const FINAL_TURN_FRAGMENT = 'final turn';
 const TASK_CONTINUE_PROCESSING = 'Continue processing';
 const TASK_COMPLETE_TASK = 'Complete task';
 const TASK_COMPLETED_RESPONSE = 'task completed';
@@ -1459,7 +1460,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-12 expected success.');
-      const finalTurnLog = result.logs.find((log) => typeof log.remoteIdentifier === 'string' && log.remoteIdentifier.includes('primary:') && typeof log.message === 'string' && log.message.includes('final turn'));
+      const finalTurnLog = result.logs.find((log) => typeof log.remoteIdentifier === 'string' && log.remoteIdentifier.includes('primary:') && typeof log.message === 'string' && log.message.includes(FINAL_TURN_FRAGMENT));
       invariant(finalTurnLog !== undefined, 'LLM request log should reflect final turn for run-test-12.');
     },
   },
@@ -1653,13 +1654,18 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-context-multi-provider expected success.');
+      const isRecord = (value: unknown): value is Record<string, unknown> => value !== null
+        && typeof value === 'object'
+        && !Array.isArray(value);
       const warnLog = result.logs.find((entry) =>
         entry.remoteIdentifier === CONTEXT_REMOTE
         && typeof entry.message === 'string'
-        && entry.message.includes(`Projected context size`)
-        && entry.message.includes(`${PRIMARY_PROVIDER}:${MODEL_NAME}`)
-        && entry.message.includes('continuing turn'));
-      invariant(warnLog !== undefined, 'Expected context warning log indicating continued execution for primary provider.');
+        && entry.message.includes(CONTEXT_LIMIT_TURN_WARN)
+        && entry.message.includes(FINAL_TURN_FRAGMENT)
+        && isRecord(entry.details)
+        && entry.details.provider === PRIMARY_PROVIDER
+        && entry.details.model === MODEL_NAME);
+      invariant(warnLog !== undefined, 'Expected context warning log indicating final turn for primary provider.');
       const llmEntries = result.accounting.filter(isLlmAccounting);
       invariant(llmEntries.length > 0, 'LLM accounting entries expected after warning.');
       invariant(llmEntries.some((entry) => entry.provider === PRIMARY_PROVIDER), 'Primary provider should still be attempted with a warning.');
@@ -1828,7 +1834,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           type: 'test-llm',
           models: {
             [MODEL_NAME]: {
-              contextWindow: 2048,
+              contextWindow: 4096,
               contextWindowBufferTokens: 32,
               tokenizer: TOKENIZER_GPT4O,
             },
@@ -1872,7 +1878,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const expectedTokens = expectLogDetailNumber(metricsLog, 'expected_tokens', 'expected_tokens detail missing for run-test-llm-context-metrics.');
       invariant(expectedTokens === ctxTokens + newTokens, 'expected_tokens should equal ctx + new for run-test-llm-context-metrics.');
       const contextWindow = expectLogDetailNumber(metricsLog, 'context_window', 'context_window detail missing for run-test-llm-context-metrics.');
-      invariant(contextWindow === 2048, 'context_window detail should match configured window for run-test-llm-context-metrics.');
+      invariant(contextWindow === 4096, 'context_window detail should match configured window for run-test-llm-context-metrics.');
       const contextPct = expectLogDetailNumber(metricsLog, 'context_pct', 'context_pct detail missing for run-test-llm-context-metrics.');
       invariant(contextPct >= 0, 'context_pct should be non-negative for run-test-llm-context-metrics.');
 
@@ -1906,7 +1912,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           type: 'test-llm',
           models: {
             [MODEL_NAME]: {
-              contextWindow: 2048,
+              contextWindow: 4096,
               contextWindowBufferTokens: 32,
               tokenizer: TOKENIZER_GPT4O,
             },
@@ -2084,7 +2090,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           type: 'test-llm',
           models: {
             [MODEL_NAME]: {
-              contextWindow: 2048,
+              contextWindow: 4096,
               contextWindowBufferTokens: 32,
               tokenizer: TOKENIZER_GPT4O,
             },
@@ -2130,7 +2136,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
 	          type: 'test-llm',
 	          models: {
 	            [MODEL_NAME]: {
-	              contextWindow: 1760,
+	              contextWindow: 2300,
 	              contextWindowBufferTokens: 0,
 	              tokenizer: TOKENIZER_GPT4O,
 	            },
@@ -2196,7 +2202,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           type: 'test-llm',
           models: {
             [MODEL_NAME]: {
-              contextWindow: 1500,
+              contextWindow: 2300,
               contextWindowBufferTokens: 0,
               tokenizer: TOKENIZER_GPT4O,
             },
@@ -2506,11 +2512,17 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const finalReport = result.finalReport!;
       invariant(result.success, 'Final report should succeed after provider fallback.');
 
+      const isRecord = (value: unknown): value is Record<string, unknown> => value !== null
+        && typeof value === 'object'
+        && !Array.isArray(value);
       const warnLog = result.logs.find((entry) =>
         entry.remoteIdentifier === CONTEXT_REMOTE
         && typeof entry.message === 'string'
-        && entry.message.includes(`${PRIMARY_PROVIDER}:${MODEL_NAME}`)
-        && entry.message.includes('continuing turn'));
+        && entry.message.includes(CONTEXT_LIMIT_TURN_WARN)
+        && entry.message.includes(FINAL_TURN_FRAGMENT)
+        && isRecord(entry.details)
+        && entry.details.provider === PRIMARY_PROVIDER
+        && entry.details.model === MODEL_NAME);
       invariant(warnLog !== undefined, 'Expected context warning log for primary provider in context_guard__multi_target_provider_selection.');
 
       const llmEntries = result.accounting.filter(isLlmAccounting);
