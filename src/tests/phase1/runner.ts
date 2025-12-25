@@ -8641,7 +8641,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(!result.success, 'Scenario run-test-102 should report failure when final_report tool fails.');
       invariant(result.finalReport !== undefined, 'Synthetic final report expected when agent__final_report fails in run-test-102.');
       invariant(!result.success, 'Synthetic final report should indicate failure for run-test-102.');
-      invariant(typeof result.finalReport.content === 'string' && result.finalReport.content.includes('final_report tool failed'), 'Synthetic content should mention tool failure for run-test-102.');
+      invariant(typeof result.finalReport.content === 'string' && result.finalReport.content.includes('final_report emission failed'), 'Synthetic content should mention final report failure for run-test-102.');
       // With synthetic report generation, we exit via EXIT-FINAL-ANSWER instead of EXIT-NO-LLM-RESPONSE
       const exitLog = result.logs.find((entry) => entry.remoteIdentifier === EXIT_FINAL_REPORT_IDENTIFIER);
       invariant(exitLog !== undefined, 'EXIT-FINAL-ANSWER log expected for run-test-102.');

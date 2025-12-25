@@ -157,6 +157,16 @@ interface TurnRunnerState {
   consecutiveProgressOnlyTurns?: number;
 }
 
+type FinalTurnLogReason =
+    | 'context'
+    | 'max_turns'
+    | 'task_status_completed'
+    | 'task_status_only'
+    | 'retry_exhaustion'
+    | 'incomplete_final_report'
+    | 'final_report_attempt'
+    | 'xml_wrapper_as_tool';
+
 // Static constants (non-LLM-facing)
 const REMOTE_FINAL_TURN = 'agent:final-turn';
 const REMOTE_CONTEXT = 'agent:context';
@@ -384,7 +394,7 @@ export class TurnRunner {
                     customLabels: this.ctx.telemetryLabels,
                 });
                 collapseLoggedThisTurn = true;
-                this.logEnteringFinalTurn('max_turns', maxTurns);
+                this.logEnteringFinalTurn(reason, currentTurn, this.state.maxTurns, maxTurns);
             };
             // Global attempts across all provider/model pairs for this turn
             let attempts = 0;
@@ -582,7 +592,7 @@ export class TurnRunner {
                         attemptConversation.push(xmlResult.pastMessage);
                     attemptConversation.push(xmlResult.nextMessage);
                     if (isFinalTurn) {
-                        let logReason: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion' = 'max_turns';
+                        let logReason: FinalTurnLogReason = 'max_turns';
                         if (this.forcedFinalTurnReason === 'context') {
                             logReason = 'context';
                         } else if (this.forcedFinalTurnReason === 'task_status_completed') {
@@ -592,7 +602,7 @@ export class TurnRunner {
                         } else if (this.forcedFinalTurnReason === 'retry_exhaustion') {
                             logReason = 'retry_exhaustion';
                         }
-                        this.logEnteringFinalTurn(logReason, currentTurn);
+                        this.logEnteringFinalTurn(logReason, currentTurn, this.state.maxTurns, maxTurns);
                     }
                     this.state.llmAttempts++;
                     attempts += 1;
@@ -1822,7 +1832,7 @@ export class TurnRunner {
             const currentTurn = this.state.currentTurn;
             const turnLabel = `${String(maxTurns)} turn${maxTurns === 1 ? '' : 's'}`;
             const savedError = this.state.lastTurnError;
-            const baseSummary = `Session completed without a final report after ${turnLabel}. The final_report tool failed.`;
+            const baseSummary = `Session completed without a final report after ${turnLabel}. The final_report emission failed.`;
             const detailedSummary = (typeof savedError === 'string' && savedError.length > 0)
                 ? `${baseSummary} Cause: ${savedError}`
                 : baseSummary;
@@ -1983,15 +1993,16 @@ export class TurnRunner {
         };
         this.log(entry);
     }
-    private logEnteringFinalTurn(reason: string, turn: number): void {
+    private logEnteringFinalTurn(reason: FinalTurnLogReason, turn: number, originalMaxTurns: number, activeMaxTurns: number): void {
         if (this.state.finalTurnEntryLogged)
             return;
-        const message = reason === 'context'
-            ? `Context guard enforced: restricting tools to \`${FINAL_REPORT_TOOL}\` and injecting finalization instruction.`
-            : `Final turn (${String(turn)}) detected: restricting tools to \`${FINAL_REPORT_TOOL}\`.`;
+        const severity = reason === 'task_status_completed' ? 'VRB' as const : 'WRN' as const;
+        const baseTurnLabel = `${String(turn)}/${String(originalMaxTurns)}`;
+        const activeSuffix = activeMaxTurns !== originalMaxTurns ? `, active_max=${String(activeMaxTurns)}` : '';
+        const message = `Final turn detected (turn=${baseTurnLabel}${activeSuffix}, reason=${reason}); removing all tools to force final-report.`;
         const warnEntry: LogEntry = {
             timestamp: Date.now(),
-            severity: 'WRN' as const,
+            severity,
             turn,
             subturn: 0,
             direction: 'request' as const,
@@ -1999,6 +2010,11 @@ export class TurnRunner {
             remoteIdentifier: REMOTE_FINAL_TURN,
             fatal: false,
             message,
+            details: {
+                final_turn_reason: reason,
+                original_max_turns: originalMaxTurns,
+                active_max_turns: activeMaxTurns,
+            },
         };
         this.log(warnEntry);
         this.state.finalTurnEntryLogged = true;
@@ -2242,7 +2258,7 @@ export class TurnRunner {
     currentTurn: number
   ): AIAgentResult {
     this.flushTurnFailureReasons(conversation);
-    const toolFailureNote = this.state.finalReportToolFailedEver ? ' The final_report tool failed.' : '';
+    const toolFailureNote = this.state.finalReportToolFailedEver ? ' The final_report emission failed.' : '';
     const summary = `${failureInfo.message}; slugs=${failureInfo.slugs.join(',')}.${toolFailureNote}`;
     this.logFailureReport(summary, currentTurn, {
         reason: 'session_failed',

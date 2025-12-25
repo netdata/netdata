@@ -1814,14 +1814,15 @@ export class AIAgentSession {
   }
 
 
-  private logEnteringFinalTurn(reason: 'context' | 'max_turns', turn: number): void {
+  private logEnteringFinalTurn(reason: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion' | 'incomplete_final_report' | 'final_report_attempt' | 'xml_wrapper_as_tool', turn: number): void {
     if (this.finalTurnEntryLogged) return;
-    const message = reason === 'context'
-      ? `Context guard enforced: restricting tools to \`${AIAgentSession.FINAL_REPORT_TOOL}\` and injecting finalization instruction.`
-      : `Final turn (${String(turn)}) detected: restricting tools to \`${AIAgentSession.FINAL_REPORT_TOOL}\`.`;
+    const severity = reason === 'task_status_completed' ? 'VRB' as const : 'WRN' as const;
+    const originalMaxTurns = this.sessionConfig.maxTurns ?? 10;
+    const baseTurnLabel = `${String(turn)}/${String(originalMaxTurns)}`;
+    const message = `Final turn detected (turn=${baseTurnLabel}, reason=${reason}); removing all tools to force final-report.`;
     const warnEntry: LogEntry = {
       timestamp: Date.now(),
-      severity: 'WRN',
+      severity,
       turn,
       subturn: 0,
       direction: 'request',
@@ -1829,6 +1830,11 @@ export class AIAgentSession {
       remoteIdentifier: AIAgentSession.REMOTE_FINAL_TURN,
       fatal: false,
       message,
+      details: {
+        final_turn_reason: reason,
+        original_max_turns: originalMaxTurns,
+        active_max_turns: originalMaxTurns,
+      },
     };
     this.log(warnEntry);
     this.finalTurnEntryLogged = true;
