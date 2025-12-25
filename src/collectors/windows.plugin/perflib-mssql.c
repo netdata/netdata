@@ -422,13 +422,14 @@ void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *
     if (unlikely(!pObjectType))
         return;
 
-    if (unlikely(!mi->conn || !mi->conn->collect_user_connections)) {
-        if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLUserConnections)))
+    if (unlikely(!mi->conn) || unlikely(!mi->conn->collect_user_connections)) {
+        if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLUserConnections))) {
             do_mssql_user_connections(mi, update_every);
+        }
     }
 
-    if (unlikely(!mi->conn || !mi->conn->collect_blocked_processes)) {
-        if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLBlockedProcesses)))
-            netdata_mssql_blocked_processes_chart(mi, update_every);
+    if (unlikely(!mi || !mi->conn || !mi->conn->collect_blocked_processes) &&
+        likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLBlockedProcesses))) {
+        netdata_mssql_blocked_processes_chart(mi, update_every);
     }
 }

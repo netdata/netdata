@@ -239,8 +239,7 @@ int do_PerflibMemory(int update_every, usec_t dt __maybe_unused)
     if (!pDataBlock)
         return -1;
 
-    if (!do_memory(pDataBlock, update_every))
-        return -1;
+    do_memory(pDataBlock, update_every);
 
     return 0;
 }
