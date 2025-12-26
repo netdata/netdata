@@ -20,7 +20,10 @@
         "type": [
           "object",
           "null"
-        ]
+        ],
+        "additionalProperties": {
+          "type": "string"
+        }
       }
     },
     "required": [
