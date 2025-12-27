@@ -332,12 +332,39 @@ procfile *procfile_readall(procfile *ff) {
     }
 
     // netdata_log_debug(D_PROCFILE, "Rewinding file '%s'", ff->filename);
-    if(unlikely(lseek(ff->fd, 0, SEEK_SET) == -1)) {
-        if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) collector_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
-        else if(unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
-            netdata_log_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
-        procfile_close(ff);
-        return NULL;
+    
+    // Skip lseek if we already know this file is non-seekable
+    if(unlikely(ff->flags & PROCFILE_FLAG_NONSEEKABLE)) {
+        // Reopen to reset position
+        char *fn = strdupz(procfile_filename(ff));
+        ff = procfile_reopen(ff, fn, NULL, ff->flags);
+        freez(fn);
+        if(unlikely(!ff))
+            return NULL;
+    }
+    else if(unlikely(lseek(ff->fd, 0, SEEK_SET) == -1)) {
+        // Some procfs files (Ubuntu HWE 24.04 / kernel 6.14) may be non-seekable.
+        // In that case, "rewind" by reopening.
+        if(errno == ESPIPE || errno == EINVAL) {
+            // Mark this file as non-seekable to avoid future lseek attempts
+            ff->flags |= PROCFILE_FLAG_NONSEEKABLE;
+            
+            // Must duplicate the filename before reopen frees it
+            char *fn = strdupz(procfile_filename(ff));
+            // Reopen resets file position to 0.
+            ff = procfile_reopen(ff, fn, NULL, ff->flags);
+            freez(fn);
+            if(unlikely(!ff))
+                return NULL;
+        }
+        else {
+            if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)))
+                collector_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
+            else if(unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
+                netdata_log_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
+            procfile_close(ff);
+            return NULL;
+        }
     }
 
     procfile_lines_reset(ff->lines);
