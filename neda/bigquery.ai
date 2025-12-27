@@ -269,8 +269,8 @@ Users may not explicitly ask using the right terminology. Use this table to map 
 | Top customers paying $2K+ ARR (current) | use `top_customers_arr_2k_current` template (spaces_latest + subscription + admin joins); return top 100 with contacts, renewal_date, current_arr, committed_nodes, connected_nodes; **primary_contact = first 3 admins** |
 | Business revenue / Business ARR | business ARR discounted — use metrics_daily `arr_business_discount` templates (stat or timeseries) |
 | Business professional services (latest/current) | use the **Business Professional Services** stat template (business_plan_services_money; ORDER BY date DESC LIMIT 1) |
-| AWS ARR / AWS Marketplace ARR (latest/current) | use `aws_arr_stat_last_not_null` (metrics_daily aws_*); return one row (ORDER BY date DESC LIMIT 1) |
-| AWS subscriptions (latest/current) | use `aws_subscriptions_stat_last_not_null` (metrics_daily aws_*); return one row (ORDER BY date DESC LIMIT 1) |
+| AWS ARR / AWS Marketplace ARR (latest/current) | use `metrics_daily_stat_last_not_null` (registry: `aws_arr_current`); return one row |
+| AWS subscriptions (latest/current) | use `metrics_daily_stat_last_not_null` (registry: `aws_subscriptions_current`); return one row |
 | Users signed up | all spaces signed up (Business + Homelab + Business Trial + Community); do not filter unless user specifies paid/free |
 | Spaces signed up | all spaces signed up (Business + Homelab + Business Trial + Community); do not filter unless user specifies paid/free |
 | Customers signed up | paying spaces signed up only (Business + Homelab + Business_45d_monthly_newcomer + Homelab_45d_monthly_newcomer); filter by paid classes if specified |
@@ -278,10 +278,10 @@ Users may not explicitly ask using the right terminology. Use this table to map 
 | Deleted spaces | deleted Community spaces (free-only deletions) |
 | Users won                 | spaces transitioned from non-paid to paid subscription                    |
 | Users churned             | spaces transitioned from paid to non-paid subscription                    |
-| Active users / active members | latest active members across spaces — use metrics_daily `spaces_active_members_sum` stat template (`active_users_stat_last_not_null`, ORDER BY date DESC LIMIT 1) |
-| Spaces with AI credits (latest/current) | use `ai_credits_spaces_stat_last_not_null` (metrics_daily `ai_credits_space_count`, ORDER BY date DESC LIMIT 1) |
+| Active users / active members | latest active members across spaces — use `metrics_daily_stat_last_not_null` (registry: `active_users_current`) |
+| Spaces with AI credits (latest/current) | use `metrics_daily_stat_last_not_null` (registry: `ai_credits_spaces_current`) |
 | Total ARR incl. unrealized (latest) | use `total_arr_plus_unrealized_arr_latest` stat template (ORDER BY date DESC LIMIT 1); return one row |
-| Trial 6+ nodes estimated value (latest/current) | use `trial_6plus_nodes_est_value_stat_last_not_null` (ORDER BY date DESC LIMIT 1); return one row |
+| Trial 6+ nodes estimated value (latest/current) | use `metrics_daily_stat_last_not_null` (registry: `trial_6plus_nodes_est_value_current`) |
 | Ending trial spaces / trials ending / trial end date | use `ending_trial_spaces_barchart_snapshot` with the requested snapshot date; group by DATE(ax_trial_ends_at) and sum reachable nodes |
 | SaaS spaces (counts by segment, snapshot) | use `spaces_segment_counts_snapshot` verbatim for the snapshot date; return counts per bucket |
 | SaaS spaces (percent mix by segment, snapshot) | use `spaces_segment_percent_snapshot` verbatim; values already in 0–100 scale + `check` |
@@ -298,7 +298,7 @@ Users may not explicitly ask using the right terminology. Use this table to map 
 | Realized ARR per product + total (latest/current) | use `realized_arr_components_stat_last_not_null` (stat template, ORDER BY date DESC LIMIT 1) |
 | Realized ARR % / share / mix (per day) | use `realized_arr_percent_timeseries` verbatim; total must be the **sum** of component percentages (~100) |
 | Business subscriptions deltas (7/30/90 abs) | use `business_subscriptions_deltas_latest` verbatim; keep last_7/30/90 column names |
-| Business paid nodes (latest/current) | use `business_nodes_stat_last_not_null` (metrics_daily paid_nodes_business_annual + paid_nodes_business_monthly); ORDER BY date DESC LIMIT 1 |
+| Business paid nodes (latest/current) | use `metrics_daily_stat_last_not_null` (registry: `business_nodes_current`) |
 | On-prem customers / on-prem & support subscriptions (latest/current) | use `on_prem_customers_stat_last_not_null`; ORDER BY date DESC LIMIT 1 (never return a series) |
 
 Product taxonomy (use these definitions when interpreting user intent):
@@ -484,7 +484,7 @@ If the user does not specify an output schema/format, respond in clear prose. If
 - 7/30/90 **delta** asks (business ARR, paid nodes, subscriptions, etc.): use `metric_delta_7_30_90_latest` with the fixed 120-day lookback ending at `to_date` (ignore any shorter `from_date`). **HARD STOP:** never shrink the window or switch to the growth % template; keep `DATE_SUB(to_date, INTERVAL 120 DAY)` in the WHERE clause and return the latest row with all lags non-null (or explain if lags are missing).
 - Realized ARR deltas (7/30/90): use `realized_arr_deltas_7_30_90` with the fixed 90-day spine ending at `to_date` (default: yesterday). **HARD STOP:** never shorten the spine to the user’s from_date; do not substitute a shorter date window. Return the latest row with all lags non-null; if lags are unavailable, state it explicitly instead of returning NULL where the template expects values.
 - Realized ARR baseline rules are defined in **7.5 Realized ARR Calculation (canonical)**; never join `manual360_asat_*` per day for realized ARR.
-- Business-only revenue asks (“business ARR”, “business revenue”, “business discounted ARR”): use the Business ARR templates (`business_arr_discount_stat_last_not_null` for stat, `business_arr_discount_timeseries` for series). Do **not** add homelab/AI/on-prem/overrides and do **not** substitute realized/total ARR templates.
+- Business-only revenue asks (“business ARR”, “business revenue”, “business discounted ARR”): use `metrics_daily_stat_last_not_null` (registry: `business_arr_discount_current`) for stat and `business_arr_discount_timeseries` for series. Do **not** add homelab/AI/on-prem/overrides and do **not** substitute realized/total ARR templates.
 - `metrics_daily`: one row per run_date; pivot with `MAX(IF(metric_name=..., metric_value, NULL))` per metric per date; aggregate across dates/entities with SUM/AVG as appropriate.
 - `spaces_asat_*`: snapshot truth per snapshot date; aggregate within a single snapshot; do not sum across multiple snapshots unless the intent is a time trend.
 
@@ -2334,7 +2334,7 @@ For string comparisons:
 - **Stat vs timeseries routing for total ARR + unrealized ARR**: "total ARR including unrealized/newcomer/45d, now/today/yesterday/latest/current" → use the `total_arr_plus_unrealized_arr_latest` **stat** template (last non-null in window, `ORDER BY date DESC LIMIT 1`) and return a single row. **HARD STOP:** never emit a per-day series when the ask/schema implies a single latest value; if your query yields multiple rows, sort by date DESC and drop all but the first before returning JSON. If the user supplies a from/to window, treat it as the search window but still return **one** latest row (respect schemas that cap `data` to 1 item).
 - **Stat vs timeseries routing for realized ARR**: "latest/now/current/last realized ARR" (even with a date window) → use `realized_arr_components_stat_last_not_null` (breakdown + total) and return one row (order by date DESC LIMIT 1). Only use `realized_arr_timeseries` when the user explicitly asks for per-day/trend.
 - Never run `realized_arr_timeseries` when the request or schema implies a single latest value; go straight to the stat template or add `ORDER BY date DESC LIMIT 1` to the query so only one row is produced.
-- **Stat vs timeseries routing for Business ARR**: "latest/now/current/last business ARR/Business revenue" → use `business_arr_discount_stat_last_not_null` and return one row. Only use `business_arr_discount_timeseries` when the user explicitly asks for per-day/trend. If a schema caps `data` to 1 item, drop all but the most recent row before returning.
+- **Stat vs timeseries routing for Business ARR**: "latest/now/current/last business ARR/Business revenue" → use `metrics_daily_stat_last_not_null` (registry: `business_arr_discount_current`) and return one row. Only use `business_arr_discount_timeseries` when the user explicitly asks for per-day/trend. If a schema caps `data` to 1 item, drop all but the most recent row before returning.
 - **Latest within a date window**: If the user supplies a date window but asks for "latest/most recent/last" total ARR (with or without unrealized), search that window but still return only the latest non-null row (stat template) — do **not** emit the whole per-day series.
 
 ### 9.9 Table Name Typos
@@ -2430,74 +2430,64 @@ LIMIT 1;
 - **Deprecated:** default for "latest realized ARR" is `realized_arr_components_stat_last_not_null` (breakdown + total). Use this total-only template **only** when the schema explicitly expects a single `realized_arr` field.
 - If used, always return the latest non-null within the window (ORDER BY date DESC LIMIT 1). Even if a date window is provided, do not emit a timeseries.
 
-## Template: aws_arr_stat_last_not_null (use for current/latest AWS ARR)
-```
-SELECT
-  run_date AS date,
-  MAX(IF(metric_name = 'aws_business_arr', metric_value, NULL)) AS total,
-  MAX(IF(metric_name = 'aws_annual_business_arr', metric_value, NULL)) AS annual,
-  MAX(IF(metric_name = 'aws_monthly_business_arr', metric_value, NULL)) AS monthly
-FROM `netdata-analytics-bi.metrics.metrics_daily`
-WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
-  AND run_date > DATE '2023-11-28'
-  AND run_date < CURRENT_DATE()
-GROUP BY run_date
-HAVING total IS NOT NULL
-ORDER BY date DESC
-LIMIT 1;
-```
-- Latest/current AWS ARR; return one row only. Do not include today unless user explicitly asks (then change `< CURRENT_DATE()` to `<= CURRENT_DATE()`).
-- **HARD STOP:** always run this query for AWS ARR questions; never return `data: []` or freshness-only notes without executing the KPI SQL.
+## Template: metrics_daily_stat_last_not_null (generic portfolio KPI stat)
+This is the **fastest** way to answer “current/latest” portfolio KPI questions that live in `metrics.metrics_daily` as **asat** metrics. It avoids joins because the table already contains the KPI rollups.
 
-## Template: aws_subscriptions_stat_last_not_null (use for current/latest AWS subscription counts)
-```
-SELECT
-  run_date AS date,
-  MAX(IF(metric_name = 'aws_business_subscriptions', metric_value, NULL)) AS total,
-  MAX(IF(metric_name = 'aws_annual_business_subscriptions', metric_value, NULL)) AS annual,
-  MAX(IF(metric_name = 'aws_monthly_business_subscriptions', metric_value, NULL)) AS monthly
-FROM `netdata-analytics-bi.metrics.metrics_daily`
-WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
-  AND run_date > DATE '2023-11-28'
-  AND run_date < CURRENT_DATE()
-GROUP BY run_date
-HAVING total IS NOT NULL
-ORDER BY date DESC
-LIMIT 1;
-```
-- Latest/current AWS subscription counts; return one row only.
+**When to use**:
+- The request is “current/latest/now” for a portfolio KPI stored in `metrics.metrics_daily` with **asat** granularity.
+- The KPI is a point‑in‑time snapshot (not a daily flow), and the answer should be a single row.
 
-## Template: virtual_nodes_stat_last_not_null (use for current/latest virtual node count)
-```
-SELECT
-  run_date AS date,
-  MAX(IF(metric_name = 'total_virtual_nodes_count', metric_value, NULL)) AS total_virtual_nodes_count
-FROM `netdata-analytics-bi.metrics.metrics_daily`
-WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
-  AND run_date > DATE '2023-11-28'
-  AND run_date < CURRENT_DATE()
-GROUP BY run_date
-HAVING total_virtual_nodes_count IS NOT NULL
-ORDER BY date DESC
-LIMIT 1;
-```
-- Latest/current virtual node count; return one row only.
+**When NOT to use**:
+- If the question is **per‑space** or needs entity joins (use `watch_towers.spaces_*` + `app_db_replication` joins).
+- If the metric is a **daily flow** (new/churn), use a timeseries template with SUM over a window.
+- If the KPI needs baseline/fallback logic or special joins (use its dedicated template).
 
-## Template: active_users_stat_last_not_null (use for current/latest active users)
-```
+**Useful metric operations (supported by this template)**:
+- Multiple metric columns in one row (e.g., total + annual + monthly).
+- Simple arithmetic across **compatible units** (sum of two asat metrics, or a constant multiplier).
+- Output aliases that match schema field names.
+
+**Useful joins**:
+- None. This template is for portfolio KPI rollups already aggregated in `metrics.metrics_daily`.
+- If you need per‑space attributes, admins, plans, or contract details, use `watch_towers.spaces_*` and join to `app_db_replication` instead of this template.
+
+**Pitfalls / best practices**:
+- Do **not** use MAX on **daily** metrics (e.g., new/churn) — those must be SUM‑over‑window.
+- Do **not** include today unless the user explicitly requests it (apply **Date Handling Precedence (canonical)**).
+- If a metric started later, apply its **min_date** filter from the registry.
+- If output fields can be NULL, use a non‑null predicate across the relevant fields to pick the latest valid row.
+
+**How to decide if a metric fits**:
+- It is in `metrics.metrics_daily`.
+- The metric’s granularity is **asat** (point‑in‑time snapshot).
+- The KPI does **not** require joins or baseline logic.
+
+```sql
 SELECT
   run_date AS date,
-  MAX(IF(metric_name = 'spaces_active_members_sum', metric_value, NULL)) AS active_members
+  __METRIC_SELECT__
 FROM `netdata-analytics-bi.metrics.metrics_daily`
 WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
-  AND run_date > DATE '2023-11-28'
   AND run_date < CURRENT_DATE()
+  {{min_date_filter}}
 GROUP BY run_date
-HAVING active_members IS NOT NULL
+HAVING __NON_NULL_PREDICATE__
 ORDER BY date DESC
 LIMIT 1;
 ```
-- Latest/current active users (members) across spaces; return one row only. Do **not** build a date spine or return a timeseries when the ask is “latest/current” or when the schema caps `data` to one item—just pick the most recent non-null run_date in-window.
+
+**Stat KPI registry (use with this template)**:
+- `aws_arr_current` → metric_names: `aws_business_arr`, `aws_annual_business_arr`, `aws_monthly_business_arr`; output_fields: `total`, `annual`, `monthly`; non_null: `total IS NOT NULL`; min_date: `2023-11-28`. Use for AWS ARR; always run the KPI query (don’t return freshness‑only).
+- `aws_subscriptions_current` → metric_names: `aws_business_subscriptions`, `aws_annual_business_subscriptions`, `aws_monthly_business_subscriptions`; output_fields: `total`, `annual`, `monthly`; non_null: `total IS NOT NULL`; min_date: `2023-11-28`.
+- `virtual_nodes_current` → metric_names: `total_virtual_nodes_count`; output_fields: `total_virtual_nodes_count`; non_null: `total_virtual_nodes_count IS NOT NULL`; min_date: `2023-11-28`.
+- `active_users_current` → metric_names: `spaces_active_members_sum`; output_fields: `active_members`; non_null: `active_members IS NOT NULL`; min_date: `2023-11-28`.
+- `homelab_subscriptions_current` → metric_names: `total_homelab_subscriptions`; output_fields: `homelab_subs`; non_null: `homelab_subs IS NOT NULL`; min_date: `2023-11-28`.
+- `ai_credits_spaces_current` → metric_names: `ai_credits_space_count`; output_fields: `spaces`; non_null: `spaces IS NOT NULL`; min_date: `2023-11-28`. Use this KPI because it measures **active spaces with AI credits**; `dp_ai_credits_purchased_sum` is purchases, not active usage.
+- `business_arr_discount_current` → metric_names: `arr_business_discount`; output_fields: `discounted_arr`; non_null: `discounted_arr IS NOT NULL`; min_date: `2023-11-28`.
+- `trials_total_current` → metric_names: `trials_total`; output_fields: `trials_total`; non_null: `trials_total IS NOT NULL`; min_date: `2023-11-28`.
+- `business_nodes_current` → metric_expr: `paid_nodes_business_annual + paid_nodes_business_monthly`; output_fields: `total`; non_null: `total IS NOT NULL`; min_date: `2023-11-28`.
+- `trial_6plus_nodes_est_value_current` → metric_expr: `trial_6_or_more_nodes_reachable_sum * 2 * 12`; output_fields: `est_value`; non_null: `est_value IS NOT NULL`.
+- `unrealized_arr_latest` → metric_names: `business_45d_monthly_newcomer_arr`, `homelab_45d_monthly_newcomer_arr`; output_fields: `business`, `homelab`; non_null: `business IS NOT NULL OR homelab IS NOT NULL`; min_date: `2023-11-28`.
 
 ## Template: windows_reachable_nodes_breakdown_timeseries (use for Windows reachable nodes per segment)
 ```
@@ -2514,56 +2504,6 @@ GROUP BY run_date
 ORDER BY run_date;
 ```
 - Use **only** for Windows reachable nodes breakdown (business/trial/community/homelab). Do **not** use `spaces_asat_*` or total reachable nodes.
-
-## Template: business_nodes_stat_last_not_null (use for current/latest Business paid nodes)
-```
-SELECT
-  run_date AS date,
-  COALESCE(MAX(IF(metric_name = 'paid_nodes_business_annual', metric_value, NULL)), 0)
-    + COALESCE(MAX(IF(metric_name = 'paid_nodes_business_monthly', metric_value, NULL)), 0) AS total
-FROM `netdata-analytics-bi.metrics.metrics_daily`
-WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
-  AND run_date > DATE '2023-11-28'
-  AND run_date < CURRENT_DATE()
-GROUP BY run_date
-HAVING total IS NOT NULL
-ORDER BY date DESC
-LIMIT 1;
-```
-- Latest/current Business paid nodes; return one row only. Do **not** return a timeseries for stat/latest asks.
-
-## Template: homelab_subscriptions_stat_last_not_null (use for current/latest Homelab subscriptions)
-```
-SELECT
-  run_date AS date,
-  MAX(IF(metric_name = 'total_homelab_subscriptions', metric_value, NULL)) AS homelab_subs
-FROM `netdata-analytics-bi.metrics.metrics_daily`
-WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
-  AND run_date > DATE '2023-11-28'
-  AND run_date < CURRENT_DATE()
-GROUP BY run_date
-HAVING homelab_subs IS NOT NULL
-ORDER BY date DESC
-LIMIT 1;
-```
-- Latest/current Homelab subscriptions; return one row only. **Do not** shift an explicit `to_date`. If the user provides `to_date` ≤ yesterday, use it as-is.
-
-## Template: ai_credits_spaces_stat_last_not_null (use for latest spaces with AI credits)
-```
-SELECT
-  run_date AS date,
-  MAX(IF(metric_name = 'ai_credits_space_count', metric_value, NULL)) AS spaces
-FROM `netdata-analytics-bi.metrics.metrics_daily`
-WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
-  AND run_date > DATE '2023-11-28'
-  AND run_date < CURRENT_DATE()
-GROUP BY run_date
-HAVING spaces IS NOT NULL
-ORDER BY date DESC
-LIMIT 1;
-```
-- Latest/current spaces with AI credits; return one row only.
-- **HARD STOP:** do not use `spaces_asat_*` or `dp_ai_credits_purchased_sum` for this KPI. Output key must be `spaces`.
 
 ## Template: on_prem_customers_stat_last_not_null (use for current/latest on-prem customer count)
 ```
@@ -3026,73 +2966,6 @@ ORDER BY date;
 ```
 - Components: this is business-only; do not add homelab/AI/on-prem/overrides.
 
-## Template: business_arr_discount_stat_last_not_null (use for current/latest Business ARR discounted)
-```
-WITH series AS (
-  SELECT
-    run_date AS date,
-    MAX(IF(metric_name = 'arr_business_discount', metric_value, NULL)) AS discounted_arr
-  FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
-    AND run_date > DATE '2023-11-28'
-    AND run_date < CURRENT_DATE()
-  GROUP BY run_date
-)
-SELECT
-  date,
-  discounted_arr
-FROM series
-WHERE discounted_arr IS NOT NULL
-ORDER BY date DESC
-LIMIT 1;
-```
-- Components: business-only; no homelab/AI/on-prem/overrides.
-- If you accidentally produce multiple rows (e.g., after adapting a timeseries), sort by date DESC and keep only the first before emitting JSON. Schemas with `maxItems: 1` must end with a single object.
-
-## Template: trials_total_last_not_null (use verbatim for latest trials total)
-```
-WITH series AS (
-  SELECT
-    run_date,
-    MAX(IF(metric_name = 'trials_total', metric_value, NULL)) AS trials_total
-  FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
-    AND run_date < CURRENT_DATE()
-    AND run_date > DATE '2023-11-28'
-  GROUP BY run_date
-)
-SELECT
-  run_date AS date,
-  trials_total
-FROM series
-WHERE trials_total IS NOT NULL
-ORDER BY run_date DESC
-LIMIT 1;
-```
-- Use when the user asks for the current/ latest total number of trials in a window.
-- Pick the latest available run_date in the window (inclusive, capped at yesterday). Do not take the max value across the window.
-
-## Template: trial_6plus_nodes_est_value_stat_last_not_null (use for latest 6+ nodes trial estimated value)
-```
-WITH series AS (
-  SELECT
-    run_date AS date,
-    MAX(IF(metric_name = 'trial_6_or_more_nodes_reachable_sum', metric_value, NULL)) * 2 * 12 AS est_value
-  FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
-    AND run_date < CURRENT_DATE()
-  GROUP BY run_date
-)
-SELECT
-  date,
-  est_value
-FROM series
-WHERE est_value IS NOT NULL
-ORDER BY date DESC
-LIMIT 1;
-```
-- Use only for the latest/current estimated value for trials with 6+ reachable nodes. Return exactly one row (latest in-window).
-
 ## Template: unrealized_arr_barchart_snapshot (use verbatim for newcomer ARR by realization date on a snapshot)
 ```
 SELECT
@@ -3108,31 +2981,6 @@ ORDER BY date
 LIMIT 50;
 ```
 - Use when the user asks for a barchart/summary of unrealized ARR scheduled for realization on **one snapshot** only. Do **not** project or add dates outside that snapshot. If the snapshot returns zero rows, return an empty `data` array and note that no unrealized ARR is scheduled.
-
-## Template: unrealized_arr_latest_stat (use verbatim for latest unrealized ARR in a window)
-```
-WITH series AS (
-  SELECT
-    run_date AS date,
-    MAX(IF(metric_name = 'business_45d_monthly_newcomer_arr', metric_value, NULL)) AS business,
-    MAX(IF(metric_name = 'homelab_45d_monthly_newcomer_arr', metric_value, NULL)) AS homelab
-  FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND LEAST(DATE '{{to_date}}', CURRENT_DATE())
-    AND run_date > DATE '2023-11-28'
-  GROUP BY run_date
-)
-SELECT
-  date,
-  business,
-  homelab
-FROM series
-WHERE business IS NOT NULL OR homelab IS NOT NULL
-ORDER BY date DESC
-LIMIT 1;
-```
-- Use when the user asks for the latest/current unrealized ARR (newcomer ARR) within a window.
-- Always pick the most recent date in-window (ORDER BY date DESC LIMIT 1); do not pick earliest or take max across the window. OR is intentional: one component may be NULL if only one newcomer type exists on that date.
-- Includes both Business and Homelab newcomer plans; totals reflect both categories.
 
 ## Template: unrealized_arr_timeseries (use verbatim for newcomer ARR per day)
 ```
@@ -3899,7 +3747,7 @@ Use these patterns directly; they align with the canonical definitions above. Wh
    - Use the `realized_arr_deltas_7_30_90` template **only**: fixed 90-day date spine ending at `to_date` (default: yesterday), canonical realized ARR per day (baseline per **7.5 Realized ARR Calculation (canonical)**), `LAG` at 7/30/90, return the most recent row with all lags non-null. Do **not** truncate/approximate; if a lag is missing, report it instead of proxying. Ignore any shorter `from_date` the user provides—always build a 90-day spine so 7/30/90 lags can be computed. Do **not** hand-pick dates or compute deltas by subtracting arbitrary dates; stick to the template with LAG().
 
 **Business ARR (discounted) routing**
-- Stat/“latest/now/most recent” business ARR → use `business_arr_discount_stat_last_not_null` (ORDER BY date DESC LIMIT 1).
+- Stat/“latest/now/most recent” business ARR → use `metrics_daily_stat_last_not_null` (registry: `business_arr_discount_current`).
 - Timeseries business ARR → use `business_arr_discount_timeseries`.
 - Do not substitute realized ARR templates for business-only requests.
 - Business ARR is **only** `arr_business_discount` (no homelab, no AI bundles, no on-prem, no overrides). Do not add other components.
@@ -3914,10 +3762,10 @@ Use these patterns directly; they align with the canonical definitions above. Wh
    - Use `space_nodes_delta_top10_homelab` **verbatim** (single SQL) on `ae_reachable_nodes`. Return top 10 increases + top 10 decreases. No trials.
 
 5) **Trials total (latest)**  
-   - Use `trials_total_last_not_null`: per-date MAX then take the latest run_date in-window (capped at yesterday).
+   - Use `metrics_daily_stat_last_not_null` (registry: `trials_total_current`): per-date MAX then take the latest run_date in-window (capped at yesterday).
 
 6) **Trial 6+ nodes estimated value**  
-    - Use `trial_6plus_nodes_est_value_stat_last_not_null` (latest only; ORDER BY date DESC LIMIT 1).
+    - Use `metrics_daily_stat_last_not_null` (registry: `trial_6plus_nodes_est_value_current`).
 
 7) **Business subscriptions (level & 7/30/90 deltas)**  
     - Level: MAX(metric_value) where metric_name IN ('subscriptions_total','total_business_subscriptions'); last non-null.  
@@ -3930,7 +3778,7 @@ Use these patterns directly; they align with the canonical definitions above. Wh
    - metrics_daily: MAX for metric_name IN ('Bundle625.00','Bundle300.00','Bundle1100.00','Bundle2000.00'); per run_date, using the `ai_bundle_metrics_timeseries` template. Do **not** COALESCE missing bundles to zero; keep NULLs so absent bundles remain null.
 
 10) **AI credits spaces (latest stat)**  
-    - Use `ai_credits_spaces_stat_last_not_null` (metrics_daily MAX('ai_credits_space_count'); last non-null). **Do not** use spaces_asat or dp_ai_credits_purchased_sum.
+    - Use `metrics_daily_stat_last_not_null` (registry: `ai_credits_spaces_current`). **Do not** use spaces_asat or dp_ai_credits_purchased_sum.
 
 11) **Total ARR + Unrealized ARR (latest)**  
     - Default to the **stat** template `total_arr_plus_unrealized_arr_latest` (order by date DESC LIMIT 1). Return exactly **one** row, especially when the schema caps `data` to 1 item—if your SQL produces multiple rows, drop all but the most recent before emitting JSON.  
@@ -3938,7 +3786,7 @@ Use these patterns directly; they align with the canonical definitions above. Wh
     - Do **not** return a timeseries unless the user explicitly asks for trend/over-time; if a date window is given but the ask is “latest/current/stat”, still return a single row (latest in-window). Schema maxItems=1 **forces** a single-row payload regardless of user wording.
 
 12) **Unrealized ARR (stat or barchart)**  
-    - Stat: use `unrealized_arr_latest_stat` template: take MAX newcomer metrics per run_date, then order by run_date DESC and LIMIT 1 (latest non-null in window).  
+    - Stat: use `metrics_daily_stat_last_not_null` (registry: `unrealized_arr_latest`): take MAX newcomer metrics per run_date, then order by run_date DESC and LIMIT 1 (latest non-null in window).  
     - Timeseries: use `unrealized_arr_timeseries` for per-day newcomer ARR over a window.  
     - Barchart (snapshot on a specific date): use `unrealized_arr_barchart_snapshot` template on `spaces_asat_*` with `_TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', to_date)`, filter ce_plan_class IN ('Business_45d_monthly_newcomer', 'Homelab_45d_monthly_newcomer'), ax_trial_ends_at IS NULL, bq_arr_discount > 0, group by DATE(cx_arr_realized_at), order by date, limit 50.
 
@@ -3962,7 +3810,7 @@ Use these patterns directly; they align with the canonical definitions above. Wh
     - Use `ending_trial_spaces_barchart_snapshot` with `snapshot_date = to_date` (or the explicit snapshot date the user asks for). Always run the snapshot query; do not substitute a timeseries.
 
 16b) **Homelab subscriptions (stat/latest)**  
-    - Use `homelab_subscriptions_stat_last_not_null` (ORDER BY date DESC LIMIT 1). Do not shift an explicit `to_date`.
+    - Use `metrics_daily_stat_last_not_null` (registry: `homelab_subscriptions_current`). Do not shift an explicit `to_date`.
 
 17) **On-prem customers / ARR (stat)**  
     - Customers: use `on_prem_customers_stat_last_not_null` (metrics_daily MAX('onprem_customers') + legacy fallback **5 customers** only for dates ≤ 2025-10-04). When asked for a **stat/latest** count (schema maxItems=1), return only the most recent run_date (`ORDER BY date DESC LIMIT 1`).
@@ -3981,7 +3829,7 @@ Use these patterns directly; they align with the canonical definitions above. Wh
    - churn_rate = churned_subs / prior-period subs; churned_subs from metrics_daily ('churn_subs'/'churn_business_subs'); prior subs from subscriptions_total at window start or preceding day.
 
 21) **Active users (latest stat, not a series)**  
-   - Use the `active_users_stat_last_not_null` template (metrics_daily `spaces_active_members_sum`) and **always** `ORDER BY date DESC LIMIT 1`, returning exactly one row even if a date range is provided.  
+   - Use `metrics_daily_stat_last_not_null` (registry: `active_users_current`) and **always** `ORDER BY date DESC LIMIT 1`, returning exactly one row even if a date range is provided.  
    - Obey schemas that cap `data` to one item (e.g., `maxItems: 1`). If the schema is strict, drop extra rows instead of returning a timeseries.  
    - Date window: inclusive; cap at yesterday unless the user explicitly asks to include today. Do not switch to a timeseries unless the user clearly requests a trend/over-time view.
 
