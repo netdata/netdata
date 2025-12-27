@@ -36,6 +36,10 @@
 - Consolidation applied (2025-12-26): **Date Handling Precedence (canonical)** added under core workflow; duplicate date rules trimmed in **How to run queries**, **Core execution rules**, and **Known pitfalls 9.3**.
 - Consolidation applied (2025-12-26): **Stat vs Timeseries Decision (canonical)** added; duplicate stat/timeseries and maxItems rules trimmed in **Understanding user requests**, **Output contract**, and **Core execution rules**.
 - Consolidation applied (2025-12-27): **metrics_daily_stat_last_not_null (generic)** added with a Stat KPI registry; removed per‑KPI stat templates for AWS ARR/subscriptions, active users, AI credits, trials total, business ARR, business nodes, homelab subs, unrealized ARR latest, virtual nodes, and trial 6+ estimate.
+- Consolidation applied (2025-12-27): **metrics_daily_timeseries_basic (generic)** added with a Timeseries KPI registry; removed per‑KPI timeseries templates for Business ARR, AI bundles, and Windows reachable nodes breakdown.
+- Consolidation applied (2025-12-27): **metrics_daily_timeseries_spine (generic)** added with a Spine KPI registry; removed `unrealized_arr_timeseries` template and rewired references.
+- Consolidation applied (2025-12-27): **metric_growth_pct_timeseries (generic)** converted to registry + rationale; removed growth % alias templates (customers/business nodes/combined nodes) and rewired references to registry entries.
+- Consolidation applied (2025-12-27): **segment_snapshot (generic)** added with a snapshot registry; removed per‑template snapshot segment counts/percent templates for spaces and nodes, and rewired references.
 
 ## Philosophy (Costa, 2025-12-26)
 - Goal is to **educate the agent**, not constrain it as a “dummy.” Avoid “do X because we say so.”
@@ -633,6 +637,35 @@ P-E: Consolidate **Manual Baseline Logic** into a single section with explicit c
      - Pros: uses space-level truth; intuitive for “customer ARR.”
      - Cons: heavy query; not the KPI rollup; can diverge from metrics_daily.
    - Recommendation: **A** (most consistent with existing KPI definitions and reduces ambiguity).
+
+### Decisions needed (2025-12-27) — template family centralization (explain‑why, not rigid rules)
+**Context:** Extend the “single template + registry + rationale/pitfalls/joins” pattern beyond stat KPIs. Goal: reduce size while improving model understanding and safe improvisation.
+1) **Which template family to centralize next (first pass)?**
+   - Option A: **metrics_daily_timeseries_basic** (no date spine; per‑day MAX for asat metrics).  
+     - Pros: lots of repetition; low risk; aligns with existing patterns.
+     - Cons: still need a separate spine template for growth‑% and null‑preserving series.
+   - Option B: **metrics_daily_timeseries_spine** (null‑preserving date spine).  
+     - Pros: clarifies include‑today + missing dates; handles growth‑% prerequisites.
+     - Cons: slightly higher risk; must be precise about when a spine is required.
+   - Option C: **growth_pct_timeseries** registry (already canonical SQL, add registry + rationale/pitfalls).  
+     - Pros: improves clarity without touching SQL; low risk.
+     - Cons: smaller size reduction.
+   - Option D: **snapshot mix/counts** templates (spaces/nodes segment counts & percents).  
+     - Pros: reduces duplicated explanations; improves correctness for % math.
+     - Cons: limited size reduction.
+   - Recommendation: **A first**, then **B**, then **C**.
+2) **Allowed operations per family**
+   - Option A: Only **metric_name selection + aliases** (strict).  
+     - Pros: safest; least ambiguity.
+     - Cons: less improvisation.
+   - Option B: Allow **simple arithmetic** across compatible metrics (sum/multipliers).  
+     - Pros: supports more real‑world questions; aligns with “educate, not constrain”.
+     - Cons: needs clear pitfalls/units guidance.
+   - Recommendation: **B**, with explicit “compatible units only” guidance.
+
+### Decisions locked (2025-12-27) — template family centralization order + freedom
+- D20: **Order** for template family centralization: A → B → C → D (timeseries basic → timeseries spine → growth % registry → snapshot mix/counts).
+- D21: **Allowed operations**: Option **B** (allow simple arithmetic across compatible metrics) with explicit unit‑compatibility guidance.
 
 ### Decisions needed (2025-12-24) — stat KPI schema shape
 1) **Schema shape for single-value KPIs**

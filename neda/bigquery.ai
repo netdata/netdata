@@ -283,15 +283,15 @@ Users may not explicitly ask using the right terminology. Use this table to map 
 | Total ARR incl. unrealized (latest) | use `total_arr_plus_unrealized_arr_latest` stat template (ORDER BY date DESC LIMIT 1); return one row |
 | Trial 6+ nodes estimated value (latest/current) | use `metrics_daily_stat_last_not_null` (registry: `trial_6plus_nodes_est_value_current`) |
 | Ending trial spaces / trials ending / trial end date | use `ending_trial_spaces_barchart_snapshot` with the requested snapshot date; group by DATE(ax_trial_ends_at) and sum reachable nodes |
-| SaaS spaces (counts by segment, snapshot) | use `spaces_segment_counts_snapshot` verbatim for the snapshot date; return counts per bucket |
-| SaaS spaces (percent mix by segment, snapshot) | use `spaces_segment_percent_snapshot` verbatim; values already in 0–100 scale + `check` |
-| Nodes total view % / reachable nodes mix % (snapshot) | use `nodes_segment_percent_snapshot` verbatim; values already in 0–100 scale + `check` |
-| Windows reachable nodes breakdown (per day) | use `windows_reachable_nodes_breakdown_timeseries` verbatim (metrics_daily windows_reachable_nodes_*); do NOT use spaces_asat |
-| Customers/subscriptions growth % | use `metric_growth_pct_timeseries` with metric_expr = total_business_subscriptions + total_homelab_subscriptions (exact expression from FAQ) |
-| Business nodes growth % | use `metric_growth_pct_timeseries` with metric_expr = paid_nodes_business_annual + paid_nodes_business_monthly |
-| Business + Homelab nodes growth % | use `metric_growth_pct_timeseries` with metric_expr = paid_nodes_business_* + total_reachable_nodes_homelab |
-| Reachable nodes growth % | use `metric_growth_pct_timeseries` with metric_expr = `MAX(IF(metric_name = 'nodes_reachable', metric_value, NULL))` (no window widening) |
-| Homelab reachable nodes growth % | use `metric_growth_pct_timeseries` with metric_expr = `MAX(IF(metric_name = 'total_reachable_nodes_homelab', metric_value, NULL))` (no window widening) |
+| SaaS spaces (counts by segment, snapshot) | use `segment_snapshot` (registry: `spaces_segment_counts_snapshot`); return counts per bucket |
+| SaaS spaces (percent mix by segment, snapshot) | use `segment_snapshot` (registry: `spaces_segment_percent_snapshot`); values already in 0–100 scale + `check` |
+| Nodes total view % / reachable nodes mix % (snapshot) | use `segment_snapshot` (registry: `nodes_segment_percent_snapshot`); values already in 0–100 scale + `check` |
+| Windows reachable nodes breakdown (per day) | use `metrics_daily_timeseries_basic` (registry: `windows_reachable_nodes_breakdown_series`); do NOT use spaces_asat |
+| Customers/subscriptions growth % | use `metric_growth_pct_timeseries` (registry: `customers_growth_pct`) |
+| Business nodes growth % | use `metric_growth_pct_timeseries` (registry: `business_nodes_growth_pct`) |
+| Business + Homelab nodes growth % | use `metric_growth_pct_timeseries` (registry: `nodes_combined_growth_pct`) |
+| Reachable nodes growth % | use `metric_growth_pct_timeseries` (registry: `reachable_nodes_growth_pct`) |
+| Homelab reachable nodes growth % | use `metric_growth_pct_timeseries` (registry: `homelab_reachable_nodes_growth_pct`) |
 | Top 10 ARR gains/losses by customer/space | use `space_arr_delta_top10` (single SQL); return all rows from SQL (top 10 positive + top 10 negative) |
 | Top 10 nodes gained/lost (Business/Homelab) | use `space_nodes_delta_top10_business` / `space_nodes_delta_top10_homelab` verbatim; return all rows from SQL |
 | ARR change between T0 and T1 (components) | use `realized_arr_kpi_delta_window` verbatim; do not rename `*_delta` keys |
@@ -484,7 +484,7 @@ If the user does not specify an output schema/format, respond in clear prose. If
 - 7/30/90 **delta** asks (business ARR, paid nodes, subscriptions, etc.): use `metric_delta_7_30_90_latest` with the fixed 120-day lookback ending at `to_date` (ignore any shorter `from_date`). **HARD STOP:** never shrink the window or switch to the growth % template; keep `DATE_SUB(to_date, INTERVAL 120 DAY)` in the WHERE clause and return the latest row with all lags non-null (or explain if lags are missing).
 - Realized ARR deltas (7/30/90): use `realized_arr_deltas_7_30_90` with the fixed 90-day spine ending at `to_date` (default: yesterday). **HARD STOP:** never shorten the spine to the user’s from_date; do not substitute a shorter date window. Return the latest row with all lags non-null; if lags are unavailable, state it explicitly instead of returning NULL where the template expects values.
 - Realized ARR baseline rules are defined in **7.5 Realized ARR Calculation (canonical)**; never join `manual360_asat_*` per day for realized ARR.
-- Business-only revenue asks (“business ARR”, “business revenue”, “business discounted ARR”): use `metrics_daily_stat_last_not_null` (registry: `business_arr_discount_current`) for stat and `business_arr_discount_timeseries` for series. Do **not** add homelab/AI/on-prem/overrides and do **not** substitute realized/total ARR templates.
+- Business-only revenue asks (“business ARR”, “business revenue”, “business discounted ARR”): use `metrics_daily_stat_last_not_null` (registry: `business_arr_discount_current`) for stat and `metrics_daily_timeseries_basic` (registry: `business_arr_discount_series`) for series. Do **not** add homelab/AI/on-prem/overrides and do **not** substitute realized/total ARR templates.
 - `metrics_daily`: one row per run_date; pivot with `MAX(IF(metric_name=..., metric_value, NULL))` per metric per date; aggregate across dates/entities with SUM/AVG as appropriate.
 - `spaces_asat_*`: snapshot truth per snapshot date; aggregate within a single snapshot; do not sum across multiple snapshots unless the intent is a time trend.
 
@@ -2334,7 +2334,7 @@ For string comparisons:
 - **Stat vs timeseries routing for total ARR + unrealized ARR**: "total ARR including unrealized/newcomer/45d, now/today/yesterday/latest/current" → use the `total_arr_plus_unrealized_arr_latest` **stat** template (last non-null in window, `ORDER BY date DESC LIMIT 1`) and return a single row. **HARD STOP:** never emit a per-day series when the ask/schema implies a single latest value; if your query yields multiple rows, sort by date DESC and drop all but the first before returning JSON. If the user supplies a from/to window, treat it as the search window but still return **one** latest row (respect schemas that cap `data` to 1 item).
 - **Stat vs timeseries routing for realized ARR**: "latest/now/current/last realized ARR" (even with a date window) → use `realized_arr_components_stat_last_not_null` (breakdown + total) and return one row (order by date DESC LIMIT 1). Only use `realized_arr_timeseries` when the user explicitly asks for per-day/trend.
 - Never run `realized_arr_timeseries` when the request or schema implies a single latest value; go straight to the stat template or add `ORDER BY date DESC LIMIT 1` to the query so only one row is produced.
-- **Stat vs timeseries routing for Business ARR**: "latest/now/current/last business ARR/Business revenue" → use `metrics_daily_stat_last_not_null` (registry: `business_arr_discount_current`) and return one row. Only use `business_arr_discount_timeseries` when the user explicitly asks for per-day/trend. If a schema caps `data` to 1 item, drop all but the most recent row before returning.
+- **Stat vs timeseries routing for Business ARR**: "latest/now/current/last business ARR/Business revenue" → use `metrics_daily_stat_last_not_null` (registry: `business_arr_discount_current`) and return one row. Only use `metrics_daily_timeseries_basic` (registry: `business_arr_discount_series`) when the user explicitly asks for per-day/trend. If a schema caps `data` to 1 item, drop all but the most recent row before returning.
 - **Latest within a date window**: If the user supplies a date window but asks for "latest/most recent/last" total ARR (with or without unrealized), search that window but still return only the latest non-null row (stat template) — do **not** emit the whole per-day series.
 
 ### 9.9 Table Name Typos
@@ -2489,21 +2489,168 @@ LIMIT 1;
 - `trial_6plus_nodes_est_value_current` → metric_expr: `trial_6_or_more_nodes_reachable_sum * 2 * 12`; output_fields: `est_value`; non_null: `est_value IS NOT NULL`.
 - `unrealized_arr_latest` → metric_names: `business_45d_monthly_newcomer_arr`, `homelab_45d_monthly_newcomer_arr`; output_fields: `business`, `homelab`; non_null: `business IS NOT NULL OR homelab IS NOT NULL`; min_date: `2023-11-28`.
 
-## Template: windows_reachable_nodes_breakdown_timeseries (use for Windows reachable nodes per segment)
-```
+## Template: metrics_daily_timeseries_basic (generic portfolio KPI series)
+This is the **fastest** way to answer “per‑day / trend / timeseries” KPI questions that live in `metrics.metrics_daily` as **asat** metrics, when you do **not** need a null‑preserving date spine.
+
+**When to use**:
+- The request is “per‑day / trend / timeseries” for a portfolio KPI stored in `metrics.metrics_daily` with **asat** granularity.
+- It’s acceptable to return only days that exist in `metrics_daily` (no synthetic date spine).
+
+**When NOT to use**:
+- If you must **preserve missing dates** (use the spine template).
+- If the metric is a **daily flow** that must be SUMed over a window (use a flow template).
+- If the KPI needs baseline/fallback logic or joins (use its dedicated template).
+
+**Useful metric operations (supported by this template)**:
+- Multiple metric columns in one result (e.g., breakdown by segment).
+- Simple arithmetic across **compatible units** (sum of asat metrics, or constant multipliers).
+- Output aliases that match schema field names.
+
+**Useful joins**:
+- None. This template is for portfolio KPI rollups already aggregated in `metrics.metrics_daily`.
+- If you need entity attributes or per‑space detail, use `watch_towers.spaces_*` + `app_db_replication` joins instead.
+
+**Pitfalls / best practices**:
+- Do **not** use MAX on **daily** flow metrics (new/churn); those require SUM over a window.
+- Do **not** include today unless explicitly requested (apply **Date Handling Precedence (canonical)**).
+- If the user explicitly says **include today**, change `run_date < CURRENT_DATE()` to `<= CURRENT_DATE()`.
+- If a metric started later, apply its **min_date** filter from the registry.
+- If preserving NULLs matters, use a spine template and avoid COALESCE unless required by the schema.
+
+**How to decide if a metric fits**:
+- It is in `metrics.metrics_daily`.
+- The metric’s granularity is **asat**.
+- Missing dates are acceptable (no spine required).
+
+```sql
 SELECT
   run_date AS date,
-  MAX(IF(metric_name = 'windows_reachable_nodes_business', metric_value, NULL)) AS business,
-  MAX(IF(metric_name = 'windows_reachable_nodes_trial', metric_value, NULL)) AS trial,
-  MAX(IF(metric_name = 'windows_reachable_nodes_community', metric_value, NULL)) AS community,
-  MAX(IF(metric_name = 'windows_reachable_nodes_homelab', metric_value, NULL)) AS homelab
+  __METRIC_SELECT__
 FROM `netdata-analytics-bi.metrics.metrics_daily`
 WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
   AND run_date < CURRENT_DATE()
+  {{min_date_filter}}
 GROUP BY run_date
-ORDER BY run_date;
+HAVING __NON_NULL_PREDICATE__
+ORDER BY date;
 ```
-- Use **only** for Windows reachable nodes breakdown (business/trial/community/homelab). Do **not** use `spaces_asat_*` or total reachable nodes.
+
+**Timeseries KPI registry (use with this template)**:
+- `business_arr_discount_series` → metric_names: `arr_business_discount`; output_fields: `discounted_arr`; non_null: `discounted_arr IS NOT NULL`; min_date: `2023-11-28`.
+- `ai_bundles_series` → metric_names: `Bundle625.00`, `Bundle300.00`, `Bundle1100.00`, `Bundle2000.00`; output_fields: `bundle_625`, `bundle_300`, `bundle_1100`, `bundle_2000`; non_null: `1=1` (preserve NULLs; do not COALESCE); min_date: `2023-11-28`.
+- `windows_reachable_nodes_breakdown_series` → metric_names: `windows_reachable_nodes_business`, `windows_reachable_nodes_trial`, `windows_reachable_nodes_community`, `windows_reachable_nodes_homelab`; output_fields: `business`, `trial`, `community`, `homelab`; non_null: `1=1`; min_date: `2023-11-28`.
+
+## Template: metrics_daily_timeseries_spine (generic spine series)
+Use this when you must **preserve missing dates** in a time range (null‑preserving spine), while still relying on `metrics.metrics_daily` as the KPI source of truth.
+
+**When to use**:
+- The request is “per‑day / trend / timeseries,” and missing dates must still appear.
+- The KPI is in `metrics.metrics_daily` with **asat** granularity.
+
+**When NOT to use**:
+- If missing dates are acceptable (use `metrics_daily_timeseries_basic`).
+- If the KPI needs baseline/fallback logic or joins (use its dedicated template).
+- If the metric is a **daily flow** that must be SUMed over a window (use a flow template).
+
+**Useful metric operations (supported by this template)**:
+- Simple arithmetic across **compatible units** (sum of asat metrics, or constant multipliers).
+- Optional COALESCE to 0 where the business meaning is “missing = 0.”
+
+**Useful joins**:
+- None. This template preserves dates; it does not add entity context.
+
+**Pitfalls / best practices**:
+- Do **not** use MAX on **daily** flow metrics (new/churn); those require SUM over a window.
+- Do **not** include today unless explicitly requested (apply **Date Handling Precedence (canonical)** before substituting dates).
+- If you COALESCE, be explicit why “missing = 0”; otherwise keep NULLs.
+- Use the registry to set min_date and non_null predicates correctly.
+
+```sql
+WITH dates AS (
+  SELECT date
+  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '{{from_date}}', DATE '{{to_date}}')) AS date
+),
+series AS (
+  SELECT
+    run_date AS date,
+    __METRIC_SELECT__
+  FROM `netdata-analytics-bi.metrics.metrics_daily`
+  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+    {{min_date_filter}}
+  GROUP BY run_date
+)
+SELECT
+  d.date,
+  __OUTPUT_SELECT__
+FROM dates d
+LEFT JOIN series s ON d.date = s.date
+WHERE d.date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+ORDER BY d.date;
+```
+
+**Spine KPI registry (use with this template)**:
+- `unrealized_arr_series` → metric_names: `business_45d_monthly_newcomer_arr`, `homelab_45d_monthly_newcomer_arr`; output_fields: `business`, `homelab`; output_select: `COALESCE(s.business, 0) AS business, COALESCE(s.homelab, 0) AS homelab`; non_null: `business IS NOT NULL OR homelab IS NOT NULL`; min_date: `2023-11-28`.
+
+## Template: metric_growth_pct_timeseries (generic growth % with null-preserving spine)
+Use this when the user asks for **7/30/90 growth %** over a window. It preserves missing dates and leaves early lag values as NULL.
+
+**When to use**:
+- Growth % asks over a date window (7/30/90), where NULL lags are expected at the start.
+- Metrics live in `metrics.metrics_daily` and can be expressed as a single numeric `metric_expr`.
+
+**When NOT to use**:
+- Absolute deltas (use the delta templates).
+- Any request requiring a different lag set or custom window widening.
+
+**Useful metric operations**:
+- Simple arithmetic across compatible units (sums of asat metrics, constant multipliers).
+- Use COALESCE only when missing = 0 is semantically correct.
+
+**Pitfalls / best practices**:
+- **HARD STOP:** never widen the window to fill lags; keep NULL pct_* where history is missing.
+- Do **not** override NULL pct_* values with 0.
+- Apply **Date Handling Precedence (canonical)** before substituting dates.
+
+```sql
+WITH dates AS (
+  SELECT date
+  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '{{from_date}}', DATE '{{to_date}}')) AS date
+),
+series AS (
+  SELECT
+    run_date AS date,
+    __METRIC_EXPR__ AS metric
+  FROM `netdata-analytics-bi.metrics.metrics_daily`
+  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+    AND run_date > DATE '2023-11-28'
+    AND run_date < CURRENT_DATE()
+  GROUP BY run_date
+),
+calc AS (
+  SELECT
+    date,
+    SAFE_DIVIDE(metric - LAG(metric, 7) OVER (ORDER BY date), LAG(metric, 7) OVER (ORDER BY date)) * 100 AS pct_7,
+    SAFE_DIVIDE(metric - LAG(metric, 30) OVER (ORDER BY date), LAG(metric, 30) OVER (ORDER BY date)) * 100 AS pct_30,
+    SAFE_DIVIDE(metric - LAG(metric, 90) OVER (ORDER BY date), LAG(metric, 90) OVER (ORDER BY date)) * 100 AS pct_90
+  FROM series
+)
+SELECT
+  d.date,
+  CASE WHEN DATE_SUB(d.date, INTERVAL 7 DAY) < DATE '{{from_date}}' THEN NULL ELSE c.pct_7 END AS pct_7,
+  CASE WHEN DATE_SUB(d.date, INTERVAL 30 DAY) < DATE '{{from_date}}' THEN NULL ELSE c.pct_30 END AS pct_30,
+  CASE WHEN DATE_SUB(d.date, INTERVAL 90 DAY) < DATE '{{from_date}}' THEN NULL ELSE c.pct_90 END AS pct_90
+FROM dates d
+LEFT JOIN calc c ON d.date = c.date
+WHERE d.date < CURRENT_DATE()
+ORDER BY d.date;
+```
+
+**Growth % KPI registry (use with this template)**:
+- `customers_growth_pct` → metric_expr: `MAX(IF(metric_name = 'total_business_subscriptions', metric_value, NULL)) + COALESCE(MAX(IF(metric_name = 'total_homelab_subscriptions', metric_value, NULL)), 0)`; notes: “customers/subscriptions growth %”.
+- `business_nodes_growth_pct` → metric_expr: `COALESCE(MAX(IF(metric_name = 'paid_nodes_business_annual', metric_value, NULL)),0) + COALESCE(MAX(IF(metric_name = 'paid_nodes_business_monthly', metric_value, NULL)),0)`.
+- `nodes_combined_growth_pct` → metric_expr: `COALESCE(MAX(IF(metric_name = 'paid_nodes_business_annual', metric_value, NULL)),0) + COALESCE(MAX(IF(metric_name = 'paid_nodes_business_monthly', metric_value, NULL)),0) + COALESCE(MAX(IF(metric_name = 'total_reachable_nodes_homelab', metric_value, NULL)),0)`.
+- `reachable_nodes_growth_pct` → metric_expr: `MAX(IF(metric_name = 'nodes_reachable', metric_value, NULL))`.
+- `homelab_reachable_nodes_growth_pct` → metric_expr: `MAX(IF(metric_name = 'total_reachable_nodes_homelab', metric_value, NULL))`.
 
 ## Template: on_prem_customers_stat_last_not_null (use for current/latest on-prem customer count)
 ```
@@ -2945,27 +3092,6 @@ LIMIT 1;
 ```
 - Use this alias when the user asks for **Business subscriptions deltas** (7/30/90). Do not swap the 30/90 labels.
 
-## Template: business_arr_discount_timeseries (use verbatim for Business ARR discounted per day)
-```
-WITH series AS (
-  SELECT
-    run_date AS date,
-    MAX(IF(metric_name = 'arr_business_discount', metric_value, NULL)) AS discounted_arr
-  FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
-    AND run_date > DATE '2023-11-28'
-    AND run_date < CURRENT_DATE()
-  GROUP BY run_date
-)
-SELECT
-  date,
-  discounted_arr
-FROM series
-WHERE discounted_arr IS NOT NULL
-ORDER BY date;
-```
-- Components: this is business-only; do not add homelab/AI/on-prem/overrides.
-
 ## Template: unrealized_arr_barchart_snapshot (use verbatim for newcomer ARR by realization date on a snapshot)
 ```
 SELECT
@@ -2981,50 +3107,6 @@ ORDER BY date
 LIMIT 50;
 ```
 - Use when the user asks for a barchart/summary of unrealized ARR scheduled for realization on **one snapshot** only. Do **not** project or add dates outside that snapshot. If the snapshot returns zero rows, return an empty `data` array and note that no unrealized ARR is scheduled.
-
-## Template: unrealized_arr_timeseries (use verbatim for newcomer ARR per day)
-```
-WITH dates AS (
-  SELECT date
-  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '{{from_date}}', DATE '{{to_date}}')) AS date
-),
-series AS (
-  SELECT
-    run_date AS date,
-    MAX(IF(metric_name = 'business_45d_monthly_newcomer_arr', metric_value, NULL)) AS business,
-    MAX(IF(metric_name = 'homelab_45d_monthly_newcomer_arr', metric_value, NULL)) AS homelab
-  FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND LEAST(DATE '{{to_date}}', CURRENT_DATE())
-    AND run_date > DATE '2023-11-28'
-  GROUP BY run_date
-)
-SELECT
-  d.date,
-  COALESCE(s.business, 0) AS business,
-  COALESCE(s.homelab, 0) AS homelab
-FROM dates d
-LEFT JOIN series s ON d.date = s.date
-WHERE d.date <= LEAST(DATE '{{to_date}}', CURRENT_DATE())
-ORDER BY d.date;
-```
-- Use when the user asks for newcomer/unrealized ARR per day over a window.
-- Components cover both Business and Homelab newcomers. Dates are inclusive, capped at yesterday.
-
-## Template: ai_bundle_metrics_timeseries (use verbatim for AI bundle units per day; preserve NULLs)
-```
-SELECT
-  run_date AS date,
-  MAX(IF(metric_name = 'Bundle625.00',  metric_value, NULL)) AS bundle_625,
-  MAX(IF(metric_name = 'Bundle300.00',  metric_value, NULL)) AS bundle_300,
-  MAX(IF(metric_name = 'Bundle1100.00', metric_value, NULL)) AS bundle_1100,
-  MAX(IF(metric_name = 'Bundle2000.00', metric_value, NULL)) AS bundle_2000
-FROM `netdata-analytics-bi.metrics.metrics_daily`
-WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
-  AND run_date < CURRENT_DATE()
-GROUP BY run_date
-ORDER BY run_date;
-```
-- Use when the user asks for AI bundle metrics per day (Bundle625/300/1100/2000). Do **not** coalesce to zero; missing bundles must remain NULL to match reference outputs and schemas.
 
 ## Template: ending_trial_spaces_barchart_snapshot (use verbatim for trial end-date barchart)
 ```
@@ -3043,129 +3125,32 @@ LIMIT 50;
 - If zero rows, return empty `data` array; do not fall back to metrics_daily or other tables.
 - **Always run this query** when the user asks for “ending trial spaces” / “trial ending” / “trial end-date barchart”. Do not stop after freshness alone.
 
-## Template: spaces_segment_counts_snapshot (use verbatim for SaaS space counts by segment on a snapshot)
-```
-SELECT
-  SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Business", 1, 0)) AS Business,
-  SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class LIKE "Business_%", 1, 0)) AS `Business_<45d`,
-  SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Homelab", 1, 0)) AS Homelab,
-  SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class LIKE "Homelab_%", 1, 0)) AS `Homelab_<45d`,
-  SUM(IF(ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes, 0) < 1, 1, 0)) AS Trials_0_nodes,
-  SUM(IF(ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes, 0) BETWEEN 1 AND 5, 1, 0)) AS `Trials_1-5_nodes`,
-  SUM(IF(ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes, 0) >= 6, 1, 0)) AS `Trials_6+_nodes`,
-  SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Community" AND COALESCE(ae_reachable_nodes, 0) < 1, 1, 0)) AS Community_0_nodes,
-  SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Community" AND COALESCE(ae_reachable_nodes, 0) >= 1, 1, 0)) AS Community_w_nodes,
-  COUNT(*) AS Total
-FROM `netdata-analytics-bi.watch_towers.spaces_asat_*`
-WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '{{snapshot_date}}');
-```
- - HARD STOP (mix % snapshot): If the user wants the percent/share/mix of spaces by segment (Business, Business_<45d, Homelab, Homelab_<45d, Trials 0/1-5/6+, Community 0/w_nodes) on any snapshot date, **always** use this template verbatim. Do **not** use `ask_data_insights`, do **not** write a custom query, do **not** post-process. The template already multiplies by 100; return numbers in the 0–100 range exactly as produced. Never divide by 100 or renormalize; keep the `check` column as returned (0 when total = 100%, else 999999). If you ever fetch raw counts for debugging, you **must** still return percentages = (count/total)*100 in the final JSON—never return raw ratios (0–1) to the user.
+## Template: segment_snapshot (generic counts/percent mix on a snapshot)
+Use this when the user asks for **segment counts or percent mix** on a single `spaces_asat_*` snapshot. This is the **fastest** way to reproduce Grafana “segment mix” panels without pulling full snapshots into the model.
 
-## Template: spaces_segment_percent_snapshot (use verbatim for SaaS space mix % on a snapshot)
-```
-WITH counts AS (
-  SELECT
-    SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Business", 1, 0)) AS Business,
-    SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class LIKE "Business_%", 1, 0)) AS `Business_<45d`,
-    SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Homelab", 1, 0)) AS Homelab,
-    SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class LIKE "Homelab_%", 1, 0)) AS `Homelab_<45d`,
-    SUM(IF(ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes, 0) < 1, 1, 0)) AS Trials_0_nodes,
-    SUM(IF(ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes, 0) BETWEEN 1 AND 5, 1, 0)) AS `Trials_1-5_nodes`,
-    SUM(IF(ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes, 0) >= 6, 1, 0)) AS `Trials_6+_nodes`,
-    SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Community" AND COALESCE(ae_reachable_nodes, 0) < 1, 1, 0)) AS Community_0_nodes,
-    SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Community" AND COALESCE(ae_reachable_nodes, 0) >= 1, 1, 0)) AS Community_w_nodes,
-    (
-      SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Business", 1, 0))
-      + SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Homelab", 1, 0))
-      + SUM(IF(ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes, 0) < 1, 1, 0))
-      + SUM(IF(ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes, 0) BETWEEN 1 AND 5, 1, 0))
-      + SUM(IF(ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes, 0) >= 6, 1, 0))
-      + SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Community" AND COALESCE(ae_reachable_nodes, 0) < 1, 1, 0))
-      + SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Community" AND COALESCE(ae_reachable_nodes, 0) >= 1, 1, 0))
-      + SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class LIKE "Business_%", 1, 0))
-      + SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class LIKE "Homelab_%", 1, 0))
-    ) AS calculated_total,
-    COUNT(*) AS total
-  FROM `netdata-analytics-bi.watch_towers.spaces_asat_*`
-  WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '{{snapshot_date}}')
-)
-SELECT
-  SAFE_DIVIDE(Business, total) * 100 AS Business,
-  SAFE_DIVIDE(`Business_<45d`, total) * 100 AS `Business_<45d`,
-  SAFE_DIVIDE(Homelab, total) * 100 AS Homelab,
-  SAFE_DIVIDE(`Homelab_<45d`, total) * 100 AS `Homelab_<45d`,
-  SAFE_DIVIDE(Trials_0_nodes, total) * 100 AS Trials_0_nodes,
-  SAFE_DIVIDE(`Trials_1-5_nodes`, total) * 100 AS `Trials_1-5_nodes`,
-  SAFE_DIVIDE(`Trials_6+_nodes`, total) * 100 AS `Trials_6+_nodes`,
-  SAFE_DIVIDE(Community_0_nodes, total) * 100 AS Community_0_nodes,
-  SAFE_DIVIDE(Community_w_nodes, total) * 100 AS Community_w_nodes,
-  IF(CAST(SAFE_DIVIDE(calculated_total, total) * 100 AS INT64) = 100, 0, 999999) AS check
-FROM counts;
-```
-- Same snapshot as counts; return percentages by dividing by total count. `check` must be returned (0 when segments sum to ~100%).
-- Keep the scale exactly as written (SAFE_DIVIDE * 100). Do **not** re-normalize or convert again; the template already yields percentage values for **all** buckets (including Community_*).
-- HARD STOP: Do **not** compute percentages client-side from the counts query—run this template directly and return its output as-is. No post-processing, no extra rounding, no additional scaling.
-- Do not round or reformat the numbers; keep the raw BigQuery numeric output (double precision). Do not coerce to strings or trim decimals—the harness expects the exact values the query returns.
-- Do not drop segments or reorder; if total = 0, `SAFE_DIVIDE` yields NULL—return NULL/0, not fallback values.
+**When to use**:
+- The ask is a **snapshot** (as‑of date) for counts or mix by segment.
+- You need either **space counts** or **reachable node counts** by the standard buckets.
 
-## Template: nodes_segment_counts_snapshot (use verbatim for reachable nodes by segment on a snapshot)
-```
-SELECT
-  SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Business", ae_reachable_nodes, 0)) AS Business,
-  SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class LIKE "Business_%", ae_reachable_nodes, 0)) AS `Business_<45d`,
-  SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Homelab", ae_reachable_nodes, 0)) AS Homelab,
-  SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class LIKE "Homelab_%", ae_reachable_nodes, 0)) AS `Homelab_<45d`,
-  SUM(IF(ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes, 0) BETWEEN 1 AND 5, ae_reachable_nodes, 0)) AS `Trials_1-5_nodes`,
-  SUM(IF(ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes, 0) >= 6, ae_reachable_nodes, 0)) AS `Trials_6+_nodes`,
-  SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Community" AND COALESCE(ae_reachable_nodes, 0) >= 1, ae_reachable_nodes, 0)) AS Community_w_nodes,
-  SUM(ae_reachable_nodes) AS Total
-FROM `netdata-analytics-bi.watch_towers.spaces_asat_*`
-WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '{{snapshot_date}}');
-```
-- Snapshot on `spaces_asat_*` at `snapshot_date` (use `_TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', snapshot_date)`).
-- Sums reachable nodes (ae_reachable_nodes) by customer segments and newcomer/trial buckets; includes Community with nodes only (Community without nodes is excluded from this nodes-focused view).
-- Always return every segment even if zero; do not drop buckets or coalesce NULLs to other buckets.
+**When NOT to use**:
+- Timeseries over multiple dates (use snapshot‑series patterns or metrics_daily if appropriate).
+- Per‑space lists (use `spaces_asat_*` directly with detailed columns).
 
-## Template: nodes_segment_percent_snapshot (use verbatim for reachable-node mix % on a snapshot)
-```
-WITH sums AS (
-  SELECT
-    SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Business", ae_reachable_nodes, 0)) AS Business,
-    SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class LIKE "Business_%", ae_reachable_nodes, 0)) AS `Business_<45d`,
-    SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Homelab", ae_reachable_nodes, 0)) AS Homelab,
-    SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class LIKE "Homelab_%", ae_reachable_nodes, 0)) AS `Homelab_<45d`,
-    SUM(IF(ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes, 0) BETWEEN 1 AND 5, ae_reachable_nodes, 0)) AS `Trials_1-5_nodes`,
-    SUM(IF(ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes, 0) >= 6, ae_reachable_nodes, 0)) AS `Trials_6+_nodes`,
-    SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Community" AND COALESCE(ae_reachable_nodes, 0) >= 1, ae_reachable_nodes, 0)) AS Community_w_nodes,
-    (
-      SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Business", ae_reachable_nodes, 0))
-      + SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Homelab", ae_reachable_nodes, 0))
-      + SUM(IF(ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes, 0) < 1, ae_reachable_nodes, 0))
-      + SUM(IF(ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes, 0) BETWEEN 1 AND 5, ae_reachable_nodes, 0))
-      + SUM(IF(ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes, 0) >= 6, ae_reachable_nodes, 0))
-      + SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Community" AND COALESCE(ae_reachable_nodes, 0) < 1, ae_reachable_nodes, 0))
-      + SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class = "Community" AND COALESCE(ae_reachable_nodes, 0) >= 1, ae_reachable_nodes, 0))
-      + SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class LIKE "Business_%", ae_reachable_nodes, 0))
-      + SUM(IF(ax_trial_ends_at IS NULL AND ce_plan_class LIKE "Homelab_%", ae_reachable_nodes, 0))
-    ) AS calculated_total,
-    SUM(ae_reachable_nodes) AS total
-  FROM `netdata-analytics-bi.watch_towers.spaces_asat_*`
-  WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '{{snapshot_date}}')
-)
-SELECT
-  SAFE_DIVIDE(Business, total) * 100 AS Business,
-  SAFE_DIVIDE(`Business_<45d`, total) * 100 AS `Business_<45d`,
-  SAFE_DIVIDE(Homelab, total) * 100 AS Homelab,
-  SAFE_DIVIDE(`Homelab_<45d`, total) * 100 AS `Homelab_<45d`,
-  SAFE_DIVIDE(`Trials_1-5_nodes`, total) * 100 AS `Trials_1-5_nodes`,
-  SAFE_DIVIDE(`Trials_6+_nodes`, total) * 100 AS `Trials_6+_nodes`,
-  SAFE_DIVIDE(Community_w_nodes, total) * 100 AS Community_w_nodes,
-  IF(CAST(SAFE_DIVIDE(calculated_total, total) * 100 AS INT64) = 100, 0, 999999) AS check
-FROM sums;
-```
-- Snapshot on `spaces_asat_*` at `snapshot_date`; percentages are already scaled (*100). Do **not** re-normalize or rescale after running this template.
-- Return every bucket **and the `check` column** exactly as in the query; if total = 0, SAFE_DIVIDE yields NULL—return NULL/0 rather than fabricating values. **HARD STOP:** Never drop `check` from the JSON payload (even if 0); keep it in `data` alongside the other buckets.
-- Use this template for any “nodes total view percent / reachable nodes mix %” style question (e.g., Grafana “nodes total view %” panel).
+**Useful operations**:
+- Counts or sums within a single snapshot.
+- Percent mix = segment / total * 100 (must use SAFE_DIVIDE; no client‑side recompute).
+
+**Pitfalls / best practices**:
+- Always use `_TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '{{snapshot_date}}')`.
+- Do **not** re‑normalize or rescale; templates already output 0–100 percentages.
+- Always return the `check` column for percent templates.
+- Do **not** swap space counts with node sums; they are different datasets and totals.
+
+**Snapshot KPI registry (use with this template)**:
+- `spaces_segment_counts_snapshot` → source: `spaces_asat_*`; measure: counts; buckets: Business, Business_<45d, Homelab, Homelab_<45d, Trials_0, Trials_1‑5, Trials_6+, Community_0, Community_w, Total.
+- `spaces_segment_percent_snapshot` → source: `spaces_asat_*`; measure: percent mix of counts; must include `check`.
+- `nodes_segment_counts_snapshot` → source: `spaces_asat_*`; measure: SUM(ae_reachable_nodes); buckets: Business, Business_<45d, Homelab, Homelab_<45d, Trials_1‑5, Trials_6+, Community_w, Total.
+- `nodes_segment_percent_snapshot` → source: `spaces_asat_*`; measure: percent mix of reachable nodes; must include `check`.
 
 ## Template: onprem_customers_latest (DEPRECATED — do NOT use; kept only for historical reference)
 ```
@@ -3256,168 +3241,6 @@ LIMIT 1;
 - Always return the most recent date in the window (order by date DESC LIMIT 1); do **not** pick the earliest date or the max value across the window. If the output schema caps `data` to 1 item, truncate to exactly one object. If the query returns multiple rows (e.g., after adaptation or by mistakenly running a timeseries template), sort by date DESC and drop all but the first before emitting JSON. Schema instructions override user free text: if schema wants one row, you must return one row even if the user wording implies per-day.
 - Manual on-prem static baseline applies only when date ≤ 2025-10-01.
 - Sanity check: if `date > 2025-10-01`, the output **must not** include the static on‑prem baseline (≈ 310,839). If your value is higher by ~310k, you applied the baseline incorrectly—fix the query.
-
-## Template: metric_growth_pct_timeseries (use verbatim for 7/30/90 growth % with null-preserving spine and null lags)
-```
-WITH dates AS (
-  SELECT date
-  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '{{from_date}}', DATE '{{to_date}}')) AS date
-),
-series AS (
-  SELECT
-    run_date AS date,
-    __METRIC_EXPR__ AS metric
-  FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
-    AND run_date > DATE '2023-11-28'
-    AND run_date < CURRENT_DATE()
-  GROUP BY run_date
-),
-calc AS (
-  SELECT
-    date,
-    SAFE_DIVIDE(metric - LAG(metric, 7) OVER (ORDER BY date), LAG(metric, 7) OVER (ORDER BY date)) * 100 AS pct_7,
-    SAFE_DIVIDE(metric - LAG(metric, 30) OVER (ORDER BY date), LAG(metric, 30) OVER (ORDER BY date)) * 100 AS pct_30,
-    SAFE_DIVIDE(metric - LAG(metric, 90) OVER (ORDER BY date), LAG(metric, 90) OVER (ORDER BY date)) * 100 AS pct_90
-  FROM series
-)
-SELECT
-  d.date,
-  CASE
-    WHEN DATE_SUB(d.date, INTERVAL 7 DAY) < DATE '{{from_date}}' THEN NULL
-    ELSE c.pct_7
-  END AS pct_7,
-  CASE
-    WHEN DATE_SUB(d.date, INTERVAL 30 DAY) < DATE '{{from_date}}' THEN NULL
-    ELSE c.pct_30
-  END AS pct_30,
-  CASE
-    WHEN DATE_SUB(d.date, INTERVAL 90 DAY) < DATE '{{from_date}}' THEN NULL
-    ELSE c.pct_90
-  END AS pct_90
-FROM dates d
-LEFT JOIN calc c ON d.date = c.date
-WHERE d.date < CURRENT_DATE()
-ORDER BY d.date;
-```
-- Keep the full date spine (LEFT JOIN) so rows remain even when lags are unavailable; pct_* may be NULL and must still be returned. **If the lag date is outside the requested window, pct_* MUST be NULL.**
-- **ABSOLUTE HARD STOP on widening the window:** never include any date < `{{from_date}}` in the series or in any helper/pre-query. If the 7/30/90-day prior point is outside the requested window, pct_* **must** stay NULL. Do not backfill, do not interpolate, do not default to 0, do not set `from_date` to `to_date - 7/30/90`, and keep the WHERE clause exactly as written. Do not reuse historical rows before `{{from_date}}` even if they exist.
-- Run exactly **one** query (this template). Do not issue any extra “lookback” or “helper” query with earlier dates. If lags are missing, return NULL and note the missing history in `notes`. Never compute pct_* for the first 7/30/90 days of the window when the lag is out of range—leave them NULL.
-- **Output rule:** return the SQL results as-is. Do not recompute pct_* from any other query, do not override NULLs, and do not substitute any values in the model.
-- **HARD STOP:** if you accidentally ran any other query, discard it; the only valid output is the rows produced by this template, including NULL pct_* values.
-- If the SQL returns rows (even if all pct_* are NULL), you **must** return those rows. Do **not** output `data: []` for growth %.
-
-## Template: customers_growth_pct_timeseries (alias; use verbatim for customers/subscriptions growth %)
-```
-WITH dates AS (
-  SELECT date
-  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '{{from_date}}', DATE '{{to_date}}')) AS date
-),
-series AS (
-  SELECT
-    run_date AS date,
-    MAX(IF(metric_name = 'total_business_subscriptions', metric_value, NULL))
-      + COALESCE(MAX(IF(metric_name = 'total_homelab_subscriptions', metric_value, NULL)), 0) AS metric
-  FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
-    AND run_date > DATE '2023-11-28'
-    AND run_date < CURRENT_DATE()
-  GROUP BY run_date
-),
-calc AS (
-  SELECT
-    date,
-    SAFE_DIVIDE(metric - LAG(metric, 7) OVER (ORDER BY date), LAG(metric, 7) OVER (ORDER BY date)) * 100 AS pct_7,
-    SAFE_DIVIDE(metric - LAG(metric, 30) OVER (ORDER BY date), LAG(metric, 30) OVER (ORDER BY date)) * 100 AS pct_30,
-    SAFE_DIVIDE(metric - LAG(metric, 90) OVER (ORDER BY date), LAG(metric, 90) OVER (ORDER BY date)) * 100 AS pct_90
-  FROM series
-)
-SELECT
-  d.date,
-  CASE WHEN DATE_SUB(d.date, INTERVAL 7 DAY) < DATE '{{from_date}}' THEN NULL ELSE c.pct_7 END AS pct_7,
-  CASE WHEN DATE_SUB(d.date, INTERVAL 30 DAY) < DATE '{{from_date}}' THEN NULL ELSE c.pct_30 END AS pct_30,
-  CASE WHEN DATE_SUB(d.date, INTERVAL 90 DAY) < DATE '{{from_date}}' THEN NULL ELSE c.pct_90 END AS pct_90
-FROM dates d
-LEFT JOIN calc c ON d.date = c.date
-WHERE d.date < CURRENT_DATE()
-ORDER BY d.date;
-```
-- Use for “customers/subscriptions growth %”. Do not run any helper queries and do not override NULL pct_* values.
-
-## Template: business_nodes_growth_pct_timeseries (alias; Business paid nodes growth %)
-```
-WITH dates AS (
-  SELECT date
-  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '{{from_date}}', DATE '{{to_date}}')) AS date
-),
-series AS (
-  SELECT
-    run_date AS date,
-    COALESCE(MAX(IF(metric_name = 'paid_nodes_business_annual', metric_value, NULL)),0)
-      + COALESCE(MAX(IF(metric_name = 'paid_nodes_business_monthly', metric_value, NULL)),0) AS metric
-  FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
-    AND run_date > DATE '2023-11-28'
-    AND run_date < CURRENT_DATE()
-  GROUP BY run_date
-),
-calc AS (
-  SELECT
-    date,
-    SAFE_DIVIDE(metric - LAG(metric, 7) OVER (ORDER BY date), LAG(metric, 7) OVER (ORDER BY date)) * 100 AS pct_7,
-    SAFE_DIVIDE(metric - LAG(metric, 30) OVER (ORDER BY date), LAG(metric, 30) OVER (ORDER BY date)) * 100 AS pct_30,
-    SAFE_DIVIDE(metric - LAG(metric, 90) OVER (ORDER BY date), LAG(metric, 90) OVER (ORDER BY date)) * 100 AS pct_90
-  FROM series
-)
-SELECT
-  d.date,
-  CASE WHEN DATE_SUB(d.date, INTERVAL 7 DAY) < DATE '{{from_date}}' THEN NULL ELSE c.pct_7 END AS pct_7,
-  CASE WHEN DATE_SUB(d.date, INTERVAL 30 DAY) < DATE '{{from_date}}' THEN NULL ELSE c.pct_30 END AS pct_30,
-  CASE WHEN DATE_SUB(d.date, INTERVAL 90 DAY) < DATE '{{from_date}}' THEN NULL ELSE c.pct_90 END AS pct_90
-FROM dates d
-LEFT JOIN calc c ON d.date = c.date
-WHERE d.date < CURRENT_DATE()
-ORDER BY d.date;
-```
-- Use for “business nodes growth %”. Do not run helper queries or override NULLs.
-
-## Template: nodes_combined_growth_pct_timeseries (alias; Business paid + Homelab reachable nodes growth %)
-```
-WITH dates AS (
-  SELECT date
-  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '{{from_date}}', DATE '{{to_date}}')) AS date
-),
-series AS (
-  SELECT
-    run_date AS date,
-    COALESCE(MAX(IF(metric_name = 'paid_nodes_business_annual', metric_value, NULL)),0)
-      + COALESCE(MAX(IF(metric_name = 'paid_nodes_business_monthly', metric_value, NULL)),0)
-      + COALESCE(MAX(IF(metric_name = 'total_reachable_nodes_homelab', metric_value, NULL)),0) AS metric
-  FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
-    AND run_date > DATE '2023-11-28'
-    AND run_date < CURRENT_DATE()
-  GROUP BY run_date
-),
-calc AS (
-  SELECT
-    date,
-    SAFE_DIVIDE(metric - LAG(metric, 7) OVER (ORDER BY date), LAG(metric, 7) OVER (ORDER BY date)) * 100 AS pct_7,
-    SAFE_DIVIDE(metric - LAG(metric, 30) OVER (ORDER BY date), LAG(metric, 30) OVER (ORDER BY date)) * 100 AS pct_30,
-    SAFE_DIVIDE(metric - LAG(metric, 90) OVER (ORDER BY date), LAG(metric, 90) OVER (ORDER BY date)) * 100 AS pct_90
-  FROM series
-)
-SELECT
-  d.date,
-  CASE WHEN DATE_SUB(d.date, INTERVAL 7 DAY) < DATE '{{from_date}}' THEN NULL ELSE c.pct_7 END AS pct_7,
-  CASE WHEN DATE_SUB(d.date, INTERVAL 30 DAY) < DATE '{{from_date}}' THEN NULL ELSE c.pct_30 END AS pct_30,
-  CASE WHEN DATE_SUB(d.date, INTERVAL 90 DAY) < DATE '{{from_date}}' THEN NULL ELSE c.pct_90 END AS pct_90
-FROM dates d
-LEFT JOIN calc c ON d.date = c.date
-WHERE d.date < CURRENT_DATE()
-ORDER BY d.date;
-```
-- Use for “business + homelab nodes growth %”. Do not run helper queries or override NULLs.
 
 ## Template: space_arr_delta_top10 (ARR change between two snapshots; **single SQL**)
 ```
@@ -3748,7 +3571,7 @@ Use these patterns directly; they align with the canonical definitions above. Wh
 
 **Business ARR (discounted) routing**
 - Stat/“latest/now/most recent” business ARR → use `metrics_daily_stat_last_not_null` (registry: `business_arr_discount_current`).
-- Timeseries business ARR → use `business_arr_discount_timeseries`.
+- Timeseries business ARR → use `metrics_daily_timeseries_basic` (registry: `business_arr_discount_series`).
 - Do not substitute realized ARR templates for business-only requests.
 - Business ARR is **only** `arr_business_discount` (no homelab, no AI bundles, no on-prem, no overrides). Do not add other components.
 
@@ -3775,7 +3598,7 @@ Use these patterns directly; they align with the canonical definitions above. Wh
    - metrics_daily: MAX metric_value where metric_name IN ('churn_subs','churn_business_subs'); per run_date.
 
 9) **AI bundles (timeseries)**  
-   - metrics_daily: MAX for metric_name IN ('Bundle625.00','Bundle300.00','Bundle1100.00','Bundle2000.00'); per run_date, using the `ai_bundle_metrics_timeseries` template. Do **not** COALESCE missing bundles to zero; keep NULLs so absent bundles remain null.
+   - metrics_daily: MAX for metric_name IN ('Bundle625.00','Bundle300.00','Bundle1100.00','Bundle2000.00'); per run_date, using `metrics_daily_timeseries_basic` (registry: `ai_bundles_series`). Do **not** COALESCE missing bundles to zero; keep NULLs so absent bundles remain null.
 
 10) **AI credits spaces (latest stat)**  
     - Use `metrics_daily_stat_last_not_null` (registry: `ai_credits_spaces_current`). **Do not** use spaces_asat or dp_ai_credits_purchased_sum.
@@ -3787,24 +3610,21 @@ Use these patterns directly; they align with the canonical definitions above. Wh
 
 12) **Unrealized ARR (stat or barchart)**  
     - Stat: use `metrics_daily_stat_last_not_null` (registry: `unrealized_arr_latest`): take MAX newcomer metrics per run_date, then order by run_date DESC and LIMIT 1 (latest non-null in window).  
-    - Timeseries: use `unrealized_arr_timeseries` for per-day newcomer ARR over a window.  
+    - Timeseries: use `metrics_daily_timeseries_spine` (registry: `unrealized_arr_series`) for per-day newcomer ARR over a window.  
     - Barchart (snapshot on a specific date): use `unrealized_arr_barchart_snapshot` template on `spaces_asat_*` with `_TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', to_date)`, filter ce_plan_class IN ('Business_45d_monthly_newcomer', 'Homelab_45d_monthly_newcomer'), ax_trial_ends_at IS NULL, bq_arr_discount > 0, group by DATE(cx_arr_realized_at), order by date, limit 50.
 
 13) **Ending trial spaces by expiry date**  
     - spaces_asat_* snapshot at `_TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', to_date)`; group by DATE(ax_trial_ends_at); SUM(ae_reachable_nodes); ORDER BY date; LIMIT 50. Do **not** filter by plan_class (trial plan classes are encoded as newcomer plans). Accept zero rows if none end on that date, but when data exists it should match the snapshot query exactly. Use the dedicated template `ending_trial_spaces_barchart_snapshot` verbatim.
 
 14) **Spaces composition (counts / percents)**  
-    - spaces_asat_* snapshot on the requested date; counts by plan_class/trial buckets; percents = counts / total.
-    - Use `spaces_segment_counts_snapshot` for counts and `spaces_segment_percent_snapshot` for mix %. Keep all buckets (Business, Business_<45d, Homelab, Homelab_<45d, Trials 0/1-5/6+, Community 0/w_nodes); do not drop zero buckets. For mix %, include the `check` column as in the template and keep the template’s scale (already in percent).
+    - Use `segment_snapshot` with registry entries `spaces_segment_counts_snapshot` (counts) and `spaces_segment_percent_snapshot` (mix %). Keep all buckets (Business, Business_<45d, Homelab, Homelab_<45d, Trials 0/1-5/6+, Community 0/w_nodes); do not drop zero buckets. For mix %, include the `check` column and keep the template’s 0–100 scale.
 
 15) **Reachable nodes by segment (counts / percents)**  
-    - spaces_asat_* snapshot on the requested date; sum `ae_reachable_nodes` by the same buckets used in the Grafana “nodes total view”.
-    - Use `nodes_segment_counts_snapshot` for counts (Business, Business_<45d, Homelab, Homelab_<45d, Trials_1-5_nodes, Trials_6+_nodes, Community_w_nodes, Total).
-    - Use `nodes_segment_percent_snapshot` for mix %; it already multiplies by 100 and returns the `check` column. Do **not** re-normalize or rescale—just return the query result **including `check`**. Keep all buckets even if zero. HARD STOP: do **not** use `spaces_segment_percent_snapshot` here—the nodes view must aggregate `ae_reachable_nodes`, not space counts.
+    - Use `segment_snapshot` with registry entries `nodes_segment_counts_snapshot` (counts) and `nodes_segment_percent_snapshot` (mix %). It already multiplies by 100 and returns `check`. Do **not** re‑normalize or rescale—return the query result **including `check`**. Keep all buckets even if zero. HARD STOP: do **not** use space‑count buckets for node mix—this view must aggregate `ae_reachable_nodes`.
 
 16) **Windows reachable nodes (stat or breakdown)**  
     - Stat: metrics_daily MAX('windows_reachable_nodes'); last non-null.  
-    - Breakdown: use `windows_reachable_nodes_breakdown_timeseries` verbatim (metrics_daily windows_reachable_nodes_{business,trial,community,homelab} per run_date). Do **not** use spaces_asat.
+    - Breakdown: use `metrics_daily_timeseries_basic` (registry: `windows_reachable_nodes_breakdown_series`) for metrics_daily windows_reachable_nodes_{business,trial,community,homelab} per run_date. Do **not** use spaces_asat.
 
 16a) **Ending trial spaces (snapshot barchart)**  
     - Use `ending_trial_spaces_barchart_snapshot` with `snapshot_date = to_date` (or the explicit snapshot date the user asks for). Always run the snapshot query; do not substitute a timeseries.
@@ -3833,16 +3653,10 @@ Use these patterns directly; they align with the canonical definitions above. Wh
    - Obey schemas that cap `data` to one item (e.g., `maxItems: 1`). If the schema is strict, drop extra rows instead of returning a timeseries.  
    - Date window: inclusive; cap at yesterday unless the user explicitly asks to include today. Do not switch to a timeseries unless the user clearly requests a trend/over-time view.
 
-21) **7/30/90 growth % (use metric_growth_pct_timeseries template with matching metric expression)**  
-    - Discounted ARR % growth: metric_expr = `MAX(IF(metric_name = 'arr_business_discount', metric_value, NULL)) + COALESCE(MAX(IF(metric_name = 'arr_homelab_discount', metric_value, NULL)), 0) + COALESCE(MAX(IF(metric_name = 'ai_credits_space_revenue', metric_value, NULL)), 0) + COALESCE(MAX(IF(metric_name = 'onprem_arr', metric_value, NULL)), 0)`.  
-    - Undiscounted ARR % growth: metric_expr = `MAX(IF(metric_name = 'arr_business', metric_value, NULL)) + COALESCE(MAX(IF(metric_name = 'arr_homelab', metric_value, NULL)), 0) + COALESCE(MAX(IF(metric_name = 'ai_credits_space_revenue', metric_value, NULL)), 0) + COALESCE(MAX(IF(metric_name = 'onprem_arr', metric_value, NULL)), 0)`.  
-    - Customers/subscriptions % growth: metric_expr = `MAX(IF(metric_name = 'total_business_subscriptions', metric_value, NULL)) + COALESCE(MAX(IF(metric_name = 'total_homelab_subscriptions', metric_value, NULL)), 0) + 0`.  
-    - Business paid nodes % growth: metric_expr = `COALESCE(MAX(IF(metric_name = 'paid_nodes_business_annual', metric_value, NULL)),0) + COALESCE(MAX(IF(metric_name = 'paid_nodes_business_monthly', metric_value, NULL)),0)`.  
-    - Reachable nodes % growth: metric_expr = `MAX(IF(metric_name = 'nodes_reachable', metric_value, NULL))`.  
-    - Business paid + homelab reachable nodes % growth: metric_expr = `COALESCE(MAX(IF(metric_name = 'paid_nodes_business_annual', metric_value, NULL)),0) + COALESCE(MAX(IF(metric_name = 'paid_nodes_business_monthly', metric_value, NULL)),0) + COALESCE(MAX(IF(metric_name = 'total_reachable_nodes_homelab', metric_value, NULL)),0)`.  
-    - Homelab reachable nodes % growth: metric_expr = `MAX(IF(metric_name = 'total_reachable_nodes_homelab', metric_value, NULL))`.  
+21) **7/30/90 growth % (use metric_growth_pct_timeseries + registry)**  
+    - Use `metric_growth_pct_timeseries` with the registry entries above (customers, business nodes, combined nodes, reachable nodes, homelab reachable nodes).  
     - Always keep the date spine and return NULL pct_* when lags are unavailable (do not drop rows). Do **not** widen the date bounds or run helper queries with earlier dates; if the 7/30/90-day lag is outside the requested window, pct_* must stay NULL. Use a **single** growth query over exactly the user-specified window; do not issue a broader preliminary query to “get history.”
-    - **Customers/subscriptions growth %** is part of this rule: use the customers metric_expr above and run the single template query. Do **not** claim “missing metrics” if the data exists; run the query and return its output as-is.
+    - **Customers/subscriptions growth %**: use the `customers_growth_pct` registry entry; run the single template query and return its output as-is.
 
 22) **Business ARR deltas (7/30/90 abs)**  
     - Use `metric_delta_7_30_90_latest` with `__METRIC_EXPR__ = MAX(IF(metric_name = 'arr_business_discount', metric_value, NULL))`; always look back at least 120 days ending at `to_date` (ignore shorter user windows) so 30/90-day lags are populated. Return the most recent row with all three lags non-null. **HARD STOP:** never shrink the window to the user’s from_date and never swap to the growth % template.
