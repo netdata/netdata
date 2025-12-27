@@ -126,6 +126,7 @@
 - Docs(go.d/prometheus): cleanup metadata.yaml ([#21498](https://github.com/netdata/netdata/issues/21498))
 - Regenerate integrations docs ([#21499](https://github.com/netdata/netdata/issues/21499))
 - Add AI-Powered Alert Configuration docs entry ([#21482](https://github.com/netdata/netdata/issues/21482))
+- Fix(go.d/vnodes): add additionalProperties to config_schema.json ([#21503](https://github.com/netdata/netdata/issues/21503))
 
 ## [2.8.0] - 2025-11-19
 
