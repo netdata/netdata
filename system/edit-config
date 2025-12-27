@@ -1,7 +1,17 @@
 #!/usr/bin/env sh
 
+if [ "${container+x}" = "x" ]; then
+  _container_saved=$container
+fi
+
 # shellcheck disable=SC1091
 [ -f /etc/profile ] && . /etc/profile
+
+if [ "${_container_saved+x}" = x ]; then
+  container=$_container_saved
+else
+  unset container
+fi
 
 set -e
 
