@@ -26,7 +26,12 @@ import { InternalToolProvider } from './tools/internal-provider.js';
 import { MCPProvider } from './tools/mcp-provider.js';
 import { RestProvider } from './tools/rest-provider.js';
 import { ToolsOrchestrator } from './tools/tools.js';
-import { truncateJsonStrings, truncateToBytes } from './truncation.js';
+import {
+  buildTruncationPrefix,
+  buildTruncationPrefixPlaceholder,
+  truncateJsonStringsWithInfo,
+  truncateToBytesWithInfo,
+} from './truncation.js';
 import { appendCallPathSegment, normalizeCallPath, sanitizeToolName, warn } from './utils.js';
 import { XmlToolTransport } from './xml-transport.js';
 
@@ -1011,12 +1016,55 @@ export class AIAgentSession {
     if (typeof limitBytes !== 'number' || limitBytes <= 0) return result;
     const sizeBytes = Buffer.byteLength(result, 'utf8');
     if (sizeBytes <= limitBytes) return result;
+    if (result.startsWith('[TRUNCATED IN THE MIDDLE BY ~')) return result;
+    const computeTruncationPercent = (originalBytes: number, finalBytes: number): number => {
+      if (originalBytes <= 0) return 0;
+      const pct = ((originalBytes - finalBytes) / originalBytes) * 100;
+      return Number(Math.max(0, pct).toFixed(1));
+    };
     try {
-      const srv = context !== undefined ? context.server : undefined;
-      const tl = context !== undefined ? context.tool : undefined;
+      const srv = context?.server;
+      const tl = context?.tool;
       const rid = (srv !== undefined && tl !== undefined)
         ? `${srv}:${tl}`
         : 'agent:tool';
+      const prefixBudgetBytes = Buffer.byteLength(`${buildTruncationPrefixPlaceholder('bytes')}\n`, 'utf8');
+      const contentBudget = limitBytes - prefixBudgetBytes;
+      const truncatedPayload = contentBudget > 0
+        ? (truncateJsonStringsWithInfo(result, contentBudget) ?? truncateToBytesWithInfo(result, contentBudget))
+        : undefined;
+      if (truncatedPayload?.truncated === true) {
+        const prefix = `${buildTruncationPrefix(truncatedPayload.omitted, 'bytes')}\n`;
+        const truncatedResult = `${prefix}${truncatedPayload.value}`;
+        const finalBytes = Buffer.byteLength(truncatedResult, 'utf8');
+        const truncatedPct = computeTruncationPercent(sizeBytes, finalBytes);
+        const warn: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'WRN',
+          turn: context?.turn ?? this.currentTurn,
+          subturn: context?.subturn ?? 0,
+          direction: 'response',
+          type: 'tool',
+          remoteIdentifier: rid,
+          fatal: false,
+          message: `Tool '${context?.tool ?? 'unknown'}' output truncated: response exceeded max size (actual ${String(sizeBytes)} B > limit ${String(limitBytes)} B).`,
+          details: {
+            original_bytes: sizeBytes,
+            final_bytes: finalBytes,
+            truncated_pct: truncatedPct,
+            limit_bytes: limitBytes,
+            truncated: true,
+            dropped: false,
+            reason: 'size_cap_exceeded',
+          },
+        };
+        this.log(warn);
+        this.centralSizeCapHits += 1;
+        return truncatedResult;
+      }
+      const failureStub = '(tool failed: response exceeded max size)';
+      const finalBytes = Buffer.byteLength(failureStub, 'utf8');
+      const truncatedPct = computeTruncationPercent(sizeBytes, finalBytes);
       const warn: LogEntry = {
         timestamp: Date.now(),
         severity: 'WRN',
@@ -1026,14 +1074,22 @@ export class AIAgentSession {
         type: 'tool',
         remoteIdentifier: rid,
         fatal: false,
-        message: `response exceeded max size: ${String(sizeBytes)} bytes > limit ${String(limitBytes)} bytes (truncated)`
+        message: `Tool '${context?.tool ?? 'unknown'}' output dropped: response exceeded max size and truncation failed (actual ${String(sizeBytes)} B > limit ${String(limitBytes)} B).`,
+        details: {
+          original_bytes: sizeBytes,
+          final_bytes: finalBytes,
+          truncated_pct: truncatedPct,
+          limit_bytes: limitBytes,
+          truncated: false,
+          dropped: true,
+          reason: 'size_cap_truncation_failed',
+        },
       };
       this.log(warn);
+      this.centralSizeCapHits += 1;
+      return failureStub;
     } catch { /* ignore logging errors */ }
-    this.centralSizeCapHits += 1;
-    // Try JSON-aware truncation first, fall back to byte truncation
-    const truncated = truncateJsonStrings(result, limitBytes) ?? truncateToBytes(result, limitBytes);
-    return truncated ?? result; // If both fail, return original (shouldn't happen given size check above)
+    return result;
   }
 
   private applyLogPayloadToOp(opId: string, log: LogEntry): boolean {
@@ -1077,6 +1133,41 @@ export class AIAgentSession {
     if (typeof this.headendId === 'string' && this.headendId.length > 0) {
       sessionSpanAttributes['ai.session.headend_id'] = this.headendId;
     }
+
+    const mergeAccountingEntries = (primary: AccountingEntry[], secondary: AccountingEntry[]): AccountingEntry[] => {
+      const combined = [...primary];
+      const isLikelyDuplicate = (candidate: AccountingEntry, entry: AccountingEntry): boolean => {
+        if (candidate.type !== entry.type) return false;
+        if (candidate.type === 'tool' && entry.type === 'tool') {
+          return candidate.command === entry.command
+            && candidate.mcpServer === entry.mcpServer
+            && candidate.status === entry.status
+            && candidate.latency === entry.latency
+            && candidate.charactersIn === entry.charactersIn
+            && candidate.charactersOut === entry.charactersOut
+            && (candidate.error ?? '') === (entry.error ?? '');
+        }
+        if (candidate.type === 'llm' && entry.type === 'llm') {
+          return candidate.provider === entry.provider
+            && candidate.model === entry.model
+            && candidate.status === entry.status
+            && candidate.latency === entry.latency
+            && candidate.tokens.inputTokens === entry.tokens.inputTokens
+            && candidate.tokens.outputTokens === entry.tokens.outputTokens
+            && candidate.tokens.totalTokens === entry.tokens.totalTokens
+            && (candidate.stopReason ?? '') === (entry.stopReason ?? '')
+            && (candidate.error ?? '') === (entry.error ?? '');
+        }
+        return false;
+      };
+      secondary.forEach((entry) => {
+        const duplicate = primary.some((candidate) => isLikelyDuplicate(candidate, entry));
+        if (!duplicate) {
+          combined.push(entry);
+        }
+      });
+      return combined;
+    };
 
     return await runWithSpan('agent.session', { attributes: sessionSpanAttributes }, async (span) => {
       let currentConversation = [...this.conversation];
@@ -1381,12 +1472,13 @@ export class AIAgentSession {
         });
         return combined;
       })();
+      const mergedAccounting = mergeAccountingEntries(flat.accounting, this.accounting);
       const resultShape = {
         success: result.success,
         error: result.error,
         conversation: result.conversation,
         logs: mergedLogs,
-        accounting: flat.accounting,
+        accounting: mergedAccounting,
         finalReport: result.finalReport,
         childConversations: result.childConversations,
         // Provide ASCII tree for downstream consumers (CLI may choose to print)
@@ -1450,12 +1542,13 @@ export class AIAgentSession {
         });
         return combined;
       })();
+      const mergedFailAccounting = mergeAccountingEntries(flatFail.accounting, this.accounting);
       const failShape = {
         success: false,
         error: message,
         conversation: currentConversation,
         logs: mergedFailLogs,
-        accounting: flatFail.accounting
+        accounting: mergedFailAccounting
       } as AIAgentResult;
       try {
         if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }

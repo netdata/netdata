@@ -12,6 +12,26 @@
 // Worst-case marker: [···TRUNCATED 9999999999 bytes···] ≈ 34 bytes
 // Using 50 to be safe with any unit name variations and edge cases
 const MARKER_OVERHEAD = 50;
+const TRUNCATION_PREFIX_PLACEHOLDER = 9999999999;
+
+export type TruncationUnit = 'bytes' | 'tokens' | 'chars';
+
+export interface TruncationInfo {
+  value: string;
+  truncated: boolean;
+  omitted: number;
+  unit: TruncationUnit;
+}
+
+export function buildTruncationPrefix(omitted: number, unit: TruncationUnit): string {
+  const safeOmitted = Math.max(0, Math.trunc(omitted));
+  const unitLabel = unit === 'bytes' ? 'BYTES' : unit === 'tokens' ? 'TOKENS' : 'CHARS';
+  return `[TRUNCATED IN THE MIDDLE BY ~${String(safeOmitted)} ${unitLabel}]`;
+}
+
+export function buildTruncationPrefixPlaceholder(unit: TruncationUnit): string {
+  return buildTruncationPrefix(TRUNCATION_PREFIX_PLACEHOLDER, unit);
+}
 
 // Minimum payload size for truncation - below this, truncation is not attempted
 const MIN_PAYLOAD_BYTES = 512;
@@ -88,12 +108,22 @@ function findSafeUtf8BoundaryAfter(buffer: Buffer, targetOffset: number): number
  *          or undefined if payload < 512 bytes and doesn't fit target
  */
 export function truncateToBytes(payload: string, targetBytes: number): string | undefined {
+  const info = truncateToBytesWithInfo(payload, targetBytes);
+  return info?.value;
+}
+
+export function truncateToBytesWithInfo(payload: string, targetBytes: number): TruncationInfo | undefined {
   const buffer = Buffer.from(payload, 'utf8');
   const inputBytes = buffer.length;
 
   // If payload already fits, return unchanged
   if (inputBytes <= targetBytes) {
-    return payload;
+    return {
+      value: payload,
+      truncated: false,
+      omitted: 0,
+      unit: 'bytes',
+    };
   }
 
   // Only truncate payloads >= 512 bytes
@@ -130,7 +160,12 @@ export function truncateToBytes(payload: string, targetBytes: number): string | 
     return undefined;
   }
 
-  return result;
+  return {
+    value: result,
+    truncated: true,
+    omitted: omittedBytes,
+    unit: 'bytes',
+  };
 }
 
 /**
@@ -203,6 +238,15 @@ export function truncateToTokens(
   targetTokens: number,
   tokenizer?: (s: string) => number
 ): string | undefined {
+  const info = truncateToTokensWithInfo(payload, targetTokens, tokenizer);
+  return info?.value;
+}
+
+export function truncateToTokensWithInfo(
+  payload: string,
+  targetTokens: number,
+  tokenizer?: (s: string) => number
+): TruncationInfo | undefined {
   // Default tokenizer: ~4 chars per token approximation
   const countTokens = tokenizer ?? ((s: string) => Math.ceil(s.length / 4));
 
@@ -216,7 +260,12 @@ export function truncateToTokens(
 
   // If payload already fits, return unchanged
   if (inputTokens <= targetTokens) {
-    return payload;
+    return {
+      value: payload,
+      truncated: false,
+      omitted: 0,
+      unit: 'tokens',
+    };
   }
 
   // Only truncate payloads >= 512 bytes
@@ -261,7 +310,12 @@ export function truncateToTokens(
     return undefined;
   }
 
-  return result;
+  return {
+    value: result,
+    truncated: true,
+    omitted: omittedTokens,
+    unit: 'tokens',
+  };
 }
 
 /**
@@ -458,4 +512,18 @@ export function truncateJsonStrings(payload: string, targetBytes: number): strin
   }
 
   return result;
+}
+
+export function truncateJsonStringsWithInfo(payload: string, targetBytes: number): TruncationInfo | undefined {
+  const truncated = truncateJsonStrings(payload, targetBytes);
+  if (truncated === undefined) return undefined;
+  const originalBytes = Buffer.byteLength(payload, 'utf8');
+  const finalBytes = Buffer.byteLength(truncated, 'utf8');
+  const omitted = Math.max(0, originalBytes - finalBytes);
+  return {
+    value: truncated,
+    truncated: originalBytes > finalBytes,
+    omitted,
+    unit: 'bytes',
+  };
 }

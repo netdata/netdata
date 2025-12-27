@@ -7,7 +7,13 @@ import type { MCPTool, LogEntry, AccountingEntry, ProgressMetrics, LogDetailValu
 import type { ToolExecuteOptions, ToolExecuteResult, ToolKind, ToolProvider, ToolExecutionContext } from './types.js';
 
 import { recordToolMetrics, runWithSpan, addSpanAttributes, addSpanEvent, recordSpanError, recordQueueDepthMetrics, recordQueueWaitMetrics } from '../telemetry/index.js';
-import { truncateJsonStrings, truncateToBytes, truncateToTokens } from '../truncation.js';
+import {
+  buildTruncationPrefix,
+  buildTruncationPrefixPlaceholder,
+  truncateJsonStringsWithInfo,
+  truncateToBytesWithInfo,
+  truncateToTokensWithInfo,
+} from '../truncation.js';
 import { appendCallPathSegment, formatToolRequestCompact, normalizeCallPath, sanitizeToolName, warn } from '../utils.js';
 
 import { queueManager, type AcquireResult, QueueAbortError } from './queue-manager.js';
@@ -36,6 +42,23 @@ const toErrorMessage = (value: unknown): string => {
     }
   }
   return 'unknown_error';
+};
+
+const TRUNCATION_PREFIX_SEPARATOR = '\n';
+
+const buildTruncationPrefixWithSeparator = (omitted: number, unit: 'bytes' | 'tokens'): string =>
+  `${buildTruncationPrefix(omitted, unit)}${TRUNCATION_PREFIX_SEPARATOR}`;
+
+const getTruncationPrefixBytesBudget = (unit: 'bytes' | 'tokens'): number =>
+  Buffer.byteLength(`${buildTruncationPrefixPlaceholder(unit)}${TRUNCATION_PREFIX_SEPARATOR}`, 'utf8');
+
+const getTruncationPrefixTokensBudget = (unit: 'bytes' | 'tokens', countTokens: (s: string) => number): number =>
+  countTokens(`${buildTruncationPrefixPlaceholder(unit)}${TRUNCATION_PREFIX_SEPARATOR}`);
+
+const computeTruncationPercent = (originalBytes: number, finalBytes: number): number => {
+  if (originalBytes <= 0) return 0;
+  const pct = ((originalBytes - finalBytes) / originalBytes) * 100;
+  return Number(Math.max(0, pct).toFixed(1));
 };
 
 export interface ToolBudgetReservation {
@@ -468,13 +491,19 @@ export class ToolsOrchestrator {
       const latency = Date.now() - start;
       const failureReason = 'budget_exceeded_prior_tool';
       const failureStub = '(tool failed: context window budget exceeded; previous tool overflowed. Session will conclude after this turn.)';
+      const finalBytesForSkip = Buffer.byteLength(failureStub, 'utf8');
       const dropDetails: Record<string, LogDetailValue> = {
         tool: composedToolName,
         tool_namespace: toolIdentity.namespace,
         provider: logProviderLabel,
         tool_kind: kind,
         input_bytes: inputBytes,
+        final_bytes: finalBytesForSkip,
+        original_bytes_unknown: true,
+        truncated_pct: 0,
         reason: failureReason,
+        dropped: true,
+        skipped_execution: true,
         latency_ms: latency,
       };
       if (batchToolSummary !== undefined) dropDetails.batch_tools = batchToolSummary;
@@ -488,7 +517,7 @@ export class ToolsOrchestrator {
         toolKind: kind,
         remoteIdentifier,
         fatal: false,
-        message: `Tool '${composedToolName}' skipped: token budget exceeded by previous tool.`,
+        message: `Tool '${composedToolName}' skipped execution: token budget exceeded by previous tool.`,
         details: dropDetails,
       };
       this.onLog(dropLog, { opId });
@@ -781,39 +810,92 @@ export class ToolsOrchestrator {
     if (!isBatchTool && typeof limit === 'number' && limit > 0 && sizeBytes > limit) {
       // Truncate first, because downstream token accounting (context guard) must
       // operate on the already-clamped payload; do not reorder this block.
-      // Warn about truncation
-      const warnDetails: Record<string, LogDetailValue> = {
-        tool: composedToolName,
-        tool_namespace: toolIdentity.namespace,
-        provider: providerField,
-        tool_kind: kind,
-        actual_bytes: sizeBytes,
-        limit_bytes: limit,
-      };
-      if (batchToolSummary !== undefined) {
-        warnDetails.batch_tools = batchToolSummary;
+      const prefixBudgetBytes = getTruncationPrefixBytesBudget('bytes');
+      const contentBudget = limit - prefixBudgetBytes;
+      const truncatedPayload = contentBudget > 0
+        ? (truncateJsonStringsWithInfo(raw, contentBudget) ?? truncateToBytesWithInfo(raw, contentBudget))
+        : undefined;
+      if (truncatedPayload?.truncated === true) {
+        const prefix = buildTruncationPrefixWithSeparator(truncatedPayload.omitted, 'bytes');
+        result = `${prefix}${truncatedPayload.value}`;
+        truncatedForSize = true;
+        const finalBytes = Buffer.byteLength(result, 'utf8');
+        const truncatedPct = computeTruncationPercent(sizeBytes, finalBytes);
+        const warnDetails: Record<string, LogDetailValue> = {
+          tool: composedToolName,
+          tool_namespace: toolIdentity.namespace,
+          provider: providerField,
+          tool_kind: kind,
+          actual_bytes: sizeBytes,
+          original_bytes: sizeBytes,
+          final_bytes: finalBytes,
+          truncated_pct: truncatedPct,
+          limit_bytes: limit,
+          truncated: true,
+          dropped: false,
+          reason: 'size_cap_exceeded',
+        };
+        if (batchToolSummary !== undefined) {
+          warnDetails.batch_tools = batchToolSummary;
+        }
+        const sizeDescriptor = `actual ${String(sizeBytes)} B > limit ${String(limit)} B`;
+        const warnMessage = batchToolSummary !== undefined
+          ? `Tool '${composedToolName}' output truncated: response exceeded max size (${sizeDescriptor}; calls: ${batchToolSummary}).`
+          : `Tool '${composedToolName}' output truncated: response exceeded max size (${sizeDescriptor}).`;
+        const warnLog: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'WRN',
+          turn: ctx.turn,
+          subturn: ctx.subturn,
+          direction: 'response',
+          type: 'tool',
+          toolKind: kind,
+          remoteIdentifier,
+          fatal: false,
+          message: warnMessage,
+          details: warnDetails,
+        };
+        this.onLog(warnLog, { opId });
+      } else {
+        result = '(tool failed: response exceeded max size)';
+        const finalBytes = Buffer.byteLength(result, 'utf8');
+        const truncatedPct = computeTruncationPercent(sizeBytes, finalBytes);
+        const warnDetails: Record<string, LogDetailValue> = {
+          tool: composedToolName,
+          tool_namespace: toolIdentity.namespace,
+          provider: providerField,
+          tool_kind: kind,
+          actual_bytes: sizeBytes,
+          original_bytes: sizeBytes,
+          final_bytes: finalBytes,
+          truncated_pct: truncatedPct,
+          limit_bytes: limit,
+          truncated: false,
+          dropped: true,
+          reason: 'size_cap_truncation_failed',
+        };
+        if (batchToolSummary !== undefined) {
+          warnDetails.batch_tools = batchToolSummary;
+        }
+        const sizeDescriptor = `actual ${String(sizeBytes)} B > limit ${String(limit)} B`;
+        const warnMessage = batchToolSummary !== undefined
+          ? `Tool '${composedToolName}' output dropped: response exceeded max size and truncation failed (${sizeDescriptor}; calls: ${batchToolSummary}).`
+          : `Tool '${composedToolName}' output dropped: response exceeded max size and truncation failed (${sizeDescriptor}).`;
+        const warnLog: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'WRN',
+          turn: ctx.turn,
+          subturn: ctx.subturn,
+          direction: 'response',
+          type: 'tool',
+          toolKind: kind,
+          remoteIdentifier,
+          fatal: false,
+          message: warnMessage,
+          details: warnDetails,
+        };
+        this.onLog(warnLog, { opId });
       }
-      const sizeDescriptor = `actual ${String(sizeBytes)} B > limit ${String(limit)} B`;
-      const warnMessage = batchToolSummary !== undefined
-        ? `Tool response exceeded max size (${sizeDescriptor}; calls: ${batchToolSummary})`
-        : `Tool response exceeded max size (${sizeDescriptor})`;
-      const warnLog: LogEntry = {
-        timestamp: Date.now(),
-        severity: 'WRN',
-        turn: ctx.turn,
-        subturn: ctx.subturn,
-        direction: 'response',
-        type: 'tool',
-        toolKind: kind,
-        remoteIdentifier,
-        fatal: false,
-        message: warnMessage,
-        details: warnDetails,
-      };
-      this.onLog(warnLog, { opId });
-      // Try JSON-aware truncation first, fall back to byte truncation
-      result = truncateJsonStrings(raw, limit) ?? truncateToBytes(raw, limit) ?? '(tool failed: response exceeded max size)';
-      truncatedForSize = true;
     }
 
     // Ensure non-empty result for downstream providers that expect a non-empty tool output
@@ -826,31 +908,78 @@ export class ToolsOrchestrator {
       : { ok: true };
 
     // If reservation fails but we have available budget, try truncating to fit
-    if (!reservation.ok && budgetCallbacks !== undefined && reservation.availableTokens !== undefined && reservation.availableTokens > 0) {
-      const truncated = truncateToTokens(result, reservation.availableTokens, budgetCallbacks.countTokens);
-      if (truncated !== undefined) {
-        result = truncated;
-        resultBytes = Buffer.byteLength(result, 'utf8');
-        truncatedForBudget = true;
-        // Retry reservation with truncated output
-        reservation = await budgetCallbacks.reserveToolOutput(result);
+    if (!reservation.ok && budgetCallbacks !== undefined && reservation.availableTokens !== undefined && reservation.availableTokens > 0 && !truncatedForSize) {
+      const prefixTokensBudget = getTruncationPrefixTokensBudget('tokens', budgetCallbacks.countTokens);
+      const contentTokenBudget = reservation.availableTokens - prefixTokensBudget;
+      if (contentTokenBudget > 0) {
+        const originalBytesForBudget = Buffer.byteLength(result, 'utf8');
+        const truncatedInfo = truncateToTokensWithInfo(result, contentTokenBudget, budgetCallbacks.countTokens);
+        if (truncatedInfo?.truncated === true) {
+          const prefix = buildTruncationPrefixWithSeparator(truncatedInfo.omitted, 'tokens');
+          result = `${prefix}${truncatedInfo.value}`;
+          resultBytes = Buffer.byteLength(result, 'utf8');
+          truncatedForBudget = true;
+          const truncatedPct = computeTruncationPercent(originalBytesForBudget, resultBytes);
+          const warnDetails: Record<string, LogDetailValue> = {
+            tool: composedToolName,
+            tool_namespace: toolIdentity.namespace,
+            provider: providerField,
+            tool_kind: kind,
+            actual_bytes: originalBytesForBudget,
+            original_bytes: originalBytesForBudget,
+            final_bytes: resultBytes,
+            truncated_pct: truncatedPct,
+            tokens_available: reservation.availableTokens,
+            truncated: true,
+            dropped: false,
+            reason: 'token_budget_enforced',
+          };
+          if (batchToolSummary !== undefined) {
+            warnDetails.batch_tools = batchToolSummary;
+          }
+          const warnMessage = batchToolSummary !== undefined
+            ? `Tool '${composedToolName}' output truncated: token budget enforced (calls: ${batchToolSummary}).`
+            : `Tool '${composedToolName}' output truncated: token budget enforced.`;
+          const warnLog: LogEntry = {
+            timestamp: Date.now(),
+            severity: 'WRN',
+            turn: ctx.turn,
+            subturn: ctx.subturn,
+            direction: 'response',
+            type: 'tool',
+            toolKind: kind,
+            remoteIdentifier,
+            fatal: false,
+            message: warnMessage,
+            details: warnDetails,
+          };
+          this.onLog(warnLog, { opId });
+          // Retry reservation with truncated output
+          reservation = await budgetCallbacks.reserveToolOutput(result);
+        }
       }
     }
 
     if (!reservation.ok) {
       const failureReason = reservation.reason ?? 'token_budget_exceeded';
       const failureStub = '(tool failed: context window budget exceeded)';
+      const originalBytesForDrop = resultBytes;
+      const finalBytesForDrop = Buffer.byteLength(failureStub, 'utf8');
+      const truncatedPct = computeTruncationPercent(originalBytesForDrop, finalBytesForDrop);
       const dropDetails: Record<string, LogDetailValue> = {
         tool: composedToolName,
         tool_namespace: toolIdentity.namespace,
         provider: providerField,
         tool_kind: kind,
-        original_bytes: sizeBytes,
-        final_bytes: resultBytes,
+        original_bytes: originalBytesForDrop,
+        final_bytes: finalBytesForDrop,
+        truncated_pct: truncatedPct,
+        raw_bytes: sizeBytes,
         tokens_estimated: reservation.tokens ?? 0,
         reason: failureReason,
         truncated: result !== raw,
         truncated_for_budget: truncatedForBudget,
+        dropped: true,
         latency_ms: latency,
       };
       if (batchToolSummary !== undefined) dropDetails.batch_tools = batchToolSummary;
@@ -864,7 +993,7 @@ export class ToolsOrchestrator {
         toolKind: kind,
         remoteIdentifier,
         fatal: false,
-        message: `Tool '${composedToolName}' output dropped after execution`,
+        message: `Tool '${composedToolName}' output dropped after execution: token budget exceeded.`,
         details: dropDetails,
       };
       this.onLog(dropLog, { opId });
@@ -948,6 +1077,7 @@ export class ToolsOrchestrator {
       responseDetails.tokens_estimated = reservation.tokens;
     }
     responseDetails.dropped = false;
+    responseDetails.truncated = truncatedForSize || truncatedForBudget;
     const resPreview = (() => {
       try {
         const jsonified = JSON.stringify(raw);

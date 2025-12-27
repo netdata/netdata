@@ -6,6 +6,7 @@
 - Need a slimmer, guardrailed prompt that still preserves Grafana-fidelity (canonical formulas/templates) instead of raw dumps.
 - **Migration request (Costa):** Replace `bigquery.ai` with `executive2.ai` for production testing, remove executive.ai references, and rename harness/scripts/TODO from *executive* → *bigquery*.
 - **Latest (2025-12-22):** Expand user-intent map for signups/customers/spaces/churn, then re-run the full harness with extreme timeouts and debug remaining failures.
+- **New (2025-12-26):** Consolidate `neda/bigquery.ai` to reduce token load by removing duplicated rules (freshness, source selection, stat vs timeseries, realized ARR) via surgical edits only.
 
 ## Analysis (current state)
 - Frontmatter: single tool `bigquery`, `maxTurns: 50`, `reasoning: high`, `maxOutputTokens: 16384`; no expected output/schema; uses `${FORMAT}` placeholder.
@@ -24,6 +25,23 @@
 - Testing: BigQuery toolbox is installed/configured; we can execute queries directly to validate parity vs Grafana.
 - Related prompt: `neda/bigquery.ai` already contains (1) a fairly complete data-flow overview, (2) Watch Towers field semantics (largely overlapping with `analytics-bi/airflow/dags/watch_towers/README.md`), and (3) KPI definitions + template patterns. This supports a “data dictionary + KPI catalog + examples” approach without re-embedding full Grafana SQL dumps.
 - Consistency risk spotted: `neda/bigquery.ai` defines “Realized ARR (discounted)” using `business_arr_discount + homelab_arr_discount + ai_credits_space_revenue`, but later lists canonical `metrics_daily` keys as `arr_business_discount` / `arr_homelab_discount`. This kind of mismatch is a likely cause of wrong queries and must be normalized.
+- Prompt duplication hotspots (after full read, 2025-12-26):
+  - Data freshness rules repeated in **0.3**, **7.1**, **9.3**, and Output Contract.
+  - Source selection / temporal routing repeated in **Domain Model**, **Source Selection Matrix**, **Authority & Scope**, **Entity Cheat Sheet**, and **Question → Table Decision Tree**.
+  - Stat vs timeseries + schema maxItems rules repeated in **Understanding user requests**, **Output Contract**, **Core execution rules**, **Known pitfalls**, and **FAQ**.
+  - Canonical realized ARR formula repeated in **Domain Model**, **Core execution rules**, **Canonical realized ARR**, **Business Logic 5.14**, **Query Patterns 7.5**, and **FAQ**.
+  - `manual_360_bq` access restriction repeated in **0.2**, **1.4**, **9.1**, and **9.8**.
+  - Date-window rules (cap today / explicit to_date) repeated in **How to run queries**, **Core execution rules**, and **Known pitfalls**.
+- Consolidation applied (2025-12-26): temporal routing centralized under **Source Selection Matrix → Temporal Data Routing (canonical)**; duplicate routing rules trimmed in sections 3.3, 7.2, 7.10, 8.6, 9.10, 9.11; routing reminders compressed.
+- Consolidation applied (2025-12-26): **Date Handling Precedence (canonical)** added under core workflow; duplicate date rules trimmed in **How to run queries**, **Core execution rules**, and **Known pitfalls 9.3**.
+- Consolidation applied (2025-12-26): **Stat vs Timeseries Decision (canonical)** added; duplicate stat/timeseries and maxItems rules trimmed in **Understanding user requests**, **Output contract**, and **Core execution rules**.
+- Consolidation applied (2025-12-27): **metrics_daily_stat_last_not_null (generic)** added with a Stat KPI registry; removed per‑KPI stat templates for AWS ARR/subscriptions, active users, AI credits, trials total, business ARR, business nodes, homelab subs, unrealized ARR latest, virtual nodes, and trial 6+ estimate.
+
+## Philosophy (Costa, 2025-12-26)
+- Goal is to **educate the agent**, not constrain it as a “dummy.” Avoid “do X because we say so.”
+- Prefer **explanations**: “when you need A, do B because X/Y/Z,” with reasoning and context.
+- Templates should include **use‑cases, rationale, useful joins, pitfalls, and best practices** so the model can **improvise safely**.
+- Guardrails are acceptable only when necessary for correctness, but the primary intent is **understanding‑first** guidance.
 
 ## Decisions needed from Costa
 1. **Fidelity vs consolidation**
@@ -549,6 +567,73 @@ Next actions to reach parity: promote 🟨 templates from scratch → prod after
 - D16: **Schema shape for stat KPIs**: use `{ data: <object>, notes: [], data_freshness: {...} }` (Option 1A). Avoid `data[]` + `maxItems: 1`.
 - D17: **Data freshness field**: add `data_freshness { last_ingested_at, age_minutes, source_table }` to all schema responses to avoid embedding freshness in notes.
 
+### Decisions locked (2025-12-26) — prompt consolidation (single pattern)
+- D18: **Consolidate Temporal Data Routing** into a single canonical section (under Source Selection Matrix), transfer and enrich all routing rules there, and replace duplicated routing guidance elsewhere with short pointers. Goal: improve understanding + reduce prompt size via **surgical edits** only.
+- D19: **Freshness consolidation**: keep the full freshness query + placement rules only in **0.3** (Non‑Negotiables) as the canonical source; replace **7.1** with a short pointer and update other sections to reference 0.3.
+
+### Stress points roadmap (2025-12-26) — fix one-by-one (no re-runs of external reviewers)
+Top 5 stress points (ranked by reliability risk + frequency):
+1) **Date handling precedence conflicts** (explicit `to_date` vs `CURRENT_DATE()` vs “include today”).
+2) **Stat vs timeseries + schema cap conflicts** (`maxItems:1`, LIMIT 1, post-filter vs template verbatim).
+3) **Template verbatim vs adaptation rule tension** (when to adapt vs hard-stop).
+4) **Freshness reporting vs schema constraints** (must include vs schema forbids).
+5) **Manual baseline cutoff logic drift** (2025-10-01/02/04 rules across templates).
+
+Planned fix order (one per iteration):
+P-A: Consolidate and enrich **Date Handling Precedence** into a single canonical block; replace all conflicting rules with pointers. **(Done 2025-12-26)**
+P-B: Consolidate **Stat vs Timeseries Decision** into a canonical block (schema-first precedence; eliminate contradictory wording). **(Done 2025-12-26)**
+P-C: Consolidate **Template Usage Rule** into a clear decision tree (exact match → verbatim; otherwise adaptation rules with required disclosures). **(Done 2025-12-26)**
+P-D: Consolidate **Freshness vs Schema** into an explicit precedence rule with strict fallbacks. **(Done 2025-12-26)**
+P-E: Consolidate **Manual Baseline Logic** into a single section with explicit cutoff dates and template references. **(Done 2025-12-26)**
+
+### Decisions needed (2025-12-26) — prompt consolidation (surgical)
+1) **Freshness rule consolidation**
+   - Option A: Keep the full freshness query + placement rules only in **0.3**; replace **7.1** with a one‑line pointer (“See 0.3”) and remove the duplicate SQL.
+     - Pros: single source of truth; saves tokens.
+     - Cons: one less visible SQL example in the “Query Patterns” section.
+   - Option B: Keep **7.1** as the canonical location; shorten **0.3** to a brief mandate with a pointer.
+     - Pros: keeps query examples grouped with patterns.
+     - Cons: weakens Non‑Negotiables section.
+   - Recommendation: **A** (non‑negotiables should remain canonical).
+2) **Stat vs timeseries rule consolidation**
+   - Option A: Make **Core execution rules** the canonical place; remove duplicate stat/series bullets from **Understanding user requests**, **Known pitfalls**, and **FAQ** (keep only template‑specific notes).
+     - Pros: clear routing; fewer contradictions.
+     - Cons: requires careful trimming across multiple sections.
+   - Option B: Keep stat/series notes inside each template/FAQ and remove from Core rules.
+     - Pros: local context near examples.
+     - Cons: more repetition; higher drift risk.
+   - Recommendation: **A** (single canonical rule + minimal template reminders).
+3) **Source selection/temporal routing consolidation**
+   - Option A: Keep **Source Selection Matrix** as canonical; trim overlapping rules from **Authority & Scope**, **Entity Cheat Sheet**, and **Decision Tree** to short pointers.
+     - Pros: one deterministic routing table; fewer contradictions.
+     - Cons: less self‑contained sections.
+   - Option B: Keep **Authority & Scope** canonical; shrink Source Selection Matrix into short examples only.
+     - Pros: authority hierarchy stays central.
+     - Cons: reduces deterministic routing guidance.
+   - Recommendation: **A** (matrix is the most explicit routing aid).
+4) **Realized ARR rule consolidation**
+   - Option A: Keep the **Canonical realized ARR** section as the single source; replace other mentions with 1‑line references.
+     - Pros: reduces drift; shortens repeated formula text.
+     - Cons: less “inline” explanation in other sections.
+   - Option B: Keep short summary in Domain Model only; remove other references.
+     - Pros: keeps business model readable.
+     - Cons: loses operational rule location for templates.
+   - Recommendation: **A** (operational rule should be canonical).
+
+### Decisions needed (2025-12-26) — ARR routing for ambiguous “current ARR”
+**Context:** The prompt has multiple valid ARR concepts (realized, business-only, total+unrealized, per-space). We need a deterministic default for ambiguous asks like “current ARR” with no qualifiers.
+1) **Default definition for ambiguous “current ARR”**
+   - Option A: **Realized ARR (portfolio)** via `realized_arr_components_stat_last_not_null` (metrics_daily).
+     - Pros: aligns with KPI dashboards; already the canonical “realized ARR” definition; avoids per-space summation drift.
+     - Cons: excludes unrealized (45d newcomers).
+   - Option B: **Total ARR + unrealized** via `total_arr_plus_unrealized_arr_latest`.
+     - Pros: includes newcomers; closer to “total potential ARR.”
+     - Cons: differs from realized ARR dashboards; can surprise finance reporting.
+   - Option C: **Per-space ARR total** via `spaces_latest.bq_arr_discount` (sum across spaces).
+     - Pros: uses space-level truth; intuitive for “customer ARR.”
+     - Cons: heavy query; not the KPI rollup; can diverge from metrics_daily.
+   - Recommendation: **A** (most consistent with existing KPI definitions and reduces ambiguity).
+
 ### Decisions needed (2025-12-24) — stat KPI schema shape
 1) **Schema shape for single-value KPIs**
    - 1A: Keep root `{ data, notes }`, but make `data` a **single object** (not an array).
@@ -616,6 +701,8 @@ Next actions to reach parity: promote 🟨 templates from scratch → prod after
 - P9: Once `executive2.ai` covers the top panels + long-tail templates well, migrate the finalized catalog/workflow into `neda/bigquery.ai`, then delete `neda/executive.ai` and `neda/executive2.ai` **only after Costa confirms**.
 - P10: Add a dedicated harness case that queries `watch_towers.manual_360_bq` via BigQuery MCP/toolbox (and a reference `bq` CLI query) to detect Drive-credential/dry-run failures early and to validate DevOps permission changes.
 - P11: Re-run harness after comparator fix, starting with `ONLY_CASE=business_nodes_delta_top10` and `homelab_nodes_delta_top10`, then full suite with the larger timeout. If failures persist, add SQL-side ordering/filters or update template routing (not user prompts).
+- P12: After Costa chooses consolidation options, apply **surgical edits** to `neda/bigquery.ai` (remove duplicated rules, replace with short pointers).
+- P13: Re-run `npm run lint` + `npm run build` after prompt edits; spot-check a small harness subset to ensure no behavioral regressions.
 
 ## Implied decisions/assumptions
 - SQL should avoid Grafana macros; replace with standard parameters (e.g., `WHERE date BETWEEN @from AND @to`).

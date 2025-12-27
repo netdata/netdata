@@ -110,6 +110,10 @@ const STREAM_REASONING_STEPS: readonly ReasoningOutput[] = [
     providerMetadata: { anthropic: { signature: 'stream-step-1' } },
   },
 ];
+const THINK_TAG_INNER = 'Example reasoning with <ai-agent-EXAMPLE-FINAL format="markdown">not real';
+const THINK_TAG_SAMPLE = `<think>${THINK_TAG_INNER}</think>`;
+const THINK_TAG_STREAM_REPORT = `${RESULT_HEADING}Think tag stream coverage.`;
+const THINK_TAG_NONSTREAM_REPORT = `${RESULT_HEADING}Think tag non-stream coverage.`;
 const THROW_FAILURE_MESSAGE = 'Simulated provider throw for coverage.';
 const FINAL_REPORT_JSON_ATTEMPT = 'Attempting JSON final report without structured payload.';
 const FINAL_REPORT_SUCCESS_SUMMARY = 'Final report emitted after retry.';
@@ -1637,6 +1641,44 @@ const SCENARIOS: ScenarioDefinition[] = [
           status: STATUS_SUCCESS,
           tokenUsage: DEFAULT_TOKEN_USAGE,
           reasoning: [...STREAM_REASONING_STEPS],
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-think-stream',
+    description: 'Leading <think> block should route to thinking stream.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: THINK_TAG_SAMPLE,
+          reportContent: THINK_TAG_STREAM_REPORT,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-think-nonstream',
+    description: 'Leading <think> block should emit thinking in non-streaming mode.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: THINK_TAG_SAMPLE,
+          reportContent: THINK_TAG_NONSTREAM_REPORT,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
         },
       },
     ],

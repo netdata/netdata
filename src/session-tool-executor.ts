@@ -29,6 +29,12 @@ type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
 type AjvValidateFn = ValidateFunction;
 const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
 
+const computeTruncationPercent = (originalBytes: number, finalBytes: number): number => {
+  if (originalBytes <= 0) return 0;
+  const pct = ((originalBytes - finalBytes) / originalBytes) * 100;
+  return Number(Math.max(0, pct).toFixed(1));
+};
+
 export const TOOL_SANITIZATION_FAILED_KEY = '__sanitization_failed';
 export const TOOL_SANITIZATION_REASON_KEY = '__sanitization_reason';
 export const TOOL_SANITIZATION_ORIGINAL_PAYLOAD_KEY = '__sanitization_original_payload';
@@ -546,6 +552,10 @@ export class SessionToolExecutor {
                   ? first.limit - first.projected
                   : 0;
 
+              const renderedFailure = TOOL_NO_OUTPUT;
+              const originalBytes = Buffer.byteLength(toolOutput, 'utf8');
+              const finalBytes = Buffer.byteLength(renderedFailure, 'utf8');
+              const truncatedPct = computeTruncationPercent(originalBytes, finalBytes);
               const warnEntry: LogEntry = {
                 timestamp: Date.now(),
                 severity: 'WRN',
@@ -560,15 +570,18 @@ export class SessionToolExecutor {
                   tool: effectiveToolName,
                   provider: providerLabel,
                   tokens_estimated: toolTokens,
+                  original_bytes: originalBytes,
+                  final_bytes: finalBytes,
+                  truncated_pct: truncatedPct,
                   projected_tokens: guardEvaluation.projectedTokens,
                   limit_tokens: first.limit,
                   remaining_tokens: remainingTokens,
                   reason: 'token_budget_exceeded',
+                  dropped: true,
                 },
               };
               this.log(warnEntry);
 
-              const renderedFailure = TOOL_NO_OUTPUT;
               const failureTokens = this.estimateTokensForCounters([
                 { role: 'tool', content: renderedFailure },
               ]);

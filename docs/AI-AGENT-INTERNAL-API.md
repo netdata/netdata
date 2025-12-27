@@ -59,7 +59,7 @@ The library performs no direct I/O (no stdout/stderr/file writes). All output, l
 - Always returns a result: `run()` resolves with `AIAgentResult` even on errors; it does not throw for normal failures.
 - Unconditional FIN summaries: The library emits `FIN` summary logs for LLM and MCP at the end of every run, including when execution fails or ends early. These are delivered through `onLog` and included in `result.logs`.
 - Error transparency: Errors are represented both in logs (`ERR`/`WRN` and `agent:EXIT-...` markers) and in the `AIAgentResult.error` string.
-- Accounting completeness: All accounting entries (LLM/tool; ok/failed) are recorded and returned.
+- Accounting completeness: All accounting entries (LLM/tool; ok/failed) are recorded and returned, with `AIAgentResult.accounting` merging opTree accounting and session-level entries (e.g., context-guard drops).
 
 ## Accounting Records: Structure and Emission Semantics
 
@@ -95,7 +95,7 @@ Type `tool` (MCP tool calls and internal tools):
 Emission timing (tool): Immediately after each tool execution completes or fails:
 - Internal tools `agent__task_status`: `status: 'ok'`, `mcpServer: 'agent'`, variable `charactersOut` (based on done/pending/now fields), `agent__final_report`: `status: 'ok'`, `mcpServer: 'agent'`, fixed `charactersOut` (12), `charactersIn` reflects parameter size.
 - External MCP tools: `status: 'ok'` with the resolved `mcpServer` on success; `status: 'failed'`, `mcpServer: 'unknown'`, and `charactersOut: 0` on error.
-- Truncation: If the tool response exceeds `toolResponseMaxBytes`, the library prefixes a truncation notice and trims the content to the limit; `charactersOut` reflects the returned (prefixed + truncated) content length. The emitted warning always includes the actual byte size and the configured limit (e.g., `Tool response exceeded max size (actual 16384 B > limit 12288 B)`).
+- Truncation: If the tool response exceeds `toolResponseMaxBytes`, the library prefixes a truncation notice and trims the content to the limit; `charactersOut` reflects the returned (prefixed + truncated) content length. Truncated outputs include both the prefix `[TRUNCATED IN THE MIDDLE BY ~X BYTES/TOKENS]` and the mid-marker `[···TRUNCATED N bytes/tokens···]`. The emitted warning includes `original_bytes`, `final_bytes`, `truncated_pct` (bytes), and the configured size/token limit.
 - Context overflow: If projecting a tool result would overflow the configured `contextWindow`, the agent injects `(tool failed: context window budget exceeded)`, records an accounting entry with `error: 'context_budget_exceeded'`, and populates `details` with `projected_tokens`, `limit_tokens`, and `remaining_tokens`.
 - Telemetry: every guard activation increments `ai_agent_context_guard_events_total{provider,model,trigger,outcome}` and updates the observable gauge `ai_agent_context_guard_remaining_tokens{provider,model,trigger,outcome}` so integrators can monitor how close sessions are to exhausting their budgets.
 
@@ -198,9 +198,11 @@ Recommendation for JSON output: include an explicit error structure in the schem
 
 - Configurable via `sessionConfig.toolResponseMaxBytes`.
 - When an MCP tool response exceeds the cap:
-  - Emits a `WRN` log (response, mcp) with full request formatting + actual size and limit, tagged "(truncated)".
-  - Returns truncated content using 50/50 split (first half + last half) with marker at truncation point:
-    - Marker format: `[···TRUNCATED {omitted} bytes···]` (appears in the middle of content)
+  - Emits a `WRN` log (response, mcp) that states whether the output was **truncated** or **dropped**, and includes:
+    - `original_bytes`, `final_bytes`, `truncated_pct` (bytes), plus `limit_bytes` when size-capped.
+  - Returns truncated content with **two markers**:
+    - Prefix at start: `[TRUNCATED IN THE MIDDLE BY ~X BYTES/TOKENS]`
+    - Existing mid-marker: `[···TRUNCATED {omitted} bytes/tokens···]` (appears in the middle of content)
   - Counts occurrences; `FIN` MCP summary includes `capped=<count>`.
 - Headend surfaces (REST/MCP/OpenAI/Anthropic) apply the same cap via their session configuration and surface errors through HTTP/SSE/WebSocket semantics. Their incoming request payloads must include `format`, and when `format` is `json`, a `schema` object is required so the library can validate structured content.
 

@@ -382,7 +382,7 @@ interface MCPTool {
 - **Tool filtering**: MCP servers and providers respect `toolsAllowed` / `toolsDenied` lists so administrators can expose only safe operations (`src/tools/mcp-provider.ts:120-220`). Internal helper `sanitizeToolName` ensures comparisons ignore `<|prefix|>` wrappers (`src/utils.ts`).
 - **Process tree killing**: Stdio MCP provider tracks child PIDs and uses `killProcessTree` to terminate servers on shutdown/restart, preventing orphaned processes (`src/tools/mcp-provider.ts:460-520`).
 - **Shared MCP registry**: Shared servers (`shared !== false`) keep a reference count so multiple sessions reuse the same transport and automatically restart if `onclose` fires (`src/tools/mcp-provider.ts:540-680`).
-- **Tool budget + truncation**: Orchestrator enforces `toolResponseMaxBytes` before committing outputs, prepending `(tool failed: response exceeded max size)` and logging warnings when truncation occurs (`src/tools/tools.ts:330-420`).
+- **Tool budget + truncation**: Orchestrator enforces `toolResponseMaxBytes` before committing outputs, truncates with a prefix + mid-marker, and logs warnings including `original_bytes`, `final_bytes`, `truncated_pct`, and size/token limits (`src/tools/tools.ts`).
 
 ### OpenAPI Importer
 11. **Automatic REST tool generation**:
@@ -424,7 +424,9 @@ interface MCPTool {
 
 ### Large response truncated
 - Check toolResponseMaxBytes setting
-- Response uses 50/50 split with marker: `[···TRUNCATED N bytes···]`
+- Response uses 50/50 split with **two markers**:
+  - Prefix: `[TRUNCATED IN THE MIDDLE BY ~X BYTES/TOKENS]`
+  - Mid-marker: `[···TRUNCATED N bytes/tokens···]`
 
 ### MCP connection failed
 - Check command/args for stdio

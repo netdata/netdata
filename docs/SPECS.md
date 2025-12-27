@@ -291,11 +291,11 @@ Notes:
 
 #### Tool Response Size Cap
 - A configurable maximum size (bytes) is enforced for MCP tool responses.
-- If a tool returns content larger than the limit, the agent truncates using 50/50 split:
-  - First half of content + marker + last half of content
-  - Marker format: `[···TRUNCATED {omitted} bytes···]`
+- If a tool returns content larger than the limit, the agent truncates using 50/50 split with **two markers**:
+  - Prefix: `[TRUNCATED IN THE MIDDLE BY ~X BYTES/TOKENS]`
+  - Mid-marker: `[···TRUNCATED {omitted} bytes/tokens···]`
   - Both beginning and end are preserved for better context.
-- A warning is logged with request details, actual size, and limit.
+- A warning is logged with request details plus `original_bytes`, `final_bytes`, `truncated_pct` (bytes), and the size/token limit.
 - Configuration surfaces (highest precedence first):
   - CLI: `--tool-response-max-bytes <n>`
   - Frontmatter: `toolResponseMaxBytes: <number>`

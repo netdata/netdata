@@ -85,6 +85,9 @@ const RETRY_EXHAUSTED_MESSAGE = 'retry exhausted';
 const COLLAPSING_REMAINING_TURNS_FRAGMENT = 'Collapsing remaining turns';
 const CONTEXT_LIMIT_TURN_WARN = 'Context limit exceeded during turn execution; proceeding with final turn.';
 const FINAL_TURN_FRAGMENT = 'final turn';
+const THINK_TAG_INNER = 'Example reasoning with <ai-agent-EXAMPLE-FINAL format="markdown">not real';
+const THINK_TAG_STREAM_FRAGMENT = 'Think tag stream coverage.';
+const THINK_TAG_NONSTREAM_FRAGMENT = 'Think tag non-stream coverage.';
 const TASK_CONTINUE_PROCESSING = 'Continue processing';
 const TASK_COMPLETE_TASK = 'Complete task';
 const TASK_COMPLETED_RESPONSE = 'task completed';
@@ -289,6 +292,7 @@ const sessionConfigObservers: ((config: AIAgentSessionConfig) => void)[] = [];
 
 const COVERAGE_ALIAS_BASENAME = 'parent.ai';
 const TRUNCATION_MARKER_PATTERN = /\[···TRUNCATED \d+ (?:bytes|chars|tokens)···\]/;
+const TRUNCATION_PREFIX_PATTERN = /\[TRUNCATED IN THE MIDDLE BY ~\d+ (?:BYTES|TOKENS|CHARS)\]/;
 const CONFIG_FILE_NAME = 'config.json';
 const INCLUDE_DIRECTIVE_TOKEN = '${include:';
 const FINAL_REPORT_CALL_ID = 'agent-final-report';
@@ -1379,14 +1383,15 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-8',
     configure: (configuration, sessionConfig, defaults) => {
-      sessionConfig.toolResponseMaxBytes = 64;
-      defaults.toolResponseMaxBytes = 64;
+      sessionConfig.toolResponseMaxBytes = 256;
+      defaults.toolResponseMaxBytes = 256;
       configuration.defaults = defaults;
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-8 expected success.');
       const toolMessages = result.conversation.filter((message) => message.role === 'tool');
       invariant(toolMessages.some((message) => TRUNCATION_MARKER_PATTERN.test(message.content)), 'Truncation marker expected in run-test-8.');
+      invariant(toolMessages.some((message) => TRUNCATION_PREFIX_PATTERN.test(message.content)), 'Truncation prefix expected in run-test-8.');
     },
   },
   {
@@ -2175,6 +2180,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(dropLog !== undefined, 'Drop warning log expected for context_guard__tool_drop_after_success.');
       const dropReason = getLogDetail(dropLog, 'reason');
       invariant(dropReason === 'token_budget_exceeded', 'Drop reason should be token_budget_exceeded for context_guard__tool_drop_after_success.');
+      invariant(logHasDetail(dropLog, 'final_bytes'), 'Drop warning should report final_bytes for context_guard__tool_drop_after_success.');
+      const dropPct = expectLogDetailNumber(dropLog, 'truncated_pct', 'Drop warning should report truncated_pct for context_guard__tool_drop_after_success.');
+      invariant(dropPct >= 0, 'Drop truncated_pct should be non-negative for context_guard__tool_drop_after_success.');
 
       const accountingEntries = result.accounting.filter(isToolAccounting);
       const failedEntry = accountingEntries.find((entry) => entry.command === 'test__test' && entry.status === 'failed');
@@ -3231,6 +3239,78 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(thinkingLog !== undefined, 'Thinking log expected for run-test-30.');
     },
   },
+  (() => {
+    let capturedThinking = '';
+    let capturedOutput = '';
+    return {
+      id: 'run-test-think-stream',
+      configure: (configuration, sessionConfig, defaults) => {
+        capturedThinking = '';
+        capturedOutput = '';
+        defaults.stream = true;
+        configuration.defaults = defaults;
+        sessionConfig.stream = true;
+        const existingCallbacks = sessionConfig.callbacks ?? {};
+        sessionConfig.callbacks = {
+          ...existingCallbacks,
+          onThinking: (chunk) => {
+            capturedThinking += chunk;
+            existingCallbacks.onThinking?.(chunk);
+          },
+          onOutput: (chunk) => {
+            capturedOutput += chunk;
+            existingCallbacks.onOutput?.(chunk);
+          },
+        };
+      },
+      expect: (result) => {
+        invariant(result.success, 'Scenario run-test-think-stream expected success.');
+        invariant(capturedThinking.includes(THINK_TAG_INNER), 'Thinking stream should contain think block content for run-test-think-stream.');
+        invariant(!capturedOutput.includes(THINK_TAG_INNER), 'Output stream should not include think block content for run-test-think-stream.');
+        invariant(!capturedOutput.includes('<think>'), 'Output stream should not include think tags for run-test-think-stream.');
+        invariant(capturedOutput.includes(THINK_TAG_STREAM_FRAGMENT), 'Output stream should include final report content for run-test-think-stream.');
+        const assistantWithThink = result.conversation.find((message) => message.role === 'assistant' && message.content.includes('<think>'));
+        invariant(assistantWithThink !== undefined, 'Assistant content should preserve <think> tags for run-test-think-stream.');
+        invariant(assistantWithThink.content.includes(THINK_TAG_INNER), 'Assistant content should preserve think inner content for run-test-think-stream.');
+      },
+    } satisfies HarnessTest;
+  })(),
+  (() => {
+    let capturedThinking = '';
+    let capturedOutput = '';
+    return {
+      id: 'run-test-think-nonstream',
+      configure: (configuration, sessionConfig, defaults) => {
+        capturedThinking = '';
+        capturedOutput = '';
+        defaults.stream = false;
+        configuration.defaults = defaults;
+        sessionConfig.stream = false;
+        const existingCallbacks = sessionConfig.callbacks ?? {};
+        sessionConfig.callbacks = {
+          ...existingCallbacks,
+          onThinking: (chunk) => {
+            capturedThinking += chunk;
+            existingCallbacks.onThinking?.(chunk);
+          },
+          onOutput: (chunk) => {
+            capturedOutput += chunk;
+            existingCallbacks.onOutput?.(chunk);
+          },
+        };
+      },
+      expect: (result) => {
+        invariant(result.success, 'Scenario run-test-think-nonstream expected success.');
+        invariant(capturedThinking.includes(THINK_TAG_INNER), 'Thinking stream should contain think block content for run-test-think-nonstream.');
+        invariant(!capturedOutput.includes(THINK_TAG_INNER), 'Output stream should not include think block content for run-test-think-nonstream.');
+        invariant(!capturedOutput.includes('<think>'), 'Output stream should not include think tags for run-test-think-nonstream.');
+        invariant(capturedOutput.includes(THINK_TAG_NONSTREAM_FRAGMENT), 'Output stream should include final report content for run-test-think-nonstream.');
+        const assistantWithThink = result.conversation.find((message) => message.role === 'assistant' && message.content.includes('<think>'));
+        invariant(assistantWithThink !== undefined, 'Assistant content should preserve <think> tags for run-test-think-nonstream.');
+        invariant(assistantWithThink.content.includes(THINK_TAG_INNER), 'Assistant content should preserve think inner content for run-test-think-nonstream.');
+      },
+    } satisfies HarnessTest;
+  })(),
   {
     id: RUN_TEST_31,
     expect: (result) => {
@@ -4471,6 +4551,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(logHasDetail(mcpTrunc, 'tool_kind') && getLogDetail(mcpTrunc, 'tool_kind') === 'mcp', 'Truncation warning must carry tool_kind field for run-test-59.');
       invariant(logHasDetail(mcpTrunc, 'actual_bytes') && getLogDetail(mcpTrunc, 'actual_bytes') === 5000, 'Truncation warning must report actual_bytes for run-test-59.');
       invariant(logHasDetail(mcpTrunc, 'limit_bytes') && getLogDetail(mcpTrunc, 'limit_bytes') === 120, 'Truncation warning must report limit_bytes for run-test-59.');
+      invariant(logHasDetail(mcpTrunc, 'final_bytes'), 'Truncation warning must report final_bytes for run-test-59.');
+      const truncPct = expectLogDetailNumber(mcpTrunc, 'truncated_pct', 'Truncation warning must report truncated_pct for run-test-59.');
+      invariant(truncPct > 0, 'truncated_pct should be positive for run-test-59.');
       const batchTool = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && TRUNCATION_MARKER_PATTERN.test(message.content));
       invariant(batchTool !== undefined, 'Truncated tool response expected for run-test-59.');
     },
@@ -9432,6 +9515,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       // Tool output should be truncated with marker, not the failure stub
       const hasTruncationMarker = toolMessages.some((message) => typeof message.content === 'string' && TRUNCATION_MARKER_PATTERN.test(message.content));
       invariant(hasTruncationMarker, 'Truncation marker expected in run-test-size-cap-truncation.');
+      const hasTruncationPrefix = toolMessages.some((message) => typeof message.content === 'string' && TRUNCATION_PREFIX_PATTERN.test(message.content));
+      invariant(hasTruncationPrefix, 'Truncation prefix expected in run-test-size-cap-truncation.');
       // Should NOT have the failure stub
       const hasFailureStub = toolMessages.some((message) => typeof message.content === 'string' && message.content === TOOL_SIZE_CAP_STUB);
       invariant(!hasFailureStub, 'Failure stub should NOT appear when truncation succeeds in run-test-size-cap-truncation.');

@@ -19,6 +19,7 @@ import type { ProviderOptions } from '@ai-sdk/provider-utils';
 import type { LanguageModel, ModelMessage, ProviderMetadata, ReasoningOutput, StreamTextResult, ToolSet } from 'ai';
 
 import { XML_WRAPPER_CALLED_AS_TOOL_RESULT, isXmlFinalReportTagName } from '../llm-messages.js';
+import { ThinkTagStreamFilter } from '../think-tag-filter.js';
 import { truncateToBytes } from '../truncation.js';
 import { clampToolName, parseJsonRecord, sanitizeToolName, TOOL_NAME_MAX_LENGTH, warn } from '../utils.js';
 
@@ -1919,6 +1920,13 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           } catch {
             // If it's not JSON, keep the response as-is
           }
+        }
+      }
+
+      if (request.onChunk !== undefined && response.length > 0) {
+        const thinkSplit = new ThinkTagStreamFilter().process(response);
+        if (thinkSplit.thinking.length > 0) {
+          request.onChunk(thinkSplit.thinking, 'thinking');
         }
       }
 
