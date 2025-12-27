@@ -7,7 +7,7 @@ fi
 # shellcheck disable=SC1091
 [ -f /etc/profile ] && . /etc/profile
 
-if [ "${_container_saved+x}" = x ]; then
+if [ "${_container_saved+x}" = "x" ]; then
   container=$_container_saved
 else
   unset container
