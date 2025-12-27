@@ -1,0 +1,4 @@
+INLINE_SINGLE=inline
+MSG=test message
+SINGLE_INJECTION=only one
+

@@ -1,0 +1,7 @@
+pattern: '(?P<MESSAGE>.*)'
+
+inject:
+  - key: ORIGINAL_LINE
+    value: '${LINE}'
+  - key: COMBINED
+    value: 'Processed: ${LINE} -> ${MESSAGE}'
