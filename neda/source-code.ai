@@ -1,6 +1,6 @@
 #!/usr/bin/env ai-agent
 ---
-description: Answers anything that can be extracted from Netdata's public and private source code and documentation repos
+description: Answers anything that can be extracted from Netdata's public and private source code and documentation repos (does not have access to non-Netdata repos)
 usage: Ask any question that can be answered from Netdata's public and private source code repos, documentation, CI/CD jobs, integrations and automations
 models:
   - nova/neda-coder

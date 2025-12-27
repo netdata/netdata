@@ -15,6 +15,7 @@ tools:
   - serper-scrape
   - jina-reader
   - fetcher
+  - exa-reader
   - cloudflare-browser
 agents: []
 input:
@@ -81,6 +82,12 @@ To fetch the page data and extract the information yourself.
 
 ### 3. `jina-reader__read_url`
 Another way to fetch the page data and extract the information yourself.
+
+### 4. `exa-reader__crawling_exa`
+Set maxCharacters to 300000 (300 thousand) to make sure you will get the whole of it.
+
+### 5. `cloudflare-browser__get_url_markdown`
+Ask cloudflare to fetch the URL and convert it to markdown.
 
 ## How to Work
 1. Use the first available tool in the order defined above, with the provided `url`

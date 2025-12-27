@@ -10,6 +10,7 @@ models:
 tools:
   - jina-search
   - brave
+  - exa-search
 agents:
   - web-fetch.ai
 toolResponseMaxBytes: 65536
@@ -32,6 +33,9 @@ Come up with 5 search queries, run them in parallel when helpful, get the result
 ## Search Providers
 1. `brave`
 2. `jina-search`
+3. `exa-search` (specialized search for companies and linkedin profiles)
+
+## Tools
 
 ## Domain page fetch
 3. `web-fetch` with a URL like: `https://[company-domain-name]`

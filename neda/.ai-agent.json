@@ -321,6 +321,44 @@
       ],
       "toolsDenied": []
     },
+    "exa-reader": {
+      "type": "http",
+      "url": "https://mcp.exa.ai/mcp?exaApiKey=${EXA_API_KEY}&tools=crawling_exa",
+      "enabled": true,
+      "toolsAllowed": [
+        "crawling_exa"
+      ],
+      "toolsDenied": []
+    },
+    "exa-code": {
+      "type": "http",
+      "url": "https://mcp.exa.ai/mcp?exaApiKey=${EXA_API_KEY}&tools=get_code_context_exa",
+      "enabled": true,
+      "toolsAllowed": [
+        "get_code_context_exa"
+      ],
+      "toolsDenied": []
+    },
+    "exa-search": {
+      "type": "http",
+      "url": "https://mcp.exa.ai/mcp?exaApiKey=${EXA_API_KEY}&tools=web_search_exa,company_research_exa,linkedin_search_exa",
+      "enabled": true,
+      "toolsAllowed": [
+        "company_research_exa",
+        "linkedin_search_exa",
+        "web_search_exa"
+      ],
+      "toolsDenied": []
+    },
+    "exa": {
+      "type": "http",
+      "url": "https://mcp.exa.ai/mcp?exaApiKey=${EXA_API_KEY}&tools=web_search_exa,get_code_context_exa,crawling_exa,company_research_exa,linkedin_search_exa,deep_researcher_start,deep_researcher_check",
+      "enabled": true,
+      "toolsAllowed": [
+        "*"
+      ],
+      "toolsDenied": []
+    },
     "jina-reader": {
       "type": "http",
       "url": "https://mcp.jina.ai/v1",

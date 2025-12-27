@@ -12,6 +12,7 @@ tools:
   - serper-search
   - jina-search
   - brave
+  - exa-search
 #  - cloudflare-browser
 agents:
   - web-fetch.ai
@@ -95,6 +96,9 @@ The following list of providers is indicative. Some providers may not be availab
 
 A few search providers return just URLs and page titles, others are able to extract more information from the pages.
 
+When to use these search providers: generic web searches not covered by the specialized agents you have access to.
+When not to use these search providers: use the `sourcegraph` agent when searching for source code examples or patterns; use the `github-search` agent when looking for issues, PRs, discussions, releases of publicly available open-source codebases' use the `reddit` agent when looking for reddit discussions.
+
 ### Serper
 
 Direct Google-search results.
@@ -102,6 +106,15 @@ Direct Google-search results.
 ### Jina
 
 Special AI based web search for information and news.
+
+### Exa
+
+Another AI optimized search. You MUST ask for 25 results.
+Exa provides specialized tools for:
+
+- Web searches
+- Companies
+- LinkedIn profiles (companies and people)
 
 ### Brave
 
@@ -114,8 +127,6 @@ Brave provides specialized tools for:
 - Local searches
 - Summarizer
 
-Depending on the user's request, use the appropriate ones. Do not call irrelevant tools.
-
 Brave is also used by Anthropic for searches.
 
 ## Your Agents
@@ -127,28 +138,27 @@ You have access to multiple agents that can help you in your research.
 Given a URL, it fetches the content and extracts from it the relevant information. The URL must be publicly available online and the extraction instructions can be complex. This is a powerful agent that can help in accessing and extracting any information from web pages.
 
 When to use: extract information from any web page
-When not to use: use `sourcegraph` when searching for source code examples or patterns; use `github-search` when looking for issues, PRs, discussions, releases of publicly available open-source codebases' use `reddit` when looking for reddit discussions
 
 ### github-search
 
 Searches on GitHub for issues, pull requests, discussions, releases and code.
 
-When to use: searching for anything on GitHub
-When not to use: use `sourcegraph` when searching for source code examples or patterns - sourcegraph is significantly more efficient in finding relevant source code
+When to use: searching for anything on GitHub.
+When not to use: use `sourcegraph` when searching for source code examples or patterns - sourcegraph is significantly more efficient in finding relevant source code.
 
 ### sourcegraph
 
 Searches open-source codebases, publicly available on GitHub, GitLab, and other public repositories.
 
-When to use: fast and efficient source code retrieval
-When not to use: does not have access to issues, PRs, discussions, or releases - it indexes only code
+When to use: fast and efficient source code retrieval.
+When not to use: does not have access to issues, PRs, discussions, or releases - it indexes only code.
 
 ### source-code
 
 Searches Netdata's private repos, including Netdata Agent, Netdata Cloud, Netdata UI, Netdata website (www.netdata.cloud), Netdata documentation (learn.netdata.cloud), CI/CD jobs, integrations and automations.
 
-When to use: you are looking for something in the Netdata repos
-When not to use: does not have access to issues, PRs, discussions, or releases - it ONLY has access to files committed on all Netdata repos (public and private)
+When to use: you are looking for something in the Netdata repos.
+When not to use: does not have access to issues, PRs, discussions, or releases - it ONLY has access to files committed on all Netdata repos (public and private).
 
 ### reddit
 
