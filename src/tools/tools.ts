@@ -1,5 +1,8 @@
 import { SpanKind } from '@opentelemetry/api';
 
+import type { ResponseCache } from '../cache/response-cache.js';
+import type { ToolCacheResolver } from '../cache/tool-cache-resolver.js';
+import type { CacheEntryMetadata, CacheLookupResult } from '../cache/types.js';
 import type { SessionProgressReporter } from '../session-progress-reporter.js';
 import type { SessionTreeBuilder, SessionNode } from '../session-tree.js';
 import type { ToolMetricsRecord } from '../telemetry/index.js';
@@ -44,6 +47,12 @@ const toErrorMessage = (value: unknown): string => {
   return 'unknown_error';
 };
 
+const isCachedToolResult = (value: unknown): value is { result: string } => {
+  if (value === null || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.result === 'string';
+};
+
 const TRUNCATION_PREFIX_SEPARATOR = '\n';
 
 const buildTruncationPrefixWithSeparator = (omitted: number, unit: 'bytes' | 'tokens'): string =>
@@ -74,6 +83,11 @@ export interface ToolBudgetCallbacks {
   countTokens: (text: string) => number;  // Tokenizer for accurate budget truncation
 }
 
+interface ToolCacheContext {
+  getCache?: () => ResponseCache | undefined;
+  resolver?: ToolCacheResolver;
+}
+
 export interface ManagedToolResult {
   ok: boolean;
   result: string;
@@ -95,7 +109,9 @@ export class ToolsOrchestrator {
   private readonly aliases = new Map<string, string>();
   private canceled = false;
   private readonly pendingQueueControllers = new Set<AbortController>();
-  private readonly sessionInfo: { agentId?: string; agentPath?: string; callPath?: string; txnId?: string; headendId?: string; telemetryLabels?: Record<string, string> };
+  private readonly cacheProvider?: () => ResponseCache | undefined;
+  private readonly toolCacheResolver?: ToolCacheResolver;
+  private readonly sessionInfo: { agentId?: string; agentPath?: string; callPath?: string; txnId?: string; headendId?: string; telemetryLabels?: Record<string, string>; agentHash?: string };
 
   constructor(
     private readonly opts: { toolTimeout?: number; toolResponseMaxBytes?: number; traceTools?: boolean },
@@ -104,9 +120,10 @@ export class ToolsOrchestrator {
     // Unified logger: session-level log() (must never throw)
     private readonly onLog: (entry: LogEntry, opts?: { opId?: string }) => void,
     private readonly onAccounting?: (entry: AccountingEntry) => void,
-    sessionInfo?: { agentId?: string; agentPath?: string; callPath?: string; txnId?: string; headendId?: string; telemetryLabels?: Record<string, string> },
+    sessionInfo?: { agentId?: string; agentPath?: string; callPath?: string; txnId?: string; headendId?: string; telemetryLabels?: Record<string, string>; agentHash?: string },
     private readonly progress?: SessionProgressReporter,
     private readonly budgetCallbacks?: ToolBudgetCallbacks,
+    cacheContext?: ToolCacheContext,
   ) {
     const normalizedCallPath = sessionInfo?.callPath !== undefined ? normalizeCallPath(sessionInfo.callPath) : undefined;
     const normalizedAgentPath = sessionInfo?.agentPath !== undefined ? normalizeCallPath(sessionInfo.agentPath) : undefined;
@@ -121,6 +138,8 @@ export class ToolsOrchestrator {
         ?? maybeValue(normalizedAgentPath)
         ?? maybeValue(normalizedAgentId),
     };
+    this.cacheProvider = cacheContext?.getCache;
+    this.toolCacheResolver = cacheContext?.resolver;
   }
 
   register(provider: ToolProvider): void {
@@ -581,6 +600,61 @@ export class ToolsOrchestrator {
       };
     }
 
+    let exec: ToolExecuteResult | undefined;
+    let errorMessage: string | undefined;
+    let cacheHitEntry: CacheLookupResult | undefined;
+    const cache = this.cacheProvider?.();
+    const cacheTtlMs = (kind === 'mcp' || kind === 'rest')
+      ? this.toolCacheResolver?.resolveTtlMs({ kind, namespace: toolIdentity.namespace, tool: toolIdentity.tool })
+      : undefined;
+    const cacheKeyPayload = (cache !== undefined && typeof cacheTtlMs === 'number' && cacheTtlMs > 0)
+      ? {
+          v: 1,
+          kind: 'tool',
+          tool: { kind, namespace: toolIdentity.namespace, name: toolIdentity.tool },
+          parameters: preparedParameters,
+        }
+      : undefined;
+
+    if (cache !== undefined && cacheKeyPayload !== undefined && typeof cacheTtlMs === 'number' && cacheTtlMs > 0) {
+      const hit = await cache.get(cacheKeyPayload, cacheTtlMs, Date.now());
+      if (hit !== undefined && isCachedToolResult(hit.value)) {
+        cacheHitEntry = hit.entry;
+        exec = { ok: true, result: hit.value.result, latencyMs: 0, kind, namespace: toolIdentity.namespace };
+        const cacheDetails: Record<string, LogDetailValue> = {
+          cache_kind: 'tool',
+          cache_key: cacheHitEntry.keyHash,
+          cache_age_ms: cacheHitEntry.ageMs,
+          cache_current_agent: agentIdLabel,
+          cache_stored_agent: cacheHitEntry.metadata.agentName ?? '',
+          cache_current_tool: toolIdentity.tool,
+          cache_stored_tool: cacheHitEntry.metadata.toolName ?? '',
+          cache_current_tool_namespace: toolIdentity.namespace,
+          cache_stored_tool_namespace: cacheHitEntry.metadata.toolNamespace ?? '',
+        };
+        if (this.sessionInfo.agentHash !== undefined) {
+          cacheDetails.cache_current_agent_hash = this.sessionInfo.agentHash;
+        }
+        if (cacheHitEntry.metadata.agentHash !== undefined) {
+          cacheDetails.cache_stored_agent_hash = cacheHitEntry.metadata.agentHash;
+        }
+        const cacheLog: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'VRB',
+          turn: ctx.turn,
+          subturn: ctx.subturn,
+          direction: 'response',
+          type: 'tool',
+          toolKind: kind,
+          remoteIdentifier,
+          fatal: false,
+          message: `cache hit: ${composedToolName}`,
+          details: cacheDetails,
+        };
+        this.onLog(cacheLog, { opId });
+      }
+    }
+
     const withTimeout = async <T>(p: Promise<T>, timeoutMs: number | undefined, onTimeout?: () => void | Promise<void>): Promise<T> => {
       if (typeof timeoutMs !== 'number' || timeoutMs <= 0) return await p;
       return await new Promise<T>((resolve, reject) => {
@@ -625,38 +699,38 @@ export class ToolsOrchestrator {
       });
     };
 
-    let exec: ToolExecuteResult | undefined;
-    let errorMessage: string | undefined;
-    try {
-      // Do not apply parent-level withTimeout to sub-agents; they manage their own timing
-      const isSubAgent = (kind === 'agent' && provider.namespace === 'subagent');
-      if (isSubAgent) {
-        const parentOpPath = (() => { try { return (opId !== undefined) ? this.opTree.getOpPath(opId) : undefined; } catch { return undefined; } })();
-        const onChildOpTree = (tree: SessionNode) => {
-          try {
-            if (opId !== undefined) {
-              this.opTree.attachChildSession(opId, tree);
-              this.onOpTreeSnapshot(this.opTree.getSession());
-            }
-          } catch (e) { warn(`onChildOpTree snapshot failed: ${toErrorMessage(e)}`); }
-        };
-        exec = await provider.execute(effective, preparedParameters, { ...opts, timeoutMs: undefined, trace: this.opts.traceTools, onChildOpTree, parentOpPath, parentContext: ctx });
-      } else {
-        const providerTimeout = opts?.timeoutMs ?? this.opts.toolTimeout;
-        const execPromise = provider.execute(
-          effective,
-          preparedParameters,
-          { ...opts, timeoutMs: providerTimeout, trace: this.opts.traceTools, parentContext: ctx }
-        );
-        if (opts?.disableGlobalTimeout === true) {
-          exec = await execPromise;
+    if (exec === undefined) {
+      try {
+        // Do not apply parent-level withTimeout to sub-agents; they manage their own timing
+        const isSubAgent = (kind === 'agent' && provider.namespace === 'subagent');
+        if (isSubAgent) {
+          const parentOpPath = (() => { try { return (opId !== undefined) ? this.opTree.getOpPath(opId) : undefined; } catch { return undefined; } })();
+          const onChildOpTree = (tree: SessionNode) => {
+            try {
+              if (opId !== undefined) {
+                this.opTree.attachChildSession(opId, tree);
+                this.onOpTreeSnapshot(this.opTree.getSession());
+              }
+            } catch (e) { warn(`onChildOpTree snapshot failed: ${toErrorMessage(e)}`); }
+          };
+          exec = await provider.execute(effective, preparedParameters, { ...opts, timeoutMs: undefined, trace: this.opts.traceTools, onChildOpTree, parentOpPath, parentContext: ctx });
         } else {
-          const timeoutCallback = (): Promise<void> => provider.cancelTool(effective, { reason: 'timeout', context: ctx });
-          exec = await withTimeout(execPromise, this.opts.toolTimeout, timeoutCallback);
+          const providerTimeout = opts?.timeoutMs ?? this.opts.toolTimeout;
+          const execPromise = provider.execute(
+            effective,
+            preparedParameters,
+            { ...opts, timeoutMs: providerTimeout, trace: this.opts.traceTools, parentContext: ctx }
+          );
+          if (opts?.disableGlobalTimeout === true) {
+            exec = await execPromise;
+          } else {
+            const timeoutCallback = (): Promise<void> => provider.cancelTool(effective, { reason: 'timeout', context: ctx });
+            exec = await withTimeout(execPromise, this.opts.toolTimeout, timeoutCallback);
+          }
         }
+      } catch (e) {
+        errorMessage = toErrorMessage(e);
       }
-    } catch (e) {
-      errorMessage = toErrorMessage(e);
     }
 
     const latency = Date.now() - start;
@@ -1183,6 +1257,20 @@ export class ToolsOrchestrator {
       'ai.tool.output_bytes': result.length,
       'ai.tool.provider_label': providerLabel,
     });
+    if (cache !== undefined && cacheKeyPayload !== undefined && cacheHitEntry === undefined && typeof cacheTtlMs === 'number' && cacheTtlMs > 0) {
+      const metadata: CacheEntryMetadata = {
+        kind: 'tool',
+        agentName: agentIdLabel,
+        toolName: toolIdentity.tool,
+        toolNamespace: toolIdentity.namespace,
+        agentHash: this.sessionInfo.agentHash,
+      };
+      try {
+        await cache.set(cacheKeyPayload, cacheTtlMs, { result }, metadata, Date.now());
+      } catch (e) {
+        warn(`tool cache write failed: ${toErrorMessage(e)}`);
+      }
+    }
     return {
       ok: true,
       result,

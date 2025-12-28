@@ -1,3 +1,4 @@
+import type { CacheConfig } from './cache/types.js';
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
 import type { PreloadedSubAgent } from './subagent-registry.js';
@@ -269,6 +270,8 @@ export interface MCPServerConfig {
   toolSchemas?: Record<string, unknown>;
   toolsAllowed?: string[];
   toolsDenied?: string[];
+  cache?: number;
+  toolsCache?: Record<string, number>;
   queue?: string;
   shared?: boolean;
   healthProbe?: 'ping' | 'listTools';
@@ -385,6 +388,7 @@ export interface Configuration {
   providers: Record<string, ProviderConfig>;
   mcpServers: Record<string, MCPServerConfig>;
   queues: Record<string, QueueConfig>;
+  cache?: CacheConfig;
   // Optional REST tools registry (manifest-driven)
   restTools?: Record<string, RestToolConfig>;
   // Optional OpenAPI specs to auto-generate REST tools
@@ -492,6 +496,7 @@ export interface RestToolConfig {
   url: string;
   headers?: Record<string, string>;
   queue?: string;
+  cache?: number;
   // JSON Schema for parameters (Ajv-compatible)
   parametersSchema: Record<string, unknown>;
   // Templated JSON body for POST/PUT/PATCH (substitute ${parameters.*})
@@ -575,6 +580,8 @@ export interface AIAgentSessionConfig {
   telemetryLabels?: Record<string, string>;
   systemPrompt: string;
   userPrompt: string;
+  cacheTtlMs?: number;
+  agentHash?: string;
   // Resolved output format for this session (must be provided by caller)
   outputFormat: OutputFormatId;
   // Optional rendering target for diagnostics

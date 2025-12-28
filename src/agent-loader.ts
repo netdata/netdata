@@ -9,6 +9,9 @@ import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, Configurati
 // no runtime format validation here; caller must pass a valid OutputFormatId
 
 import { AIAgent as Agent } from './ai-agent.js';
+import { sha256Hex } from './cache/hash.js';
+import { stableStringify } from './cache/stable-stringify.js';
+import { parseCacheDurationMsStrict } from './cache/ttl.js';
 import { buildUnifiedConfiguration, discoverLayers, resolveDefaults, type ResolvedConfigLayer } from './config-resolver.js';
 import { parseFrontmatter, parseList, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
 import { resolveIncludes } from './include-resolver.js';
@@ -46,6 +49,7 @@ export interface LoadedAgentSessionOptions {
 export interface LoadedAgent {
   id: string; // canonical path (or synthetic when no file)
   promptPath: string;
+  agentHash: string;
   systemTemplate: string;
   description?: string;
   usage?: string;
@@ -76,6 +80,7 @@ export interface LoadedAgent {
     traceSdk: boolean;
     verbose: boolean;
     mcpInitConcurrency?: number;
+    cacheTtlMs?: number;
   };
   subTools: { name: string; description?: string }[]; // placeholder for future
   createSession: (
@@ -142,6 +147,7 @@ export interface GlobalOverrides {
   repeatPenalty?: number | null;
   llmTimeout?: number;
   toolTimeout?: number;
+  cache?: string | number;
   maxRetries?: number;
   maxTurns?: number;
   maxToolCallsPerTurn?: number;
@@ -174,6 +180,7 @@ export interface LoadAgentOptions {
   maxToolCallsPerTurn?: number;
   llmTimeout?: number;
   toolTimeout?: number;
+  cache?: string | number;
   temperature?: number | null;
   topP?: number | null;
   topK?: number | null;
@@ -197,10 +204,11 @@ export interface LoadAgentOptions {
     repeatPenalty?: number | null;
     llmTimeout?: number;
     toolTimeout?: number;
+    cache?: string | number;
     maxRetries?: number;
     maxTurns?: number;
-  toolResponseMaxBytes?: number;
-  maxToolCallsPerTurn?: number;
+    toolResponseMaxBytes?: number;
+    maxToolCallsPerTurn?: number;
     reasoning?: ReasoningLevel | 'none';
     reasoningValue?: ProviderReasoningValue | null;
     caching?: 'none' | 'full';
@@ -443,6 +451,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       maxToolCallsPerTurn: options?.maxToolCallsPerTurn,
       llmTimeout: options?.llmTimeout,
       toolTimeout: options?.toolTimeout,
+      cache: options?.cache,
       temperature: options?.temperature,
       topP: options?.topP,
       topK: options?.topK,
@@ -470,6 +479,11 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
     throw new Error(`Effective options validation failed:\n${msgs}`);
   }
 
+  const cacheTtlMs = (() => {
+    if (eff.cache === undefined) return undefined;
+    return parseCacheDurationMsStrict(eff.cache, `cache (agent ${promptPath})`);
+  })();
+
   mergedDefaultsForChildren = (() => {
     const base = options?.defaultsForUndefined !== undefined ? { ...options.defaultsForUndefined } : {};
     if (options?.defaultsForUndefined?.reasoning !== undefined && base.reasoning === undefined) {
@@ -479,6 +493,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       base.reasoningValue = options.defaultsForUndefined.reasoningValue;
     }
     if (eff.caching !== undefined && base.caching === undefined) base.caching = eff.caching;
+    if (eff.cache !== undefined && base.cache === undefined) base.cache = eff.cache;
     return Object.keys(base).length > 0 ? base : undefined;
   })();
 
@@ -604,6 +619,43 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
     }
   }
 
+  const agentHashPayload = {
+    prompt: promptContent,
+    config,
+    targets: selectedTargets,
+    tools: selectedTools,
+    agents: effAgents,
+    expectedOutput: resolvedExpectedOutput,
+    input: resolvedInput,
+    outputSchema: resolvedOutputSchema,
+    effective: {
+      temperature: eff.temperature,
+      topP: eff.topP,
+      topK: eff.topK,
+      maxOutputTokens: eff.maxOutputTokens,
+      repeatPenalty: eff.repeatPenalty,
+      llmTimeout: eff.llmTimeout,
+      toolTimeout: eff.toolTimeout,
+      cache: eff.cache,
+      cacheTtlMs,
+      maxRetries: eff.maxRetries,
+      maxTurns: eff.maxTurns,
+      maxToolCallsPerTurn: eff.maxToolCallsPerTurn,
+      toolResponseMaxBytes: eff.toolResponseMaxBytes,
+      stream: eff.stream,
+      traceLLM: eff.traceLLM,
+      traceMCP: eff.traceMCP,
+      traceSdk: eff.traceSdk,
+      verbose: eff.verbose,
+      mcpInitConcurrency: eff.mcpInitConcurrency,
+      reasoning: eff.reasoning,
+      reasoningValue: eff.reasoningValue,
+      caching: eff.caching,
+      contextWindow: options?.globalOverrides?.contextWindow,
+    },
+  };
+  const agentHash = sha256Hex(stableStringify(agentHashPayload));
+
   const agentName = path.basename(promptPath).replace(/\.[^.]+$/, '');
 
   validateQueueBindings(config);
@@ -625,6 +677,8 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       subAgents: subAgentInfos,
       systemPrompt,
       userPrompt,
+      cacheTtlMs,
+      agentHash,
       outputFormat: o.outputFormat,
       renderTarget: o.renderTarget,
       conversationHistory: o.history,
@@ -725,6 +779,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
   return {
     id,
     promptPath,
+    agentHash,
     systemTemplate,
     description: fm?.description,
     usage: fm?.usage,
@@ -756,6 +811,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       traceSdk: eff.traceSdk,
       verbose: eff.verbose,
       mcpInitConcurrency: eff.mcpInitConcurrency,
+      cacheTtlMs,
     },
     createSession,
     run: runSession,

@@ -1,5 +1,8 @@
+import type { DurationInput } from './cache/ttl.js';
 import type { FrontmatterOptions } from './frontmatter.js';
 import type { Configuration, ReasoningLevel, ProviderReasoningValue, CachingMode } from './types.js';
+
+import { parseDurationMs } from './cache/ttl.js';
 
 interface CLIOverrides {
   stream?: boolean;
@@ -8,6 +11,7 @@ interface CLIOverrides {
   maxToolCallsPerTurn?: number;
   llmTimeout?: number;
   toolTimeout?: number;
+  cache?: string | number;
   temperature?: number | null;
   topP?: number | null;
   topK?: number | null;
@@ -32,6 +36,7 @@ interface GlobalLLMOverrides {
   maxToolCallsPerTurn?: number;
   llmTimeout?: number;
   toolTimeout?: number;
+  cache?: string | number;
   temperature?: number | null;
   topP?: number | null;
   topK?: number | null;
@@ -52,6 +57,7 @@ interface DefaultsForUndefined {
   repeatPenalty?: number | null;
   llmTimeout?: number;
   toolTimeout?: number;
+  cache?: string | number;
   maxRetries?: number;
   maxTurns?: number;
   maxToolCallsPerTurn?: number;
@@ -69,6 +75,7 @@ interface ResolvedEffectiveOptions {
   repeatPenalty: number | null;
   llmTimeout: number;
   toolTimeout: number;
+  cache?: string | number;
   maxRetries: number;
   maxTurns: number;
   maxToolCallsPerTurn: number;
@@ -193,6 +200,31 @@ export function resolveEffectiveOptions(args: {
     return 'full';
   };
 
+  const normalizeCache = (value: unknown): string | number | undefined => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) return trimmed;
+    }
+    return undefined;
+  };
+
+  const readCache = (): string | number | undefined => {
+    const sources: unknown[] = [
+      getGlobalVal('cache'),
+      getCliVal('cache'),
+      fm?.cache,
+      getDefUndef('cache'),
+      getCfgDefault('cache'),
+    ];
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const value of sources) {
+      const normalized = normalizeCache(value);
+      if (normalized !== undefined) return normalized;
+    }
+    return undefined;
+  };
+
   const readNum = (name: string, fmVal: unknown, fallback: number): number => {
     const globalVal = getGlobalVal(name);
     if (typeof globalVal === 'number' && Number.isFinite(globalVal)) return globalVal;
@@ -204,6 +236,25 @@ export function resolveEffectiveOptions(args: {
     if (typeof def === 'number' && Number.isFinite(def)) return def;
     const dv = getCfgDefault(name);
     if (typeof dv === 'number' && Number.isFinite(dv)) return dv;
+    return fallback;
+  };
+
+  const readDurationMs = (name: string, fmVal: unknown, fallback: number): number => {
+    const normalize = (value: unknown): DurationInput => (
+      typeof value === 'number' || typeof value === 'string' || value === null || value === undefined ? value : undefined
+    );
+    const sources: unknown[] = [
+      getGlobalVal(name),
+      getCliVal(name),
+      fmVal,
+      getDefUndef(name),
+      getCfgDefault(name),
+    ];
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const value of sources) {
+      const parsed = parseDurationMs(normalize(value));
+      if (parsed !== undefined) return parsed;
+    }
     return fallback;
   };
 
@@ -255,8 +306,9 @@ export function resolveEffectiveOptions(args: {
       return Number.isNaN(v) ? undefined : Math.trunc(v);
     })(),
     repeatPenalty: readNullableNum('repeatPenalty', (fm as { repeatPenalty?: number | null } | undefined)?.repeatPenalty, null),
-    llmTimeout: readNum('llmTimeout', fm?.llmTimeout, 600000),
-    toolTimeout: readNum('toolTimeout', fm?.toolTimeout, 300000),
+    llmTimeout: readDurationMs('llmTimeout', fm?.llmTimeout, 600000),
+    toolTimeout: readDurationMs('toolTimeout', fm?.toolTimeout, 300000),
+    cache: readCache(),
     maxRetries: readNum('maxRetries', fm?.maxRetries, 3),
     maxTurns: readNum('maxTurns', fm?.maxTurns, 10),
     maxToolCallsPerTurn: readNum('maxToolCallsPerTurn', (fm as { maxToolCallsPerTurn?: number } | undefined)?.maxToolCallsPerTurn, 10),

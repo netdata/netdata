@@ -488,6 +488,22 @@ Example `.ai-agent.json` (safe to commit):
 }
 ```
 
+Optional response cache (global, opt-in):
+
+```json
+"cache": {
+  "backend": "sqlite",
+  "sqlite": { "path": "${HOME}/.ai-agent/cache.db" },
+  "maxEntries": 5000
+}
+```
+
+- If no `cache` block is provided, enabling any cache TTL uses the default SQLite backend at `${HOME}/.ai-agent/cache.db` with `maxEntries=5000` (when the SQLite module is available).
+- Per-agent TTL: frontmatter/CLI `cache: off | <ms> | <N.Nu>` (`ms,s,m,h,d,w,mo,y`).
+- Per-tool TTL: `mcpServers.<name>.cache`, `mcpServers.<name>.toolsCache.<tool>`, `restTools.<tool>.cache`.
+- Cache hits are logged; misses are silent.
+- If the SQLite backend cannot be loaded, caching is disabled unless Redis is configured.
+
 Add a `queues` block whenever you need to throttle heavy MCP servers (Playwright/fetcher, OpenAPI imports, etc.):
 
 ```json

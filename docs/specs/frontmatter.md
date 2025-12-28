@@ -34,8 +34,9 @@ agents: sub-agent-1,sub-agent-2
 maxTurns: 10
 maxToolCallsPerTurn: 20
 maxRetries: 3
-llmTimeout: 60000
-toolTimeout: 30000
+llmTimeout: 60s
+toolTimeout: 30s
+cache: 5m
 temperature: 0.7
 topP: 0.9
 maxOutputTokens: 16384
@@ -121,8 +122,9 @@ interface FrontmatterOptions {
   maxTurns?: number;
   maxToolCallsPerTurn?: number;
   maxRetries?: number;
-  llmTimeout?: number;
-  toolTimeout?: number;
+  llmTimeout?: number | string;
+  toolTimeout?: number | string;
+  cache?: number | string;
   temperature?: number;
   topP?: number;
   maxOutputTokens?: number;
@@ -238,6 +240,19 @@ if (opts?.strict !== false) {
 }
 ```
 
+## Response Cache Parsing
+
+**Location**: `src/frontmatter.ts` (cache option capture)
+
+```typescript
+if (typeof raw.cache === 'number' || typeof raw.cache === 'string') {
+  options.cache = raw.cache as number | string;
+}
+```
+
+- Allowed values: `off` \| `<ms>` \| `<N.Nu>` where `u ∈ { ms, s, m, h, d, w, mo, y }`.
+- Parsing to milliseconds happens later when resolving effective options.
+
 ## Helper Functions
 
 ### stripFrontmatter
@@ -299,8 +314,8 @@ function buildFrontmatterTemplate(args): Record<string, unknown> {
 - `maxTurns`: Max LLM turns
 - `maxToolCallsPerTurn`: Max tool calls per turn
 - `maxRetries`: Retry limit
-- `llmTimeout`: LLM timeout in ms
-- `toolTimeout`: Tool timeout in ms
+- `llmTimeout`: LLM timeout (`ms` or duration like `5s/2m`)
+- `toolTimeout`: Tool timeout (`ms` or duration like `5s/2m`)
 - `temperature`: Sampling temperature
 - `topP`: Top-p sampling
 - `topK`: Top-k sampling

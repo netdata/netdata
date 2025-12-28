@@ -9,6 +9,7 @@ import type { RestExtraRoute } from './rest-headend.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 
 import { loadAgent, LoadedAgentCache, type LoadAgentOptions, type LoadedAgent } from '../agent-loader.js';
+import { parseDurationMs } from '../cache/ttl.js';
 import { discoverLayers } from '../config-resolver.js';
 import { SessionManager } from '../server/session-manager.js';
 import { initSlackHeadend } from '../server/slack.js';
@@ -530,7 +531,12 @@ export class SlackHeadend implements Headend {
       return (expandStrict(rawVal, envVars, name) as Record<string, unknown>) ?? {};
     };
     const apiResolved = resolveSection('api') as { port?: number };
-    const slackResolved = resolveSection('slack') as { botToken?: string; appToken?: string; signingSecret?: string; mentions?: boolean; dms?: boolean; updateIntervalMs?: number; historyLimit?: number; historyCharsCap?: number; openerTone?: 'random' | 'cheerful' | 'formal' | 'busy'; routing?: unknown };
+    const slackResolvedRaw = resolveSection('slack') as { botToken?: string; appToken?: string; signingSecret?: string; mentions?: boolean; dms?: boolean; updateIntervalMs?: number | string; historyLimit?: number; historyCharsCap?: number; openerTone?: 'random' | 'cheerful' | 'formal' | 'busy'; routing?: unknown };
+    const parsedUpdateInterval = parseDurationMs(slackResolvedRaw.updateIntervalMs);
+    const slackResolved = {
+      ...slackResolvedRaw,
+      updateIntervalMs: parsedUpdateInterval ?? (typeof slackResolvedRaw.updateIntervalMs === 'number' ? slackResolvedRaw.updateIntervalMs : undefined),
+    };
 
     const primaryLoaded = this.loadAgent(primaryAgentPath);
     const defaultSessions = primaryLoaded.sessions;

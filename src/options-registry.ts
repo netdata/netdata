@@ -89,7 +89,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   numDef({
     key: 'llmTimeout',
     default: 600000,
-    description: 'How long to wait (ms) for the LLM to respond before giving up (resets each time a token arrives); default 2 minutes',
+    description: 'How long to wait for the LLM to respond (ms or duration like 5s/2m); default 2 minutes',
     cli: { names: ['--llm-timeout-ms', '--llmTimeoutMs'], showInHelp: true },
     fm: { allowed: true, key: 'llmTimeout' },
     config: { path: 'defaults.llmTimeout' },
@@ -100,13 +100,23 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   numDef({
     key: 'toolTimeout',
     default: 300000,
-    description: 'How long to wait (ms) for each tool call to complete before aborting it; default 5 minutes',
+    description: 'How long to wait for each tool call to complete (ms or duration like 5s/2m); default 5 minutes',
     cli: { names: ['--tool-timeout-ms', '--toolTimeoutMs'], showInHelp: true },
     fm: { allowed: true, key: 'toolTimeout' },
     config: { path: 'defaults.toolTimeout' },
     scope: 'masterDefault',
     groups: [G_MASTER_DEFAULTS],
     numeric: { min: 0, integer: true },
+  }),
+  strDef({
+    key: 'cache',
+    default: undefined,
+    description: 'Response cache TTL (off|<ms>|<N.Nu> where u=ms,s,m,h,d,w,mo,y); set per agent or via CLI',
+    cli: { names: ['--cache'], showInHelp: true },
+    fm: { allowed: true, key: 'cache' },
+    scope: 'allAgents',
+    groups: [G_MASTER_DEFAULTS],
+    render: { showInFrontmatterTemplate: true },
   }),
   numDef({
     key: 'toolResponseMaxBytes',
@@ -409,7 +419,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   strDef({
     key: 'telemetryOtlpTimeoutMs',
     default: undefined,
-    description: 'OTLP export timeout in milliseconds',
+    description: 'OTLP export timeout (ms or duration like 5s/2m).',
     cli: { names: ['--telemetry-otlp-timeout-ms'], showInHelp: true },
     config: { path: 'telemetry.otlp.timeoutMs' },
     scope: 'global',
@@ -508,7 +518,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   strDef({
     key: 'telemetryLoggingOtlpTimeoutMs',
     default: undefined,
-    description: 'Override OTLP timeout (ms) for log exports.',
+    description: 'Override OTLP timeout for log exports (ms or duration like 5s/2m).',
     cli: { names: ['--telemetry-logging-otlp-timeout-ms'], showInHelp: true },
     config: { path: 'telemetry.logging.otlp.timeoutMs' },
     scope: 'global',

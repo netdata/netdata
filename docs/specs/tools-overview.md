@@ -71,6 +71,7 @@ interface ToolExecuteResult {
 - `aliases: Map<string, string>` - Tool name aliases
 - `canceled: boolean` - Cancellation flag
 - `pendingQueueControllers: Set<AbortController>` - Active queue controllers
+- `cacheProvider/toolCacheResolver` (optional) - Global response cache hooks for MCP/REST tools
 
 **Key Methods**:
 - `register(provider)` - Add provider to registry
@@ -84,13 +85,14 @@ interface ToolExecuteResult {
 
 **Execution Flow (executeWithManagement)**:
 1. Validate tool exists and resolve provider/kind/queue
-2. Acquire queue slot (unless `bypassConcurrency`)
-3. Begin opTree operation + progress event
-4. Run centralized timeout wrapper
-5. Call `provider.execute()`
-6. Apply response size cap + context-guard reservation
-7. Record accounting + telemetry
-8. End opTree operation, release queue slot, return result
+2. Check tool response cache (if enabled) and short-circuit on hit
+3. Acquire queue slot (unless `bypassConcurrency`)
+4. Begin opTree operation + progress event
+5. Run centralized timeout wrapper
+6. Call `provider.execute()`
+7. Apply response size cap + context-guard reservation
+8. Record accounting + telemetry
+9. End opTree operation, release queue slot, return result
 
 ## Concrete Providers
 
@@ -124,10 +126,12 @@ interface MCPServerConfig {
   toolSchemas?: Record<string, unknown>;
   toolsAllowed?: string[];
   toolsDenied?: string[];
+  cache?: number;             // Tool response cache TTL (ms; accepts duration strings)
+  toolsCache?: Record<string, number>; // Per-tool TTL overrides (ms; accepts duration strings)
   queue?: string;
   shared?: boolean;
   healthProbe?: 'ping' | 'listTools';
-  requestTimeoutMs?: number;
+  requestTimeoutMs?: number;  // Request timeout (ms; accepts duration strings)
 }
 ```
 
@@ -141,20 +145,34 @@ interface MCPServerConfig {
 - URL template expansion
 - Query parameter handling
 - Request body construction
-- Authentication (API key, bearer token)
+- Authentication via headers/params (templated in config)
 
 **Tool Naming**: `rest__{toolname}` (e.g., `rest__weather_api`)
 
 **Configuration** (`RestToolConfig`):
 ```typescript
 interface RestToolConfig {
+  description: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   url: string;
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   headers?: Record<string, string>;
-  auth?: { type: 'apiKey' | 'bearer'; key: string; in?: 'header' | 'query'; name?: string };
-  bodyTemplate?: string;
-  description?: string;
-  inputSchema?: Record<string, unknown>;
+  queue?: string;
+  cache?: number;             // Tool response cache TTL (ms; accepts duration strings)
+  parametersSchema: Record<string, unknown>;
+  bodyTemplate?: unknown;
+  streaming?: {
+    mode: 'json-stream';
+    linePrefix?: string;
+    discriminatorField: string;
+    doneValue: string;
+    answerField?: string;
+    tokenValue?: string;
+    tokenField?: string;
+    timeoutMs?: number;       // Stream timeout (ms; accepts duration strings)
+    maxBytes?: number;
+  };
+  hasComplexQueryParams?: boolean;
+  queryParamNames?: string[];
 }
 ```
 

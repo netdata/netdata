@@ -18,6 +18,7 @@ interface RestToolConfig {
   parametersSchema: Record<string, unknown>;  // JSON Schema
   description: string;                    // Tool description
   bodyTemplate?: unknown;                 // Body template
+  cache?: number;                         // Tool response cache TTL (ms; accepts duration strings)
   queue?: string;                         // Queue name
   streaming?: {                           // JSON streaming config
     mode: 'json-stream';
@@ -27,11 +28,14 @@ interface RestToolConfig {
     answerField?: string;
     tokenValue?: string;
     tokenField?: string;
+    timeoutMs?: number;                   // Stream timeout (ms; accepts duration strings)
   };
   hasComplexQueryParams?: boolean;        // Enable complex query serialization
   queryParamNames?: string[];             // Names of complex params
 }
 ```
+
+- Config accepts `off` \| `<ms>` \| `<N.Nu>` for cache TTLs and `ms` \| `N.Nu` for streaming timeouts; they are resolved to milliseconds before use.
 
 ### Provider Class
 ```typescript

@@ -316,6 +316,7 @@
         "BRAVE_API_KEY": "${BRAVE_API_KEY}"
       },
       "enabled": true,
+      "cache": "1d",
       "toolsAllowed": [
         "*"
       ],
@@ -325,6 +326,7 @@
       "type": "http",
       "url": "https://mcp.exa.ai/mcp?exaApiKey=${EXA_API_KEY}&tools=crawling_exa",
       "enabled": true,
+      "cache": "1d",
       "toolsAllowed": [
         "crawling_exa"
       ],
@@ -334,6 +336,7 @@
       "type": "http",
       "url": "https://mcp.exa.ai/mcp?exaApiKey=${EXA_API_KEY}&tools=get_code_context_exa",
       "enabled": true,
+      "cache": "1d",
       "toolsAllowed": [
         "get_code_context_exa"
       ],
@@ -343,6 +346,7 @@
       "type": "http",
       "url": "https://mcp.exa.ai/mcp?exaApiKey=${EXA_API_KEY}&tools=web_search_exa,company_research_exa,linkedin_search_exa",
       "enabled": true,
+      "cache": "1d",
       "toolsAllowed": [
         "company_research_exa",
         "linkedin_search_exa",
@@ -366,6 +370,7 @@
         "Authorization": "Bearer ${JINA_API_KEY}"
       },
       "enabled": true,
+      "cache": "1d",
       "toolsAllowed": [
         "read_url"
       ],
@@ -378,6 +383,7 @@
         "Authorization": "Bearer ${JINA_API_KEY}"
       },
       "enabled": true,
+      "cache": "1d",
       "toolsAllowed": [
         "search_web",
         "search_arxiv"
@@ -391,6 +397,7 @@
         "Authorization": "Bearer ${JINA_API_KEY}"
       },
       "enabled": true,
+      "cache": "1d",
       "toolsAllowed": [
         "*"
       ],
@@ -502,6 +509,7 @@
         "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
       },
       "enabled": true,
+      "cache": "1d",
       "toolsAllowed": [
         "*"
       ],
@@ -631,6 +639,7 @@
         "fetcher-mcp"
       ],
       "enabled": true,
+      "cache": "1d",
       "queue": "fetcher",
       "toolsAllowed": [
         "*"
@@ -789,6 +798,7 @@
         "SERPER_API_KEY": "${SERPER_API_KEY}"
       },
       "enabled": true,
+      "cache": "1d",
       "toolsAllowed": [
         "google_search"
       ],
@@ -805,6 +815,7 @@
         "SERPER_API_KEY": "${SERPER_API_KEY}"
       },
       "enabled": true,
+      "cache": "1d",
       "toolsAllowed": [
         "scrape"
       ],
@@ -821,6 +832,7 @@
         "FIRECRAWL_API_URL": "http://10.20.1.106:9910"
       },
       "enabled": true,
+      "cache": "1d",
       "toolsAllowed": [
         "firecrawl_scrape",
         "firecrawl_extract"
@@ -834,6 +846,7 @@
         "/opt/ai-agent/mcp/sourcegraph/sourcegraph-mcp-server.js"
       ],
       "enabled": true,
+      "cache": "1d",
       "toolsAllowed": [
         "*"
       ],

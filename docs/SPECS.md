@@ -134,6 +134,11 @@ All string values in the configuration support environment variable expansion us
     "default": { "concurrent": 32 },
     "fetcher": { "concurrent": 4 }
   },
+  "cache": {
+    "backend": "sqlite",
+    "sqlite": { "path": "${HOME}/.ai-agent/cache.db" },
+    "maxEntries": 5000
+  },
   "accounting": {
     "file": "${HOME}/ai-agent-accounting.jsonl"
   },
@@ -155,6 +160,18 @@ All string values in the configuration support environment variable expansion us
 - MCP servers, REST tools, and OpenAPI generated operations can bind to a queue by setting `queue: "name"`. When omitted they fall back to `default`.
 - Only external tools participate in queueing; internal agent helpers (`agent__final_report`, `agent__task_status`, `agent__batch`) bypass queues so they never deadlock against their parents.
 - Every tool execution is routed through the queue manager. When a tool must wait for a slot the agent logs a `queued` entry and emits telemetry via `ai_agent_queue_depth` (gauge of in-use/waiting slots) and `ai_agent_queue_wait_duration_ms` (histogram + last-wait gauge).
+
+### Response Caching (Global)
+
+- Optional global cache config lives at top-level `cache` in `.ai-agent.json`. If omitted, enabling a cache TTL uses the default SQLite backend at `${HOME}/.ai-agent/cache.db` with `maxEntries=5000` (when SQLite is available).
+- Per-agent TTLs come from frontmatter/CLI `cache` (`off` | `<ms>` | `<N.Nu>` where `u ∈ { ms, s, m, h, d, w, mo, y }`).
+- Per-tool TTLs are configured via `mcpServers.<name>.cache`, `mcpServers.<name>.toolsCache.<tool>`, and `restTools.<tool>.cache`.
+- Cache keys are SHA hashes of:
+  - Agents: `agentHash + userPrompt + expected format/schema`.
+  - Tools: `tool identity (namespace + name) + request payload`.
+  Cache hits are logged; misses are silent.
+- `agentHash` is computed by the registry from the fully expanded prompt (after `${include:...}` resolution, before other `${VAR}` expansion) plus the resolved agent config. Paths and agent names are not part of the identity.
+- If the SQLite backend cannot be loaded, caching is disabled unless Redis is configured.
 
 ### Context Window Configuration
 

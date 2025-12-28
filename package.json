@@ -62,11 +62,16 @@
     "json-schema-library": "^10.5.2",
     "jsonrepair": "^3.13.1",
     "ollama-ai-provider-v2": "^1.5.5",
+    "redis": "^5.10.0",
     "undici": "^7.16.0",
     "ws": "^8.18.3",
     "zod": "^4.2.1"
   },
+  "optionalDependencies": {
+    "better-sqlite3": "^12.5.0"
+  },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^5.0.6",
     "@types/node": "^25.0.3",
     "@types/ws": "^8.18.1",

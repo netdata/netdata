@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import type { Configuration } from './types.js';
 
+import { parseCacheDurationMsStrict, parseDurationMsStrict } from './cache/ttl.js';
 import { isUnsetParamValue } from './utils.js';
 
 const computeDefaultQueueConcurrency = (): number => {
@@ -57,6 +58,16 @@ const nullableNumericParam = (constraints?: { min?: number; max?: number; int?: 
       if (constraints?.int === true && !Number.isInteger(val)) return false;
       return true;
     });
+
+const cacheDurationParam = (context: string) => z.union([z.number(), z.string()]).transform((val) => {
+  const parsed = parseCacheDurationMsStrict(val, context);
+  return parsed;
+});
+
+const durationMsParam = (context: string) => z.union([z.number(), z.string()]).transform((val) => {
+  const parsed = parseDurationMsStrict(val, context);
+  return parsed;
+}).refine((val) => val > 0, { message: 'must be a positive duration' });
 
 const ProviderModelOverridesSchema = z.object({
   temperature: nullableNumericParam({ min: 0, max: 2 }),
@@ -125,10 +136,28 @@ const MCPServerConfigSchema = z.object({
   toolSchemas: z.record(z.string(), z.unknown()).optional(),
   toolsAllowed: z.array(z.string()).optional(),
   toolsDenied: z.array(z.string()).optional(),
+  cache: cacheDurationParam('mcpServers.cache').optional(),
+  toolsCache: z.record(z.string(), cacheDurationParam('mcpServers.toolsCache')).optional(),
   queue: z.string().optional(),
   shared: z.boolean().optional(),
   healthProbe: z.enum(['ping','listTools']).optional(),
+  requestTimeoutMs: durationMsParam('mcpServers.requestTimeoutMs').optional(),
 });
+
+const CacheConfigSchema = z.object({
+  backend: z.enum(['sqlite', 'redis']).optional(),
+  maxEntries: z.number().int().positive().optional(),
+  sqlite: z.object({
+    path: z.string().optional(),
+  }).optional(),
+  redis: z.object({
+    url: z.string().optional(),
+    username: z.string().optional(),
+    password: z.string().optional(),
+    database: z.number().int().optional(),
+    keyPrefix: z.string().optional(),
+  }).optional(),
+}).optional();
 
 const EngageEnum = z.enum(['mentions','channel-posts','dms']);
 
@@ -174,7 +203,7 @@ const SlackConfigSchema = z.object({
   enabled: z.boolean().optional(),
   mentions: z.boolean().optional(),
   dms: z.boolean().optional(),
-  updateIntervalMs: z.number().int().positive().optional(),
+  updateIntervalMs: durationMsParam('slack.updateIntervalMs').optional(),
   historyLimit: z.number().int().positive().optional(),
   historyCharsCap: z.number().int().positive().optional(),
   botToken: z.string().optional(),
@@ -201,7 +230,7 @@ const FormatsConfigSchema = z.object({
 
 const TelemetryOtlpSchema = z.object({
   endpoint: z.string().optional(),
-  timeoutMs: z.number().int().positive().optional(),
+  timeoutMs: durationMsParam('telemetry.otlp.timeoutMs').optional(),
 }).optional();
 
 const TelemetryPrometheusSchema = z.object({
@@ -224,7 +253,7 @@ const TelemetryLogExtraSchema = z.enum(['otlp']);
 
 const TelemetryLoggingOtlpSchema = z.object({
   endpoint: z.string().optional(),
-  timeoutMs: z.number().int().positive().optional(),
+  timeoutMs: durationMsParam('telemetry.logging.otlp.timeoutMs').optional(),
 }).optional();
 
 const TelemetryLoggingSchema = z.object({
@@ -246,6 +275,7 @@ const ConfigurationSchema = z.object({
   providers: z.record(z.string(), ProviderConfigSchema),
   mcpServers: z.record(z.string(), MCPServerConfigSchema),
   queues: z.record(z.string(), z.object({ concurrent: z.number().int().positive() })),
+  cache: CacheConfigSchema,
   accounting: z.object({ file: z.string() }).optional(),
   pricing: z
     .record(
@@ -265,8 +295,8 @@ const ConfigurationSchema = z.object({
     .optional(),
   defaults: z
     .object({
-      llmTimeout: z.number().positive().optional(),
-      toolTimeout: z.number().positive().optional(),
+      llmTimeout: durationMsParam('defaults.llmTimeout').optional(),
+      toolTimeout: durationMsParam('defaults.toolTimeout').optional(),
       temperature: nullableNumericParam({ min: 0, max: 2 }),
       topP: nullableNumericParam({ min: 0, max: 1 }),
       topK: nullableNumericParam({ min: 1, int: true }),

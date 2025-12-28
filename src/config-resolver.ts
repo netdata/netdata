@@ -4,7 +4,8 @@ import path from 'node:path';
 import type { Configuration, MCPServerConfig, ProviderConfig, RestToolConfig, OpenAPISpecConfig, TelemetryConfig, QueueConfig } from './types.js';
 import { DEFAULT_QUEUE_CONCURRENCY } from './config.js';
 
-import { warn } from './utils.js';
+import { parseCacheDurationMsStrict, parseDurationMsStrict, type CacheDurationInput } from './cache/ttl.js';
+import { isPlainObject, warn } from './utils.js';
 
 type LayerOrigin = '--config' | 'cwd' | 'prompt' | 'binary' | 'home' | 'system';
 
@@ -228,6 +229,20 @@ function resolveMCPServer(id: string, layers: ResolvedConfigLayer[], opts?: Reso
         if (v === undefined) throw buildMissingVarError('mcp', id, layer.origin, name);
         return v;
       }) as MCPServerConfig;
+      if (expanded.cache !== undefined) {
+        expanded.cache = parseCacheDurationMsStrict(expanded.cache, `mcpServers.${id}.cache`);
+      }
+      if (expanded.toolsCache !== undefined && expanded.toolsCache !== null && typeof expanded.toolsCache === 'object') {
+        const toolsCacheRaw = expanded.toolsCache as Record<string, unknown>;
+        const parsedToolsCache = Object.entries(toolsCacheRaw).reduce<Record<string, number>>((acc, [toolName, rawValue]) => {
+          acc[toolName] = parseCacheDurationMsStrict(rawValue as CacheDurationInput, `mcpServers.${id}.toolsCache.${toolName}`);
+          return acc;
+        }, {});
+        expanded.toolsCache = parsedToolsCache;
+      }
+      if (expanded.requestTimeoutMs !== undefined) {
+        expanded.requestTimeoutMs = parseDurationMsStrict(expanded.requestTimeoutMs, `mcpServers.${id}.requestTimeoutMs`);
+      }
       return expanded;
     } catch (error) {
       if (error instanceof MissingVariableError) {
@@ -257,6 +272,12 @@ function resolveRestTool(id: string, layers: ResolvedConfigLayer[]): RestToolCon
         if (v === undefined) throw buildMissingVarError('defaults', id, layer.origin, name);
         return v;
       }) as RestToolConfig;
+      if (expanded.cache !== undefined) {
+        expanded.cache = parseCacheDurationMsStrict(expanded.cache, `restTools.${id}.cache`);
+      }
+      if (expanded.streaming?.timeoutMs !== undefined) {
+        expanded.streaming.timeoutMs = parseDurationMsStrict(expanded.streaming.timeoutMs, `restTools.${id}.streaming.timeoutMs`);
+      }
       return expanded;
     } catch (error) {
       if (error instanceof MissingVariableError) {
@@ -295,7 +316,17 @@ export function resolveDefaults(layers: ResolvedConfigLayer[]): NonNullable<Conf
     if (found !== undefined) {
       const j = found.json as { defaults?: Record<string, unknown> } | undefined;
       const dfl = j?.defaults;
-      if (dfl !== undefined && Object.prototype.hasOwnProperty.call(dfl, k)) (out as Record<string, unknown>)[k] = dfl[k];
+      if (dfl !== undefined && Object.prototype.hasOwnProperty.call(dfl, k)) {
+        const raw = dfl[k];
+        if (k === 'llmTimeout' || k === 'toolTimeout') {
+          const normalized = (typeof raw === 'number' || typeof raw === 'string' || raw === null || raw === undefined)
+            ? raw
+            : undefined;
+          (out as Record<string, unknown>)[k] = parseDurationMsStrict(normalized, `defaults.${k}`);
+        } else {
+          (out as Record<string, unknown>)[k] = raw;
+        }
+      }
     }
   });
   return out;
@@ -379,7 +410,107 @@ function resolveTelemetry(layers: ResolvedConfigLayer[]): TelemetryConfig | unde
     const v = envVal ?? process.env[name];
     return v ?? '';
   }) as TelemetryConfig;
+  if (expanded.otlp?.timeoutMs !== undefined) {
+    expanded.otlp.timeoutMs = parseDurationMsStrict(expanded.otlp.timeoutMs, 'telemetry.otlp.timeoutMs');
+  }
+  if (expanded.logging?.otlp?.timeoutMs !== undefined) {
+    expanded.logging.otlp.timeoutMs = parseDurationMsStrict(expanded.logging.otlp.timeoutMs, 'telemetry.logging.otlp.timeoutMs');
+  }
   return expanded;
+}
+
+const parseOptionalString = (value: unknown, context: string): string | undefined => {
+  if (value === undefined) return undefined;
+  if (typeof value === 'string') return value;
+  throw new Error(`${context} must be a string`);
+};
+
+const parsePositiveInt = (value: unknown, context: string): number | undefined => {
+  if (value === undefined) return undefined;
+  const raw = typeof value === 'string' ? value.trim() : value;
+  if (raw === '') throw new Error(`${context} must be a positive integer`);
+  const num = typeof raw === 'number' ? raw : Number(raw);
+  if (!Number.isFinite(num) || num <= 0 || !Number.isInteger(num)) {
+    throw new Error(`${context} must be a positive integer`);
+  }
+  return Math.trunc(num);
+};
+
+const parseNonNegativeInt = (value: unknown, context: string): number | undefined => {
+  if (value === undefined) return undefined;
+  const raw = typeof value === 'string' ? value.trim() : value;
+  if (raw === '') throw new Error(`${context} must be a non-negative integer`);
+  const num = typeof raw === 'number' ? raw : Number(raw);
+  if (!Number.isFinite(num) || num < 0 || !Number.isInteger(num)) {
+    throw new Error(`${context} must be a non-negative integer`);
+  }
+  return Math.trunc(num);
+};
+
+const parseCacheBackend = (value: unknown, context: string): 'sqlite' | 'redis' | undefined => {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') throw new Error(`${context} must be 'sqlite' or 'redis'`);
+  if (value === 'sqlite' || value === 'redis') return value;
+  throw new Error(`${context} must be 'sqlite' or 'redis'`);
+};
+
+const parseCacheConfig = (value: unknown, origin: string): Configuration['cache'] => {
+  if (!isPlainObject(value)) {
+    throw new Error(`cache config in ${origin} must be an object`);
+  }
+  const backend = parseCacheBackend(value.backend, 'cache.backend');
+  const maxEntries = parsePositiveInt(value.maxEntries, 'cache.maxEntries');
+  const sqliteRaw = value.sqlite;
+  const sqlite = (() => {
+    if (sqliteRaw === undefined) return undefined;
+    if (!isPlainObject(sqliteRaw)) {
+      throw new Error('cache.sqlite must be an object');
+    }
+    const path = parseOptionalString(sqliteRaw.path, 'cache.sqlite.path');
+    return path !== undefined ? { path } : {};
+  })();
+  const redisRaw = value.redis;
+  const redis = (() => {
+    if (redisRaw === undefined) return undefined;
+    if (!isPlainObject(redisRaw)) {
+      throw new Error('cache.redis must be an object');
+    }
+    const url = parseOptionalString(redisRaw.url, 'cache.redis.url');
+    const username = parseOptionalString(redisRaw.username, 'cache.redis.username');
+    const password = parseOptionalString(redisRaw.password, 'cache.redis.password');
+    const database = parseNonNegativeInt(redisRaw.database, 'cache.redis.database');
+    const keyPrefix = parseOptionalString(redisRaw.keyPrefix, 'cache.redis.keyPrefix');
+    return { url, username, password, database, keyPrefix };
+  })();
+  return {
+    backend,
+    maxEntries,
+    sqlite,
+    redis,
+  };
+};
+
+function resolveCache(layers: ResolvedConfigLayer[]): Configuration['cache'] {
+  const found = layers.find((layer) => {
+    const j = layer.json as { cache?: Record<string, unknown> } | undefined;
+    return j?.cache !== undefined;
+  });
+  if (found === undefined) return undefined;
+  const source = found.json as { cache?: Record<string, unknown> } | undefined;
+  const cacheRaw = source?.cache;
+  if (cacheRaw === undefined) return undefined;
+  const env = found.env ?? {};
+  const expanded = expandPlaceholders(cacheRaw, (name: string) => {
+    const envVal = Object.prototype.hasOwnProperty.call(env, name) ? env[name] : undefined;
+    const v = envVal ?? process.env[name];
+    return v ?? '';
+  });
+  try {
+    return parseCacheConfig(expanded, found.jsonPath);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`cache config validation failed in ${found.jsonPath}: ${message}`);
+  }
 }
 
 export function buildUnifiedConfiguration(
@@ -429,6 +560,7 @@ export function buildUnifiedConfiguration(
   const pricing = resolvePricing(layers);
   const telemetry = resolveTelemetry(layers);
   const queues = resolveQueues(layers);
+  const cache = resolveCache(layers);
 
-  return { providers, mcpServers, restTools, openapiSpecs, queues, defaults, accounting, pricing, telemetry } as Configuration;
+  return { providers, mcpServers, restTools, openapiSpecs, queues, defaults, accounting, pricing, telemetry, cache } as Configuration;
 }

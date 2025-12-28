@@ -124,6 +124,8 @@ interface AIAgentSessionConfig {
   tools: string[];                          // Tool providers to use
   systemPrompt: string;                     // System prompt
   userPrompt: string;                       // User prompt
+  cacheTtlMs?: number;                      // Response cache TTL (ms; 0/off disables)
+  agentHash?: string;                       // Stable agent hash for cache keys
   outputFormat: OutputFormatId;             // Output format
 
   // Optional identity
@@ -156,8 +158,8 @@ interface AIAgentSessionConfig {
   maxToolCallsPerTurn?: number;             // Max tool calls per turn
 
   // Optional timeouts
-  llmTimeout?: number;                      // LLM timeout (ms)
-  toolTimeout?: number;                     // Tool timeout (ms)
+  llmTimeout?: number;                      // LLM timeout (ms; frontmatter/CLI/config also accept duration strings)
+  toolTimeout?: number;                     // Tool timeout (ms; frontmatter/CLI/config also accept duration strings)
 
   // Optional behavior
   stream?: boolean;                         // Enable streaming

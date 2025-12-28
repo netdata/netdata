@@ -12,6 +12,7 @@ toolResponseMaxBytes: 16384
 maxOutputTokens: 32768
 maxTurns: 30
 reasoning: none
+cache: 1d
 ---
 You are an elite code search researcher using Sourcegraph.
 

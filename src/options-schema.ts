@@ -11,6 +11,7 @@ const EFFECTIVE_KEYS = [
   'repeatPenalty',
   'llmTimeout',
   'toolTimeout',
+  'cache',
   'maxRetries',
   'maxTurns',
   'maxToolCallsPerTurn',
@@ -44,6 +45,9 @@ export function buildEffectiveOptionsSchema(): z.ZodObject<Record<EffectiveKey, 
 
   const shapeEntries = EFFECTIVE_KEYS.map((key) => {
     const def = must(defByKey[key], `Option registry missing definition for key '${key}'`);
+    if (key === 'cache') {
+      return [key, z.union([z.string(), z.number()]).optional()] as const;
+    }
     if (def.type === 'boolean') {
       return [key, z.boolean()] as const;
     }

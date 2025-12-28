@@ -16,8 +16,9 @@ export interface FrontmatterOptions {
   maxTurns?: number;
   maxToolCallsPerTurn?: number;
   maxRetries?: number;
-  llmTimeout?: number;
-  toolTimeout?: number;
+  llmTimeout?: number | string;
+  toolTimeout?: number | string;
+  cache?: number | string;
   temperature?: number | null;
   topP?: number | null;
   topK?: number | null;
@@ -120,8 +121,9 @@ export function parseFrontmatter(
     if (typeof raw.maxTurns === 'number') options.maxTurns = raw.maxTurns;
     if (typeof raw.maxToolCallsPerTurn === 'number') options.maxToolCallsPerTurn = raw.maxToolCallsPerTurn;
     if (typeof raw.maxRetries === 'number') options.maxRetries = raw.maxRetries;
-    if (typeof raw.llmTimeout === 'number') options.llmTimeout = raw.llmTimeout;
-    if (typeof raw.toolTimeout === 'number') options.toolTimeout = raw.toolTimeout;
+    if (typeof raw.llmTimeout === 'number' || typeof raw.llmTimeout === 'string') options.llmTimeout = raw.llmTimeout;
+    if (typeof raw.toolTimeout === 'number' || typeof raw.toolTimeout === 'string') options.toolTimeout = raw.toolTimeout;
+    if (typeof raw.cache === 'number' || typeof raw.cache === 'string') options.cache = raw.cache;
     if (typeof raw.toolResponseMaxBytes === 'number') options.toolResponseMaxBytes = raw.toolResponseMaxBytes;
     if (typeof raw.maxOutputTokens === 'number') options.maxOutputTokens = raw.maxOutputTokens;
     // Parse nullable numeric params (accept special strings like 'none', 'off', 'unset', 'default', 'null')

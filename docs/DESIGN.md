@@ -132,6 +132,8 @@ Each session MUST be completely autonomous:
 - ❌ **No shared accounting/logging** - Each session tracks its own metrics
 - ❌ **No shared retry state** - Each session has independent retry logic
 
+**Note**: Optional global response caching (when enabled) stores hashed responses in a shared backend. It does not share mutable session state and is opt-in per agent/tool.
+
 ## API Design
 
 ### Session Creation

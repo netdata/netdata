@@ -112,6 +112,20 @@ Messages should focus on incremental information; implied fields live in the str
 - **Tool execution tokens** – Each successful tool invocation emits a `VRB` log with `details.tokens` capturing the estimated tokenizer cost of the tool output. When the context guard replaces a tool response with the fallback `(tool failed: context window budget exceeded)`, the corresponding accounting entry records `original_tokens`, `replacement_tokens`, and the context guard warning references the offending provider/model pair.
 - **Tool failure severity** – JSON-RPC/tool execution failures now emit `WRN` severity with `details.error_message` populated; downstream systems should continue to rely on `status`/`error_message` (not severity) to distinguish failure from success. Success paths remain `VRB` (or `TRC` when tracing is enabled).
 
+### Cache Hit Logs
+
+- **Agent cache hits** – Emit `remoteIdentifier=agent:cache` with `type=llm`, `direction=response`, and details:
+  - `cache_kind=agent`, `cache_key`, `cache_age_ms`
+  - `cache_current_agent`, `cache_stored_agent`, `cache_current_format`, `cache_stored_format`
+  - optional `cache_current_agent_hash`, `cache_stored_agent_hash`
+- **Tool cache hits** – Emit standard tool logs with `details.cache_kind=tool` and:
+  - `cache_key`, `cache_age_ms`
+  - `cache_current_agent`, `cache_stored_agent`
+  - `cache_current_tool`, `cache_stored_tool`
+  - `cache_current_tool_namespace`, `cache_stored_tool_namespace`
+  - optional `cache_current_agent_hash`, `cache_stored_agent_hash`
+- **Cache misses are silent** (no log entry).
+
 ### Session Exit Logs
 
 - `agent:EXIT-*` entries inherit their severity from the `fatal` flag. Synthetic or hard failures keep `fatal=true` and therefore emit `ERR` severity, ensuring monitoring pipelines can alarm on failed sessions (including sub-agents). Successful exits (actual final reports) set `fatal=false`, log `VRB`/`FIN`, and keep the existing FIN summary lines that follow immediately after.

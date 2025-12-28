@@ -19,6 +19,7 @@ maxTurns: 3
 maxToolCallsPerTurn: 10
 caching: none
 reasoning: none
+cache: 1d
 ---
 Your goal is to find information about the company the user provided:
 

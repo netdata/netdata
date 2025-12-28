@@ -68,8 +68,9 @@
 | `maxTurns` | int | `10` | Total LLM turns with tool access. |
 | `maxToolCallsPerTurn` | int | `10` | Caps tool invocations per turn. |
 | `maxRetries` | int | `3` | Provider/model attempts per turn. |
-| `llmTimeout` | ms | `600000` | Reset per streamed chunk. |
-| `toolTimeout` | ms | `300000` | Per tool call timeout. |
+| `llmTimeout` | `ms` \| `N.Nu` | `600000` | Reset per streamed chunk. |
+| `toolTimeout` | `ms` \| `N.Nu` | `300000` | Per tool call timeout. |
+| `cache` | `off` \| `ms` \| `N.Nu` | unset | Response cache TTL (uses default cache backend if none configured). |
 | `temperature` | number | `0.2` | Clamped `0-2`. |
 | `topP` | number or null | `null` | `0-1`; `null` omits the parameter. |
 | `topK` | int or null | `null` | `>=1`; `null` omits the parameter. |
@@ -227,6 +228,7 @@ Use the research agent whenever you need canonical company data; use the sweeps 
   - Fields: `type` (`stdio|websocket|http|sse`), `command` + `args` (for stdio), `url`, `headers`, `env`, `enabled`, `toolSchemas`, `toolsAllowed/Denied`.
   - Legacy aliases `type=local/remote` auto-normalize.
 - **REST tools (`restTools`)**: Each entry names a tool (prefixed `rest__` at runtime) with HTTP metadata imported directly or via `openapiSpecs`.
+- **Response cache (`cache`)**: Optional global cache backend config (SQLite or Redis). If omitted, enabling a TTL uses the default SQLite cache at `${HOME}/.ai-agent/cache.db`. Per-agent/frontmatter `cache` and per-tool `mcpServers.<name>.cache`/`toolsCache` or `restTools.<tool>.cache` TTLs control reuse.
 - **Defaults**: Under `defaults`, you may set the same knobs as frontmatter/CLI (timeouts, sampling, stream, tool limits, contextWindowBufferTokens, default output format, per-surface format preferences).
 - **Queues**: Declare process-wide concurrency in `queues.{name}.concurrent`. Every MCP/REST tool binds to a queue via `queue: name` (falling back to `default`). Use small queues (e.g., `fetcher`) to throttle heavy MCP servers like Playwright; internal tools never consume slots so deadlocks are impossible.
 - **Telemetry**: `telemetry` block controls OTLP exporters, Prometheus endpoint, trace sampler (`always_on|always_off|parent|ratio`), log formats (`journald|logfmt|json|none`), and extra sinks (`otlp`).
@@ -260,6 +262,19 @@ Use the research agent whenever you need canonical company data; use the sweeps 
 - **Exit detection**: If the underlying MCP transport closes (stdio child exits, websocket disconnects, HTTP/SSE link drops), ai-agent now treats that as a fatal condition and immediately schedules the same restart loop without waiting for the next tool timeout. The next caller either waits for the restart or receives `mcp_restart_in_progress` instead of timing out on a dead connection.
 - **Acquire timeout (60s)**: When acquiring a shared MCP server, callers wait up to 60 seconds for initialization. If the server is unavailable (404, network error, etc.), all waiting callers fail together at the 60s mark and proceed without that MCP server. Background retries continue indefinitely. After the first timeout, all subsequent callers fail immediately (short circuit) until the server recovers—there is no repeated waiting. Once background initialization succeeds, the failed state clears and future callers get the ready server. This ensures subagents don't block indefinitely on unavailable MCP servers while still allowing recovery.
 - `healthProbe` (default `"ping"`) controls the probe used after a timeout; set to `"listTools"` for servers that don't implement `ping`.
+
+### Response cache example
+```json
+"cache": {
+  "backend": "sqlite",
+  "sqlite": { "path": "${HOME}/.ai-agent/cache.db" },
+  "maxEntries": 5000
+}
+```
+- TTL inputs: `off` \| `<ms>` \| `<N.Nu>` where `u ∈ { ms, s, m, h, d, w, mo, y }`.
+- Per-agent: frontmatter/CLI `cache`.
+- Per-tool: `mcpServers.<name>.cache`, `mcpServers.<name>.toolsCache.<tool>`, `restTools.<tool>.cache`.
+- If the SQLite backend cannot be loaded, caching is disabled unless a Redis backend is configured.
 
 Timeouts are not crashes. Many MCP servers run long-lived asynchronous work (SQL engines, crawlers, fetchers) and may legitimately exceed a single request’s SLA while still servicing other requests. ai-agent therefore refuses to restart a shared server unless the probe fails. For servers where the protocol-level `ping` is insufficient (it’s a lightweight heartbeat handled by the SDK), set `healthProbe: 'listTools'` or another work-specific probe so we only recycle the process when it truly stops responding.
 

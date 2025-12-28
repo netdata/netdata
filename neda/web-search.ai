@@ -25,6 +25,7 @@ maxOutputTokens: 32768
 maxTurns: 30
 maxToolCallsPerTurn: 10
 reasoning: none
+cache: 1d
 ---
 You are an elite search AI agent specializing in online investigations.
 

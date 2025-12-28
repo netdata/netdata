@@ -13,6 +13,7 @@ import type { AccountingEntry, AIAgentCallbacks, CallbackMeta, Configuration, Co
 import type { CommanderError } from 'commander';
 
 import { AgentRegistry } from './agent-registry.js';
+import { parseDurationMs } from './cache/ttl.js';
 import { buildUnifiedConfiguration, discoverLayers, resolveDefaults } from './config-resolver.js';
 import { formatPromptValue, resolveFormatIdForCli } from './formats.js';
 import { parseFrontmatter, stripFrontmatter, parseList, parsePairs, buildFrontmatterTemplate } from './frontmatter.js';
@@ -250,6 +251,14 @@ const formatUnknownValue = (value: unknown): string => {
   return `[${typeof value}]`;
 };
 
+const parseDurationOption = (raw: unknown, label: string): number | undefined => {
+  const parsed = parseDurationMs(typeof raw === 'string' || typeof raw === 'number' ? raw : undefined);
+  if (parsed === undefined && raw !== undefined) {
+    warn(`Ignoring invalid ${label} value '${formatUnknownValue(raw)}'`);
+  }
+  return parsed;
+};
+
 const extractTelemetryOverrides = (
   opts: Record<string, unknown>,
   sourceOf: (name: string) => ('cli' | 'default' | 'env' | 'implied' | undefined),
@@ -268,8 +277,8 @@ const extractTelemetryOverrides = (
 
   if (sourceOf('telemetryOtlpTimeoutMs') === 'cli') {
     const raw = opts.telemetryOtlpTimeoutMs;
-    const parsed = typeof raw === 'number' ? raw : (typeof raw === 'string' ? Number(raw) : Number.NaN);
-    if (Number.isFinite(parsed) && parsed > 0) {
+    const parsed = parseDurationMs(typeof raw === 'string' || typeof raw === 'number' ? raw : undefined);
+    if (typeof parsed === 'number' && Number.isFinite(parsed) && parsed > 0) {
       overrides.otlpTimeoutMs = Math.trunc(parsed);
     } else if (raw !== undefined) {
       warn(`Ignoring invalid --telemetry-otlp-timeout-ms value '${formatUnknownValue(raw)}'`);
@@ -345,8 +354,8 @@ const extractTelemetryOverrides = (
 
   if (sourceOf('telemetryLoggingOtlpTimeoutMs') === 'cli') {
     const raw = opts.telemetryLoggingOtlpTimeoutMs;
-    const parsed = typeof raw === 'number' ? raw : (typeof raw === 'string' ? Number(raw) : Number.NaN);
-    if (Number.isFinite(parsed) && parsed > 0) {
+    const parsed = parseDurationMs(typeof raw === 'string' || typeof raw === 'number' ? raw : undefined);
+    if (typeof parsed === 'number' && Number.isFinite(parsed) && parsed > 0) {
       overrides.logOtlpTimeoutMs = Math.trunc(parsed);
     } else if (raw !== undefined) {
       warn(`Ignoring invalid --telemetry-logging-otlp-timeout-ms value '${formatUnknownValue(raw)}'`);
@@ -1012,6 +1021,7 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
       toolTimeout: 'toolTimeout',
       'tool-timeout': 'toolTimeout',
       'tool-timeout-ms': 'toolTimeout',
+      cache: 'cache',
       maxRetries: 'maxRetries',
       'max-retries': 'maxRetries',
       maxTurns: 'maxTurns',
@@ -1050,6 +1060,11 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
     return result;
   };
   const parseInteger = (key: string, raw: string): number => Math.trunc(parseNumber(key, raw));
+  const parseDuration = (key: string, raw: string): number => {
+    const parsed = parseDurationMs(raw);
+    if (parsed === undefined) throw new Error(`${key} override requires a duration value (e.g., 5000, 5s, 2m)`);
+    return Math.trunc(parsed);
+  };
   const parseBoolean = (key: string, raw: string): boolean => {
     const normalized = raw.trim().toLowerCase();
     if (normalized === 'true' || normalized === '1') return true;
@@ -1110,10 +1125,13 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
         overrides.repeatPenalty = parseNullableNumber('repeatPenalty', value);
         break;
       case 'llmTimeout':
-        overrides.llmTimeout = parseInteger('llmTimeout', value);
+        overrides.llmTimeout = parseDuration('llmTimeout', value);
         break;
       case 'toolTimeout':
-        overrides.toolTimeout = parseInteger('toolTimeout', value);
+        overrides.toolTimeout = parseDuration('toolTimeout', value);
+        break;
+      case 'cache':
+        overrides.cache = value;
         break;
       case 'maxRetries':
         overrides.maxRetries = parseInteger('maxRetries', value);
@@ -1723,6 +1741,15 @@ program
         }
       }
 
+      let cliCache: string | number | undefined;
+      if (optSrc('cache') === 'cli') {
+        if (typeof options.cache === 'string' || typeof options.cache === 'number') {
+          cliCache = options.cache;
+        } else {
+          exitWith(4, 'invalid --cache value', 'EXIT-CLI-CACHE');
+        }
+      }
+
       const cliDefaultsForUndefined = cliDefaultReasoning !== undefined ? { reasoning: cliDefaultReasoning } : undefined;
 
       // Derive agent id: from prompt filename when available, else 'cli-main'
@@ -1755,8 +1782,13 @@ program
         topP: (optSrc('topP') === 'cli' || optSrc('top-p') === 'cli') ? Number(options.topP ?? options['top-p']) : undefined,
         topK: (optSrc('topK') === 'cli' || optSrc('top-k') === 'cli') ? Math.trunc(Number(options.topK ?? options['top-k'])) : undefined,
         repeatPenalty: (optSrc('repeatPenalty') === 'cli' || optSrc('repeat-penalty') === 'cli') ? Number(options.repeatPenalty ?? options['repeat-penalty']) : undefined,
-        llmTimeout: (optSrc('llmTimeoutMs') === 'cli' || optSrc('llm-timeout-ms') === 'cli') ? Number(options.llmTimeoutMs ?? options['llm-timeout-ms']) : undefined,
-        toolTimeout: (optSrc('toolTimeoutMs') === 'cli' || optSrc('tool-timeout-ms') === 'cli') ? Number(options.toolTimeoutMs ?? options['tool-timeout-ms']) : undefined,
+        llmTimeout: (optSrc('llmTimeoutMs') === 'cli' || optSrc('llm-timeout-ms') === 'cli')
+          ? parseDurationOption(options.llmTimeoutMs ?? options['llm-timeout-ms'], '--llm-timeout-ms')
+          : undefined,
+        toolTimeout: (optSrc('toolTimeoutMs') === 'cli' || optSrc('tool-timeout-ms') === 'cli')
+          ? parseDurationOption(options.toolTimeoutMs ?? options['tool-timeout-ms'], '--tool-timeout-ms')
+          : undefined,
+        cache: cliCache,
         maxRetries: optSrc('maxRetries') === 'cli' ? Number(options.maxRetries) : undefined,
         maxTurns: optSrc('maxTurns') === 'cli' ? Number(options.maxTurns) : undefined,
         toolResponseMaxBytes: (optSrc('toolResponseMaxBytes') === 'cli' || optSrc('tool-response-max-bytes') === 'cli') ? Number(options.toolResponseMaxBytes ?? options['tool-response-max-bytes']) : undefined,

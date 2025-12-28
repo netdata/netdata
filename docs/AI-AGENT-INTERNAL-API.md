@@ -22,12 +22,16 @@ The library performs no direct I/O (no stdout/stderr/file writes). All output, l
   - `headendId?: string` – optional identifier propagated to logging when the session is created from a headend (REST/MCP/OpenAI/Anthropic)
   - `systemPrompt: string`
   - `userPrompt: string`
+  - `cacheTtlMs?: number` – response cache TTL in ms (0/off disables; uses default cache backend if none configured)
+  - `agentHash?: string` – stable agent hash (prompt + agent config; computed by registry) used for cache keys
   - `conversationHistory?: ConversationMessage[]`
   - Output contract: `expectedOutput?: { format: 'json' | 'markdown' | 'text'; schema?: Record<string, unknown> }`
   - Execution controls (optional): `temperature`, `topP`, `topK`, `repeatPenalty`, `maxRetries`, `maxTurns`, `llmTimeout`, `toolTimeout`, `stream`
   - UX flags (optional): `traceLLM`, `traceMCP`, `verbose`
   - Tool response cap (optional): `toolResponseMaxBytes` (bytes)
   - `callbacks?: AIAgentCallbacks`
+- `Configuration`
+  - `cache?: CacheConfig` – global response cache backend (SQLite/Redis); when absent, cache uses defaults only if a TTL is enabled
 - `AIAgentCallbacks`
   - `onLog(entry: LogEntry)` – structured logs (see below)
   - `onOutput(text: string)` – assistant output stream

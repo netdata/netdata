@@ -30,6 +30,8 @@ This document proposes and specifies an in‑memory, preloaded, multi‑agent sy
 - Clear status interfaces and accounting.
 - The core library does no I/O; the CLI or integrators wire callbacks.
 
+**Note**: Optional global response caching (when enabled) stores hashed responses in a shared backend. It does not share mutable session state and is opt‑in per agent/tool.
+
 ## Architecture Overview
 
 ### Parent Agent (Orchestrator)

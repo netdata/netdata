@@ -5,10 +5,14 @@ import path from 'node:path';
 
 import { SpanStatusCode, type Attributes } from '@opentelemetry/api';
 
+import type { ResponseCache } from './cache/response-cache.js';
+import type { ToolCacheResolver } from './cache/tool-cache-resolver.js';
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
-import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, SessionSnapshotPayload, AccountingFlushPayload, ReasoningLevel, ProviderReasoningMapping, ProviderReasoningValue, ToolChoiceMode, LogPayload, TurnRequestContextMetrics } from './types.js';
+import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, SessionSnapshotPayload, AccountingFlushPayload, ReasoningLevel, ProviderReasoningMapping, ProviderReasoningValue, ToolChoiceMode, LogPayload, TurnRequestContextMetrics, LogDetailValue } from './types.js';
 
+import { getResponseCache } from './cache/cache-factory.js';
+import { createToolCacheResolver } from './cache/tool-cache-resolver.js';
 import { validateProviders, validateMCPServers, validatePrompts } from './config.js';
 import { ContextGuard, type ContextGuardBlockedEntry, type ContextGuardEvaluation, type TargetContextConfig } from './context-guard.js';
 import { FinalReportManager, type PendingFinalReportPayload } from './final-report-manager.js';
@@ -32,7 +36,7 @@ import {
   truncateJsonStringsWithInfo,
   truncateToBytesWithInfo,
 } from './truncation.js';
-import { appendCallPathSegment, normalizeCallPath, sanitizeToolName, warn } from './utils.js';
+import { appendCallPathSegment, isPlainObject, normalizeCallPath, sanitizeToolName, warn } from './utils.js';
 import { XmlToolTransport } from './xml-transport.js';
 
 // Exit codes according to DESIGN.md
@@ -72,6 +76,25 @@ interface ToolSelection {
   toolsForTurn: MCPTool[];
 }
 
+interface AgentCachePayload {
+  finalReport?: AIAgentResult['finalReport'];
+  conversation: ConversationMessage[];
+  childConversations?: AIAgentResult['childConversations'];
+}
+
+const isAgentCachePayload = (value: unknown): value is AgentCachePayload => {
+  if (!isPlainObject(value)) return false;
+  const record = value;
+  if (!Array.isArray(record.conversation)) return false;
+  if (record.childConversations !== undefined && !Array.isArray(record.childConversations)) return false;
+  const finalReport = record.finalReport;
+  if (!isPlainObject(finalReport)) return false;
+  const report = finalReport;
+  if (typeof report.format !== 'string') return false;
+  if (typeof report.ts !== 'number' || !Number.isFinite(report.ts)) return false;
+  return true;
+};
+
 // Immutable session class according to DESIGN.md
 
 // TargetContextConfig, ContextGuardBlockedEntry, ContextGuardEvaluation moved to context-guard.ts
@@ -91,6 +114,7 @@ export class AIAgentSession {
   private static readonly RETRY_ACTION_SKIP_PROVIDER = 'skip-provider';
   private static readonly CONTEXT_LIMIT_WARN = 'Context limit exceeded; forcing final turn.';
   private static readonly CONTEXT_LIMIT_TURN_WARN = 'Context limit exceeded during turn execution; proceeding with final turn.';
+  private static readonly SESSION_FINALIZED_MESSAGE = 'session finalized';
   readonly config: Configuration;
   readonly conversation: ConversationMessage[];
   readonly logs: LogEntry[];
@@ -102,6 +126,8 @@ export class AIAgentSession {
   
   private readonly llmClient: LLMClient;
   private readonly sessionConfig: AIAgentSessionConfig;
+  private readonly responseCache?: ResponseCache;
+  private readonly toolCacheResolver?: ToolCacheResolver;
   private readonly abortSignal?: AbortSignal;
   private canceled = false;
   private readonly stopRef?: { stopping: boolean };
@@ -415,6 +441,13 @@ export class AIAgentSession {
     this._currentTurn = currentTurn;
     this.llmClient = llmClient;
     this.sessionConfig = sessionConfig;
+    const toolCacheResolver = createToolCacheResolver(sessionConfig.config);
+    const wantsAgentCache = typeof sessionConfig.cacheTtlMs === 'number' && sessionConfig.cacheTtlMs > 0;
+    const wantsToolCache = toolCacheResolver !== undefined;
+    this.responseCache = (wantsAgentCache || wantsToolCache)
+      ? getResponseCache(sessionConfig.config.cache ?? {})
+      : undefined;
+    this.toolCacheResolver = this.responseCache !== undefined ? toolCacheResolver : undefined;
     // Initialize FinalReportManager (format resolved later in run())
     this.finalReportManager = new FinalReportManager({
       finalReportToolName: AIAgentSession.FINAL_REPORT_TOOL,
@@ -524,6 +557,9 @@ export class AIAgentSession {
     } catch (e) { warn(`system init logging failed: ${e instanceof Error ? e.message : String(e)}`); }
 
     // Tools orchestrator (MCP + REST + Internal + Subagents)
+    const cacheContext = (this.responseCache !== undefined && this.toolCacheResolver !== undefined)
+      ? { getCache: () => this.responseCache, resolver: this.toolCacheResolver }
+      : undefined;
     const orch = new ToolsOrchestrator({
       toolTimeout: sessionConfig.toolTimeout,
       toolResponseMaxBytes: sessionConfig.toolResponseMaxBytes,
@@ -540,9 +576,11 @@ export class AIAgentSession {
       txnId: this.txnId,
       headendId: this.headendId,
       telemetryLabels: this.telemetryLabels,
+      agentHash: sessionConfig.agentHash,
     },
     this.progressReporter,
-    toolBudgetCallbacks);
+    toolBudgetCallbacks,
+    cacheContext);
     const providerRequestTimeout = (() => {
       const raw = sessionConfig.toolTimeout;
       if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) return undefined;
@@ -1174,6 +1212,24 @@ export class AIAgentSession {
       let currentLogs = [...this.logs];
       let currentAccounting = [...this.accounting];
       let currentTurn = this.currentTurn;
+      const cache = this.responseCache;
+      const cacheTtlMs = this.sessionConfig.cacheTtlMs;
+      const agentHash = this.sessionConfig.agentHash;
+      const expectedSchema = this.sessionConfig.expectedOutput?.format === 'json'
+        ? this.sessionConfig.expectedOutput.schema
+        : undefined;
+      const cacheKeyPayload = (cache !== undefined && typeof cacheTtlMs === 'number' && cacheTtlMs > 0 && typeof agentHash === 'string' && agentHash.length > 0)
+        ? {
+            v: 1,
+            kind: 'agent',
+            agentHash,
+            request: {
+              userPrompt: this.sessionConfig.userPrompt,
+              format: this.sessionConfig.outputFormat,
+              schema: expectedSchema,
+            },
+          }
+        : undefined;
 
       this.progressReporter.agentStarted({
         callPath: this.getCallPathLabel(),
@@ -1187,6 +1243,90 @@ export class AIAgentSession {
       });
 
       try {
+      if (cache !== undefined && cacheKeyPayload !== undefined && typeof cacheTtlMs === 'number' && cacheTtlMs > 0) {
+        const hit = await cache.get(cacheKeyPayload, cacheTtlMs, Date.now());
+        if (hit !== undefined && isAgentCachePayload(hit.value)) {
+          const cacheDetails: Record<string, LogDetailValue> = {
+            cache_kind: 'agent',
+            cache_key: hit.entry.keyHash,
+            cache_age_ms: hit.entry.ageMs,
+            cache_current_agent: this.getAgentIdLabel(),
+            cache_stored_agent: hit.entry.metadata.agentName ?? '',
+            cache_current_format: this.sessionConfig.outputFormat,
+            cache_stored_format: hit.entry.metadata.format ?? '',
+          };
+          if (this.sessionConfig.agentHash !== undefined) {
+            cacheDetails.cache_current_agent_hash = this.sessionConfig.agentHash;
+          }
+          if (hit.entry.metadata.agentHash !== undefined) {
+            cacheDetails.cache_stored_agent_hash = hit.entry.metadata.agentHash;
+          }
+          const cacheLog: LogEntry = {
+            timestamp: Date.now(),
+            severity: 'VRB',
+            turn: currentTurn,
+            subturn: 0,
+            direction: 'response',
+            type: 'llm',
+            remoteIdentifier: 'agent:cache',
+            fatal: false,
+            message: `cache hit: ${this.getAgentDisplayName()}`,
+            details: cacheDetails,
+          };
+          this.log(cacheLog);
+          const cachedPayload = hit.value;
+          try {
+            if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
+            const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
+            this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: AIAgentSession.SESSION_FINALIZED_MESSAGE }, { opId: finOp });
+            this.opTree.endOp(finOp, 'ok');
+            this.opTree.endTurn(0);
+            this.opTree.endSession(true);
+          } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
+          const flat = (() => { try { return this.opTree.flatten(); } catch { return { logs: this.logs, accounting: this.accounting }; } })();
+          const mergedLogs = (() => {
+            const combined = [...flat.logs];
+            const seen = new Set<string>();
+            combined.forEach((entry) => {
+              const key = `${String(entry.timestamp)}:${entry.remoteIdentifier}:${entry.message}`;
+              seen.add(key);
+            });
+            this.logs.forEach((entry) => {
+              const key = `${String(entry.timestamp)}:${entry.remoteIdentifier}:${entry.message}`;
+              if (!seen.has(key)) {
+                combined.push(entry);
+                seen.add(key);
+              }
+            });
+            return combined;
+          })();
+          const mergedAccounting = mergeAccountingEntries(flat.accounting, this.accounting);
+          const resultShape: AIAgentResult = {
+            success: true,
+            error: undefined,
+            conversation: cachedPayload.conversation,
+            logs: mergedLogs,
+            accounting: mergedAccounting,
+            finalReport: cachedPayload.finalReport,
+            childConversations: cachedPayload.childConversations,
+            treeAscii: undefined,
+            opTreeAscii: (() => { try { return this.opTree.renderAscii(); } catch { return undefined; } })(),
+            opTree: (() => { try { return this.opTree.getSession(); } catch { return undefined; } })(),
+          };
+          this.emitAgentCompletion(true, undefined);
+          try {
+            await this.persistSessionSnapshot('final');
+            await this.flushAccounting(resultShape.accounting);
+          } catch (e) {
+            warn(`final persistence failed: ${e instanceof Error ? e.message : String(e)}`);
+          }
+          span.setAttributes({
+            'ai.agent.success': resultShape.success,
+            'ai.agent.turn_count': currentTurn,
+          });
+          return resultShape;
+        }
+      }
       // Start execution session in the tree
       // opTree is canonical; no separate session
       // Warmup providers (ensures MCP tools/instructions are available) and refresh mapping
@@ -1447,7 +1587,7 @@ export class AIAgentSession {
       try {
         if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
         const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
-        this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: 'session finalized' }, { opId: finOp });
+        this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: AIAgentSession.SESSION_FINALIZED_MESSAGE }, { opId: finOp });
         this.opTree.endOp(finOp, 'ok');
         // End system turn
         this.opTree.endTurn(0);
@@ -1486,6 +1626,24 @@ export class AIAgentSession {
         opTreeAscii: (() => { try { return this.opTree.renderAscii(); } catch { return undefined; } })(),
         opTree: (() => { try { return this.opTree.getSession(); } catch { return undefined; } })(),
       } as AIAgentResult;
+      if (cache !== undefined && cacheKeyPayload !== undefined && typeof cacheTtlMs === 'number' && cacheTtlMs > 0 && resultShape.success && resultShape.finalReport !== undefined) {
+        const metadata = {
+          kind: 'agent' as const,
+          agentName: this.getAgentIdLabel(),
+          agentHash: this.sessionConfig.agentHash,
+          format: this.sessionConfig.outputFormat,
+        };
+        const payload: AgentCachePayload = {
+          finalReport: resultShape.finalReport,
+          conversation: resultShape.conversation,
+          childConversations: resultShape.childConversations,
+        };
+        try {
+          await cache.set(cacheKeyPayload, cacheTtlMs, payload, metadata, Date.now());
+        } catch (e) {
+          warn(`cache write failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
       // Decouple progress events from model-given status: emit agent_finished if final report exists
       // Model status (success/failure/partial) is semantic for parent agent, not a system failure indicator
       this.emitAgentCompletion(result.success, result.error);
@@ -1600,7 +1758,7 @@ export class AIAgentSession {
     try {
       if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
       const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
-      this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: 'session finalized' }, { opId: finOp });
+      this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: AIAgentSession.SESSION_FINALIZED_MESSAGE }, { opId: finOp });
       this.opTree.endOp(finOp, 'ok');
       this.opTree.endTurn(0);
       this.opTree.endSession(true);

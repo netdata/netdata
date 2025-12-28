@@ -64,6 +64,7 @@ maxTurns: 5
 maxToolCallsPerTurn: 2
 caching: full
 reasoning: none
+cache: 1d
 ---
 You are a precision content extractor.
 

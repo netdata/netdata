@@ -22,11 +22,16 @@ interface MCPServerConfig {
   headers?: Record<string, string>; // For websocket/http/sse
   toolsAllowed?: string[];    // Tool whitelist
   toolsDenied?: string[];     // Tool blacklist
+  cache?: number;             // Tool response cache TTL (ms; accepts duration strings)
+  toolsCache?: Record<string, number>; // Per-tool TTL overrides (ms; accepts duration strings)
   shared?: boolean;           // Use shared registry (default true)
   healthProbe?: 'ping' | 'listTools'; // Health check method
   queue?: string;             // Queue name for concurrency
+  requestTimeoutMs?: number;  // MCP request timeout (ms; accepts duration strings)
 }
 ```
+
+- Config accepts `off` \| `<ms>` \| `<N.Nu>` for cache TTLs and `ms` \| `N.Nu` for timeouts; they are resolved to milliseconds before use.
 
 ### MCPServer
 ```typescript

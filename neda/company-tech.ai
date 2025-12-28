@@ -19,6 +19,7 @@ maxToolCallsPerTurn: 20
 maxOutputTokens: 16384
 maxTurns: 20
 reasoning: none
+cache: 1d
 ---
 You are an elite AI company technology stack researcher.
 

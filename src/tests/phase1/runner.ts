@@ -21,6 +21,7 @@ import type { AddressInfo } from 'node:net';
 import { loadAgent, loadAgentFromContent } from '../../agent-loader.js';
 import { AgentRegistry } from '../../agent-registry.js';
 import { AIAgentSession } from '../../ai-agent.js';
+import { sha256Hex } from '../../cache/hash.js';
 import { loadConfiguration } from '../../config.js';
 import { parseFrontmatter, parseList, parsePairs } from '../../frontmatter.js';
 import { resolveIncludes } from '../../include-resolver.js';
@@ -324,6 +325,10 @@ const TOOL_OK_JSON = '{"ok":true}';
 const STOP_REASON_TOOL_CALLS = 'tool-calls';
 const JSON_ONLY_URL = 'https://example.com/resource';
 const DEFAULT_PROMPT_SCENARIO = 'run-test-1' as const;
+const CACHE_AGE_DETAIL_KEY = 'cache_age_ms';
+const CACHE_KIND_DETAIL_KEY = 'cache_kind';
+const TOOL_CACHE_KIND = 'tool';
+const AGENT_CACHE_REMOTE = 'agent:cache';
 const BASE_DEFAULTS = {
   stream: false,
   maxTurns: 3,
@@ -12464,5 +12469,183 @@ BASE_TEST_SCENARIOS.push({
   expect: (result: AIAgentResult) => {
     invariant(!result.success, 'max turn exhaustion should fail session');
     expectTurnFailureContains(result.logs, 'run-test-max-turn-exhaustion-fails', ['no_tools', 'final_report_missing', 'retries_exhausted']);
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-agent-cache-hit',
+  execute: async (configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-agent-cache-agent-'));
+    const cachePath = path.join(cacheDir, 'cache.db');
+    configuration.cache = { backend: 'sqlite', sqlite: { path: cachePath }, maxEntries: 50 };
+    sessionConfig.cacheTtlMs = 60000;
+    sessionConfig.agentHash = sha256Hex('agent-cache-hit');
+    sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
+    const first = await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-agent-first' }).run();
+    const second = await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-agent-second' }).run();
+    return Object.assign(second, {
+      __cacheBaseline: {
+        accounting: first.accounting,
+        finalReport: first.finalReport,
+        logs: first.logs,
+      },
+    });
+  },
+  expect: (result: AIAgentResult & { __cacheBaseline?: { accounting: AccountingEntry[]; finalReport?: AIAgentResult['finalReport']; logs: LogEntry[] } }) => {
+    const baseline = result.__cacheBaseline;
+    invariant(baseline !== undefined, 'Baseline payload missing for run-test-agent-cache-hit.');
+    invariant(baseline.finalReport !== undefined, 'Baseline final report missing for run-test-agent-cache-hit.');
+    invariant(result.finalReport !== undefined, 'Cache hit final report missing for run-test-agent-cache-hit.');
+    invariant(
+      result.finalReport?.content === baseline.finalReport?.content,
+      'Cached final report content should match baseline for run-test-agent-cache-hit.',
+    );
+    const baselineCacheLog = baseline.logs.find((entry) => entry.remoteIdentifier === AGENT_CACHE_REMOTE);
+    invariant(baselineCacheLog === undefined, 'Baseline run should not be a cache hit for run-test-agent-cache-hit.');
+    const baselineLlmEntries = baseline.accounting.filter(isLlmAccounting);
+    invariant(baselineLlmEntries.length > 0, 'Baseline run should include LLM accounting for run-test-agent-cache-hit.');
+    const cachedLlmEntries = result.accounting.filter(isLlmAccounting);
+    invariant(cachedLlmEntries.length === 0, 'Cache hit should not emit LLM accounting for run-test-agent-cache-hit.');
+    const cacheLog = result.logs.find((entry) => entry.remoteIdentifier === AGENT_CACHE_REMOTE);
+    invariant(cacheLog !== undefined, 'Cache hit log expected for run-test-agent-cache-hit.');
+    const cacheAge = expectLogDetailNumber(cacheLog, CACHE_AGE_DETAIL_KEY, `${CACHE_AGE_DETAIL_KEY} detail missing for run-test-agent-cache-hit.`);
+    invariant(cacheAge >= 0, `${CACHE_AGE_DETAIL_KEY} should be non-negative for run-test-agent-cache-hit.`);
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-tool-cache-hit',
+  execute: async (configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-agent-cache-tool-'));
+    const cachePath = path.join(cacheDir, 'cache.db');
+    configuration.cache = { backend: 'sqlite', sqlite: { path: cachePath }, maxEntries: 50 };
+    configuration.mcpServers = {
+      ...configuration.mcpServers,
+      test: {
+        ...configuration.mcpServers.test,
+        cache: 60000,
+      },
+    };
+    sessionConfig.cacheTtlMs = 0;
+    sessionConfig.agentHash = sha256Hex('tool-cache-hit');
+    sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
+    const first = await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-tool-first' }).run();
+    const second = await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-tool-second' }).run();
+    return Object.assign(second, {
+      __cacheBaseline: {
+        finalReport: first.finalReport,
+        logs: first.logs,
+      },
+    });
+  },
+  expect: (result: AIAgentResult & { __cacheBaseline?: { finalReport?: AIAgentResult['finalReport']; logs: LogEntry[] } }) => {
+    const baseline = result.__cacheBaseline;
+    invariant(baseline !== undefined, 'Baseline payload missing for run-test-tool-cache-hit.');
+    invariant(baseline.finalReport !== undefined, 'Baseline final report missing for run-test-tool-cache-hit.');
+    invariant(result.finalReport !== undefined, 'Final report missing for run-test-tool-cache-hit.');
+    invariant(
+      result.finalReport?.content === baseline.finalReport?.content,
+      'Final report should match baseline for run-test-tool-cache-hit.',
+    );
+    const baselineCacheLog = baseline.logs.find((entry) => getLogDetail(entry, CACHE_KIND_DETAIL_KEY) === TOOL_CACHE_KIND);
+    invariant(baselineCacheLog === undefined, 'Baseline run should not be a cache hit for run-test-tool-cache-hit.');
+    const cacheLog = result.logs.find((entry) => getLogDetail(entry, CACHE_KIND_DETAIL_KEY) === TOOL_CACHE_KIND);
+    invariant(cacheLog !== undefined, 'Tool cache hit log expected for run-test-tool-cache-hit.');
+    const cacheAge = expectLogDetailNumber(cacheLog, CACHE_AGE_DETAIL_KEY, `${CACHE_AGE_DETAIL_KEY} detail missing for run-test-tool-cache-hit.`);
+    invariant(cacheAge >= 0, `${CACHE_AGE_DETAIL_KEY} should be non-negative for run-test-tool-cache-hit.`);
+    const storedTool = getLogDetail(cacheLog, 'cache_stored_tool');
+    invariant(typeof storedTool === 'string' && storedTool.length > 0, 'cache_stored_tool should be set for run-test-tool-cache-hit.');
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-agent-cache-disabled',
+  execute: async (configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-agent-cache-agent-disabled-'));
+    const cachePath = path.join(cacheDir, 'cache.db');
+    configuration.cache = { backend: 'sqlite', sqlite: { path: cachePath }, maxEntries: 50 };
+    sessionConfig.cacheTtlMs = 0;
+    sessionConfig.agentHash = sha256Hex('agent-cache-disabled');
+    sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
+    await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-agent-disabled-first' }).run();
+    return await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-agent-disabled-second' }).run();
+  },
+  expect: (result: AIAgentResult) => {
+    const cacheLog = result.logs.find((entry) => entry.remoteIdentifier === AGENT_CACHE_REMOTE);
+    invariant(cacheLog === undefined, 'Cache hit log should be absent when agent cache is disabled.');
+    const llmEntries = result.accounting.filter(isLlmAccounting);
+    invariant(llmEntries.length > 0, 'Disabled agent cache should still execute LLM calls.');
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-agent-cache-expired',
+  execute: async (configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-agent-cache-agent-expired-'));
+    const cachePath = path.join(cacheDir, 'cache.db');
+    configuration.cache = { backend: 'sqlite', sqlite: { path: cachePath }, maxEntries: 50 };
+    sessionConfig.cacheTtlMs = 5;
+    sessionConfig.agentHash = sha256Hex('agent-cache-expired');
+    sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
+    await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-agent-expired-first' }).run();
+    await new Promise((resolve) => { setTimeout(resolve, 10); });
+    return await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-agent-expired-second' }).run();
+  },
+  expect: (result: AIAgentResult) => {
+    const cacheLog = result.logs.find((entry) => entry.remoteIdentifier === AGENT_CACHE_REMOTE);
+    invariant(cacheLog === undefined, 'Expired agent cache should not return a cache hit.');
+    const llmEntries = result.accounting.filter(isLlmAccounting);
+    invariant(llmEntries.length > 0, 'Expired agent cache should still execute LLM calls.');
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-tool-cache-disabled',
+  execute: async (configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-agent-cache-tool-disabled-'));
+    const cachePath = path.join(cacheDir, 'cache.db');
+    configuration.cache = { backend: 'sqlite', sqlite: { path: cachePath }, maxEntries: 50 };
+    configuration.mcpServers = {
+      ...configuration.mcpServers,
+      test: {
+        ...configuration.mcpServers.test,
+        cache: 0,
+      },
+    };
+    sessionConfig.cacheTtlMs = 0;
+    sessionConfig.agentHash = sha256Hex('tool-cache-disabled');
+    sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
+    await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-tool-disabled-first' }).run();
+    return await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-tool-disabled-second' }).run();
+  },
+  expect: (result: AIAgentResult) => {
+    const cacheLog = result.logs.find((entry) => getLogDetail(entry, CACHE_KIND_DETAIL_KEY) === TOOL_CACHE_KIND);
+    invariant(cacheLog === undefined, 'Tool cache hit log should be absent when tool cache is disabled.');
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-tool-cache-expired',
+  execute: async (configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-agent-cache-tool-expired-'));
+    const cachePath = path.join(cacheDir, 'cache.db');
+    configuration.cache = { backend: 'sqlite', sqlite: { path: cachePath }, maxEntries: 50 };
+    configuration.mcpServers = {
+      ...configuration.mcpServers,
+      test: {
+        ...configuration.mcpServers.test,
+        cache: 5,
+      },
+    };
+    sessionConfig.cacheTtlMs = 0;
+    sessionConfig.agentHash = sha256Hex('tool-cache-expired');
+    sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
+    await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-tool-expired-first' }).run();
+    await new Promise((resolve) => { setTimeout(resolve, 10); });
+    return await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-tool-expired-second' }).run();
+  },
+  expect: (result: AIAgentResult) => {
+    const cacheLog = result.logs.find((entry) => getLogDetail(entry, CACHE_KIND_DETAIL_KEY) === TOOL_CACHE_KIND);
+    invariant(cacheLog === undefined, 'Expired tool cache should not return a cache hit.');
   },
 } satisfies HarnessTest);
