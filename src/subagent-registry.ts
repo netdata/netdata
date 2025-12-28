@@ -20,7 +20,7 @@ type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
 const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
 
 import { DEFAULT_TOOL_INPUT_SCHEMA, cloneJsonSchema } from './input-contract.js';
-import { appendCallPathSegment } from './utils.js';
+import { appendCallPathSegment, isPlainObject } from './utils.js';
 
 export interface PreloadedSubAgent {
   toolName: string;
@@ -201,7 +201,12 @@ export class SubAgentRegistry {
             throw new Error('invalid_parameters: validation_failed');
           }
         }
-        try { return JSON.stringify(parameters); } catch { return '[unserializable-parameters]'; }
+        if (!isPlainObject(parameters)) return '[unserializable-parameters]';
+        const promptParams = Object.keys(parameters).reduce<Record<string, unknown>>((acc, key) => {
+          if (key !== 'reason') acc[key] = parameters[key];
+          return acc;
+        }, {});
+        try { return JSON.stringify(promptParams); } catch { return '[unserializable-parameters]'; }
       }
       const formatParam = (parameters as { format?: unknown }).format;
       if (formatParam !== 'sub-agent') {

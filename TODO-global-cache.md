@@ -87,6 +87,9 @@ Add opt-in global response caching for agents and tools. Cache entries are keyed
 15) **Cache payload validation**
    - Decision: **tighten cached payload validation** and treat malformed payloads as cache misses.
 
+16) **Sub-agent reason handling**
+   - Decision: **reason must not be part of cache keys** and **sub-agents must not see it**; keep reason for user-facing metadata only.
+
 ## Plan
 1) **Config + schema**
    - Add `cache` to frontmatter + CLI options for agents (override precedence).

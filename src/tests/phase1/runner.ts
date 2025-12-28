@@ -6852,6 +6852,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const parentSession = createParentSessionStub(configuration);
       const ok = await registry.execute(tool.name, { query: 'topic', limit: 2, reason: 'Explicit title' }, parentSession);
       invariant(typeof ok.result === 'string', 'Explicit sub-agent execution should succeed.');
+      const firstUser = ok.conversation.find((m) => m.role === 'user');
+      invariant(firstUser !== undefined && typeof firstUser.content === 'string', 'Explicit sub-agent user prompt missing.');
+      invariant(firstUser.content.includes('"query"'), 'Explicit sub-agent JSON prompt should include query.');
+      invariant(!firstUser.content.includes('"reason"'), 'Explicit sub-agent JSON prompt should omit reason.');
 
       const expectFailure = async (args: Record<string, unknown>, fragment: string): Promise<void> => {
         let failed = false;

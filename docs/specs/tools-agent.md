@@ -193,6 +193,7 @@ No direct logging in provider. Child session logs independently with inherited t
 3. **OpTree attachment**: Child tree linked via callback
 4. **Accounting aggregation**: Child costs included in parent totals
 5. **Result serialization**: Final report becomes tool result
+6. **Reason metadata**: `reason` remains required for tool calls but is stripped before JSON prompt construction; it is only used for user-facing titles and never reaches the sub-agent prompt.
 
 ## Business Logic Coverage (Verified 2025-11-16)
 
