@@ -108,6 +108,19 @@
      - Cons: Less discoverable; not a CLI flag.
    - Recommendation: **8A** (meets the “command line flag” requirement and allows env overrides).
 
+9. **Prompt difficulty diagnostics in agent output (new)**
+   - Context: Costa wants per-test “stress indicators” to spot fragile prompt areas even when numeric outputs pass.
+   - 9A: **Hybrid (recommended)** — add a small `diagnostics` object to schemas + prompt guidance for self‑report; compute objective signals (turns/tool errors/timeouts) in the harness logs.
+     - Pros: Balanced; subjective + objective; low schema footprint.
+     - Cons: Requires schema updates across tests; still some self‑report noise.
+   - 9B: **All in schema (self‑report only)** — add fields like `prompt_clarity_pct`, `pivoted`, `confidence_pct`, `notes`, etc., and rely on the model.
+     - Pros: Simple to implement; everything in JSON output.
+     - Cons: Subjective variance; extra tokens can increase truncation risk.
+   - 9C: **Harness‑only diagnostics** — no schema changes; derive difficulty metrics from logs only.
+     - Pros: Deterministic; no risk to output length.
+     - Cons: No self‑reported “ease”/prompt clarity signal.
+   - Recommendation: **9A** (hybrid).
+
 ### Decisions locked in (2025-12-21)
 - 1A accepted: single canonical realized ARR rule = metrics_daily onprem_arr + static manual360_asat_20251002 baseline for dates ≤ 2025-10-01; no per-day manual360 joins.
 - 2A accepted: templates are “verbatim after substituting ISO dates”; remove “no placeholders” ambiguity.
@@ -130,6 +143,7 @@
 - **Context merge plan (2025-12-19)**: Merge bigquery.ai context into executive2.ai while keeping it lean—add freshness note, read-only/allowed datasets, data-flow overview, KPI-definition vs template distinction, and clarify discount/on-prem terminology without expanding template SQL mass. Retain JSON-only output and template-first guardrails.
 - **Context merge applied (2025-12-19)**: Executive2 now embeds condensed bigquery.ai policy: freshness query requirement (notes), allowed datasets/read-only, data-flow summary, entity quick-reference, KPI intent mapping, discount naming clarification, and reiteration of template-first + JSON-only rules. On-prem parity remains the static manual360 baseline until told otherwise.
 - **KPI template port (2025-12-19)**: All remaining Grafana-aligned KPI templates from scratch promoted into executive2 (business/homelab/on-prem levels & deltas, subscriptions, nodes, AI bundles/credits, trials 6+ est value, professional services, SaaS spaces counts/percent, nodes snapshots, unrealized/ending trials charts). One copy of each template kept; JSON-only contract preserved.
+- **Diagnostics (2025-12-27)**: Use model self-report for `sql_failures` (do not parse logs); include a diagnostics block in schema and prompt so the agent counts its own failed queries.
 
 ### Panel → template coverage snapshot (top-of-dashboard, 2025-12-18)
 Status legend: ✅ in `executive2.ai` (prod), 🟨 in `executive2-scratch.ai` (WIP), ⛔ not mapped yet.
@@ -204,6 +218,14 @@ Next actions to reach parity: promote 🟨 templates from scratch → prod after
 - Re-run full harness with `MODEL_OVERRIDE=nova/gpt-oss-20b`, `TEMPERATURE_OVERRIDE=0`, `--continue --jobs 3`, and **10h timeouts**.
 - For each failure: extract snapshot via `neda/bigquery-snapshot-dump.sh`, inspect SQL + final JSON, and determine whether the error is **format-only** or **wrong-query**.
 - If wrong-query: strengthen prompt rule at the earliest relevant section (avoid scattered exceptions).
+
+## Plan agreed (2025-12-28) — “educate, don’t constrain”
+Focus on **reasoning cards** (short “why/when/how” explanations) at the template/registry level to improve model understanding without heavy guardrails.
+1. **Growth % templates**: explain why we do **not** widen windows, why NULLs are expected at window start, and how that preserves Grafana parity.
+2. **Snapshot segment templates**: explain the **segment taxonomy** (trial vs newcomer vs paid), why `ax_trial_ends_at` is the trial signal, and why counts vs node sums must not be mixed.
+3. **Barchart snapshot templates**: explain **date bucketing** (e.g., `DATE(cx_arr_realized_at)`), why weekly grouping is incorrect, and how snapshot scope limits dates.
+4. **Customer list / top‑N templates**: explain **current vs snapshot** routing, ordering, and why strict filters/limits are required for parity.
+5. **“Since only” deltas**: explain how `since X` maps to **two snapshots** (`from_date = X`, `to_date = yesterday`) and why this is required to avoid drifting IDs.
 
 ### Top panels covered in parity harness (so far)
 - Panel 7: `$ Realized ARR - Forecasts` (discounted realized ARR incl. on-prem baseline)

@@ -2464,6 +2464,7 @@ This is the **fastest** way to answer “current/latest” portfolio KPI questio
 - Do **not** include today unless the user explicitly requests it (apply **Date Handling Precedence (canonical)**).
 - If a metric started later, apply its **min_date** filter from the registry.
 - If output fields can be NULL, use a non‑null predicate across the relevant fields to pick the latest valid row.
+- If the query returns **no rows**, do not invent zeros; treat it as “no data in window” and note it. Zero is meaningful only when the SQL actually returns 0.
 
 **How to decide if a metric fits**:
 - It is in `metrics.metrics_daily`.
@@ -2610,6 +2611,11 @@ Use this when the user asks for **7/30/90 growth %** over a window. It preserves
 - Absolute deltas (use the delta templates).
 - Any request requiring a different lag set or custom window widening.
 
+**Why this template (reasoning)**:
+- Grafana growth panels use the **exact user window**; widening changes the baseline and makes results non‑comparable.
+- Early rows **must be NULL** when lag history is outside the window — that’s a signal of insufficient history, not zero growth.
+- The date spine ensures every day in the window is represented, even if metrics are missing for some dates.
+
 **Useful metric operations**:
 - Simple arithmetic across compatible units (sums of asat metrics, constant multipliers).
 - Use COALESCE only when missing = 0 is semantically correct.
@@ -2618,6 +2624,7 @@ Use this when the user asks for **7/30/90 growth %** over a window. It preserves
 - **HARD STOP:** never widen the window to fill lags; keep NULL pct_* where history is missing.
 - Do **not** override NULL pct_* values with 0.
 - Apply **Date Handling Precedence (canonical)** before substituting dates.
+- Do **not** drop rows because pct_* is NULL; the date spine is part of the contract.
 
 ```sql
 WITH dates AS (
@@ -3032,6 +3039,7 @@ Notes:
 - Even if the user provides a narrower from/to window, expand to `DATE_SUB(to_date, INTERVAL 90 DAY)` .. `to_date` so that 7/30/90-day lags are computable; otherwise lags will be NULL. HARD STOP: do not shrink the window (e.g., to the last 7/14/30 days) and do not pre-filter “available” dates—run the full 90-day spine exactly as written.
 - Do **not** replace the `DATE_SUB(..., INTERVAL 90 DAY)` lower bound with a user-provided `from_date` or with `to_date` only; the date spine must cover the full 90 days to make all three lags non-null.
 - Uses canonical realized ARR (business + homelab + ai credits + onprem_arr + static on-prem baseline for dates ≤ 2025-10-01).
+- If the SQL returns **no rows**, do not fabricate zeros; return empty `data` with a note and verify the window/metric names.
 
 ## Template: metric_delta_7_30_90_latest (use for 7/30/90 absolute deltas on a single metric)
 ```
@@ -3115,6 +3123,7 @@ ORDER BY date
 LIMIT 50;
 ```
 - Use when the user asks for a barchart/summary of unrealized ARR scheduled for realization on **one snapshot** only. Do **not** project or add dates outside that snapshot. If the snapshot returns zero rows, return an empty `data` array and note that no unrealized ARR is scheduled.
+- **Date bucketing rationale**: the bar axis is `DATE(cx_arr_realized_at)` from the snapshot. Do not re‑bucket to weeks/months or “fill” missing dates; only dates present in that snapshot should appear.
 
 ## Template: ending_trial_spaces_barchart_snapshot (use verbatim for trial end-date barchart)
 ```
@@ -3153,6 +3162,27 @@ Use this when the user asks for **segment counts or percent mix** on a single `s
 - Do **not** re‑normalize or rescale; templates already output 0–100 percentages.
 - Always return the `check` column for percent templates.
 - Do **not** swap space counts with node sums; they are different datasets and totals.
+
+**Segment logic rationale (why these buckets)**:
+- **Trials** are identified by `ax_trial_ends_at IS NOT NULL` (plan_class alone is not reliable for trials).
+- **Newcomers (<45d)** use `ce_plan_class LIKE 'Business_%'/'Homelab_%'` **only when** `ax_trial_ends_at IS NULL` (paid but still in first 45 days).
+- **Paid**: `ce_plan_class = 'Business'/'Homelab'` with `ax_trial_ends_at IS NULL`.
+- **Community** buckets use `ce_plan_class = 'Community'` and split by nodes: 0 vs ≥1.
+- **Counts** use `SUM(IF(..., 1, 0))`; **node mixes** use `SUM(ae_reachable_nodes)` — never mix these.
+
+**Bucket definitions (counts)**:
+- `Business`: `ax_trial_ends_at IS NULL AND ce_plan_class = 'Business'`
+- `Business_<45d`: `ax_trial_ends_at IS NULL AND ce_plan_class LIKE 'Business_%'`
+- `Homelab`: `ax_trial_ends_at IS NULL AND ce_plan_class = 'Homelab'`
+- `Homelab_<45d`: `ax_trial_ends_at IS NULL AND ce_plan_class LIKE 'Homelab_%'`
+- `Trials_0_nodes`: `ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes,0) < 1`
+- `Trials_1-5_nodes`: `ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes,0) BETWEEN 1 AND 5`
+- `Trials_6+_nodes`: `ax_trial_ends_at IS NOT NULL AND COALESCE(ae_reachable_nodes,0) >= 6`
+- `Community_0_nodes`: `ax_trial_ends_at IS NULL AND ce_plan_class = 'Community' AND COALESCE(ae_reachable_nodes,0) < 1`
+- `Community_w_nodes`: `ax_trial_ends_at IS NULL AND ce_plan_class = 'Community' AND COALESCE(ae_reachable_nodes,0) >= 1`
+
+**Bucket definitions (reachable nodes)**:
+- Same predicates as above, but **SUM(ae_reachable_nodes)** instead of counting rows.
 
 **Snapshot KPI registry (use with this template)**:
 - `spaces_segment_counts_snapshot` → source: `spaces_asat_*`; measure: counts; buckets: Business, Business_<45d, Homelab, Homelab_<45d, Trials_0, Trials_1‑5, Trials_6+, Community_0, Community_w, Total.
@@ -3314,6 +3344,7 @@ SELECT * FROM positive
 UNION ALL
 SELECT * FROM negative;
 ```
+- **Since‑only asks**: if the user says “since YYYY‑MM‑DD” without an end date, set `to_date` to the effective end date (yesterday unless “include today”). This template requires **two snapshots**; do not substitute `spaces_latest` for `to_date`.
 - **HARD STOP:** Use this **single SQL** (or equivalent) and return only the top 10 positive + top 10 negative rows. Do **not** fetch the full dataset into the model; MCP output is size-limited and partial results are unreliable.
 - Treat `from_date`/`to_date` as snapshot dates; do not use timeseries diffs for this KPI. The SQL must do the diff and ordering.
 - Do **not** apply manual on-prem baseline here; this is per-space ARR from snapshots only.
@@ -3554,6 +3585,8 @@ LIMIT 100;
 - **Renewal date rule:** annual = `start_date + 1 year`, monthly = `start_date + 1 month`, missing/blank period or start_date = `"unknown"`.
 - **Committed nodes** must come from `spaceroom_space_active_subscriptions_latest` (latest by `created_at`); **connected nodes** from `spaces_latest.ae_reachable_nodes`.
 - Keep the paid plan-class filter exactly as written (includes 45d newcomers) and exclude trials (`ax_trial_ends_at IS NULL OR ''`).
+- **Why this template**: it mirrors the “current top customers” panel by using the **current snapshot** plus subscription/admin joins; using `spaces_asat_*` changes the customer set and breaks parity.
+- **Ordering rationale**: `ORDER BY current_arr DESC, space_id` defines the exact top‑100 set; changing sort/order will change which customers appear.
 
 ## FAQ: Common KPI answers (recipes)
 
