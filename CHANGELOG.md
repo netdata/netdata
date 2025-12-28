@@ -127,6 +127,7 @@
 - Regenerate integrations docs ([#21499](https://github.com/netdata/netdata/issues/21499))
 - Add AI-Powered Alert Configuration docs entry ([#21482](https://github.com/netdata/netdata/issues/21482))
 - Fix(go.d/vnodes): add additionalProperties to config_schema.json ([#21503](https://github.com/netdata/netdata/issues/21503))
+- Fix(edit-config): ignore container variable inherited from /etc/profile ([#21505](https://github.com/netdata/netdata/issues/21505))
 
 ## [2.8.0] - 2025-11-19
 
