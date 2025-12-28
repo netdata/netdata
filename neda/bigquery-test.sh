@@ -4114,6 +4114,9 @@ run_agent() {
   local out_file="$1" schema_file="$2" question="$3"
   local override_args=()
   local schema_json
+  local diagnostics_json
+  local merged_schema
+  local merged_schema_file
   local question_payload
   if [[ -n "${MODEL_OVERRIDE}" ]]; then
     override_args=(--override "models=${MODEL_OVERRIDE}")
@@ -4128,9 +4131,45 @@ run_agent() {
     override_args+=(--override "toolTimeout=${TOOL_TIMEOUT_MS}")
   fi
   if command -v jq >/dev/null 2>&1; then
-    schema_json="$(jq -c '.' "${schema_file}")"
+    diagnostics_json="$(cat <<'JSON' | jq -c '.'
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "prompt_clarity_pct",
+    "sql_failures",
+    "turns_required",
+    "pivoted",
+    "contradictions_overlaps",
+    "confidence_pct",
+    "notes"
+  ],
+  "properties": {
+    "prompt_clarity_pct": { "type": "number" },
+    "sql_failures": { "type": "number" },
+    "turns_required": { "type": "number" },
+    "pivoted": { "type": "boolean" },
+    "contradictions_overlaps": { "type": "array", "items": { "type": "string" } },
+    "confidence_pct": { "type": "number" },
+    "notes": { "type": "string" }
+  }
+}
+JSON
+    )"
+    merged_schema="$(jq -c --argjson diag "${diagnostics_json}" '
+      .properties = (.properties // {}) |
+      .properties.diagnostics = $diag |
+      .required = ((.required // []) + ["diagnostics"] | unique)
+    ' "${schema_file}")"
+    schema_json="${merged_schema}"
   else
     schema_json="$(cat "${schema_file}")"
+  fi
+  if [[ -n "${merged_schema:-}" ]]; then
+    merged_schema_file="$(mktemp "${OUT_DIR}/schema-with-diagnostics.XXXXXX.json")"
+    printf '%s' "${merged_schema}" >"${merged_schema_file}"
+  else
+    merged_schema_file="${schema_file}"
   fi
   question_payload="$(printf 'Use the following JSON schema exactly; your response must match it with no extra keys.\nSchema:\n%s\n\nQuestion:\n%s' "${schema_json}" "${question}")"
   run "${AI_AGENT_BIN}" \
@@ -4138,7 +4177,7 @@ run_agent() {
     "${SYSTEM_PROMPT}" \
     --no-stream \
     --format json \
-    --schema "@${schema_file}" \
+    --schema "@${merged_schema_file}" \
     "${override_args[@]}" \
     "${question_payload}" \
     >"${out_file}"
