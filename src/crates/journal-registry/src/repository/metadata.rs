@@ -3,8 +3,8 @@
 //! This module provides metadata tracking for journal files, including time ranges
 //! derived from indexing operations.
 
+use crate::TimeRange;
 use crate::repository::File;
-pub use journal_common::TimeRange;
 
 /// Pairs a File with its TimeRange.
 #[derive(Debug, Clone)]

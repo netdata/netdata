@@ -15,7 +15,7 @@ use tracing::{error, info};
 async fn main() {
     println!("TRUST_DURATIONS 1");
 
-    rt::init_tracing("warn");
+    rt::init_tracing("debug");
 
     let result = run_plugin().await;
 

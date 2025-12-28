@@ -43,7 +43,7 @@ for file_info in files {
 Update metadata after indexing:
 
 ```rust
-registry.update_time_range(&file, TimeRange::Bounded { start, end });
+registry.update_time_range(&file, start_time, end_time, indexed_at, online);
 ```
 
 ## How it works

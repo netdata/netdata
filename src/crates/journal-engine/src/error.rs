@@ -49,6 +49,10 @@ pub enum EngineError {
     /// Time budget exceeded during batch processing
     #[error("Time budget exceeded")]
     TimeBudgetExceeded,
+
+    /// Invalid time range (start >= end)
+    #[error("Invalid time range: start={start} >= end={end}")]
+    InvalidTimeRange { start: u32, end: u32 },
 }
 
 static_assertions::const_assert!(std::mem::size_of::<EngineError>() <= 64);

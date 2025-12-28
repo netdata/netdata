@@ -1,6 +1,6 @@
 //! Time range metadata for indexed journal files
 
-use crate::Seconds;
+use journal_common::Seconds;
 
 /// Time range information for a journal file derived from indexing it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

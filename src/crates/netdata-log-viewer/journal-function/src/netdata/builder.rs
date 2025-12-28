@@ -8,7 +8,7 @@ use journal_core::Result;
 use journal_engine::{CellValue, Histogram, LogEntryData, Table};
 use serde_json;
 use std::collections::HashMap;
-use tracing::{info, warn};
+use tracing::warn;
 
 /// Wrapper around entry_data_to_table that applies Netdata transformations.
 fn entry_data_to_table_with_transformations(
@@ -98,17 +98,8 @@ pub fn build_ui_response(
 
     match entry_data_to_table_with_transformations(log_entries, field_names, &transformations) {
         Ok(table) => {
-            info!(
-                "table has {} rows and {} columns",
-                table.row_count(),
-                table.column_count()
-            );
-
             // Transform to UI format
             let ui_data_rows = super::response::table_to_netdata_response(&table, &column_schema);
-
-            info!("transformed to {} UI data rows", ui_data_rows.len());
-
             (columns, serde_json::json!(ui_data_rows))
         }
         Err(e) => {

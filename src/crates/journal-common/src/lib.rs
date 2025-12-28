@@ -7,10 +7,8 @@ pub mod collections;
 pub mod compat;
 pub mod system;
 pub mod time;
-pub mod time_range;
 
 pub use time::{Microseconds, RealtimeClock, Seconds, monotonic_now};
-pub use time_range::TimeRange;
 
 // Re-export collection types for convenience
 pub use collections::{HashMap, HashSet, VecDeque};

@@ -90,72 +90,6 @@ impl BucketRequest {
     }
 }
 
-/// A histogram request for a given [start, end) time range with a specific
-/// filter expression that should be matched.
-#[derive(Debug, Clone)]
-pub(crate) struct HistogramRequest {
-    /// Start time
-    pub after: u32,
-    /// End time
-    pub before: u32,
-    /// Bucket duration in seconds
-    pub bucket_duration: u32,
-    /// Facets to use for file indexes
-    pub(crate) facets: Facets,
-    /// Filter expression to apply
-    pub filter_expr: Filter,
-}
-
-impl HistogramRequest {
-    pub(crate) fn new(
-        after: u32,
-        before: u32,
-        bucket_duration: u32,
-        facets: &[String],
-        filter_expr: &Filter,
-    ) -> Self {
-        Self {
-            after,
-            before,
-            bucket_duration,
-            facets: Facets::new(facets),
-            filter_expr: filter_expr.clone(),
-        }
-    }
-
-    /// Returns the bucket requests that should be used in order to
-    /// generate data for this histogram based on the specified bucket duration.
-    pub(crate) fn bucket_requests(&self) -> Vec<BucketRequest> {
-        let bucket_duration = self.bucket_duration;
-
-        // Buckets are aligned to their duration
-        let aligned_start = (self.after / bucket_duration) * bucket_duration;
-        let aligned_end = self.before.div_ceil(bucket_duration) * bucket_duration;
-
-        // Allocate our buckets
-        let num_buckets = ((aligned_end - aligned_start) / bucket_duration) as usize;
-        let mut buckets = Vec::with_capacity(num_buckets);
-        assert!(
-            num_buckets > 0,
-            "histogram requests should always have at least one bucket"
-        );
-
-        // Create our buckets
-        for bucket_index in 0..num_buckets {
-            let start = aligned_start + (bucket_index as u32 * bucket_duration);
-
-            buckets.push(BucketRequest {
-                start: Seconds(start),
-                end: Seconds(start + bucket_duration),
-                facets: self.facets.clone(),
-                filter_expr: self.filter_expr.clone(),
-            });
-        }
-
-        buckets
-    }
-}
-
 /// A bucket response containing aggregated field value counts.
 #[derive(Debug, Clone)]
 pub struct BucketResponse {
@@ -260,22 +194,27 @@ impl HistogramEngine {
     ///
     /// # Arguments
     /// * `indexed_files` - Pre-computed file indexes
-    /// * `after` - Start time (inclusive) in seconds since Unix epoch
-    /// * `before` - End time (exclusive) in seconds since Unix epoch
+    /// * `time_range` - Query time range with aligned boundaries and bucket duration
     /// * `facets` - Fields to index
     /// * `filter_expr` - Filter expression to apply
     pub fn compute_from_indexes(
         &self,
         indexed_files: &[(FileIndexKey, FileIndex)],
-        after: u32,
-        before: u32,
+        time_range: &crate::QueryTimeRange,
         facets: &[String],
         filter_expr: &Filter,
     ) -> Result<Histogram> {
-        let time_range_duration = before - after;
-        let bucket_duration = calculate_bucket_duration(time_range_duration);
-        let histogram_request = HistogramRequest::new(after, before, bucket_duration, facets, filter_expr);
-        let bucket_requests = histogram_request.bucket_requests();
+        // Generate bucket requests from time range
+        let facets = Facets::new(facets);
+        let bucket_requests: Vec<BucketRequest> = time_range
+            .buckets()
+            .map(|(start, end)| BucketRequest {
+                start: Seconds(start),
+                end: Seconds(end),
+                facets: facets.clone(),
+                filter_expr: filter_expr.clone(),
+            })
+            .collect();
 
         // Find buckets that need computation
         let buckets_to_compute: Vec<BucketRequest> = {
@@ -295,8 +234,15 @@ impl HistogramEngine {
                 .map(|br| (br.clone(), BucketResponse::new()))
                 .collect();
 
+            // Track which buckets can be cached (no online file contributions)
+            let mut bucket_cacheable: HashMap<BucketRequest, bool> = buckets_to_compute
+                .iter()
+                .map(|br| (br.clone(), true))
+                .collect();
+
             // Process all file indexes and update responses
             for (_, file_index) in indexed_files {
+                let is_online = file_index.online();
                 // Get file's time range from the index
                 let file_start = file_index.start_time();
                 let file_end = file_index.end_time();
@@ -311,6 +257,11 @@ impl HistogramEngine {
                     // Skip if file's time range doesn't overlap with bucket's time range
                     if file_start >= bucket_request.end || file_end <= bucket_request.start {
                         continue;
+                    }
+
+                    // If this file is online and overlaps with the bucket, mark bucket as non-cacheable
+                    if is_online {
+                        bucket_cacheable.insert(bucket_request.clone(), false);
                     }
 
                     // Evaluate filter to bitmap
@@ -362,24 +313,44 @@ impl HistogramEngine {
                 }
             }
 
-            // Cache the computed responses
-            let mut responses = self.responses.write();
-            for (bucket_request, response) in new_responses {
-                responses.insert(bucket_request, response);
+            // Cache only the responses that are safe to cache (no online file contributions)
+            let mut responses_guard = self.responses.write();
+            for (bucket_request, response) in &new_responses {
+                if bucket_cacheable.get(bucket_request).copied().unwrap_or(false) {
+                    responses_guard.insert(bucket_request.clone(), response.clone());
+                }
             }
+            drop(responses_guard);
+
+            // Build histogram from all responses (cached + newly computed non-cacheable)
+            let responses_guard = self.responses.read();
+            let buckets = bucket_requests
+                .into_iter()
+                .filter_map(|bucket_request| {
+                    // Try to get from cache first, then from newly computed responses
+                    let response = responses_guard
+                        .get(&bucket_request)
+                        .cloned()
+                        .or_else(|| new_responses.get(&bucket_request).cloned());
+
+                    response.map(|r| (bucket_request, r))
+                })
+                .collect();
+
+            Ok(Histogram { buckets })
+        } else {
+            // All buckets were cached, just build histogram from cache
+            let responses = self.responses.read();
+            let buckets = bucket_requests
+                .into_iter()
+                .filter_map(|bucket_request| {
+                    responses
+                        .get(&bucket_request)
+                        .map(|response| (bucket_request, response.clone()))
+                })
+                .collect();
+
+            Ok(Histogram { buckets })
         }
-
-        // Build the histogram from cached responses
-        let responses = self.responses.read();
-        let buckets = bucket_requests
-            .into_iter()
-            .filter_map(|bucket_request| {
-                responses
-                    .get(&bucket_request)
-                    .map(|response| (bucket_request, response.clone()))
-            })
-            .collect();
-
-        Ok(Histogram { buckets })
     }
 }

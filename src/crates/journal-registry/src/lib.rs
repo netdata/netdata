@@ -39,6 +39,8 @@
 
 pub mod registry;
 pub mod repository;
+pub mod time_range;
 
 pub use registry::{Monitor, Registry, RegistryError};
-pub use repository::{File, FileInfo, Origin, Source, Status, TimeRange};
+pub use repository::{File, FileInfo, Origin, Source, Status};
+pub use time_range::TimeRange;

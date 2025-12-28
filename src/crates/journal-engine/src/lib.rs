@@ -24,6 +24,7 @@ pub mod facets;
 pub mod histogram;
 pub mod indexing;
 pub mod logs;
+pub mod query_time_range;
 
 // Re-export key types for convenience
 pub use cache::{FileIndexCache, FileIndexKey};
@@ -34,3 +35,4 @@ pub use histogram::{
 };
 pub use indexing::{FileIndexCacheBuilder, batch_compute_file_indexes};
 pub use logs::{CellValue, ColumnInfo, LogEntryData, LogQuery, Table, entry_data_to_table};
+pub use query_time_range::QueryTimeRange;

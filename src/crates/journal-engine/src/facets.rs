@@ -140,6 +140,10 @@ impl Facets {
     pub fn is_empty(&self) -> bool {
         self.fields.is_empty()
     }
+
+    pub fn precomputed_hash(&self) -> u64 {
+        self.precomputed_hash
+    }
 }
 
 impl serde::Serialize for Facets {

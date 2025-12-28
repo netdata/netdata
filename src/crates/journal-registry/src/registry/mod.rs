@@ -299,8 +299,29 @@ impl Registry {
     }
 
     /// Update time range metadata after indexing a file
-    pub fn update_time_range(&self, file: &File, time_range: TimeRange) {
+    pub fn update_time_range(
+        &self,
+        file: &File,
+        start_time: Seconds,
+        end_time: Seconds,
+        indexed_at: Seconds,
+        online: bool,
+    ) {
         let mut inner = self.inner.write();
+
+        let time_range = if online {
+            TimeRange::Active {
+                start: start_time,
+                end: end_time,
+                indexed_at: indexed_at,
+            }
+        } else {
+            TimeRange::Bounded {
+                start: start_time,
+                end: end_time,
+                indexed_at: indexed_at,
+            }
+        };
 
         let file_info = FileInfo {
             file: file.clone(),

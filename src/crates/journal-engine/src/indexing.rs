@@ -7,11 +7,12 @@
 use crate::{
     cache::{FileIndexCache, FileIndexKey},
     error::{EngineError, Result},
+    query_time_range::QueryTimeRange,
 };
 use foundation::Timeout;
-use journal_index::{FieldName, FileIndex, FileIndexer, Seconds};
+use journal_index::{FileIndex, FileIndexer};
 use journal_registry::Registry;
-use tracing::{debug, error};
+use tracing::{error, trace};
 
 // ============================================================================
 // File Index Cache Builder
@@ -134,8 +135,7 @@ impl Default for FileIndexCacheBuilder {
 /// # Arguments
 /// * `cache` - The file index cache
 /// * `registry` - Registry to update with file metadata
-/// * `keys` - Vector of (file, facets) pairs to fetch/compute indexes for
-/// * `source_timestamp_field` - Field name to use for timestamps when indexing
+/// * `keys` - Vector of (file, facets, source_timestamp_field) to fetch/compute indexes for
 /// * `bucket_duration` - Duration of histogram buckets in seconds
 /// * `timeout` - Timeout for the entire operation (can be extended dynamically)
 ///
@@ -146,12 +146,11 @@ pub async fn batch_compute_file_indexes(
     cache: &FileIndexCache,
     registry: &Registry,
     keys: Vec<FileIndexKey>,
-    source_timestamp_field: FieldName,
-    bucket_duration: Seconds,
+    time_range: &QueryTimeRange,
     timeout: Timeout,
 ) -> Result<Vec<(FileIndexKey, FileIndex)>> {
+    let bucket_duration = time_range.bucket_duration_seconds();
     // Phase 1: Batch check cache for all keys upfront
-    debug!("phase 1");
     let cache_lookup_futures = keys.iter().map(|key| {
         let key_clone = key.clone();
         async move {
@@ -173,7 +172,6 @@ pub async fn batch_compute_file_indexes(
         .map_err(|_| EngineError::TimeBudgetExceeded)?;
 
     // Phase 2: Separate cache hits from misses, check freshness and compatibility
-    debug!("phase 2");
     let mut responses = Vec::with_capacity(keys.len());
     let mut keys_to_compute = Vec::new();
     let mut cache_hits = 0;
@@ -217,13 +215,12 @@ pub async fn batch_compute_file_indexes(
         return Err(EngineError::TimeBudgetExceeded);
     }
 
-    debug!(
+    trace!(
         "phase 2 summary: hits={}, misses={}, stale={}, incompatible_bucket={}",
         cache_hits, cache_misses, stale_entries, incompatible_bucket
     );
 
     // Phase 3: Spawn single blocking task with rayon for parallel computation
-    debug!("phase 3");
     let time_budget_remaining = timeout.remaining();
 
     let compute_task = tokio::task::spawn_blocking(move || {
@@ -247,7 +244,7 @@ pub async fn batch_compute_file_indexes(
                 let result = file_indexer
                     .index(
                         &key.file,
-                        Some(&source_timestamp_field),
+                        key.source_timestamp_field.as_ref(),
                         key.facets.as_slice(),
                         bucket_duration,
                     )
@@ -266,21 +263,25 @@ pub async fn batch_compute_file_indexes(
                 format!("Blocking task panicked: {}", e),
             )));
         }
-        Err(timeout) => {
+        Err(_timeout) => {
             // Note: the blocking task will continue running in background but
             // we will ignore the results
-            error!("computing file indexes timed out (elapsed={})", timeout);
             return Err(EngineError::TimeBudgetExceeded);
         }
     };
 
     // Phase 4: Update registry and cache, then collect responses
-    debug!("phase 4");
     for (key, response) in computed_results {
         // Update registry and cache on success
         if let Ok(index) = response {
-            let time_range = index.time_range();
-            let _ = registry.update_time_range(&key.file, time_range);
+            let _ = registry.update_time_range(
+                &key.file,
+                index.start_time(),
+                index.end_time(),
+                index.indexed_at(),
+                index.online(),
+            );
+
             cache.insert(key.clone(), index.clone());
             responses.push((key, index));
         }

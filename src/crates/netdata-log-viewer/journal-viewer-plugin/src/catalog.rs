@@ -7,7 +7,6 @@ use netdata_plugin_schema::HttpAccess;
 use parking_lot::RwLock;
 use rt::FunctionHandler;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
 use tracing::{debug, error, info, instrument, warn};
 
 // Import types from journal-function crate
@@ -34,28 +33,15 @@ use journal_index::{FieldName, FieldValuePair, Microseconds, Seconds};
 #[instrument(skip(selections))]
 fn build_filter_from_selections(selections: &HashMap<String, Vec<String>>) -> Filter {
     if selections.is_empty() {
-        info!("no selections provided, using empty filter");
         return Filter::none();
     }
 
     let mut field_filters = Vec::new();
 
     for (field, values) in selections {
-        // Ignore log sources. We've not implemented this functionality.
-        if field == "__logs_sources" {
-            info!("ignoring __logs_sources field");
-            continue;
-        }
-
         if values.is_empty() {
             continue;
         }
-
-        info!(
-            "building filter for field '{}' with {} values",
-            field,
-            values.len()
-        );
 
         // Build OR filter for all values of this field
         let value_filters: Vec<_> = values
@@ -76,10 +62,8 @@ fn build_filter_from_selections(selections: &HashMap<String, Vec<String>>) -> Fi
     }
 
     if field_filters.is_empty() {
-        info!("no valid field filters, using empty filter");
         Filter::none()
     } else {
-        info!("created filter with {} field filters", field_filters.len());
         Filter::and(field_filters)
     }
 }
@@ -218,7 +202,6 @@ impl TransactionRegistry {
 
         let transaction = Transaction::new(id.clone(), timeout);
         transactions.insert(id, transaction.clone());
-        debug!("Created transaction {} in registry", transaction.id());
 
         Some(transaction)
     }
@@ -233,9 +216,6 @@ impl TransactionRegistry {
     /// Returns the removed transaction if it existed.
     fn remove(&self, id: &str) -> Option<Transaction> {
         let transaction = self.transactions.write().remove(id);
-        if transaction.is_some() {
-            debug!("Removed transaction {} from registry", id);
-        }
         transaction
     }
 
@@ -271,7 +251,6 @@ struct CatalogFunctionInner {
     registry: Registry,
     cache: FileIndexCache,
     histogram_engine: Arc<HistogramEngine>,
-    request_counter: AtomicU64,
     transaction_registry: TransactionRegistry,
 }
 
@@ -295,8 +274,7 @@ impl CatalogFunction {
     fn query_logs_from_indexes(
         &self,
         indexed_files: &[journal_index::FileIndex],
-        after: u32,
-        before: u32,
+        time_range: &journal_function::QueryTimeRange,
         anchor: Option<u64>,
         filter: &Filter,
         search_query: &str,
@@ -305,16 +283,13 @@ impl CatalogFunction {
     ) -> (Vec<journal_function::LogEntryData>, bool, bool) {
         use journal_function::LogQuery;
 
-        info!("querying logs from {} indexed files", indexed_files.len());
-
         if indexed_files.is_empty() {
-            info!("no indexed files available for log query");
             return (Vec::new(), false, false);
         }
 
         // Convert time range boundaries to microseconds
-        let after_usec = after as u64 * 1_000_000;
-        let before_usec = before as u64 * 1_000_000;
+        let after_usec = time_range.aligned_start() as u64 * 1_000_000;
+        let before_usec = time_range.aligned_end() as u64 * 1_000_000;
 
         // Query log entries
         // Determine anchor point: use explicit anchor if provided, otherwise use time range boundary
@@ -356,15 +331,11 @@ impl CatalogFunction {
 
         // Apply regex search if search_query is not empty
         if !search_query.is_empty() {
-            debug!("applying regex filter to log query: {:?}", search_query);
             query = query.with_regex(search_query);
         }
 
         let mut log_entries = match query.execute() {
-            Ok(entries) => {
-                info!("retrieved {} log entries (limit + 1 query)", entries.len());
-                entries
-            }
+            Ok(entries) => entries,
             Err(e) => {
                 error!("log query execution failed: {}", e);
                 if !search_query.is_empty() {
@@ -381,10 +352,6 @@ impl CatalogFunction {
         let has_more_in_query_direction = log_entries.len() > limit;
         if has_more_in_query_direction {
             log_entries.truncate(limit);
-            info!(
-                "truncated to {} entries, more available in query direction",
-                limit
-            );
         }
 
         // Query 1 entry in the opposite direction to check if there are entries there
@@ -451,11 +418,6 @@ impl CatalogFunction {
             }
         };
 
-        info!(
-            "pagination flags: has_before={}, has_after={}",
-            has_before, has_after
-        );
-
         // UI always expects logs sorted descending by timestamp (newest first)
         // regardless of query direction
         log_entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
@@ -493,26 +455,10 @@ impl CatalogFunction {
         // Create histogram engine
         let histogram_engine = HistogramEngine::new();
 
-        // Initialize response logging directory at info level
-        if tracing::enabled!(tracing::Level::INFO) {
-            let response_dir = std::path::Path::new("/tmp/responses");
-            if response_dir.exists() {
-                if let Err(e) = std::fs::remove_dir_all(response_dir) {
-                    warn!("Failed to remove existing /tmp/responses directory: {}", e);
-                }
-            }
-            if let Err(e) = std::fs::create_dir_all(response_dir) {
-                warn!("Failed to create /tmp/responses directory: {}", e);
-            } else {
-                info!("created /tmp/responses directory for response logging");
-            }
-        }
-
         let inner = CatalogFunctionInner {
             registry,
             cache,
             histogram_engine: Arc::new(histogram_engine),
-            request_counter: AtomicU64::new(0),
             transaction_registry: TransactionRegistry::new(),
         };
 
@@ -536,78 +482,6 @@ impl CatalogFunction {
             error!("failed to process notify event: {}", e);
         }
     }
-
-    /// Logs the response as pretty-printed JSON to /tmp/responses/<request-number>-<timestamp>.json
-    fn log_response(&self, response: &CatalogResponse) {
-        // Early return if INFO level is not enabled
-        if !tracing::enabled!(tracing::Level::INFO) {
-            return;
-        }
-
-        const MAX_RESPONSES: usize = 60;
-        const RESPONSE_DIR: &str = "/tmp/responses";
-
-        // Get request number and increment counter
-        let request_num = self.inner.request_counter.fetch_add(1, Ordering::SeqCst);
-
-        // Get current timestamp in microseconds
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_micros();
-
-        // Build filename
-        let filename = format!("{}/{:06}-{}.json", RESPONSE_DIR, request_num, timestamp);
-
-        // Serialize response as pretty-printed JSON
-        match serde_json::to_string_pretty(response) {
-            Ok(json) => {
-                if let Err(e) = std::fs::write(&filename, json) {
-                    warn!("failed to write response to {}: {}", filename, e);
-                    return;
-                }
-                info!("logged response to {}", filename);
-            }
-            Err(e) => {
-                warn!("failed to serialize response to JSON: {}", e);
-                return;
-            }
-        }
-
-        // Clean up old files, keeping only the latest MAX_RESPONSES
-        if let Ok(entries) = std::fs::read_dir(RESPONSE_DIR) {
-            let mut files: Vec<_> = entries
-                .filter_map(|entry| {
-                    let entry = entry.ok()?;
-                    let path = entry.path();
-
-                    // Only consider .json files
-                    if !path.extension().map_or(false, |ext| ext == "json") {
-                        return None;
-                    }
-
-                    // Extract request number from filename (format: NNNNNN-timestamp.json)
-                    let filename = path.file_name()?.to_str()?;
-                    let request_num_str = filename.split('-').next()?;
-                    let request_num: u64 = request_num_str.parse().ok()?;
-
-                    Some((path, request_num))
-                })
-                .collect();
-
-            // Sort by request number (newest/highest first)
-            files.sort_by(|a, b| b.1.cmp(&a.1));
-
-            // Remove files beyond MAX_RESPONSES
-            for (path, _) in files.iter().skip(MAX_RESPONSES) {
-                if let Err(e) = std::fs::remove_file(path) {
-                    warn!("failed to remove old response file {:?}: {}", path, e);
-                } else {
-                    info!("removed old response file {:?}", path);
-                }
-            }
-        }
-    }
 }
 
 #[async_trait]
@@ -616,120 +490,156 @@ impl FunctionHandler for CatalogFunction {
     type Response = CatalogResponse;
 
     async fn on_call(&self, transaction: String, request: Self::Request) -> Result<Self::Response> {
-        // Validate time range
-        if request.after >= request.before {
-            error!(
-                "[{}] invalid time range: after={} >= before={}",
-                transaction, request.after, request.before
-            );
-            return Err(netdata_plugin_error::NetdataPluginError::Other {
-                message: "invalid time range: after must be less than before".to_string(),
-            });
-        }
-
-        // Create timeout for this operation (12 seconds initial budget)
-        let timeout = journal_function::Timeout::new(std::time::Duration::from_secs(12));
-
         // Register the transaction with the timeout
-        let txn = self
+        let timeout = journal_function::Timeout::new(std::time::Duration::from_secs(10));
+        let Some(txn) = self
             .inner
             .transaction_registry
-            .create(transaction.clone(), Some(timeout.clone()));
-        if txn.is_none() {
-            warn!(
-                "Transaction {} already exists, continuing anyway",
-                transaction
-            );
-        }
+            .create(transaction.clone(), Some(timeout.clone()))
+        else {
+            return Err(netdata_plugin_error::NetdataPluginError::Other {
+                message: format!("[{}] transaction already exists", transaction),
+            });
+        };
+        info!("[{}] started transaction", txn.id());
 
-        let filter_expr = build_filter_from_selections(&request.selections);
+        // Create query time range with automatic alignment
+        let time_range = journal_function::QueryTimeRange::new(request.after, request.before)
+            .map_err(|e| netdata_plugin_error::NetdataPluginError::Other {
+                message: format!("[{}] {}", txn.id(), e),
+            })?;
 
-        // Get facets from request or use empty list
-        // FIXME: Need to review this
-        let facets: Vec<String> = request
-            .facets
-            .iter()
-            .filter(|f| *f != "__logs_sources") // Ignore special fields
-            .cloned()
-            .collect();
+        info!(
+            "[{}] time range: [{}, {}), aligned: [{}, {}), bucket duration: {} seconds",
+            txn.id(),
+            time_range.requested_start(),
+            time_range.requested_end(),
+            time_range.aligned_start(),
+            time_range.aligned_end(),
+            time_range.bucket_duration()
+        );
 
-        // Step 1: Find files in the time range ONCE
+        // Find files in the time range
+        let op_start = std::time::Instant::now();
         let files = self
             .inner
             .registry
             .find_files_in_range(Seconds(request.after), Seconds(request.before))
             .map_err(|e| netdata_plugin_error::NetdataPluginError::Other {
-                message: format!("failed to find files in range: {}", e),
+                message: format!("[{}] failed to find files in range: {}", txn.id(), e),
             })?;
+        let find_files_duration = op_start.elapsed();
+        info!("[{}] found {} files in time range", txn.id(), files.len(),);
+        if tracing::enabled!(tracing::Level::DEBUG) {
+            for (idx, file_info) in files.iter().enumerate() {
+                debug!(
+                    "[{}] file[{}/{}]: {}",
+                    txn.id(),
+                    idx + 1,
+                    files.len(),
+                    file_info.file.path(),
+                );
+            }
+        }
 
-        // Step 2: Build file index keys ONCE
-        let facets_obj = Facets::new(&facets);
+        // Build fiter expression
+        let filter_expr = build_filter_from_selections(&request.selections);
+        info!("[{}] filter expression: {}", txn.id(), filter_expr);
+
+        // Build facets for file indexes
+        let facets = Facets::new(&request.facets);
+        info!(
+            "[{}] using {} facets with precomputed hash {}",
+            txn.id(),
+            facets.len(),
+            facets.precomputed_hash()
+        );
+        if tracing::enabled!(tracing::Level::DEBUG) {
+            for (idx, facet) in facets.iter().enumerate() {
+                debug!(
+                    "[{}] facet[{}/{}]: {}",
+                    txn.id(),
+                    idx + 1,
+                    facets.len(),
+                    facet.as_str(),
+                );
+            }
+        }
+
+        // Build file index keys
+        let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
         let keys: Vec<FileIndexKey> = files
             .iter()
-            .map(|f| FileIndexKey::new(&f.file, &facets_obj))
+            .map(|f| FileIndexKey::new(&f.file, &facets, Some(source_timestamp_field.clone())))
             .collect();
 
-        // Step 3: Compute bucket duration for indexing
-        // We need to determine the appropriate bucket duration based on the time range
-        let time_range_duration = request.before - request.after;
-        let bucket_duration = journal_function::calculate_bucket_duration(time_range_duration);
-        info!("using bucket duration: {} seconds", bucket_duration);
-
-        // Align time boundaries to bucket_duration to ensure consistency between
-        // histogram computation and log queries. This prevents discrepancies where
-        // histogram buckets use aligned boundaries but log queries use unaligned ones.
-        // - aligned_after: rounds down to nearest bucket boundary
-        // - aligned_before: rounds up to nearest bucket boundary
-        let aligned_after = (request.after / bucket_duration) * bucket_duration;
-        let aligned_before = request.before.div_ceil(bucket_duration) * bucket_duration;
-
-        // Step 4: Index all files ONCE
-        info!("indexing {} files", keys.len());
-        let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
-
+        // Index all files
+        let op_start = std::time::Instant::now();
         let indexed_files = journal_function::batch_compute_file_indexes(
             &self.inner.cache,
             &self.inner.registry,
             keys,
-            source_timestamp_field,
-            Seconds(bucket_duration),
+            &time_range,
             timeout,
         )
         .await
         .map_err(|e| netdata_plugin_error::NetdataPluginError::Other {
-            message: format!("failed to index files: {}", e),
+            message: format!("[{}] failed to index files: {}", txn.id(), e),
         })?;
-        info!("indexed {} files", indexed_files.len());
+        let indexing_duration = op_start.elapsed();
 
-        // Step 5: Compute histogram from pre-indexed files
-        info!("computing histogram from indexed files");
+        info!(
+            "[{}] retrieved {}/{} file indexes for histogram buckets and log entries",
+            txn.id(),
+            indexed_files.len(),
+            files.len(),
+        );
+        if tracing::enabled!(tracing::Level::DEBUG) {
+            for (idx, (key, file_index)) in indexed_files.iter().enumerate() {
+                debug!(
+                    "[{}] file index[{}/{}]: {}, indexed at: {}, online: {}, bucket duration: {}",
+                    txn.id(),
+                    idx + 1,
+                    files.len(),
+                    key.file.path(),
+                    file_index.indexed_at().0,
+                    file_index.online(),
+                    file_index.bucket_duration().0
+                );
+            }
+        }
+
+        // Compute histogram from pre-indexed files
+        let op_start = std::time::Instant::now();
         let histogram = self
             .inner
             .histogram_engine
-            .compute_from_indexes(
-                &indexed_files,
-                aligned_after,
-                aligned_before,
-                &facets,
-                &filter_expr,
-            )
+            .compute_from_indexes(&indexed_files, &time_range, &request.facets, &filter_expr)
             .map_err(|e| netdata_plugin_error::NetdataPluginError::Other {
                 message: format!("failed to compute histogram: {}", e),
             })?;
-        info!("histogram computation complete");
+        let histogram_duration = op_start.elapsed();
 
-        // Step 6: Query logs from pre-indexed files
+        // Query logs from pre-indexed files
+        let op_start = std::time::Instant::now();
         let limit = request.last.unwrap_or(200);
         let file_indexes: Vec<_> = indexed_files.iter().map(|(_, idx)| idx.clone()).collect();
         let (log_entries, has_before, has_after) = self.query_logs_from_indexes(
             &file_indexes,
-            aligned_after,
-            aligned_before,
+            &time_range,
             request.anchor,
             &filter_expr,
             &request.query,
             limit,
             request.direction,
+        );
+        let query_logs_duration = op_start.elapsed();
+        info!(
+            "[{}] retrieved {} log entries (has before: {}, has after: {})",
+            txn.id(),
+            log_entries.len(),
+            has_before,
+            has_after
         );
 
         // Build Netdata UI response (columns + data)
@@ -780,17 +690,20 @@ impl FunctionHandler for CatalogFunction {
             pagination: netdata::Pagination::default(),
         };
 
+        let Some(txn) = self.inner.transaction_registry.remove(&transaction) else {
+            return Err(netdata_plugin_error::NetdataPluginError::Other {
+                message: format!("[{}] transaction does not exist", transaction),
+            });
+        };
         info!(
-            "successfully created response with {} facets",
-            response.facets.len()
+            "[{}] completed transaction (find_files: {:?}, indexing: {:?}, histogram: {:?}, query_logs: {:?}, total: {:?})",
+            txn.id(),
+            find_files_duration,
+            indexing_duration,
+            histogram_duration,
+            query_logs_duration,
+            txn.elapsed()
         );
-
-        // Log response to file
-        self.log_response(&response);
-
-        // Remove the transaction from the registry
-        self.inner.transaction_registry.remove(&transaction);
-        info!("Transaction {} completed successfully", transaction);
 
         Ok(response)
     }

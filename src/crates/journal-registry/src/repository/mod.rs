@@ -36,7 +36,7 @@ pub mod metadata;
 
 // Re-export only the public API types
 pub use crate::repository::file::{File, Origin, Source, Status};
-pub use crate::repository::metadata::{FileInfo, TimeRange};
+pub use crate::repository::metadata::FileInfo;
 
 // Re-export workspace-internal types (hidden from public docs)
 // These are not in lib.rs exports but accessible via full paths for workspace crates
@@ -53,8 +53,8 @@ mod tests {
     use super::*;
     use crate::repository::collection::Chain;
     use crate::repository::file::FileInner;
-    use journal_common::collections::VecDeque;
     use journal_common::Seconds;
+    use journal_common::collections::VecDeque;
     use std::sync::Arc;
     use uuid::Uuid;
 

@@ -1,7 +1,6 @@
 use crate::{
     Bitmap, FieldName, FieldValuePair, Histogram, IndexError, Microseconds, Result, Seconds,
 };
-use journal_common::TimeRange;
 use journal_core::collections::{HashMap, HashSet};
 use journal_core::file::{JournalFile, Mmap};
 use journal_core::repository::File;
@@ -111,25 +110,6 @@ impl FileIndex {
     /// Get the end time of this file's indexed time range.
     pub fn end_time(&self) -> Seconds {
         self.histogram.end_time()
-    }
-
-    /// Get the time range of this file's indexed entries.
-    pub fn time_range(&self) -> TimeRange {
-        let (start, end) = self.histogram.time_range();
-
-        if self.was_online {
-            TimeRange::Active {
-                start,
-                end,
-                indexed_at: self.indexed_at,
-            }
-        } else {
-            TimeRange::Bounded {
-                start,
-                end,
-                indexed_at: self.indexed_at,
-            }
-        }
     }
 
     /// Get the number of time buckets.

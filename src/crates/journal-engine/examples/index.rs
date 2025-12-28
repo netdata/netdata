@@ -31,7 +31,7 @@
 // echo "259:0 rbps=10485760 wbps=10485760" | sudo tee /sys/fs/cgroup/slow-io/io.max
 
 use journal_engine::{
-    Facets, FileIndexCacheBuilder, FileIndexKey, batch_compute_file_indexes,
+    Facets, FileIndexCacheBuilder, FileIndexKey, QueryTimeRange, batch_compute_file_indexes,
 };
 use foundation::Timeout;
 use journal_index::FieldName;
@@ -92,20 +92,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Configure indexing parameters (modify these as needed)
     let facets = Facets::new(&["log.severity_number".to_string()]);
+    let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
 
     let keys: Vec<FileIndexKey> = files
         .iter()
-        .map(|file_info| FileIndexKey::new(&file_info.file, &facets))
+        .map(|file_info| FileIndexKey::new(&file_info.file, &facets, Some(source_timestamp_field.clone())))
         .collect();
 
-    let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let bucket_duration = journal_common::Seconds(60);
+    // Create a time range for indexing (24 hours)
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs() as u32;
+    let time_range = QueryTimeRange::new(now - 86400, now)?;
     let timeout = Timeout::new(Duration::from_secs(60));
 
     info!(
-        "computing {} file indexes with timeout {:?}",
+        "computing {} file indexes with timeout {:?}, bucket duration: {}s",
         keys.len(),
-        timeout.remaining()
+        timeout.remaining(),
+        time_range.bucket_duration()
     );
 
     // Run batch indexing
@@ -114,8 +119,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &cache,
         &registry,
         keys,
-        source_timestamp_field,
-        bucket_duration,
+        &time_range,
         timeout,
     )
     .await?;
