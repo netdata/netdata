@@ -17,7 +17,7 @@ modules:
         - openmetrics
       related_resources:
         integrations:
-          list: []
+          list: [ ]
       info_provided_to_referring_integrations:
         description: ""
       most_popular: true
@@ -28,8 +28,8 @@ modules:
         method_description: |
           It collects metrics by periodically sending HTTP requests to the target instance.
       supported_platforms:
-        include: []
-        exclude: []
+        include: [ ]
+        exclude: [ ]
       multi_instance: true
       additional_permissions:
         description: ""
@@ -43,7 +43,7 @@ modules:
           description: ""
     setup: &setup
       prerequisites:
-        list: []
+        list: [ ]
       configuration:
         file:
           name: go.d/prometheus.conf
@@ -280,8 +280,8 @@ modules:
                     url: http://192.0.2.1:9090/metrics
     troubleshooting:
       problems:
-        list: []
-    alerts: []
+        list: [ ]
+    alerts: [ ]
     metrics:
       folding:
         title: Metrics
@@ -306,125 +306,8 @@ modules:
         - As Histogram if it has 'le' label.
 
         **The rest are ignored**.
-      availability: []
-      scopes: []
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-airflow
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Apache Airflow
-        link: https://github.com/shalb/airflow-exporter
-        icon_filename: airflow.png
-        categories:
-          - data-collection.apm
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Apache Airflow metrics to optimize task scheduling and workflow management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Airflow exporter](https://github.com/shalb/airflow-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Airflow exporter](https://github.com/shalb/airflow-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      most_popular: false
-      community: true
-      id: collector-go.d.plugin-prometheus-alibaba-cloud
-      monitored_instance:
-        name: Alibaba Cloud
-        link: https://github.com/aylei/aliyun-exporter # FIXME: This repository has been archived by the owner on Oct 28, 2019
-        icon_filename: alibaba-cloud.svg
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords:
-        - cloud services
-        - cloud computing
-        - scalability
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Alibaba Cloud services and resources for efficient management and cost optimization.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Alibaba Cloud Exporter](https://github.com/aylei/aliyun-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Alibaba Cloud Exporter](https://github.com/aylei/aliyun-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-flink
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Apache Flink
-        link: https://github.com/matsumana/flink_exporter
-        icon_filename: apache_flink.png
-        categories:
-          - data-collection.apm
-      keywords:
-        - web server
-        - http
-        - https
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep an eye on Apache Flink metrics for efficient stream processing and application management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Apache Flink Metrics Reporter](https://github.com/matsumana/flink_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Apache Flink Metrics Reporter](https://github.com/matsumana/flink_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      most_popular: false
-      community: true
-      id: collector-go.d.plugin-prometheus-aruba
-      monitored_instance:
-        name: Aruba devices
-        link: https://github.com/slashdoom/aruba_exporter
-        icon_filename: aruba.svg
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords:
-        - network monitoring
-        - network performance
-        - aruba devices
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Aruba Networks devices performance metrics for comprehensive network management and analysis.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Aruba Exporter](https://github.com/slashdoom/aruba_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Aruba Exporter](https://github.com/slashdoom/aruba_exporter) by following the instructions mentioned in the exporter README.
+      availability: [ ]
+      scopes: [ ]
   - <<: *module
     meta:
       <<: *meta
@@ -458,363 +341,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-aws_ecs
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: AWS ECS
-        link: https://github.com/bevers222/ecs-exporter
-        icon_filename: amazon-ecs.png
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords:
-        - cloud services
-        - cloud computing
-        - aws services
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep an eye on AWS ECS services and resources for optimized container management and orchestration.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [AWS ECS exporter](https://github.com/bevers222/ecs-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [AWS ECS exporter](https://github.com/bevers222/ecs-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-aws_health
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: AWS Health events
-        link: https://github.com/vladvasiliu/aws-health-exporter-rs
-        icon_filename: aws.svg
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords:
-        - cloud services
-        - cloud computing
-        - aws services
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track AWS service health metrics for proactive incident management and resolution.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [AWS Health Exporter](https://github.com/vladvasiliu/aws-health-exporter-rs).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [AWS Health Exporter](https://github.com/vladvasiliu/aws-health-exporter-rs) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-aws_instance_health
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: AWS instance health
-        link: https://github.com/bobtfish/aws-instance-health-exporter
-        icon_filename: aws.svg
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords:
-        - cloud services
-        - cloud computing
-        - aws services
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor the health of AWS instances for improved performance and availability.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [AWS instance health exporter](https://github.com/bobtfish/aws-instance-health-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [AWS instance health exporter](https://github.com/bobtfish/aws-instance-health-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-aws_s3
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: AWS S3 buckets
-        link: https://github.com/ribbybibby/s3_exporter
-        icon_filename: aws-s3.png
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords:
-        - cloud services
-        - cloud computing
-        - aws services
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor AWS S3 storage metrics for optimized performance, data management, and cost efficiency.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [AWS S3 Exporter](https://github.com/ribbybibby/s3_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [AWS S3 Exporter](https://github.com/ribbybibby/s3_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-aws_sqs
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: AWS SQS
-        link: https://github.com/jmal98/sqs-exporter
-        icon_filename: aws-sqs.png
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords:
-        - cloud services
-        - cloud computing
-        - aws services
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track AWS SQS messaging metrics for efficient message processing and queue management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [AWS SQS Exporter](https://github.com/jmal98/sqs-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [AWS SQS Exporter](https://github.com/jmal98/sqs-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-azure_ad_app_passwords
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Azure AD App passwords
-        link: https://github.com/vladvasiliu/azure-app-secrets-monitor
-        icon_filename: azure.png
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords:
-        - cloud services
-        - cloud computing
-        - azure services
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Safeguard and track Azure App secrets for enhanced security and access management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Azure App Secrets monitor](https://github.com/vladvasiliu/azure-app-secrets-monitor).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Azure App Secrets monitor](https://github.com/vladvasiliu/azure-app-secrets-monitor) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-azure_elastic_sql
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Azure Elastic Pool SQL
-        link: https://github.com/benclapp/azure_elastic_sql_exporter
-        icon_filename: azure-elastic-sql.png
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords:
-        - database
-        - relational db
-        - data querying
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Azure Elastic SQL performance metrics for efficient database management and query optimization.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Azure Elastic SQL Exporter](https://github.com/benclapp/azure_elastic_sql_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Azure Elastic SQL Exporter](https://github.com/benclapp/azure_elastic_sql_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-azure_app
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Azure application
-        link: https://github.com/RobustPerception/azure_metrics_exporter
-        icon_filename: azure.png
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords:
-        - cloud services
-        - cloud computing
-        - azure services
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track Azure Monitor metrics for comprehensive resource management and performance optimization.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Azure Monitor exporter](https://github.com/RobustPerception/azure_metrics_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Azure Monitor exporter](https://github.com/RobustPerception/azure_metrics_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-azure_res
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Azure Resources
-        link: https://github.com/FXinnovation/azure_metrics_exporter
-        icon_filename: azure.png
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords:
-        - cloud services
-        - cloud computing
-        - azure services
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep tabs on Azure resources vital metrics for efficient cloud management and cost optimization.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Azure Resources Exporter](https://github.com/FXinnovation/azure_metrics_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Azure Resources Exporter](https://github.com/FXinnovation/azure_metrics_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-azure_service_bus
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Azure Service Bus
-        link: https://github.com/marcinbudny/servicebus_exporter
-        icon_filename: azure-service-bus.png
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords:
-        - cloud services
-        - cloud computing
-        - azure services
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Azure Service Bus messaging metrics for optimized communication and integration.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Azure Service Bus Exporter](https://github.com/marcinbudny/servicebus_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Azure Service Bus Exporter](https://github.com/marcinbudny/servicebus_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-azure_sql
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Azure SQL
-        link: https://github.com/iamseth/azure_sql_exporter
-        icon_filename: azure-sql.png
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords:
-        - database
-        - relational db
-        - data querying
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track Azure SQL performance metrics for efficient database management and query performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Azure SQL exporter](https://github.com/iamseth/azure_sql_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Azure SQL exporter](https://github.com/iamseth/azure_sql_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-bigquery
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: BigQuery
-        link: https://github.com/m-lab/prometheus-bigquery-exporter
-        icon_filename: bigquery.png
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Google BigQuery metrics for optimized data processing and analysis.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [BigQuery Exporter](https://github.com/m-lab/prometheus-bigquery-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [BigQuery Exporter](https://github.com/m-lab/prometheus-bigquery-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-blackbox
       most_popular: false
       community: true
@@ -843,60 +369,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-borg
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Borg backup
-        link: https://github.com/k0ral/borg-exporter
-        icon_filename: borg.svg
-        categories:
-          - data-collection.storage-mount-points-and-filesystems
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track Borg backup performance metrics for efficient data protection and recovery.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Borg backup exporter](https://github.com/k0ral/borg-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Borg backup exporter](https://github.com/k0ral/borg-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-cadvisor
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: cAdvisor
-        link: https://github.com/google/cadvisor
-        icon_filename: cadvisor.png
-        categories:
-          - data-collection.containers-and-vms
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor container resource usage and performance metrics with cAdvisor for efficient container management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [cAdvisor](https://github.com/google/cadvisor).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [cAdvisor](https://github.com/google/cadvisor) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-cilium_agent
       most_popular: false
       community: true
@@ -906,7 +378,7 @@ modules:
         icon_filename: cilium.png
         categories:
           - data-collection.kubernetes
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -933,7 +405,7 @@ modules:
         icon_filename: cilium.png
         categories:
           - data-collection.kubernetes
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -960,7 +432,7 @@ modules:
         icon_filename: cilium.png
         categories:
           - data-collection.kubernetes
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -975,66 +447,6 @@ modules:
           - title: Install Exporter
             description: |
               Install [Cilium Proxy](https://github.com/cilium/proxy) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-citrix_netscaler
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Citrix NetScaler
-        link: https://github.com/rokett/Citrix-NetScaler-Exporter
-        icon_filename: citrix.svg
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords:
-        - network monitoring
-        - network performance
-        - traffic analysis
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep tabs on NetScaler performance metrics for efficient application delivery and load balancing.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Citrix NetScaler Exporter](https://github.com/rokett/Citrix-NetScaler-Exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Citrix NetScaler Exporter](https://github.com/rokett/Citrix-NetScaler-Exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-cloudflare_pcap
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Cloudflare PCAP
-        link: https://github.com/wehkamp/docker-prometheus-cloudflare-exporter
-        icon_filename: cloudflare.svg
-        categories:
-          - data-collection.web-servers-and-web-proxies
-      keywords:
-        - cloud services
-        - cloud computing
-        - scalability
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep tabs on Cloudflare CDN and security metrics for optimized content delivery and protection.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Cloudflare exporter](https://github.com/wehkamp/docker-prometheus-cloudflare-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Cloudflare exporter](https://github.com/wehkamp/docker-prometheus-cloudflare-exporter) by following the instructions mentioned in the exporter README.
   - <<: *module
     meta:
       id: collector-go.d.plugin-prometheus-aws_cloudwatch
@@ -1077,7 +489,7 @@ modules:
         icon_filename: concourse.png
         categories:
           - data-collection.ci-cd-systems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1104,7 +516,7 @@ modules:
         icon_filename: scylladb.png
         categories:
           - data-collection.database-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1124,7 +536,7 @@ modules:
         icon_filename: crowdsec.png
         categories:
           - data-collection.security-systems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1142,87 +554,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-dell_emc_ecs
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Dell EMC ECS cluster
-        link: https://github.com/paychex/prometheus-emcecs-exporter
-        icon_filename: dell.svg
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Dell EMC ECS object storage metrics for optimized storage management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Dell EMC ECS Exporter](https://github.com/paychex/prometheus-emcecs-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Dell EMC ECS Exporter](https://github.com/paychex/prometheus-emcecs-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-dell_emc_isilon
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Dell EMC Isilon cluster
-        link: https://github.com/paychex/prometheus-isilon-exporter
-        icon_filename: dell.svg
-        categories:
-          - data-collection.storage-mount-points-and-filesystems
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track Dell EMC Isilon scale-out NAS metrics for efficient storage management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Dell EMC Isilon Exporter](https://github.com/paychex/prometheus-isilon-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Dell EMC Isilon Exporter](https://github.com/paychex/prometheus-isilon-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-digitalocean
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: DigitalOcean
-        link: https://github.com/metalmatze/digitalocean_exporter
-        icon_filename: digitalocean.svg
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track DigitalOcean cloud provider metrics for optimized resource management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [DigitalOcean Exporter](https://github.com/metalmatze/digitalocean_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [DigitalOcean Exporter](https://github.com/metalmatze/digitalocean_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-discourse
       most_popular: false
       community: true
@@ -1232,7 +563,7 @@ modules:
         icon_filename: discourse.svg
         categories:
           - data-collection.media-streaming-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1259,7 +590,7 @@ modules:
         icon_filename: dynatrace.svg
         categories:
           - data-collection.observability
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1286,7 +617,7 @@ modules:
         icon_filename: eos.png
         categories:
           - data-collection.storage-mount-points-and-filesystems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1313,7 +644,7 @@ modules:
         icon_filename: etcd.svg
         categories:
           - data-collection.service-discovery-registry
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1333,7 +664,7 @@ modules:
         icon_filename: freebsd.svg
         categories:
           - data-collection.freebsd
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1360,7 +691,7 @@ modules:
         icon_filename: freebsd.svg
         categories:
           - data-collection.freebsd
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1387,7 +718,7 @@ modules:
         icon_filename: gcp-gce.svg
         categories:
           - data-collection.cloud-provider-managed
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1405,33 +736,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-gcp_quota
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: GCP Quota
-        link: https://github.com/mintel/gcp-quota-exporter
-        icon_filename: gcp.png
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Google Cloud Platform quota metrics for optimized resource usage and cost management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [GCP Quota Exporter](https://github.com/mintel/gcp-quota-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [GCP Quota Exporter](https://github.com/mintel/gcp-quota-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-github_repo
       most_popular: false
       community: true
@@ -1441,7 +745,7 @@ modules:
         icon_filename: github.svg
         categories:
           - data-collection.other
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1468,7 +772,7 @@ modules:
         icon_filename: gitlab.png
         categories:
           - data-collection.ci-cd-systems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1495,7 +799,7 @@ modules:
         icon_filename: gobetween.svg
         categories:
           - data-collection.web-servers-and-web-proxies
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1575,7 +879,7 @@ modules:
         icon_filename: grafana.png
         categories:
           - data-collection.observability
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1595,7 +899,7 @@ modules:
         icon_filename: graylog.svg
         categories:
           - data-collection.logs-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1623,7 +927,7 @@ modules:
         icon_filename: sap.svg
         categories:
           - data-collection.database-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1650,7 +954,7 @@ modules:
         icon_filename: intrinsec.svg
         categories:
           - data-collection.security-systems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1668,33 +972,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-hp_ilo
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: HP iLO
-        link: https://github.com/infinityworks/hpilo-exporter
-        icon_filename: hp.svg
-        categories:
-          - data-collection.hardware-devices-and-sensors
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor HP Integrated Lights Out (iLO) metrics for efficient server management and diagnostics.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [HP iLO Metrics Exporter](https://github.com/infinityworks/hpilo-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [HP iLO Metrics Exporter](https://github.com/infinityworks/hpilo-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-hubble
       most_popular: false
       community: true
@@ -1704,7 +981,7 @@ modules:
         icon_filename: hubble.png
         categories:
           - data-collection.observability
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1731,7 +1008,7 @@ modules:
         icon_filename: ibm.svg
         categories:
           - data-collection.storage-mount-points-and-filesystems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1788,7 +1065,7 @@ modules:
         icon_filename: jenkins.svg
         categories:
           - data-collection.ci-cd-systems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1815,7 +1092,7 @@ modules:
         icon_filename: java.svg
         categories:
           - data-collection.apm
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1830,33 +1107,6 @@ modules:
           - title: Install Exporter
             description: |
               Install [JMX Exporter](https://github.com/prometheus/jmx_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-jolokia
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: jolokia
-        link: https://github.com/aklinkert/jolokia_exporter
-        icon_filename: jolokia.png
-        categories:
-          - data-collection.apm
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Jolokia JVM metrics for optimized Java application performance and management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [jolokia_exporter](https://github.com/aklinkert/jolokia_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [jolokia_exporter](https://github.com/aklinkert/jolokia_exporter) by following the instructions mentioned in the exporter README.
   - <<: *module
     meta:
       <<: *meta
@@ -1959,7 +1209,7 @@ modules:
         icon_filename: linode.svg
         categories:
           - data-collection.cloud-provider-managed
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -1986,7 +1236,7 @@ modules:
         icon_filename: loki.png
         categories:
           - data-collection.logs-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2013,7 +1263,7 @@ modules:
         icon_filename: minecraft.png
         categories:
           - data-collection.gaming
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2040,7 +1290,7 @@ modules:
         icon_filename: mosquitto.svg
         categories:
           - data-collection.message-brokers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2058,33 +1308,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-mp707
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: MP707 USB thermometer
-        link: https://github.com/nradchenko/mp707_exporter
-        icon_filename: thermometer.png
-        categories:
-          - data-collection.iot-devices
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track MP707 power strip metrics for efficient energy management and monitoring.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [MP707 exporter](https://github.com/nradchenko/mp707_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [MP707 exporter](https://github.com/nradchenko/mp707_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-ibm_mq
       most_popular: false
       community: true
@@ -2094,7 +1317,7 @@ modules:
         icon_filename: ibm.svg
         categories:
           - data-collection.message-brokers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2121,7 +1344,7 @@ modules:
         icon_filename: mqtt.svg
         categories:
           - data-collection.message-brokers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2199,63 +1422,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-netmeter
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: NetMeter
-        link: https://github.com/ssbostan/netmeter-exporter
-        icon_filename: netmeter.png
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords:
-        - network monitoring
-        - network performance
-        - traffic analysis
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor NetMeter network traffic metrics for efficient network management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [NetMeter Exporter](https://github.com/ssbostan/netmeter-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [NetMeter Exporter](https://github.com/ssbostan/netmeter-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-newrelic
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: New Relic
-        link: https://github.com/jfindley/newrelic_exporter
-        icon_filename: newrelic.svg
-        categories:
-          - data-collection.observability
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor New Relic application performance management metrics for efficient application monitoring and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [New Relic exporter](https://github.com/jfindley/newrelic_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [New Relic exporter](https://github.com/jfindley/newrelic_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-openvswitch
       most_popular: false
       community: true
@@ -2265,7 +1431,7 @@ modules:
         icon_filename: ovs.png
         categories:
           - data-collection.networking-stack-and-network-interfaces
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2280,87 +1446,6 @@ modules:
           - title: Install Exporter
             description: |
               Install [Open vSwitch Exporter](https://github.com/digitalocean/openvswitch_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-openldap
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: OpenLDAP (community)
-        link: https://github.com/tomcz/openldap_exporter
-        icon_filename: openldap.svg
-        categories:
-          - data-collection.authentication-and-authorization
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor OpenLDAP directory service metrics for efficient directory management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [OpenLDAP Metrics Exporter](https://github.com/tomcz/openldap_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [OpenLDAP Metrics Exporter](https://github.com/tomcz/openldap_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-openstack
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: OpenStack
-        link: https://github.com/CanonicalLtd/prometheus-openstack-exporter
-        icon_filename: openstack.svg
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track OpenStack cloud computing platform metrics for efficient infrastructure management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Openstack exporter](https://github.com/CanonicalLtd/prometheus-openstack-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Openstack exporter](https://github.com/CanonicalLtd/prometheus-openstack-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-openvas
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: OpenVAS
-        link: https://github.com/ModeClearCode/openvas_exporter
-        icon_filename: openVAS.png
-        categories:
-          - data-collection.security-systems
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor OpenVAS vulnerability scanner metrics for efficient security assessment and management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [OpenVAS exporter](https://github.com/ModeClearCode/openvas_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [OpenVAS exporter](https://github.com/ModeClearCode/openvas_exporter) by following the instructions mentioned in the exporter README.
   - <<: *module
     meta:
       <<: *meta
@@ -2403,7 +1488,7 @@ modules:
         icon_filename: hue.svg
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2430,7 +1515,7 @@ modules:
         icon_filename: podman.png
         categories:
           - data-collection.containers-and-vms
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2457,7 +1542,7 @@ modules:
         icon_filename: proxmox.png
         categories:
           - data-collection.containers-and-vms
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2484,7 +1569,7 @@ modules:
         icon_filename: radius.png
         categories:
           - data-collection.authentication-and-authorization
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2541,7 +1626,7 @@ modules:
         icon_filename: ripe.png
         categories:
           - data-collection.networking-stack-and-network-interfaces
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2559,88 +1644,31 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-sentry
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Sentry
-        link: https://github.com/snakecharmer/sentry_exporter
-        icon_filename: sentry.png
-        categories:
-          - data-collection.apm
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track Sentry error tracking and monitoring platform metrics for efficient application performance and error management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Sentry Exporter](https://github.com/snakecharmer/sentry_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Sentry Exporter](https://github.com/snakecharmer/sentry_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-slurm
       most_popular: false
       community: true
       monitored_instance:
         name: Slurm
-        link: https://github.com/vpenso/prometheus-slurm-exporter
+        link: https://github.com/SckyzO/slurm_exporter
         icon_filename: slurm.png
         categories:
           - data-collection.task-queues
           #- data-collection.provisioning-systems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
         metrics_description: |
           Track Slurm workload manager metrics for efficient high-performance computing (HPC) and cluster management.
         method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [slurm exporter](https://github.com/vpenso/prometheus-slurm-exporter).
+          Metrics are gathered by periodically sending HTTP requests to [slurm exporter](https://github.com/SckyzO/slurm_exporter).
     setup:
       <<: *setup
       prerequisites:
         list:
           - title: Install Exporter
             description: |
-              Install [slurm exporter](https://github.com/vpenso/prometheus-slurm-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-ipmi
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: IPMI (By SoundCloud)
-        link: https://github.com/prometheus-community/ipmi_exporter
-        icon_filename: soundcloud.svg
-        categories:
-          - data-collection.hardware-devices-and-sensors
-      keywords:
-        - cloud services
-        - cloud computing
-        - scalability
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor IPMI metrics externally for efficient server hardware management and monitoring.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [SoundCloud IPMI Exporter (querying IPMI externally, blackbox-exporter style)](https://github.com/prometheus-community/ipmi_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [SoundCloud IPMI Exporter (querying IPMI externally, blackbox-exporter style)](https://github.com/prometheus-community/ipmi_exporter) by following the instructions mentioned in the exporter README.
+              Install [slurm exporter](https://github.com/SckyzO/slurm_exporter) by following the instructions mentioned in the exporter README.
   - <<: *module
     meta:
       <<: *meta
@@ -2653,7 +1681,7 @@ modules:
         icon_filename: spacelift.png
         categories:
           - data-collection.provisioning-systems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2671,60 +1699,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-ssh
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: SSH
-        link: https://github.com/Nordstrom/ssh_exporter
-        icon_filename: ssh.png
-        categories:
-          - data-collection.authentication-and-authorization
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor SSH server metrics for efficient secure shell server management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [SSH Exporter](https://github.com/Nordstrom/ssh_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [SSH Exporter](https://github.com/Nordstrom/ssh_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-ssl
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: SSL Certificate
-        link: https://github.com/ribbybibby/ssl_exporter
-        icon_filename: ssl.svg
-        categories:
-          - data-collection.security-systems
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track SSL/TLS certificate metrics for efficient web security and certificate management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [SSL Certificate exporter](https://github.com/ribbybibby/ssl_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [SSL Certificate exporter](https://github.com/ribbybibby/ssl_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-starlink
       most_popular: false
       community: true
@@ -2734,7 +1708,7 @@ modules:
         icon_filename: starlink.svg
         categories:
           - data-collection.networking-stack-and-network-interfaces
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2761,7 +1735,7 @@ modules:
         icon_filename: statuspage.png
         categories:
           - data-collection.notifications
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2788,7 +1762,7 @@ modules:
         icon_filename: tacacs.png
         categories:
           - data-collection.authentication-and-authorization
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2815,7 +1789,7 @@ modules:
         icon_filename: tesla.png
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2833,33 +1807,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-tesla_powerwall
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Tesla Powerwall
-        link: https://github.com/foogod/powerwall_exporter
-        icon_filename: tesla.png
-        categories:
-          - data-collection.iot-devices
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Tesla Powerwall metrics for efficient home energy storage and management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Tesla Powerwall Exporter](https://github.com/foogod/powerwall_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Tesla Powerwall Exporter](https://github.com/foogod/powerwall_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-twitch
       most_popular: false
       community: true
@@ -2869,7 +1816,7 @@ modules:
         icon_filename: twitch.svg
         categories:
           - data-collection.media-streaming-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2896,7 +1843,7 @@ modules:
         icon_filename: ubiquiti.png
         categories:
           - data-collection.networking-stack-and-network-interfaces
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2923,7 +1870,7 @@ modules:
         icon_filename: uptimerobot.svg
         categories:
           - data-collection.synthetic-checks
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -2941,33 +1888,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-hashicorp_vault
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: HashiCorp Vault secrets
-        link: https://github.com/tomtom-international/vault-assessment-prometheus-exporter
-        icon_filename: vault.svg
-        categories:
-          - data-collection.authentication-and-authorization
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track HashiCorp Vault security assessment metrics for efficient secrets management and security.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Vault Assessment Prometheus Exporter](https://github.com/tomtom-international/vault-assessment-prometheus-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Vault Assessment Prometheus Exporter](https://github.com/tomtom-international/vault-assessment-prometheus-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-vault_pki
       most_popular: false
       community: true
@@ -2977,7 +1897,7 @@ modules:
         icon_filename: vault.svg
         categories:
           - data-collection.security-systems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3004,7 +1924,7 @@ modules:
         icon_filename: vertica.svg
         categories:
           - data-collection.database-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3031,7 +1951,7 @@ modules:
         icon_filename: vscode.svg
         categories:
           - data-collection.apm
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3049,62 +1969,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-airthings_waveplus
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Airthings Waveplus air sensor
-        link: https://github.com/jeremybz/waveplus_exporter
-        icon_filename: airthings.svg
-        categories:
-          - data-collection.iot-devices
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track Waveplus radon sensor metrics for efficient indoor air quality monitoring and management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Waveplus Radon Sensor Exporter](https://github.com/jeremybz/waveplus_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Waveplus Radon Sensor Exporter](https://github.com/jeremybz/waveplus_exporter) by following the instructions mentioned in the exporter README.
-
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-xmpp_blackbox
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: XMPP Server
-        link: https://github.com/horazont/xmpp-blackbox-exporter
-        icon_filename: xmpp.svg
-        categories:
-          - data-collection.message-brokers
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor XMPP (Extensible Messaging and Presence Protocol) server metrics for efficient messaging and communication management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [XMPP Server Exporter](https://github.com/horazont/xmpp-blackbox-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [XMPP Server Exporter](https://github.com/horazont/xmpp-blackbox-exporter) by following the instructions mentioned in the exporter README.
-
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-4d_server
       most_popular: false
       community: true
@@ -3114,7 +1978,7 @@ modules:
         icon_filename: 4d_server.png
         categories:
           - data-collection.database-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3141,7 +2005,7 @@ modules:
         icon_filename: mtc.svg
         categories:
           - data-collection.networking-stack-and-network-interfaces
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3168,7 +2032,7 @@ modules:
         icon_filename: a2s.png
         categories:
           - data-collection.gaming
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3186,60 +2050,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-akami_edgedns
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Akamai Edge DNS Traffic
-        link: https://github.com/akamai/akamai-edgedns-traffic-exporter
-        icon_filename: akamai.svg
-        categories:
-          - data-collection.dns-and-dhcp-servers
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track and analyze Akamai Edge DNS traffic for enhanced performance and security.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Akamai Edge DNS Traffic Exporter](https://github.com/akamai/akamai-edgedns-traffic-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Akamai Edge DNS Traffic Exporter](https://github.com/akamai/akamai-edgedns-traffic-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-akami_gtm
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Akamai Global Traffic Management
-        link: https://github.com/akamai/akamai-gtm-metrics-exporter
-        icon_filename: akamai.svg
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor vital metrics of Akamai Global Traffic Management (GTM) for optimized load balancing and failover.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Akamai Global Traffic Management Metrics Exporter](https://github.com/akamai/akamai-gtm-metrics-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Akamai Global Traffic Management Metrics Exporter](https://github.com/akamai/akamai-gtm-metrics-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-alamos_fe2
       most_popular: false
       community: true
@@ -3249,7 +2059,7 @@ modules:
         icon_filename: alamos_fe2.png
         categories:
           - data-collection.apm
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3267,33 +2077,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-altaro_backup
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Altaro Backup
-        link: https://github.com/raph2i/altaro_backup_exporter
-        icon_filename: altaro.svg
-        categories:
-          - data-collection.storage-mount-points-and-filesystems
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track Altaro Backup performance metrics to ensure smooth data protection and recovery operations.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Altaro Backup Exporter](https://github.com/raph2i/altaro_backup_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Altaro Backup Exporter](https://github.com/raph2i/altaro_backup_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-amd_smi
       most_popular: false
       community: true
@@ -3303,7 +2086,7 @@ modules:
         icon_filename: amd.svg
         categories:
           - data-collection.hardware-devices-and-sensors
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3321,33 +2104,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-aaisp
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Andrews & Arnold line status
-        link: https://github.com/daveio/aaisp-exporter
-        icon_filename: andrewsarnold.jpg
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track Andrews & Arnold Ltd (AAISP) metrics for improved network performance and diagnostics.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Andrews & Arnold line status exporter](https://github.com/daveio/aaisp-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Andrews & Arnold line status exporter](https://github.com/daveio/aaisp-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-apicast
       most_popular: false
       community: true
@@ -3357,7 +2113,7 @@ modules:
         icon_filename: apicast.png
         categories:
           - data-collection.web-servers-and-web-proxies
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3375,117 +2131,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-apple_timemachine
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Apple Time Machine
-        link: https://github.com/znerol/prometheus-timemachine-exporter
-        icon_filename: apple.svg
-        categories:
-          - data-collection.macos-systems
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track Apple Time Machine backup metrics for efficient data protection and recovery.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Apple Time Machine Exporter](https://github.com/znerol/prometheus-timemachine-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Apple Time Machine Exporter](https://github.com/znerol/prometheus-timemachine-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-arm_hwcpipe
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: ARM HWCPipe
-        link: https://github.com/ylz-at/arm-hwcpipe-exporter
-        icon_filename: arm.svg
-        categories:
-          - data-collection.hardware-devices-and-sensors
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep track of ARM running Android devices and get metrics for efficient performance optimization.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [ARM HWCPipe Exporter](https://github.com/ylz-at/arm-hwcpipe-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [ARM HWCPipe Exporter](https://github.com/ylz-at/arm-hwcpipe-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-arvancloud_cdn
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: ArvanCloud CDN
-        link: https://github.com/arvancloud/ar-prometheus-exporter
-        icon_filename: arvancloud.png
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords:
-        - cloud services
-        - cloud computing
-        - scalability
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track and analyze ArvanCloud CDN and cloud services performance metrics for optimized delivery and management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [ArvanCloud exporter](https://github.com/arvancloud/ar-prometheus-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [ArvanCloud exporter](https://github.com/arvancloud/ar-prometheus-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-audisto
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Audisto
-        link: https://github.com/ZeitOnline/audisto_exporter
-        icon_filename: audisto.svg
-        categories:
-          - data-collection.apm
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Audisto SEO and website metrics for improved search performance and optimization.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Audisto exporter](https://github.com/ZeitOnline/audisto_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Audisto exporter](https://github.com/ZeitOnline/audisto_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-authlog
       most_popular: false
       community: true
@@ -3495,7 +2140,7 @@ modules:
         icon_filename: linux.png
         categories:
           - data-collection.logs-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3510,36 +2155,6 @@ modules:
           - title: Install Exporter
             description: |
               Install [AuthLog Exporter](https://github.com/woblerr/authlog_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-aws_ec2_spot
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: AWS EC2 Spot Instance
-        link: https://github.com/patcadelina/ec2-spot-exporter
-        icon_filename: aws-ec2.png
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords:
-        - cloud services
-        - cloud computing
-        - aws services
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor AWS EC2 Spot instances'' performance metrics for efficient resource allocation and cost optimization.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [AWS EC2 Spot Exporter](https://github.com/patcadelina/ec2-spot-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [AWS EC2 Spot Exporter](https://github.com/patcadelina/ec2-spot-exporter) by following the instructions mentioned in the exporter README.
   - <<: *module
     meta:
       <<: *meta
@@ -3573,34 +2188,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-bobcat
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Bobcat Miner 300
-        link: https://github.com/pperzyna/bobcat_exporter
-        icon_filename: bobcat.jpg
-        categories:
-          - data-collection.iot-devices
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Bobcat equipment metrics for optimized performance and maintenance management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Bobcat Exporter](https://github.com/pperzyna/bobcat_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Bobcat Exporter](https://github.com/pperzyna/bobcat_exporter) by following the instructions mentioned in the exporter README.
-
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-bosh
       most_popular: false
       community: true
@@ -3610,7 +2197,7 @@ modules:
         icon_filename: bosh.png
         categories:
           - data-collection.provisioning-systems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3628,33 +2215,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-bpftrace
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: bpftrace variables
-        link: https://github.com/andreasgerstmayr/bpftrace_exporter
-        icon_filename: bpftrace.png
-        categories:
-          - data-collection.apm
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track bpftrace metrics for advanced performance analysis and troubleshooting.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [bpftrace exporter](https://github.com/andreasgerstmayr/bpftrace_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [bpftrace exporter](https://github.com/andreasgerstmayr/bpftrace_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-bungeecord
       most_popular: false
       community: true
@@ -3664,7 +2224,7 @@ modules:
         icon_filename: bungee.png
         categories:
           - data-collection.gaming
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3691,7 +2251,7 @@ modules:
         icon_filename: celery.png
         categories:
           - data-collection.task-queues
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3709,33 +2269,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-checkpoint
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Checkpoint device
-        link: https://github.com/RespiroConsulting/CheckPointExporter
-        icon_filename: checkpoint.png
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track Check Point firewall and security metrics for enhanced network protection and management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Checkpoint exporter](https://github.com/RespiroConsulting/CheckPointExporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Checkpoint exporter](https://github.com/RespiroConsulting/CheckPointExporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-chia
       most_popular: false
       community: true
@@ -3745,7 +2278,7 @@ modules:
         icon_filename: chia.png
         categories:
           - data-collection.blockchain-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3772,7 +2305,7 @@ modules:
         icon_filename: christelec.png
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3799,7 +2332,7 @@ modules:
         icon_filename: clamav.png
         categories:
           - data-collection.security-systems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3826,7 +2359,7 @@ modules:
         icon_filename: clamav.png
         categories:
           - data-collection.security-systems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3853,7 +2386,7 @@ modules:
         icon_filename: clash.png
         categories:
           - data-collection.web-servers-and-web-proxies
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3931,37 +2464,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-akami_cloudmonitor
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Akami Cloudmonitor
-        link: https://github.com/ExpressenAB/cloudmonitor_exporter
-        icon_filename: akamai.svg
-        categories:
-          - data-collection.cloud-provider-managed
-      keywords:
-        - cloud services
-        - cloud computing
-        - scalability
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Akamai cloudmonitor provider metrics for comprehensive cloud performance management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Cloudmonitor exporter](https://github.com/ExpressenAB/cloudmonitor_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Cloudmonitor exporter](https://github.com/ExpressenAB/cloudmonitor_exporter) by following the instructions mentioned in the exporter README.
-
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-lustre
       most_popular: false
       community: true
@@ -3971,7 +2473,7 @@ modules:
         icon_filename: lustre.png
         categories:
           - data-collection.cloud-provider-managed
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -3998,7 +2500,7 @@ modules:
         icon_filename: cluster-control.svg
         categories:
           - data-collection.database-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -4025,7 +2527,7 @@ modules:
         icon_filename: collectd.png
         categories:
           - data-collection.observability
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -4043,33 +2545,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-shell_cmd
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Shell command
-        link: https://github.com/tomwilkie/prom-run
-        icon_filename: crunner.svg
-        categories:
-          - data-collection.generic-data-collection
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track custom command output metrics for tailored monitoring and management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Command runner exporter](https://github.com/tomwilkie/prom-run).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Command runner exporter](https://github.com/tomwilkie/prom-run) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-ftbeerpi
       most_popular: false
       community: true
@@ -4079,7 +2554,7 @@ modules:
         icon_filename: craftbeer.png
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -4096,34 +2571,6 @@ modules:
               Install [CraftBeerPi exporter](https://github.com/jo-hannes/craftbeerpi_exporter) by following the instructions mentioned in the exporter README.
   - <<: *module
     meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-crypto
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Crypto exchanges
-        link: https://github.com/ix-ai/crypto-exporter
-        icon_filename: crypto.png
-        categories:
-          - data-collection.blockchain-servers
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track cryptocurrency market metrics for informed investment and trading decisions.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Crypto exporter](https://github.com/ix-ai/crypto-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Crypto exporter](https://github.com/ix-ai/crypto-exporter) by following the instructions mentioned in the exporter README.
-
-  - <<: *module
-    meta:
       id: collector-go.d.plugin-prometheus-cryptowatch
       <<: *meta
       most_popular: false
@@ -4134,7 +2581,7 @@ modules:
         icon_filename: cryptowatch.png
         categories:
           - data-collection.blockchain-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -4149,169 +2596,6 @@ modules:
           - title: Install Exporter
             description: |
               Install [Cryptowat Exporter](https://github.com/nbarrientos/cryptowat_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-certificate_transparency
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Certificate Transparency
-        link: https://github.com/Hsn723/ct-exporter
-        icon_filename: ct.png
-        categories:
-          - data-collection.security-systems
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track certificate transparency log metrics for enhanced
-          SSL/TLS certificate management and security.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [ct-exporter](https://github.com/Hsn723/ct-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [ct-exporter](https://github.com/Hsn723/ct-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-custom
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Custom Exporter
-        link: https://github.com/orange-cloudfoundry/custom_exporter
-        icon_filename: customdata.png
-        categories:
-          - data-collection.generic-data-collection
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Create and monitor custom metrics tailored to your specific use case and requirements.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Custom Exporter](https://github.com/orange-cloudfoundry/custom_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Custom Exporter](https://github.com/orange-cloudfoundry/custom_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-cvmfs
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: CVMFS clients
-        link: https://github.com/guilbaults/cvmfs-exporter
-        icon_filename: cvmfs.png
-        categories:
-          - data-collection.storage-mount-points-and-filesystems
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track CernVM File System metrics for optimized distributed file system performance and management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [CVMFS exporter](https://github.com/guilbaults/cvmfs-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [CVMFS exporter](https://github.com/guilbaults/cvmfs-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-ddwrt
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: DDWRT Routers
-        link: https://github.com/camelusferus/ddwrt_collector
-        icon_filename: ddwrt.png
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep tabs on DD-WRT router metrics for efficient network management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [ddwrt-collector](https://github.com/camelusferus/ddwrt_collector).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [ddwrt-collector](https://github.com/camelusferus/ddwrt_collector) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      id: collector-go.d.plugin-prometheus-dell_emc_xtremio
-      <<: *meta
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Dell EMC XtremIO cluster
-        link: https://github.com/cthiel42/prometheus-xtremio-exporter
-        icon_filename: dell.svg
-        categories:
-          - data-collection.storage-mount-points-and-filesystems
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep an eye on Dell/EMC XtremIO storage metrics for optimized data management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Dell/EMC XtremIO Exporter](https://github.com/cthiel42/prometheus-xtremio-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Dell/EMC XtremIO Exporter](https://github.com/cthiel42/prometheus-xtremio-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-dependency_track
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Dependency-Track
-        link: https://github.com/jetstack/dependency-track-exporter
-        icon_filename: dependency-track.png
-        categories:
-          - data-collection.apm
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Dependency-Track metrics for efficient vulnerability management and software supply chain analysis.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Dependency-Track Exporter](https://github.com/jetstack/dependency-track-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Dependency-Track Exporter](https://github.com/jetstack/dependency-track-exporter) by following the instructions mentioned in the exporter README.
   - <<: *module
     meta:
       id: collector-go.d.plugin-prometheus-dmarc
@@ -4354,7 +2638,7 @@ modules:
         icon_filename: dnsbl.png
         categories:
           - data-collection.dns-and-dhcp-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -4383,7 +2667,7 @@ modules:
         icon_filename: bird.png
         categories:
           - data-collection.networking-stack-and-network-interfaces
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -4410,7 +2694,7 @@ modules:
         icon_filename: elgato.svg
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -4437,7 +2721,7 @@ modules:
         icon_filename: energomera.png
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -4455,34 +2739,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-excel
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Excel spreadsheet
-        link: https://github.com/MarcusCalidus/excel-exporter
-        icon_filename: excel.png
-        categories:
-          - data-collection.generic-data-collection
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Export Prometheus metrics to Excel for versatile data analysis and reporting.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Excel Exporter](https://github.com/MarcusCalidus/excel-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Excel Exporter](https://github.com/MarcusCalidus/excel-exporter) by following the instructions mentioned in the exporter README.
-
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-fastd
       most_popular: false
       community: true
@@ -4492,7 +2748,7 @@ modules:
         icon_filename: fastd.png
         categories:
           - data-collection.vpns
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -4519,7 +2775,7 @@ modules:
         icon_filename: freifunk.png
         categories:
           - data-collection.networking-stack-and-network-interfaces
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -4546,7 +2802,7 @@ modules:
         icon_filename: frrouting.png
         categories:
           - data-collection.networking-stack-and-network-interfaces
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -4564,33 +2820,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-generic_cli
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Generic Command Line Output
-        link: https://github.com/MarioMartReq/generic-exporter
-        icon_filename: cli.svg
-        categories:
-          - data-collection.generic-data-collection
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track custom command line output metrics for tailored monitoring and management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Generic Command Line Output Exporter](https://github.com/MarioMartReq/generic-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Generic Command Line Output Exporter](https://github.com/MarioMartReq/generic-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-github_ratelimit
       most_popular: false
       community: true
@@ -4600,7 +2829,7 @@ modules:
         icon_filename: github.svg
         categories:
           - data-collection.other
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -4628,7 +2857,7 @@ modules:
         icon_filename: gpsd.png
         categories:
           - data-collection.apm
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -4646,33 +2875,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-gtp
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: GTP
-        link: https://github.com/wmnsk/gtp_exporter
-        icon_filename: gtpu.png
-        categories:
-          - data-collection.telephony-servers
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep an eye on GTP (GPRS Tunneling Protocol) metrics for optimized mobile data communication and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [GTP Exporter](https://github.com/wmnsk/gtp_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [GTP Exporter](https://github.com/wmnsk/gtp_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-halon
       most_popular: false
       community: true
@@ -4682,7 +2884,7 @@ modules:
         icon_filename: halon.svg
         categories:
           - data-collection.mail-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -4700,198 +2902,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-hasura_graphql
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Hasura GraphQL Server
-        link: https://github.com/zolamk/hasura-exporter
-        icon_filename: hasura.svg
-        categories:
-          - data-collection.database-servers
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep tabs on Hasura GraphQL engine metrics for optimized
-          API performance and management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Hasura Exporter](https://github.com/zolamk/hasura-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Hasura Exporter](https://github.com/zolamk/hasura-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-hdsentinel
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: HDSentinel
-        link: https://github.com/qusielle/hdsentinel-exporter
-        icon_filename: harddisk.svg
-        categories:
-          - data-collection.storage-mount-points-and-filesystems
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Hard Disk Sentinel metrics for efficient storage device health management and diagnostics.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [HDSentinel Exporter](https://github.com/qusielle/hdsentinel-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [HDSentinel Exporter](https://github.com/qusielle/hdsentinel-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-helium_hotspot
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Helium hotspot
-        link: https://github.com/tedder/helium_hotspot_exporter
-        icon_filename: helium.svg
-        categories:
-          - data-collection.iot-devices
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track Helium hotspot metrics for optimized LoRaWAN network management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Helium hotspot exporter](https://github.com/tedder/helium_hotspot_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Helium hotspot exporter](https://github.com/tedder/helium_hotspot_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-helium_miner
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Helium miner (validator)
-        link: https://github.com/tedder/miner_exporter
-        icon_filename: helium.svg
-        categories:
-          - data-collection.blockchain-servers
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Helium miner and validator metrics for efficient blockchain performance and management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Helium miner (validator) exporter](https://github.com/tedder/miner_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Helium miner (validator) exporter](https://github.com/tedder/miner_exporter) by following the instructions mentioned in the exporter README.
-
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-hhvm
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: HHVM
-        link: https://github.com/wikimedia/operations-software-hhvm_exporter
-        icon_filename: hhvm.svg
-        categories:
-          - data-collection.web-servers-and-web-proxies
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor HipHop Virtual Machine metrics for efficient
-          PHP execution and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [HHVM Exporter](https://github.com/wikimedia/operations-software-hhvm_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [HHVM Exporter](https://github.com/wikimedia/operations-software-hhvm_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-hilink
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Huawei devices
-        link: https://github.com/eliecharra/hilink-exporter
-        icon_filename: huawei.svg
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep tabs on Huawei HiLink device metrics for optimized connectivity and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Huawei Hilink exporter](https://github.com/eliecharra/hilink-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Huawei Hilink exporter](https://github.com/eliecharra/hilink-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-hitron_cgm
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Hitron CGN series CPE
-        link: https://github.com/yrro/hitron-exporter
-        icon_filename: hitron.svg
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Hitron CGNV4 gateway metrics for efficient network management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Hitron CGNV4 exporter](https://github.com/yrro/hitron-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Hitron CGNV4 exporter](https://github.com/yrro/hitron-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-hitron_coda
       most_popular: false
       community: true
@@ -4901,7 +2911,7 @@ modules:
         icon_filename: hitron.svg
         categories:
           - data-collection.networking-stack-and-network-interfaces
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -4928,7 +2938,7 @@ modules:
         icon_filename: homebridge.svg
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -4955,7 +2965,7 @@ modules:
         icon_filename: homey.svg
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -4982,7 +2992,7 @@ modules:
         icon_filename: ibm.svg
         categories:
           - data-collection.hardware-devices-and-sensors
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -5009,7 +3019,7 @@ modules:
         icon_filename: ibm.svg
         categories:
           - data-collection.hardware-devices-and-sensors
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -5027,60 +3037,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-iota
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: IOTA full node
-        link: https://github.com/crholliday/iota-prom-exporter
-        icon_filename: iota.svg
-        categories:
-          - data-collection.blockchain-servers
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep an eye on IOTA cryptocurrency network metrics for efficient blockchain performance and management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [IOTA Exporter](https://github.com/crholliday/iota-prom-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [IOTA Exporter](https://github.com/crholliday/iota-prom-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-iqair
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: iqAir AirVisual air quality monitors
-        link: https://github.com/Packetslave/iqair_exporter
-        icon_filename: iqair.svg
-        categories:
-          - data-collection.iot-devices
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor air quality data from IQAir devices for efficient environmental monitoring and analysis.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [IQair Exporter](https://github.com/Packetslave/iqair_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [IQair Exporter](https://github.com/Packetslave/iqair_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-jarvis
       most_popular: false
       community: true
@@ -5090,7 +3046,7 @@ modules:
         icon_filename: jarvis.jpg
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -5118,7 +3074,7 @@ modules:
         icon_filename: storage-enclosure.svg
         categories:
           - data-collection.storage-mount-points-and-filesystems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -5136,33 +3092,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-jetbrains_fls
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: JetBrains Floating License Server
-        link: https://github.com/mkreu/jetbrains-fls-exporter
-        icon_filename: jetbrains.png
-        categories:
-          - data-collection.generic-data-collection
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor JetBrains floating license server metrics for efficient software licensing management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [JetBrains Floating License Server Export](https://github.com/mkreu/jetbrains-fls-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [JetBrains Floating License Server Export](https://github.com/mkreu/jetbrains-fls-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-journald
       most_popular: false
       community: true
@@ -5172,7 +3101,7 @@ modules:
         icon_filename: linux.png
         categories:
           - data-collection.logs-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -5190,36 +3119,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-kafka_connect
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Kafka Connect
-        link: https://github.com/findelabs/kafka-connect-exporter-rs
-        icon_filename: kafka.svg
-        categories:
-          - data-collection.message-brokers
-      keywords:
-        - big data
-        - stream processing
-        - message broker
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep tabs on Kafka Connect metrics for efficient data streaming and integration.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Kafka Connect exporter](https://github.com/findelabs/kafka-connect-exporter-rs).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Kafka Connect exporter](https://github.com/findelabs/kafka-connect-exporter-rs) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-kannel
       most_popular: false
       community: true
@@ -5229,7 +3128,7 @@ modules:
         icon_filename: kannel.png
         categories:
           - data-collection.telephony-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -5256,7 +3155,7 @@ modules:
         icon_filename: keepalived.png
         categories:
           - data-collection.networking-stack-and-network-interfaces
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -5274,90 +3173,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-korral
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Kubernetes Cluster Cloud Cost
-        link: https://github.com/agilestacks/korral
-        icon_filename: kubernetes.svg
-        categories:
-          - data-collection.kubernetes
-      keywords:
-        - cloud services
-        - cloud computing
-        - scalability
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep an eye on Kubernetes cloud cost metrics for efficient cloud resource management and budgeting.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Kubernetes Cloud Cost Exporter](https://github.com/agilestacks/korral).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Kubernetes Cloud Cost Exporter](https://github.com/agilestacks/korral) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-lagerist
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Lagerist Disk latency
-        link: https://github.com/Svedrin/lagerist
-        icon_filename: linux.png
-        categories:
-          - data-collection.storage-mount-points-and-filesystems
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track disk latency metrics for efficient storage performance and diagnostics.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Lagerist Disk latency exporter](https://github.com/Svedrin/lagerist).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Lagerist Disk latency exporter](https://github.com/Svedrin/lagerist) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-ldap
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: LDAP
-        link: https://github.com/titisan/ldap_exporter
-        icon_filename: ldap.png
-        categories:
-          - data-collection.authentication-and-authorization
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep an eye on Lightweight Directory Access Protocol (LDAP) metrics for efficient directory service management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [LDAP Exporter](https://github.com/titisan/ldap_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [LDAP Exporter](https://github.com/titisan/ldap_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-lynis
       most_popular: false
       community: true
@@ -5367,7 +3182,7 @@ modules:
         icon_filename: lynis.png
         categories:
           - data-collection.security-systems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -5385,60 +3200,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-machbase
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Machbase
-        link: https://github.com/MACHBASE/prometheus-machbase-exporter
-        icon_filename: machbase.png
-        categories:
-          - data-collection.database-servers
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Machbase time-series database metrics for efficient data storage and query performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Machbase Exporter](https://github.com/MACHBASE/prometheus-machbase-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Machbase Exporter](https://github.com/MACHBASE/prometheus-machbase-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-maildir
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Maildir
-        link: https://github.com/cherti/mailexporter
-        icon_filename: mailserver.svg
-        categories:
-          - data-collection.mail-servers
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track mail server metrics for optimized email management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [mailexporter](https://github.com/cherti/mailexporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [mailexporter](https://github.com/cherti/mailexporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-meilisearch
       most_popular: false
       community: true
@@ -5448,7 +3209,7 @@ modules:
         icon_filename: meilisearch.svg
         categories:
           - data-collection.search-engines
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -5466,33 +3227,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-memcached
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Memcached (community)
-        link: https://github.com/prometheus/memcached_exporter
-        icon_filename: memcached.svg
-        categories:
-          - data-collection.database-servers
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Memcached in-memory key-value store metrics for efficient caching performance and management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Memcached exporter](https://github.com/prometheus/memcached_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Memcached exporter](https://github.com/prometheus/memcached_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-mesos
       most_popular: false
       community: true
@@ -5503,7 +3237,7 @@ modules:
         categories:
           #- data-collection.provisioning-systems
           - data-collection.task-queues
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -5530,7 +3264,7 @@ modules:
         icon_filename: xiaomi.svg
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -5587,7 +3321,7 @@ modules:
         icon_filename: filesystem.svg
         categories:
           - data-collection.storage-mount-points-and-filesystems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -5605,33 +3339,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-monnit_mqtt
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Monnit Sensors MQTT
-        link: https://github.com/braxton9460/monnit-mqtt-exporter
-        icon_filename: monnit.svg
-        categories:
-          - data-collection.iot-devices
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track Monnit sensor data via MQTT for efficient IoT device monitoring and management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Monnit Sensors MQTT Exporter WIP](https://github.com/braxton9460/monnit-mqtt-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Monnit Sensors MQTT Exporter WIP](https://github.com/braxton9460/monnit-mqtt-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-mtail
       most_popular: false
       community: true
@@ -5641,7 +3348,7 @@ modules:
         icon_filename: mtail.png
         categories:
           - data-collection.logs-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -5659,33 +3366,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-naemon
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Naemon
-        link: https://github.com/Griesbacher/Iapetos
-        icon_filename: naemon.svg
-        categories:
-          - data-collection.observability
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Naemon or Nagios network monitoring metrics for efficient IT infrastructure management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Naemon / Nagios Exporter](https://github.com/Griesbacher/Iapetos).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Naemon / Nagios Exporter](https://github.com/Griesbacher/Iapetos) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-nagios
       most_popular: false
       community: true
@@ -5695,7 +3375,7 @@ modules:
         icon_filename: nagios.png
         categories:
           - data-collection.observability
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -5723,7 +3403,7 @@ modules:
         icon_filename: nature-remo.png
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -5771,36 +3451,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-netflow
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: NetFlow
-        link: https://github.com/paihu/netflow_exporter
-        icon_filename: netflow.png
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords:
-        - network monitoring
-        - network performance
-        - traffic analysis
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track NetFlow network traffic metrics for efficient network monitoring and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [netflow exporter](https://github.com/paihu/netflow_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [netflow exporter](https://github.com/paihu/netflow_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-nextcloud
       most_popular: false
       community: true
@@ -5840,7 +3490,7 @@ modules:
         icon_filename: nextdns.png
         categories:
           - data-collection.dns-and-dhcp-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -5858,33 +3508,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-nftables
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: nftables
-        link: https://github.com/Sheridan/nftables_exporter
-        icon_filename: nftables.png
-        categories:
-          - data-collection.linux-systems.firewall-metrics
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor nftables firewall metrics for efficient network security and management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [nftables_exporter](https://github.com/Sheridan/nftables_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [nftables_exporter](https://github.com/Sheridan/nftables_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-ibm_aix_njmon
       most_popular: false
       community: true
@@ -5894,7 +3517,7 @@ modules:
         icon_filename: ibm.svg
         categories:
           - data-collection.apm
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -5921,7 +3544,7 @@ modules:
         icon_filename: nrpelinux.png
         categories:
           - data-collection.apm
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -5939,60 +3562,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-nsxt
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: NSX-T
-        link: https://github.com/jk8s/nsxt_exporter
-        icon_filename: vmware-nsx.svg
-        categories:
-          - data-collection.containers-and-vms
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track VMware NSX-T software-defined networking metrics for efficient network virtualization and security management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [NSX-T Exporter](https://github.com/jk8s/nsxt_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [NSX-T Exporter](https://github.com/jk8s/nsxt_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      id: collector-go.d.plugin-prometheus-nvml
-      <<: *meta
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: NVML
-        link: https://github.com/oko/nvml-exporter-rs
-        icon_filename: nvidia.svg
-        categories:
-          - data-collection.hardware-devices-and-sensors
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep an eye on NVIDIA Management Library (NVML) GPU metrics for efficient GPU performance and management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [NVML exporter](https://github.com/oko/nvml-exporter-rs).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [NVML exporter](https://github.com/oko/nvml-exporter-rs) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-obs_studio
       most_popular: false
       community: true
@@ -6002,7 +3571,7 @@ modules:
         icon_filename: obs-studio.png
         categories:
           - data-collection.media-streaming-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6020,65 +3589,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-odbc
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: ODBC
-        link: https://github.com/MACHBASE/prometheus-odbc-exporter
-        icon_filename: odbc.svg
-        categories:
-          - data-collection.database-servers
-      keywords:
-        - database
-        - dbms
-        - data storage
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep tabs on Open Database Connectivity (ODBC) metrics for efficient database connection and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [ODBC Exporter](https://github.com/MACHBASE/prometheus-odbc-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [ODBC Exporter](https://github.com/MACHBASE/prometheus-odbc-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-openhab
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: OpenHAB
-        link: https://github.com/pdreker/openhab_exporter
-        icon_filename: openhab.svg
-        categories:
-          - data-collection.iot-devices
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track openHAB smart home automation system metrics for efficient home automation and energy management.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [OpenHAB exporter](https://github.com/pdreker/openhab_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [OpenHAB exporter](https://github.com/pdreker/openhab_exporter) by following the instructions mentioned in the exporter README.
-
-
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-openrc
       most_popular: false
       community: true
@@ -6088,7 +3598,7 @@ modules:
         icon_filename: linux.png
         categories:
           - data-collection.linux-systems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6103,34 +3613,6 @@ modules:
           - title: Install Exporter
             description: |
               Install [openrc-exporter](https://git.sr.ht/~tomleb/openrc-exporter) by following the instructions mentioned in the exporter README.
-
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-openrct2
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: OpenRCT2
-        link: https://github.com/terinjokes/openrct2-prometheus-exporter
-        icon_filename: openRCT2.png
-        categories:
-          - data-collection.gaming
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track OpenRCT2 game metrics for efficient game server management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [OpenRCT2 Prometheus Exporter](https://github.com/terinjokes/openrct2-prometheus-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [OpenRCT2 Prometheus Exporter](https://github.com/terinjokes/openrct2-prometheus-exporter) by following the instructions mentioned in the exporter README.
   - <<: *module
     meta:
       <<: *meta
@@ -6169,83 +3651,25 @@ modules:
       community: true
       monitored_instance:
         name: OpenWeatherMap
-        link: https://github.com/Tenzer/openweathermap-exporter
+        link: https://github.com/billykwooten/openweather-exporter
         icon_filename: openweather.png
         categories:
           - data-collection.generic-data-collection
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
         metrics_description: |
           Track OpenWeatherMap weather data and air pollution metrics for efficient environmental monitoring and analysis.
         method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [OpenWeatherMap Exporter](https://github.com/Tenzer/openweathermap-exporter).
+          Metrics are gathered by periodically sending HTTP requests to [OpenWeatherMap Exporter](https://github.com/billykwooten/openweather-exporter).
     setup:
       <<: *setup
       prerequisites:
         list:
           - title: Install Exporter
             description: |
-              Install [OpenWeatherMap Exporter](https://github.com/Tenzer/openweathermap-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-oracledb
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Oracle DB (community)
-        link: https://github.com/iamseth/oracledb_exporter
-        icon_filename: oracle.svg
-        categories:
-          - data-collection.database-servers
-      keywords:
-        - oracle
-        - database
-        - dbms
-        - data storage
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track Oracle Database metrics for efficient database management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Oracle DB Exporter](https://github.com/iamseth/oracledb_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Oracle DB Exporter](https://github.com/iamseth/oracledb_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-otrs
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: OTRS
-        link: https://github.com/JulianDroste/otrs_exporter
-        icon_filename: otrs.png
-        categories:
-          - data-collection.notifications
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor OTRS (Open-Source Ticket Request System) metrics for efficient helpdesk management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [OTRS Exporter](https://github.com/JulianDroste/otrs_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [OTRS Exporter](https://github.com/JulianDroste/otrs_exporter) by following the instructions mentioned in the exporter README.
+              Install [OpenWeatherMap Exporter](https://github.com/billykwooten/openweather-exporter) by following the instructions mentioned in the exporter README.
   - <<: *module
     meta:
       <<: *meta
@@ -6258,7 +3682,7 @@ modules:
         icon_filename: dutch-electricity.png
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6286,7 +3710,7 @@ modules:
         icon_filename: patroni.png
         categories:
           - data-collection.database-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6313,7 +3737,7 @@ modules:
         icon_filename: wunderground.png
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6340,7 +3764,7 @@ modules:
         icon_filename: pgbackrest.png
         categories:
           - data-collection.database-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6367,7 +3791,7 @@ modules:
         icon_filename: pgpool2.png
         categories:
           - data-collection.database-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6394,7 +3818,7 @@ modules:
         icon_filename: pimorino.png
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6412,60 +3836,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-pingdom
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Pingdom
-        link: https://github.com/veepee-oss/pingdom_exporter
-        icon_filename: solarwinds.svg
-        categories:
-          - data-collection.synthetic-checks
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Pingdom website monitoring service metrics for efficient website performance management and diagnostics.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Pingdom Exporter](https://github.com/veepee-oss/pingdom_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Pingdom Exporter](https://github.com/veepee-oss/pingdom_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-dell_powermax
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Dell PowerMax
-        link: https://github.com/kckecheng/powermax_exporter
-        icon_filename: powermax.png
-        categories:
-          - data-collection.storage-mount-points-and-filesystems
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Dell EMC PowerMax storage array metrics for efficient storage management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [PowerMax Exporter](https://github.com/kckecheng/powermax_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [PowerMax Exporter](https://github.com/kckecheng/powermax_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-powerpal
       most_popular: false
       community: true
@@ -6475,7 +3845,7 @@ modules:
         icon_filename: powerpal.png
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6502,7 +3872,7 @@ modules:
         icon_filename: proftpd.png
         categories:
           - data-collection.ftp-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6520,33 +3890,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-eaton_ups
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Eaton UPS
-        link: https://github.com/psyinfra/prometheus-eaton-ups-exporter
-        icon_filename: eaton.svg
-        categories:
-          - data-collection.ups
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Eaton uninterruptible power supply (UPS) metrics for efficient power management and monitoring.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Prometheus Eaton UPS Exporter](https://github.com/psyinfra/prometheus-eaton-ups-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Prometheus Eaton UPS Exporter](https://github.com/psyinfra/prometheus-eaton-ups-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-redis_queue
       most_popular: false
       community: true
@@ -6556,7 +3899,7 @@ modules:
         icon_filename: rq.png
         categories:
           - data-collection.message-brokers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6583,7 +3926,7 @@ modules:
         icon_filename: radiots.png
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6601,33 +3944,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-rancher
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Rancher
-        link: https://github.com/infinityworksltd/prometheus-rancher-exporter
-        icon_filename: rancher.svg
-        categories:
-          - data-collection.kubernetes
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track Rancher container orchestration platform metrics for efficient container management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Rancher Exporter](https://github.com/infinityworksltd/prometheus-rancher-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Rancher Exporter](https://github.com/infinityworksltd/prometheus-rancher-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-raritan_pdu
       most_popular: false
       community: true
@@ -6637,7 +3953,7 @@ modules:
         icon_filename: raritan.svg
         categories:
           - data-collection.hardware-devices-and-sensors
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6664,7 +3980,7 @@ modules:
         icon_filename: sabnzbd.png
         categories:
           - data-collection.media-streaming-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6691,7 +4007,7 @@ modules:
         icon_filename: salicru.png
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6718,7 +4034,7 @@ modules:
         icon_filename: sense.png
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6736,33 +4052,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-servertech
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: ServerTech
-        link: https://github.com/tynany/servertech_exporter
-        icon_filename: servertech.png
-        categories:
-          - data-collection.hardware-devices-and-sensors
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep an eye on Server Technology power distribution unit (PDU) metrics for efficient power management and monitoring.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [ServerTech Exporter](https://github.com/tynany/servertech_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [ServerTech Exporter](https://github.com/tynany/servertech_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-shelly
       most_popular: false
       community: true
@@ -6772,7 +4061,7 @@ modules:
         icon_filename: shelly.jpg
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6790,33 +4079,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-sia
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Sia
-        link: https://github.com/tbenz9/sia_exporter
-        icon_filename: sia.png
-        categories:
-          - data-collection.blockchain-servers
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track Sia decentralized storage platform metrics for efficient storage management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Sia Exporter](https://github.com/tbenz9/sia_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Sia Exporter](https://github.com/tbenz9/sia_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-s7_plc
       most_popular: false
       community: true
@@ -6826,7 +4088,7 @@ modules:
         icon_filename: siemens.svg
         categories:
           - data-collection.hardware-devices-and-sensors
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6853,7 +4115,7 @@ modules:
         icon_filename: site24x7.svg
         categories:
           - data-collection.synthetic-checks
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6880,7 +4142,7 @@ modules:
         icon_filename: sma.png
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6907,7 +4169,7 @@ modules:
         icon_filename: sml.png
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6934,7 +4196,7 @@ modules:
         icon_filename: softether.svg
         categories:
           - data-collection.vpns
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6961,7 +4223,7 @@ modules:
         icon_filename: solar.png
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -6979,33 +4241,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-solaredge
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: SolarEdge inverters
-        link: https://github.com/dave92082/SolarEdge-Exporter
-        icon_filename: solaredge.png
-        categories:
-          - data-collection.iot-devices
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track SolarEdge solar inverter metrics for efficient solar energy management and monitoring.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [SolarEdge Exporter](https://github.com/dave92082/SolarEdge-Exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [SolarEdge Exporter](https://github.com/dave92082/SolarEdge-Exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-solis
       most_popular: false
       community: true
@@ -7015,7 +4250,7 @@ modules:
         icon_filename: solis.jpg
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -7042,7 +4277,7 @@ modules:
         icon_filename: sonic.png
         categories:
           - data-collection.networking-stack-and-network-interfaces
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -7069,7 +4304,7 @@ modules:
         icon_filename: ibm.svg
         categories:
           - data-collection.storage-mount-points-and-filesystems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -7087,33 +4322,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-speedify
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Speedify CLI
-        link: https://github.com/willshen/speedify_exporter
-        icon_filename: speedify.png
-        categories:
-          - data-collection.vpns
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track Speedify VPN metrics for efficient virtual private network (VPN) management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Speedify Exporter](https://github.com/willshen/speedify_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Speedify Exporter](https://github.com/willshen/speedify_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-sphinx
       most_popular: false
       community: true
@@ -7123,7 +4331,7 @@ modules:
         icon_filename: sphinx.png
         categories:
           - data-collection.search-engines
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -7141,33 +4349,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-starwind_vsan
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Starwind VSAN VSphere Edition
-        link: https://github.com/evoicefire/starwind-vsan-exporter
-        icon_filename: starwind.svg
-        categories:
-          - data-collection.storage-mount-points-and-filesystems
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep tabs on StarWind Virtual SAN metrics for efficient storage virtualization and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Starwind vSAN Exporter](https://github.com/evoicefire/starwind-vsan-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Starwind vSAN Exporter](https://github.com/evoicefire/starwind-vsan-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-storidge
       most_popular: false
       community: true
@@ -7177,7 +4358,7 @@ modules:
         icon_filename: storidge.png
         categories:
           - data-collection.storage-mount-points-and-filesystems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -7195,33 +4376,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-stream_generic
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Stream
-        link: https://github.com/carlpett/stream_exporter
-        icon_filename: stream.png
-        categories:
-          - data-collection.media-streaming-servers
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor streaming metrics for efficient media streaming and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Stream exporter](https://github.com/carlpett/stream_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Stream exporter](https://github.com/carlpett/stream_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-strongswan
       most_popular: false
       community: true
@@ -7231,7 +4385,7 @@ modules:
         icon_filename: strongswan.svg
         categories:
           - data-collection.vpns
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -7258,7 +4412,7 @@ modules:
         icon_filename: sunspec.png
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -7285,7 +4439,7 @@ modules:
         icon_filename: suricata.png
         categories:
           - data-collection.security-systems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -7314,7 +4468,7 @@ modules:
         icon_filename: synology.png
         categories:
           - data-collection.storage-mount-points-and-filesystems
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -7341,7 +4495,7 @@ modules:
         icon_filename: sysload.png
         categories:
           - data-collection.apm
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -7358,33 +4512,6 @@ modules:
               Install [Sysload Exporter](https://github.com/egmc/sysload_exporter) by following the instructions mentioned in the exporter README.
   - <<: *module
     meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-trex
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: T-Rex NVIDIA GPU Miner
-        link: https://github.com/dennisstritzke/trex_exporter
-        icon_filename: trex.png
-        categories:
-          - data-collection.hardware-devices-and-sensors
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor T-Rex NVIDIA GPU miner metrics for efficient cryptocurrency mining and GPU performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [T-Rex NVIDIA GPU Miner Exporter](https://github.com/dennisstritzke/trex_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [T-Rex NVIDIA GPU Miner Exporter](https://github.com/dennisstritzke/trex_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
       id: collector-go.d.plugin-prometheus-tado
       <<: *meta
       most_popular: false
@@ -7395,7 +4522,7 @@ modules:
         icon_filename: tado.png
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -7423,7 +4550,7 @@ modules:
         icon_filename: tanker.png
         categories:
           - data-collection.generic-data-collection
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -7450,7 +4577,7 @@ modules:
         icon_filename: tesla.png
         categories:
           - data-collection.iot-devices
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -7468,87 +4595,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-tplink_p110
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: TP-Link P110
-        link: https://github.com/ijohanne/prometheus-tplink-p110-exporter
-        icon_filename: tplink.png
-        categories:
-          - data-collection.iot-devices
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track TP-Link P110 smart plug metrics for efficient energy management and monitoring.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [TP-Link P110 Exporter](https://github.com/ijohanne/prometheus-tplink-p110-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [TP-Link P110 Exporter](https://github.com/ijohanne/prometheus-tplink-p110-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-traceroute
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Traceroute
-        link: https://github.com/jeanfabrice/prometheus-tcptraceroute-exporter
-        icon_filename: traceroute.png
-        categories:
-          - data-collection.networking-stack-and-network-interfaces
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Export traceroute metrics for efficient network path analysis and performance monitoring.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [traceroute exporter](https://github.com/jeanfabrice/prometheus-tcptraceroute-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [traceroute exporter](https://github.com/jeanfabrice/prometheus-tcptraceroute-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-twincat_ads_webservice
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: TwinCAT ADS Web Service
-        link: https://github.com/MarcusCalidus/twincat-ads-webservice-exporter
-        icon_filename: twincat.png
-        categories:
-          - data-collection.generic-data-collection
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor TwinCAT ADS (Automation Device Specification) Web Service metrics for efficient industrial automation and control.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [TwinCAT ADS Web Service exporter](https://github.com/MarcusCalidus/twincat-ads-webservice-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [TwinCAT ADS Web Service exporter](https://github.com/MarcusCalidus/twincat-ads-webservice-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-warp10
       most_popular: false
       community: true
@@ -7558,7 +4604,7 @@ modules:
         icon_filename: warp10.svg
         categories:
           - data-collection.database-servers
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -7586,7 +4632,7 @@ modules:
         icon_filename: yourls.png
         categories:
           - data-collection.apm
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -7613,7 +4659,7 @@ modules:
         icon_filename: zerto.png
         categories:
           - data-collection.cloud-provider-managed
-      keywords: []
+      keywords: [ ]
     overview:
       <<: *overview
       data_collection:
@@ -7628,30 +4674,3 @@ modules:
           - title: Install Exporter
             description: |
               Install [Zerto Exporter](https://github.com/claranet/zerto-exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-zulip
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: Zulip
-        link: https://github.com/brokenpip3/zulip-exporter
-        icon_filename: zulip.png
-        categories:
-          - data-collection.media-streaming-servers
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor Zulip open-source group chat application metrics for efficient team communication management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Zulip Exporter](https://github.com/brokenpip3/zulip-exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Zulip Exporter](https://github.com/brokenpip3/zulip-exporter) by following the instructions mentioned in the exporter README.

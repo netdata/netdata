@@ -1240,10 +1240,11 @@ update_binpkg() {
     fi
   fi
 
-  current_major="$(echo "${nd_version}" | cut -f 1 -d '.' | tr -d 'v')"
+  current_major="$(get_current_version | head -c 4 | awk '{ print $1 + 0 }')"
   latest_major="$(get_new_binpkg_major)"
 
-  if [ -n "${latest_major}" ] && [ "${latest_major}" -ne "${current_major}" ]; then
+  # current_major == 0 means we could not determine the installed version
+  if [ -n "${latest_major}" ] && [ "${current_major}" -ne 0 ] && [ "${latest_major}" -ne "${current_major}" ]; then
     update_safe=0
 
     for v in ${NETDATA_ACCEPT_MAJOR_VERSIONS}; do
