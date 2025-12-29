@@ -56,7 +56,6 @@ Our [static builds](#static-builds) are expected to work on these platforms if a
 | Debian                   | 11.x           | x86\_64, i386, ARMv7, AArch64 |                                                                                                                |
 | Fedora                   | 43             | x86\_64, AArch64              |                                                                                                                |
 | Fedora                   | 42             | x86\_64, AArch64              |                                                                                                                |
-| Fedora                   | 41             | x86\_64, AArch64              |                                                                                                                |
 | openSUSE                 | Tumbleweed     | x86\_64, AArch64              |                                                                                                                |
 | openSUSE                 | Leap 16.0      | x86\_64, AArch64              |                                                                                                                |
 | openSUSE                 | Leap 15.6      | x86\_64, AArch64              |                                                                                                                |
@@ -124,22 +123,15 @@ This is a list of platforms that we have supported in the recent past but no lon
 | Platform     | Version   | Notes                |
 |--------------|-----------|----------------------|
 | Alpine Linux | 3.18      | EOL as of 2024-05-23 |
-| Alpine Linux | 3.17      | EOL as of 2023-11-01 |
-| Alpine Linux | 3.16      | EOL as of 2024-05-23 |
-| Alpine Linux | 3.15      | EOL as of 2023-11-01 |
-| Alpine Linux | 3.14      | EOL as of 2023-05-01 |
 | Debian       | 10.x      | EOL as of 2024-07-01 |
+| Fedora       | 41        | EOL as of 2025-12-15 |
 | Fedora       | 40        | EOL as of 2024-11-12 |
 | Fedora       | 39        | EOL as of 2024-05-14 |
 | Fedora       | 38        | EOL as of 2024-05-14 |
-| Fedora       | 37        | EOL as of 2023-12-05 |
 | openSUSE     | Leap 15.5 | EOL as of 2024-12-31 |
-| openSUSE     | Leap 15.4 | EOL as of 2023-12-07 |
-| openSUSE     | Leap 15.3 | EOL as of 2022-12-01 |
 | Ubuntu       | 24.10     | EOL as of 2024-07-01 |
 | Ubuntu       | 23.10     | EOL as of 2024-07-01 |
 | Ubuntu       | 23.04     | EOL as of 2024-01-20 |
-| Ubuntu       | 22.10     | EOL as of 2023-07-20 |
 | Ubuntu       | 18.04     | EOL as of 2023-04-02 |
 
 ## Static builds

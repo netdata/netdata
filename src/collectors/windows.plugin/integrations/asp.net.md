@@ -95,6 +95,7 @@ Metrics:
 | aspnet.requests_executing | executing | requests |
 | aspnet.requests_failed | executing | requests |
 | aspnet.requests_not_found | not found | requests |
+| aspnet.requests_not_authorized | not_authorized | requests |
 | aspnet.requests_in_application_queue | queue | requests |
 | aspnet.requests_timeout | timeout | requests |
 | aspnet.requests_succeeded | success | requests |

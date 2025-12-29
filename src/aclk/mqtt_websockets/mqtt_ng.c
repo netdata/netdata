@@ -2026,7 +2026,13 @@ static int mqtt_ng_next_to_send(struct mqtt_ng_client *client) {
 
     struct buffer_fragment *frag = BUFFER_FIRST_FRAG(&client->main_buffer.hdr_buffer);
     while (frag) {
-        if ( frag->sent != frag->len )
+        // Skip fragments marked for garbage collection - their data may have
+        // been freed by mark_message_for_gc() after a timeout or ACK
+        if (frag_is_marked_for_gc(frag)) {
+            frag = frag->next;
+            continue;
+        }
+        if (frag->sent != frag->len)
             break;
         frag = frag->next;
     }

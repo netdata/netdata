@@ -72,7 +72,7 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| mem.numa_node_mem_usage | free, standby, available | bytes |
+| mem.numa_node_mem_usage | free, standby | bytes |
 
 
 

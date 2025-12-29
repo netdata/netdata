@@ -332,10 +332,10 @@ static void ctx_get_context_list_to_cleanup(nd_uuid_t *host_uuid, void (*cleanup
         context = (char *) sqlite3_column_text(res, 0);
         STRING *ctx = string_strdupz(context);
         Pvalue = JudyLIns(&CTX_JudyL, (Word_t) ctx, PJE0);
-        if (*Pvalue)
+        if (Pvalue == PJERR || *Pvalue)
             string_freez(ctx);
         else
-            *(int *)Pvalue = 1;
+            *Pvalue = (void *)1;
     }
 
     if (CTX_JudyL) {
@@ -394,7 +394,7 @@ bool sql_set_host_label(nd_uuid_t *host_id, const char *label_key, const char *l
         return false;
 
     if (!PREPARE_STATEMENT(db_meta, SQL_SET_HOST_LABEL, &res))
-        return 1;
+        return false;
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
@@ -419,14 +419,17 @@ void sql_update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id)
 {
     sqlite3_stmt *res = NULL;
     RRDHOST *host = NULL;
+    RRDHOST_ACQUIRED *acquired_host = NULL;
 
-    char host_guid[GUID_LEN + 1];
+    char host_guid[UUID_STR_LEN];
     uuid_unparse_lower(*host_id, host_guid);
-    rrd_wrlock();
-    host = rrdhost_find_by_guid(host_guid);
-    if (likely(host))
-        set_host_node_id(host, node_id);
-    rrd_wrunlock();
+
+    acquired_host = rrdhost_find_and_acquire(host_guid);
+    if (acquired_host) {
+        if ((host = rrdhost_acquired_to_rrdhost(acquired_host)))
+            set_host_node_id(host, node_id);
+        rrdhost_acquired_release(acquired_host);
+    }
 
     if (!PREPARE_STATEMENT(db_meta, SQL_UPDATE_NODE_ID, &res))
         return;
@@ -1558,15 +1561,14 @@ static void timer_cb(uv_timer_t *handle)
        config->store_metadata = true;
 }
 
-void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int vacuum_pc)
+void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int vacuum_pc, time_t *next_run)
 {
-    static time_t next_run = 0;
-
     time_t now = now_realtime_sec();
-    if (next_run > now)
+    if (next_run && *next_run > now)
         return;
 
-    next_run = now + DATABASE_VACUUM_FREQUENCY_SECONDS;
+    if (next_run)
+        *next_run = now + DATABASE_VACUUM_FREQUENCY_SECONDS;
 
     int free_pages = get_free_page_count(database);
     int total_pages = get_database_page_count(database);
@@ -1692,6 +1694,7 @@ done:
 void run_metadata_cleanup(struct meta_config_s *config)
 {
     static time_t next_context_list_cleanup = 0;
+    static time_t next_vacuum_run = 0;
 
     time_t now = now_realtime_sec();
 
@@ -1723,7 +1726,7 @@ void run_metadata_cleanup(struct meta_config_s *config)
     if (unlikely(SHUTDOWN_REQUESTED(config)))
         return;
 
-    vacuum_database(db_meta, "METADATA", DATABASE_FREE_PAGES_THRESHOLD_PC, DATABASE_FREE_PAGES_VACUUM_PC);
+    vacuum_database(db_meta, "METADATA", DATABASE_FREE_PAGES_THRESHOLD_PC, DATABASE_FREE_PAGES_VACUUM_PC, &next_vacuum_run);
 
     (void) sqlite3_wal_checkpoint(db_meta, NULL);
 }
@@ -2557,13 +2560,13 @@ static void metadata_event_loop(void *arg)
                         pending_uuid_deletion = callocz(1, sizeof(*pending_uuid_deletion));
 
                     Pvalue = JudyLIns(&pending_uuid_deletion->JudyL, ++pending_uuid_deletion->count, PJE0);
-                    if (Pvalue != PJERR)
-                        *Pvalue = uuid;
-                    else {
+                    if (unlikely(Pvalue == PJERR)) {
                         // Failure in Judy, attempt to continue running anyway
                         // ignore uuid, global cleanup will take care of it
                         freez(uuid);
                     }
+                    else
+                        *Pvalue = uuid;
                     break;
                 case METADATA_STORE_CLAIM_ID:
                     store_claim_id((nd_uuid_t *)cmd.param[0], (nd_uuid_t *)cmd.param[1]);
@@ -2577,14 +2580,14 @@ static void metadata_event_loop(void *arg)
 
                     struct host_ctx_cleanup_s *ctx_cleanup = (struct host_ctx_cleanup_s *)cmd.param[0];
                     Pvalue = JudyLIns(&pending_ctx_cleanup_list->JudyL, ++pending_ctx_cleanup_list->count, PJE0);
-                    if (Pvalue && Pvalue != PJERR)
-                        *Pvalue = ctx_cleanup;
-                    else {
+                    if (unlikely(Pvalue == PJERR)) {
                         // Failure in Judy, attempt to continue running anyway
                         // Cleanup structure
                         string_freez(ctx_cleanup->context);
                         freez(ctx_cleanup);
                     }
+                    else
+                        *Pvalue = ctx_cleanup;
                     break;
                 case METADATA_STORE:
                     if (config->metadata_running || unittest_running)
@@ -2634,17 +2637,19 @@ static void metadata_event_loop(void *arg)
                         pending_alert_list = callocz(1, sizeof(*pending_alert_list));
 
                     Pvalue = JudyLIns(&pending_alert_list->JudyL, ++pending_alert_list->count, PJE0);
-                    if (!Pvalue || Pvalue == PJERR)
-                        fatal("METASYNC: Corrupted pending_alert_list Judy array");
+                    if (unlikely(Pvalue == PJERR))
+                        fatal("METASYNC: Failed to insert into pending_alert_list Judy array");
                     *Pvalue = (void *)host;
 
                     Pvalue = JudyLIns(&pending_alert_list->JudyL, ++pending_alert_list->count, PJE0);
-                    if (!Pvalue || Pvalue == PJERR)
-                        fatal("METASYNC: Corrupted pending_alert_list Judy array");
+                    if (unlikely(Pvalue == PJERR))
+                        fatal("METASYNC: Failed to insert into pending_alert_list Judy array");
                     *Pvalue = (void *)ae;
                     break;
                 case METADATA_DEL_HOST_AE:
-                    (void)JudyLIns(&config->ae_DelJudyL, (Word_t)(void *)cmd.param[0], PJE0);
+                    Pvalue = JudyLIns(&config->ae_DelJudyL, (Word_t)(void *)cmd.param[0], PJE0);
+                    if (Pvalue == PJERR)
+                        nd_log_daemon(NDLP_ERR, "METADATA: Failed to track alert entry for deletion");
                     break;
                 case METADATA_EXECUTE_STORE_STATEMENT:
                     stmt = (sqlite3_stmt *)cmd.param[0];
@@ -2652,12 +2657,12 @@ static void metadata_event_loop(void *arg)
                         pending_sql_statement = callocz(1, sizeof(*pending_sql_statement));
 
                     Pvalue = JudyLIns(&pending_sql_statement->JudyL, ++pending_sql_statement->count, PJE0);
-                    if (Pvalue && Pvalue != PJERR)
-                        *Pvalue = (void *)stmt;
-                    else {
+                    if (unlikely(Pvalue == PJERR)) {
                         // Fallback execute immediately
                         execute_statement(stmt, false);
                     }
+                    else
+                        *Pvalue = (void *)stmt;
                     break;
                 case METADATA_SYNC_SHUTDOWN:
                     __atomic_store_n(&config->shutdown_requested, true, __ATOMIC_RELAXED);

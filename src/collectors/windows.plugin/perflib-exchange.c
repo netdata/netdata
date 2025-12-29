@@ -62,7 +62,7 @@ struct exchange_queue {
 
     COUNTER_DATA exchangeTransportQueuesActiveMailboxDelivery;
     COUNTER_DATA exchangeTransportQueuesExternalActiveRemoteDelivery;
-    COUNTER_DATA exchangeTransportQueuesInternalActiveRemoteDeliery;
+    COUNTER_DATA exchangeTransportQueuesInternalActiveRemoteDelivery;
     COUNTER_DATA exchangeTransportQueuesUnreachable;
     COUNTER_DATA exchangeTransportQueuesPoison;
 };
@@ -99,7 +99,7 @@ static void exchange_workload_initialize_variables(struct exchange_workload *ew)
 }
 
 static void
-dict_exchange_insert_worload_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+dict_exchange_insert_workload_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct exchange_workload *ew = value;
 
@@ -110,7 +110,7 @@ static void exchange_queue_initialize_variables(struct exchange_queue *eq)
 {
     eq->exchangeTransportQueuesActiveMailboxDelivery.key = "Active Mailbox Delivery Queue Length";
     eq->exchangeTransportQueuesExternalActiveRemoteDelivery.key = "External Active Remote Delivery Queue Length";
-    eq->exchangeTransportQueuesInternalActiveRemoteDeliery.key = "Internal Active Remote Delivery Queue Length";
+    eq->exchangeTransportQueuesInternalActiveRemoteDelivery.key = "Internal Active Remote Delivery Queue Length";
     eq->exchangeTransportQueuesPoison.key = "Poison Queue Length";
     eq->exchangeTransportQueuesUnreachable.key = "Unreachable Queue Length";
 }
@@ -131,7 +131,7 @@ static void initialize(void)
 
     exchange_workloads = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct exchange_workload));
-    dictionary_register_insert_callback(exchange_workloads, dict_exchange_insert_worload_cb, NULL);
+    dictionary_register_insert_callback(exchange_workloads, dict_exchange_insert_workload_cb, NULL);
 
     exchange_queues = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct exchange_queue));
@@ -573,7 +573,7 @@ static void netdata_exchange_rpc(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
         netdata_exchange_rpc_requests(&exchangeRPCRequest, update_every);
 
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &exchangeRPCActiveUserCount))
-        netdata_exchange_rpc_active_user_count(&exchangeRPCRequest, update_every);
+        netdata_exchange_rpc_active_user_count(&exchangeRPCActiveUserCount, update_every);
 
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &exchangeRPCConnectionCount))
         netdata_exchange_rpc_connection_count(&exchangeRPCConnectionCount, update_every);
@@ -693,18 +693,18 @@ static void netdata_exchange_proxy_mailbox_server_locator(struct exchange_proxy 
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_proxy_%s_mailbox_server_locator_avg_latency_sec", proxy);
 
         ep->st_exchange_http_proxy_server_location_avg_latency = rrdset_create_localhost(
-            "exchange",
-            id,
-            NULL,
-            "proxy",
-            "exchange.http_proxy_mailbox_server_locator_avg_latency_sec",
-            "Average latency of MailboxServerLocator web service calls.",
-            "seconds",
-            PLUGIN_WINDOWS_NAME,
-            "PerflibExchange",
-            PRIO_EXCHANGE_PROXY_SERVER_LOCATIOR_AVG_LATENCY,
-            update_every,
-            RRDSET_TYPE_LINE);
+                "exchange",
+                id,
+                NULL,
+                "proxy",
+                "exchange.http_proxy_mailbox_server_locator_avg_latency_sec",
+                "Average latency of MailboxServerLocator web service calls.",
+                "seconds",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibExchange",
+                PRIO_EXCHANGE_PROXY_SERVER_LOCATOR_AVG_LATENCY,
+                update_every,
+                RRDSET_TYPE_LINE);
 
         ep->rd_exchange_http_proxy_server_location_avg_latency = rrddim_add(
             ep->st_exchange_http_proxy_server_location_avg_latency, "latency", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
@@ -761,18 +761,18 @@ static void netdata_exchange_proxy_request_total(struct exchange_proxy *ep, char
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_proxy_%s_requests_total", proxy);
 
         ep->st_exchange_http_proxy_requests_total = rrdset_create_localhost(
-            "exchange",
-            id,
-            NULL,
-            "proxy",
-            "exchange.http_proxy_requests",
-            "Number of proxy requests processed each second.",
-            "requests",
-            PLUGIN_WINDOWS_NAME,
-            "PerflibExchange",
-            PRIO_EXCHANGE_PROXY_PROXY_REQUESTS_TOTAL,
-            update_every,
-            RRDSET_TYPE_LINE);
+                "exchange",
+                id,
+                NULL,
+                "proxy",
+                "exchange.http_proxy_requests",
+                "Number of proxy requests processed each second.",
+                "requests",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibExchange",
+                PRIO_EXCHANGE_PROXY_REQUESTS_TOTAL,
+                update_every,
+                RRDSET_TYPE_LINE);
 
         ep->rd_exchange_http_proxy_requests_total =
             rrddim_add(ep->st_exchange_http_proxy_requests_total, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -841,7 +841,7 @@ static void netdata_exchange_workload_active_tasks(struct exchange_workload *ew,
             "tasks",
             PLUGIN_WINDOWS_NAME,
             "PerflibExchange",
-            PRIO_EXCHANGE_WORKlOAD_ACTIVE_TASKS,
+            PRIO_EXCHANGE_WORKLOAD_ACTIVE_TASKS,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -874,14 +874,14 @@ static void netdata_exchange_workload_completed_tasks(struct exchange_workload *
             "tasks/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibExchange",
-            PRIO_EXCHANGE_WORKlOAD_COMPLETE_TASKS,
+            PRIO_EXCHANGE_WORKLOAD_COMPLETE_TASKS,
             update_every,
             RRDSET_TYPE_LINE);
 
         ew->rd_exchange_workload_complete_tasks =
             rrddim_add(ew->st_exchange_workload_complete_tasks, "completed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-        rrdlabels_add(ew->st_exchange_workload_complete_tasks->rrdlabels, "completed", workload, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(ew->st_exchange_workload_complete_tasks->rrdlabels, "workload", workload, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
@@ -907,7 +907,7 @@ static void netdata_exchange_workload_queued_tasks(struct exchange_workload *ew,
             "tasks/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibExchange",
-            PRIO_EXCHANGE_WORKlOAD_QUEUE_TASKS,
+            PRIO_EXCHANGE_WORKLOAD_QUEUE_TASKS,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -940,7 +940,7 @@ static void netdata_exchange_workload_yielded_tasks(struct exchange_workload *ew
             "tasks/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibExchange",
-            PRIO_EXCHANGE_WORKlOAD_YIELDED_TASKS,
+            PRIO_EXCHANGE_WORKLOAD_YIELDED_TASKS,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -973,7 +973,7 @@ static void netdata_exchange_workload_activity_status(struct exchange_workload *
             "status",
             PLUGIN_WINDOWS_NAME,
             "PerflibExchange",
-            PRIO_EXCHANGE_WORKlOAD_ACTIVITY,
+            PRIO_EXCHANGE_WORKLOAD_ACTIVITY,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -991,7 +991,6 @@ static void netdata_exchange_workload_activity_status(struct exchange_workload *
         ew->st_exchange_workload_activity_status,
         ew->rd_exchange_workload_activity_active_status,
         (collected_number)value);
-    rrdset_done(ew->st_exchange_workload_activity_status);
 
     value = !value;
     rrddim_set_by_pointer(
@@ -1131,7 +1130,7 @@ static void netdata_exchange_queue_internal_active_remote_delivery(struct exchan
     rrddim_set_by_pointer(
             eq->st_exchange_queue_internal_active_remote_delivery,
             eq->rd_exchange_queue_internal_active_remote_delivery,
-            (collected_number)eq->exchangeTransportQueuesInternalActiveRemoteDeliery.current.Data);
+            (collected_number)eq->exchangeTransportQueuesInternalActiveRemoteDelivery.current.Data);
     rrdset_done(eq->st_exchange_queue_internal_active_remote_delivery);
 }
 
@@ -1230,7 +1229,7 @@ static void netdata_exchange_queues(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYP
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesExternalActiveRemoteDelivery))
             netdata_exchange_queue_external_active_remote_delivery(eq, windows_shared_buffer, update_every);
 
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesInternalActiveRemoteDeliery))
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesInternalActiveRemoteDelivery))
             netdata_exchange_queue_internal_active_remote_delivery(eq, windows_shared_buffer, update_every);
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesUnreachable))

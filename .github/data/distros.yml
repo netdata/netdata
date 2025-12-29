@@ -239,13 +239,6 @@ include:
       repo_distro: fedora/42
     test:
       ebpf-core: true
-  - <<: *fedora
-    version: "41"
-    packages:
-      <<: *fedora_packages
-      repo_distro: fedora/41
-    test:
-      ebpf-core: true
 
   - &opensuse
     distro: opensuse
@@ -432,6 +425,13 @@ legacy: # Info for platforms we used to support and still need to handle package
     packages:
       <<: *fedora_packages
       repo_distro: fedora/40
+    test:
+      ebpf-core: true
+  - <<: *fedora
+    version: "41"
+    packages:
+      <<: *fedora_packages
+      repo_distro: fedora/41
     test:
       ebpf-core: true
   - <<: *opensuse

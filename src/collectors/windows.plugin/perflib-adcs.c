@@ -381,9 +381,9 @@ static void netdata_adcs_retrieval_processing(
         return;
     }
 
-    if (!ac->st_adcs_challenge_response_processing_time_seconds) {
+    if (!ac->st_adcs_retrievals_processing_time_seconds) {
         snprintfz(id, RRD_ID_LENGTH_MAX, "cert_%s_retrievals_processing_time", ac->name);
-        ac->st_adcs_challenge_response_processing_time_seconds = rrdset_create_localhost(
+        ac->st_adcs_retrievals_processing_time_seconds = rrdset_create_localhost(
             "adcs",
             id,
             NULL,
@@ -397,8 +397,8 @@ static void netdata_adcs_retrieval_processing(
             update_every,
             RRDSET_TYPE_LINE);
 
-        ac->rd_adcs_challenge_response_processing_time_seconds = rrddim_add(
-            ac->st_adcs_challenge_response_processing_time_seconds,
+        ac->rd_adcs_retrievals_processing_time_seconds = rrddim_add(
+            ac->st_adcs_retrievals_processing_time_seconds,
             "processing_time",
             NULL,
             1,
@@ -406,17 +406,17 @@ static void netdata_adcs_retrieval_processing(
             RRD_ALGORITHM_ABSOLUTE);
 
         rrdlabels_add(
-            ac->st_adcs_challenge_response_processing_time_seconds->rrdlabels, "cert", ac->name, RRDLABEL_SRC_AUTO);
+            ac->st_adcs_retrievals_processing_time_seconds->rrdlabels, "cert", ac->name, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
-        ac->st_adcs_challenge_response_processing_time_seconds,
-        ac->rd_adcs_challenge_response_processing_time_seconds,
+        ac->st_adcs_retrievals_processing_time_seconds,
+        ac->rd_adcs_retrievals_processing_time_seconds,
         (collected_number)ac->ADCSRetrievalsProcessingTime.current.Data);
-    rrdset_done(ac->st_adcs_challenge_response_processing_time_seconds);
+    rrdset_done(ac->st_adcs_retrievals_processing_time_seconds);
 }
 
-static void netdata_adcs_crypto_singing_time(
+static void netdata_adcs_crypto_signing_time(
     struct adcs_certificate *ac,
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
@@ -458,7 +458,7 @@ static void netdata_adcs_crypto_singing_time(
     rrddim_set_by_pointer(
         ac->st_adcs_request_cryptographic_signing_time_seconds,
         ac->rd_adcs_request_cryptographic_signing_time_seconds,
-        (collected_number)ac->ADCSRetrievalsProcessingTime.current.Data);
+        (collected_number)ac->ADCSRequestCryptoSigningTime.current.Data);
     rrdset_done(ac->st_adcs_request_cryptographic_signing_time_seconds);
 }
 
@@ -649,27 +649,27 @@ static void netdata_adcs_signed_certificate_timetamp_list_processing(
     rrdset_done(ac->st_adcs_signed_certificate_timestamp_list_processing_time_seconds);
 }
 
+#define CERTIFICATION_AUTHORITY "Certification Authority"
 static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
-    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Certification Authority");
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, CERTIFICATION_AUTHORITY);
     if (!pObjectType)
         return false;
 
     static void (*doADCS[])(struct adcs_certificate *, PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
-        netdata_adcs_requests,
-        netdata_adcs_requests_processing_time,
-        netdata_adcs_retrievals,
-        netdata_adcs_failed_requets,
-        netdata_adcs_issued_requets,
-        netdata_adcs_pending_requets,
-        netdata_adcs_challenge_response,
-        netdata_adcs_retrieval_processing,
-        netdata_adcs_crypto_singing_time,
-        netdata_adcs_policy_mod_processing_time,
-        netdata_adcs_challenge_response_processing_time,
-        netdata_adcs_signed_certificate_timetamp_list,
-        netdata_adcs_signed_certificate_timetamp_list_processing,
-        netdata_adcs_retrieval_processing,
+            netdata_adcs_requests,
+            netdata_adcs_requests_processing_time,
+            netdata_adcs_retrievals,
+            netdata_adcs_failed_requets,
+            netdata_adcs_issued_requets,
+            netdata_adcs_pending_requets,
+            netdata_adcs_challenge_response,
+            netdata_adcs_retrieval_processing,
+            netdata_adcs_crypto_signing_time,
+            netdata_adcs_policy_mod_processing_time,
+            netdata_adcs_challenge_response_processing_time,
+            netdata_adcs_signed_certificate_timetamp_list,
+            netdata_adcs_signed_certificate_timetamp_list_processing,
 
         // This must be the end
         NULL};
@@ -704,7 +704,7 @@ int do_PerflibADCS(int update_every, usec_t dt __maybe_unused)
         initialized = true;
     }
 
-    DWORD id = RegistryFindIDByName("Certification Authority");
+    DWORD id = RegistryFindIDByName(CERTIFICATION_AUTHORITY);
     if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
         return -1;
 
@@ -712,7 +712,8 @@ int do_PerflibADCS(int update_every, usec_t dt __maybe_unused)
     if (!pDataBlock)
         return -1;
 
-    do_ADCS(pDataBlock, update_every);
+    if (!do_ADCS(pDataBlock, update_every))
+        return -1;
 
     return 0;
 }

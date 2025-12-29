@@ -13,6 +13,7 @@
 
 static ISensorManager *pSensorManager = NULL;
 static ND_THREAD *sensors_thread_update = NULL;
+static netdata_mutex_t sensors_mutex;
 
 #define NETDATA_WIN_SENSOR_STATES (6)
 #define NETDATA_WIN_VECTOR_POS (3)
@@ -403,8 +404,11 @@ static inline char *netdata_pvar_to_char(const PROPERTYKEY *key, ISensor *pSenso
     HRESULT hr = pSensor->lpVtbl->GetProperty(pSensor, key, &pv);
     if (SUCCEEDED(hr) && pv.vt == VT_LPWSTR) {
         char value[8192];
-        size_t len = wcslen(pv.pwszVal);
+        int len = wcslen(pv.pwszVal);
         len = wcstombs(value, pv.pwszVal, len);
+        if (len < 0) {
+            return NULL;
+        }
         value[len] = '\0';
         PropVariantClear(&pv);
         return strdupz(value);
@@ -428,12 +432,11 @@ static int netdata_collect_sensor_data(collected_number *value, ISensor *pSensor
     PROPVARIANT pv = {};
     HRESULT hr;
 
-    int defined = 0;
     hr = pSensor->lpVtbl->GetData(pSensor, &pReport);
     if (SUCCEEDED(hr) && pReport) {
         PropVariantInit(&pv);
         hr = pReport->lpVtbl->GetSensorValue(pReport, key, &pv);
-        if (SUCCEEDED(hr) && (pv.vt == VT_R4 || pv.vt == VT_R8 || pv.vt == VT_UI4 || pv.vt == VT_BOOL)) {
+        if (SUCCEEDED(hr)) {
             switch (pv.vt) {
                 case VT_UI4:
                     *value = (collected_number)(pv.ulVal * 100);
@@ -447,16 +450,25 @@ static int netdata_collect_sensor_data(collected_number *value, ISensor *pSensor
                 case VT_BOOL:
                     *value = (pv.boolVal == VARIANT_TRUE) ? 100 : 0;
                     break;
+                default:
+                    goto error_collect_sensor_data;
             }
-            defined = 1;
+            pReport->lpVtbl->Release(pReport);
+        } else {
+            pReport->lpVtbl->Release(pReport);
+            goto error_collect_sensor_data;
         }
         PropVariantClear(&pv);
-        pReport->lpVtbl->Release(pReport);
-    } else {
-        *value = 0;
-    }
+    } else
+        goto error_collect_sensor_data;
 
-    return defined;
+    return 1;
+error_collect_sensor_data:
+    if (pv.vt != VT_EMPTY)
+        PropVariantClear(&pv);
+
+    *value = 0;
+    return 0;
 }
 
 static void netdata_sensors_get_data(struct sensor_data *sd, ISensor *pSensor)
@@ -527,7 +539,7 @@ static void netdata_sensors_get_custom_data(struct sensor_data *sd, ISensor *pSe
 static struct netdata_sensors_extra_config *netdata_sensors_fill_configuration(const char *name)
 {
 #define NETDATA_DEFAULT_SENSOR_SECTION "plugin:windows:GetSensors"
-    char section_name[CONFIG_MAX_NAME];
+    char section_name[CONFIG_MAX_NAME + 1];
     snprintfz(section_name, CONFIG_MAX_NAME, "%s:%s", NETDATA_DEFAULT_SENSOR_SECTION, name);
 
     const char *units = inicfg_get(&netdata_config, section_name, "units", NULL);
@@ -564,6 +576,8 @@ static void netdata_get_sensors()
         ISensor *pSensor = NULL;
         hr = pSensorCollection->lpVtbl->GetAt(pSensorCollection, i, &pSensor);
         if (FAILED(hr) || !pSensor) {
+            if (pSensor)
+                pSensor->lpVtbl->Release(pSensor);
             continue;
         }
 
@@ -579,6 +593,7 @@ static void netdata_get_sensors()
             continue;
         }
 
+        __netdata_mutex_lock(&sensors_mutex);
         struct sensor_data *sd = dictionary_set(sensors, thread_values, NULL, sizeof(*sd));
 
         if (unlikely(!sd->initialized)) {
@@ -628,6 +643,7 @@ static void netdata_get_sensors()
                 }
             }
         }
+        __netdata_mutex_unlock(&sensors_mutex);
 
         pSensor->lpVtbl->Release(pSensor);
     }
@@ -701,6 +717,9 @@ static int initialize(int update_every)
     // Note: COM and Sensor API initialization is now done in the sensor thread
     // (netdata_sensors_monitor) because COM must be initialized per-thread.
     // The sensor thread owns the pSensorManager instance and handles its cleanup.
+
+    if (unlikely(__netdata_mutex_init(&sensors_mutex)))
+        return -1;
 
     sensors = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct sensor_data));
@@ -875,7 +894,9 @@ int do_GetSensors(int update_every, usec_t dt __maybe_unused)
         initialized = true;
     }
 
+    __netdata_mutex_lock(&sensors_mutex);
     dictionary_sorted_walkthrough_read(sensors, dict_sensors_charts_cb, &update_every);
+    __netdata_mutex_unlock(&sensors_mutex);
     return 0;
 }
 
@@ -886,6 +907,8 @@ void do_Sensors_cleanup()
     if (nd_thread_join(sensors_thread_update))
         nd_log_daemon(NDLP_ERR, "Failed to join sensors thread update");
 
+    __netdata_mutex_destroy(&sensors_mutex);
+    dictionary_destroy(sensors);
     // Note: pSensorManager is owned and cleaned up by the sensor thread itself
     // No additional cleanup needed here since the thread has already released resources
 }
