@@ -4,9 +4,12 @@
 //! over time ranges, with support for filtering and faceted field indexing.
 
 use crate::{cache::FileIndexKey, error::Result, facets::Facets};
-use journal_core::collections::{HashMap, HashSet};
+use journal_core::collections::HashSet;
 use journal_index::{FieldName, FieldValuePair, FileIndex, Filter, Seconds};
+use lru::LruCache;
 use parking_lot::RwLock;
+use std::collections::HashMap;
+use std::num::NonZeroUsize;
 use std::time::Duration;
 
 #[allow(unused_imports)]
@@ -176,14 +179,24 @@ impl Histogram {
 /// The engine maintains caches and resources for efficiently computing histograms
 /// across multiple queries. It can be reused for multiple histogram computations.
 pub struct HistogramEngine {
-    responses: RwLock<HashMap<BucketRequest, BucketResponse>>,
+    responses: RwLock<LruCache<BucketRequest, BucketResponse>>,
 }
 
 impl HistogramEngine {
-    /// Creates a new HistogramEngine.
+    /// Creates a new HistogramEngine with a default capacity of 1000 bucket responses.
     pub fn new() -> Self {
+        Self::with_capacity(1000)
+    }
+
+    /// Creates a new HistogramEngine with the specified cache capacity.
+    ///
+    /// The capacity determines how many bucket responses will be cached before
+    /// old entries are evicted using an LRU policy.
+    pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            responses: RwLock::new(HashMap::default()),
+            responses: RwLock::new(LruCache::new(
+                NonZeroUsize::new(capacity).expect("capacity must be non-zero")
+            )),
         }
     }
 
@@ -222,7 +235,7 @@ impl HistogramEngine {
 
             bucket_requests
                 .iter()
-                .filter(|br| !responses.contains_key(br))
+                .filter(|br| !responses.contains(br))
                 .cloned()
                 .collect()
         };
@@ -317,17 +330,17 @@ impl HistogramEngine {
             let mut responses_guard = self.responses.write();
             for (bucket_request, response) in &new_responses {
                 if bucket_cacheable.get(bucket_request).copied().unwrap_or(false) {
-                    responses_guard.insert(bucket_request.clone(), response.clone());
+                    responses_guard.put(bucket_request.clone(), response.clone());
                 }
             }
             drop(responses_guard);
 
             // Build histogram from all responses (cached + newly computed non-cacheable)
-            let responses_guard = self.responses.read();
+            let mut responses_guard = self.responses.write();
             let buckets = bucket_requests
                 .into_iter()
                 .filter_map(|bucket_request| {
-                    // Try to get from cache first, then from newly computed responses
+                    // Try to get from cache first (updates LRU), then from newly computed responses
                     let response = responses_guard
                         .get(&bucket_request)
                         .cloned()
@@ -340,10 +353,11 @@ impl HistogramEngine {
             Ok(Histogram { buckets })
         } else {
             // All buckets were cached, just build histogram from cache
-            let responses = self.responses.read();
+            let mut responses = self.responses.write();
             let buckets = bucket_requests
                 .into_iter()
                 .filter_map(|bucket_request| {
+                    // Use get() to update LRU order for accessed entries
                     responses
                         .get(&bucket_request)
                         .map(|response| (bucket_request, response.clone()))

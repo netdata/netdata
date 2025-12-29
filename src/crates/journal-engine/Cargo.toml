@@ -29,6 +29,7 @@ journal-core = { workspace = true }
 journal-index = { workspace = true }
 journal-registry = { workspace = true }
 foundation = { workspace = true }
+lru = { workspace = true }
 
 allocative = { workspace = true, optional = true }
 
