@@ -31,7 +31,6 @@ bytes = { workspace = true }
 itoa = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter", "json"] }
 tracing-journald = { workspace = true }
-tracing-appender = { workspace = true }
 
 [dev-dependencies]
 console-subscriber = "0.4"

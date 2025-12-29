@@ -37,7 +37,7 @@ pub fn run(args: Vec<String>) -> i32 {
 }
 
 async fn async_run(_args: Vec<String>) -> i32 {
-    rt::init_tracing("info");
+    rt::init_tracing();
 
     match run_internal().await {
         Ok(()) => 0,
