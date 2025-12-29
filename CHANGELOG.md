@@ -128,6 +128,9 @@
 - Add AI-Powered Alert Configuration docs entry ([#21482](https://github.com/netdata/netdata/issues/21482))
 - Fix(go.d/vnodes): add additionalProperties to config_schema.json ([#21503](https://github.com/netdata/netdata/issues/21503))
 - Fix(edit-config): ignore container variable inherited from /etc/profile ([#21505](https://github.com/netdata/netdata/issues/21505))
+- Build(deps): bump github.com/jackc/pgx/v5 from 5.7.6 to 5.8.0 in /src/go ([#21509](https://github.com/netdata/netdata/issues/21509))
+- Chore(go.d/pgbouncer): use jackc/pgx/v5 ([#21510](https://github.com/netdata/netdata/issues/21510))
+- Fix: add procfile parsing for non-seekable files ([#21507](https://github.com/netdata/netdata/issues/21507))
 
 ## [2.8.0] - 2025-11-19
 
