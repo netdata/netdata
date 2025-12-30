@@ -144,6 +144,7 @@
 - **Context merge applied (2025-12-19)**: Executive2 now embeds condensed bigquery.ai policy: freshness query requirement (notes), allowed datasets/read-only, data-flow summary, entity quick-reference, KPI intent mapping, discount naming clarification, and reiteration of template-first + JSON-only rules. On-prem parity remains the static manual360 baseline until told otherwise.
 - **KPI template port (2025-12-19)**: All remaining Grafana-aligned KPI templates from scratch promoted into executive2 (business/homelab/on-prem levels & deltas, subscriptions, nodes, AI bundles/credits, trials 6+ est value, professional services, SaaS spaces counts/percent, nodes snapshots, unrealized/ending trials charts). One copy of each template kept; JSON-only contract preserved.
 - **Diagnostics (2025-12-27)**: Use model self-report for `sql_failures` (do not parse logs); include a diagnostics block in schema and prompt so the agent counts its own failed queries.
+- **Harness overrides (2025-12-29)**: For `gpt-oss-20b`, force `--no-stream` and `--override temperature=1` in the harness to avoid broken streaming and model-specific temperature requirements; re-run failed cases under these defaults.
 
 ### Panel → template coverage snapshot (top-of-dashboard, 2025-12-18)
 Status legend: ✅ in `executive2.ai` (prod), 🟨 in `executive2-scratch.ai` (WIP), ⛔ not mapped yet.

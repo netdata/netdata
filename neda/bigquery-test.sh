@@ -71,7 +71,7 @@ TO_DATE="${TO_DATE:-$(date -I -d '1 day ago')}"
 AI_AGENT_BIN="${AI_AGENT_BIN:-${SCRIPT_DIR}/../ai-agent}"
 SYSTEM_PROMPT="${SYSTEM_PROMPT:-${SCRIPT_DIR}/bigquery.ai}"
 MODEL_OVERRIDE="${MODEL_OVERRIDE:-vllm3/gpt-oss-20b}"
-TEMPERATURE_OVERRIDE="${TEMPERATURE_OVERRIDE:-0}"
+TEMPERATURE_OVERRIDE="${TEMPERATURE_OVERRIDE:-1}"
 LLM_TIMEOUT_MS="${LLM_TIMEOUT_MS:-36000000}"
 TOOL_TIMEOUT_MS="${TOOL_TIMEOUT_MS:-36000000}"
 
@@ -4118,6 +4118,7 @@ run_agent() {
   local merged_schema
   local merged_schema_file
   local question_payload
+  local no_stream_flag="--no-stream"
   if [[ -n "${MODEL_OVERRIDE}" ]]; then
     override_args=(--override "models=${MODEL_OVERRIDE}")
   fi
@@ -4175,7 +4176,7 @@ JSON
   run "${AI_AGENT_BIN}" \
     --verbose \
     "${SYSTEM_PROMPT}" \
-    --no-stream \
+    "${no_stream_flag}" \
     --format json \
     --schema "@${merged_schema_file}" \
     "${override_args[@]}" \
