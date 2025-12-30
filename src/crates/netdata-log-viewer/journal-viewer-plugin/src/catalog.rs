@@ -746,10 +746,14 @@ impl FunctionHandler for CatalogFunction {
     }
 
     fn declaration(&self) -> FunctionDeclaration {
-        info!("generating function declaration for systemd-journal");
+        // NOTE: `rt` special cases this function call to handle GET/POST
+        // calls in a consistent way. If you rename this function, you should
+        // update the `rt` crate as well.
+
+        info!("generating journal-viewer function declaration");
         let mut func_decl = FunctionDeclaration::new(
-            "systemd-journal",
-            "Query and visualize systemd journal entries with histograms and facets",
+            "journal-viewer",
+            "Query and visualize journal log entries with histograms and facets",
         );
         func_decl.global = true;
         func_decl.tags = Some(String::from("logs"));

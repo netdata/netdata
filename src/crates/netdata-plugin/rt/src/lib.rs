@@ -855,7 +855,7 @@ where
         // we convert the frontend request from a GET to POST.
         let mut function_call = function_call;
         {
-            if function_call.name == "systemd-journal" {
+            if function_call.name == "journal-viewer" {
                 if !function_call.args.is_empty() {
                     let mut map = serde_json::Map::new();
                     map.insert("info".to_string(), serde_json::json!(true));
