@@ -246,7 +246,7 @@ impl TransactionRegistry {
     }
 }
 
-/// Inner state for CatalogFunction (enables cloning)
+/// Inner state for CatalogFunction
 struct CatalogFunctionInner {
     registry: Registry,
     cache: FileIndexCache,
