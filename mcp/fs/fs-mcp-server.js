@@ -974,7 +974,7 @@ async function toolRGrep(args) {
     throw excludedError();
   }
   const cs = Boolean(caseSensitive);
-  const maxFilesLimit = maxFiles || Infinity;
+  const maxFilesLimit = typeof maxFiles === 'number' && maxFiles > 0 ? maxFiles : Infinity;
   const abs = resolveRel(normalizedDir);
 
   // Validate the directory itself
@@ -986,6 +986,7 @@ async function toolRGrep(args) {
   const re = buildRegex(regex, cs);
   const hits = [];
   const warnings = [];
+  let stoppedEarly = false;
   const stack = [[abs, normalizedDir === '' ? '' : normalizedDir.replace(/\\/g, '/')]];
 
   // Statistics tracking
@@ -1061,6 +1062,7 @@ async function toolRGrep(args) {
 
                 // Stop if we've reached maxFiles
                 if (hits.length >= maxFilesLimit) {
+                  stoppedEarly = Number.isFinite(maxFilesLimit);
                   break fileLoop; // Break out of outer loop
                 }
                 break;
@@ -1105,6 +1107,12 @@ async function toolRGrep(args) {
   // Add matches if any
   if (strippedHits.length > 0) {
     output.push(...strippedHits);
+    output.push('');  // Empty line before summary
+  }
+
+  if (stoppedEarly) {
+    output.push(`WARNING: RGrep stopped early because maxFiles=${String(maxFilesLimit)} was reached. Results may be incomplete.`);
+    output.push('If you need all matches, re-run RGrep with a higher maxFiles value.');
     output.push('');  // Empty line before summary
   }
 

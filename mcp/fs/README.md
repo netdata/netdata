@@ -194,6 +194,7 @@ Recursively search directory contents.
 - Symlink warnings
 - Per-file match reporting
 - Overall statistics
+- If `maxFiles` is reached, output includes a warning that results are incomplete and suggests re-running with a higher limit
 
 **Output Format:**
 ```

@@ -824,6 +824,8 @@ const tests = [
         console.log(result);
       }
       if (!result.includes('1 match found in 1 file')) throw new Error('RGrep maxFiles should stop after one file');
+      if (!result.includes('RGrep stopped early')) throw new Error('RGrep should warn when maxFiles is reached');
+      if (!result.includes('maxFiles=1')) throw new Error('RGrep warning should include the maxFiles value');
     }
   },
 
