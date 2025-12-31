@@ -223,6 +223,7 @@ Security vulnerability tracking (private)
 4. DYNCFG = Netdata's UI based configuration. This exists mostly for alerts and golang/rust based plugins, allowing them to be configured on the fly.
 5. DYNCFG is able to configure any Netdata Agent in a Netdata ecosystem, as long as it is somehow (directly or indirectly) connected to Netdata Cloud. The streaming protocol of Netdata enables this, by routing DYNCFG requests and responses to Netdata Agents via their parents.
 6. DYNCFG is the `config` API endpoint (GET/POST).
+7. Dashboard = cloud-frontend, which is the same for both Netdata Agents/Parents and Netdata Cloud.
 
 IMPORTANT: Netdata uses unusual API endpoints and searching for POST/PUT/GET on assumed/expected endpoints may reveal nothing. Before concluding that some API functionality is not supported, you should first trace the functionality backwards: find the code that implements the features, find how it is exposed in the APIs, find which components use these APIs, examine what features these components offer.
 
