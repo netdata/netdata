@@ -213,3 +213,17 @@ Security vulnerability tracking (private)
 
 - netdata/netdata-ghsa-xfp2-8264-4w82: Security advisory (private)  
 - netdata/netdata-ghsa-xhw4-q8f5-2j4c: Security advisory (private)
+
+
+## Best Practices For Searching
+
+1. Netdata Agents (children) communicate to Netdata Parents via streaming. This is a single bidirectional socket, initiated from the child to the parent, although there is a small handshake before this is established, using simple http(s) calls, in order to support load balancing parents.
+2. Netdata Agents and Parents communicate to Netdata Cloud via MQTT over WebSocket over HTTPS. There is a small handshake before this is established, for authorization and settings.
+3. Vnode = virtual node. This has nothing to do with virtualization or containerization. It is used by Netdata to create node entities for remotely monitored systems and applications, allowing users to see on the dashboard cloud provider managed databases, SNMP devices, or even systems like IBM i. vnodes are mostly implemented by go.d.plugin.
+4. DYNCFG = Netdata's UI based configuration. This exists mostly for alerts and golang/rust based plugins, allowing them to be configured on the fly.
+5. DYNCFG is able to configure any Netdata Agent in a Netdata ecosystem, as long as it is somehow (directly or indirectly) connected to Netdata Cloud. The streaming protocol of Netdata enables this, by routing DYNCFG requests and responses to Netdata Agents via their parents.
+6. DYNCFG is the `config` API endpoint (GET/POST).
+
+IMPORTANT: Netdata uses unusual API endpoints and searching for POST/PUT/GET on assumed/expected endpoints may reveal nothing. Before concluding that some API functionality is not supported, you should first trace the functionality backwards: find the code that implements the features, find how it is exposed in the APIs, find which components use these APIs, examine what features these components offer.
+
+IMPORTANT: When searching in the repos, do not make case sensitive searches, unless you know you are looking for something specific that is case sensitive. Do not assume snake case, camel case, etc. Different teams (agent, front-end, cloud backend, SREs) may use different formats.
