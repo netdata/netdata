@@ -15,6 +15,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Test configuration
 const TEST_DIR = path.join(os.tmpdir(), `fs-mcp-test-${Date.now()}`);
 const SERVER_PATH = path.join(__dirname, 'fs-mcp-server.js');
+const MCPIGNORE_PATH = path.join(TEST_DIR, '.mcpignore');
 
 // Colors for output
 const RED = '\x1b[0;31m';
@@ -33,6 +34,14 @@ let verbose = false;
 if (process.argv.includes('--verbose') || process.argv.includes('-v')) {
   verbose = true;
   console.log(`${YELLOW}Running in verbose mode${NC}`);
+}
+
+async function writeMcpIgnore(content) {
+  await fs.promises.writeFile(MCPIGNORE_PATH, content, 'utf8');
+}
+
+async function removeMcpIgnore() {
+  await fs.promises.rm(MCPIGNORE_PATH, { force: true, recursive: true });
 }
 
 // Helper to create test directory structure
@@ -104,6 +113,27 @@ async function setupTestEnvironment() {
   await fs.promises.writeFile(path.join(TEST_DIR, 'test_hidden', '.hidden_file'), 'hidden content');
   await fs.promises.writeFile(path.join(TEST_DIR, 'test_hidden', 'visible_file'), 'visible content');
   await fs.promises.writeFile(path.join(TEST_DIR, 'test_hidden', '.another_hidden'), 'more hidden');
+
+  // Create default-excluded directories
+  await fs.promises.mkdir(path.join(TEST_DIR, '.git'));
+  await fs.promises.mkdir(path.join(TEST_DIR, '.git', 'objects'), { recursive: true });
+  await fs.promises.writeFile(path.join(TEST_DIR, '.git', 'config'), 'EXCLUDED_DEFAULT');
+  await fs.promises.mkdir(path.join(TEST_DIR, 'node_modules'));
+  await fs.promises.writeFile(path.join(TEST_DIR, 'node_modules', 'module.js'), 'EXCLUDED_DEFAULT');
+
+  // Create exclusion test structure
+  await fs.promises.mkdir(path.join(TEST_DIR, 'excluded_dir'));
+  await fs.promises.writeFile(path.join(TEST_DIR, 'excluded_dir', 'secret.txt'), 'EXCLUDED_SECRET');
+  await fs.promises.writeFile(path.join(TEST_DIR, 'excluded_file.txt'), 'EXCLUDED_FILE');
+  await fs.promises.writeFile(path.join(TEST_DIR, 'allowed_file.txt'), 'EXCLUDED_ALLOWED');
+  await fs.promises.symlink('excluded_file.txt', path.join(TEST_DIR, 'link_to_excluded'));
+
+  // Create nested exclusion scope for Tree/Find tests
+  await fs.promises.mkdir(path.join(TEST_DIR, 'exclude_scope'));
+  await fs.promises.writeFile(path.join(TEST_DIR, 'exclude_scope', 'visible.txt'), 'VISIBLE');
+  await fs.promises.writeFile(path.join(TEST_DIR, 'exclude_scope', 'excluded_child.txt'), 'EXCLUDED_CHILD');
+  await fs.promises.mkdir(path.join(TEST_DIR, 'exclude_scope', 'excluded_child_dir'));
+  await fs.promises.writeFile(path.join(TEST_DIR, 'exclude_scope', 'excluded_child_dir', 'child.txt'), 'EXCLUDED_CHILD_DIR');
 }
 
 // MCP client implementation
@@ -201,7 +231,7 @@ class MCPTestClient {
 }
 
 // Test runner
-async function runTest(name, testFn, serverArgs = []) {
+async function runTest(name, testFn, serverArgs = [], setup, teardown) {
   const testNum = testsPassed + testsFailed + 1;
 
   if (verbose) {
@@ -212,9 +242,11 @@ async function runTest(name, testFn, serverArgs = []) {
 
   const client = new MCPTestClient(serverArgs);
   try {
+    if (typeof setup === 'function') {
+      await setup();
+    }
     await client.start();
     await testFn(client);
-    await client.stop();
 
     testsPassed++;
     if (verbose) {
@@ -232,8 +264,12 @@ async function runTest(name, testFn, serverArgs = []) {
       console.log(`${RED}✗${NC}`);
     }
 
-    await client.stop();
     return { name, passed: false, error: error.message };
+  } finally {
+    await client.stop();
+    if (typeof teardown === 'function') {
+      await teardown();
+    }
   }
 }
 
@@ -1099,6 +1135,126 @@ const tests = [
       // Verify nested file is found with recursive glob
       if (!resultRecursive.includes('subdir1/nested.js')) throw new Error('Find should find nested files with **/* glob');
     }
+  },
+  {
+    name: 'Default exclusions apply when .mcpignore is missing',
+    setup: async () => {
+      await removeMcpIgnore();
+    },
+    fn: async (client) => {
+      const result = await client.callTool('ListDir', { dir: '.' });
+      if (result.includes('.git/')) throw new Error('Default exclusions should hide .git');
+      if (result.includes('node_modules/')) throw new Error('Default exclusions should hide node_modules');
+    }
+  },
+
+  {
+    name: '.mcpignore exclusions apply to all tools',
+    setup: async () => {
+      await writeMcpIgnore([
+        'excluded_dir/',
+        'excluded_file.txt',
+        'exclude_scope/excluded_child.txt',
+        'exclude_scope/excluded_child_dir/'
+      ].join('\n'));
+    },
+    teardown: async () => {
+      await removeMcpIgnore();
+    },
+    fn: async (client) => {
+      const listRoot = await client.callTool('ListDir', { dir: '.' });
+      if (listRoot.includes('excluded_dir/')) throw new Error('ListDir should skip excluded_dir');
+      if (listRoot.includes('excluded_file.txt')) throw new Error('ListDir should skip excluded_file.txt');
+      if (listRoot.includes('link_to_excluded')) throw new Error('ListDir should skip symlink to excluded target');
+      if (!listRoot.includes('.git/')) throw new Error('ListDir should show .git when .mcpignore exists');
+
+      const listScope = await client.callTool('ListDir', { dir: 'exclude_scope' });
+      if (!listScope.includes('visible.txt')) throw new Error('ListDir should show visible.txt');
+      if (listScope.includes('excluded_child.txt')) throw new Error('ListDir should skip excluded_child.txt');
+      if (listScope.includes('excluded_child_dir/')) throw new Error('ListDir should skip excluded_child_dir');
+
+      const treeScope = await client.callTool('Tree', { dir: 'exclude_scope' });
+      if (!treeScope.includes('visible.txt')) throw new Error('Tree should show visible.txt');
+      if (treeScope.includes('excluded_child.txt')) throw new Error('Tree should skip excluded_child.txt');
+      if (treeScope.includes('excluded_child_dir')) throw new Error('Tree should skip excluded_child_dir');
+
+      const findScope = await client.callTool('Find', { dir: 'exclude_scope', glob: '*' });
+      if (!findScope.includes('visible.txt')) throw new Error('Find should show visible.txt');
+      if (findScope.includes('excluded_child.txt')) throw new Error('Find should skip excluded_child.txt');
+      if (findScope.includes('excluded_child_dir')) throw new Error('Find should skip excluded_child_dir');
+
+      const rgrepRoot = await client.callTool('RGrep', { dir: '.', regex: 'EXCLUDED', caseSensitive: true });
+      if (!rgrepRoot.includes('allowed_file.txt')) throw new Error('RGrep should find allowed_file.txt');
+      if (rgrepRoot.includes('excluded_file.txt')) throw new Error('RGrep should skip excluded_file.txt');
+      if (rgrepRoot.includes('excluded_dir/secret.txt')) throw new Error('RGrep should skip excluded_dir');
+
+      client.errorOutput = '';
+      try {
+        await client.callTool('Read', { file: 'excluded_file.txt', start: 0, lines: 10, headOrTail: 'head' });
+        throw new Error('Read should fail with ENOENT for excluded file');
+      } catch (e) {
+        if (!String(e.message).includes('ENOENT')) throw new Error('Read should return ENOENT for excluded file');
+        if (!client.errorOutput.includes('excluded path')) throw new Error('Read should log excluded path');
+      }
+
+      client.errorOutput = '';
+      try {
+        await client.callTool('Grep', { file: 'excluded_file.txt', regex: 'EXCLUDED', caseSensitive: true, before: 0, after: 0 });
+        throw new Error('Grep should fail with ENOENT for excluded file');
+      } catch (e) {
+        if (!String(e.message).includes('ENOENT')) throw new Error('Grep should return ENOENT for excluded file');
+        if (!client.errorOutput.includes('excluded path')) throw new Error('Grep should log excluded path');
+      }
+
+      client.errorOutput = '';
+      try {
+        await client.callTool('ListDir', { dir: 'excluded_dir' });
+        throw new Error('ListDir should fail with ENOENT for excluded directory');
+      } catch (e) {
+        if (!String(e.message).includes('ENOENT')) throw new Error('ListDir should return ENOENT for excluded directory');
+        if (!client.errorOutput.includes('excluded path')) throw new Error('ListDir should log excluded path');
+      }
+    }
+  },
+
+  {
+    name: '.mcpignore unreadable falls back to defaults',
+    setup: async () => {
+      await removeMcpIgnore();
+      await fs.promises.mkdir(MCPIGNORE_PATH);
+    },
+    teardown: async () => {
+      await removeMcpIgnore();
+    },
+    fn: async (client) => {
+      const result = await client.callTool('ListDir', { dir: '.' });
+      if (result.includes('.git/')) throw new Error('Defaults should hide .git when .mcpignore is unreadable');
+      if (result.includes('node_modules/')) throw new Error('Defaults should hide node_modules when .mcpignore is unreadable');
+      if (!client.errorOutput.includes('Failed to read .mcpignore')) throw new Error('Unreadable .mcpignore should log an error');
+    }
+  },
+
+  {
+    name: 'RGrep default skips binary decode',
+    setup: async () => {
+      await removeMcpIgnore();
+    },
+    fn: async (client) => {
+      const result = await client.callTool('RGrep', { dir: '.', regex: '\\\\u00ff', caseSensitive: true });
+      if (result.includes('binary.dat')) throw new Error('RGrep should not match binary.dat without decode');
+    }
+  },
+
+  {
+    name: 'RGrep decode binary flag matches hex escapes',
+    setup: async () => {
+      await removeMcpIgnore();
+    },
+    serverArgs: ['--rgrep-decode-binary'],
+    fn: async (client) => {
+      const result = await client.callTool('RGrep', { dir: '.', regex: '\\\\u00ff', caseSensitive: true });
+      if (!result.includes('binary.dat')) throw new Error('RGrep should match binary.dat with --rgrep-decode-binary');
+    }
   }
 ];
 
@@ -1197,7 +1353,7 @@ async function main() {
 
     // Run all tests and collect results
     for (const test of tests) {
-      const result = await runTest(test.name, test.fn, test.serverArgs);
+      const result = await runTest(test.name, test.fn, test.serverArgs, test.setup, test.teardown);
       testResults.push(result);
     }
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Minimal MCP stdio server (no external deps).
+ * Minimal MCP stdio server.
  *
- * Usage: node fs-mcp-server.js [--no-rgrep-root] <ROOT_DIR>
+ * Usage: node fs-mcp-server.js [--no-rgrep-root] [--rgrep-decode-binary] <ROOT_DIR>
  * - All tool paths are relative to <ROOT_DIR>
  * - '..' segments are forbidden in any input path
  * - Absolute paths are not allowed
@@ -24,6 +24,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import ignore from 'ignore';
+
 const fsp = fs.promises;
 
 // -------------------------- Utility: JSON-RPC over LSP framing --------------------------
@@ -44,14 +46,19 @@ function respondError(id, code, message, data) {
 }
 
 // -------------------------- Root and path safety --------------------------
-const USAGE = 'Usage: node fs-mcp-server.js [--no-rgrep-root] <ROOT_DIR>';
+const USAGE = 'Usage: node fs-mcp-server.js [--no-rgrep-root] [--rgrep-decode-binary] <ROOT_DIR>';
 
 function parseArgs(argv) {
   let allowRGrepRoot = true;
+  let rgrepDecodeBinary = false;
   let rootArg;
   for (const arg of argv) {
     if (arg === '--no-rgrep-root') {
       allowRGrepRoot = false;
+      continue;
+    }
+    if (arg === '--rgrep-decode-binary') {
+      rgrepDecodeBinary = true;
       continue;
     }
     if (arg.startsWith('-')) {
@@ -67,10 +74,10 @@ function parseArgs(argv) {
     console.error(USAGE);
     process.exit(1);
   }
-  return { allowRGrepRoot, rootArg };
+  return { allowRGrepRoot, rgrepDecodeBinary, rootArg };
 }
 
-const { allowRGrepRoot, rootArg } = parseArgs(process.argv.slice(2));
+const { allowRGrepRoot, rgrepDecodeBinary, rootArg } = parseArgs(process.argv.slice(2));
 
 const ROOT = (() => {
   // console.error('MCP: Starting fs-mcp-server.js with args:', process.argv.slice(2));
@@ -104,6 +111,64 @@ const ROOT = (() => {
 })();
 
 const ALLOW_RGREP_ROOT = allowRGrepRoot;
+const RGREP_DECODE_BINARY = rgrepDecodeBinary;
+
+const IGNORE_FILE = '.mcpignore';
+const DEFAULT_EXCLUDES = ['.git/', 'node_modules/'];
+
+const IGNORE_STATE = buildIgnoreState();
+
+function buildIgnoreState() {
+  const matcher = ignore();
+  const ignorePath = path.join(ROOT, IGNORE_FILE);
+  try {
+    const content = fs.readFileSync(ignorePath, 'utf8');
+    if (content.trim().length > 0) {
+      matcher.add(content);
+    }
+    return { matcher, source: 'mcpignore', path: ignorePath };
+  } catch (e) {
+    if (e && e.code !== 'ENOENT') {
+      console.error(`MCP: Failed to read ${IGNORE_FILE} at ${ignorePath}: ${e.message}. Using default exclusions.`);
+    }
+    matcher.add(DEFAULT_EXCLUDES);
+    return { matcher, source: 'defaults', path: ignorePath };
+  }
+}
+
+function normalizeRelPath(relPath) {
+  if (!relPath) return '';
+  if (relPath === '.') return '';
+  return relPath.replace(/\\/g, '/').replace(/^\.\/+/, '');
+}
+
+function isExcludedPath(relPath, isDir = false) {
+  if (!IGNORE_STATE.matcher) return false;
+  const normalized = normalizeRelPath(relPath);
+  if (normalized === '') return false;
+  if (IGNORE_STATE.matcher.ignores(normalized)) return true;
+  if (isDir && IGNORE_STATE.matcher.ignores(normalized + '/')) return true;
+  return false;
+}
+
+function isExcludedTarget(validation) {
+  if (!validation || typeof validation.resolvedRel !== 'string') return false;
+  const isDir = Boolean(validation.targetIsDir);
+  return isExcludedPath(validation.resolvedRel, isDir);
+}
+
+function logExcludedAccess(toolName, relPath, detail) {
+  const message = detail ? `MCP: ${toolName} excluded path ${relPath} (${detail})` : `MCP: ${toolName} excluded path ${relPath}`;
+  console.error(message);
+}
+
+function excludedError() {
+  return new Error('ENOENT: no such file or directory');
+}
+
+function exclusionSourceLabel() {
+  return IGNORE_STATE.source === 'mcpignore' ? '.mcpignore' : 'default exclusions';
+}
 
 function assertNoDotDot(raw) {
   if (typeof raw !== 'string') throw new Error('path must be a string');
@@ -175,6 +240,7 @@ async function validatePath(absPath, relPath = '', allowFollow = false) {
 
         // Resolve the target path
         const resolvedTarget = isAbsolute ? target : path.resolve(path.dirname(absPath), target);
+        const resolvedRel = path.relative(ROOT, resolvedTarget).replace(/\\/g, '/');
 
         // Canonicalize the target to handle symlinks and case normalization
         let canonTarget;
@@ -210,8 +276,6 @@ async function validatePath(absPath, relPath = '', allowFollow = false) {
         try {
           const targetStat = await fsp.stat(resolvedTarget);
           const targetType = targetStat.isDirectory() ? 'dir' : targetStat.isFile() ? 'file' : 'other';
-          const resolvedRel = path.relative(ROOT, resolvedTarget);
-
           // For file operations, allow following valid symlinks to files
           if (allowFollow && targetType === 'file') {
             return {
@@ -220,6 +284,7 @@ async function validatePath(absPath, relPath = '', allowFollow = false) {
               size: targetStat.size || 0,
               isSymlink: true,
               target: resolvedRel,
+              resolvedRel,
               resolvedPath: canonTarget  // Use canonical path for consistency
             };
           }
@@ -233,6 +298,7 @@ async function validatePath(absPath, relPath = '', allowFollow = false) {
             target: displayTarget,
             targetType,
             targetIsDir: targetStat.isDirectory(),
+            resolvedRel,
             reason: allowFollow ? `symlink points to ${targetType}, not a regular file` : 'symlink (not followed for directory operations)'
           };
         } catch (statError) {
@@ -323,7 +389,10 @@ async function listDirEntries(dirAbs, baseRel) {
   for (const d of dirents) {
     const full = path.join(dirAbs, d.name);
     const relPath = (baseRel ? baseRel + '/' : '') + d.name;
+    const isDir = d.isDirectory();
+    if (isExcludedPath(relPath, isDir)) continue;
     const validation = await validatePath(full, relPath);
+    if (validation.type === 'symlink' && isExcludedTarget(validation)) continue;
     entries.push({ relPath, validation });
   }
 
@@ -358,7 +427,10 @@ async function walkTree(dirAbs, baseRel, acc, indentStr = '', options = {}, stat
   for (const d of dirents) {
     const rel = (baseRel ? baseRel + '/' : '') + d.name;
     const full = path.join(dirAbs, d.name);
+    const isDir = d.isDirectory();
+    if (isExcludedPath(rel, isDir)) continue;
     const validation = await validatePath(full, rel);
+    if (validation.type === 'symlink' && isExcludedTarget(validation)) continue;
     entries.push({ name: d.name, rel, full, validation, isDir: d.isDirectory() });
 
     // Count files
@@ -443,7 +515,10 @@ async function findMatches(baseAbs, baseRel, regex, acc, stats) {
   for (const d of dirents) {
     const rel = (baseRel ? baseRel + '/' : '') + d.name;
     const full = path.join(baseAbs, d.name);
+    const isDir = d.isDirectory();
+    if (isExcludedPath(rel, isDir)) continue;
     const validation = await validatePath(full, rel);
+    if (validation.type === 'symlink' && isExcludedTarget(validation)) continue;
 
     // Count files examined
     if (validation.valid && validation.type === 'file') {
@@ -500,7 +575,12 @@ function buildRegex(pattern, caseSensitive, global = false) {
 async function toolListDir(args) {
   const { dir, showSize, showLastModified, showCreated } = args;
   if (typeof dir !== 'string') throw new Error('dir must be a string');
-  const abs = resolveRel(dir);
+  const normalizedDir = dir === '.' ? '' : dir;
+  if (normalizedDir !== '' && isExcludedPath(normalizedDir, true)) {
+    logExcludedAccess('ListDir', normalizedDir, `excluded by ${exclusionSourceLabel()}`);
+    throw excludedError();
+  }
+  const abs = resolveRel(normalizedDir);
 
   // Validate the directory itself
   const dirValidation = await validatePath(abs);
@@ -508,7 +588,7 @@ async function toolListDir(args) {
     throw new Error('not a valid directory');
   }
 
-  const entries = await listDirEntries(abs, dir === '' ? '' : dir.replace(/\\/g, '/'));
+  const entries = await listDirEntries(abs, normalizedDir === '' ? '' : normalizedDir.replace(/\\/g, '/'));
 
   // Count files and directories
   let fileCount = 0;
@@ -594,7 +674,12 @@ async function toolTree(args) {
   if (dir === '' || dir === '.') {
     throw new Error('Traversing the entire tree from the root is not allowed due to size limitations. Use it on specific subdirectories.');
   }
-  const abs = resolveRel(dir);
+  const normalizedDir = dir === '.' ? '' : dir;
+  if (normalizedDir !== '' && isExcludedPath(normalizedDir, true)) {
+    logExcludedAccess('Tree', normalizedDir, `excluded by ${exclusionSourceLabel()}`);
+    throw excludedError();
+  }
+  const abs = resolveRel(normalizedDir);
 
   // Validate the directory itself
   const dirValidation = await validatePath(abs);
@@ -604,7 +689,7 @@ async function toolTree(args) {
 
   const entries = [];
   const stats = { filesCount: 0, dirsExamined: 0 };
-  const baseRel = dir.replace(/\\/g, '/');
+  const baseRel = normalizedDir.replace(/\\/g, '/');
 
   // Add the root directory itself (no size for directories)
   const rootDisplay = baseRel + '/';
@@ -623,7 +708,12 @@ async function toolFind(args) {
   const { dir, glob } = args;
   if (typeof dir !== 'string') throw new Error('dir must be a string');
   if (typeof glob !== 'string') throw new Error('glob must be a string');
-  const abs = resolveRel(dir);
+  const normalizedDir = dir === '.' ? '' : dir;
+  if (normalizedDir !== '' && isExcludedPath(normalizedDir, true)) {
+    logExcludedAccess('Find', normalizedDir, `excluded by ${exclusionSourceLabel()}`);
+    throw excludedError();
+  }
+  const abs = resolveRel(normalizedDir);
 
   // Validate the directory itself
   const dirValidation = await validatePath(abs);
@@ -634,7 +724,7 @@ async function toolFind(args) {
   const regex = globToRegex(glob);
   const matches = [];
   const stats = { filesExamined: 0, dirsExamined: 0 };
-  const baseDir = dir === '' ? '' : dir.replace(/\\/g, '/');
+  const baseDir = normalizedDir === '' ? '' : normalizedDir.replace(/\\/g, '/');
   await findMatches(abs, baseDir, regex, matches, stats);
 
   // Format matches, stripping base directory and adding type indicators
@@ -684,6 +774,11 @@ async function toolRead(args) {
   if (!Number.isInteger(lines) || lines < 0) throw new Error('lines must be a non-negative integer');
   const mode = headOrTail;
   if (mode !== 'head' && mode !== 'tail') throw new Error("headOrTail must be 'head' or 'tail'");
+  const normalizedFile = file.replace(/\\/g, '/');
+  if (isExcludedPath(normalizedFile, false)) {
+    logExcludedAccess('Read', normalizedFile, `excluded by ${exclusionSourceLabel()}`);
+    throw excludedError();
+  }
   const abs = resolveRel(file);
 
   // Universal validation - allow following symlinks for read operations
@@ -698,6 +793,11 @@ async function toolRead(args) {
       const reason = validation.reason || 'not a regular file';
       throw new Error(reason);
     }
+  }
+
+  if (validation.isSymlink && isExcludedPath(validation.resolvedRel, false)) {
+    logExcludedAccess('Read', normalizedFile, `target excluded by ${exclusionSourceLabel()}: ${validation.resolvedRel}`);
+    throw excludedError();
   }
 
   // Use resolved path if it's a symlink
@@ -724,6 +824,11 @@ async function toolGrep(args) {
   if (!Number.isInteger(before) || before < 0) throw new Error('before must be a non-negative integer');
   if (!Number.isInteger(after) || after < 0) throw new Error('after must be a non-negative integer');
   const cs = Boolean(caseSensitive);
+  const normalizedFile = file.replace(/\\/g, '/');
+  if (isExcludedPath(normalizedFile, false)) {
+    logExcludedAccess('Grep', normalizedFile, `excluded by ${exclusionSourceLabel()}`);
+    throw excludedError();
+  }
   const abs = resolveRel(file);
 
   // Universal validation - allow following symlinks for grep operations
@@ -738,6 +843,11 @@ async function toolGrep(args) {
       const reason = validation.reason || 'not a regular file';
       throw new Error(reason);
     }
+  }
+
+  if (validation.isSymlink && isExcludedPath(validation.resolvedRel, false)) {
+    logExcludedAccess('Grep', normalizedFile, `target excluded by ${exclusionSourceLabel()}: ${validation.resolvedRel}`);
+    throw excludedError();
   }
 
   // Use resolved path if it's a symlink
@@ -859,6 +969,10 @@ async function toolRGrep(args) {
   if (!ALLOW_RGREP_ROOT && normalizedDir === '') {
     throw new Error('recursive grep on the entire tree from the root is disabled by --no-rgrep-root. Use it on specific subdirectories or start the server without --no-rgrep-root.');
   }
+  if (normalizedDir !== '' && isExcludedPath(normalizedDir, true)) {
+    logExcludedAccess('RGrep', normalizedDir, `excluded by ${exclusionSourceLabel()}`);
+    throw excludedError();
+  }
   const cs = Boolean(caseSensitive);
   const maxFilesLimit = maxFiles || Infinity;
   const abs = resolveRel(normalizedDir);
@@ -882,6 +996,7 @@ async function toolRGrep(args) {
   const CHUNK_SIZE = 1024 * 1024; // 1MB
   const OVERLAP_SIZE = 1024; // 1KB overlap to catch matches at boundaries
   const buffer = Buffer.allocUnsafe(CHUNK_SIZE + OVERLAP_SIZE);
+  const decodeRGrepChunk = RGREP_DECODE_BINARY ? decodeUtf8WithHexEscapes : (chunk) => chunk.toString('utf8');
 
   fileLoop: while (stack.length > 0) {
     const [curAbs, curRel] = stack.pop();
@@ -897,9 +1012,12 @@ async function toolRGrep(args) {
     for (const d of dirents) {
       const rel = (curRel ? curRel + '/' : '') + d.name;
       const full = path.join(curAbs, d.name);
+      const isDir = d.isDirectory();
+      if (isExcludedPath(rel, isDir)) continue;
 
       // Universal validation
       const validation = await validatePath(full, rel);
+      if (validation.type === 'symlink' && isExcludedTarget(validation)) continue;
 
       // Collect warnings for symlinks that are not followed
       if (validation.type === 'symlink' ||
@@ -934,7 +1052,7 @@ async function toolRGrep(args) {
               if (bytesRead === 0) break;
 
               // Convert chunk to string with previous overlap
-              const chunk = decodeUtf8WithHexEscapes(buffer.subarray(0, bytesRead));
+              const chunk = decodeRGrepChunk(buffer.subarray(0, bytesRead));
               const searchText = previousOverlap + chunk;
 
               if (re.test(searchText)) {

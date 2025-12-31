@@ -11,6 +11,7 @@ The `fs-mcp-server` is a production-ready filesystem server that implements the 
 - **Comprehensive operations** - Read, search, list, tree visualization, and grep capabilities
 - **Robust error handling** - Graceful handling of binary files, broken symlinks, and invalid UTF-8
 - **Rich metadata** - File sizes, timestamps, symlink targets, and operation statistics
+- **Exclusions** - Root-level `.mcpignore` for admin-controlled ignores
 
 ## Installation
 
@@ -39,6 +40,9 @@ node fs-mcp-server.js /path/to/directory
 
 # Disable root RGrep (safer for large trees)
 node fs-mcp-server.js --no-rgrep-root /path/to/directory
+
+# Enable RGrep binary decoding (slower; hex-escapes invalid bytes)
+node fs-mcp-server.js --rgrep-decode-binary /path/to/directory
 
 # Use environment variable
 MCP_ROOT=/path/to/directory node fs-mcp-server.js
@@ -183,7 +187,7 @@ Recursively search directory contents.
 - `dir` (string, required) - Directory to search (root allowed by default; start the server with `--no-rgrep-root` to disable)
 - `regex` (string, required) - Regular expression pattern
 - `caseSensitive` (boolean, required) - Case sensitivity
-- `maxFiles` (number) - Maximum files to search
+- `maxFiles` (number) - Maximum matching files to return (search stops after this many matches)
 
 **Features:**
 - Recursive directory traversal
@@ -220,10 +224,21 @@ Hidden files (starting with `.`) are included by default in all operations:
 - Tree displays hidden entries
 - RGrep searches hidden files
 
+### Exclusions (.mcpignore)
+
+Exclusions are admin-only and applied to **all tools**.
+
+- Root-level `.mcpignore` file only (no nested ignore files)
+- Uses full `.gitignore` pattern semantics
+- If `.mcpignore` exists, **no internal defaults** are applied
+- If `.mcpignore` is missing or unreadable, defaults apply: `.git/` and `node_modules/`
+- Explicit access to excluded paths returns ENOENT; traversal skips excluded paths silently
+
 ### Binary File Handling
 
 Binary files are handled gracefully:
-- Invalid UTF-8 bytes shown as hex escapes (e.g., `\xFE`)
+- Read/Grep: invalid UTF-8 bytes are shown as hex escapes (e.g., `\xFE`)
+- RGrep: uses plain UTF-8 decode by default; use `--rgrep-decode-binary` to enable hex-escape decoding
 - Large files include size warnings
 - Binary content remains searchable
 
