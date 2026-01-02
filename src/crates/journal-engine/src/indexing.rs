@@ -272,18 +272,27 @@ pub async fn batch_compute_file_indexes(
 
     // Phase 4: Update registry and cache, then collect responses
     for (key, response) in computed_results {
-        // Update registry and cache on success
-        if let Ok(index) = response {
-            let _ = registry.update_time_range(
-                &key.file,
-                index.start_time(),
-                index.end_time(),
-                index.indexed_at(),
-                index.online(),
-            );
+        match response {
+            Ok(index) => {
+                // Update registry and cache on success
+                registry.update_time_range(
+                    &key.file,
+                    index.start_time(),
+                    index.end_time(),
+                    index.indexed_at(),
+                    index.online(),
+                );
 
-            cache.insert(key.clone(), index.clone());
-            responses.push((key, index));
+                cache.insert(key.clone(), index.clone());
+                responses.push((key, index));
+            }
+            Err(e) => {
+                error!(
+                    "file index computation failed for file={}: {}",
+                    key.file.path(),
+                    e
+                );
+            }
         }
     }
 
