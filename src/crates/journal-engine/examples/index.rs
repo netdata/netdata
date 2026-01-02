@@ -30,10 +30,10 @@
 // # Let's say it's 259:0, Set a 10MB/s read and write limit
 // echo "259:0 rbps=10485760 wbps=10485760" | sudo tee /sys/fs/cgroup/slow-io/io.max
 
+use foundation::Timeout;
 use journal_engine::{
     Facets, FileIndexCacheBuilder, FileIndexKey, QueryTimeRange, batch_compute_file_indexes,
 };
-use foundation::Timeout;
 use journal_index::FieldName;
 use journal_registry::{Monitor, Registry};
 use std::env;
@@ -54,8 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dir = if let Some(arg) = env::args().nth(1) {
         PathBuf::from(arg)
     } else {
-        // PathBuf::from("/mnt/slow-disk/otel-aws")
-        PathBuf::from("/home/vk/repos/tmp/otel-aws")
+        PathBuf::from("/mnt/slow-disk/otel-aws")
     };
 
     info!("scanning directory: {}", dir.display());
@@ -96,7 +95,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let keys: Vec<FileIndexKey> = files
         .iter()
-        .map(|file_info| FileIndexKey::new(&file_info.file, &facets, Some(source_timestamp_field.clone())))
+        .map(|file_info| {
+            FileIndexKey::new(
+                &file_info.file,
+                &facets,
+                Some(source_timestamp_field.clone()),
+            )
+        })
         .collect();
 
     // Create a time range for indexing (24 hours)
@@ -115,14 +120,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Run batch indexing
     let start = std::time::Instant::now();
-    let responses = batch_compute_file_indexes(
-        &cache,
-        &registry,
-        keys,
-        &time_range,
-        timeout,
-    )
-    .await?;
+    let responses =
+        batch_compute_file_indexes(&cache, &registry, keys, &time_range, timeout).await?;
 
     let elapsed = start.elapsed();
 
