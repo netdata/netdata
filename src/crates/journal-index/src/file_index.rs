@@ -94,7 +94,7 @@ impl FileIndex {
     pub fn is_fresh(&self) -> bool {
         if self.was_online {
             let now = Seconds::now();
-            let age = now.get() - self.indexed_at.get();
+            let age = now.get().saturating_sub(self.indexed_at.get());
             age < 1
         } else {
             // Archived/offline file: always fresh
