@@ -309,6 +309,7 @@ export type ToolChoiceMode = 'auto' | 'required';
 export interface ProviderModelConfig {
   overrides?: ProviderModelOverrides;
   reasoning?: ProviderReasoningMapping | null;
+  interleaved?: boolean | string;
   toolChoice?: ToolChoiceMode;
   contextWindow?: number;
   tokenizer?: string;
@@ -738,6 +739,7 @@ export interface TurnRequest {
   onChunk?: (chunk: string, type: 'content' | 'thinking') => void;
   reasoningLevel?: ReasoningLevel;
   reasoningValue?: ProviderReasoningValue | null;
+  interleaved?: boolean | string;
   sendReasoning?: boolean;
   caching?: CachingMode;
   sdkTrace?: boolean;

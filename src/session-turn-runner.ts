@@ -3102,6 +3102,10 @@ export class TurnRunner {
             return providerChoice;
         return undefined;
     }
+    private resolveInterleaved(provider: string, model: string): boolean | string | undefined {
+        const providerConfig = this.ctx.config.providers[provider];
+        return providerConfig.models?.[model]?.interleaved;
+    }
     private resolveModelOverrides(provider: string, model: string): Record<string, number | null> {
         const providers = this.ctx.config.providers;
         const providerConfig = Object.prototype.hasOwnProperty.call(providers, provider)
@@ -3474,6 +3478,7 @@ export class TurnRunner {
             toolChoice: this.resolveToolChoice(provider, model, llmTools.length),
             abortSignal: this.ctx.abortSignal,
             sendReasoning,
+            interleaved: this.resolveInterleaved(provider, model),
             onChunk: (chunk: string, type: 'content' | 'thinking') => {
                 const isRootSession = this.ctx.parentTxnId === undefined;
                 if (type === 'content') {
@@ -3518,6 +3523,7 @@ export class TurnRunner {
             repeatPenalty: effectiveRepeatPenalty ?? null,
             reasoningLevel: effectiveReasoningLevel ?? null,
             reasoningValue: effectiveReasoningValue ?? null,
+            interleaved: this.resolveInterleaved(provider, model) ?? null,
             sendReasoning: sendReasoning ?? null,
             toolChoice: request.toolChoice ?? null,
             tools: llmTools.map((tool) => ({

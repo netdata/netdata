@@ -6177,6 +6177,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         overrideTargetsRef = overrideTargets;
         const overrides: NonNullable<LoadAgentOptions['globalOverrides']> = {
           models: overrideTargets,
+          interleaved: 'reasoning_content',
           temperature: overrideLLMExpected.temperature,
           topP: overrideLLMExpected.topP,
           maxOutputTokens: overrideLLMExpected.maxOutputTokens,
@@ -6232,6 +6233,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(overrideParentLoaded.effective.toolResponseMaxBytes === overrideLLMExpected.toolResponseMaxBytes, 'Parent toolResponseMaxBytes should follow overrides.');
       invariant(overrideParentLoaded.effective.mcpInitConcurrency === overrideLLMExpected.mcpInitConcurrency, 'Parent mcpInitConcurrency should follow overrides.');
       invariant(overrideParentLoaded.effective.stream === overrideLLMExpected.stream, 'Parent stream flag should follow overrides.');
+      const parentInterleaved = overrideParentLoaded.config.providers[PRIMARY_PROVIDER]?.models?.[MODEL_NAME]?.interleaved;
+      invariant(parentInterleaved === 'reasoning_content', 'Parent interleaved override mismatch for run-test-94.');
       invariant(overrideChildLoaded !== undefined, 'Child loaded agent missing for global override test.');
       invariant(overrideChildLoaded.targets === overrideTargetsRef, 'Child targets reference mismatch for global override test.');
       invariant(overrideChildLoaded.targets.every((entry) => entry.provider === PRIMARY_PROVIDER && entry.model === MODEL_NAME), 'Child targets should be overridden to primary provider/model.');
@@ -6247,6 +6250,42 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(overrideChildLoaded.effective.toolResponseMaxBytes === overrideLLMExpected.toolResponseMaxBytes, 'Child toolResponseMaxBytes should follow overrides.');
       invariant(overrideChildLoaded.effective.mcpInitConcurrency === overrideLLMExpected.mcpInitConcurrency, 'Child mcpInitConcurrency should follow overrides.');
       invariant(overrideChildLoaded.effective.stream === overrideLLMExpected.stream, 'Child stream flag should follow overrides.');
+      const childInterleaved = overrideChildLoaded.config.providers[PRIMARY_PROVIDER]?.models?.[MODEL_NAME]?.interleaved;
+      invariant(childInterleaved === 'reasoning_content', 'Child interleaved override mismatch for run-test-94.');
+    },
+  },
+  {
+    id: 'run-test-interleaved-config',
+    description: 'Per-model interleaved config is parsed and preserved.',
+    execute: () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}interleaved-config-`));
+      try {
+        const configPath = path.join(tempDir, 'interleaved-config.json');
+        const configData = {
+          providers: {
+            [PRIMARY_PROVIDER]: {
+              type: 'test-llm',
+              models: {
+                [MODEL_NAME]: {
+                  interleaved: 'reasoning_details',
+                },
+              },
+            },
+          },
+          mcpServers: {},
+          queues: { default: { concurrent: 32 } },
+        } satisfies Configuration;
+        fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), 'utf-8');
+        const loaded = loadConfiguration(configPath);
+        const interleaved = loaded.providers[PRIMARY_PROVIDER]?.models?.[MODEL_NAME]?.interleaved;
+        invariant(interleaved === 'reasoning_details', 'Interleaved config should be preserved for run-test-interleaved-config.');
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+      return Promise.resolve(makeSuccessResult('run-test-interleaved-config'));
+    },
+    expect: (result) => {
+      invariant(result.success, 'Interleaved config test expected success.');
     },
   },
 
@@ -9442,8 +9481,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         convertResponseMessagesExposed(messages: ResponseMessage[], provider: string, model: string, tokens: TokenUsage): ConversationMessage[] {
           return this.convertResponseMessages(messages, provider, model, tokens);
         }
-        convertMessagesExposed(messages: ConversationMessage[]): ModelMessage[] {
-          return this.convertMessages(messages);
+        convertMessagesExposed(messages: ConversationMessage[], options?: { interleaved?: boolean | string }): ModelMessage[] {
+          return this.convertMessages(messages, options);
         }
       }
 
@@ -9505,6 +9544,151 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Reasoning replay test expected success.');
+    },
+  },
+  {
+    id: 'reasoning-interleaved-provider-options',
+    execute: () => {
+      class ExposureProvider extends BaseLLMProvider {
+        name = 'exposure';
+        // eslint-disable-next-line @typescript-eslint/no-useless-constructor -- Expose protected base constructor for testing.
+        constructor() {
+          super();
+        }
+        executeTurn(_request: TurnRequest): Promise<TurnResult> {
+          return Promise.reject(new Error('not implemented'));
+        }
+        protected convertResponseMessages(messages: ResponseMessage[], provider: string, model: string, tokens: TokenUsage): ConversationMessage[] {
+          return this.convertResponseMessagesGeneric(messages, provider, model, tokens);
+        }
+        convertMessagesExposed(messages: ConversationMessage[], interleaved?: boolean | string): ModelMessage[] {
+          return this.convertMessages(messages, { interleaved });
+        }
+      }
+
+      const provider = new ExposureProvider();
+      const firstReasoning = 'First reasoning.';
+      const thirdReasoning = 'Third reasoning.';
+      const conversation: ConversationMessage[] = [
+        {
+          role: 'assistant',
+          content: 'Answer one.',
+          reasoning: [{ type: 'reasoning', text: firstReasoning }],
+        },
+        {
+          role: 'assistant',
+          content: 'Answer two.',
+        },
+        {
+          role: 'assistant',
+          content: 'Answer three.',
+          reasoning: [{ type: 'reasoning', text: thirdReasoning }],
+        },
+      ];
+
+      const messages = provider.convertMessagesExposed(conversation, true);
+      const assistantMessages = messages.filter((msg) => msg.role === 'assistant');
+      invariant(assistantMessages.length === 3, 'Expected three assistant messages for interleaved test.');
+      const [first, second, third] = assistantMessages;
+      const getReasoning = (msg: ModelMessage | undefined): string | undefined => {
+        const options = msg !== undefined && typeof msg === 'object' ? (msg as { providerOptions?: unknown }).providerOptions : undefined;
+        if (options === undefined || options === null || typeof options !== 'object') return undefined;
+        const openaiCompatible = (options as { openaiCompatible?: unknown }).openaiCompatible;
+        if (openaiCompatible === undefined || openaiCompatible === null || typeof openaiCompatible !== 'object') return undefined;
+        return (openaiCompatible as { reasoning_content?: unknown }).reasoning_content as string | undefined;
+      };
+      invariant(getReasoning(first) === firstReasoning, 'First assistant should carry reasoning_content.');
+      invariant(getReasoning(second) === undefined, 'Second assistant should not carry reasoning_content.');
+      invariant(getReasoning(third) === thirdReasoning, 'Third assistant should carry reasoning_content.');
+      const hasReasoningPart = (msg: ModelMessage | undefined): boolean => {
+        if (msg === undefined || msg === null) return false;
+        const content = (msg as { content?: unknown }).content;
+        if (!Array.isArray(content)) return false;
+        return content.some((part) => (part as { type?: string }).type === 'reasoning');
+      };
+      invariant(!hasReasoningPart(first), 'First assistant should not keep reasoning parts in content.');
+      invariant(!hasReasoningPart(third), 'Third assistant should not keep reasoning parts in content.');
+      const inlineConversation: ConversationMessage[] = [
+        {
+          role: 'assistant',
+          content: `Inline reasoning: ${firstReasoning}`,
+          reasoning: [{ type: 'reasoning', text: firstReasoning }],
+        },
+      ];
+      const inlineMessage = provider.convertMessagesExposed(inlineConversation, true).find((msg) => msg.role === 'assistant');
+      invariant(getReasoning(inlineMessage) === undefined, 'Interleaved reasoning should be omitted when already in content.');
+
+      const detailsMessages = provider.convertMessagesExposed(conversation, 'reasoning_details');
+      const detailsFirst = detailsMessages.find((msg) => msg.role === 'assistant');
+      const detailsOptions = detailsFirst !== undefined ? (detailsFirst as { providerOptions?: unknown }).providerOptions : undefined;
+      const detailsOpenai = detailsOptions !== undefined && typeof detailsOptions === 'object'
+        ? (detailsOptions as { openaiCompatible?: unknown }).openaiCompatible
+        : undefined;
+      const detailsField = detailsOpenai !== undefined && typeof detailsOpenai === 'object'
+        ? (detailsOpenai as { reasoning_details?: unknown }).reasoning_details
+        : undefined;
+      invariant(detailsField === firstReasoning, 'Custom interleaved field should be set on assistant message.');
+      return Promise.resolve(makeSuccessResult('reasoning-interleaved-provider-options'));
+    },
+    expect: (result) => {
+      invariant(result.success, 'Interleaved provider options test expected success.');
+    },
+  },
+  {
+    id: 'reasoning-interleaved-sdk-payload',
+    description: 'SDK request payload carries reasoning_content for interleaved assistant messages.',
+    configure: (configuration, sessionConfig) => {
+      const providerConfig = configuration.providers[PRIMARY_PROVIDER] ?? { type: 'test-llm' };
+      const models = providerConfig.models ?? {};
+      const existing = models[MODEL_NAME] ?? {};
+      models[MODEL_NAME] = { ...existing, interleaved: true };
+      providerConfig.models = models;
+      configuration.providers[PRIMARY_PROVIDER] = providerConfig;
+      sessionConfig.traceSdk = true;
+      sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Interleaved SDK payload test expected success.');
+      const traceLogs = result.logs.filter((entry) => entry.severity === 'TRC'
+        && entry.type === 'llm'
+        && entry.message === 'SDK request payload');
+      invariant(traceLogs.length > 0, 'SDK request payload logs missing for interleaved SDK payload test.');
+      const payloads = traceLogs
+        .map((entry) => entry.details?.payload)
+        .filter((payload): payload is string => typeof payload === 'string' && payload.length > 0)
+        .map((payload) => {
+          try {
+            return JSON.parse(payload) as unknown;
+          } catch {
+            return undefined;
+          }
+        })
+        .filter((payload): payload is unknown[] => Array.isArray(payload));
+      invariant(payloads.length > 0, 'Parsed SDK request payloads missing for interleaved SDK payload test.');
+      const assistantMessages = payloads
+        .flatMap((payload) => payload)
+        .filter((msg): msg is Record<string, unknown> => msg !== null && typeof msg === 'object' && !Array.isArray(msg))
+        .filter((msg) => msg.role === 'assistant');
+      invariant(assistantMessages.length > 0, 'Assistant messages missing from SDK request payload for interleaved SDK payload test.');
+      const extractReasoningContent = (msg: Record<string, unknown>): string | undefined => {
+        const providerOptions = msg.providerOptions;
+        if (providerOptions === undefined || providerOptions === null || typeof providerOptions !== 'object') return undefined;
+        const openaiCompatible = (providerOptions as Record<string, unknown>).openaiCompatible;
+        if (openaiCompatible === undefined || openaiCompatible === null || typeof openaiCompatible !== 'object') return undefined;
+        const content = (openaiCompatible as Record<string, unknown>).reasoning_content;
+        return typeof content === 'string' ? content : undefined;
+      };
+      const reasoningValues = assistantMessages
+        .map((msg) => extractReasoningContent(msg))
+        .filter((value): value is string => typeof value === 'string' && value.length > 0);
+      const expectedReasoning = 'Evaluating task before invoking tool.';
+      invariant(reasoningValues.includes(expectedReasoning), 'SDK request payload missing expected reasoning_content value.');
+      const hasReasoningParts = assistantMessages.some((msg) => {
+        const content = msg.content;
+        if (!Array.isArray(content)) return false;
+        return content.some((part) => (part as { type?: unknown }).type === 'reasoning');
+      });
+      invariant(!hasReasoningParts, 'SDK request payload should not include reasoning parts when interleaving is enabled.');
     },
   },
   // =====================================================================

@@ -156,6 +156,7 @@ export interface GlobalOverrides {
   mcpInitConcurrency?: number;
   reasoning?: ReasoningLevel | 'none' | 'inherit';
   reasoningValue?: ProviderReasoningValue | null;
+  interleaved?: boolean | string;
   caching?: 'none' | 'full';
   contextWindow?: number;
   // Silent feature disablement
@@ -405,6 +406,17 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
         custom: mergedCustom,
       };
       config.providers[name] = next;
+    });
+  }
+  const interleavedOverride = options?.globalOverrides?.interleaved;
+  if (interleavedOverride !== undefined) {
+    selectedTargets.forEach(({ provider, model }) => {
+      const providerConfig = config.providers[provider];
+      if (providerConfig === undefined) return;
+      const models = providerConfig.models ?? {};
+      const existingModel = models[model] ?? {};
+      models[model] = { ...existingModel, interleaved: interleavedOverride };
+      providerConfig.models = models;
     });
   }
   const defaults = resolveDefaults(layers);

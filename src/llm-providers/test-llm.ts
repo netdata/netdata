@@ -258,7 +258,7 @@ export class TestLLMProvider extends BaseLLMProvider {
       ? this.filterToolsForFinalTurn(request.tools, request.isFinalTurn === true)
       : request.tools;
     const tools = this.convertTools(toolsForTurn, request.toolExecutor);
-    const messages = super.convertMessages(request.messages);
+    const messages = super.convertMessages(request.messages, { interleaved: request.interleaved });
     const finalMessages = this.buildFinalTurnMessages(messages, request.isFinalTurn === true);
 
     const start = Date.now();
@@ -369,7 +369,7 @@ export class TestLLMProvider extends BaseLLMProvider {
 
     const model = createScenarioLanguageModel(context);
     const tools = this.convertTools([], request.toolExecutor);
-    const messages = super.convertMessages(request.messages);
+    const messages = super.convertMessages(request.messages, { interleaved: request.interleaved });
     const finalMessages = this.buildFinalTurnMessages(messages, true);
     const start = Date.now();
     return await super.executeNonStreamingTurn(model, finalMessages, tools, request, start, undefined);

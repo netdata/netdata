@@ -440,6 +440,15 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     return this.isPlainObject(value);
   }
 
+  private resolveInterleavedField(value?: boolean | string): string | undefined {
+    if (value === true) return 'reasoning_content';
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : undefined;
+    }
+    return undefined;
+  }
+
   protected toProviderOptions(value: ProviderMetadata): ProviderOptions {
     return value as unknown as ProviderOptions;
   }
@@ -2210,7 +2219,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
    * Convert conversation messages to AI SDK format
    * Preserves tool messages which are critical for multi-turn tool conversations
    */
-  protected convertMessages(messages: ConversationMessage[]): ModelMessage[] {
+  protected convertMessages(messages: ConversationMessage[], options?: { interleaved?: boolean | string }): ModelMessage[] {
+    const interleavedField = this.resolveInterleavedField(options?.interleaved);
     // Build a lookup from toolCallId -> toolName using assistant messages
     const callIdToName = new Map<string, string>();
     // eslint-disable-next-line functional/no-loop-statements
@@ -2303,6 +2313,9 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         }
 
         const combinedReasoning = this.mergeReasoningOutputs(reasoningFromMessage, contentReasoningSegments);
+        const interleavedReasoningText = interleavedField !== undefined
+          ? combinedReasoning.map((segment) => segment.text).join('')
+          : '';
         const metadataProvider = m.metadata?.provider;
         const providerSupportsReasoningReplay = this.supportsReasoningReplay()
           || metadataProvider === 'anthropic';
@@ -2336,11 +2349,34 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           finalParts = [...reasoningParts, ...parts];
         }
 
-        if (finalParts.length === 0) {
-          modelMessages.push({ role: 'assistant', content: '' });
-        } else {
-          modelMessages.push({ role: 'assistant', content: finalParts as never });
+        const assistantTextContent = parts.reduce((acc, part) => {
+          if (part.type !== 'text') return acc;
+          return acc + part.text;
+        }, '');
+        const hasInterleavedReasoning = interleavedReasoningText.trim().length > 0;
+        const reasoningAlreadyInContent = hasInterleavedReasoning
+          && assistantTextContent.includes(interleavedReasoningText);
+        const shouldInterleave = interleavedField !== undefined
+          && hasInterleavedReasoning
+          && !shouldIncludeReasoning;
+        const assistantMessage: ModelMessage = finalParts.length === 0
+          ? { role: 'assistant', content: '' }
+          : { role: 'assistant', content: finalParts as never };
+        if (shouldInterleave && !reasoningAlreadyInContent) {
+          const baseOptions = this.isPlainObject(assistantMessage.providerOptions)
+            ? assistantMessage.providerOptions
+            : undefined;
+          const nextOptions: Record<string, unknown> = baseOptions !== undefined ? { ...baseOptions } : {};
+          const existingCompat = this.isPlainObject(nextOptions.openaiCompatible)
+            ? nextOptions.openaiCompatible
+            : {};
+          nextOptions.openaiCompatible = {
+            ...existingCompat,
+            [interleavedField]: interleavedReasoningText,
+          };
+          assistantMessage.providerOptions = nextOptions as ProviderOptions;
         }
+        modelMessages.push(assistantMessage);
         continue;
       }
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition

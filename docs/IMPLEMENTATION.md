@@ -19,7 +19,7 @@ Architecture
 - Environment expansion: `${VAR}` expanded for all strings except under `mcpServers.*.(env|headers)` where literal placeholders are preserved for the server process; these are resolved at spawn/transport time instead.
 - Schema (selected fields):
   - `providers[providerName]`: `{ apiKey?: string; baseUrl?: string }`
-  - `providers[providerName].models[modelName]`: `{ contextWindow?: number; tokenizer?: string; contextWindowBufferTokens?: number; overrides?: ... }`
+  - `providers[providerName].models[modelName]`: `{ contextWindow?: number; tokenizer?: string; contextWindowBufferTokens?: number; overrides?: ...; interleaved?: boolean | string }`
   - `mcpServers[name]`: `{ type: 'stdio'|'websocket'|'http'|'sse', command?: string|[string,...], args?: string[], url?: string, headers?: Record<string,string>, env?: Record<string,string>, enabled?: boolean }`
   - `defaults`: `{ llmTimeout?: number; toolTimeout?: number; temperature?: number; topP?: number; topK?: number; repeatPenalty?: number; contextWindowBufferTokens?: number }`
 

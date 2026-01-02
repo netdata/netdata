@@ -40,7 +40,7 @@ export class AnthropicProvider extends BaseLLMProvider {
       const model = this.provider(request.model);
       const filteredTools = this.filterToolsForFinalTurn(request.tools, request.isFinalTurn);
       const tools = this.convertTools(filteredTools, request.toolExecutor);
-      const messages = super.convertMessages(request.messages);
+      const messages = super.convertMessages(request.messages, { interleaved: request.interleaved });
 
       // Apply cache control to the last message only and remove any prior cache controls to stay within Anthropic limits
       const finalMessages = this.buildFinalTurnMessages(messages, request.isFinalTurn);

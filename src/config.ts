@@ -97,9 +97,12 @@ const ProviderReasoningSchema = z
   ])
   .optional();
 
+const InterleavedSchema = z.union([z.boolean(), z.string().min(1)]);
+
 const ProviderModelConfigSchema = z.object({
   overrides: ProviderModelOverridesSchema.optional(),
   reasoning: ProviderReasoningSchema,
+  interleaved: InterleavedSchema.optional(),
   contextWindow: z.number().int().positive().optional(),
   tokenizer: z.string().optional(),
   contextWindowBufferTokens: z.number().int().positive().optional(),

@@ -1031,6 +1031,7 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
       toolResponseMaxBytes: 'toolResponseMaxBytes',
       'tool-response-max-bytes': 'toolResponseMaxBytes',
       stream: 'stream',
+      interleaved: 'interleaved',
       mcpInitConcurrency: 'mcpInitConcurrency',
       'mcp-init-concurrency': 'mcpInitConcurrency',
       reasoning: 'reasoning',
@@ -1070,6 +1071,14 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
     if (normalized === 'true' || normalized === '1') return true;
     if (normalized === 'false' || normalized === '0') return false;
     throw new Error(`${key} override requires a boolean value (true|false)`);
+  };
+  const parseInterleaved = (raw: string): boolean | string => {
+    const trimmed = raw.trim();
+    const normalized = trimmed.toLowerCase();
+    if (normalized === 'true' || normalized === '1') return true;
+    if (normalized === 'false' || normalized === '0') return false;
+    if (trimmed.length === 0) throw new Error('interleaved override requires a boolean or non-empty string');
+    return trimmed;
   };
 
   // Boolean flags that can be specified without =value (e.g., --override no-batch)
@@ -1151,6 +1160,9 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
       case 'stream':
         overrides.stream = parseBoolean('stream', value);
         break;
+      case 'interleaved':
+        overrides.interleaved = parseInterleaved(value);
+        break;
       case 'reasoning': {
         const normalizedReasoning = value.trim().toLowerCase();
         if (normalizedReasoning === 'default' || normalizedReasoning === 'unset' || normalizedReasoning === 'inherit') {
@@ -1187,7 +1199,7 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
         overrides.noProgress = value === '' ? true : parseBoolean('noProgress', value);
         break;
       default:
-        throw new Error(`unsupported override key '${rawKey}'; expected keys like models, maxOutputTokens, temperature, contextWindow, no-batch, no-progress`);
+        throw new Error(`unsupported override key '${rawKey}'; expected keys like models, maxOutputTokens, temperature, interleaved, contextWindow, no-batch, no-progress`);
     }
   });
   return overrides;

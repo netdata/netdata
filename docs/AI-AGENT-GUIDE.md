@@ -223,7 +223,7 @@ Use the research agent whenever you need canonical company data; use the sweeps 
 - **Providers (`providers.<name>`)**:
   - Required `type`: one of `openai`, `anthropic`, `google`, `openrouter`, `ollama`, `test-llm`.
   - Optional `apiKey`, `baseUrl`, `headers`, `custom` provider-specific payloads, `toolsAllowed/Denied`, `reasoning` mapping (single value or tuple per reasoning level), `contextWindow`, `tokenizer`, `contextWindowBufferTokens`.
-  - `models.<model>` supports `overrides.temperature/topP/topK/repeatPenalty`, reasoning entries, `contextWindow`, `tokenizer`, `contextWindowBufferTokens`.
+  - `models.<model>` supports `overrides.temperature/topP/topK/repeatPenalty`, reasoning entries, `interleaved` (boolean or field name), `contextWindow`, `tokenizer`, `contextWindowBufferTokens`.
 - **MCP servers (`mcpServers.<name>`)**:
   - Fields: `type` (`stdio|websocket|http|sse`), `command` + `args` (for stdio), `url`, `headers`, `env`, `enabled`, `toolSchemas`, `toolsAllowed/Denied`.
   - Legacy aliases `type=local/remote` auto-normalize.
@@ -457,7 +457,7 @@ OpenAI‑compatible providers enable `includeUsage` for streaming token usage by
 | 5 | Internal hardcoded defaults | Temperature 0.0, topP null, topK null, repeatPenalty null, llmTimeout 600 000 ms, toolTimeout 300 000 ms, maxRetries 3, maxTurns 10, maxToolCallsPerTurn 10, toolResponseMaxBytes 12 288 bytes, stream false.
 
 - **Sub-agent propagation**: Parent sessions pass effective options (post-override) when launching child sessions unless the child frontmatter/CLI overrides them. `defaultsForUndefined` ensures missing knobs inherit the parent’s resolved values.
-- **Runtime overrides**: `--override key=value` (applies to all agents) and `--models`/`--tools` CLI args feed `globalOverrides`. Use sparingly.
+- **Runtime overrides**: `--override key=value` (applies to all agents) and `--models`/`--tools` CLI args feed `globalOverrides`. Use sparingly. `--override interleaved=true|false|<field>` forces per-model interleaved replay for every selected target.
 
 **Checklist**
 - [ ] Decide which layer owns each knob; avoid mixing frontmatter + CLI for the same setting unless necessary.

@@ -216,6 +216,18 @@ omit a parameter entirely.
 In this example `meta-llama/llama-3` never receives a `top_p` value, while
 `openai/gpt-4o-mini` always uses the specified temperature and top-p values.
 
+#### Interleaved reasoning replay (per-model)
+
+Some models require their previous reasoning to be replayed using provider-native fields.
+Use `models.<model>.interleaved` to enable this replay. It accepts:
+- `true` → inject `reasoning_content`
+- `"reasoning_content"` or any other string → inject that field name
+
+When enabled, reasoning segments are removed from the assistant content and the merged
+reasoning text is injected into `providerOptions.openaiCompatible.<field>` for **each**
+assistant message that has reasoning (unless that reasoning text already appears verbatim in the
+assistant message content for the same turn).
+
 ### Command Line vs Configuration Priority
 - **Flags override config**: Command line options override configuration file settings
 - **Defaults in config**: All timeout, limit, and model parameters can be set in the config file under `"defaults"`
