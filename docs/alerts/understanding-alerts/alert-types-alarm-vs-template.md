@@ -1,104 +1,113 @@
 # 1.2 Alert Types: `alarm` vs `template`
 
-A Netdata alert can be defined in two ways, depending on **how broadly you want the rule to apply**:
-
-- **`alarm`** a rule attached to a **specific chart instance**
-- **`template`** a rule attached to a **context**, applied to **all charts that match that context**
-
 :::note
 
-Both use the same health engine and evaluation logic; they differ only in **scope**.
+The distinction between `alarm` and `template` is a legacy feature. Netdata is moving toward a unified alert definition format (YAML-based) where both will be consolidated into a single alert type. The `alarm` syntax is essentially a subset of `template` functionality. For new alert definitions, **use `template` exclusively**.
 
 :::
 
-## `alarm`: Chart-Specific Alerts
+## The Unified Alert Model
 
-An **`alarm`** is a chart-specific alert. It is tied to **one particular chart** on a node.
+In Netdata, alerts are rules that monitor metrics from charts and assign a status. While the current configuration syntax has two forms (`alarm` and `template`), they share the same underlying mechanisms.
 
 | Aspect | Description |
 |--------|-------------|
-| **Scope** | Exactly one chart (for example, a particular filesystem usage chart or a single network interface chart) |
-| **Use when** | You know exactly which chart you want to monitor and you want instance-specific thresholds or behavior |
-| **Examples** | • Alert if the **root filesystem** on this node is more than 90% full<br/>• Alert if **eth0** has packet error rate above a threshold |
-| **Characteristics** | • The `alarm` definition targets a single chart, so it only exists where that chart exists<br/>• If that chart is not present on a given node, the alert is not created on that node<br/>• You can define multiple different `alarm` rules for different charts on the same host |
+| **Unified evaluation** | Both use the same health engine and evaluation logic |
+| **Scope** | The rule can target one specific chart or all charts of a context |
+| **Future direction** | Both will be unified into a single YAML-based alert definition format |
 
-:::note
+## `template`: The Preferred Alert Type
 
-Detailed syntax for the `alarm` line and how it references a chart is covered in **Chapter 3: Alert Configuration Syntax**.
-
-:::
-
-## `template`: Context-Based Alerts
-
-A **`template`** is a context-based alert. It is attached to a **context** (a chart "family" or type) and automatically applies to **all charts that belong to that context**.
+A **template** is the recommended way to define alerts. It is attached to a **context** (a chart "family" or type) and automatically applies to **all charts that match that context**.
 
 | Aspect | Description |
 |--------|-------------|
 | **Scope** | All charts that share the same context (for example, all disks, all network interfaces, all containers) |
 | **Use when** | You want one rule to monitor every instance of a type without writing separate alerts for each chart |
 | **Examples** | • Alert if **any network interface** uses more than 90% of its bandwidth<br/>• Alert if **any filesystem** on the host has less than 5% free space<br/>• Alert if **any container** exceeds a CPU utilization threshold |
-| **Characteristics** | • The `template` definition is written once per context<br/>• At runtime, the health engine automatically instantiates this template for every chart that matches that context<br/>• New charts of that context (for example, a new disk or container) automatically inherit the alert without additional configuration |
+| **Benefits** | • Written once per context<br/>• Automatically instantiated for every matching chart<br/>• New charts automatically inherit the alert |
 
-:::note
+## `alarm`: Legacy Chart-Specific Syntax
 
-The exact rules for how contexts are matched and how templates are instantiated are described in **Chapter 3: Alert Configuration Syntax**.
+An **alarm** is a legacy syntax for defining chart-specific alerts. It is tied to **one particular chart** on a node.
+
+:::note 
+
+Deprecation Notice
+The `alarm` syntax is maintained for backward compatibility. New alert definitions should use `template` exclusively. In future versions, both will be consolidated into a unified YAML format.
 
 :::
 
-## When to Use `alarm` vs `template`
+| Aspect | Description |
+|--------|-------------|
+| **Scope** | Exactly one chart (for example, a particular filesystem usage chart or a single network interface chart) |
+| **When to use** | Legacy configurations only; new definitions should use `template` |
+| **Characteristics** | Targets a single chart; exists only where that chart exists |
 
-Both `alarm` and `template` use the same underlying mechanisms (metric lookups, expressions, thresholds). The difference is entirely about **how widely the rule applies**.
-
+## Why Prefer `template`?
 ```mermaid
 flowchart TD
-    Start("Do you need to monitor<br/>multiple similar components?")
-    Start -->|Yes| Multiple("**Use `template`**<br/>One rule applies to all<br/>matching charts automatically")
-    Start -->|No| Single("**Use `alarm`**<br/>Target one specific<br/>chart instance")
-    Multiple --> Examples1("**Examples:**<br/>- All network interfaces<br/>- All filesystems<br/>- All containers<br/>- All disk devices")
-    Single --> Examples2("**Examples:**<br/>- Root filesystem only<br/>- eth0 interface only<br/>- Specific database volume<br/>- Critical service chart")
-    Multiple --> Benefits1("**Benefits:**<br/>✓ Auto-covers new instances<br/>✓ Consistent thresholds<br/>✓ Less configuration")
-    Single --> Benefits2("**Benefits:**<br/>✓ Instance-specific thresholds<br/>✓ Special cases<br/>✓ Fine-grained control")
-%% Style definitions
+    Start("Do you need to monitor<br/>a specific chart instance?")
+    Start -->|No| Template("Use **`template`**<br/>One rule applies to all<br/>matching charts automatically")
+    Start -->|Yes| TemplateScoped("Use **`template`** with<br/>specific context match<br/>instead of `alarm` syntax")
+    TemplateScoped --> Explain["Define context and<br/>specific dimension/chart<br/>to target one instance"]
+    Template --> Benefits("**Benefits:**<br/>✓ Future-proof syntax<br/>✓ Unified configuration<br/>✓ Easier migration to YAML")
+    Explain --> Benefits
+    
     classDef decision fill: #2196F3, stroke: #000000, stroke-width: 3px, color: #ffffff, font-size: 16px
     classDef template fill: #4caf50, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
-    classDef alarm fill: #ffeb3b, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
-    classDef examples fill: #f9f9f9, stroke: #000000, stroke-width: 2px, color: #000000, font-size: 14px
+    classDef explain fill: #f9f9f9, stroke: #000000, stroke-width: 2px, color: #000000, font-size: 14px
     classDef benefits fill: #f9f9f9, stroke: #000000, stroke-width: 2px, color: #000000, font-size: 14px
-%% Apply styles
+    
     class Start decision
-    class Multiple template
-    class Single alarm
-    class Examples1 examples
-    class Examples2 examples
-    class Benefits1 benefits
-    class Benefits2 benefits
+    class Template,TemplateScoped template
+    class Explain explain
+    class Benefits benefits
 ```
 
-Use **`alarm`** when:
-
-- You need a rule for **one specific chart**, not all similar ones
-- A particular instance is more important or behaves differently (for example, a critical database volume vs generic disks)
-- You want **special thresholds** for a single chart that differ from the generic rule
-
-Use **`template`** when:
-
+Use **template** when:
 - You want **consistent monitoring** across all disks, interfaces, containers, or other repeated components
 - You expect new instances to appear over time and want them **automatically covered**
-- You prefer **shorter, more generic configuration** instead of many per-chart rules
+- You are **creating new alert definitions** (strongly preferred over `alarm`)
+- You want **future compatibility** with the upcoming YAML format
 
-A common pattern in real deployments is to:
+## How to Target a Specific Chart with `template`
 
-- Define a **template** for general coverage of a context
-- Add one or more **chart-specific alarms** on top for special cases that require different thresholds or behavior
+If you need to target a specific chart instance (the use case for legacy `alarm`), use `template` with scoped context matching:
+
+- Specify the exact context dimension or filter
+- Use `from` and `to` options to narrow scope
+- This approach migrates cleanly to the future YAML format
+
+Example (legacy `alarm` vs equivalent `template`):
+```yaml
+# Legacy alarm syntax (discouraged)
+alarm: disk_fill_alarm
+    on: disk space
+    to: disk
+    units: %
+    every: 10s
+    warn: $this > 80
+    crit: $this > 90
+
+# Preferred template syntax (future-compatible)
+template: disk_fill_alarm
+    on: disk space
+    dimensions: /var/lib
+    warn: $this > 80
+    crit: $this > 90
+```
 
 ## Key Takeaways
 
-- **`alarm`** = one rule → **one chart instance** (chart-specific alert)
-- **`template`** = one rule → **all charts of a context** (context-based alert)
-- Both are evaluated by the same health engine on the Agent/Parent; only the **scope** differs
+- **`template`** is the **recommended and future-proof** way to define alerts
+- **`alarm`** is legacy syntax maintained for backward compatibility only
+- Both use the same health engine; only the **scope and syntax** differ
+- New alert definitions should **exclusively use `template`**
+- Netdata is moving toward a **unified YAML format** that will replace both
 
 ## What's Next
 
 - **1.3 Where Alerts Live (Files, Agent, Cloud)** File locations for stock vs custom alerts, and how Cloud-defined alerts integrate with file-based configuration
-- **Chapter 2: Creating and Managing Alerts** How to create/edit `alarm` and `template` rules via config files and Netdata Cloud UI
-- **Chapter 3: Alert Configuration Syntax** The exact configuration lines and options for defining alarms and templates
+- **Chapter 2: Creating and Managing Alerts** How to create/edit alert rules via config files and Netdata Cloud UI
+- **Chapter 3: Alert Configuration Syntax** The exact configuration lines and options for defining template-based alerts
