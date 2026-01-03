@@ -11,7 +11,57 @@
       ],
       "stringSchemaFormatsDenied": [
         "uri"
-      ]
+      ],
+      "models": {
+        "minimax-m2.1": {
+          "contextWindow": 196608,
+          "reasoning": null,
+          "interleaved": true,
+          "overrides": {
+          }
+        },
+        "minimax-m2": {
+          "contextWindow": 196608,
+          "reasoning": null,
+          "interleaved": true,
+          "overrides": {
+          }
+        },
+        "gpt-oss-20b": {
+          "contextWindow": 131072,
+          "interleaved": false,
+          "overrides": {
+          }
+        },
+        "glm-4.7": {
+          "contextWindow": 202752,
+          "reasoning": null,
+          "interleaved": true,
+          "overrides": {
+          }
+        },
+        "glm-4.6": {
+          "contextWindow": 202752,
+          "reasoning": null,
+          "interleaved": false,
+          "overrides": {
+          }
+        },
+        "glm-4.5": {
+          "contextWindow": 131072,
+          "reasoning": null,
+          "interleaved": false,
+          "overrides": {
+          }
+        },
+        "glm-4.5-air": {
+          "contextWindow": 131072,
+          "reasoning": null,
+          "interleaved": false,
+          "overrides": {
+          }
+        }
+      }
     },
     "vllm1": {
       "type": "openai-compatible",
