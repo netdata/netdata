@@ -79,7 +79,7 @@ int do_GetPowerSupply(int update_every, usec_t dt __maybe_unused)
 
     HDEVINFO hdev = SetupDiGetClassDevs(&GUID_DEVCLASS_BATTERY, 0, 0, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
     if (hdev == INVALID_HANDLE_VALUE)
-        return 1;
+        return -1;
 
     SP_DEVICE_INTERFACE_DATA did = {0};
     did.cbSize = sizeof(did);

@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/blang/semver/v4"
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/stdlib"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
 // 'SHOW STATS;' response was changed significantly in v1.8.0
@@ -264,12 +264,12 @@ func (c *Collector) openConnection() error {
 	if err != nil {
 		return err
 	}
-	cfg.PreferSimpleProtocol = true
 
-	db, err := sql.Open("pgx", stdlib.RegisterConnConfig(cfg))
-	if err != nil {
-		return fmt.Errorf("error on opening a connection with the PgBouncer database [%s]: %v", c.DSN, err)
-	}
+	cfg.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+
+	db := stdlib.OpenDB(*cfg, stdlib.OptionShouldPing(func(_ context.Context, _ stdlib.ShouldPingParams) bool {
+		return false
+	}))
 
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)

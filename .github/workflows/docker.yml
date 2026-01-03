@@ -257,7 +257,7 @@ jobs:
       - name: Upload Cache
         id: upload-cache
         if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v5.0.0
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: cache-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/build-cache/*
@@ -338,7 +338,7 @@ jobs:
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
       - name: Download Cache
         id: fetch-cache
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: cache-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/build-cache
@@ -381,7 +381,7 @@ jobs:
       - name: Upload digest
         id: upload-digest
         if: github.repository == 'netdata/netdata'
-        uses: actions/upload-artifact@v5.0.0
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: docker-digests-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/digests/*
@@ -427,7 +427,7 @@ jobs:
         uses: actions/checkout@v6
       - name: Download digests
         id: fetch-digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: /tmp/digests
           pattern: docker-digests-*
@@ -495,7 +495,7 @@ jobs:
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
       - name: Download Cache
         id: fetch-cache
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: cache-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/build-cache
@@ -539,7 +539,7 @@ jobs:
       - name: Upload digest
         id: upload-digest
         if: github.repository == 'netdata/netdata'
-        uses: actions/upload-artifact@v5.0.0
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: quay-digests-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/digests/*
@@ -585,7 +585,7 @@ jobs:
         uses: actions/checkout@v6
       - name: Download digests
         id: fetch-digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: /tmp/digests
           pattern: quay-digests-*
@@ -654,7 +654,7 @@ jobs:
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
       - name: Download Cache
         id: fetch-cache
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: cache-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/build-cache
@@ -698,7 +698,7 @@ jobs:
       - name: Upload digest
         id: upload-digest
         if: github.repository == 'netdata/netdata'
-        uses: actions/upload-artifact@v5.0.0
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: ghcr-digests-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/digests/*
@@ -744,7 +744,7 @@ jobs:
         uses: actions/checkout@v6
       - name: Download digests
         id: fetch-digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: /tmp/digests
           pattern: ghcr-digests-*

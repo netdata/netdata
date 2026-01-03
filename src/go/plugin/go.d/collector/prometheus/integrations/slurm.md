@@ -24,7 +24,7 @@ Module: prometheus
 Track Slurm workload manager metrics for efficient high-performance computing (HPC) and cluster management.
 
 
-Metrics are gathered by periodically sending HTTP requests to [slurm exporter](https://github.com/vpenso/prometheus-slurm-exporter).
+Metrics are gathered by periodically sending HTTP requests to [slurm exporter](https://github.com/SckyzO/slurm_exporter).
 
 
 This collector is supported on all platforms.
@@ -97,7 +97,7 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Install Exporter
 
-Install [slurm exporter](https://github.com/vpenso/prometheus-slurm-exporter) by following the instructions mentioned in the exporter README.
+Install [slurm exporter](https://github.com/SckyzO/slurm_exporter) by following the instructions mentioned in the exporter README.
 
 
 

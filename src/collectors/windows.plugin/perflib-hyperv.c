@@ -439,7 +439,7 @@ void initialize_hyperv_root_partition_keys(struct hypervisor_root_partition *p)
     p->IOTLBFlushesSec.key = "I/O TLB Flushes/sec";
     p->AddressSpaces.key = "Address Spaces";
     p->VirtualTLBPages.key = "Virtual TLB Pages";
-    p->VirtualTLBFlushEntiresSec.key = "Virtual TLB Flush Entires/sec";
+    p->VirtualTLBFlushEntiresSec.key = "Virtual TLB Flush Entries/sec";
 }
 
 // Callback function for inserting root partition metrics into the dictionary
@@ -1557,7 +1557,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_PACKETS,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_BROADCAST_PACKETS,
                 update_every,
                 RRDSET_TYPE_LINE);
 
