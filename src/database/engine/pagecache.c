@@ -873,6 +873,8 @@ ALWAYS_INLINE_HOT void pg_cache_preload(struct rrdeng_query_handle *handle) {
         completion_init(&handle->pdc->page_completion);
         completion_mark_complete(&handle->pdc->prep_completion);
         completion_mark_complete(&handle->pdc->page_completion);
+        pdc_release_and_destroy_if_unreferenced(handle->pdc, true, true);
+        handle->pdc = NULL;
         return;
     }
     handle->pdc->start_time_s = handle->start_time_s;
