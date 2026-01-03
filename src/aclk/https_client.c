@@ -737,20 +737,11 @@ err_exit:
 
 static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
 {
-    X509 *err_cert;
-    int err, depth;
-    char *err_str;
+    int err = 0;
 
     if (!preverify_ok) {
         err = X509_STORE_CTX_get_error(ctx);
-        depth = X509_STORE_CTX_get_error_depth(ctx);
-        err_cert = X509_STORE_CTX_get_current_cert(ctx);
-        err_str = X509_NAME_oneline(X509_get_subject_name(err_cert), NULL, 0);
-
-        netdata_log_error("Cert Chain verify error:num=%d:%s:depth=%d:%s", err,
-                 X509_verify_cert_error_string(err), depth, err_str);
-
-        free(err_str);
+        netdata_ssl_log_verify_error(ctx);
     }
 
     if(cloud_config_insecure_get()) {

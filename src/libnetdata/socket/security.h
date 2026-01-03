@@ -53,4 +53,6 @@ ssize_t netdata_ssl_peek(NETDATA_SSL *ssl, void *buf, size_t num);
 ssize_t netdata_ssl_pending(NETDATA_SSL *ssl);
 bool netdata_ssl_has_pending(NETDATA_SSL *ssl);
 
+void netdata_ssl_log_verify_error(X509_STORE_CTX *ctx);
+
 #endif //NETDATA_SECURITY_H
