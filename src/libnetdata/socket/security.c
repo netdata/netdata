@@ -864,19 +864,34 @@ void netdata_ssl_log_verify_error(X509_STORE_CTX *ctx) {
     int depth = X509_STORE_CTX_get_error_depth(ctx);
     X509 *err_cert = X509_STORE_CTX_get_current_cert(ctx);
 
+    // Check if certificate and subject name are available
+    X509_NAME *subject_name = err_cert ? X509_get_subject_name(err_cert) : NULL;
+    if (!subject_name)
+        goto fallback;
+
     BIO *bio = BIO_new(BIO_s_mem());
-    if (bio) {
-        X509_NAME_print_ex(bio, X509_get_subject_name(err_cert), 0, XN_FLAG_ONELINE);
-        char *data = NULL;
-        long len = BIO_get_mem_data(bio, &data);
+    if (!bio)
+        goto fallback;
+
+    // X509_NAME_print_ex returns negative on error
+    if (X509_NAME_print_ex(bio, subject_name, 0, XN_FLAG_ONELINE) < 0) {
+        BIO_free(bio);
+        goto fallback;
+    }
+
+    char *data = NULL;
+    long len = BIO_get_mem_data(bio, &data);
+    if (len > 0 && data) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "SSL: certificate verify error %d:%s at depth %d, subject: %.*s",
                err, X509_verify_cert_error_string(err), depth, (int)len, data);
         BIO_free(bio);
+        return;
     }
-    else {
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "SSL: certificate verify error %d:%s at depth %d",
-               err, X509_verify_cert_error_string(err), depth);
-    }
+    BIO_free(bio);
+
+fallback:
+    nd_log(NDLS_DAEMON, NDLP_ERR,
+           "SSL: certificate verify error %d:%s at depth %d",
+           err, X509_verify_cert_error_string(err), depth);
 }
