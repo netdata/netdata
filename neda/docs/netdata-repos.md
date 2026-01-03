@@ -105,6 +105,8 @@ UI components and visualization
 - netdata/netdata-ui: UI components library and toolkit (public)
 - netdata/charts: Frontend charting SDK and visualization library (public)
 
+Users can download the latest compiled Netdata Cloud UI (or Netdata UI for short, commonly referred as Netdata Dashboard too) compiled. No source code is publicly available. The Netdata Agent installer downloads and installs the latest version of the UI and it is also publicly available via cloudflare.
+
 ### AI Assistants
 
 All in-app AI features which require observability data (troubleshooting, root cause analysis, alert analysis, reporting, etc) are handled by the cloud-insights-service:
