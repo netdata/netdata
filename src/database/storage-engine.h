@@ -168,6 +168,9 @@ static void storage_engine_store_metric(
     STORAGE_COLLECT_HANDLE *sch, usec_t point_in_time_ut,
     NETDATA_DOUBLE n, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value,
     uint16_t count, uint16_t anomaly_count, SN_FLAGS flags) {
+    if(unlikely(!sch))
+        return;
+
     internal_fatal(!is_valid_backend(sch->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
@@ -288,6 +291,9 @@ int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *sch);
 // returns 1 if it's safe to delete the dimension
 
 static inline int storage_engine_store_finalize(STORAGE_COLLECT_HANDLE *sch) {
+    if(unlikely(!sch))
+        return 1;  // safe to delete if no handle
+
     internal_fatal(!is_valid_backend(sch->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
@@ -304,6 +310,9 @@ void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch
 void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every);
 
 static inline void storage_engine_store_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every) {
+    if(unlikely(!sch))
+        return;
+
     internal_fatal(!is_valid_backend(sch->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE

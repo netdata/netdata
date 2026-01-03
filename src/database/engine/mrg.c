@@ -124,7 +124,9 @@ bool mrg_metric_release_and_delete(MRG *mrg, METRIC *metric) {
 
 ALWAYS_INLINE
 METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric) {
-    metric_acquire(mrg, metric);
+    if(!metric_acquire(mrg, metric))
+        return NULL;
+
     return metric;
 }
 
