@@ -36,6 +36,7 @@ CFLAGS="${BUILD_CFLAGS}" /usr/bin/cmake \
     -G "${generator}" \
     -DCMAKE_INSTALL_PREFIX="/opt/netdata" \
     -DBUILD_FOR_PACKAGING=On \
+    -DPACKAGE_TYPE=windows \
     -DNETDATA_USER="${USER}" \
     -DENABLE_ACLK=On \
     -DENABLE_CLOUD=On \
