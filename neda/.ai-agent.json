@@ -552,6 +552,30 @@
         "update_pull_request_branch"
       ]
     },
+    "github-support": {
+      "type": "stdio",
+      "queue": "github",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      },
+      "enabled": true,
+      "toolsAllowed": [
+        "list_issues",
+        "search_issues",
+        "get_issue",
+        "get_pull_request",
+        "list_pull_requests",
+        "get_pull_request_status",
+        "get_pull_request_comments",
+        "get_pull_request_reviews"
+      ],
+      "toolsDenied": []
+    },
     "context7": {
       "type": "http",
       "url": "https://mcp.context7.com/mcp",
