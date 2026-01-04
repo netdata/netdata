@@ -132,6 +132,7 @@
 - Chore(go.d/pgbouncer): use jackc/pgx/v5 ([#21510](https://github.com/netdata/netdata/issues/21510))
 - Fix: add procfile parsing for non-seekable files ([#21507](https://github.com/netdata/netdata/issues/21507))
 - Build(deps): bump github.com/godbus/dbus/v5 from 5.2.1 to 5.2.2 in /src/go ([#21511](https://github.com/netdata/netdata/issues/21511))
+- Fix race condition during journal file deletion ([#21512](https://github.com/netdata/netdata/issues/21512))
 
 ## [2.8.0] - 2025-11-19
 
