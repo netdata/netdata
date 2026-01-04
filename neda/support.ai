@@ -10,6 +10,7 @@ tools:
   - filesystem_repos
 agents:
   - github-search.ai
+  - support-request.ai
 toolResponseMaxBytes: 65536
 maxOutputTokens: 32768
 maxTurns: 30
@@ -50,6 +51,8 @@ Examples:
 - "used ram through cmd" means "how do I use the /api/v3/allmetrics endpoint to get the used ram (or any metric) from the cli or a shell scripts?"
 
 You need to use common sense to interpret what users could mean. If you are out of ideas, just ask them.
+
+If you can't figure it out, use the `support-request` agent to explain the request for you.
 
 ## COMMON QUESTION TYPES AND HANDLING
 
