@@ -33,7 +33,7 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.57",
     "@ai-sdk/google": "^2.0.52",
-    "@ai-sdk/openai": "^2.0.89",
+    "@ai-sdk/openai": "^3.0.2",
     "@ai-sdk/openai-compatible": "^1.0.30",
     "@ai-sdk/provider-utils": "^3.0.20",
     "@anthropic-ai/tokenizer": "^0.0.4",
