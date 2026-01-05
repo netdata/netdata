@@ -2,7 +2,7 @@
 /**
  * Minimal MCP stdio server.
  *
- * Usage: node fs-mcp-server.js [--no-rgrep-root] [--rgrep-decode-binary] <ROOT_DIR>
+ * Usage: node fs-mcp-server.js [--no-rgrep-root] [--no-tree-root] [--rgrep-decode-binary] <ROOT_DIR>
  * - All tool paths are relative to <ROOT_DIR>
  * - '..' segments are forbidden in any input path
  * - Absolute paths are not allowed
@@ -46,15 +46,20 @@ function respondError(id, code, message, data) {
 }
 
 // -------------------------- Root and path safety --------------------------
-const USAGE = 'Usage: node fs-mcp-server.js [--no-rgrep-root] [--rgrep-decode-binary] <ROOT_DIR>';
+const USAGE = 'Usage: node fs-mcp-server.js [--no-rgrep-root] [--no-tree-root] [--rgrep-decode-binary] <ROOT_DIR>';
 
 function parseArgs(argv) {
   let allowRGrepRoot = true;
+  let allowTreeRoot = true;
   let rgrepDecodeBinary = false;
   let rootArg;
   for (const arg of argv) {
     if (arg === '--no-rgrep-root') {
       allowRGrepRoot = false;
+      continue;
+    }
+    if (arg === '--no-tree-root') {
+      allowTreeRoot = false;
       continue;
     }
     if (arg === '--rgrep-decode-binary') {
@@ -74,10 +79,10 @@ function parseArgs(argv) {
     console.error(USAGE);
     process.exit(1);
   }
-  return { allowRGrepRoot, rgrepDecodeBinary, rootArg };
+  return { allowRGrepRoot, allowTreeRoot, rgrepDecodeBinary, rootArg };
 }
 
-const { allowRGrepRoot, rgrepDecodeBinary, rootArg } = parseArgs(process.argv.slice(2));
+const { allowRGrepRoot, allowTreeRoot, rgrepDecodeBinary, rootArg } = parseArgs(process.argv.slice(2));
 
 const ROOT = (() => {
   // console.error('MCP: Starting fs-mcp-server.js with args:', process.argv.slice(2));
@@ -111,6 +116,7 @@ const ROOT = (() => {
 })();
 
 const ALLOW_RGREP_ROOT = allowRGrepRoot;
+const ALLOW_TREE_ROOT = allowTreeRoot;
 const RGREP_DECODE_BINARY = rgrepDecodeBinary;
 
 const IGNORE_FILE = '.mcpignore';
@@ -575,6 +581,7 @@ function buildRegex(pattern, caseSensitive, global = false) {
 async function toolListDir(args) {
   const { dir, showSize, showLastModified, showCreated } = args;
   if (typeof dir !== 'string') throw new Error('dir must be a string');
+  if (dir.length === 0) throw new Error("dir must be a non-empty string (use '.' for root)");
   const normalizedDir = dir === '.' ? '' : dir;
   if (normalizedDir !== '' && isExcludedPath(normalizedDir, true)) {
     logExcludedAccess('ListDir', normalizedDir, `excluded by ${exclusionSourceLabel()}`);
@@ -661,7 +668,7 @@ async function toolListDir(args) {
   }
 
   // Add summary at the end
-  const summary = `\n${fileCount} file${fileCount !== 1 ? 's' : ''} and ${dirCount} director${dirCount !== 1 ? 'ies' : 'y'} in ${dir || 'root'}`;
+  const summary = `\n${fileCount} file${fileCount !== 1 ? 's' : ''} and ${dirCount} director${dirCount !== 1 ? 'ies' : 'y'} in ${dir}`;
   lines.push(summary);
 
   return lines.join('\n');
@@ -670,9 +677,9 @@ async function toolListDir(args) {
 async function toolTree(args) {
   const { dir, showSize } = args;
   if (typeof dir !== 'string') throw new Error('dir must be a string');
-  // Refuse to list entire tree for empty dir or '.'
-  if (dir === '' || dir === '.') {
-    throw new Error('Traversing the entire tree from the root is not allowed due to size limitations. Use it on specific subdirectories.');
+  if (dir.length === 0) throw new Error("dir must be a non-empty string (use '.' for root)");
+  if (dir === '.' && !ALLOW_TREE_ROOT) {
+    throw new Error('recursive tree on the entire root is disabled by --no-tree-root. Use it on specific subdirectories or start the server without --no-tree-root.');
   }
   const normalizedDir = dir === '.' ? '' : dir;
   if (normalizedDir !== '' && isExcludedPath(normalizedDir, true)) {
@@ -707,6 +714,7 @@ async function toolTree(args) {
 async function toolFind(args) {
   const { dir, glob } = args;
   if (typeof dir !== 'string') throw new Error('dir must be a string');
+  if (dir.length === 0) throw new Error("dir must be a non-empty string (use '.' for root)");
   if (typeof glob !== 'string') throw new Error('glob must be a string');
   const normalizedDir = dir === '.' ? '' : dir;
   if (normalizedDir !== '' && isExcludedPath(normalizedDir, true)) {
@@ -752,7 +760,7 @@ async function toolFind(args) {
   });
 
   // Build output with statistics
-  const summary = `${matches.length} file${matches.length !== 1 ? 's' : ''} matched under ${dir || 'root'}, examined ${stats.filesExamined} file${stats.filesExamined !== 1 ? 's' : ''} in ${stats.dirsExamined} director${stats.dirsExamined !== 1 ? 'ies' : 'y'}`;
+  const summary = `${matches.length} file${matches.length !== 1 ? 's' : ''} matched under ${dir}, examined ${stats.filesExamined} file${stats.filesExamined !== 1 ? 's' : ''} in ${stats.dirsExamined} director${stats.dirsExamined !== 1 ? 'ies' : 'y'}`;
 
   const output = [];
 
@@ -771,8 +779,8 @@ async function toolRead(args) {
   const { file, start, lines, headOrTail } = args;
   if (typeof file !== 'string') throw new Error('file must be a string');
   if (!Number.isInteger(start) || start < 0) throw new Error('start must be a non-negative integer');
-  if (!Number.isInteger(lines) || lines < 0) throw new Error('lines must be a non-negative integer');
-  const mode = headOrTail;
+  if (!Number.isInteger(lines) || lines < 1) throw new Error('lines must be an integer >= 1');
+  const mode = headOrTail === undefined ? 'head' : headOrTail;
   if (mode !== 'head' && mode !== 'tail') throw new Error("headOrTail must be 'head' or 'tail'");
   const normalizedFile = file.replace(/\\/g, '/');
   if (isExcludedPath(normalizedFile, false)) {
@@ -821,9 +829,12 @@ async function toolGrep(args) {
   const { file, regex, before, after, caseSensitive } = args;
   if (typeof file !== 'string') throw new Error('file must be a string');
   if (typeof regex !== 'string') throw new Error('regex must be a string');
-  if (!Number.isInteger(before) || before < 0) throw new Error('before must be a non-negative integer');
-  if (!Number.isInteger(after) || after < 0) throw new Error('after must be a non-negative integer');
-  const cs = Boolean(caseSensitive);
+  const beforeValue = before === undefined ? 10 : before;
+  const afterValue = after === undefined ? 10 : after;
+  if (!Number.isInteger(beforeValue) || beforeValue < 0) throw new Error('before must be a non-negative integer');
+  if (!Number.isInteger(afterValue) || afterValue < 0) throw new Error('after must be a non-negative integer');
+  if (caseSensitive !== undefined && typeof caseSensitive !== 'boolean') throw new Error('caseSensitive must be a boolean');
+  const cs = caseSensitive === undefined ? false : caseSensitive;
   const normalizedFile = file.replace(/\\/g, '/');
   if (isExcludedPath(normalizedFile, false)) {
     logExcludedAccess('Grep', normalizedFile, `excluded by ${exclusionSourceLabel()}`);
@@ -907,10 +918,10 @@ async function toolGrep(args) {
       linesToShow.set(i, true);
     }
     // Add context lines
-    for (let i = Math.max(0, match.startLine - before); i < match.startLine; i++) {
+    for (let i = Math.max(0, match.startLine - beforeValue); i < match.startLine; i++) {
       if (!linesToShow.has(i)) linesToShow.set(i, false);
     }
-    for (let i = match.endLine + 1; i <= Math.min(lines.length - 1, match.endLine + after); i++) {
+    for (let i = match.endLine + 1; i <= Math.min(lines.length - 1, match.endLine + afterValue); i++) {
       if (!linesToShow.has(i)) linesToShow.set(i, false);
     }
   }
@@ -964,9 +975,9 @@ async function toolRGrep(args) {
   const { dir, regex, caseSensitive, maxFiles } = args;
   if (typeof dir !== 'string') throw new Error('dir must be a string');
   if (typeof regex !== 'string') throw new Error('regex must be a string');
-  // Refuse to grep entire tree for empty dir or '.'
+  if (dir.length === 0) throw new Error("dir must be a non-empty string (use '.' for root)");
   const normalizedDir = dir === '.' ? '' : dir;
-  if (!ALLOW_RGREP_ROOT && normalizedDir === '') {
+  if (!ALLOW_RGREP_ROOT && dir === '.') {
     throw new Error('recursive grep on the entire tree from the root is disabled by --no-rgrep-root. Use it on specific subdirectories or start the server without --no-rgrep-root.');
   }
   if (normalizedDir !== '' && isExcludedPath(normalizedDir, true)) {
@@ -974,7 +985,7 @@ async function toolRGrep(args) {
     throw excludedError();
   }
   const cs = Boolean(caseSensitive);
-  const maxFilesLimit = typeof maxFiles === 'number' && maxFiles > 0 ? maxFiles : Infinity;
+  const maxFilesLimit = typeof maxFiles === 'number' && maxFiles > 0 ? maxFiles : 200;
   const abs = resolveRel(normalizedDir);
 
   // Validate the directory itself
@@ -1100,23 +1111,23 @@ async function toolRGrep(args) {
   });
 
   // Build output with statistics
-  const summary = `${hits.length} match${hits.length !== 1 ? 'es' : ''} found in ${hits.length} file${hits.length !== 1 ? 's' : ''} across ${dirsExamined} director${dirsExamined !== 1 ? 'ies' : 'y'} under ${normalizedDir || 'root'} (examined ${filesExamined} file${filesExamined !== 1 ? 's' : ''})`;
+  const summary = `${hits.length} match${hits.length !== 1 ? 'es' : ''} found in ${hits.length} file${hits.length !== 1 ? 's' : ''} across ${dirsExamined} director${dirsExamined !== 1 ? 'ies' : 'y'} under ${dir} (examined ${filesExamined} file${filesExamined !== 1 ? 's' : ''})`;
 
   const output = [];
-
-  // Add matches if any
-  if (strippedHits.length > 0) {
-    output.push(...strippedHits);
-    output.push('');  // Empty line before summary
-  }
 
   if (stoppedEarly) {
     output.push(`WARNING: RGrep stopped early because maxFiles=${String(maxFilesLimit)} was reached. Results may be incomplete.`);
     output.push('If you need all matches, re-run RGrep with a higher maxFiles value.');
-    output.push('');  // Empty line before summary
   }
 
   output.push(summary);
+  output.push('');
+  output.push(`Files matched under ${dir}:`);
+  output.push('');
+
+  if (strippedHits.length > 0) {
+    output.push(...strippedHits);
+  }
 
   // Add warnings at the end
   if (warnings.length > 0) {
@@ -1128,13 +1139,27 @@ async function toolRGrep(args) {
 }
 
 // -------------------------- MCP methods --------------------------
+const DIR_DESCRIPTION = "Directory path relative to ROOT (non-empty; use '.' for root, no leading slash)";
+const TREE_DIR_DESCRIPTION = ALLOW_TREE_ROOT
+  ? DIR_DESCRIPTION
+  : "Directory path relative to ROOT (root '.' is not allowed due to its size, use specific subdirectories)";
+const RGREP_DIR_DESCRIPTION = ALLOW_RGREP_ROOT
+  ? DIR_DESCRIPTION
+  : "Directory path relative to ROOT (root '.' is not allowed due to its size, use specific subdirectories)";
+const TREE_DESCRIPTION = ALLOW_TREE_ROOT
+  ? 'Recursively list files and directories under a directory (symlinks are not traversed). All paths are relative to ROOT; ".." and absolute paths are forbidden.'
+  : 'Recursively list files and directories under a directory (symlinks are not traversed). All paths are relative to ROOT; ".." and absolute paths are forbidden.';
+const RGREP_DESCRIPTION = ALLOW_RGREP_ROOT
+  ? 'MULTI-LINE grep across files under a directory. The regex uses JavaScript syntax with dotAll (. matches newlines). Returns paths of files that match. Control case sensitivity via caseSensitive flag. Paths are relative to ROOT; ".." and absolute paths are forbidden.'
+  : 'MULTI-LINE grep across files under a directory. The regex uses JavaScript syntax with dotAll (. matches newlines). Returns paths of files that match. Control case sensitivity via caseSensitive flag. Paths are relative to ROOT; ".." and absolute paths are forbidden.';
+
 const tools = [
-  { name: 'ListDir', description: 'List contents of a directory under ROOT. Returns entries with optional metadata. Symlinks are shown but not followed. All paths are relative to ROOT; ".." segments and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { dir: { type: 'string', description: 'Directory path relative to ROOT (empty string for root, no leading slash)' }, showSize: { type: 'boolean', description: 'Include file sizes in bytes (files only, not directories)' }, showLastModified: { type: 'boolean', description: 'Include last modified timestamp' }, showCreated: { type: 'boolean', description: 'Include creation timestamp' } }, required: ['dir'] }, handler: toolListDir },
-  { name: 'Tree', description: 'Recursively list files and directories under a directory (symlinks are not traversed). All paths are relative to ROOT; ".." and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { dir: { type: 'string', description: 'Directory path relative to ROOT (empty string for root, no leading slash)' }, showSize: { type: 'boolean', description: 'Include file sizes in bytes (files only, not directories)' } }, required: ['dir'] }, handler: toolTree },
-  { name: 'Find', description: 'Find entries by simple glob under a directory and its subdirectories. Supported glob: * and ? only (match across path separators). No character classes, braces, or **. Includes symlinks in results but never follows them. Paths are relative to ROOT; ".." and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { dir: { type: 'string', description: 'Directory path relative to ROOT (empty string for root, no leading slash)' }, glob: { type: 'string', description: 'Simple glob pattern (* and ? only, matches across path separators)' } }, required: ['dir', 'glob'] }, handler: toolFind },
-  { name: 'Read', description: "Read file by lines with numbering. Can follow symlinks to valid files. headOrTail='head' returns lines [start, start+lines); 'tail' treats start as offset from end (start=0 => last lines). Lines are multi-byte aware; invalid UTF-8 bytes are hex-escaped as \\u00NN (strict JSON). Each line is prefixed with a 4-char right-aligned line number and a space.", inputSchema: { type: 'object', properties: { file: { type: 'string', description: 'File path relative to ROOT' }, start: { type: 'integer', minimum: 0, description: 'Starting line (0-based for head, offset from end for tail)' }, lines: { type: 'integer', minimum: 0, description: 'Number of lines to read' }, headOrTail: { type: 'string', enum: ['head', 'tail'], description: "'head' reads from start, 'tail' reads from end" } }, required: ['file', 'start', 'lines', 'headOrTail'] }, handler: toolRead },
-  { name: 'Grep', description: 'MULTI-LINE grep in a file. Can follow symlinks to valid files. The regex uses JavaScript syntax with dotAll (. matches newlines). Returns blocks per match with before/after context and line-numbered text. Control case sensitivity via caseSensitive flag. Paths are relative to ROOT; ".." and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { file: { type: 'string', description: 'File path relative to ROOT' }, regex: { type: 'string', description: 'JavaScript regular expression pattern' }, before: { type: 'integer', minimum: 0, description: 'Lines of context before match' }, after: { type: 'integer', minimum: 0, description: 'Lines of context after match' }, caseSensitive: { type: 'boolean', description: 'true for case-sensitive matching' } }, required: ['file', 'regex', 'before', 'after', 'caseSensitive'] }, handler: toolGrep },
-  { name: 'RGrep', description: 'MULTI-LINE grep across files under a directory. The regex uses JavaScript syntax with dotAll (. matches newlines). Returns paths of files that match. Root directory search is allowed unless the server is started with --no-rgrep-root. Control case sensitivity via caseSensitive flag. Paths are relative to ROOT; ".." and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { dir: { type: 'string', description: 'Directory path relative to ROOT (empty string or "." for root unless --no-rgrep-root is set)' }, regex: { type: 'string', description: 'JavaScript regular expression pattern' }, caseSensitive: { type: 'boolean', description: 'true for case-sensitive matching' }, maxFiles: { type: 'integer', minimum: 1, description: 'Optional: Maximum number of matching files to return' } }, required: ['dir', 'regex', 'caseSensitive'] }, handler: toolRGrep },
+  { name: 'ListDir', description: 'List contents of a directory under ROOT. Returns entries with optional metadata. Symlinks are shown but not followed. All paths are relative to ROOT; ".." segments and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { dir: { type: 'string', minLength: 1, description: DIR_DESCRIPTION }, showSize: { type: 'boolean', default: false, description: 'Include file sizes in bytes (files only, not directories)' }, showLastModified: { type: 'boolean', default: false, description: 'Include last modified timestamp' }, showCreated: { type: 'boolean', default: false, description: 'Include creation timestamp' } }, required: ['dir'] }, handler: toolListDir },
+  { name: 'Tree', description: TREE_DESCRIPTION, inputSchema: { type: 'object', properties: { dir: { type: 'string', minLength: 1, description: TREE_DIR_DESCRIPTION }, showSize: { type: 'boolean', default: false, description: 'Include file sizes in bytes (files only, not directories)' } }, required: ['dir'] }, handler: toolTree },
+  { name: 'Find', description: 'Find entries by simple glob under a directory and its subdirectories. Supported glob: * and ? only (match across path separators). No character classes, braces, or **. Includes symlinks in results but never follows them. Paths are relative to ROOT; ".." and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { dir: { type: 'string', minLength: 1, description: DIR_DESCRIPTION }, glob: { type: 'string', description: 'Simple glob pattern (* and ? only, matches across path separators)' } }, required: ['dir', 'glob'] }, handler: toolFind },
+  { name: 'Read', description: "Read file by lines with numbering. Can follow symlinks to valid files. headOrTail='head' returns lines [start, start+lines); 'tail' treats start as offset from end (start=0 => last lines). Lines are multi-byte aware; invalid UTF-8 bytes are hex-escaped as \\u00NN (strict JSON). Each line is prefixed with a 4-char right-aligned line number and a space.", inputSchema: { type: 'object', properties: { file: { type: 'string', description: 'File path relative to ROOT' }, start: { type: 'integer', minimum: 0, description: 'Starting line (0-based for head, offset from end for tail)' }, lines: { type: 'integer', minimum: 1, description: 'Number of lines to read' }, headOrTail: { type: 'string', enum: ['head', 'tail'], default: 'head', description: "'head' reads from start, 'tail' reads from end" } }, required: ['file', 'start', 'lines'] }, handler: toolRead },
+  { name: 'Grep', description: 'MULTI-LINE grep in a file. Can follow symlinks to valid files. The regex uses JavaScript syntax with dotAll (. matches newlines). Returns blocks per match with before/after context and line-numbered text. Control case sensitivity via caseSensitive flag. Paths are relative to ROOT; ".." and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { file: { type: 'string', description: 'File path relative to ROOT' }, regex: { type: 'string', description: 'JavaScript regular expression pattern' }, before: { type: 'integer', minimum: 0, default: 10, description: 'Lines of context before match' }, after: { type: 'integer', minimum: 0, default: 10, description: 'Lines of context after match' }, caseSensitive: { type: 'boolean', default: false, description: 'true for case-sensitive matching' } }, required: ['file', 'regex'] }, handler: toolGrep },
+  { name: 'RGrep', description: RGREP_DESCRIPTION, inputSchema: { type: 'object', properties: { dir: { type: 'string', minLength: 1, description: RGREP_DIR_DESCRIPTION }, regex: { type: 'string', description: 'JavaScript regular expression pattern' }, caseSensitive: { type: 'boolean', description: 'true for case-sensitive matching' }, maxFiles: { type: 'integer', minimum: 1, default: 200, description: 'Optional: Maximum number of matching files to return' } }, required: ['dir', 'regex', 'caseSensitive'] }, handler: toolRGrep },
 ];
 
 function listToolsResponse() { return { tools: tools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema })) }; }

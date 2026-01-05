@@ -446,6 +446,38 @@ const tests = [
   },
 
   {
+    name: 'Tree root allowed by default',
+    fn: async (client) => {
+      const result = await client.callTool('Tree', { dir: '.' });
+      if (verbose) {
+        console.log(`${GRAY}Tool: Tree${NC}`);
+        console.log(`${GRAY}Parameters: ${JSON.stringify({ dir: '.' })}${NC}`);
+        console.log('Output:');
+        console.log(result);
+      }
+      if (!result.includes('under .')) throw new Error('Tree root summary should mention "."');
+    }
+  },
+
+  {
+    name: 'Tree root blocked with --no-tree-root',
+    serverArgs: ['--no-tree-root'],
+    fn: async (client) => {
+      try {
+        await client.callTool('Tree', { dir: '.' });
+        throw new Error('Should have failed on root Tree with --no-tree-root');
+      } catch (e) {
+        if (verbose) {
+          console.log(`${GRAY}Expected error: ${e.message}${NC}`);
+        }
+        if (!String(e.message).includes('--no-tree-root')) {
+          throw new Error('Error should mention --no-tree-root');
+        }
+      }
+    }
+  },
+
+  {
     name: 'Tree with symlinks shows warnings',
     fn: async (client) => {
       const result = await client.callTool('Tree', { dir: 'test_tree' });
@@ -785,21 +817,22 @@ const tests = [
     name: 'RGrep root allowed by default',
     fn: async (client) => {
       const result = await client.callTool('RGrep', {
-        dir: '',
+        dir: '.',
         regex: 'content',
         caseSensitive: true
       });
       if (verbose) {
         console.log(`${GRAY}Tool: RGrep${NC}`);
         console.log(`${GRAY}Parameters: ${JSON.stringify({
-          dir: '',
+          dir: '.',
           regex: 'content',
           caseSensitive: true
         })}${NC}`);
         console.log('Output:');
         console.log(result);
       }
-      if (!result.includes('under root')) throw new Error('RGrep root summary should mention root');
+      if (!result.includes('under .')) throw new Error('RGrep root summary should mention "."');
+      if (!result.includes('Files matched under .:')) throw new Error('RGrep root should include the files header');
     }
   },
 
@@ -807,7 +840,7 @@ const tests = [
     name: 'RGrep respects maxFiles',
     fn: async (client) => {
       const result = await client.callTool('RGrep', {
-        dir: '',
+        dir: '.',
         regex: 'content',
         caseSensitive: true,
         maxFiles: 1
@@ -815,7 +848,7 @@ const tests = [
       if (verbose) {
         console.log(`${GRAY}Tool: RGrep${NC}`);
         console.log(`${GRAY}Parameters: ${JSON.stringify({
-          dir: '',
+          dir: '.',
           regex: 'content',
           caseSensitive: true,
           maxFiles: 1
@@ -823,9 +856,13 @@ const tests = [
         console.log('Output:');
         console.log(result);
       }
-      if (!result.includes('1 match found in 1 file')) throw new Error('RGrep maxFiles should stop after one file');
-      if (!result.includes('RGrep stopped early')) throw new Error('RGrep should warn when maxFiles is reached');
+      if (!result.startsWith('WARNING: RGrep stopped early')) throw new Error('RGrep should start with the early-stop warning');
+      const warningIndex = result.indexOf('WARNING: RGrep stopped early');
+      const summaryIndex = result.indexOf('1 match found in 1 file');
+      if (summaryIndex === -1) throw new Error('RGrep maxFiles should stop after one file');
+      if (summaryIndex < warningIndex) throw new Error('RGrep summary should appear after the early-stop warning');
       if (!result.includes('maxFiles=1')) throw new Error('RGrep warning should include the maxFiles value');
+      if (!result.includes('Files matched under .:')) throw new Error('RGrep maxFiles output should include the files header');
     }
   },
 
@@ -835,7 +872,7 @@ const tests = [
     fn: async (client) => {
       try {
         await client.callTool('RGrep', {
-          dir: '',
+          dir: '.',
           regex: 'content',
           caseSensitive: true
         });

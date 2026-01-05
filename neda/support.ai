@@ -11,7 +11,7 @@ tools:
   - github-support
 agents:
   - support-request.ai
-toolResponseMaxBytes: 65536
+toolResponseMaxBytes: 25000
 maxOutputTokens: 32768
 maxTurns: 30
 maxToolCallsPerTurn: 10
@@ -532,6 +532,12 @@ Example:
 Based on the default configuration [CODE], this interval can be changed via
 `update every` setting. Similar to how Prometheus handles scraping [DEVOPS],
 this affects both CPU usage and data resolution [INFERENCE]."
+
+### NO TIME/DURATION/EFFORT ESTIMATES
+
+When the user request involves detailed planning (e.g. deployment and configuration guides), you may come up with a phased implementation plan. The time and effort estimations you give are usually wrong for Netdata (Netdata is usually easier and faster to deploy at scale).
+
+For this reason, you should not estimate time and effort. You may split the implementation plan into concrete steps, milestones or phases, but avoid estimating time/duration or effort required.
 
 ## TRANSPARENCY ABOUT PRIVATE/PROPRIETARY SOURCES
 

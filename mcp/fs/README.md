@@ -41,6 +41,9 @@ node fs-mcp-server.js /path/to/directory
 # Disable root RGrep (safer for large trees)
 node fs-mcp-server.js --no-rgrep-root /path/to/directory
 
+# Disable root Tree (safer for large trees)
+node fs-mcp-server.js --no-tree-root /path/to/directory
+
 # Enable RGrep binary decoding (slower; hex-escapes invalid bytes)
 node fs-mcp-server.js --rgrep-decode-binary /path/to/directory
 
@@ -64,10 +67,10 @@ The server enforces strict security boundaries:
 List directory contents with optional metadata.
 
 **Parameters:**
-- `dir` (string, required) - Directory path relative to root
-- `showSize` (boolean) - Include file sizes
-- `showLastModified` (boolean) - Include modification timestamps
-- `showCreated` (boolean) - Include creation timestamps
+- `dir` (string, required) - Directory path relative to root (use `.` for root; no leading slash)
+- `showSize` (boolean, optional, default: false) - Include file sizes
+- `showLastModified` (boolean, optional, default: false) - Include modification timestamps
+- `showCreated` (boolean, optional, default: false) - Include creation timestamps
 
 **Output Format:**
 ```
@@ -85,8 +88,8 @@ broken_link -> [broken]        -
 Display directory structure as an ASCII tree.
 
 **Parameters:**
-- `dir` (string, required) - Directory path relative to root
-- `maxDepth` (number) - Maximum tree depth (default: 10)
+- `dir` (string, required) - Directory path relative to root (use `.` for root; no leading slash). Root can be disabled with `--no-tree-root`.
+- `showSize` (boolean, optional, default: false) - Include file sizes in bytes (files only)
 
 **Output Format:**
 ```
@@ -106,7 +109,7 @@ project/
 Find files and directories matching glob patterns.
 
 **Parameters:**
-- `dir` (string, required) - Starting directory
+- `dir` (string, required) - Starting directory (use `.` for root; no leading slash)
 - `glob` (string, required) - Glob pattern (e.g., `*.js`, `**/*.md`)
 
 **Features:**
@@ -131,8 +134,8 @@ Read file contents with line numbers.
 **Parameters:**
 - `file` (string, required) - File path relative to root
 - `start` (number, required) - Starting line (0-based)
-- `lines` (number, required) - Number of lines to read
-- `headOrTail` (string, required) - Read from 'head' or 'tail'
+- `lines` (number, required, min: 1) - Number of lines to read
+- `headOrTail` (string, optional, default: `head`) - Read from 'head' or 'tail'
 
 **Features:**
 - Line numbers for easy reference
@@ -155,9 +158,9 @@ Search file contents with regex patterns.
 **Parameters:**
 - `file` (string, required) - File to search
 - `regex` (string, required) - Regular expression pattern
-- `caseSensitive` (boolean, required) - Case sensitivity
-- `before` (number, required) - Context lines before match
-- `after` (number, required) - Context lines after match
+- `caseSensitive` (boolean, optional, default: false) - Case sensitivity
+- `before` (number, optional, default: 10) - Context lines before match
+- `after` (number, optional, default: 10) - Context lines after match
 
 **Features:**
 - Multi-line regex support
@@ -184,10 +187,10 @@ file.txt: 3 matches found. Total lines in file: 100
 Recursively search directory contents.
 
 **Parameters:**
-- `dir` (string, required) - Directory to search (root allowed by default; start the server with `--no-rgrep-root` to disable)
+- `dir` (string, required) - Directory to search (use `.` for root; no leading slash). Root can be disabled with `--no-rgrep-root`.
 - `regex` (string, required) - Regular expression pattern
 - `caseSensitive` (boolean, required) - Case sensitivity
-- `maxFiles` (number) - Maximum matching files to return (search stops after this many matches)
+- `maxFiles` (number, optional, default: 200) - Maximum matching files to return (search stops after this many matches)
 
 **Features:**
 - Recursive directory traversal
@@ -198,11 +201,15 @@ Recursively search directory contents.
 
 **Output Format:**
 ```
-src/index.js: 2 matches
-src/utils/helper.js: 1 match
-WARNING: link -> target not followed
+WARNING: RGrep stopped early because maxFiles=1 was reached. Results may be incomplete.
+If you need all matches, re-run RGrep with a higher maxFiles value.
+1 match found in 1 file across 3 directories under project (examined 15 files)
 
-3 files with matches, 3 total matches found, searched 15 files
+Files matched under project:
+
+src/index.js
+
+WARNING: link -> target not followed
 ```
 
 ## Special Features
