@@ -875,6 +875,8 @@ ALWAYS_INLINE_HOT void pg_cache_preload(struct rrdeng_query_handle *handle) {
         completion_mark_complete(&handle->pdc->page_completion);
         pdc_release_and_destroy_if_unreferenced(handle->pdc, true, true);
         handle->pdc = NULL;
+        __atomic_sub_fetch(&handle->ctx->atomic.inflight_queries, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&rrdeng_cache_efficiency_stats.currently_running_queries, 1, __ATOMIC_RELAXED);
         return;
     }
     handle->pdc->start_time_s = handle->start_time_s;

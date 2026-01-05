@@ -2489,6 +2489,15 @@ void pgc_open_cache_to_journal_v2(
             continue;
         }
 
+        // Check UUID validity early, before any JudyL modifications
+        nd_uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
+        if (unlikely(!uuid)) {
+            mrg_metric_release(main_mrg, metric);
+            page_transition_unlock(cache, page);
+            page_release(cache, page, false);
+            continue;
+        }
+
         page_flag_set(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
 
         pgc_queue_unlock(cache, &cache->hot);
@@ -2530,18 +2539,7 @@ void pgc_open_cache_to_journal_v2(
         if(!*PValue) {
             mi = aral_mallocz(ar_mi);
             mi->metric = metric;
-            mi->uuid = mrg_metric_uuid(main_mrg, metric);
-            if (unlikely(!mi->uuid)) {
-                // UUID is invalid - this is an error condition
-                internal_fatal(true, "Migration to journal v2: metric has NULL uuid");
-                mrg_metric_release(main_mrg, metric);
-                aral_freez(ar_mi, mi);
-                page_flag_clear(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
-                page_transition_unlock(cache, page);
-                page_release(cache, page, false);
-                pgc_queue_lock(cache, &cache->hot, PGC_QUEUE_LOCK_PRIO_LOW);
-                continue;
-            }
+            mi->uuid = uuid;
             mi->first_time_s = page->start_time_s;
             mi->last_time_s = page->end_time_s;
             mi->number_of_pages = 1;
