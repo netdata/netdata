@@ -27,7 +27,8 @@ XML transport is fixed to xml-final: native tool_calls remain for regular tools,
 
 ## Error Handling
 - Invalid/mismatched tags: ignored.
-- Leading `<think>...</think>` blocks (including leading whitespace) are stripped before XML parsing and unclosed-final extraction, so XML examples inside reasoning are never treated as final reports.
+- Leading `<think>...</think>` blocks (including leading whitespace) are stripped before XML parsing, unclosed-final extraction, and malformed-tag checks, so XML examples inside reasoning are never treated as final reports.
+- Truncated structured output (stopReason=length/max_tokens) is rejected for JSON/slack-block-kit; the failure reason includes the token limit (e.g., `token_limit: N tokens`) and no JSON repair is attempted on truncated XML wrappers.
 - Payload JSON parsing/validation still done at orchestrator (same repair/validation path as native).
 - Over-budget tool outputs replaced with `(tool failed: context window budget exceeded)` as usual.
 

@@ -300,6 +300,11 @@ export const parseJsonValueDetailed = (raw: unknown, options?: JsonParseOptions)
   if (originalText.length === 0) {
     return { repairs: [], error: 'empty', originalText };
   }
+  const looksLikeXmlWrapper = originalText.startsWith('<ai-agent-');
+  const missingXmlClosing = looksLikeXmlWrapper && !originalText.includes('</ai-agent-');
+  if (missingXmlClosing && /^<ai-agent-[^>]*>/.exec(originalText) !== null) {
+    return { repairs: [], error: 'parse_failed', originalText };
+  }
 
   const enqueue = (target: string | undefined, steps: string[]): { text: string; steps: string[] } | undefined => {
     if (target === undefined) return undefined;

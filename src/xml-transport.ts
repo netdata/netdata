@@ -265,7 +265,7 @@ export class XmlToolTransport {
           severity: 'WRN',
           message: `Final report truncated (stopReason=${stopReason ?? 'unknown'}, format=${resolvedFormat}, length=${String(extractedContent.length)} chars). Will retry.\nTruncated output:\n${preview}`
         });
-        const reason = typeof maxOutputTokens === 'number' ? `token_limit: ${String(maxOutputTokens)}` : undefined;
+        const reason = typeof maxOutputTokens === 'number' ? `token_limit: ${String(maxOutputTokens)} tokens` : undefined;
         callbacks.onTurnFailure('xml_structured_output_truncated', reason);
         return { truncatedRejected: true };
       } else {
@@ -376,10 +376,11 @@ export class XmlToolTransport {
 
     // Handle leftover content (incomplete/malformed tags)
     // Only flag as error if leftover actually contains an XML tag attempt
-    if (flushResult.leftover.trim().length > 0 && flushResult.leftover.includes(XML_TAG_PREFIX)) {
-      const hasClosing = flushResult.leftover.includes('</ai-agent-');
-      const slotMatch = /<ai-agent-([A-Za-z0-9\-]+)/.exec(flushResult.leftover);
-      const capturedSlot = slotMatch?.[1] ?? `(partial: ${flushResult.leftover.slice(0, 60).replace(/\n/g, ' ')})`;
+    const sanitizedLeftover = stripLeadingThinkBlock(flushResult.leftover).stripped;
+    if (sanitizedLeftover.trim().length > 0 && sanitizedLeftover.includes(XML_TAG_PREFIX)) {
+      const hasClosing = sanitizedLeftover.includes('</ai-agent-');
+      const slotMatch = /<ai-agent-([A-Za-z0-9\-]+)/.exec(sanitizedLeftover);
+      const capturedSlot = slotMatch?.[1] ?? `(partial: ${sanitizedLeftover.slice(0, 60).replace(/\n/g, ' ')})`;
       const slug: TurnFailedSlug = hasClosing ? 'xml_slot_mismatch' : 'xml_missing_closing_tag';
       const reasonDetail = `slot: ${capturedSlot}`;
       const reasonMessage = renderTurnFailedSlug(slug, reasonDetail);
@@ -390,7 +391,7 @@ export class XmlToolTransport {
         slotId: slotMatch?.[1] ?? 'malformed',
         tool: 'agent__final_report',
         status: 'failed',
-        request: truncateToBytes(flushResult.leftover, TRUNCATE_PREVIEW_BYTES) ?? flushResult.leftover,
+        request: truncateToBytes(sanitizedLeftover, TRUNCATE_PREVIEW_BYTES) ?? sanitizedLeftover,
         response: reasonMessage,
       };
       errors.push(errorEntry);
@@ -401,12 +402,13 @@ export class XmlToolTransport {
 
     if (parsedSlots.length === 0) {
       // Check if there was an attempt at XML that failed
-      if (content.includes(XML_TAG_PREFIX)) {
-        const slotMatch = /<ai-agent-([A-Za-z0-9\-]+)/.exec(content);
-        const missingClosing = !content.includes('</ai-agent-');
+      const sanitizedContent = stripLeadingThinkBlock(content).stripped;
+      if (sanitizedContent.includes(XML_TAG_PREFIX)) {
+        const slotMatch = /<ai-agent-([A-Za-z0-9\-]+)/.exec(sanitizedContent);
+        const missingClosing = !sanitizedContent.includes('</ai-agent-');
         // Extract snippet around the tag for debugging
-        const tagIdx = content.indexOf(XML_TAG_PREFIX);
-        const snippet = content.slice(tagIdx, tagIdx + 60).replace(/\n/g, ' ');
+        const tagIdx = sanitizedContent.indexOf(XML_TAG_PREFIX);
+        const snippet = sanitizedContent.slice(tagIdx, tagIdx + 60).replace(/\n/g, ' ');
         const slotInfo = slotMatch?.[1] ?? `(partial: ${snippet})`;
         const slug: TurnFailedSlug = missingClosing ? 'xml_missing_closing_tag' : 'xml_malformed_mismatch';
         const reasonDetail = `slot: ${slotInfo}`;
@@ -419,7 +421,7 @@ export class XmlToolTransport {
           slotId: slotMatch?.[1] ?? 'malformed',
           tool: 'agent__final_report',
           status: 'failed',
-          request: truncateToBytes(content, TRUNCATE_PREVIEW_BYTES) ?? content,
+          request: truncateToBytes(sanitizedContent, TRUNCATE_PREVIEW_BYTES) ?? sanitizedContent,
           response: reasonMessage,
         };
         errors.push(errorEntry);

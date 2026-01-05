@@ -168,8 +168,8 @@ describe('XmlToolTransport', () => {
       expect(parse.errors).toHaveLength(0);
       // Should call onTurnFailure with truncation message
       expect(onFailure).toHaveBeenCalledTimes(1);
-      expect(onFailure.mock.calls[0][0]).toContain('truncated');
-      expect(onFailure.mock.calls[0][0]).toContain('8192 tokens');
+      expect(onFailure.mock.calls[0][0]).toBe('xml_structured_output_truncated');
+      expect(onFailure.mock.calls[0][1]).toContain('8192 tokens');
       // Should log with content dump
       expect(onLog).toHaveBeenCalledTimes(1);
       expect(logCalls[0].severity).toBe('WRN');
@@ -209,7 +209,8 @@ describe('XmlToolTransport', () => {
       expect(parse.errors).toHaveLength(0);
       // Should call onTurnFailure
       expect(onFailure).toHaveBeenCalledTimes(1);
-      expect(onFailure.mock.calls[0][0]).toContain('4096 tokens');
+      expect(onFailure.mock.calls[0][0]).toBe('xml_structured_output_truncated');
+      expect(onFailure.mock.calls[0][1]).toContain('4096 tokens');
       // Should log
       expect(onLog).toHaveBeenCalledTimes(1);
     });
