@@ -66,7 +66,7 @@
     "redis": "^5.10.0",
     "undici": "^7.16.0",
     "ws": "^8.18.3",
-    "zod": "^4.2.1"
+    "zod": "^4.3.5"
   },
   "optionalDependencies": {
     "better-sqlite3": "^12.5.0"
