@@ -233,8 +233,8 @@ void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const c
                         mdi->MSSQLBufferPageLookups.current.Data = (ULONGLONG)inst_value;
                 }
             }
-            netdata_MSSQL_release_results(mdi->parent->conn->dbInstanceTransactionSTMT);
         }
+        netdata_MSSQL_release_results(mdi->parent->conn->dbInstanceTransactionSTMT);
     }
 
     SQLCHAR query[sizeof(NETDATA_QUERY_PERFORMANCE_COUNTER) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
