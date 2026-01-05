@@ -144,14 +144,10 @@ void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const c
         goto endcounters;
 
     if (likely(mdi->collect_instance)) {
-        /* Collect instance counters that were previously fetched with a separate
-         * buffer-stats query. */
         char inst_obj[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
         long inst_value = 0;
         SQLLEN col_inst_obj_len = 0, col_inst_value_len = 0;
 
-        /* Execute the unified performance counter query targeting the instance
-         to fetch buffer and compilation stats. */
         SQLCHAR inst_query[sizeof(NETDATA_QUERY_PERFORMANCE_COUNTER) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
         snprintfz(
             (char *)inst_query,
@@ -162,7 +158,6 @@ void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const c
 
         SQLRETURN inst_ret = SQLExecDirect(mdi->parent->conn->dbInstanceTransactionSTMT, (SQLCHAR *)inst_query, SQL_NTS);
         if (likely(netdata_mssql_check_result(inst_ret))) {
-            /* don't fail whole collection for instance-level query */
             netdata_MSSQL_error(
                 SQL_HANDLE_STMT,
                 mdi->parent->conn->dbInstanceTransactionSTMT,
@@ -242,7 +237,6 @@ void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const c
         }
     }
 
-    /* Now fetch per-database metrics (transactions, locks, etc.) */
     SQLCHAR query[sizeof(NETDATA_QUERY_PERFORMANCE_COUNTER) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
     snprintfz(
             (char *)query,
