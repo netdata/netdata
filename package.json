@@ -93,7 +93,7 @@
     "eslint-plugin-security": "^3.0.1",
     "eslint-plugin-sonarjs": "^3.0.5",
     "eslint-plugin-unicorn": "^62.0.0",
-    "knip": "^5.78.0",
+    "knip": "^5.79.0",
     "prettier": "^3.7.4",
     "typescript": "^5.9.3",
     "vitest": "^4.0.16"
