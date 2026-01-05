@@ -31,7 +31,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^2.0.57",
+    "@ai-sdk/anthropic": "^3.0.2",
     "@ai-sdk/google": "^2.0.52",
     "@ai-sdk/openai": "^2.0.89",
     "@ai-sdk/openai-compatible": "^1.0.30",
