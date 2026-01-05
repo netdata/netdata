@@ -1016,7 +1016,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // ----------------------------------------------------------------------------------------------------------------
 
     struct functions_evloop_globals *wg =
-        functions_evloop_init(5, "Network-Viewer", &stdout_mutex, &plugin_should_exit);
+        functions_evloop_init(5, "Network-Viewer", &stdout_mutex, &plugin_should_exit, NULL);
 
     functions_evloop_add_function(wg, NETWORK_CONNECTIONS_VIEWER_FUNCTION,
                                   network_viewer_function,
@@ -1030,8 +1030,8 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
-    while(!plugin_should_exit) {
 
+    while(!__atomic_load_n(&plugin_should_exit, __ATOMIC_ACQUIRE)) {
         usec_t dt_ut = heartbeat_next(&hb);
         send_newline_ut += dt_ut;
 
