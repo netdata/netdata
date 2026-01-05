@@ -158,7 +158,7 @@ void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const c
             sizeof(NETDATA_QUERY_PERFORMANCE_COUNTER) + 2 * NETDATA_MAX_INSTANCE_OBJECT,
             NETDATA_QUERY_PERFORMANCE_COUNTER,
             dbname,
-            dbname);
+            mdi->parent->instanceID);
 
         SQLRETURN inst_ret = SQLExecDirect(mdi->parent->conn->dbInstanceTransactionSTMT, (SQLCHAR *)inst_query, SQL_NTS);
         if (likely(netdata_mssql_check_result(inst_ret))) {
