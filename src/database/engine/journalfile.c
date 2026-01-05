@@ -532,7 +532,12 @@ int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct
     if (journalfile->file)
         (void)close_uv_file(datafile, journalfile->file);
 
-    // This is the new journal v2 index file
+    // Wait for all references to be released and unmap before deleting files.
+    // This prevents SIGBUS when threads are still accessing the mmap'd data.
+    if(journalfile_v2_data_available(journalfile))
+        journalfile_v2_data_unmap_permanently(journalfile);
+
+    // Now safe to delete the files - no threads are accessing them
     int deleted = 0;
     UNLINK_FILE(ctx, path_v2, ret);
     if (ret == 0)
@@ -543,9 +548,6 @@ int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct
         deleted++;
 
     __atomic_add_fetch(&ctx->stats.journalfile_deletions, deleted, __ATOMIC_RELAXED);
-
-    if(journalfile_v2_data_available(journalfile))
-        journalfile_v2_data_unmap_permanently(journalfile);
 
     return ret;
 }
