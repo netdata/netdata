@@ -33,15 +33,15 @@ require (
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/kanocz/fcgi_client v0.0.0-20210113082628-fff85c8adfb7
-	github.com/likexian/whois v1.15.6
-	github.com/likexian/whois-parser v1.24.20
+	github.com/likexian/whois v1.15.7
+	github.com/likexian/whois-parser v1.24.21
 	github.com/lmittmann/tint v1.1.2
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mattn/go-xmlrpc v0.0.3
 	github.com/miekg/dns v1.1.69
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/prometheus-community/pro-bing v0.7.0
-	github.com/prometheus/common v0.67.4
+	github.com/prometheus/common v0.67.5
 	github.com/prometheus/prometheus v2.55.1+incompatible
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/sijms/go-ora/v2 v2.9.0
@@ -119,7 +119,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kamstrup/intmap v0.5.2 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
-	github.com/likexian/gokit v0.25.15 // indirect
+	github.com/likexian/gokit v0.25.16 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
 	github.com/mdlayher/genetlink v1.3.2 // indirect
 	github.com/mdlayher/netlink v1.7.2 // indirect
@@ -160,13 +160,13 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/mod v0.30.0 // indirect
-	golang.org/x/oauth2 v0.32.0 // indirect
+	golang.org/x/oauth2 v0.34.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/term v0.38.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
 	golang.org/x/tools v0.39.0 // indirect
 	golang.zx2c4.com/wireguard v0.0.0-20230325221338-052af4a8072b // indirect
-	google.golang.org/protobuf v1.36.10 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/cenkalti/backoff.v2 v2.2.1 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect

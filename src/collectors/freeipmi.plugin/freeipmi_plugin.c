@@ -1645,7 +1645,7 @@ close_and_send:
 
 static void plugin_exit(int code) {
     fflush(stdout);
-    function_plugin_should_exit = true;
+    __atomic_store_n(&function_plugin_should_exit, true, __ATOMIC_RELEASE);
     exit(code);
 }
 
@@ -2006,7 +2006,7 @@ int main (int argc, char **argv) {
 
     heartbeat_t hb;
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
-    for(iteration = 0; 1 ; iteration++) {
+    for(iteration = 0; !__atomic_load_n(&function_plugin_should_exit, __ATOMIC_ACQUIRE) ; iteration++) {
         usec_t dt = heartbeat_next(&hb);
 
         if (!tty) {
@@ -2072,7 +2072,7 @@ int main (int argc, char **argv) {
         if (add_func_sensors) {
             add_func_sensors = false;
             struct functions_evloop_globals *wg =
-                functions_evloop_init(1, "FREEIPMI", &stdout_mutex, &function_plugin_should_exit);
+                functions_evloop_init(1, "FREEIPMI", &stdout_mutex, &function_plugin_should_exit, NULL);
             functions_evloop_add_function(
                 wg, "ipmi-sensors", freeimi_function_sensors, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
             FREEIPMI_GLOBAL_FUNCTION_SENSORS();
