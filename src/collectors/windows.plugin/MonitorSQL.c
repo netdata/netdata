@@ -141,7 +141,7 @@ void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const c
     SQLLEN col_object_len = 0, col_value_len = 0;
 
     if (unlikely(!mdi->parent->conn->collect_transactions && !mdi->parent->conn->collect_buffer))
-        goto endtransactions;
+        goto endcounters;
 
     if (likely(mdi->collect_instance)) {
         /* Collect instance counters that were previously fetched with a separate
@@ -256,7 +256,7 @@ void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const c
         mdi->collecting_data = false;
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT, mdi->parent->conn->dbPerfCounterSTMT, NETDATA_MSSQL_ODBC_QUERY, mdi->parent->instanceID);
-        goto endtransactions;
+        goto endcounters;
     }
 
     ret = SQLBindCol(
@@ -264,14 +264,14 @@ void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const c
     if (likely(netdata_mssql_check_result(ret))) {
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT, mdi->parent->conn->dbPerfCounterSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
-        goto endtransactions;
+        goto endcounters;
     }
 
     ret = SQLBindCol(mdi->parent->conn->dbPerfCounterSTMT, 2, SQL_C_LONG, &value, sizeof(value), &col_value_len);
     if (likely(netdata_mssql_check_result(ret))) {
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT, mdi->parent->conn->dbPerfCounterSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
-        goto endtransactions;
+        goto endcounters;
     }
 
     do {
@@ -282,7 +282,7 @@ void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const c
                 break;
             case SQL_NO_DATA:
             default:
-                goto endtransactions;
+                goto endcounters;
         }
 
         if (col_object_len == SQL_NULL_DATA)
@@ -332,7 +332,7 @@ void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const c
 
     } while (true);
 
-endtransactions:
+endcounters:
     netdata_MSSQL_release_results(mdi->parent->conn->dbPerfCounterSTMT);
 }
 
