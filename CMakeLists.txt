@@ -181,7 +181,7 @@ mark_as_advanced(ENABLE_SENTRY)
 
 option(BUILD_FOR_PACKAGING "Build for a packaging target" False)
 mark_as_advanced(BUILD_FOR_PACKAGING)
-cmake_dependent_option(CREATE_USER "Create the netdata user and group if they don’t exist on the system" True "NOT BUILD_FOR_PACKAGING AND NOT OS_WINDOWS" False)
+cmake_dependent_option(CREATE_USER "Create the netdata user and group if they don’t exist on the system" True "NOT OS_WINDOWS" False)
 if(BUILD_FOR_PACKAGING)
   set(PACKAGE_TYPE "none" CACHE STRING "Specify the type of package to build for.")
   mark_as_advanced(PACKAGE_TYPE)
