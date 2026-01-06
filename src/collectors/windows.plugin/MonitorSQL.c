@@ -187,6 +187,72 @@ bool netdata_mssql_counter_buffer(struct mssql_db_instance *mdi, char *inst_obj,
     return ret;
 }
 
+bool netdata_mssql_counter_transaction(struct mssql_db_instance *mdi, char *object_name, long value)
+{
+    bool ret = false;
+    if (unlikely(!strncmp(object_name,
+                          NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC,
+                          sizeof(NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC) - 1))) {
+        mdi->MSSQLDatabaseActiveTransactions.current.Data = (ULONGLONG)value;
+        ret = true;
+    } else if (unlikely(!strncmp(object_name,
+                                 NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC,
+                                 sizeof(NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC) - 1))) {
+        mdi->MSSQLDatabaseTransactions.current.Data = (ULONGLONG)value;
+        ret = true;
+    } else if (unlikely(!strncmp(object_name,
+                                 NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC,
+                                 sizeof(NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC) - 1))) {
+        mdi->MSSQLDatabaseWriteTransactions.current.Data = (ULONGLONG)value;
+        ret = true;
+    }
+
+    return ret;
+}
+
+bool netdata_mssql_counter_lock_and_log(struct mssql_db_instance *mdi, char *object_name, long value)
+{
+    bool ret = false;
+    if (unlikely(!strncmp(object_name,
+                          NETDATA_MSSQL_BACKUP_RESTORE_METRIC,
+                          sizeof(NETDATA_MSSQL_BACKUP_RESTORE_METRIC) - 1))) {
+        mdi->MSSQLDatabaseBackupRestoreOperations.current.Data = (ULONGLONG)value;
+        ret = true;
+    } else if (unlikely(!strncmp(object_name,
+                                 NETDATA_MSSQL_LOG_FLUSHED_METRIC,
+                                 sizeof(NETDATA_MSSQL_LOG_FLUSHED_METRIC) - 1))) {
+        mdi->MSSQLDatabaseLogFlushed.current.Data = (ULONGLONG)value;
+        ret = true;
+    } else if (unlikely(!strncmp(object_name,
+                                 NETDATA_MSSQL_LOG_FLUSHES_METRIC,
+                                 sizeof(NETDATA_MSSQL_LOG_FLUSHES_METRIC) - 1))) {
+        mdi->MSSQLDatabaseLogFlushes.current.Data = (ULONGLONG)value;
+        ret = true;
+    } else if (unlikely(!strncmp(object_name,
+                                 NETDATA_MSSQL_NUMBER_DEADLOCKS_METRIC,
+                                 sizeof(NETDATA_MSSQL_NUMBER_DEADLOCKS_METRIC) - 1))) {
+        mdi->MSSQLDatabaseDeadLockSec.current.Data = (ULONGLONG)value;
+        ret = true;
+    } else if (unlikely(!strncmp(object_name,
+                                 NETDATA_MSSQL_LOCK_WAITS_METRIC,
+                                 sizeof(NETDATA_MSSQL_LOCK_WAITS_METRIC) - 1))) {
+        mdi->MSSQLDatabaseLockWaitSec.current.Data = (ULONGLONG)value;
+        ret = true;
+    } else if (unlikely(!strncmp(object_name,
+                                 NETDATA_MSSQL_LOCK_TIMEOUTS_METRIC,
+                                 sizeof(NETDATA_MSSQL_LOCK_TIMEOUTS_METRIC) - 1))) {
+        mdi->MSSQLDatabaseLockTimeoutsSec.current.Data = (ULONGLONG)value;
+        ret = true;
+    } else if (unlikely(!strncmp(object_name,
+                                 NETDATA_MSSQL_LOCK_REQUESTS_METRIC,
+                                 sizeof(NETDATA_MSSQL_LOCK_REQUESTS_METRIC) - 1))) {
+        mdi->MSSQLDatabaseLockRequestsSec.current.Data = (ULONGLONG)value;
+        ret = true;
+    }
+
+    return ret;
+}
+
 void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const char *dbname)
 {
     char object_name[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
@@ -203,7 +269,6 @@ void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const c
             (char *)query,
             sizeof(NETDATA_QUERY_PERFORMANCE_COUNTER) + 2 * NETDATA_MAX_INSTANCE_OBJECT,
             NETDATA_QUERY_PERFORMANCE_COUNTER,
-            dbname,
             dbname);
 
     SQLRETURN ret = SQLExecDirect(mdi->parent->conn->dbPerfCounterSTMT, (SQLCHAR *)query, SQL_NTS);
@@ -245,48 +310,14 @@ void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const c
         if (col_value_len == SQL_NULL_DATA)
             value = 0;
 
-        // We cannot use strcmp, because buffer is filled with spaces instead NULL.
         if (netdata_mssql_counter_buffer(mdi, object_name, value))
             continue;
 
-        if (unlikely(!strncmp(
-                object_name,
-                NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC,
-                sizeof(NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC) - 1)))
-            mdi->MSSQLDatabaseActiveTransactions.current.Data = (ULONGLONG)value;
-        else if (unlikely(!strncmp(
-                     object_name,
-                     NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC,
-                     sizeof(NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC) - 1)))
-            mdi->MSSQLDatabaseTransactions.current.Data = (ULONGLONG)value;
-        else if (unlikely(!strncmp(
-                     object_name,
-                     NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC,
-                     sizeof(NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC) - 1)))
-            mdi->MSSQLDatabaseWriteTransactions.current.Data = (ULONGLONG)value;
-        else if (unlikely(!strncmp(
-                     object_name, NETDATA_MSSQL_BACKUP_RESTORE_METRIC, sizeof(NETDATA_MSSQL_BACKUP_RESTORE_METRIC) - 1)))
-            mdi->MSSQLDatabaseBackupRestoreOperations.current.Data = (ULONGLONG)value;
-        else if (unlikely(!strncmp(
-                     object_name, NETDATA_MSSQL_LOG_FLUSHED_METRIC, sizeof(NETDATA_MSSQL_LOG_FLUSHED_METRIC) - 1)))
-            mdi->MSSQLDatabaseLogFlushed.current.Data = (ULONGLONG)value;
-        else if (unlikely(!strncmp(
-                     object_name, NETDATA_MSSQL_LOG_FLUSHES_METRIC, sizeof(NETDATA_MSSQL_LOG_FLUSHES_METRIC) - 1)))
-            mdi->MSSQLDatabaseLogFlushes.current.Data = (ULONGLONG)value;
-        else if (unlikely(!strncmp(
-                     object_name,
-                     NETDATA_MSSQL_NUMBER_DEADLOCKS_METRIC,
-                     sizeof(NETDATA_MSSQL_NUMBER_DEADLOCKS_METRIC) - 1)))
-            mdi->MSSQLDatabaseDeadLockSec.current.Data = (ULONGLONG)value;
-        else if (unlikely(!strncmp(
-                     object_name, NETDATA_MSSQL_LOCK_WAITS_METRIC, sizeof(NETDATA_MSSQL_LOCK_WAITS_METRIC) - 1)))
-            mdi->MSSQLDatabaseLockWaitSec.current.Data = (ULONGLONG)value;
-        else if (unlikely(!strncmp(
-                     object_name, NETDATA_MSSQL_LOCK_TIMEOUTS_METRIC, sizeof(NETDATA_MSSQL_LOCK_TIMEOUTS_METRIC) - 1)))
-            mdi->MSSQLDatabaseLockTimeoutsSec.current.Data = (ULONGLONG)value;
-        else if (unlikely(!strncmp(
-                     object_name, NETDATA_MSSQL_LOCK_REQUESTS_METRIC, sizeof(NETDATA_MSSQL_LOCK_REQUESTS_METRIC) - 1)))
-            mdi->MSSQLDatabaseLockRequestsSec.current.Data = (ULONGLONG)value;
+        if (netdata_mssql_counter_transaction(mdi, object_name, value))
+            continue;
+
+        if (netdata_mssql_counter_lock_and_log(mdi, object_name, value))
+            continue;
 
     } while (true);
 

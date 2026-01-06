@@ -24,7 +24,7 @@
 // SQL SERVER BEFORE 2008 DOES NOT HAVE DATA IN THIS TABLE
 // https://github.com/influxdata/telegraf/blob/081dfa26e80d8764fb7f9aac5230e81584b62b56/plugins/inputs/sqlserver/sqlqueriesV2.go#L1259
 #define NETDATA_QUERY_PERFORMANCE_COUNTER \
-    "SELECT counter_name, cntr_value FROM %s.sys.dm_os_performance_counters WHERE instance_name = '%s' AND counter_name IN ('Active Transactions', 'Transactions/sec', 'Write Transactions/sec', 'Backup/Restore Throughput/sec', 'Log Bytes Flushed/sec', 'Log Flushes/sec', 'Number of Deadlocks/sec', 'Lock Waits/sec', 'Lock Timeouts/sec', 'Lock Requests/sec', 'Page reads/sec', 'Page writes/sec', 'Buffer cache hit ratio', 'Checkpoint pages/sec', 'Page life expectancy', 'Lazy writes/sec', 'Page Lookups/sec', 'SQL Compilations/sec', 'SQL Re-Compilations/sec');"
+    "SELECT counter_name, cntr_value FROM %s.sys.dm_os_performance_counters WHERE counter_name IN ('Active Transactions', 'Transactions/sec', 'Write Transactions/sec', 'Backup/Restore Throughput/sec', 'Log Bytes Flushed/sec', 'Log Flushes/sec', 'Number of Deadlocks/sec', 'Lock Waits/sec', 'Lock Timeouts/sec', 'Lock Requests/sec', 'Page reads/sec', 'Page writes/sec', 'Buffer cache hit ratio', 'Checkpoint pages/sec', 'Page life expectancy', 'Lazy writes/sec', 'Page Lookups/sec', 'SQL Compilations/sec', 'SQL Re-Compilations/sec');"
 
 #define NETDATA_QUERY_CHECK_PERM                                                                                       \
     "SELECT CASE WHEN IS_SRVROLEMEMBER('sysadmin') = 1 OR HAS_PERMS_BY_NAME(null, null, 'VIEW SERVER STATE') = 1 THEN 1 ELSE 0 END AS has_permission;"
