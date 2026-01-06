@@ -576,6 +576,22 @@
       ],
       "toolsDenied": []
     },
+    "discourse": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@discourse/mcp@latest",
+        "--site",
+        "https://community.netdata.cloud"
+      ],
+      "env": {},
+      "enabled": true,
+      "toolsAllowed": [
+        "*"
+      ],
+      "toolsDenied": []
+    },
     "context7": {
       "type": "http",
       "url": "https://mcp.context7.com/mcp",
