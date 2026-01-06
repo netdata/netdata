@@ -253,7 +253,7 @@ bool netdata_mssql_counter_lock_and_log(struct mssql_db_instance *mdi, char *obj
     return ret;
 }
 
-void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const char *dbname, const char *instance_name)
+void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const char *dbname)
 {
     char object_name[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
     long value = 0;
@@ -760,10 +760,10 @@ endreplication:
     (void)netdata_select_db(mdi->parent->conn->netdataSQLHDBc, "master");
     netdata_MSSQL_release_results(mdi->parent->conn->dbReplicationPublisher);
 }
+
 int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_db_instance *mdi = value;
-    const char *instance_name = data;
     const char *dbname = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
     if (unlikely(!mdi->collecting_data || !mdi->parent || !mdi->parent->conn)) {
@@ -780,7 +780,7 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
         goto enddrunquery;
     }
 
-    dict_mssql_fill_performance_counters(mdi, dbname, instance_name);
+    dict_mssql_fill_performance_counters(mdi, dbname);
     dict_mssql_fill_locks(mdi, dbname);
 
     if (likely(mdi->running_replication && mdi->parent->conn->collect_replication))
@@ -1601,7 +1601,6 @@ int netdata_mssql_reset_value(const DICTIONARY_ITEM *item __maybe_unused, void *
 int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_instance *mi = value;
-    const char *instance_name = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
     static long collecting = 1;
 
     if (likely(mi->conn && mi->conn->is_connected && collecting)) {
@@ -1620,7 +1619,7 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
             netdata_mssql_fill_user_connection(mi);
             if (likely(mi->conn->collect_blocked_processes))
                 netdata_mssql_fill_blocked_processes_query(mi);
-            dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, (void *)instance_name);
+            dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
         }
 
         collecting = dict_mssql_fill_waits(mi);
