@@ -1,6 +1,6 @@
 #!/usr/bin/env ai-agent
 ---
-description: "Netdata User Support Agent: Provides comprehensive support using documentation, community forums, and codebase analysis without exposing private source code."
+description: "Netdata User Support Agent: Provides comprehensive support using documentation, community forums, and codebase analysis."
 usage: "Ask any question about Netdata's features, configuration, troubleshooting, or capabilities. Best for user support inquiries."
 models:
   - nova/minimax-m2.1

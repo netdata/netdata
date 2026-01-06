@@ -24,6 +24,7 @@ agents:
   - freshdesk.ai
   - netdata.ai
   - source-code.ai
+  - support.ai
   - gsc.ai
   - ga.ai
   - cloudflare.ai

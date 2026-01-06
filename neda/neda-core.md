@@ -290,6 +290,39 @@ Expected Output: current operational status report of our production systems
 Input: check for anomalies over the weekend; anything important happened?
 Expected Output: anomaly detection report of our production systems over the weekend
 
+### support
+Scope: Netdata's AI Support Engineer, for providing all kinds of answers to user support and pre-sales requests, combining documentation, community issues and forums, and source code analysis.
+Operation: This agent has direct access to Netdata's public websites (including documentation), github issues, community forums and source code.
+Input: Any end-user support question, including Netdata concepts, documentation, troubleshooting, pre-sales (e.g. deployment guides)
+Exepcted Output: Detailed end-user documentation and instructions
+
+When to use: Use it when the response is to be presented to end-users. This agent provides end user documentation and instructions, hiding internal details.
+When not use: When Netdata employees ask technical questions it is better to use `source-code` and `github`. `support` does not have access to all the information `source-code` and `github` have.
+
+**Example 1**
+Input: How to monitor X? (X = whatever technology)
+Output: Detailed instructions on how to configure Netdata for monitoring X, including any alternatives when available
+
+**Example 2**
+Input: How to create an alert for X? (X = whatever monitored)
+Output: Detailed instructions on what alert to create and how
+
+**Example 3**
+Input: Does Netdata have/support X? (X = whatever technology, e.g. "a query language")
+Output: Detailed information on the availability of the given technology
+
+**Example 4**
+Input: I am trying to do X, but Netdata logs Y and I see on the dashboard Z
+Output: Detailed information on what exactly problem the user is facing and how to overcome it
+
+**Example 5**
+Input: I want to deploy Netdata and my infrastructure looks like X, Y and Z. How should I do it and why?
+Output: Detailed information on the deployment options available with an analysis tailored for the specific use case
+
+**Example 6**
+Input: I am currently using X (e.g. solarwinds, zabbix, nagios, datadog, grafana, etc) and I want to switch to Netdata. What should I know?
+Output: Detailed information about the pros and cons of switching, the benefits of using Netdata over X, and any potential gaps in service coverage between Netdata and X
+
 ### source-code
 Scope: Answers any question about Netdata source code, CI/CD configurations and generally anything available in our repos
 Operation: This agent has direct access to all Netdata public and private repos and has filesystem operations to search and read any file and directory
