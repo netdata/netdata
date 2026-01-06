@@ -134,6 +134,10 @@
 - Build(deps): bump github.com/godbus/dbus/v5 from 5.2.1 to 5.2.2 in /src/go ([#21511](https://github.com/netdata/netdata/issues/21511))
 - Fix race condition during journal file deletion ([#21512](https://github.com/netdata/netdata/issues/21512))
 - Improve EBPF cleanup ([#21501](https://github.com/netdata/netdata/issues/21501))
+- Adjust functions event loop to propagate exit code ([#21455](https://github.com/netdata/netdata/issues/21455))
+- Improve certificate verification error logging in ACLK connections ([#21513](https://github.com/netdata/netdata/issues/21513))
+- Build(deps): bump github.com/likexian/whois from 1.15.6 to 1.15.7 in /src/go ([#21516](https://github.com/netdata/netdata/issues/21516))
+- Build(deps): bump github.com/prometheus/common from 0.67.4 to 0.67.5 in /src/go ([#21517](https://github.com/netdata/netdata/issues/21517))
 
 ## [2.8.0] - 2025-11-19
 
