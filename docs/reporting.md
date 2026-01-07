@@ -11,8 +11,6 @@ Extract infrastructure insights for stakeholders, leadership, and external tools
 | **[Grafana](#grafana-integration)** | Medium | Custom dashboards, teams already using Grafana |
 | **[Export to BI](#export-to-business-intelligence-tools)** | Advanced | Power BI, Tableau, Looker, custom analytics pipelines |
 
----
-
 ## AI Insights
 
 Ask Netdata anything about your infrastructure in plain language and receive an executive-ready report. No configuration required—just describe what you need.
@@ -72,8 +70,6 @@ factors, and remediation recommendations.
 - Each report consumes 1 AI credit (10 free per month on eligible plans)
 - Data privacy: metrics are summarized into structured context; your data is not used to train foundation models
 
----
-
 ## AI Assistants (MCP)
 
 Connect your AI assistant directly to Netdata using the Model Context Protocol (MCP). Ask questions in natural language and receive answers based on live infrastructure data.
@@ -122,8 +118,6 @@ Once connected, ask natural language questions:
 
 See [Netdata MCP](/docs/netdata-ai/mcp/README.md) for detailed setup instructions.
 
----
-
 ## Grafana integration
 
 Connect Grafana to Netdata Cloud for infrastructure-wide dashboards. Use Grafana's visualization capabilities with Netdata's real-time metrics.
@@ -151,8 +145,6 @@ Generate API tokens from Netdata Cloud under **User Settings** → **API Tokens*
 - Requires Netdata Cloud account
 - Grafana Cloud or self-hosted Grafana
 - API tokens available on all plans
-
----
 
 ## Export to business intelligence tools
 
@@ -225,8 +217,6 @@ See [Export Metrics to External Time-Series Databases](/docs/exporting-metrics/R
 - Long-term archival beyond Netdata's retention
 - Compliance requirements for data export
 
----
-
 ## Choosing the right method
 
 ### Start with AI Insights if you:
@@ -256,8 +246,6 @@ See [Export Metrics to External Time-Series Databases](/docs/exporting-metrics/R
 - Need to combine infrastructure metrics with business data
 - Require custom analytics beyond monitoring
 - Have compliance requirements for data in specific systems
-
----
 
 ## Related documentation
 
