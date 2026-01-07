@@ -15,45 +15,34 @@ struct cpu_data {
 };
 
 struct cpu_data *cpus = NULL;
-size_t ncpus = 0 ;
+size_t ncpus = 0;
 static ND_THREAD *hardware_info_thread = NULL;
 static collected_number (*temperature_fcnt)(MSR_REQUEST *) = NULL;
+static CRITICAL_SECTION cpus_lock;
 
 static void netdata_stop_driver()
 {
     SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
     if (scm == NULL) {
-        nd_log(
-                NDLS_COLLECTORS,
-                NDLP_ERR,
-                "Cannot open Service Manager. Error= %lu \n", GetLastError());
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open Service Manager. Error= %lu \n", GetLastError());
         return;
     }
 
     SC_HANDLE service = OpenService(scm, srv_name, SERVICE_STOP | SERVICE_QUERY_STATUS | DELETE);
     if (service == NULL) {
-        nd_log(
-                NDLS_COLLECTORS,
-                NDLP_ERR,
-                "Cannot open the service. Error= %lu \n", GetLastError());
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open the service. Error= %lu \n", GetLastError());
         CloseServiceHandle(scm);
         return;
     }
 
-    SERVICE_STATUS_PROCESS ss_status = {};
-    if (ControlService(service, SERVICE_CONTROL_STOP, (LPSERVICE_STATUS)&ss_status) == 0) {
+    SERVICE_STATUS ss_status = {};
+    if (ControlService(service, SERVICE_CONTROL_STOP, &ss_status) == 0) {
         if (GetLastError() != ERROR_SERVICE_NOT_ACTIVE) {
-            nd_log(
-                    NDLS_COLLECTORS,
-                    NDLP_ERR,
-                    "Cannot stop the service. Error= %lu \n", GetLastError());
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot stop the service. Error= %lu \n", GetLastError());
         }
     } else {
         if (!DeleteService(service)) {
-            nd_log(
-                    NDLS_COLLECTORS,
-                    NDLP_ERR,
-                    "Cannot delete service. Error= %lu \n", GetLastError());
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot delete service. Error= %lu \n", GetLastError());
         }
     }
 
@@ -63,46 +52,35 @@ static void netdata_stop_driver()
 
 int netdata_install_driver()
 {
-    SC_HANDLE scm = OpenSCManager(
-            NULL,
-            NULL,
-            SC_MANAGER_CREATE_SERVICE
-    );
+    SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_CREATE_SERVICE);
 
     if (unlikely(!scm)) {
-        nd_log(
-                NDLS_COLLECTORS,
-                NDLP_ERR,
-                "Cannot open Service Manager. Error= %lu \n", GetLastError());
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open Service Manager. Error= %lu \n", GetLastError());
         return -1;
     }
 
     char expanded_path[MAX_PATH];
     if (ExpandEnvironmentStringsA(drv_path, expanded_path, sizeof(expanded_path)) == 0) {
-        nd_log(
-                NDLS_COLLECTORS,
-                NDLP_ERR,
-                "Cannot expand environment strings. Error= %lu \n", GetLastError());
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot expand environment strings. Error= %lu \n", GetLastError());
         CloseServiceHandle(scm);
         return -1;
     }
 
     // Create the service entry for the driver
     SC_HANDLE service = CreateServiceA(
-            scm,
-            srv_name,
-            srv_name,
-            SERVICE_START | SERVICE_STOP | DELETE,
-            SERVICE_KERNEL_DRIVER,
-            SERVICE_DEMAND_START,
-            SERVICE_ERROR_NORMAL,
-            expanded_path,
-            NULL,
-            NULL,
-            NULL,
-            NULL,
-            NULL
-    );
+        scm,
+        srv_name,
+        srv_name,
+        SERVICE_START | SERVICE_STOP | DELETE,
+        SERVICE_KERNEL_DRIVER,
+        SERVICE_DEMAND_START,
+        SERVICE_ERROR_NORMAL,
+        expanded_path,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL);
 
     if (unlikely(!service)) {
         if (GetLastError() == ERROR_SERVICE_EXISTS) {
@@ -110,10 +88,7 @@ int netdata_install_driver()
             return 0;
         }
 
-        nd_log(
-                NDLS_COLLECTORS,
-                NDLP_ERR,
-                "Cannot create Service. Error= %lu \n", GetLastError());
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create Service. Error= %lu \n", GetLastError());
         CloseServiceHandle(scm);
         return -1;
     }
@@ -128,31 +103,22 @@ int netdata_start_driver()
 {
     SC_HANDLE scm = OpenSCManagerA(NULL, NULL, SC_MANAGER_CONNECT);
     if (unlikely(!scm)) {
-        nd_log(
-                NDLS_COLLECTORS,
-                NDLP_ERR,
-                "Cannot open Service Manager. Error= %lu \n", GetLastError());
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open Service Manager. Error= %lu \n", GetLastError());
         return -1;
     }
 
     SC_HANDLE service = OpenServiceA(scm, srv_name, SERVICE_START | SERVICE_QUERY_STATUS);
     if (unlikely(!service)) {
         CloseServiceHandle(scm);
-        nd_log(
-                NDLS_COLLECTORS,
-                NDLP_ERR,
-                "Cannot open Service. Error= %lu \n", GetLastError());
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open Service. Error= %lu \n", GetLastError());
         return -1;
     }
 
     int ret = 0;
     if (!StartServiceA(service, 0, NULL)) {
         DWORD err = GetLastError();
-        if (err != ERROR_SERVICE_EXISTS && err != ERROR_SERVICE_ALREADY_RUNNING) {
-            nd_log(
-                    NDLS_COLLECTORS,
-                    NDLP_ERR,
-                    "Cannot start Service. Error= %lu \n", err);
+        if (err != ERROR_SERVICE_ALREADY_RUNNING) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot start Service. Error= %lu \n", err);
             ret = -1;
         }
     }
@@ -164,13 +130,10 @@ int netdata_start_driver()
 
 static inline HANDLE netdata_open_device()
 {
-    HANDLE msr_h = CreateFileA(MSR_USER_PATH, GENERIC_READ | GENERIC_WRITE, 0,
-                        NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE msr_h =
+        CreateFileA(MSR_USER_PATH, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (msr_h == INVALID_HANDLE_VALUE) {
-        nd_log(
-                NDLS_COLLECTORS,
-                NDLP_ERR,
-                "Cannot open device. GetLastError= %lu \n", GetLastError());
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open device. GetLastError= %lu \n", GetLastError());
     }
     return msr_h;
 }
@@ -178,14 +141,14 @@ static inline HANDLE netdata_open_device()
 static collected_number netdata_intel_cpu_temp(MSR_REQUEST *req)
 {
     const ULONG TJMAX = 100;
-    ULONG digital_readout = (req->low >> 16) & 0x7F;  // bits [22:16]
+    ULONG digital_readout = (req->low >> 16) & 0x7F; // bits [22:16]
     return (collected_number)(TJMAX - digital_readout);
 }
 
 static collected_number netdata_amd_cpu_temp(MSR_REQUEST *req)
 {
     ULONG amd_temp = (req->low >> 21) & 0x7FF;
-    return (collected_number) amd_temp/8;
+    return (collected_number)amd_temp / 8;
 }
 
 void netdata_collect_cpu_chart()
@@ -197,14 +160,16 @@ void netdata_collect_cpu_chart()
 
     const uint32_t MSR_THERM_STATUS = 0x19C;
 
+    EnterCriticalSection(&cpus_lock);
     for (size_t cpu = 0; cpu < ncpus; cpu++) {
         DWORD bytes = 0;
-        MSR_REQUEST req = { MSR_THERM_STATUS, (ULONG)cpu, 0, 0 };
+        MSR_REQUEST req = {MSR_THERM_STATUS, (ULONG)cpu, 0, 0};
 
         if (DeviceIoControl(device, IOCTL_MSR_READ, &req, sizeof(req), &req, sizeof(req), &bytes, NULL)) {
             cpus[cpu].cpu_temp = temperature_fcnt(&req);
         }
     }
+    LeaveCriticalSection(&cpus_lock);
 
     CloseHandle(device);
 }
@@ -248,23 +213,29 @@ static void netdata_detect_cpu()
 
 static int initialize()
 {
+    InitializeCriticalSection(&cpus_lock);
+
     netdata_detect_cpu();
     if (!temperature_fcnt) {
+        DeleteCriticalSection(&cpus_lock);
         return -1;
     }
 
     if (netdata_install_driver()) {
+        DeleteCriticalSection(&cpus_lock);
         return -1;
     }
 
     if (netdata_start_driver()) {
+        DeleteCriticalSection(&cpus_lock);
         return -1;
     }
 
     ncpus = os_get_system_cpus();
     cpus = callocz(ncpus, sizeof(struct cpu_data));
 
-    hardware_info_thread = nd_thread_create("hi_threads", NETDATA_THREAD_OPTION_DEFAULT, get_hardware_info_thread, NULL);
+    hardware_info_thread =
+        nd_thread_create("hi_threads", NETDATA_THREAD_OPTION_DEFAULT, get_hardware_info_thread, NULL);
 
     return 0;
 }
@@ -274,18 +245,18 @@ static RRDSET *netdata_publish_cpu_chart(int update_every)
     static RRDSET *st_cpu_temp = NULL;
     if (!st_cpu_temp) {
         st_cpu_temp = rrdset_create_localhost(
-                "cpu",
-                "temperature",
-                NULL,
-                "temperature",
-                "cpu.temperature",
-                "Core temperature",
-                "Celsius",
-                PLUGIN_WINDOWS_NAME,
-                "GetHardwareInfo",
-                NETDATA_CHART_PRIO_CPU_TEMPERATURE,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "cpu",
+            "temperature",
+            NULL,
+            "temperature",
+            "cpu.temperature",
+            "Core temperature",
+            "Celsius",
+            PLUGIN_WINDOWS_NAME,
+            "GetHardwareInfo",
+            NETDATA_CHART_PRIO_CPU_TEMPERATURE,
+            update_every,
+            RRDSET_TYPE_LINE);
     }
 
     return st_cpu_temp;
@@ -294,6 +265,8 @@ static RRDSET *netdata_publish_cpu_chart(int update_every)
 static void netdata_loop_cpu_chart(int update_every)
 {
     RRDSET *chart = netdata_publish_cpu_chart(update_every);
+
+    EnterCriticalSection(&cpus_lock);
     for (int i = 0; i < (int)ncpus; i++) {
         struct cpu_data *lcpu = &cpus[i];
         if (!lcpu->rd_cpu_temp) {
@@ -303,7 +276,9 @@ static void netdata_loop_cpu_chart(int update_every)
         }
         rrddim_set_by_pointer(chart, lcpu->rd_cpu_temp, lcpu->cpu_temp);
     }
-        rrdset_done(chart);
+    LeaveCriticalSection(&cpus_lock);
+
+    rrdset_done(chart);
 }
 
 int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
@@ -327,4 +302,6 @@ void do_GetHardwareInfo_cleanup()
         nd_log_daemon(NDLP_ERR, "Failed to join Get Hardware Info thread");
 
     netdata_stop_driver();
+
+    DeleteCriticalSection(&cpus_lock);
 }
