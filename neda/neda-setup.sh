@@ -162,6 +162,19 @@ else
 fi
 
 # ============================================================================
+# RIPGREP (required by ai-agent for file search)
+# ============================================================================
+
+log_info "Checking ripgrep..."
+
+if ! command -v rg &> /dev/null; then
+    log_info "Installing ripgrep..."
+    run apt-get install -y ripgrep
+else
+    log_info "ripgrep already available ($(rg --version | head -1))"
+fi
+
+# ============================================================================
 # GOOGLE CLOUD SDK
 # ============================================================================
 
