@@ -119,6 +119,52 @@ if [ -d "$INSTALL_DIR" ]; then
     run $SUDO cp -a "$INSTALL_DIR/." "$BACKUP_DIR/" 2>/dev/null || true
 fi
 
+# Clean up old backups, keeping only the 10 most recent
+# Safety: strict pattern matching and individual path validation
+cleanup_old_backups() {
+    local keep_count=10
+    local backup_pattern='^ai-agent\.backup\.[0-9]{8}_[0-9]{6}$'
+
+    # Find all backup directories in /opt that match our naming pattern
+    # Using -maxdepth 1 to stay strictly in /opt
+    local all_backups=()
+    while IFS= read -r dir; do
+        local basename
+        basename=$(basename "$dir")
+        # Strict validation: must match exact pattern YYYYMMDD_HHMMSS
+        if [[ "$basename" =~ $backup_pattern ]]; then
+            all_backups+=("$dir")
+        fi
+    done < <(find /opt -maxdepth 1 -type d -name 'ai-agent.backup.*' 2>/dev/null | sort)
+
+    local total=${#all_backups[@]}
+    if (( total <= keep_count )); then
+        return 0
+    fi
+
+    local to_delete=$(( total - keep_count ))
+    log_info "Cleaning up old backups: removing $to_delete, keeping $keep_count most recent..."
+
+    # Delete oldest backups (array is sorted, oldest first)
+    for (( i=0; i<to_delete; i++ )); do
+        local backup_path="${all_backups[$i]}"
+        local backup_name
+        backup_name=$(basename "$backup_path")
+
+        # Final safety check: validate full path structure
+        if [[ "$backup_path" == "/opt/$backup_name" ]] && \
+           [[ "$backup_name" =~ $backup_pattern ]] && \
+           [[ -d "$backup_path" ]]; then
+            log_info "  Removing old backup: $backup_name"
+            $SUDO rm -rf "$backup_path"
+        else
+            log_warn "  Skipping suspicious path: $backup_path"
+        fi
+    done
+}
+
+cleanup_old_backups
+
 # Create directory structure
 log_info "Creating installation directory structure..."
 run $SUDO mkdir -p "$INSTALL_DIR"/{dist,mcp,cache,tmp,logs}
