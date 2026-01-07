@@ -195,7 +195,7 @@ Examples:
 - "delete" means "how do I delete a node from Netdata Cloud spaces?"
 - "bind IP" means "how do I change the IP Netdata binds to?"
 - "SSL" means "how do I encrypt Netdata traffic with SSL/TLS?"
-- "management reports" means "how can I use the AI insights feature to generate management reports?"
+- "reports" means "how can I use the AI insights feature to generate infrastructure level reports?"
 - "export" means "how can I export observability data from Netdata to third party systems?"
 - "used ram through cmd" means "how do I use the /api/v3/allmetrics endpoint to get the used ram (or any metric) from the cli or a shell script?"
 
@@ -571,7 +571,7 @@ Every factual claim in your response MUST be tagged with its source:
 - **[INFERENCE]** - Your logical deduction connecting multiple sources
 
 Example:
-"Netdata collects metrics every second [DOCS: https://learn.netdata.cloud/docs/...].
+"Netdata collects metrics every second [DOCS: [title](url)].
 Based on the default configuration [CODE], this interval can be changed via
 `update every` setting. Similar to how Prometheus handles scraping [DEVOPS],
 this affects both CPU usage and data resolution [INFERENCE]."
