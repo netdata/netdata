@@ -266,6 +266,8 @@ void dict_mssql_fill_performance_counters(struct mssql_db_instance *mdi, const c
         return;
 
     SQLCHAR query[sizeof(NETDATA_QUERY_PERFORMANCE_COUNTER) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
+    // We are using the database name instead of the instance name because, on Windows, the instance name having the metrics
+    // is often the same as the database name.
     snprintfz(
         (char *)query,
         sizeof(NETDATA_QUERY_PERFORMANCE_COUNTER) + 2 * NETDATA_MAX_INSTANCE_OBJECT,
