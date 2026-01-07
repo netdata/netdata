@@ -61,6 +61,22 @@ cd "$SCRIPT_DIR"
 log_info "Starting AI Agent build and installation process..."
 
 # ============================================================================
+# DEPENDENCY CHECKS
+# ============================================================================
+
+# Check for ripgrep (required at runtime for file search operations)
+if ! command -v rg &> /dev/null; then
+    log_warn "ripgrep (rg) is not installed."
+    log_warn "ai-agent requires ripgrep for file search operations."
+    log_warn "Install it via your package manager:"
+    log_warn "  - Arch/Manjaro: sudo pacman -S ripgrep"
+    log_warn "  - Ubuntu/Debian: sudo apt install ripgrep"
+    log_warn "  - RHEL/Fedora: sudo dnf install ripgrep"
+    log_warn "  - macOS: brew install ripgrep"
+    log_warn ""
+fi
+
+# ============================================================================
 # BUILD PHASE
 # ============================================================================
 
