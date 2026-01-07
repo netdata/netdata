@@ -141,6 +141,8 @@ REVISE PHASE:
 Using your feedback, improve both your reasoning process and final answer:
 [Your improved answer, incorporating reflection]
 
+Iterate as necessary until your final report/answer is fully and accurately addressing the task.
+
 ## Final Report/Answer
 
 You MUST ALWAYS comply with the requirements and the format of your final report/answer.
