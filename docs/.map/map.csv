@@ -5,6 +5,7 @@ https://github.com/netdata/netdata/edit/master/docs/realtime-monitoring.md,Real-
 https://github.com/netdata/netdata/edit/master/docs/scalability.md,Scalability,Published,Welcome to Netdata,,
 https://github.com/netdata/netdata/edit/master/src/collectors/COLLECTORS.md,Monitor Anything,Published,Welcome to Netdata,,Netdata gathers real-time metrics from hundreds of data sources using collectors. Most require zero configuration and are pre-configured out of the box.
 https://github.com/netdata/netdata/edit/master/docs/fleet-configuration-management.md,Fleet Deployment and Configuration Management,Published,Welcome to Netdata,,
+https://github.com/netdata/netdata/edit/master/docs/reporting.md,Reporting,Published,Welcome to Netdata,"power bi, tableau, looker, qlik, reporting, business intelligence, bi, grafana, ai insights, mcp, executive reports, board reporting, data export","Extract infrastructure insights for stakeholders and BI tools using AI Insights, AI assistants (MCP), Grafana, or data export to Power BI, Tableau, and other analytics platforms."
 https://github.com/netdata/netdata/edit/master/docs/getting-started-netdata/guide.md,Getting Started,Published,root,,
 https://github.com/netdata/netdata/edit/master/docs/Demo-Sites.md,Live Demo,Published,root,,
 ,,,,,
