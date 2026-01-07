@@ -6,7 +6,7 @@
 #include "netdata_win_driver.h"
 
 static const char *srv_name = "NetdataDriver";
-const char *drv_path = "%SystemRoot%\\system32\\netdata_driver.sys";
+static const char *drv_path = "%SystemRoot%\\system32\\netdata_driver.sys";
 
 struct cpu_data {
     RRDDIM *rd_cpu_temp;
@@ -37,12 +37,16 @@ static void netdata_stop_driver()
 
     SERVICE_STATUS ss_status = {};
     if (ControlService(service, SERVICE_CONTROL_STOP, &ss_status) == 0) {
-        if (GetLastError() != ERROR_SERVICE_NOT_ACTIVE) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot stop the service. Error= %lu \n", GetLastError());
+        DWORD err = GetLastError();
+        if (err != ERROR_SERVICE_NOT_ACTIVE) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot stop the service. Error= %lu \n", err);
         }
-    } else {
-        if (!DeleteService(service)) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot delete service. Error= %lu \n", GetLastError());
+    }
+
+    if (!DeleteService(service)) {
+        DWORD err = GetLastError();
+        if (err != ERROR_SERVICE_MARKED_FOR_DELETE) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot delete service. Error= %lu \n", err);
         }
     }
 
@@ -140,15 +144,32 @@ static inline HANDLE netdata_open_device()
 
 static collected_number netdata_intel_cpu_temp(MSR_REQUEST *req)
 {
+    if (!req)
+        return 0;
+
     const ULONG TJMAX = 100;
     ULONG digital_readout = (req->low >> 16) & 0x7F; // bits [22:16]
-    return (collected_number)(TJMAX - digital_readout);
+
+    collected_number temp = (collected_number)(TJMAX - digital_readout);
+
+    if (temp < 0 || temp > 150)
+        return 0;
+
+    return temp;
 }
 
 static collected_number netdata_amd_cpu_temp(MSR_REQUEST *req)
 {
+    if (!req)
+        return 0;
+
     ULONG amd_temp = (req->low >> 21) & 0x7FF;
-    return (collected_number)amd_temp / 8;
+    collected_number temp = (collected_number)amd_temp / 8;
+
+    if (temp < 0 || temp > 150)
+        return 0;
+
+    return temp;
 }
 
 void netdata_collect_cpu_chart()
@@ -166,7 +187,12 @@ void netdata_collect_cpu_chart()
         MSR_REQUEST req = {MSR_THERM_STATUS, (ULONG)cpu, 0, 0};
 
         if (DeviceIoControl(device, IOCTL_MSR_READ, &req, sizeof(req), &req, sizeof(req), &bytes, NULL)) {
-            cpus[cpu].cpu_temp = temperature_fcnt(&req);
+            if (temperature_fcnt)
+                cpus[cpu].cpu_temp = temperature_fcnt(&req);
+            else
+                cpus[cpu].cpu_temp = 0;
+        } else {
+            cpus[cpu].cpu_temp = 0;
         }
     }
     LeaveCriticalSection(&cpus_lock);
@@ -235,7 +261,7 @@ static int initialize()
     cpus = callocz(ncpus, sizeof(struct cpu_data));
 
     hardware_info_thread =
-        nd_thread_create("hi_threads", NETDATA_THREAD_OPTION_DEFAULT, get_hardware_info_thread, NULL);
+        nd_thread_create("hw_info_thread", NETDATA_THREAD_OPTION_DEFAULT, get_hardware_info_thread, NULL);
 
     return 0;
 }
@@ -298,10 +324,17 @@ int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
 
 void do_GetHardwareInfo_cleanup()
 {
-    if (nd_thread_join(hardware_info_thread))
-        nd_log_daemon(NDLP_ERR, "Failed to join Get Hardware Info thread");
+    if (hardware_info_thread) {
+        if (nd_thread_join(hardware_info_thread))
+            nd_log_daemon(NDLP_ERR, "Failed to join Get Hardware Info thread");
+    }
 
     netdata_stop_driver();
 
     DeleteCriticalSection(&cpus_lock);
+
+    if (cpus) {
+        freez(cpus);
+        cpus = NULL;
+    }
 }
