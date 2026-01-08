@@ -148,50 +148,70 @@ Generate API tokens from Netdata Cloud under **User Settings** → **API Tokens*
 
 ## Export to business intelligence tools
 
-Export raw metrics to external databases and business intelligence platforms. This approach provides maximum flexibility for custom analytics pipelines.
+Export metrics from Netdata to external databases and business intelligence platforms. You can query data from individual Agents or use Netdata Cloud to aggregate metrics from your entire infrastructure.
 
 ### Supported BI platforms
 
-Netdata exports metrics to 30+ databases that integrate with popular business intelligence tools:
+Netdata integrates with popular business intelligence tools through several pathways:
 
-| BI Platform | Integration Path |
-|-------------|------------------|
-| **Power BI** | Via Prometheus endpoint, PostgreSQL, or TimescaleDB |
-| **Tableau** | Via PostgreSQL, InfluxDB, or Prometheus |
-| **Looker / Looker Studio** | Via BigQuery, PostgreSQL, or Prometheus |
-| **Qlik** | Via PostgreSQL, InfluxDB, or direct REST API |
-| **SAP Analytics Cloud** | Via PostgreSQL or REST API |
-| **Metabase** | Via PostgreSQL or TimescaleDB |
-| **Apache Superset** | Via PostgreSQL, InfluxDB, or Prometheus |
-| **Sisense** | Via PostgreSQL or REST API |
-| **Domo** | Via REST API or database connectors |
-| **ThoughtSpot** | Via PostgreSQL or cloud data warehouses |
+| BI Platform | Integration Options |
+|-------------|---------------------|
+| **Power BI** | Netdata Cloud API, Prometheus endpoint, or database export |
+| **Tableau** | Netdata Cloud API, PostgreSQL, or Prometheus |
+| **Looker / Looker Studio** | Netdata Cloud API, BigQuery, or Prometheus |
+| **Qlik** | Netdata Cloud API, PostgreSQL, or InfluxDB |
+| **SAP Analytics Cloud** | Netdata Cloud API or PostgreSQL |
+| **Metabase** | Netdata Cloud API, PostgreSQL, or TimescaleDB |
+| **Apache Superset** | Netdata Cloud API, PostgreSQL, or Prometheus |
+| **Domo** | Netdata Cloud API or database connectors |
+| **ThoughtSpot** | Netdata Cloud API or PostgreSQL |
 
-### Export options
+### Query options
 
-#### Prometheus endpoint (recommended for most BI tools)
+#### Netdata Cloud API (recommended)
 
-Netdata exposes metrics in Prometheus format at:
+The Netdata Cloud API lets you query metrics from all your nodes through a single endpoint. This is the simplest approach for multi-node infrastructure.
+
+1. Generate an API token from **User Settings** → **API Tokens**
+2. Use the token to authenticate requests to `https://app.netdata.cloud/api/v2/data`
+
+```bash
+# Query CPU metrics from all nodes
+curl -H 'Accept: application/json' \
+     -H "Authorization: Bearer YOUR_API_TOKEN" \
+     'https://app.netdata.cloud/api/v2/data?contexts=system.cpu&after=-3600'
+
+# Get list of all nodes in your space
+curl -H 'Accept: application/json' \
+     -H "Authorization: Bearer YOUR_API_TOKEN" \
+     'https://app.netdata.cloud/api/v2/nodes'
+```
+
+The Cloud API returns aggregated data from all nodes in your infrastructure, making it ideal for BI tools that need a unified view.
+
+#### Prometheus endpoint (single-node)
+
+For single-node deployments or Prometheus-based workflows, query the Agent directly:
 
 ```
-http://YOUR_NETDATA_IP:19999/api/v1/allmetrics?format=prometheus
+http://AGENT_IP:19999/api/v1/allmetrics?format=prometheus
 ```
 
-Many BI tools can scrape this endpoint directly or connect through a Prometheus server.
+Replace `AGENT_IP` with your Netdata Agent IP address. This endpoint is useful when you need metrics from a specific node or when your BI tool already integrates with Prometheus.
 
 #### REST API with JSON
 
-Query specific metrics in JSON format:
+Query specific metrics from an Agent in JSON format:
 
 ```bash
-# Get metrics as JSON
-curl 'http://YOUR_NETDATA_IP:19999/api/v1/allmetrics?format=json'
+# Get all metrics as JSON
+curl 'http://AGENT_IP:19999/api/v1/allmetrics?format=json'
 
-# Query specific charts
-curl 'http://YOUR_NETDATA_IP:19999/api/v1/data?chart=system.cpu&after=-3600&format=json'
+# Query a specific chart
+curl 'http://AGENT_IP:19999/api/v1/data?chart=system.cpu&after=-3600&format=json'
 ```
 
-Power BI and other tools can consume this JSON through Power Query or equivalent data transformation features.
+Power BI and similar tools can consume this JSON through Power Query or equivalent data transformation features.
 
 #### Database export connectors
 
