@@ -79,6 +79,67 @@ export const isPlainObject = (value: unknown): value is Record<string, unknown> 
   value !== null && typeof value === 'object' && !Array.isArray(value)
 );
 
+/**
+ * Sanitizes text for safe transmission to LLM APIs.
+ *
+ * 1. Detects Mathematical Alphanumeric Symbols (U+1D400–U+1D7FF) which are
+ *    encoded as surrogate pairs with high surrogate \uD835 followed by a
+ *    low surrogate. Only when detected, applies NFKC normalization to
+ *    convert them to ASCII equivalents (e.g., 𝗗𝗮𝘁𝗮𝗱𝗼𝗴 → Datadog).
+ * 2. Always removes unpaired Unicode surrogates (U+D800–U+DFFF) that would
+ *    cause UTF-8 encoding failures.
+ *
+ * This prevents errors like:
+ *   'utf-8' codec can't encode character '\ud835' in position X: surrogates not allowed
+ *
+ * NFKC is gated to preserve tool output integrity - it only runs when
+ * actual mathematical styled characters are present (valid surrogate pairs),
+ * avoiding unintended changes to ligatures, fullwidth forms, or other
+ * compatibility characters.
+ */
+export function sanitizeTextForLLM(text: string): string {
+  // Step 1: Conditionally normalize - only if Mathematical Alphanumeric Symbols detected
+  // These are encoded as surrogate pairs: high surrogate \uD835 + low surrogate \uDC00-\uDFFF
+  // We require a valid pair to avoid false positives from unpaired surrogates
+  const hasMathAlphanumeric = /\uD835[\uDC00-\uDFFF]/.test(text);
+  const normalized = hasMathAlphanumeric ? text.normalize('NFKC') : text;
+
+  // Step 2: Remove unpaired surrogates (always applied as safety net)
+  // High surrogates: U+D800–U+DBFF, Low surrogates: U+DC00–U+DFFF
+  // A valid pair is: high followed immediately by low
+  // Remove: high not followed by low, or low not preceded by high
+  let result = '';
+  // eslint-disable-next-line functional/no-loop-statements
+  for (let i = 0; i < normalized.length; i += 1) {
+    const code = normalized.charCodeAt(i);
+
+    // Check if this is a high surrogate (U+D800–U+DBFF)
+    if (code >= 0xD800 && code <= 0xDBFF) {
+      const nextCode = i + 1 < normalized.length ? normalized.charCodeAt(i + 1) : 0;
+      // Only keep if followed by a low surrogate (U+DC00–U+DFFF)
+      if (nextCode >= 0xDC00 && nextCode <= 0xDFFF) {
+        result += normalized[i];
+        result += normalized[i + 1];
+        i += 1; // Skip the low surrogate we just processed
+      }
+      // Otherwise skip this unpaired high surrogate
+      continue;
+    }
+
+    // Check if this is a low surrogate (U+DC00–U+DFFF) without preceding high
+    // (If we're here, previous char wasn't a high surrogate that included us)
+    if (code >= 0xDC00 && code <= 0xDFFF) {
+      // Skip unpaired low surrogate
+      continue;
+    }
+
+    // Regular character - keep it
+    result += normalized[i];
+  }
+
+  return result;
+}
+
 const tryParseJsonDetailed = (value: string): { value?: unknown; error?: string } => {
   try {
     return { value: JSON.parse(value) as unknown };

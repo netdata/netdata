@@ -19,9 +19,10 @@ import { TRUNCATE_PREVIEW_BYTES, truncateToBytes } from './truncation.js';
 import {
   clampToolName,
   estimateMessagesBytes,
-  UNKNOWN_TOOL_ERROR_PREFIX,
   parseJsonRecord,
+  sanitizeTextForLLM,
   sanitizeToolName,
+  UNKNOWN_TOOL_ERROR_PREFIX,
 } from './utils.js';
 
 type AjvInstance = AjvClass;
@@ -433,9 +434,12 @@ export class SessionToolExecutor {
             state.productiveToolExecutedThisTurn = true;
           }
 
+          // Sanitize tool output to prevent UTF-8 encoding errors from Unicode surrogates
+          // (e.g., mathematical bold characters from web content like 𝗗𝗮𝘁𝗮𝗱𝗼𝗴)
+          const sanitizedResult = sanitizeTextForLLM(managed.result);
           const uncappedToolOutput =
-            managed.result.length > 0
-              ? managed.result
+            sanitizedResult.length > 0
+              ? sanitizedResult
               : TOOL_NO_OUTPUT;
           // Batch tool is a container - inner tools already get capped individually, don't cap the container
           const toolOutput = (this.applyToolResponseCap !== undefined && !isBatchTool)
