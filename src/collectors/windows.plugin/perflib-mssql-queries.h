@@ -12,8 +12,11 @@
     "SELECT resource_type, count(*) FROM %s.sys.dm_tran_locks WHERE DB_NAME(resource_database_id) = '%s' group by resource_type;"
 
 #define NETDATA_REPLICATION_DB "distribution"
+#define NETDATA_MSSQL_MASTER_DB "master"
 
 #define NETDATA_REPLICATION_MONITOR_QUERY "EXEC sp_replmonitorhelppublication;"
+
+#define NETDATA_REPLICATION_MONITOR_SUBSCRIPTION_QUERY "EXEC sp_replmonitorhelpsubscription @publication_type = "
 
 #define NETDATA_QUERY_LIST_DB "SELECT name FROM sys.databases;"
 
@@ -678,6 +681,7 @@ struct netdata_mssql_conn {
     SQLHSTMT dbSQLConnections;
     SQLHSTMT dbSQLBlockedProcesses;
     SQLHSTMT dbReplicationPublisher;
+    SQLHSTMT dbReplicationDistributor;
 
     BOOL collect_transactions;
     BOOL collect_waits;
@@ -792,6 +796,30 @@ struct mssql_publisher_publication {
     RRDDIM *rd_synchronization_time;
 };
 
+// https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-replmonitorhelpsubscription-transact-sql?view=sql-server-ver17
+struct mssql_subscription_publication {
+    struct mssql_publisher_publication *parent;
+
+    // Additional lables
+    int publication_type;
+    char *subscriber_db;
+    char *subscriber;
+
+    // Charts
+    int agent_not_running;
+    int time_to_expiration;
+    int latency;
+
+    RRDSET *st_agent_not_running;
+    RRDDIM *rd_agent_not_running;
+
+    RRDSET *st_time2expiration;
+    RRDDIM *rd_time2expiration;
+
+    RRDSET *st_latency;
+    RRDDIM *rd_latency;
+};
+
 struct mssql_instance {
     char *instanceID;
     int update_every;
@@ -829,6 +857,7 @@ struct mssql_instance {
     DICTIONARY *databases;
     DICTIONARY *sysjobs;
     DICTIONARY *publisher_publication;
+    DICTIONARY *publication_subscription;
 
     RRDSET *st_conn_memory;
     RRDDIM *rd_conn_memory;

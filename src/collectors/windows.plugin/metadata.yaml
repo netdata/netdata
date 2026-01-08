@@ -2637,7 +2637,7 @@ modules:
               chart_type: line
               dimensions:
                 - name: size
-        - name: MSSQL Replication
+        - name: MSSQL Replication Publisher
           description: "These metrics refer to the Microsoft SQL Servers replication on host."
           labels:
             - name: mssql_instance
@@ -2692,6 +2692,38 @@ modules:
                 - name: agents
             - name: mssql.replication_synchronization
               description: The shortest synchronization.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: seconds
+        - name: MSSQL Replication Subscriber
+          description: "These metrics refer to the Microsoft SQL Servers subscriber."
+          labels:
+            - name: mssql_instance
+              description: The instance name.
+            - name: publisher
+              description: The SQL server publisher name.
+            - name: subscriber
+              description: The subscriber name.
+            - name: subscriber_db
+              description: The database used by subscriber.
+            - name: publication
+              description: The publication name.
+          metrics:
+            - name: mssql.replication_subscriber_latency
+              description: The subscriber latency
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: seconds
+            - name: mssql.replication_subscriber_agent_not_running
+              description: Length of time agent has not running
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: seconds
+            - name: mssql.replication_subscriber_time_to_expiration
+              description: Length of time before subscription expires
               unit: seconds
               chart_type: line
               dimensions:
