@@ -205,23 +205,32 @@ This endpoint is useful when you need metrics from a specific node or when your 
 
 #### REST API with JSON
 
-Query specific metrics from an Agent or Parent in JSON format:
+Query specific metrics from an Agent or Parent in JSON format. This is useful for BI tools that need to combine Netdata metrics with other business data.
+
+**Common BI use cases:**
 
 ```bash
-# Get all metrics as JSON
-curl 'http://NODE_IP:19999/api/v3/allmetrics?format=json'
+# Daily averages for last 30 days, grouped by node
+curl 'http://NODE_IP:19999/api/v3/data?contexts=system.cpu&after=-2592000&points=30&time_group=avg&group_by=node'
 
-# Query CPU context for last hour (3600 seconds), 100 points, hourly grouping
-curl 'http://NODE_IP:19999/api/v3/data?contexts=system.cpu&after=-3600&points=100&time_group=sum'
+# Weekly max values for capacity planning
+curl 'http://NODE_IP:19999/api/v3/data?contexts=system.ram&after=-604800&points=4&time_group=max&group_by=node'
+
+# Hourly sum for cost analysis
+curl 'http://NODE_IP:19999/api/v3/data?contexts=system.cpu&after=-86400&points=24&time_group=sum'
 ```
 
-Key parameters:
-- `contexts` - Metric context to query (e.g., `system.cpu`, `system.ram`, `disk.io`)
-- `after` / `before` - Timeframe in seconds (negative) or Unix timestamps (positive)
-- `points` - Number of points to return (0 = all available)
-- `time_group` - Aggregation function (`avg`, `sum`, `min`, `max`, etc.)
+**Key parameters for BI workflows:**
 
-Power BI and similar tools can consume this JSON through Power Query or equivalent data transformation features.
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `contexts` | Metric context to query | `system.cpu`, `system.ram`, `disk.io` |
+| `after` / `before` | Timeframe (seconds or Unix timestamp) | `-2592000` = last 30 days |
+| `points` | Number of output points | `30` = daily for monthly view |
+| `time_group` | Aggregation function | `avg`, `sum`, `min`, `max` |
+| `group_by` | How to group results | `node`, `context`, `label:LABEL_NAME` |
+
+Power BI, Tableau, and similar tools can consume this JSON through their data transformation features (Power Query, etc.).
 
 #### Database export connectors
 
