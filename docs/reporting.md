@@ -211,9 +211,15 @@ Query specific metrics from an Agent or Parent in JSON format:
 # Get all metrics as JSON
 curl 'http://NODE_IP:19999/api/v3/allmetrics?format=json'
 
-# Query a specific context (v3 API uses 'contexts' plural)
-curl 'http://NODE_IP:19999/api/v3/data?contexts=system.cpu&after=-3600&format=json2'
+# Query CPU context for last hour (3600 seconds), 100 points, hourly grouping
+curl 'http://NODE_IP:19999/api/v3/data?contexts=system.cpu&after=-3600&points=100&time_group=sum'
 ```
+
+Key parameters:
+- `contexts` - Metric context to query (e.g., `system.cpu`, `system.ram`, `disk.io`)
+- `after` / `before` - Timeframe in seconds (negative) or Unix timestamps (positive)
+- `points` - Number of points to return (0 = all available)
+- `time_group` - Aggregation function (`avg`, `sum`, `min`, `max`, etc.)
 
 Power BI and similar tools can consume this JSON through Power Query or equivalent data transformation features.
 
