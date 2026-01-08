@@ -138,6 +138,8 @@
 - Improve certificate verification error logging in ACLK connections ([#21513](https://github.com/netdata/netdata/issues/21513))
 - Build(deps): bump github.com/likexian/whois from 1.15.6 to 1.15.7 in /src/go ([#21516](https://github.com/netdata/netdata/issues/21516))
 - Build(deps): bump github.com/prometheus/common from 0.67.4 to 0.67.5 in /src/go ([#21517](https://github.com/netdata/netdata/issues/21517))
+- Suppress a handful of known warnings during the build process. ([#20102](https://github.com/netdata/netdata/issues/20102))
+- Minor improvements to CMake code. ([#21146](https://github.com/netdata/netdata/issues/21146))
 
 ## [2.8.0] - 2025-11-19
 
