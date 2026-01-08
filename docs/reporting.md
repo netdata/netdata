@@ -211,8 +211,8 @@ Query specific metrics from an Agent or Parent in JSON format:
 # Get all metrics as JSON
 curl 'http://NODE_IP:19999/api/v3/allmetrics?format=json'
 
-# Query a specific context (v3 API)
-curl 'http://NODE_IP:19999/api/v3/data?context=system.cpu&after=-3600&format=json'
+# Query a specific context (v3 API uses 'contexts' plural)
+curl 'http://NODE_IP:19999/api/v3/data?contexts=system.cpu&after=-3600&format=json2'
 ```
 
 Power BI and similar tools can consume this JSON through Power Query or equivalent data transformation features.
