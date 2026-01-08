@@ -8,6 +8,7 @@
 - docs/docs/AI-AGENT-INTERNAL-API.md current status of the ai-agent internal agent API.
 - README.md for end-user documentation of the application.
 - docs/AI-AGENT-GUIDE.md for the AI-facing source of truth covering prompts, configs, headends, snapshots, and operational defaults.
+- **docs/SESSION-SNAPSHOTS.md** for session snapshot extraction commands and structure. YOU MUST READ this document when working with session snapshots (debugging issues, extracting LLM payloads, tool requests/responses, logs, WRN/ERR entries, sub-agent data).
 
 The code has extensive tests and its business logic is described in detail in the documents under `docs/specs/*.md`. These documents have been SYNCHORIZED with the codebase and they act as a reference during code refactorings, new features and improvements (they are organized by feature, module and business logic).
 
@@ -15,6 +16,32 @@ CRITICAL: **Every code change that affects runtime behavior, defaults, schemas, 
 CRITICAL: **Always keep documentation synchronized.**
 
 The application source code is in the root directory (src/, package.json, etc).
+
+## SESSION SNAPSHOTS
+
+### Snapshot Locations
+
+- **Default**: `~/.ai-agent/sessions/{originId}.json.gz`
+- **Production**: `/opt/neda/.ai-agent/sessions/{originId}.json.gz`
+
+### Working with Snapshots
+
+When debugging session issues, extracting LLM payloads, examining tool calls, or analyzing errors:
+
+1. **YOU MUST READ** `docs/SESSION-SNAPSHOTS.md` before working with snapshots
+2. Use `zcat` to decompress and `jq` to extract specific data
+3. Common extractions:
+   - LLM request/response payloads: `.opTree.turns[].ops[] | select(.kind == "llm")`
+   - Tool requests/responses: `.opTree.turns[].ops[] | select(.kind == "tool")`
+   - WRN/ERR logs: `[.. | objects | select(.severity == "WRN" or .severity == "ERR")]`
+   - Sub-agent sessions: `.opTree.turns[].ops[] | select(.kind == "session") | .childSession`
+
+### Documentation
+
+- `docs/SESSION-SNAPSHOTS.md` contains comprehensive extraction commands
+- `docs/specs/snapshots.md` contains technical specifications
+- `src/session-tree.ts` contains the opTree implementation
+- `src/persistence.ts` contains file persistence logic
 
 ## TESTING MODELS
 
@@ -95,11 +122,13 @@ These rules help generate code that passes `npm run lint` and `npm run build` on
 ## Specific Context
 
 ### Build Commands
+
 - Build: `npm run build` (TypeScript → dist)
 - Lint: `npm run lint` (ESLint with --max-warnings 0)
 - Full build script: `./build-and-install.sh` (builds + lints + installs to /opt/ai-agent)
 
 ### Test Commands
+
 - No dedicated test framework configured
 - For manual testing use: `npm run start`
 - Test models: Use ollama on host 'nova' with model 'gpt-oss:20b'
@@ -107,35 +136,41 @@ These rules help generate code that passes `npm run lint` and `npm run build` on
 ### Code Style Guidelines
 
 #### TypeScript
+
 - Target: ES2022, strict mode enabled
 - Use `Record<string, unknown>` for generic objects, avoid `any`
 - Prefer `unknown` for untyped values, narrow with type guards
 - Avoid unnecessary assertions (`as any` unallowed)
 
 #### Naming Conventions
+
 - kebab-case for filenames
 - camelCase for variables/types
 - PascalCase for classes/interfaces
 - Detailed, descriptive type names preferred
 
 #### Imports
+
 - Use type imports where possible: `import type { Foo } from 'bar'`
 - Import order: builtin → external → type → internal → parent → sibling → index → object
 - Alphabetize within groups, natural sort
 - Remove unused imports (linting enforced)
 
 #### Error Handling
+
 - Map external errors to internal types without `any`
 - Use union types for status/error handling
 - Prefer nullish coalescing (`??`) over truthy checks when appropriate
 - Explicit `typeof` checks for `unknown` values
 
 #### Functional Programming
+
 - Prefer map/reduce/filter over loops
 - Add targeted ESLint disable for loop statements when necessary
 - `// eslint-disable-next-line functional/no-loop-statements` with comment
 
 #### Other Rules
+
 - No default exports
 - Remove unused vars (rename to `_param` if needed)
 - Prefer dot notation over brackets
@@ -143,6 +178,7 @@ These rules help generate code that passes `npm run lint` and `npm run build` on
 - Node protocol usage required for imports
 
 #### Quality Standards
+
 - Lint must pass with zero warnings/errors
 - Build must succeed before commits
 - Read docs/SPECS.md, docs/IMPLEMENTATION.md, docs/DESIGN.md for context
@@ -182,4 +218,3 @@ It is extremely important to keep the main orchestration loops thin and lean. I 
 The current status of the core session orchestration loops is not clean. I expect that everything we do from now on will gradually improve the clarity and simplicity of the main orchestrator loops by MOVING away parts.
 
 Separation of concerns is of paramount importance here: the main orchestrator loops DO NOT NEED TO KNOW how exactly a final report is parsed or extracted, how tools are orchestrated and what failure cases exist, etc. All non-core functionality should be moved AWAY from the core orchestrator loops.
-
