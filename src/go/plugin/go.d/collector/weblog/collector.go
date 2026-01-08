@@ -23,7 +23,7 @@ func init() {
 }
 
 func New() *Collector {
-	return &Collector{
+	clr := &Collector{
 		Config: Config{
 			ExcludePath:    "*.gz",
 			GroupRespCodes: true,
@@ -33,7 +33,6 @@ func New() *Collector {
 					FieldsPerRecord:  -1,
 					Delimiter:        " ",
 					TrimLeadingSpace: false,
-					CheckField:       checkCSVFormatField,
 				},
 				LTSV: logs.LTSVConfig{
 					FieldDelimiter: "\t",
@@ -44,6 +43,8 @@ func New() *Collector {
 			},
 		},
 	}
+	clr.Config.CSV.SetCheckField(checkCSVFormatField)
+	return clr
 }
 
 type (

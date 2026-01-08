@@ -67,7 +67,7 @@ func TestNewCSVFormat(t *testing.T) {
 		t.Run(tt.format, func(t *testing.T) {
 			c := testCSVConfig
 			c.Format = tt.format
-			c.CheckField = testCheckCSVFormatField
+			c.checkField = testCheckCSVFormatField
 			tt.wantFormat.raw = tt.format
 
 			f, err := newCSVFormat(c)

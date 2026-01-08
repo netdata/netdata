@@ -14,11 +14,12 @@ import (
 
 type (
 	CSVConfig struct {
-		FieldsPerRecord  int                              `yaml:"fields_per_record,omitempty" json:"fields_per_record"`
-		Delimiter        string                           `yaml:"delimiter,omitempty" json:"delimiter"`
-		TrimLeadingSpace bool                             `yaml:"trim_leading_space,omitempty" json:"trim_leading_space"`
-		Format           string                           `yaml:"format,omitempty" json:"format"`
-		CheckField       func(string) (string, int, bool) `yaml:"-" json:"-"`
+		FieldsPerRecord  int    `yaml:"fields_per_record,omitempty" json:"fields_per_record"`
+		Delimiter        string `yaml:"delimiter,omitempty" json:"delimiter"`
+		TrimLeadingSpace bool   `yaml:"trim_leading_space,omitempty" json:"trim_leading_space"`
+		Format           string `yaml:"format,omitempty" json:"format"`
+
+		checkField func(string) (string, int, bool)
 	}
 
 	CSVParser struct {
@@ -38,6 +39,10 @@ type (
 		idx  int
 	}
 )
+
+func (c *CSVConfig) SetCheckField(f func(string) (string, int, bool)) {
+	c.checkField = f
+}
 
 func NewCSVParser(config CSVConfig, in io.Reader) (*CSVParser, error) {
 	if config.Format == "" {
@@ -118,7 +123,7 @@ func newCSVFormat(config CSVConfig) (*csvFormat, error) {
 		return nil, err
 	}
 
-	fields, err := createCSVFields(record, config.CheckField)
+	fields, err := createCSVFields(record, config.checkField)
 	if err != nil {
 		return nil, err
 	}

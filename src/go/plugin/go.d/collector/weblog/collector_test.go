@@ -1150,7 +1150,6 @@ func prepareWebLogCollectFull(t *testing.T) *Collector {
 				Delimiter:        " ",
 				TrimLeadingSpace: false,
 				Format:           format,
-				CheckField:       checkCSVFormatField,
 			},
 		},
 		Path:        "testdata/full.log",
@@ -1186,6 +1185,7 @@ func prepareWebLogCollectFull(t *testing.T) *Collector {
 		Histogram:      metrix.DefBuckets,
 		GroupRespCodes: true,
 	}
+	cfg.CSV.SetCheckField(checkCSVFormatField)
 	collr := New()
 	collr.Config = cfg
 	require.NoError(t, collr.Init(context.Background()))
@@ -1218,7 +1218,6 @@ func prepareWebLogCollectCommon(t *testing.T) *Collector {
 				Delimiter:        " ",
 				TrimLeadingSpace: false,
 				Format:           format,
-				CheckField:       checkCSVFormatField,
 			},
 		},
 		Path:           "testdata/common.log",
@@ -1228,6 +1227,7 @@ func prepareWebLogCollectCommon(t *testing.T) *Collector {
 		Histogram:      nil,
 		GroupRespCodes: false,
 	}
+	cfg.CSV.SetCheckField(checkCSVFormatField)
 
 	collr := New()
 	collr.Config = cfg
@@ -1256,7 +1256,6 @@ func prepareWebLogCollectCustom(t *testing.T) *Collector {
 				Delimiter:        " ",
 				TrimLeadingSpace: false,
 				Format:           format,
-				CheckField:       checkCSVFormatField,
 			},
 		},
 		CustomFields: []customField{
@@ -1281,6 +1280,7 @@ func prepareWebLogCollectCustom(t *testing.T) *Collector {
 		Histogram:      nil,
 		GroupRespCodes: false,
 	}
+	cfg.CSV.SetCheckField(checkCSVFormatField)
 	collr := New()
 	collr.Config = cfg
 	require.NoError(t, collr.Init(context.Background()))
@@ -1308,7 +1308,6 @@ func prepareWebLogCollectCustomTimeFields(t *testing.T) *Collector {
 				Delimiter:        " ",
 				TrimLeadingSpace: false,
 				Format:           format,
-				CheckField:       checkCSVFormatField,
 			},
 		},
 		CustomTimeFields: []customTimeField{
@@ -1327,6 +1326,7 @@ func prepareWebLogCollectCustomTimeFields(t *testing.T) *Collector {
 		Histogram:      nil,
 		GroupRespCodes: false,
 	}
+	cfg.CSV.SetCheckField(checkCSVFormatField)
 	collr := New()
 	collr.Config = cfg
 	require.NoError(t, collr.Init(context.Background()))
@@ -1354,7 +1354,6 @@ func prepareWebLogCollectCustomNumericFields(t *testing.T) *Collector {
 				Delimiter:        " ",
 				TrimLeadingSpace: false,
 				Format:           format,
-				CheckField:       checkCSVFormatField,
 			},
 		},
 		CustomNumericFields: []customNumericField{
@@ -1373,6 +1372,7 @@ func prepareWebLogCollectCustomNumericFields(t *testing.T) *Collector {
 		Histogram:      nil,
 		GroupRespCodes: false,
 	}
+	cfg.CSV.SetCheckField(checkCSVFormatField)
 	collr := New()
 	collr.Config = cfg
 	require.NoError(t, collr.Init(context.Background()))
@@ -1413,7 +1413,6 @@ func prepareWebLogCollectIISFields(t *testing.T) *Collector {
 				Delimiter:        " ",
 				TrimLeadingSpace: false,
 				Format:           format,
-				CheckField:       checkCSVFormatField,
 			},
 		},
 		Path:           "testdata/u_ex221107.log",
@@ -1423,6 +1422,7 @@ func prepareWebLogCollectIISFields(t *testing.T) *Collector {
 		GroupRespCodes: false,
 	}
 
+	cfg.CSV.SetCheckField(checkCSVFormatField)
 	collr := New()
 	collr.Config = cfg
 	require.NoError(t, collr.Init(context.Background()))

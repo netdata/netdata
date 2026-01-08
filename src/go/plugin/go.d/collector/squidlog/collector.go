@@ -23,7 +23,7 @@ func init() {
 }
 
 func New() *Collector {
-	return &Collector{
+	clr := &Collector{
 		Config: Config{
 			Path:        "/var/log/squid/access.log",
 			ExcludePath: "*.gz",
@@ -34,11 +34,12 @@ func New() *Collector {
 					Delimiter:        " ",
 					TrimLeadingSpace: true,
 					Format:           "- $resp_time $client_address $result_code $resp_size $req_method - - $hierarchy $mime_type",
-					CheckField:       checkCSVFormatField,
 				},
 			},
 		},
 	}
+	clr.Config.CSV.SetCheckField(checkCSVFormatField)
+	return clr
 }
 
 type Config struct {
