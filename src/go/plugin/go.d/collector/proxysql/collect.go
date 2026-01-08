@@ -163,10 +163,9 @@ func (c *Collector) collectStatsMySQLConnectionPool(mx map[string]int64) error {
 			c.cache.getBackend(hg, host, port).updated = true
 			px = "backend_" + backendID(hg, host, port) + "_"
 		case "status":
-			mx[px+"status_ONLINE"] = metrix.Bool(value == "1")
-			mx[px+"status_SHUNNED"] = metrix.Bool(value == "2")
-			mx[px+"status_OFFLINE_SOFT"] = metrix.Bool(value == "3")
-			mx[px+"status_OFFLINE_HARD"] = metrix.Bool(value == "4")
+			for _, st := range []string{"ONLINE", "SHUNNED", "OFFLINE_SOFT", "OFFLINE_HARD"} {
+				mx[px+"status_"+st] = metrix.Bool(value == st)
+			}
 		default:
 			mx[px+column] = parseInt(value)
 		}
