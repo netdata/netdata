@@ -103,6 +103,7 @@ static void logical_disk_cleanup(struct logical_disk *d)
     d->collected_metadata = false;
 
     rrdset_is_obsolete___safe_from_collector_thread(d->st_disk_space);
+    d->st_disk_space = NULL;
 }
 
 static void physical_disk_initialize(struct physical_disk *d)
