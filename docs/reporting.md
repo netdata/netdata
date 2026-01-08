@@ -191,24 +191,28 @@ The Cloud API returns aggregated data from all nodes in your infrastructure, mak
 
 #### Prometheus endpoint (single-node)
 
-For single-node deployments or Prometheus-based workflows, query the Agent directly:
+For single-node deployments or Prometheus-based workflows, query the Agent or Parent directly:
 
 ```
-http://AGENT_IP:19999/api/v1/allmetrics?format=prometheus
+http://NODE_IP:19999/api/v3/allmetrics?format=prometheus
 ```
 
-Replace `AGENT_IP` with your Netdata Agent IP address. This endpoint is useful when you need metrics from a specific node or when your BI tool already integrates with Prometheus.
+Replace `NODE_IP` with your Netdata Agent or Parent IP address:
+- **Agent IP**: Returns metrics from that single node
+- **Parent IP**: Returns aggregated metrics from all child agents connected to that Parent
+
+This endpoint is useful when you need metrics from a specific node or when your BI tool already integrates with Prometheus.
 
 #### REST API with JSON
 
-Query specific metrics from an Agent in JSON format:
+Query specific metrics from an Agent or Parent in JSON format:
 
 ```bash
 # Get all metrics as JSON
-curl 'http://AGENT_IP:19999/api/v1/allmetrics?format=json'
+curl 'http://NODE_IP:19999/api/v3/allmetrics?format=json'
 
 # Query a specific chart
-curl 'http://AGENT_IP:19999/api/v1/data?chart=system.cpu&after=-3600&format=json'
+curl 'http://NODE_IP:19999/api/v3/data?chart=system.cpu&after=-3600&format=json'
 ```
 
 Power BI and similar tools can consume this JSON through Power Query or equivalent data transformation features.
