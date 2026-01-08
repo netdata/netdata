@@ -31,13 +31,16 @@ modules:
           This plugin ingests OpenTelemetry metrics and logs via the OTLP/gRPC protocol.
 
           It receives OTLP-formatted data from any OpenTelemetry-compatible source (collectors, SDKs, instrumented applications)
-          and automatically creates Netdata charts for visualization and alerting.
+          and automatically creates Netdata charts for visualization and alerting. Metrics are aggregated using
+          fixed-interval slot-based aggregation.
 
           For logs, it stores them in systemd-compatible journal files with configurable rotation and retention policies.
         method_description: |
           The plugin listens on a gRPC endpoint (default `127.0.0.1:4317`) for incoming OTLP data.
           It supports both metrics and logs signals. Metrics are mapped to Netdata charts using configurable
-          mapping rules. Logs are stored in journal files for querying via the Netdata Logs tab.
+          mapping rules and emitted at a configurable collection interval (default 10 seconds).
+          Charts with no data are automatically removed after an expiry period.
+          Logs are stored in journal files for querying via the Netdata Logs tab.
       supported_platforms:
         include:
           - Linux
@@ -90,12 +93,20 @@ modules:
               description: Directory with YAML files for mapping OTLP metrics to Netdata charts.
               default_value: "otel.d/v1/metrics/"
               required: false
-            - name: metrics.buffer_samples
-              description: Number of samples to buffer for collection interval detection.
+            - name: metrics.interval_secs
+              description: Collection interval in seconds (1–3600). Defines the Netdata chart update frequency.
               default_value: 10
               required: false
-            - name: metrics.throttle_charts
-              description: Maximum number of new charts to create per collection interval.
+            - name: metrics.grace_period_secs
+              description: Grace period in seconds. After the last data point, the plugin waits this long before gap-filling.
+              default_value: 60
+              required: false
+            - name: metrics.expiry_duration_secs
+              description: Expiry duration in seconds. Charts with no data for this long are removed.
+              default_value: 900
+              required: false
+            - name: metrics.max_new_charts_per_request
+              description: Maximum number of new charts that can be created per gRPC request. Limits cardinality explosion from high-cardinality label combinations.
               default_value: 100
               required: false
             - name: logs.journal_dir
@@ -140,7 +151,10 @@ modules:
                   path: "127.0.0.1:4317"
                 metrics:
                   chart_configs_dir: otel.d/v1/metrics/
-                  buffer_samples: 10
+                  interval_secs: 10
+                  grace_period_secs: 60
+                  expiry_duration_secs: 900
+                  max_new_charts_per_request: 100
                 logs:
                   journal_dir: /var/log/netdata/otel-journals
             - name: TLS-enabled configuration
@@ -152,7 +166,10 @@ modules:
                   tls_key_path: /etc/netdata/ssl/key.pem
                 metrics:
                   chart_configs_dir: otel.d/v1/metrics/
-                  buffer_samples: 10
+                  interval_secs: 10
+                  grace_period_secs: 60
+                  expiry_duration_secs: 900
+                  max_new_charts_per_request: 100
                 logs:
                   journal_dir: /var/log/netdata/otel-journals
     troubleshooting:

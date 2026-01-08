@@ -69,8 +69,8 @@ pub fn init_tracing() {
         .unwrap_or("info");
 
     // Create environment filter: configured level as default, but limit noisy
-    // third-party crates to warn.
-    let filter = format!("{filter_str},foyer=warn,notify=warn");
+    // third-party crates to info.
+    let filter = format!("{filter_str},foyer=info,notify=info,h2=info,tower=info,hyper=info");
     let env_filter = EnvFilter::new(&filter);
 
     // Build the registry with base layers

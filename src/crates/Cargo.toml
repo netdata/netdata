@@ -110,6 +110,8 @@ hdrhistogram = { version = "7.5" }
 rayon = "1.11.0"
 itoa = "1.0"
 
+base64 = "0.22"
+
 # OTEL-specific dependencies
 atty = "0.2"
 bytesize = "1.3"
@@ -153,6 +155,7 @@ otel-signal-viewer-plugin = { path = "netdata-log-viewer/otel-signal-viewer-plug
 otel-plugin = { path = "netdata-otel/otel-plugin" }
 flatten_otel = { path = "netdata-otel/flatten_otel" }
 
+reqwest = { version = "0.12", features = ["json"] }
 tempfile = { version = "3" }
 
 proptest = "1.9"

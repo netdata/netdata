@@ -15,17 +15,23 @@ endpoint:
   tls_ca_cert_path: null
 
 metrics:
-  # Print flattened metrics to stdout for debugging, instead of ingesting them
-  print_flattened: false
-
-  # Number of samples to buffer for collection interval detection
-  buffer_samples: 10
-
-  # Maximum number of new charts to create per collection interval
-  throttle_charts: 100
-
   # Directory with configuration files for mapping OTEL metrics to Netdata charts
   chart_configs_dir: @configdir_POST@/otel.d/v1/metrics
+
+  # Collection interval in seconds (1–3600). Defines the Netdata chart update frequency.
+  interval_secs: 10
+
+  # Grace period in seconds. After the last data point, the plugin waits this long
+  # before gap-filling. When interval_secs is overridden, this auto-derives as
+  # 5 * interval_secs unless explicitly set.
+  grace_period_secs: 60
+
+  # Expiry duration in seconds. Charts with no data for this long are removed.
+  expiry_duration_secs: 900
+
+  # Maximum number of new charts that can be created per gRPC request.
+  # Limits cardinality explosion from high-cardinality label combinations.
+  max_new_charts_per_request: 100
 
 logs:
   # Directory to store journal files for logs.
