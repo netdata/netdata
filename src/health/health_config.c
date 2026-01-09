@@ -203,36 +203,46 @@ static inline int health_parse_db_lookup(size_t line, const char *filename, char
             }
             else if(*s == '=') {
                 s++;
-                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL;
-            }
-            else
-                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER;
-        }
-        else if(*s == '>') {
-            if(*s == '=') {
-                s++;
                 ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS_EQUAL;
             }
             else
                 ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS;
         }
+        else if(*s == '>') {
+            s++;
+            if(*s == '=') {
+                s++;
+                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL;
+            }
+            else
+                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER;
+        }
 
         while(*s && isspace((uint8_t)*s)) s++;
 
-        if(*s) {
-            if(isdigit((uint8_t)*s) || *s == '.') {
-                ac->time_group_value = str2ndd(s, &s);
-                while(s && *s && isspace((uint8_t)*s)) s++;
+        if(*s == ')') {
+            // empty options like countif() - allowed, will use defaults
+        }
+        else if(isdigit((uint8_t)*s) || *s == '.') {
+            // parse numeric value
+            ac->time_group_value = str2ndd(s, &s);
+            while(s && *s && isspace((uint8_t)*s)) s++;
 
-                if(!s || *s != ')') {
-                    netdata_log_error("Health configuration at line %zu of file '%s': missing closing parenthesis after number in aggregation method on '%s'",
-                                      line, filename, key);
-                    return 0;
-                }
+            if(!s || *s != ')') {
+                netdata_log_error("Health configuration at line %zu of file '%s': missing closing parenthesis after number in aggregation method on '%s'",
+                                  line, filename, key);
+                return 0;
             }
         }
-        else if(*s != ')') {
-            netdata_log_error("Health configuration at line %zu of file '%s': missing closing parenthesis after method on '%s'",
+        else if(*s) {
+            // invalid character - not a digit, not '.', not ')'
+            netdata_log_error("Health configuration at line %zu of file '%s': invalid character '%c' in aggregation method options on '%s'",
+                              line, filename, *s, key);
+            return 0;
+        }
+        else {
+            // end of string without closing parenthesis
+            netdata_log_error("Health configuration at line %zu of file '%s': missing closing parenthesis after aggregation method on '%s'",
                               line, filename, key);
             return 0;
         }
@@ -262,6 +272,7 @@ static inline int health_parse_db_lookup(size_t line, const char *filename, char
     }
 
     // then is the 'after' time
+    while(*s && isspace((uint8_t)*s)) s++;  // skip whitespace after group method
     key = s;
     while(*s && !isspace((uint8_t)*s)) s++;
     while(*s && isspace((uint8_t)*s)) *s++ = '\0';
