@@ -191,10 +191,10 @@ caps_plugins="apps.plugin slabinfo.plugin debugfs.plugin go.d.plugin perf.plugin
 
 if command -v setcap >/dev/null 2>&1; then
   for f in ${caps_plugins}; do
-    f="usr/libexec/netdata/plugins.d/${x}"
+    x="usr/libexec/netdata/plugins.d/${f}"
 
-    if [ -f "${f}" ]; then
-      run chmod 0750 "${f}"
+    if [ -f "${x}" ]; then
+      run chmod 0750 "${x}"
     fi
   done
 
