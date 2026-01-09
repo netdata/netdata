@@ -94,7 +94,7 @@ case "${PKG_TYPE}" in
         fi
         ;;
     RPM)
-        add_cmake_optkon PACKAGE_TYPE rpm
+        add_cmake_option PACKAGE_TYPE rpm
         ;;
     *) echo "Unrecognized package type ${PKG_TYPE}." ; exit 1 ;;
 esac

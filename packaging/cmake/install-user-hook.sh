@@ -58,11 +58,11 @@ else
         nologin="$(command -v nologin || echo '/bin/false')"
 
         if command -v useradd 1> /dev/null 2>&1; then
-            useradd -r -g "${user}" -c "${user}" -s "${nologin}" --no-create-home -d "${homedir}" "${user}"
+            useradd -r -g "${group}" -c "${user}" -s "${nologin}" --no-create-home -d "${homedir}" "${user}"
         elif command -v pw 1> /dev/null 2>&1; then
-            pw useradd "${user}" -d "${homedir}" -g "${user}" -s "${nologin}"
+            pw useradd "${user}" -d "${homedir}" -g "${group}" -s "${nologin}"
         elif command -v adduser 1> /dev/null 2>&1; then
-            adduser -h "${homedir}" -s "${nologin}" -D -G "${user}" "${user}"
+            adduser -h "${homedir}" -s "${nologin}" -D -G "${group}" "${user}"
         elif command -v sysadminctl 1> /dev/null 2>&1; then
             gid=$(dscl . read /Groups/"${group}" 2>/dev/null | grep PrimaryGroupID | grep -Eo "[0-9]+")
             if sysadminctl -addUser "${user}" -shell /usr/bin/false -home /var/empty -GID "$gid"; then
