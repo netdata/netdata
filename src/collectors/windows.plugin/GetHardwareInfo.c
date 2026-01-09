@@ -245,17 +245,14 @@ static int initialize()
 
     netdata_detect_cpu();
     if (!temperature_fcnt) {
-        DeleteCriticalSection(&cpus_lock);
         return -1;
     }
 
     if (netdata_install_driver()) {
-        DeleteCriticalSection(&cpus_lock);
         return -1;
     }
 
     if (netdata_start_driver()) {
-        DeleteCriticalSection(&cpus_lock);
         return -1;
     }
 
