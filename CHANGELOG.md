@@ -140,6 +140,12 @@
 - Build(deps): bump github.com/prometheus/common from 0.67.4 to 0.67.5 in /src/go ([#21517](https://github.com/netdata/netdata/issues/21517))
 - Suppress a handful of known warnings during the build process. ([#20102](https://github.com/netdata/netdata/issues/20102))
 - Minor improvements to CMake code. ([#21146](https://github.com/netdata/netdata/issues/21146))
+- Merge MSSQL Queries  (windows.plugin) ([#21491](https://github.com/netdata/netdata/issues/21491))
+- Improve storage collector by using dictionary delete callbacks ([#21500](https://github.com/netdata/netdata/issues/21500))
+- Enhance error handling for journal v2 migration ([#21514](https://github.com/netdata/netdata/issues/21514))
+- Fix(go.d/proxysql): correct backend status metric mapping ([#21524](https://github.com/netdata/netdata/issues/21524))
+- MCP test client: fix prompts/resources support and schema validation ([#21521](https://github.com/netdata/netdata/issues/21521))
+- Fix(go.d/pkg/logs):  fix ParserConfig.CSV omitempty behavior ([#21526](https://github.com/netdata/netdata/issues/21526))
 
 ## [2.8.0] - 2025-11-19
 
