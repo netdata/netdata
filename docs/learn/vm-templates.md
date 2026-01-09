@@ -115,7 +115,7 @@ A: Use cloud-init to install Netdata on first boot:
 ```yaml
 # cloud-init config
 runcmd:
-  - curl https://get.netdata.io/kickstart.sh -- --claim-token TOKEN --claim-rooms ROOM_ID | sh
+  - curl https://get.netdata.io/kickstart.sh | bash -s -- --claim-token TOKEN --claim-rooms ROOM_ID
 ```
 
 Netdata will generate a unique GUID and auto-claim on first boot.
