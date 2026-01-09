@@ -2482,6 +2482,21 @@ void pgc_open_cache_to_journal_v2(
         }
 
         METRIC *metric = mrg_metric_dup(main_mrg, (METRIC *)page->metric_id);
+        if(!metric) {
+            // metric has been deleted, skip this page
+            page_transition_unlock(cache, page);
+            page_release(cache, page, false);
+            continue;
+        }
+
+        // Check UUID validity early, before any JudyL modifications
+        nd_uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
+        if (unlikely(!uuid)) {
+            mrg_metric_release(main_mrg, metric);
+            page_transition_unlock(cache, page);
+            page_release(cache, page, false);
+            continue;
+        }
 
         page_flag_set(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
 
@@ -2524,7 +2539,7 @@ void pgc_open_cache_to_journal_v2(
         if(!*PValue) {
             mi = aral_mallocz(ar_mi);
             mi->metric = metric;
-            mi->uuid = mrg_metric_uuid(main_mrg, metric);
+            mi->uuid = uuid;
             mi->first_time_s = page->start_time_s;
             mi->last_time_s = page->end_time_s;
             mi->number_of_pages = 1;
