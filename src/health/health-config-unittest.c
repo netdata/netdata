@@ -94,6 +94,10 @@ static const db_lookup_test_case_t test_cases[] = {
     { "countif(!=0.5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL, 0.5, -600, 0, "countif not equal" },
     { "countif(<>0.5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL, 0.5, -600, 0, "countif not equal alt" },
     { "countif(0.5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0.5, -600, 0, "countif equal (default)" },
+    { "countif(=0.5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0.5, -600, 0, "countif explicit equal" },
+    { "countif(:0.5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0.5, -600, 0, "countif colon equal" },
+    { "countif(==0.5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0.5, -600, 0, "countif double equal" },
+    { "countif(!5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL, 5.0, -600, 0, "countif bang not equal" },
 
     // countif with integer values
     { "countif(>0) -5m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 0.0, -300, 0, "countif >0" },
@@ -103,15 +107,41 @@ static const db_lookup_test_case_t test_cases[] = {
     // countif with decimal starting with dot
     { "countif(>.5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 0.5, -600, 0, "countif >.5" },
     { "countif(<.25) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS, 0.25, -600, 0, "countif <.25" },
+    { "countif(=.5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0.5, -600, 0, "countif =.5" },
+    { "countif(>=.1) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL, 0.1, -600, 0, "countif >=.1" },
+    { "countif(>-.5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, -0.5, -600, 0, "countif >-.5" },
+    { "countif(<-.25) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS, -0.25, -600, 0, "countif <-.25" },
+
+    // countif with negative numbers
+    { "countif(>-3) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, -3.0, -600, 0, "countif >-3" },
+    { "countif(>=-3) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL, -3.0, -600, 0, "countif >=-3" },
+    { "countif(<-1.5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS, -1.5, -600, 0, "countif <-1.5" },
+    { "countif(=-10) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, -10.0, -600, 0, "countif =-10" },
+
+    // countif with explicit positive sign
+    { "countif(>+5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 5.0, -600, 0, "countif >+5" },
+    { "countif(=+0) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0.0, -600, 0, "countif =+0" },
+
+    // countif with scientific notation
+    { "countif(>1e-5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 1e-5, -600, 0, "countif scientific" },
+    { "countif(<1.5e3) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS, 1500.0, -600, 0, "countif sci positive exp" },
+    { "countif(>=1E-10) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL, 1e-10, -600, 0, "countif sci uppercase E" },
 
     // countif with empty parentheses (defaults to =0)
     { "countif() -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0.0, -600, 0, "countif default" },
+
+    // countif with whitespace inside parentheses
+    { "countif( >5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 5.0, -600, 0, "countif space before op" },
+    { "countif(> 5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 5.0, -600, 0, "countif space after op" },
+    { "countif( > 5 ) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 5.0, -600, 0, "countif spaces around" },
+    { "countif(  >=  0.5  ) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL, 0.5, -600, 0, "countif multi spaces" },
 
     // countif with options
     { "countif(>2.00) -10m unaligned of *", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 2.0, -600, 0, "countif with opts" },
     { "countif(>0) -1m unaligned absolute", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 0.0, -60, 0, "countif absolute" },
 
     // percentile variations
+    { "percentile( 95 ) -10m", true, RRDR_GROUPING_PERCENTILE, DC_COND, 95.0, -600, 0, "percentile with spaces" },
     { "percentile(95) -10m", true, RRDR_GROUPING_PERCENTILE, DC_COND, 95.0, -600, 0, "percentile 95" },
     { "percentile(99) -5m", true, RRDR_GROUPING_PERCENTILE, DC_COND, 99.0, -300, 0, "percentile 99" },
     { "percentile(50) -10m", true, RRDR_GROUPING_PERCENTILE, DC_COND, 50.0, -600, 0, "percentile 50 (median)" },
@@ -192,6 +222,24 @@ static const db_lookup_test_case_t test_cases[] = {
     // Invalid characters in group options
     { "countif(>abc) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "invalid char in countif" },
     { "percentile(abc) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "invalid char in percentile" },
+
+    // Invalid operator combinations
+    { "countif(===5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "triple equals invalid" },
+    { "countif(>==5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "greater double equals invalid" },
+    { "countif(<==5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "less double equals invalid" },
+    { "countif(>::5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "colon after greater invalid" },
+    { "countif(>=:5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "colon after greater-equal invalid" },
+    { "countif(<:5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "colon after less invalid" },
+
+    // Operators with no value (should default to 0)
+    { "countif(=) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0.0, -600, 0, "equals no value" },
+    { "countif(==) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0.0, -600, 0, "double equals no value" },
+    { "countif(:) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0.0, -600, 0, "colon no value" },
+    { "countif(>) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 0.0, -600, 0, "greater no value" },
+    { "countif(<) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS, 0.0, -600, 0, "less no value" },
+    { "countif(!) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL, 0.0, -600, 0, "bang no value" },
+    { "countif(!=) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL, 0.0, -600, 0, "not-equal no value" },
+    { "countif(<>) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL, 0.0, -600, 0, "less-greater no value" },
 
     // Missing closing parenthesis
     { "countif(>0.5 -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "missing close paren" },

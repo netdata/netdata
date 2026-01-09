@@ -190,6 +190,9 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
     }
 
     if(group_options) {
+        // skip leading whitespace inside parentheses
+        while(*s && isspace((uint8_t)*s)) s++;
+
         if(*s == '!') {
             s++;
             if(*s == '=') s++;
@@ -217,14 +220,20 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
             else
                 ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER;
         }
+        else if(*s == '=' || *s == ':') {
+            // explicit equal operator (=, == or :)
+            s++;
+            if(*s == '=') s++;  // support == as well
+            ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL;
+        }
 
         while(*s && isspace((uint8_t)*s)) s++;
 
         if(*s == ')') {
             // empty options like countif() - allowed, will use defaults
         }
-        else if(isdigit((uint8_t)*s) || *s == '.') {
-            // parse numeric value
+        else if(isdigit((uint8_t)*s) || *s == '.' || *s == '-' || *s == '+') {
+            // parse numeric value (including negative numbers like >=-3)
             ac->time_group_value = str2ndd(s, &s);
             while(s && *s && isspace((uint8_t)*s)) s++;
 
@@ -235,7 +244,7 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
             }
         }
         else if(*s) {
-            // invalid character - not a digit, not '.', not ')'
+            // invalid character - not a valid start of a number or ')'
             netdata_log_error("Health configuration at line %zu of file '%s': invalid character '%c' in aggregation method options on '%s'",
                               line, filename, *s, key);
             return 0;
@@ -301,6 +310,7 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
             if (!duration_parse_seconds(value, &ac->before)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
                                   line, filename, value, key);
+                return 0;
             }
         }
         else if(!strcasecmp(key, HEALTH_EVERY_KEY)) {
@@ -311,6 +321,7 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
             if (!duration_parse_seconds(value, &ac->update_every)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
                                   line, filename, value, key);
+                return 0;
             }
         }
         else if(!strcasecmp(key, "absolute") || !strcasecmp(key, "abs") || !strcasecmp(key, "absolute_sum")) {

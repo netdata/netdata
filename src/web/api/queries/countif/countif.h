@@ -64,8 +64,16 @@ static inline void tg_countif_create(RRDR *r, const char *options __maybe_unused
                 }
                 break;
 
-            default:
             case '=':
+                options++;
+                if(*options == '=')
+                    ; // support ==, will be advanced below
+                else
+                    options--;
+                g->comparison = TG_COUNTIF_EQUAL;
+                break;
+
+            default:
             case ':':
                 g->comparison = TG_COUNTIF_EQUAL;
                 break;
