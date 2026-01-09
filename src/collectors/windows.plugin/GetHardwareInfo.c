@@ -19,6 +19,7 @@ size_t ncpus = 0;
 static ND_THREAD *hardware_info_thread = NULL;
 static collected_number (*temperature_fcnt)(MSR_REQUEST *) = NULL;
 static CRITICAL_SECTION cpus_lock;
+bool cpus_lock_initialized = false;
 
 static void netdata_stop_driver()
 {
@@ -240,6 +241,7 @@ static void netdata_detect_cpu()
 static int initialize()
 {
     InitializeCriticalSection(&cpus_lock);
+    cpus_lock_initialized = true;
 
     netdata_detect_cpu();
     if (!temperature_fcnt) {
@@ -331,10 +333,12 @@ void do_GetHardwareInfo_cleanup()
 
     netdata_stop_driver();
 
-    DeleteCriticalSection(&cpus_lock);
+    if (cpus_lock_initialized)
+        DeleteCriticalSection(&cpus_lock);
 
     if (cpus) {
         freez(cpus);
         cpus = NULL;
+        ncpus = 0;
     }
 }
