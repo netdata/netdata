@@ -94,6 +94,7 @@ https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/authentication
 https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/view-plan-and-billing.md,Netdata Plans & Billing,Published,Netdata Cloud,,
 https://github.com/netdata/netdata/edit/master/src/aclk/README.md,Agent-Cloud Link (ACLK),Published,Netdata Cloud,,The Agent-Cloud link (ACLK) is the mechanism responsible for connecting a Netdata agent to Netdata Cloud.
 https://github.com/netdata/netdata/edit/master/docs/learn/remove-node.md,Remove Agent,Published,Netdata Cloud,,
+https://github.com/netdata/netdata/edit/master/docs/learn/vm-templates.md,VM Templates and Clones,Published,Netdata Cloud,"vm,template,clone,kvm,proxmox,vagrant,terraform",Guide for preparing VM templates and cloning VMs with Netdata
 https://github.com/netdata/netdata/edit/master/docs/delete/netdata/account.md,Account Deletion,Published,Netdata Cloud,,
 ,,,,,
 https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/README.md,Netdata Cloud On-Prem,Published,Netdata Cloud On-Prem,,
