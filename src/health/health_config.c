@@ -155,7 +155,7 @@ static inline int health_parse_repeat(
     return 1;
 }
 
-static inline int health_parse_db_lookup(size_t line, const char *filename, char *string, struct rrd_alert_config *ac) {
+int health_parse_db_lookup(size_t line, const char *filename, char *string, struct rrd_alert_config *ac) {
     if(ac->dimensions) string_freez(ac->dimensions);
     ac->dimensions = NULL;
     ac->after = 0;
