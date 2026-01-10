@@ -146,6 +146,8 @@
 - Fix(go.d/proxysql): correct backend status metric mapping ([#21524](https://github.com/netdata/netdata/issues/21524))
 - MCP test client: fix prompts/resources support and schema validation ([#21521](https://github.com/netdata/netdata/issues/21521))
 - Fix(go.d/pkg/logs):  fix ParserConfig.CSV omitempty behavior ([#21526](https://github.com/netdata/netdata/issues/21526))
+- Use the same type for all time_group_value values ([#21528](https://github.com/netdata/netdata/issues/21528))
+- Fix(diskspace.plugin): exclude ZFS datasets ([#21532](https://github.com/netdata/netdata/issues/21532))
 
 ## [2.8.0] - 2025-11-19
 
