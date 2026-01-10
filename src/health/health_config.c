@@ -232,9 +232,10 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
         if(*s == ')') {
             // empty options like countif() - allowed, will use defaults
         }
-        else if(isdigit((uint8_t)*s) ||
-                *s == '.' ||
-                ((*s == '-' || *s == '+') && s[1] && (isdigit((uint8_t)s[1]) || s[1] == '.'))) {
+        else if((isdigit((uint8_t)*s)) ||
+                (*s == '.' && isdigit((uint8_t)s[1])) ||
+                ((*s == '-' || *s == '+') && s[1] &&
+                 ((isdigit((uint8_t)s[1])) || (s[1] == '.' && isdigit((uint8_t)s[2]))))) {
             // parse numeric value (including negative numbers like >=-3, or >+5, or >-.5)
             ac->time_group_value = str2ndd(s, &s);
             while(s && *s && isspace((uint8_t)*s)) s++;

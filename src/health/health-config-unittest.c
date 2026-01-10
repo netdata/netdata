@@ -223,6 +223,18 @@ static const db_lookup_test_case_t test_cases[] = {
     { "countif(>abc) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "invalid char in countif" },
     { "percentile(abc) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "invalid char in percentile" },
 
+    // Malformed numeric values (lone dot, sign+dot without digits)
+    { "countif(.) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "lone dot invalid" },
+    { "countif(+.) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "plus dot invalid" },
+    { "countif(-.) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "minus dot invalid" },
+    { "countif(>.) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "greater dot invalid" },
+    { "countif(<.) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "less dot invalid" },
+    { "countif(>=.) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "greater-equal dot invalid" },
+    { "countif(<=.) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "less-equal dot invalid" },
+    { "countif(>+.) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "greater plus dot invalid" },
+    { "countif(<-.) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "less minus dot invalid" },
+    { "percentile(.) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "percentile lone dot invalid" },
+
     // Invalid operator combinations
     { "countif(===5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "triple equals invalid" },
     { "countif(>==5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "greater double equals invalid" },
