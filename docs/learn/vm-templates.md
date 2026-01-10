@@ -1,284 +1,254 @@
 # VM Templates and Clones
 
-When creating VM templates or cloning VMs, you need to reset the node identity so each clone gets a unique identity in Netdata Cloud.
+:::danger
+**Destructive Operations - Data Loss Warning**
 
-## Understanding Node Identity
+The commands in this guide **permanently delete**:
+- All historical metrics
+- [Node identity](node-identities.md#agent-self-identity)
+- [Cloud connection](node-identities.md#aclk-identity)
+- Alert history
 
-Netdata uses multiple identity files that work together:
+**This is irreversible. There is no undo.**
 
-### Machine GUID (Primary Node Identity)
+Only run these commands on VMs you intend to convert to templates.
+Running these on a production system will destroy your monitoring data.
+:::
 
-The **machine GUID** is the unique identifier for this specific node. It is used by Netdata Cloud and Parents to uniquely identify this node.
+:::tip
+**What You'll Learn**
 
-- **Primary file**: `/var/lib/netdata/registry/netdata.public.unique.id`
-- **Recovery backup**: `/var/lib/netdata/status-netdata.json` (and fallback locations)
+How to prepare a VM template so each clone gets a unique Netdata identity and automatically connects to Netdata Cloud.
+:::
 
-**Generation behavior**:
-1. On first start, Netdata tries to read the GUID from the primary file
-2. If missing or invalid, falls back to the status file backup
-3. If still missing, generates a new random UUID
-4. The GUID is then saved to the primary file with a timestamp
+## Prerequisites
 
-The machine GUID **never changes** once created, unless manually deleted.
+- **Read first**: [Node Identities](node-identities.md) - understand what you're deleting
+- Netdata installed on a VM
+- Hypervisor that supports templates or golden images
+- (Optional) `/etc/netdata/claim.conf` configured for auto-claiming to Cloud
 
-> **Note**: The SQLite databases (`netdata-meta.db`) store metadata about nodes this agent has seen (for Parents that receive data from Children), but they do **not** affect the agent's own identity. The agent's identity comes exclusively from the GUID file and status file backups.
+## Overview
 
-### Claimed ID (ACLK Authentication)
+To prepare a VM template:
 
-The **claimed ID** is a separate random UUID generated during the claiming process. It authenticates the Agent-Cloud Link (ACLK) connection.
+1. **Stop Netdata** - Prevent file regeneration
+2. **Delete identity and data files** - Force new identity on clone boot
+3. **Keep claim.conf** - Enable auto-claiming (optional)
+4. **Convert to template** - Without starting Netdata
 
-- **Primary storage**: `/var/lib/netdata/cloud.d/cloud.conf` (key: `claimed_id`)
-- **Legacy file**: `/var/lib/netdata/cloud.d/claimed_id`
-- **RSA keypair**: `/var/lib/netdata/cloud.d/private.pem` and `public.pem`
+## Files to Delete
 
-The claimed ID can be regenerated independently of the machine GUID by removing the `cloud.d` directory and re-claiming.
+:::danger
+**Verify you are on the correct VM before running these commands.**
+:::
 
-### Node ID (Cloud-Assigned)
+| Category | Files | What's Lost |
+|----------|-------|-------------|
+| **[Agent Identity](node-identities.md#agent-self-identity)** | [GUID file](node-identities.md#agent-self-identity), [status backups](node-identities.md#status-file-backups) | Node identity |
+| **[ACLK Auth](node-identities.md#aclk-identity)** | [`cloud.d/`](node-identities.md#aclk-identity) directory | Cloud connection, must re-claim |
+| **[Node Metadata](node-identities.md#parent-children-identities)** | `netdata-meta.db*`, `context-meta.db*` | Node metadata, metric mappings |
+| **Metrics** | `dbengine*` directories (all tiers) | All historical metrics |
 
-The **node ID** is assigned by Netdata Cloud when the agent first connects. It links the machine GUID to your Cloud space.
+**Keep**: `/etc/netdata/claim.conf` - enables auto-claiming on clones
 
-- **Stored in**: `/var/cache/netdata/netdata-meta.db` (in `node_instance` table)
+## Step-by-Step
 
-### Database Files (Metric Metadata)
-
-The SQLite databases and dbengine files store metadata about nodes and their metrics:
-
-- **Location**: `/var/cache/netdata/netdata-meta.db`, `/var/cache/netdata/context-meta.db`
-- **dbengine data**: `/var/cache/netdata/dbengine/` (and per-node subdirectories)
-
-These files do **not** determine the agent's own identity, but keeping them in templates causes problems:
-
-1. **Profile switch**: The agent detects multiple node identities and assumes it's a Parent, switching to a parent runtime profile (larger caches, different behavior)
-2. **Stale node reporting**: The agent reports all known nodes to Netdata Cloud, including the old template node
-3. **Cloud confusion**: Netdata Cloud believes the template node has multiple Parents (all the clones)
-4. **Persistent stale entries**: The template's identity appears as a stale node in Cloud until all clones rotate their databases due to retention settings (can take years with tiering)
-
-### Status File (Recovery Backup)
-
-The status file provides crash recovery and stores the machine GUID as a backup.
-
-- **Primary location**: `/var/lib/netdata/status-netdata.json`
-- **Fallback locations** (tried in order if primary fails):
-  - `/var/cache/netdata/status-netdata.json`
-  - `/tmp/status-netdata.json`
-  - `/run/status-netdata.json`
-  - `/var/run/status-netdata.json`
-
-## Preparing a Template
-
-To ensure each cloned VM gets a unique identity, you must remove **all** identity-related files.
-
-> **Note**: The paths below assume default installation. If you customized `[directories]` in `netdata.conf`, adjust paths accordingly:
-> - `lib` setting → affects `/var/lib/netdata/` paths
-> - `cache` setting → affects `/var/cache/netdata/` paths
+### 1. Stop Netdata
 
 ```bash
-# Stop Netdata
 sudo systemctl stop netdata
+```
 
-# Remove the machine GUID file
+### 2. Delete All Identity and Data Files
+
+:::danger
+**Point of No Return**
+
+The following commands permanently delete Netdata data. Verify you are on the template VM.
+:::
+
+```bash
+# Machine GUID (Agent Self Identity)
 sudo rm -f /var/lib/netdata/registry/netdata.public.unique.id
 
-# Remove ALL status file locations (recovery backups)
+# Status file backups (GUID recovery locations)
 sudo rm -f /var/lib/netdata/status-netdata.json
 sudo rm -f /var/cache/netdata/status-netdata.json
 sudo rm -f /tmp/status-netdata.json
 sudo rm -f /run/status-netdata.json
 sudo rm -f /var/run/status-netdata.json
 
-# Remove ACLK authentication (claimed_id, RSA keys, cloud config)
+# ACLK authentication (Claimed ID, RSA keys)
 sudo rm -rf /var/lib/netdata/cloud.d/
 
-# Remove databases and metric data (prevents stale node reporting to Cloud)
-sudo rm -f /var/cache/netdata/netdata-meta.db
-sudo rm -f /var/cache/netdata/netdata-meta.db-wal
-sudo rm -f /var/cache/netdata/netdata-meta.db-shm
-sudo rm -f /var/cache/netdata/context-meta.db
-sudo rm -f /var/cache/netdata/context-meta.db-wal
-sudo rm -f /var/cache/netdata/context-meta.db-shm
-sudo rm -rf /var/cache/netdata/dbengine/
-
-# DO NOT remove /etc/netdata/claim.conf - it enables auto-claiming under the new identity
-# DO NOT start Netdata - the template must have no identity for clones to create new ones
+# Databases and metrics (metadata, all dbengine tiers)
+sudo rm -f /var/cache/netdata/netdata-meta.db*
+sudo rm -f /var/cache/netdata/context-meta.db*
+sudo rm -rf /var/cache/netdata/dbengine*
 ```
 
-After this, convert the VM to a template.
+### 3. Configure Auto-Claiming (Optional)
 
-### Understanding Auto-Claiming
+To have clones automatically claim to Netdata Cloud on first boot, ensure `/etc/netdata/claim.conf` exists:
 
-There are two ways to enable auto-claiming on first boot:
+```bash
+cat /etc/netdata/claim.conf
+```
 
-#### Option 1: claim.conf file (Recommended)
-
-The kickstart script creates `/etc/netdata/claim.conf` when called with claiming parameters:
-
+Should contain:
 ```ini
 [global]
    url = https://app.netdata.cloud
    token = YOUR_SPACE_TOKEN
-   rooms = ROOM_ID1,ROOM_ID2
+   rooms = ROOM_ID
 ```
 
-**Keep this file** in your template.
+### 4. Convert to Template
 
-#### Option 2: Environment variables
+**Do not start Netdata.** Convert the VM to a template using your hypervisor.
 
-Set these environment variables in your VM's environment (e.g., via systemd override, `/etc/environment`, or cloud-init):
+## When Clones Boot
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `NETDATA_CLAIM_TOKEN` | Your Netdata Cloud Space token | Yes |
-| `NETDATA_CLAIM_ROOMS` | Comma-separated Room IDs | No |
-| `NETDATA_CLAIM_URL` | Cloud URL (default: `https://app.netdata.cloud`) | No |
-| `NETDATA_CLAIM_PROXY` | Proxy server URL | No |
+1. Netdata starts, no [GUID](node-identities.md#agent-self-identity) found, generates new unique identity
+2. If `claim.conf` exists, auto-claims to Cloud
+3. Cloud assigns [Node ID](node-identities.md#cloud-node-identity), new node appears in your Space
 
-**Auto-claiming flow** (either method):
-1. Clone boots → Netdata generates new machine GUID
-2. Netdata reads `claim.conf` or environment variables → auto-claims to Cloud
-3. Cloud assigns new node ID → node appears in your space
+Each clone is a unique, independent node.
 
-## Cloning from Template
+## Hypervisor Notes
 
-When you clone a VM from the template:
+The Netdata cleanup commands are the same for all hypervisors. The difference is **when** and **how** to run them.
 
-1. **First boot**: Netdata generates a new unique machine GUID
-2. **Auto-claims**: If `/etc/netdata/claim.conf` exists, claims to Cloud automatically
-3. **Cloud registration**: Cloud assigns a new node ID, node appears in your space
+| Hypervisor | Template Support | When to Clean | Automation |
+|------------|------------------|---------------|------------|
+| **Proxmox** | Convert to Template | Before conversion | cloud-init scripts |
+| **VMware/vSphere** | VM Templates | Before conversion | Guest customization |
+| **libvirt/KVM** | virt-sysprep | During sysprep | `--delete` flags |
+| **AWS** | AMI | Before image creation | user-data scripts |
+| **Azure** | Managed Image | Before capture | cloud-init |
+| **GCP** | Machine Image | Before creation | startup scripts |
+| **Vagrant** | Box packaging | Before `vagrant package` | Vagrantfile provisioner |
 
-## Troubleshooting Cloned VMs
-
-If cloned VMs share the same identity in Cloud:
-
-| Symptom | Cause | Solution |
-|---------|-------|----------|
-| Same node appears multiple times | Template had GUID stored | Reset GUID before templating |
-| Clones can't connect to Parent | Duplicate machine GUID | Delete GUID file on affected clones, restart |
-| Cloud shows unstable connections | Two agents with same GUID | One kicks the other offline repeatedly |
-| Stale "template" node in Cloud | Database files kept in template | Wait for retention to expire, or manually delete databases on all clones |
-| Clones using Parent profile | Database has multiple node identities | Delete `netdata-meta.db*` and `dbengine/` on clones |
-
-**Common mistakes**:
-- Forgot to remove `/var/lib/netdata/status-netdata.json` (GUID recovered from backup)
-- Forgot to remove databases/dbengine (causes agent to report stale nodes to Cloud)
-- Started Netdata before templating (regenerated the GUID)
-
-## Quick Reference: Identity Files
-
-| File | Contains | Must Remove | Why |
-|------|----------|-------------|-----|
-| `/var/lib/netdata/registry/netdata.public.unique.id` | Machine GUID | Yes | Primary identity file |
-| `/var/lib/netdata/status-netdata.json` | Machine GUID backup | Yes | GUID recovered from here |
-| `/var/cache/netdata/status-netdata.json` | Machine GUID backup | Yes | GUID recovered from here |
-| `/tmp/status-netdata.json` | Machine GUID backup | Yes | GUID recovered from here |
-| `/run/status-netdata.json` | Machine GUID backup | Yes | GUID recovered from here |
-| `/var/run/status-netdata.json` | Machine GUID backup | Yes | GUID recovered from here |
-| `/var/lib/netdata/cloud.d/` | Claimed ID, RSA keys | Yes | ACLK authentication |
-| `/var/cache/netdata/netdata-meta.db*` | Node metadata | Yes | Prevents stale node reporting |
-| `/var/cache/netdata/context-meta.db*` | Context metadata | Yes | Prevents stale node reporting |
-| `/var/cache/netdata/dbengine/` | Metric data | Yes | Prevents stale node reporting |
-| `/etc/netdata/claim.conf` | Claiming credentials | **No** | Enables auto-claiming |
-
-## FAQ
-
-### Proxmox
-
-**Q: How do I prepare a template in Proxmox?**
-
-A: Install Netdata on a VM, run the reset commands from "Preparing a Template" above, then right-click the VM and select "Convert to Template".
-
-**Q: Can I use cloud-init with Netdata templates?**
-
-A: Yes. Cloud-init runs on first boot, and Netdata generates a new machine GUID on its first start. Keep `/etc/netdata/claim.conf` in the template for auto-claiming.
-
-### Vagrant
-
-**Q: How to create a Vagrant box with Netdata?**
-
-A: Install Netdata on the base VM, run the reset commands, then run `vagrant package --output my-box.box`. Users who run `vagrant up` will get a unique identity on first boot.
-
-### libvirt/KVM
-
-**Q: How to clone a KVM VM with Netdata?**
-
-A: Use `virt-sysprep` to reset all identity files:
+<details>
+<summary><strong>libvirt/KVM: virt-sysprep example</strong></summary>
 
 ```bash
 virt-sysprep -a myvm.qcow2 \
   --delete /var/lib/netdata/registry/netdata.public.unique.id \
   --delete /var/lib/netdata/status-netdata.json \
   --delete /var/cache/netdata/status-netdata.json \
+  --delete /var/lib/netdata/cloud.d \
   --delete '/var/cache/netdata/netdata-meta.db*' \
   --delete '/var/cache/netdata/context-meta.db*' \
-  --delete /var/cache/netdata/dbengine/ \
-  --delete /var/lib/netdata/cloud.d/
+  --delete '/var/cache/netdata/dbengine*'
 ```
 
-### Cloud Images (AWS, Azure, GCP)
+</details>
 
-**Q: How to create a custom AMI with Netdata?**
+<details>
+<summary><strong>Cloud-init: Fresh install approach</strong></summary>
 
-A: Launch an instance, install Netdata with claiming, run the reset commands (keeping `claim.conf`), create an AMI. Instances launched from your AMI will auto-claim with unique identities.
-
-### Terraform
-
-**Q: How to provision VMs with Netdata using Terraform?**
-
-A: Use cloud-init to install Netdata on first boot:
+Alternative: Install Netdata on first boot instead of templating:
 
 ```yaml
-# cloud-init config
+# cloud-init user-data
 runcmd:
   - curl -fsSL https://get.netdata.cloud/kickstart.sh -o /tmp/kickstart.sh
   - bash /tmp/kickstart.sh --claim-token TOKEN --claim-rooms ROOM_ID
 ```
 
-Netdata will generate a unique GUID and auto-claim on first boot.
+Each instance installs fresh with unique identity.
 
-### Containers
+</details>
 
-**Q: Do I need to reset identity for containers?**
+## Troubleshooting
 
-A: No. Containers get a unique machine GUID on first start automatically because they start with empty volumes. Each new container instance has its own identity.
+**Clones share the same identity**
 
-### General
+Cause: [GUID recovered from status backup](node-identities.md#status-file-backups). Netdata checks multiple backup locations before generating a new GUID.
 
-**Q: What happens if I reboot a cloned VM?**
+Solution: Delete **all** status file locations, not just the primary GUID file. See the cleanup commands in [Step 2](#2-delete-all-identity-and-data-files).
 
-A: The machine GUID stays the same. Netdata only generates a new GUID when the primary file AND all backups are missing. Reboots preserve the identity.
+---
 
-**Q: Can I use the same claim token for multiple clones?**
+**Clones don't connect to Parent**
 
-A: Yes. Each clone generates its own machine GUID and claimed ID. They use the same token to authenticate but appear as separate nodes in Cloud.
+Cause: Either clones share the same [Machine GUID](node-identities.md#agent-self-identity) (only one can connect at a time), or `stream.conf` wasn't configured in the template.
 
-**Q: What happens if two VMs share the same machine GUID?**
+Solution:
+- Verify each clone has a unique GUID: `cat /var/lib/netdata/registry/netdata.public.unique.id`
+- Verify `stream.conf` exists and has the correct Parent destination and API key
+- If GUIDs are duplicated, run the cleanup on each clone (loses metrics)
 
-A: Both VMs will have the same identity and **cannot connect concurrently**:
+---
 
-1. **Parent connections**: Only one can stream at a time. The second fails to connect.
-2. **Cloud connections**: The second VM kicks the first offline. Cloud detects the duplicate and disconnects the old client.
+**Stale "template" node appears in Cloud**
 
-This causes unstable connections and confusion in Cloud. Always reset **all** identity files before templating.
+Cause: [Database files kept](node-identities.md#multiple-node-identities-in-database) from the template. The template's node identity persists in the metadata.
 
-**Q: What if I only deleted the GUID file but clones still share identity?**
+Solution: Delete databases on all clones. This loses historical metrics but removes the stale node reference.
 
-A: The machine GUID was recovered from a backup location. Delete all files listed in "Quick Reference: Identity Files" above.
+---
 
-**Q: Why remove database files if they don't affect node identity?**
+**Clones using Parent profile unexpectedly**
 
-A: The databases store metadata about all nodes this agent has seen. If kept in a template:
-- Each clone reports the old template node to Netdata Cloud
-- Cloud sees the template node as having multiple Parents (all clones)
-- The stale template entry persists until retention expires (possibly years)
-- The agent may switch to a Parent runtime profile (larger caches, different behavior)
+Cause: Template had `stream.conf` with an enabled API key section (configured to receive streams, as Parent).
 
-**Q: I already deployed clones with database files - how do I fix it?**
+Solution: Reset `stream.conf` on clones or delete the API key sections that enable receiving.
 
-A: On each affected clone:
+---
+
+**Unstable Cloud connections (flapping)**
+
+Cause: Two agents have the same [Machine GUID](node-identities.md#agent-self-identity). Cloud kicks the older connection offline when the second connects.
+
+Solution: Each agent needs a unique GUID. Run the cleanup procedure on affected clones.
+
+---
+
+**Clone doesn't auto-claim to Cloud**
+
+Cause: Missing `claim.conf` or environment variables not set.
+
+Solution: Create `/etc/netdata/claim.conf` with your Space token.
+
+---
+
+### Fixing Already-Deployed Clones
+
+If clones were deployed with identity files:
+
 ```bash
+# On each affected clone
 sudo systemctl stop netdata
+sudo rm -f /var/lib/netdata/registry/netdata.public.unique.id
+sudo rm -f /var/lib/netdata/status-netdata.json
+sudo rm -f /var/cache/netdata/status-netdata.json
 sudo rm -f /var/cache/netdata/netdata-meta.db*
 sudo rm -f /var/cache/netdata/context-meta.db*
-sudo rm -rf /var/cache/netdata/dbengine/
+sudo rm -rf /var/cache/netdata/dbengine*
 sudo systemctl start netdata
 ```
-The stale template node will eventually disappear from Cloud as clones rotate their data. Historical metrics on the clones will be lost.
+
+:::warning
+This deletes all historical metrics on the clone.
+:::
+
+## FAQ
+
+**Q: What if I reboot a clone?**
+
+A: Identity persists. Netdata only generates a new [GUID](node-identities.md#agent-self-identity) when the file AND all [backups](node-identities.md#status-file-backups) are missing.
+
+**Q: Can multiple clones use the same claim token?**
+
+A: Yes. Each clone gets a unique [Machine GUID](node-identities.md#agent-self-identity) and [Claimed ID](node-identities.md#claimed-id). They authenticate with the same token but appear as separate nodes.
+
+**Q: Do containers need this?**
+
+A: No. Containers start with empty volumes, so each gets a unique identity automatically.
+
+**Q: Is my claim token secure in the template?**
+
+A: The token only allows claiming to your Space. It cannot read data or modify other nodes. Treat it like an API key - don't expose publicly, but it's safe in private templates.
