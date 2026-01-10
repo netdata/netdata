@@ -56,7 +56,7 @@ require (
 	golang.org/x/sync v0.19.0
 	golang.org/x/text v0.32.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20220504211119-3d4a969bb56b
-	gopkg.in/ini.v1 v1.67.0
+	gopkg.in/ini.v1 v1.67.1
 	gopkg.in/rethinkdb/rethinkdb-go.v6 v6.2.2
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.34.3
