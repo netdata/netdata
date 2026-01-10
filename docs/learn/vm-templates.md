@@ -6,7 +6,7 @@
 The commands in this guide **permanently delete**:
 - All historical metrics
 - [Node identity](node-identities.md#agent-self-identity)
-- [Cloud connection](node-identities.md#aclk-identity)
+- [Cloud connection](node-identities.md#agent-cloud-link-aclk-identity)
 - Alert history
 
 **This is irreversible. There is no undo.**
@@ -46,7 +46,7 @@ To prepare a VM template:
 | Category | Files | What's Lost |
 |----------|-------|-------------|
 | **[Agent Identity](node-identities.md#agent-self-identity)** | [GUID file](node-identities.md#agent-self-identity), [status backups](node-identities.md#status-file-backups) | Node identity |
-| **[ACLK Auth](node-identities.md#aclk-identity)** | [`cloud.d/`](node-identities.md#aclk-identity) directory | Cloud connection, must re-claim |
+| **[ACLK Auth](node-identities.md#agent-cloud-link-aclk-identity)** | [`cloud.d/`](node-identities.md#agent-cloud-link-aclk-identity) directory | Cloud connection, must re-claim |
 | **[Node Metadata](node-identities.md#parent-children-identities)** | `netdata-meta.db*`, `context-meta.db*` | Node metadata, metric mappings |
 | **Metrics** | `dbengine*` directories (all tiers) | All historical metrics |
 
@@ -138,6 +138,9 @@ virt-sysprep -a myvm.qcow2 \
   --delete /var/lib/netdata/registry/netdata.public.unique.id \
   --delete /var/lib/netdata/status-netdata.json \
   --delete /var/cache/netdata/status-netdata.json \
+  --delete /tmp/status-netdata.json \
+  --delete /run/status-netdata.json \
+  --delete /var/run/status-netdata.json \
   --delete /var/lib/netdata/cloud.d \
   --delete '/var/cache/netdata/netdata-meta.db*' \
   --delete '/var/cache/netdata/context-meta.db*' \
@@ -222,17 +225,30 @@ If clones were deployed with identity files:
 ```bash
 # On each affected clone
 sudo systemctl stop netdata
+
+# Machine GUID
 sudo rm -f /var/lib/netdata/registry/netdata.public.unique.id
+
+# Status file backups (all locations)
 sudo rm -f /var/lib/netdata/status-netdata.json
 sudo rm -f /var/cache/netdata/status-netdata.json
+sudo rm -f /tmp/status-netdata.json
+sudo rm -f /run/status-netdata.json
+sudo rm -f /var/run/status-netdata.json
+
+# ACLK authentication (if re-claiming to Cloud)
+sudo rm -rf /var/lib/netdata/cloud.d/
+
+# Databases and metrics
 sudo rm -f /var/cache/netdata/netdata-meta.db*
 sudo rm -f /var/cache/netdata/context-meta.db*
 sudo rm -rf /var/cache/netdata/dbengine*
+
 sudo systemctl start netdata
 ```
 
 :::warning
-This deletes all historical metrics on the clone.
+This deletes all historical metrics on the clone. If you skip deleting `cloud.d/`, you must re-claim to Cloud manually.
 :::
 
 ## FAQ

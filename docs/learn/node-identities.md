@@ -208,7 +208,7 @@ A: Two agents likely have the same Machine GUID. This causes "flapping" as Cloud
 A:
 - **Machine GUID**: Agent-generated, identifies the node itself, never changes
 - **Node ID**: Cloud-assigned, links the Machine GUID to your Space
-- **Claimed ID**: Agent-generated during claiming, identified the ACLK connection
+- **Claimed ID**: Agent-generated during claiming, identifies the ACLK connection
 
 **Q: Do containers need unique GUIDs?**
 
