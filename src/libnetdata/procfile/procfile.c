@@ -330,14 +330,29 @@ procfile *procfile_readall(procfile *ff) {
 
         ff->len += r;
     }
-
-    // netdata_log_debug(D_PROCFILE, "Rewinding file '%s'", ff->filename);
-    if(unlikely(lseek(ff->fd, 0, SEEK_SET) == -1)) {
-        if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) collector_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
-        else if(unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
-            netdata_log_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
-        procfile_close(ff);
-        return NULL;
+    
+    if (unlikely(ff->flags & PROCFILE_FLAG_NONSEEKABLE)) {
+        char *fn = procfile_filename(ff);
+        ff = procfile_reopen(ff, fn, NULL, ff->flags);
+        if (unlikely(!ff))
+            return NULL;
+    } else if (unlikely(lseek(ff->fd, 0, SEEK_SET) == -1)) {
+        // Some procfs files (Ubuntu HWE 24.04 / kernel 6.14) may be non-seekable.
+        // In that case, "rewind" by reopening.
+        if (errno == ESPIPE || errno == EINVAL) {
+            ff->flags |= PROCFILE_FLAG_NONSEEKABLE;
+            char *fn = procfile_filename(ff);
+            ff = procfile_reopen(ff, fn, NULL, ff->flags);
+            if (unlikely(!ff))
+                return NULL;
+        } else {
+            if (unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)))
+                collector_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
+            else if (unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
+                netdata_log_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
+            procfile_close(ff);
+            return NULL;
+        }
     }
 
     procfile_lines_reset(ff->lines);
@@ -498,9 +513,8 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
     }
     ff->stats.opens++;
 
-    // netdata_log_info("PROCFILE: opened '%s' on fd %d", filename, ff->fd);
-
-    //strncpyz(ff->filename, filename, FILENAME_MAX);
+    // IMPORTANT: 'filename' parameter must not be used after this point
+    // as it may point to ff->filename which we're about to free
     freez(ff->filename);
     ff->filename = NULL;
     ff->flags = flags;

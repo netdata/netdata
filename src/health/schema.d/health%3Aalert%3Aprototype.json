@@ -281,7 +281,7 @@
                 "then": {
                   "properties": {
                     "time_group_value": {
-                      "type": "integer",
+                      "type": "number",
                       "default": 1,
                       "title": "Trim %",
                       "description": ""
@@ -305,7 +305,7 @@
                 "then": {
                   "properties": {
                     "time_group_value": {
-                      "type": "integer",
+                      "type": "number",
                       "default": 1,
                       "title": "Trim %",
                       "description": ""
@@ -329,7 +329,7 @@
                 "then": {
                   "properties": {
                     "time_group_value": {
-                      "type": "integer",
+                      "type": "number",
                       "default": 95,
                       "title": "Percentage",
                       "description": ""

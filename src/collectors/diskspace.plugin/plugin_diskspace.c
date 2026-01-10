@@ -299,7 +299,26 @@ static void calculate_values_and_show_charts(
         m->collected++;
 }
 
+// Check if a ZFS filesystem entry is a dataset (not a pool)
+static inline bool is_zfs_dataset(struct mountinfo *mi) {
+    if(!mi || !mi->filesystem || !mi->mount_source || !mi->mount_source[0])
+        return false;
+
+    if(strcmp(mi->filesystem, "zfs") != 0)
+        return false;
+    
+    // For ZFS, the mount_source contains the dataset name (e.g., "tank" or "tank/install")
+    // Pools have no slash, datasets have at least one slash
+    return strchr(mi->mount_source, '/') != NULL;
+}
+
 static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
+    // Skip ZFS datasets, only monitor ZFS pools
+    // This prevents alert floods when a pool fills up
+    if (is_zfs_dataset(mi)) {
+        return;
+    }
+
     const char *disk = mi->persistent_id;
 
     static SIMPLE_PATTERN *excluded_mountpoints = NULL;
