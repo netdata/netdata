@@ -1113,7 +1113,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const ch
         if (sqlite3_column_type(stmt_query, 24) == SQLITE_NULL)
             buffer_json_member_add_string(wb, "old_value", NULL);
         else
-            buffer_json_member_add_double(wb, "old_value", sqlite3_column_double(stmt_query, 23));
+            buffer_json_member_add_double(wb, "old_value", sqlite3_column_double(stmt_query, 24));
 
         freez(edit_command);
 
