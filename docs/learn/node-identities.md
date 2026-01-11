@@ -1,9 +1,11 @@
 # Node Identities
 
 :::tip
+
 **What You'll Learn**
 
 How Netdata identifies nodes across Agents, Parents, and Cloud - and why each identity type matters for your infrastructure.
+
 :::
 
 Netdata uses several identity mechanisms to uniquely identify nodes, authenticate connections, and track metrics across your infrastructure. Understanding these identities is essential when:
@@ -47,12 +49,15 @@ The Machine GUID is also stored in status files for crash recovery:
 | `/var/run/status-netdata.json` | Fallback 4 |
 
 :::note
+
 **Redundant Storage**
 
 The Machine GUID is stored redundantly across multiple locations. If the primary file is missing or corrupted, Netdata automatically recovers the GUID from backup locations. This ensures identity persistence across crashes and unexpected shutdowns.
+
 :::
 
 :::warning
+
 **GUID Must Be Unique**
 
 If two Agents have the same Machine GUID:
@@ -61,6 +66,7 @@ If two Agents have the same Machine GUID:
 - This causes unstable "flapping" connections
 
 See [VM Templates](vm-templates.md) for how to avoid this when cloning VMs.
+
 :::
 
 ## Parent: Children Identities
@@ -130,9 +136,11 @@ Each virtual node is defined in a YAML file:
 | `labels` | No | Key-value pairs for filtering and organization |
 
 :::warning
+
 **GUID Uniqueness**
 
 Each virtual node GUID must be unique across your entire infrastructure. Using the same GUID as another node (real or virtual) causes identity conflicts - the same problems as [duplicate Machine GUIDs](#agent-self-identity).
+
 :::
 
 ### How Virtual Nodes Work
@@ -182,38 +190,57 @@ The **Claimed ID** is a random UUID generated during the claiming process. It's 
 | **Regeneration** | A new Claimed ID is generated each time the agent is re-claimed |
 
 :::note
+
 **Custom Paths**
 
 If you customized `[directories]` in `netdata.conf`:
 - `lib` setting affects `/var/lib/netdata/` paths
 - `cache` setting affects `/var/cache/netdata/` paths
+
 :::
 
 ## FAQ
 
-**Q: How do I find my node's Machine GUID?**
+<details>
+<summary>How do I find my node's Machine GUID?</summary>
 
-A: Read the file `/var/lib/netdata/registry/netdata.public.unique.id`.
+Read the file `/var/lib/netdata/registry/netdata.public.unique.id`.
 
-**Q: Can I change my node's Machine GUID?**
+</details>
 
-A: Yes, but it will appear as a new node in Netdata Cloud and Netdata Parents. Delete the GUID file and status backups, then restart Netdata. See [VM Templates](vm-templates.md) for the complete procedure.
+<details>
+<summary>Can I change my node's Machine GUID?</summary>
 
-**Q: Why does my node keep going offline/online in Cloud?**
+Yes, but it will appear as a new node in Netdata Cloud and Netdata Parents. Delete the GUID file and status backups, then restart Netdata. See [VM Templates](vm-templates.md) for the complete procedure.
 
-A: Two agents likely have the same Machine GUID. This causes "flapping" as Cloud kicks the older connection when the second connects. Each agent needs a unique GUID.
+</details>
 
-**Q: What's the difference between Machine GUID, Node ID, and Claimed ID?**
+<details>
+<summary>Why does my node keep going offline/online in Cloud?</summary>
 
-A:
+Two agents likely have the same Machine GUID. This causes "flapping" as Cloud kicks the older connection when the second connects. Each agent needs a unique GUID.
+
+</details>
+
+<details>
+<summary>What's the difference between Machine GUID, Node ID, and Claimed ID?</summary>
+
 - **Machine GUID**: Agent-generated, identifies the node itself, never changes
 - **Node ID**: Cloud-assigned, links the Machine GUID to your Space
 - **Claimed ID**: Agent-generated during claiming, identifies the ACLK connection
 
-**Q: Do containers need unique GUIDs?**
+</details>
 
-A: Containers with ephemeral storage get unique GUIDs automatically on each start. Containers with persistent volumes at `/var/lib/netdata/` retain their GUID across restarts.
+<details>
+<summary>Do containers need unique GUIDs?</summary>
 
-**Q: Can the same node exist in multiple Spaces?**
+Containers with ephemeral storage get unique GUIDs automatically on each start. Containers with persistent volumes at `/var/lib/netdata/` retain their GUID across restarts.
 
-A: No. A node can only exist in one Space. To move a node to a different Space, unclaim it first, then claim to the new Space.
+</details>
+
+<details>
+<summary>Can the same node exist in multiple Spaces?</summary>
+
+No. A node can only exist in one Space. To move a node to a different Space, unclaim it first, then claim to the new Space.
+
+</details>
