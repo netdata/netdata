@@ -28,3 +28,5 @@ These examples follow the structure established in **2.1 Quick Start: Create You
 - **6.1 Core System Alerts** covers CPU, memory, disk, network
 - **6.2 Service and Availability** for health checks
 - **6.3 Application-Level Alerts** for databases and web servers
+- **6.4 Anomaly-Based Alerts** for ML/anomaly-bit use cases
+- **6.5 Trend and Capacity Alerts** for growth projections and planning
