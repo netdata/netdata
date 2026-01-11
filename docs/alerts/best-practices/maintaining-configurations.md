@@ -51,3 +51,9 @@ Monitor alert volume after changes. An unexpected increase or decrease in firing
 Workloads evolve over time. A CPU threshold calibrated for a ten-node cluster may need adjustment as the cluster grows to twenty nodes. Memory patterns change as applications add features or optimize their footprint.
 
 Monitor the relationship between alert behavior and workload changes. When significant workload changes occur, review affected alerts proactively rather than waiting for problems to reveal misconfigurations.
+
+## What's Next
+
+- **12.4 Large Environment Patterns** for parent-based and distributed setups
+- **12.5 SLIs and SLOs** for connecting to business objectives
+- **13. Alerts and Notifications Architecture** for deep-dive internals

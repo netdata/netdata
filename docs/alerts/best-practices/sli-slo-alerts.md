@@ -27,3 +27,9 @@ Alerts should eventually connect to business impact. An alert that fires with no
 Define business impact categories for your organization. Map alerts to these categories during alert design. This mapping helps prioritization during incident response.
 
 Connect alert thresholds to business objectives. For example, an HTTP error rate alert might trigger at 0.3% because 0.3% error rate impacts an SLO of 99.9% availability.
+
+## What's Next
+
+- **13. Alerts and Notifications Architecture** for deep-dive internals
+- **1. Understanding Alerts in Netdata** to start building alerts
+- **2. Creating and Managing Alerts** for practical alert creation

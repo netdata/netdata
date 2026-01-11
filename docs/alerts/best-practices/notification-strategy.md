@@ -41,3 +41,10 @@ Avoid using the same notification channel for alerts with vastly different urgen
 After responding to alerts, conduct brief reviews to improve future responses. What information would have helped resolve faster? What alerts were false positives?
 
 Update alert configurations based on response patterns. Alerts that consistently trigger false positives need threshold adjustments. Alerts that require investigation before responders can act need better documentation.
+
+## What's Next
+
+- **12.3 Maintaining Alert Configurations** for version control and periodic reviews
+- **12.4 Large Environment Patterns** for parent-based and distributed setups
+- **12.5 SLIs and SLOs** for connecting to business objectives
+- **13. Alerts and Notifications Architecture** for internal behavior
