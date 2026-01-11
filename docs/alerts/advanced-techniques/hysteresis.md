@@ -15,8 +15,8 @@ template: cpu_hysteresis
     on: system.cpu
 lookup: average -5m of user,system
     every: 1m
-     warn: ($this > 80) && ($status != WARNING)
-     crit: ($this > 95) && ($status != CRITICAL)
+     warn: (($this > 80) && ($status != WARNING)) || (($this > 70) && ($status == WARNING))
+     crit: (($this > 95) && ($status != CRITICAL)) || (($this > 85) && ($status == CRITICAL))
 ```
 
 Behavior:
