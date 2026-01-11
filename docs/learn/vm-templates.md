@@ -1,6 +1,7 @@
 # VM Templates and Clones
 
 :::danger
+
 **Destructive Operations - Data Loss Warning**
 
 The commands in this guide **permanently delete**:
@@ -13,12 +14,15 @@ The commands in this guide **permanently delete**:
 
 Only run these commands on VMs you intend to convert to templates.
 Running these on a production system will destroy your monitoring data.
+
 :::
 
 :::tip
+
 **What You'll Learn**
 
 How to prepare a VM template so each clone gets a unique Netdata identity and automatically connects to Netdata Cloud.
+
 :::
 
 ## Prerequisites
@@ -40,7 +44,9 @@ To prepare a VM template:
 ## Files to Delete
 
 :::danger
+
 **Verify you are on the correct VM before running these commands.**
+
 :::
 
 | Category | Files | What's Lost |
@@ -63,9 +69,11 @@ sudo systemctl stop netdata
 ### 2. Delete All Identity and Data Files
 
 :::danger
+
 **Point of No Return**
 
 The following commands permanently delete Netdata data. Verify you are on the template VM.
+
 :::
 
 ```bash
@@ -167,15 +175,13 @@ Each instance installs fresh with unique identity.
 
 ## Troubleshooting
 
-**Clones share the same identity**
+### Clones share the same identity
 
 Cause: [GUID recovered from status backup](node-identities.md#status-file-backups). Netdata checks multiple backup locations before generating a new GUID.
 
 Solution: Delete **all** status file locations, not just the primary GUID file. See the cleanup commands in [Step 2](#2-delete-all-identity-and-data-files).
 
----
-
-**Clones don't connect to Parent**
+### Clones don't connect to Parent
 
 Cause: Either clones share the same [Machine GUID](node-identities.md#agent-self-identity) (only one can connect at a time), or `stream.conf` wasn't configured in the template.
 
@@ -184,39 +190,29 @@ Solution:
 - Verify `stream.conf` exists and has the correct Parent destination and API key
 - If GUIDs are duplicated, run the cleanup on each clone (loses metrics)
 
----
-
-**Stale "template" node appears in Cloud**
+### Stale "template" node appears in Cloud
 
 Cause: [Database files kept](node-identities.md#multiple-node-identities-in-database) from the template. The template's node identity persists in the metadata.
 
 Solution: Delete databases on all clones. This loses historical metrics but removes the stale node reference.
 
----
-
-**Clones using Parent profile unexpectedly**
+### Clones using Parent profile unexpectedly
 
 Cause: Template had `stream.conf` with an enabled API key section (configured to receive streams, as Parent).
 
 Solution: Reset `stream.conf` on clones or delete the API key sections that enable receiving.
 
----
-
-**Unstable Cloud connections (flapping)**
+### Unstable Cloud connections (flapping)
 
 Cause: Two agents have the same [Machine GUID](node-identities.md#agent-self-identity). Cloud kicks the older connection offline when the second connects.
 
 Solution: Each agent needs a unique GUID. Run the cleanup procedure on affected clones.
 
----
-
-**Clone doesn't auto-claim to Cloud**
+### Clone doesn't auto-claim to Cloud
 
 Cause: Missing `claim.conf` or environment variables not set.
 
 Solution: Create `/etc/netdata/claim.conf` with your Space token.
-
----
 
 ### Fixing Already-Deployed Clones
 
@@ -248,23 +244,37 @@ sudo systemctl start netdata
 ```
 
 :::warning
+
 This deletes all historical metrics on the clone. If you skip deleting `cloud.d/`, you must re-claim to Cloud manually.
+
 :::
 
 ## FAQ
 
-**Q: What if I reboot a clone?**
+<details>
+<summary>What if I reboot a clone?</summary>
 
-A: Identity persists. Netdata only generates a new [GUID](node-identities.md#agent-self-identity) when the file AND all [backups](node-identities.md#status-file-backups) are missing.
+Identity persists. Netdata only generates a new [GUID](node-identities.md#agent-self-identity) when the file AND all [backups](node-identities.md#status-file-backups) are missing.
 
-**Q: Can multiple clones use the same claim token?**
+</details>
 
-A: Yes. Each clone gets a unique [Machine GUID](node-identities.md#agent-self-identity) and [Claimed ID](node-identities.md#claimed-id). They authenticate with the same token but appear as separate nodes.
+<details>
+<summary>Can multiple clones use the same claim token?</summary>
 
-**Q: Do containers need this?**
+Yes. Each clone gets a unique [Machine GUID](node-identities.md#agent-self-identity) and [Claimed ID](node-identities.md#claimed-id). They authenticate with the same token but appear as separate nodes.
 
-A: No. Containers start with empty volumes, so each gets a unique identity automatically.
+</details>
 
-**Q: Is my claim token secure in the template?**
+<details>
+<summary>Do containers need this?</summary>
 
-A: The token only allows claiming to your Space. It cannot read data or modify other nodes. Treat it like an API key - don't expose publicly, but it's safe in private templates.
+No. Containers start with empty volumes, so each gets a unique identity automatically.
+
+</details>
+
+<details>
+<summary>Is my claim token secure in the template?</summary>
+
+The token only allows claiming to your Space. It cannot read data or modify other nodes. Treat it like an API key - don't expose publicly, but it's safe in private templates.
+
+</details>
