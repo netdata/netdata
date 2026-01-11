@@ -100,5 +100,5 @@ For a given alert definition applied to a given chart instance, there is one **a
 
 ## What's Next
 
-- **1.2 Alert Types: `alarm` vs `template`** Detailed explanation of chart-specific vs context-based rules
+- **1.2 Alert Types: `alarm` vs `template`** (Netdata Legacy Doc, use template for all cases)
 - **1.3 Where Alerts Live (Files, Agent, Cloud)** File paths, stock vs custom alerts, Cloud integration
