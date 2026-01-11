@@ -66,6 +66,8 @@ https://github.com/netdata/netdata/edit/master/src/database/README.md,Database,P
 https://github.com/netdata/netdata/edit/master/src/libnetdata/log/README.md,Logging,Published,Netdata Agent,,
 https://github.com/netdata/netdata/edit/master/src/registry/README.md,Registry,Published,Netdata Agent,,"Netdata utilizes a central registry of machines/person GUIDs, URLs, and opt-in account information to provide unified cross-server dashboards."
 https://github.com/netdata/netdata/edit/master/src/cli/README.md,Agent CLI,Published,Netdata Agent,,"The Netdata Agent includes a command-line experience for reloading health configuration, reopening log files, halting the daemon, and more."
+https://github.com/netdata/netdata/edit/master/docs/learn/node-identities.md,Node Identities,Published,Netdata Agent,"guid,machine guid,node id,claimed id,identity",Understanding how Netdata identifies nodes across Agents Parents and Cloud
+https://github.com/netdata/netdata/edit/master/docs/learn/vm-templates.md,VM Templates,Published,Netdata Agent,"vm,template,clone,kvm,proxmox,vagrant,terraform",Prepare VM templates so each clone gets a unique Netdata identity
 https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/anonymous-telemetry-events.md,Anonymous telemetry events,Published,Netdata Agent,,
 ,,,,,
 ,,,,,
