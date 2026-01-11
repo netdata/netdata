@@ -163,7 +163,7 @@ Both chart IDs and contexts use **dots** in their naming convention.
 - **Dashboard:** Hover over the date on a chart and check the tooltip
 - **API:** `curl "http://localhost:19999/api/v1/charts" | jq '.charts[] | {id, context}'`
 
-Both use dots (`.`), not underscores (`_`), in their names.
++Contexts use dots (`.`), while chart IDs may include dots or underscores (for example, `disk_space._run`).
 
 :::
 
