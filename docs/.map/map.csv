@@ -91,6 +91,7 @@ https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/authentication
 https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/authentication-and-authorization/api-tokens.md,API Tokens,Published,Netdata Cloud/Authentication & Authorization,
 https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/view-plan-and-billing.md,Netdata Plans & Billing,Published,Netdata Cloud,
 https://github.com/netdata/netdata/edit/master/src/aclk/README.md,Agent-Cloud Link (ACLK),Published,Netdata Cloud,The Agent-Cloud link (ACLK) is the mechanism responsible for connecting a Netdata agent to Netdata Cloud.
+https://github.com/netdata/netdata/edit/master/docs/learn/unclaim-reclaim-node.md,Unclaim and Reclaim a Node,Published,Netdata Cloud,
 https://github.com/netdata/netdata/edit/master/docs/learn/remove-node.md,Remove Agent,Published,Netdata Cloud,
 https://github.com/netdata/netdata/edit/master/docs/delete/netdata/account.md,Account Deletion,Published,Netdata Cloud,
 ,,,,
