@@ -388,7 +388,7 @@ No direct events. Accounting entries emitted per LLM attempt.
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Provider selection
 - Turn execution
 - Error mapping

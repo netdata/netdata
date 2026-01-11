@@ -303,7 +303,7 @@ handleShutdownSignal() {
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Transport creation
 - Tool registration
 - Session management

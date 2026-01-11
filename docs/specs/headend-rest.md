@@ -394,7 +394,7 @@ Graceful end then destroy after timeout.
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Health check endpoint
 - Agent execution (success/error)
 - Extra route registration

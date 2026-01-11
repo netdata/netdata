@@ -268,7 +268,7 @@ Standardized log format for headend events.
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Sequential startup
 - Concurrent shutdown
 - Fatal error propagation

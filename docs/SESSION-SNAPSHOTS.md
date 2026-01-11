@@ -39,7 +39,7 @@ Default location: `~/.ai-agent/sessions/`
 SessionNode
 ├── id                    // Internal session ID
 ├── traceId               // Public transaction ID (matches filename)
-├── agentId               // Agent name (e.g., "phase1-run-test-1")
+├── agentId               // Agent name (e.g., "phase2-run-test-1")
 ├── callPath              // Hierarchical call path for sub-agents
 ├── sessionTitle         // Session title
 ├── latestStatus         // Current status message
@@ -174,8 +174,8 @@ zcat "$SNAPSHOT" | jq '{sessionId:.opTree.id, traceId:.opTree.traceId, agentId:.
 # {
 #   "sessionId": "mgbsnq2h-dx4iw2",
 #   "traceId": "756b8ce8-3ad8-4a5a-8094-e45f0ba23a11",
-#   "agentId": "phase1-run-test-1",
-#   "callPath": "phase1-run-test-1",
+#   "agentId": "phase2-run-test-1",
+#   "callPath": "phase2-run-test-1",
 #   "success": true,
 #   "error": null,
 #   "totals": { "tokensIn": 120, "tokensOut": 40, ... }

@@ -358,7 +358,7 @@ Features:
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Builder construction
 - Turn lifecycle
 - Operation lifecycle

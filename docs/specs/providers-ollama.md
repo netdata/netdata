@@ -181,7 +181,7 @@ Unlike Anthropic/Google/OpenAI, Ollama provider:
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - URL normalization cases
 - Provider options merging
 - Response conversion

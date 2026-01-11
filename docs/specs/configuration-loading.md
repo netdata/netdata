@@ -6,7 +6,7 @@ The CLI and headends assemble configuration by merging multiple `.ai-agent.json`
 ## Source Files
 - `src/config-resolver.ts` – Layer discovery, placeholder expansion, `buildUnifiedConfiguration`
 - `src/agent-loader.ts` – Validations (`validateNoPlaceholders`, `validateQueueBindings`), persistence overrides, CLI merge logic
-- `src/config.ts` – Legacy single-file loader (phase1 harness)
+- `src/config.ts` – Legacy single-file loader (phase2 harness)
 - `src/types.ts` – `Configuration`/provider/MCP schema definitions
 - `src/subagent-registry.ts`, `src/cli.ts` – Consumers of the resolved configuration
 
@@ -68,7 +68,7 @@ const cfg = buildUnifiedConfiguration(
 ## Legacy `loadConfiguration()` Path
 **Location**: `src/config.ts:180-364`
 
-- Still used by the deterministic phase1 harness and standalone library imports.
+- Still used by the deterministic phase2 harness and standalone library imports.
 - Behavior: resolve a single `.ai-agent.json` (order: `--config` → `cwd` → `$HOME/.ai-agent.json`), expand `${VAR}` via `process.env`, normalize legacy MCP server shapes (`type: 'local'|'remote'`, array commands, `environment` alias), insert `queues.default`, and Zod-validate.
 - MCP `env`/`headers` entries are explicitly skipped during expansion so secrets are resolved at spawn time, matching the new resolver’s behavior.
 
@@ -94,7 +94,7 @@ const cfg = buildUnifiedConfiguration(
 - **Scoped env overlays**: Confirmed placeholder evaluation always consults the originating layer’s env map before `process.env`, preventing unrelated `.ai-agent.env` files from leaking secrets across projects (`src/config-resolver.ts:88-175`).
 - **Error transparency**: `MissingVariableError` propagates the human-readable scope/origin/id so operators know which file lacks a value; CLI surfaces the exact message without wrapping (`src/cli.ts:470-580`).
 - **Queue guardrails**: `validateQueueBindings` blocks startup if a referenced queue is undefined, ensuring telemetry metrics (`ai_agent_queue_depth`, `ai_agent_queue_wait_duration_ms`) stay accurate and tool throttling behaves predictably (`src/agent-loader.ts:305-343`, `src/tools/queue-manager.ts:1-120`).
-- **Legacy loader parity**: Phase1 harness uses `loadConfiguration()` directly (`src/tests/phase1/runner.ts:5980-6320`), and the helper still normalizes legacy MCP types + applies `DEFAULT_QUEUE_CONCURRENCY`, so deterministic scenarios read the same schema as production.
+- **Legacy loader parity**: Phase 2 harness uses `loadConfiguration()` directly (`src/tests/phase2-harness-scenarios/phase2-runner.ts:5980-6320`), and the helper still normalizes legacy MCP types + applies `DEFAULT_QUEUE_CONCURRENCY`, so deterministic scenarios read the same schema as production.
 
 ## Troubleshooting
 | Symptom | Likely Cause | Resolution |

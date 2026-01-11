@@ -331,7 +331,7 @@ const fallbackWait = Math.min(Math.max(attempts * 1_000, RATE_LIMIT_MIN_WAIT_MS)
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Retry on rate limit
 - Retry on network error
 - Synthetic retry on content-only

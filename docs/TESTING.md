@@ -1,12 +1,34 @@
 # Testing
 
-## Deterministic Harness
-- Harness runs scripted scenarios against the core agent loop without touching production providers.
-- Scripted provider lives at `src/llm-providers/test-llm.ts`; deterministic MCP server lives at `src/tests/mcp/test-stdio-server.ts`.
-- Scenario definitions reside in `src/tests/fixtures/test-llm-scenarios.ts` and are executed via `src/tests/phase1-harness.ts`.
+## Test Phase Overview
+
+| Phase | Type | Command | Description |
+|-------|------|---------|-------------|
+| **Phase 1** | Parallel | `npm run test:phase1` | Unit tests (vitest, isolated) |
+| **Phase 2** | Parallel + Sequential | `npm run test:phase2` | Deterministic harness scenarios |
+| **Phase 3** | Real LLM | `npm run test:phase3` | Live provider integration tests |
+
+## Phase 1: Unit Tests
+
+Unit tests live under `src/tests/unit/*.spec.ts` and run in parallel via Vitest.
+
+- Execute with `npm run test:phase1`
+- Tests are isolated with no shared state
+- Fast execution (~300ms for ~200 tests)
+- Covers: JSON repair, truncation, XML tools, Slack formatting, LLM messages, etc.
+
+## Phase 2: Deterministic Harness
+
+The deterministic harness runs scripted scenarios against the core agent loop without touching production providers.
+
+- Scripted provider lives at `src/llm-providers/test-llm.ts`
+- Deterministic MCP server lives at `src/tests/mcp/test-stdio-server.ts`
+- Scenario definitions reside in `src/tests/fixtures/test-llm-scenarios.ts`
+- Executed via `src/tests/phase2-harness.ts`
+- Tests run in two batches: parallel-safe tests first (concurrency=32 max), then sequential tests that require isolation due to shared state or prototype patching
 
 ### Harness Controls and Observable Contract
-Phase 1 tests only have five levers, and every scenario must be designed by manipulating these inputs and then asserting the resulting user-facing contract:
+Phase 2 tests only have five levers, and every scenario must be designed by manipulating these inputs and then asserting the resulting user-facing contract:
 
 1. **User prompt** – shape the task, history, and configuration overrides that the CLI would normally pass to the agent.
 2. **Test MCP tool** – return deterministic mocked tool payloads, failures, or timeouts to force tool-selection and tool-execution branches.
@@ -17,27 +39,30 @@ Phase 1 tests only have five levers, and every scenario must be designed by ma
 Harness tests **must not** depend on internal log strings (`result.logs`), log identifiers (`remoteIdentifier`), log severities, or other implementation-specific data structures. Instead, craft scenarios that trigger the desired code paths through the five controls above and then assert the externally observable contract via final response and accounting.
 
 ### Defining the Contract
-The contract is the union of user-configurable settings and global business rules. Every harness scenario should pose the question “Is the configuration respected under all conditions?” Examples include:
+The contract is the union of user-configurable settings and global business rules. Every harness scenario should pose the question "Is the configuration respected under all conditions?" Examples include:
 
 - `maxTurns`, `maxToolCallsPerTurn`, `maxRetries`, `toolResponseMaxBytes`, `contextWindow` per model, fallback model lists, reasoning toggles, timeouts, temperature/`top_p`, `maxOutputTokens`, repeat-penalty overrides, etc. Tests should confirm these knobs behave exactly as configured even when tools or LLM responses fail.
-- Business rules such as “always return output (success report or synthetic failure)”, “CLI exits with code 0 on success, non-zero on failure”, “tool responses that overflow the context window are dropped and replaced with failure notices”, “dropped tool outputs always feed an explicit error message back to the LLM”, “if the LLM responds with empty content we inject an ephemeral corrective user turn”, and similar guardrails documented in specs.
+- Business rules such as "always return output (success report or synthetic failure)", "CLI exits with code 0 on success, non-zero on failure", "tool responses that overflow the context window are dropped and replaced with failure notices", "dropped tool outputs always feed an explicit error message back to the LLM", "if the LLM responds with empty content we inject an ephemeral corrective user turn", and similar guardrails documented in specs.
 
 Harness scenarios MUST combine configuration + scripted LLM/MCP behavior to hit each branch, then verify—via the final response and accounting—that the contract stayed intact. When a potential violation cannot be proven via the final response alone, accounting should expose the relevant signal (e.g., retry counts, provider switches, tool execution status). Logs should only be inspected manually while debugging and must not be part of automated assertions.
 
-## Running The Suite
+### Running Phase 2
 - Build + lint remain required before invoking tests (`npm run build`, `npm run lint`).
-- Execute all deterministic scenarios with `npm run test:phase1` (the script rebuilds automatically).
-- `npm test` now runs the exact same Phase 1 harness via Vitest (`src/tests/phase1/phase1-suite.spec.ts`). Vitest simply launches `node dist/tests/phase1-harness.js` and streams its output, so CLI and Vitest results stay identical.
+- Execute all deterministic scenarios with `npm run test:phase2` (the script rebuilds automatically).
+- Run only parallel tests: `npm run test:phase2:parallel`
+- Run only sequential tests: `npm run test:phase2:sequential`
+- `npm test` runs both Phase 1 and Phase 2 via Vitest.
 - Lint ignores `coverage/` artifacts generated by coverage runs.
-- **Always run the full suite**: Local filters (`PHASE1_ONLY_SCENARIO=...`) are for debugging only. Before merging any change that touches retry/final-report logic you must run `npm run test:phase1` without filters so the new `run-test-final-report-retry-text` / `run-test-synthetic-failure-contract` scenarios always execute alongside the legacy set.
+- **Always run the full suite**: Local filters (`PHASE1_ONLY_SCENARIO=...`) are for debugging only. Before merging any change that touches retry/final-report logic you must run `npm run test:phase2` without filters so all scenarios execute.
 - Expect three informational warnings when scenario `run-test-20` simulates persistence write failures; no manual cleanup is needed.
 - Scenario coverage currently spans fallback routing, MCP timeouts, retry exhaustion, persistence artifacts, pricing/sub-agent flows, and rate-limit backoff.
 - Local filtering: set `PHASE1_ONLY_SCENARIO=run-test-1,run-test-2` to run a subset while debugging. The harness automatically ignores this variable when `CI` is set (`CI=1|true|yes`), ensuring automation always runs the full suite even if the environment leaks the filter.
+- Environment variables: `PHASE2_MODE` (all|parallel|sequential), `PHASE2_PARALLEL_CONCURRENCY` (number), `PHASE2_FORCE_SEQUENTIAL` (1 to force all tests sequential).
 
 ### Retry / Finalization Scenarios
 - `run-test-final-report-retry-text` validates that invalid final-report tool calls trigger retries, text extraction stays pending until the final turn, and the eventual acceptance log cites `source='tool-call'`. Assertions inspect both logs and `finalReport.content`.
 - `run-test-synthetic-failure-contract` forces max turns without any tool calls so we can assert the synthetic failure contract (`status: failure`, metadata reason `max_turns_exhausted`, `agent:failure-report`, telemetry source `synthetic`).
-- Future tests added under `TODO-retry-testing-plan.md` must assert `result.finalReport !== undefined`, the correct `finalReportSource`, and the telemetry/log identifiers introduced in Nov 2025. Use the same pattern as the scenarios above when building new fixtures.
+- Future tests added under `TODO-retry-testing-plan.md` must assert `result.finalReport !== undefined`, the correct `finalReportSource`, and the telemetry/log identifiers introduced in Nov 2025. Use the same pattern as the scenarios above when building new fixtures.
 - `run-test-xml-wrapper-as-tool` ensures calling the XML final wrapper tag as a tool yields a specific tool failure, TURN-FAILED guidance with the real nonce/format, and collapses remaining turns.
 
 ### Restart Fixture Controls
@@ -47,7 +72,7 @@ The deterministic stdio MCP server exposes several environment knobs so restart 
 | --- | --- |
 | `MCP_FIXTURE_MODE=restart` | Enables the restart fixture behavior (hang, exit, recover). |
 | `MCP_FIXTURE_STATE_FILE=/tmp/.../state.json` | Shared state file that tracks phases between process restarts. The harness auto-creates this under `os.tmpdir()`. |
-| `MCP_FIXTURE_HANG_MS` / `MCP_FIXTURE_EXIT_DELAY_MS` | Milliseconds to busy-wait/sleep before exiting the child process and how long to wait before actually calling `process.exit`. Defaults: 4000 ms hang, 2000 ms exit delay. |
+| `MCP_FIXTURE_HANG_MS` / `MCP_FIXTURE_EXIT_DELAY_MS` | Milliseconds to busy-wait/sleep before exiting the child process and how long to wait before actually calling `process.exit`. Defaults: 4000 ms hang, 2000 ms exit delay. |
 | `MCP_FIXTURE_BLOCK_EVENT_LOOP=1` | Forces a CPU-bound busy wait instead of `setTimeout`, simulating an event-loop stall. |
 | `MCP_FIXTURE_SKIP_EXIT=1` | Prevents the fixture from calling `process.exit`, letting tests simulate a hung process that never dies. |
 | `MCP_FIXTURE_FAIL_INIT_ATTEMPTS=N` | Causes the fixture to terminate during startup `N` times before allowing a successful boot (used to test initialization retries). |
@@ -55,26 +80,39 @@ The deterministic stdio MCP server exposes several environment knobs so restart 
 
 Use these knobs in new scenarios whenever you need deterministic combinations of hangs, exits, and restart delays; see `run-test-71`, `run-test-72`, and `run-test-73` for examples.
 
-## Phase 2 Integration Runs (Live Only)
-- Phase 2 uses the runner in `src/tests/phase2-runner.ts` to execute real-provider scenarios (`basic-llm`, `multi-turn`) in both streaming and non-streaming modes. There is no fixture replay path. `src/tests/phase2/phase2-suite.spec.ts` exposes the same runner to Vitest for opt-in automation.
-- Model ordering and cost tiers live in `src/tests/phase2-models.ts`. Tier 1 currently targets the self-hosted `vllm/default-model` (OpenAI-compatible) and `ollama/gpt-oss:20b`; higher tiers cover Anthropic, OpenRouter, OpenAI, and Google models.
-- Test agents for the scenarios are located under `src/tests/phase2/test-agents/` (`test-master.ai`, `test-agent1.ai`, `test-agent2.ai`).
-- Commands:
-  - `npm run test:phase2` — build + run every configured model/tier/stream combination.
-  - `npm run test:phase2:tier1` — run only Tier 1 (self-hosted) models.
-  - `npm run test:phase2:tier2` — run Tiers 1 and 2 (adds mid-priced cloud models).
-  - `npm run test:phase2:vitest` — build + run the Phase 2 runner via Vitest (wraps `dist/tests/phase2-runner.js`, honoring `PHASE2_TIERS`).
-  - `npm run test:all` — executes Phase 1, then Phase 2 Tier 1.
-- Safeguards:
-  - The runner stops after the first failure when `PHASE2_STOP_ON_FAILURE=1` (default). Set `PHASE2_STOP_ON_FAILURE=0` to force the full matrix while debugging.
-  - Optional tracing/logging toggles: `PHASE2_TRACE_LLM`, `PHASE2_TRACE_SDK`, `PHASE2_TRACE_MCP`, `PHASE2_VERBOSE`.
-  - All runs are live. Verify credentials before invoking Tier 2/3 and budget for provider costs.
+## Phase 3: Real LLM Integration Tests
 
+Phase 3 uses the runner in `src/tests/phase3-runner.ts` to execute real-provider scenarios (`basic-llm`, `multi-turn`) in both streaming and non-streaming modes. There is no fixture replay path. `src/tests/phase3/phase3-suite.spec.ts` exposes the same runner to Vitest for opt-in automation.
+
+### Model Configuration
+Model configurations live in `src/tests/phase3-models.ts`. The default configuration uses free nova models:
+
+| Model | Provider | Tier |
+|-------|----------|------|
+| `gpt-oss-20b` | nova | 1 |
+| `minimax-m2.1` | nova | 1 |
+| `glm-4.5-air` | nova | 1 |
+| `glm-4.6` | nova | 1 |
+| `glm-4.7` | nova | 1 |
+
+Test agents for the scenarios are located under `src/tests/phase3/test-agents/` (`test-master.ai`, `test-agent1.ai`, `test-agent2.ai`).
+
+### Commands
+- `npm run test:phase3` — build + run every configured model/tier/stream combination.
+- `npm run test:phase3:tier1` — run only Tier 1 models.
+- `npm run test:phase3:tier2` — run Tiers 1 and 2.
+- `npm run test:phase3:vitest` — build + run the Phase 3 runner via Vitest (wraps `dist/tests/phase3-runner.js`, honoring `PHASE3_TIERS`).
+- `npm run test:all` — executes Phase 1, Phase 2, then Phase 3 Tier 1.
+
+### Safeguards
+- The runner stops after the first failure when `PHASE3_STOP_ON_FAILURE=1` (default). Set `PHASE3_STOP_ON_FAILURE=0` to force the full matrix while debugging.
+- Optional tracing/logging toggles: `PHASE3_TRACE_LLM`, `PHASE3_TRACE_SDK`, `PHASE3_TRACE_MCP`, `PHASE3_VERBOSE`.
+- All runs are live. Verify credentials before invoking and budget for any provider costs if using paid models.
 
 ## Coverage And Debugging
-- Capture V8 coverage by running `NODE_V8_COVERAGE=coverage npm run test:phase1` or `npx c8 npm run test:phase1` for summarized reports.
-- Harness logs, accounting entries, and persistence outputs land under temporary directories prefixed `ai-agent-phase1-*`; inspect these paths to diagnose failures.
-- When extending scenarios, update `src/tests/phase1-harness.ts` expectations and ensure new live runs are scoped (e.g., `--tier` / `--model`) before landing changes.
+- Capture V8 coverage by running `NODE_V8_COVERAGE=coverage npm run test:phase2` or `npx c8 npm run test:phase2` for summarized reports.
+- Harness logs, accounting entries, and persistence outputs land under temporary directories prefixed `ai-agent-phase2-*`; inspect these paths to diagnose failures.
+- When extending scenarios, update `src/tests/phase2-harness.ts` expectations and ensure new live runs are scoped (e.g., `--tier` / `--model`) before landing changes.
 
 ## Test MCP Notes
 - The test MCP server exposes `test` and `test-summary` tools; sanitized tool names appear as `test__test` in accounting/logs.

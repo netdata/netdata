@@ -412,7 +412,7 @@ Format:
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Transport type selection
 - Tool namespacing
 - Tool filtering

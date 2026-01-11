@@ -418,7 +418,7 @@ Flow:
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Provider construction
 - Header injection
 - Reasoning configuration

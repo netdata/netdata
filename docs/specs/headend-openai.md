@@ -369,7 +369,7 @@ Similar to REST headend:
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Model listing
 - Chat completion (streaming/non-streaming)
 - Prompt building

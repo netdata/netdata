@@ -277,7 +277,7 @@ root (turn 1.0)
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Path normalization
 - Segment appending
 - Turn path composition

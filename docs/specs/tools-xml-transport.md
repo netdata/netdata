@@ -53,5 +53,5 @@ This separation ensures wrapper fields (transport metadata) never pollute the pa
 - XML-NEXT rendering (nonce + final slot)
 - Final-report precedence in XML
 - Accounting `source: xml`
-- Phase 1 harness scenarios covering: native tools + XML final-report, invalid tag/nonce ignored
+- Phase 2 harness scenarios covering: native tools + XML final-report, invalid tag/nonce ignored
 - 3-layer final report processing for each format type

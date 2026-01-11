@@ -338,7 +338,7 @@ Silent failure returns empty object, allowing:
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Schema validation
 - Basic cost computation
 - Unit conversion (per_1k vs per_1m)

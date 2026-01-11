@@ -356,7 +356,7 @@ Includes warning: "Do not combine task_status with final_report in same request"
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Basic batch execution
 - Error handling (unknown tool, invalid input)
 - Schema generation

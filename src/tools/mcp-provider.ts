@@ -297,6 +297,8 @@ class MCPSharedRegistry {
     await Promise.allSettled(closers);
     this.entries.clear();
     this.failedServers.clear();
+    // Reset stopping flag so registry can be reused after shutdown (important for test suites)
+    this.stopping = false;
   }
 
   async handleTimeout(serverName: string, logger: LogFn): Promise<void> {

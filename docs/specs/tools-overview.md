@@ -412,7 +412,7 @@ interface MCPTool {
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Tool registration
 - Tool discovery
 - Execution routing

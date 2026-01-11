@@ -512,7 +512,7 @@ All errors populate `result.error` and set `result.success = false`.
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Session creation and validation
 - Configuration passing
 - Callback invocation

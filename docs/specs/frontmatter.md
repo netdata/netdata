@@ -362,7 +362,7 @@ In non-strict mode:
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Frontmatter extraction
 - Schema loading (inline, string, file)
 - Reasoning level parsing

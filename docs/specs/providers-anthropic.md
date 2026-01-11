@@ -252,7 +252,7 @@ Rate limits are logged and retried; no model-facing system notice is injected fo
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Cache control application
 - Reasoning budget parsing
 - Signature validation

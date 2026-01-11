@@ -203,7 +203,7 @@ No direct logging in provider. Child session logs independently with inherited t
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Tool listing delegation
 - Tool existence checking
 - Identity resolution

@@ -395,7 +395,7 @@ Graceful shutdown of all providers.
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Metric recording
 - Label building
 - Sampler creation

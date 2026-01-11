@@ -251,7 +251,7 @@ Defined in `src/ai-agent.ts:16-44`:
 - `tool_finished` - Tool execution completed
 
 ## Test Coverage
-- Phase 1 harness: `src/tests/phase1/*.ts` - Deterministic scenarios
+- Phase 2 harness: `src/tests/phase2-harness-scenarios/*.ts` - Deterministic scenarios
 - Covered: Session creation, turn execution, retry logic, context guard, tool execution
 - Gaps: None identified in core orchestration
 

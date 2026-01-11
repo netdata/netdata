@@ -2573,7 +2573,7 @@ export class TurnRunner {
             originTxnId: this.ctx.originTxnId,
         };
         if (process.env.CONTEXT_DEBUG === 'true') {
-            // Debug visibility for accounting expectations in phase1 harness
+            // Debug visibility for accounting expectations in phase2 harness
             console.log('final-report-accounting', finalReportAccounting);
         }
         accounting.push(finalReportAccounting);

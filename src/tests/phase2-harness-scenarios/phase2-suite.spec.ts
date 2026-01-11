@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { describe, it } from 'vitest';
 
-const harnessEntry = path.resolve('dist/tests/phase1-harness.js');
+const harnessEntry = path.resolve('dist/tests/phase2-harness.js');
 
 const runHarness = (): Promise<void> => new Promise((resolve, reject) => {
   const childEnv = { ...process.env } as Record<string, string | undefined>;
@@ -19,7 +19,7 @@ const runHarness = (): Promise<void> => new Promise((resolve, reject) => {
     (error, _stdout, stderr) => {
       if (error !== null) {
         const message = stderr.length > 0 ? `\n${stderr}` : '';
-        reject(new Error(`phase1 harness failed: ${error.message}${message}`));
+        reject(new Error(`phase2 harness failed: ${error.message}${message}`));
         return;
       }
       resolve();
@@ -29,7 +29,7 @@ const runHarness = (): Promise<void> => new Promise((resolve, reject) => {
   child.stderr?.pipe(process.stderr);
 });
 
-describe('phase1 deterministic harness', () => {
+describe('phase2 deterministic harness', () => {
   it('executes all registered scenarios via CLI harness', async () => {
     await runHarness();
   });

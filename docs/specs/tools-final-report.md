@@ -352,7 +352,7 @@ When `isFinalTurn === true`:
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Successful report capture
 - Different status values
 - Format variations

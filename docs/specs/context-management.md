@@ -273,7 +273,7 @@ When forced final turn but still over limit:
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Context estimation accuracy
 - Guard evaluation logic
 - Final turn enforcement

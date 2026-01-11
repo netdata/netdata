@@ -397,7 +397,7 @@ writeJson(res, status, { error: code, message });
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Model listing with display names
 - Message creation (streaming/non-streaming)
 - Prompt composition

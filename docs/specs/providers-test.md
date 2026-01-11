@@ -499,11 +499,11 @@ buildFallbackStep(turn, message): ScenarioTurn {
 
 - **Attempt counters**: `{ scenarioId, turn, provider }` keys ensure `failuresBeforeSuccess` runs exactly as many times as requested; once the scripted success path executes the counter remains at the max value, so future invocations skip the simulated failures for that provider/scenario combination (`src/llm-providers/test-llm.ts:130-212`).
 - **Reasoning signature stripping**: The provider mirrors Anthropic’s behavior by stripping reasoning content without signatures on turns > 1, guaranteeing deterministic transcripts for harness assertions (`src/llm-providers/test-llm.ts:24-82`).
-- **Phase 1 harness integration**: TestLLM drives every deterministic scenario in `src/tests/phase1/` to validate retry logic, tool orchestration, accounting, and pricing without live APIs (`src/tests/phase1-harness.ts`, `src/tests/fixtures/test-llm-scenarios.ts`).
+- **Phase 2 harness integration**: TestLLM drives every deterministic scenario in `src/tests/phase2-harness-scenarios/` to validate retry logic, tool orchestration, accounting, and pricing without live APIs (`src/tests/phase2-harness.ts`, `src/tests/fixtures/test-llm-scenarios.ts`).
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Scenario loading
 - Turn number computation
 - Tool validation

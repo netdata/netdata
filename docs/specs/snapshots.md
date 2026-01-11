@@ -278,7 +278,7 @@ User-provided `persistence` config values override defaults. Custom callbacks (`
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Snapshot payload structure
 - Callback invocation
 - Error handling

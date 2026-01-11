@@ -11,7 +11,7 @@ One simple format (`.ai` files) works as standalone agents, sub-agents, master o
 Key features at a glance:
 - Multi-provider support (OpenAI, Anthropic, Google, OpenRouter, Ollama, Test LLM)
 - MCP/REST/sub-agent/internal tools with concurrency queues and context guard
-- Deterministic Phase 1/2 harnesses for regression coverage
+- Three-phase test harness: Phase 1 (parallel unit), Phase 2 (sequential deterministic), Phase 3 (real LLM)
 - XML transport: fixed to `xml-final` (native tool calls for tools; final report must be emitted via `<ai-agent-NONCE-XXXX tool="agent__final_report">…</ai-agent-NONCE-XXXX>`). Progress remains native.
 - CLI override for tool transport has been removed; xml-final is mandatory.
 
@@ -418,8 +418,11 @@ The framework uses a **multi-level configuration system** with clear precedence 
       - Where you run the command from
       - Ideal for project-specific settings
 
-### Deterministic Testing
-- Run `npm run test:phase1` (or `npm test` if you prefer Vitest) to execute the deterministic harness across scripted provider + MCP scenarios.
+### Testing
+- `npm run test:phase1` — Parallel unit tests (~200 tests, ~300ms)
+- `npm run test:phase2` — Sequential deterministic harness (~260 scenarios)
+- `npm run test:phase3` — Real LLM integration tests (nova models)
+- `npm run test:all` — Run all phases
 - Detailed steps, coverage guidance, and debugging tips live in [`docs/TESTING.md`](docs/TESTING.md).
 
    c. **Prompt file directory**: `.ai-agent.json` and `.ai-agent.env`

@@ -299,7 +299,7 @@ The flow is **procedural**, not state-machine driven. Error handling is inline v
 
 ## Test Coverage
 
-**Phase 1 Tests**:
+**Phase 2 Tests**:
 - Session creation validation
 - Turn execution flow
 - Retry logic scenarios

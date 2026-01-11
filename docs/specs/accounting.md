@@ -281,7 +281,7 @@ interface SessionTotals {
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Entry creation for LLM
 - Entry creation for tools
 - Cost computation

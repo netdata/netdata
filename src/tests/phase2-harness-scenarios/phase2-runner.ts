@@ -37,7 +37,7 @@ import { formatRichLogLine } from '../../logging/rich-format.js';
 import { ShutdownController } from '../../shutdown-controller.js';
 import { SubAgentRegistry } from '../../subagent-registry.js';
 import { estimateMessagesTokens, resolveTokenizer } from '../../tokenizer-registry.js';
-import { MCPProvider, forceRemoveSharedRegistryEntry } from '../../tools/mcp-provider.js';
+import { MCPProvider, forceRemoveSharedRegistryEntry, shutdownSharedRegistry } from '../../tools/mcp-provider.js';
 import { queueManager } from '../../tools/queue-manager.js';
 import { truncateToBytes } from '../../truncation.js';
 import { clampToolName, sanitizeToolName, formatToolRequestCompact, formatAgentResultHumanReadable, setWarningSink, getWarningSink, warn } from '../../utils.js';
@@ -104,6 +104,129 @@ const DUMP_SCENARIOS = new Set(parseDumpList(process.env.PHASE1_DUMP_SCENARIO));
 const dumpScenarioResultIfNeeded = (scenarioId: string, result: AIAgentResult): void => {
   if (!DUMP_SCENARIOS.has(scenarioId)) return;
   console.log(`[dump] scenario=${scenarioId}:`, JSON.stringify(result, null, 2));
+};
+
+/**
+ * Tests that MUST run sequentially (not in parallel) due to:
+ * - runWithPatchedExecuteTurn: patches LLMClient.prototype.executeTurn globally
+ * - Shared state variables: runTest16Paths, runTest20Paths, runTest54State
+ * - captureSessionConfig: modifies sessionConfigObservers global array
+ */
+/* eslint-disable sonarjs/no-duplicate-string -- test IDs naturally share 'run-test-' prefix */
+const SEQUENTIAL_TEST_IDS = new Set([
+  // Tests using shared state variables
+  'run-test-16',
+  'run-test-20',
+  'run-test-54',
+  // Tests using runWithPatchedExecuteTurn (patches LLMClient.prototype globally)
+  'run-test-69',
+  'run-test-107',
+  'run-test-empty-response',
+  'run-test-empty-response-final-turn',
+  'run-test-final-report-empty-parameters',
+  'run-test-final-report-literal-newlines',
+  'run-test-final-report-null-parameters',
+  'run-test-final-report-with-other-tools',
+  'run-test-final-report-wrong-types',
+  'run-test-invalid-no-text-fallback',
+  'run-test-llm-error-during-final-turn',
+  'run-test-llm-keeps-sending-invalid',
+  'run-test-llm-never-sends-final-report',
+  'run-test-multiple-tool-calls-all-invalid',
+  'run-test-reasoning-without-final-report',
+  'run-test-turn-collapse-incomplete-final-report',
+  'run-test-whitespace-only-response',
+  'run-test-final-report-parameters-string',
+  'run-test-final-report-retry-text',
+  'run-test-final-report-valid-tool-call',
+  'run-test-invalid-final-report-at-max-turns',
+  'run-test-invalid-final-report-before-max-turns',
+  'run-test-invalid-schema-tool-fails',
+  'run-test-max-provider-retries-exhausted',
+  'run-test-max-turn-exhaustion-fails',
+  'run-test-no-collapse-already-at-max',
+  'run-test-old-progress-report-rejected',
+  'run-test-progress-only-fails',
+  'run-test-pure-text-final-report',
+  'run-test-retry-exhaustion-during-final-turn',
+  'run-test-retry-exhaustion-forces-final',
+  'run-test-retry-exhaustion-no-tools',
+  'run-test-single-provider-final-turn-invalid-response',
+  'run-test-synthetic-failure-contract',
+  'run-test-task-status-completed',
+  'run-test-task-status-reset-on-real-tool',
+  'run-test-task-status-standalone-consecutive-final',
+  'run-test-task-status-standalone-first',
+  'run-test-task-status-standalone-second',
+  'run-test-task-status-thinking-stability',
+  'run-test-text-extraction-invalid-text',
+  'run-test-text-extraction-non-final-turn',
+  'run-test-tool-message-fallback-validation-fails',
+  'run-test-turn-collapse-both-flags',
+  'run-test-turn-collapse-final-report-attempted',
+  'run-test-unknown-tool-fails',
+  'run-test-xml-final-only',
+  'run-test-xml-happy',
+  'run-test-xml-invalid-tag',
+  'run-test-xml-wrapper-as-tool',
+  'run-test-max-context-bypass-retries',
+  'run-test-max-context-bypass-tools',
+  'run-test-remaining-turns-collapse',
+  'run-test-context-guard-compact-happy',
+  'run-test-context-guard-compact-large-drop',
+  'run-test-context-guard-compact-multi-drop',
+  'run-test-context-guard-compact-empty-second',
+  'run-test-context-guard-compact-all-drop',
+  'run-test-context-guard-no-compact-with-history',
+  'run-test-context-guard-compact-no-drop',
+  'run-test-conversation-message-type-inference',
+  'run-test-provider-fallback-during-retry',
+  'run-test-provider-fallback-after-failure',
+  'run-test-provider-fallback-success-after-retry',
+  'run-test-context-guard-force-final-turn',
+  'run-test-context-guard-preflight-final-turn',
+  'run-test-provider-error-increments-retry',
+  'run-test-remaining-turns-collapse-immediate',
+  // Coverage tests using global state variables
+  'coverage-openrouter-json',
+  'coverage-openrouter-sse',
+  'coverage-openrouter-sse-nonblocking',
+  'coverage-generic-json',
+  'coverage-session-snapshot',
+  'coverage-llm-payload',
+  // Tests with queue/rate-limit/timing dependencies that fail in parallel
+  'context_guard__tool_drop_after_success',
+  'run-test-queue-isolation',
+  'run-test-max-turn-limit',
+  'run-test-63',
+  'run-test-122',
+  'run-test-123',
+  'run-test-91',
+  'run-test-49',
+  'run-test-114',
+  'run-test-44',
+  'reasoning-interleaved-sdk-payload',
+  'run-test-size-cap-truncation',
+  'run-test-size-cap-small-payload-passes',
+  'run-test-size-cap-small-over-limit-fails',
+  'run-test-final-report-tool-message-fallback',
+  'run-test-stream-dedupe-final-report',
+  'run-test-tool-cache-hit',
+  'run-test-25',
+  'run-test-72-probe-success-no-restart',
+  'run-test-90-rate-limit',
+]);
+/* eslint-enable sonarjs/no-duplicate-string */
+
+/** Check if a test must run sequentially */
+const isSequentialTest = (test: HarnessTest): boolean => {
+  // Explicit flag takes precedence
+  if (test.sequential === true) return true;
+  // Check against known sequential test IDs
+  if (SEQUENTIAL_TEST_IDS.has(test.id)) return true;
+  // reasoning-matrix tests use captureSessionConfig
+  if (test.id.startsWith('reasoning-matrix-')) return true;
+  return false;
 };
 const TOOL_DROP_STUB = `(tool failed: ${CONTEXT_OVERFLOW_FRAGMENT})`;
 const TOOL_SIZE_CAP_STUB = '(tool failed: response exceeded max size)';
@@ -336,7 +459,7 @@ const BASE_DEFAULTS = {
   llmTimeout: 10_000,
   toolTimeout: 10_000,
 } as const;
-const TMP_PREFIX = 'ai-agent-phase1-';
+const TMP_PREFIX = 'ai-agent-phase2-';
 const SESSIONS_SUBDIR = 'sessions';
 const BILLING_FILENAME = 'billing.jsonl';
 const THRESHOLD_BUFFER_TOKENS = 8;
@@ -820,7 +943,7 @@ function expectLlmLogContext(
     const actualRemote = log.remoteIdentifier;
     invariant(actualRemote === expectation.remote, `Unexpected remoteIdentifier for ${scenarioId}: ${actualRemote}.`);
   }
-  const expectedAgent = `phase1-${scenarioId}`;
+  const expectedAgent = `phase2-${scenarioId}`;
   invariant(log.agentId === expectedAgent, `agentId mismatch for ${scenarioId}.`);
   invariant(log.callPath === expectedAgent, `callPath mismatch for ${scenarioId}.`);
   invariant(typeof log.txnId === 'string' && log.txnId.length > 0, `txnId missing for ${scenarioId}.`);
@@ -996,6 +1119,14 @@ interface HarnessTest {
   id: string;
   description?: string;
   timeoutMs?: number;
+  /**
+   * When true, this test MUST run sequentially (not in parallel with other tests).
+   * Set this flag for tests that:
+   * - Use runWithPatchedExecuteTurn (patches LLMClient.prototype.executeTurn globally)
+   * - Use shared state variables (runTest16Paths, runTest20Paths, runTest54State)
+   * - Use captureSessionConfig/registerSessionConfigObserver (modifies global observers)
+   */
+  sequential?: boolean;
   configure?: (
     configuration: Configuration,
     sessionConfig: AIAgentSessionConfig,
@@ -5955,7 +6086,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       description: 'Agent loader propagates session configuration overrides.',
       execute: async () => {
         capturedSessionConfig = undefined;
-        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'phase1-loader-'));
+        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'phase2-loader-'));
         const configPath = path.join(tempDir, 'ai-agent.json');
         const configData = {
           providers: {
@@ -9834,7 +9965,7 @@ async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
     maxTurns: 3,
     toolTimeout: defaults.toolTimeout,
     llmTimeout: defaults.llmTimeout,
-    agentId: `phase1-${prompt}`,
+    agentId: `phase2-${prompt}`,
     abortSignal: abortController.signal,
     // Tests use native transport by default; XML-specific tests override this
     // transport fixed internally
@@ -11890,18 +12021,145 @@ export function listPhaseOneScenarioIds(): string[] {
   return BASE_TEST_SCENARIOS.map((scenario) => scenario.id);
 }
 
+/** Environment variable to force all-sequential mode (for debugging) */
+const PHASE2_FORCE_SEQUENTIAL = process.env.PHASE2_FORCE_SEQUENTIAL === '1';
+/** Environment variable to run only parallel or sequential tests: 'all' (default), 'parallel', 'sequential' */
+const PHASE2_MODE = (process.env.PHASE2_MODE ?? 'all') as 'all' | 'parallel' | 'sequential';
+/** Maximum parallel test concurrency (default: half of available parallelism or 32, whichever is smaller) */
+const PHASE2_PARALLEL_CONCURRENCY = Math.min(
+  Number(process.env.PHASE2_PARALLEL_CONCURRENCY) || Math.max(1, Math.floor(os.availableParallelism?.() ?? os.cpus().length) / 2),
+  32
+);
+
+interface TestRunResult {
+  scenario: HarnessTest;
+  result?: AIAgentResult;
+  error?: Error;
+  durationMs: number;
+}
+
+async function runSingleScenario(scenario: HarnessTest): Promise<TestRunResult> {
+  const startMs = Date.now();
+  try {
+    const result = await runScenario(scenario);
+    dumpScenarioResultIfNeeded(scenario.id, result);
+    scenario.expect(result);
+    return { scenario, result, durationMs: Date.now() - startMs };
+  } catch (error: unknown) {
+    return { scenario, error: toError(error), durationMs: Date.now() - startMs };
+  }
+}
+
+async function runParallelBatch(scenarios: HarnessTest[], concurrency: number): Promise<TestRunResult[]> {
+  const results: TestRunResult[] = [];
+  const pending: Promise<void>[] = [];
+  let nextIndex = 0;
+
+  const startNext = async (): Promise<void> => {
+    if (nextIndex >= scenarios.length) return;
+    const scenario = scenarios[nextIndex];
+    nextIndex += 1;
+    const result = await runSingleScenario(scenario);
+    results.push(result);
+    await startNext();
+  };
+
+  // Start initial batch up to concurrency limit
+  const initialBatch = Math.min(concurrency, scenarios.length);
+  // eslint-disable-next-line functional/no-loop-statements
+  for (let i = 0; i < initialBatch; i += 1) {
+    pending.push(startNext());
+  }
+
+  await Promise.all(pending);
+  return results;
+}
+
 export async function runPhaseOneSuite(options?: PhaseOneRunOptions): Promise<void> {
   validateRichFormatterParity();
   await runJournaldSinkUnitTests();
   const scenarios = resolveScenarios(options);
   const total = scenarios.length;
+
+  // Partition tests into parallel-safe and sequential groups
+  const allParallelTests: HarnessTest[] = [];
+  const allSequentialTests: HarnessTest[] = [];
+  scenarios.forEach((scenario) => {
+    if (PHASE2_FORCE_SEQUENTIAL || isSequentialTest(scenario)) {
+      allSequentialTests.push(scenario);
+    } else {
+      allParallelTests.push(scenario);
+    }
+  });
+
+  // Filter based on PHASE2_MODE
+  const parallelTests = PHASE2_MODE === 'sequential' ? [] : allParallelTests;
+  const sequentialTests = PHASE2_MODE === 'parallel' ? [] : allSequentialTests;
+  const runningTotal = parallelTests.length + sequentialTests.length;
+
+  // Warn about conflicting env vars
+  if (PHASE2_FORCE_SEQUENTIAL && PHASE2_MODE === 'parallel') {
+    console.warn('[warn] PHASE2_FORCE_SEQUENTIAL=1 with PHASE2_MODE=parallel results in zero tests (all tests forced sequential, then filtered out)');
+  }
+
+  const modeLabel = PHASE2_MODE === 'all' ? '' : ` [mode=${PHASE2_MODE}]`;
+  console.log(`Phase 2: ${String(total)} total scenarios (${String(allParallelTests.length)} parallel, ${String(allSequentialTests.length)} sequential)${modeLabel}`);
+  if (PHASE2_MODE !== 'all') {
+    console.log(`Running ${PHASE2_MODE} tests only: ${String(runningTotal)} scenarios`);
+  }
+  if (parallelTests.length > 0) {
+    console.log(`Running parallel tests with concurrency=${String(PHASE2_PARALLEL_CONCURRENCY)}`);
+  }
+
+  let passCount = 0;
+  let failedScenario: TestRunResult | undefined;
+
+  // Run parallel tests first (faster execution)
+  if (parallelTests.length > 0 && !PHASE2_FORCE_SEQUENTIAL) {
+    const parallelStartMs = Date.now();
+    const parallelResults = await runParallelBatch(parallelTests, PHASE2_PARALLEL_CONCURRENCY);
+    const parallelDuration = formatDurationMs(parallelStartMs, Date.now());
+
+    // Report parallel results
+    parallelResults.forEach((r) => {
+      const description = resolveScenarioDescription(r.scenario.id, r.scenario.description);
+      const duration = formatDurationMs(0, r.durationMs);
+      const baseLabel = r.scenario.id;
+      const header = `[PAR] ${baseLabel}${description !== undefined ? `: ${description}` : ''}`;
+      if (r.error === undefined) {
+        console.log(`${header} [PASS] ${duration}`);
+        passCount += 1;
+      } else {
+        const hint = r.result !== undefined ? formatFailureHint(r.result) : '';
+        console.error(`${header} [FAIL] ${duration} - ${r.error.message}${hint}`);
+        failedScenario ??= r;
+      }
+    });
+
+    console.log(`Parallel batch completed: ${String(parallelResults.length)} tests in ${parallelDuration}`);
+
+    // Stop on first failure
+    if (failedScenario?.error !== undefined) {
+      await cleanupActiveHandles();
+      throw failedScenario.error;
+    }
+
+    // Clean up state between parallel and sequential batches to avoid pollution
+    await cleanupActiveHandles();
+    queueManager.reset();
+    // Shutdown shared MCP registry to ensure clean state for sequential tests
+    await shutdownSharedRegistry();
+    // Longer delay to let MCP server processes fully terminate and release resources
+    await new Promise((resolve) => { setTimeout(resolve, 500); });
+  }
+
+  // Run sequential tests one by one
   // eslint-disable-next-line functional/no-loop-statements
-  for (let index = 0; index < total; index += 1) {
-    const scenario = scenarios[index];
-    const runPrefix = `${String(index + 1)}/${String(total)}`;
+  for (const scenario of sequentialTests) {
+    const runPrefix = `${String(passCount + 1)}/${String(total)}`;
     const description = resolveScenarioDescription(scenario.id, scenario.description);
     const baseLabel = `${runPrefix} ${scenario.id}`;
-    const header = `[RUN] ${baseLabel}${description !== undefined ? `: ${description}` : ''}`;
+    const header = `[SEQ] ${baseLabel}${description !== undefined ? `: ${description}` : ''}`;
     const startMs = Date.now();
     let result: AIAgentResult | undefined;
     try {
@@ -11909,20 +12167,24 @@ export async function runPhaseOneSuite(options?: PhaseOneRunOptions): Promise<vo
       dumpScenarioResultIfNeeded(scenario.id, result);
       scenario.expect(result);
       const duration = formatDurationMs(startMs, Date.now());
-       
+
       console.log(`${header} [PASS] ${duration}`);
+      passCount += 1;
     } catch (error: unknown) {
       const duration = formatDurationMs(startMs, Date.now());
       const message = toErrorMessage(error);
       const hint = result !== undefined ? formatFailureHint(result) : '';
-       
+
       console.error(`${header} [FAIL] ${duration} - ${message}${hint}`);
+      await cleanupActiveHandles();
       throw error;
     }
   }
+
   await cleanupActiveHandles();
-   
-  console.log('phase1 scenario: ok');
+
+  const summaryTotal = PHASE2_MODE === 'all' ? total : runningTotal;
+  console.log(`phase2 scenario: ok (${String(passCount)}/${String(summaryTotal)} passed)`);
 }
 
 async function cleanupActiveHandles(): Promise<void> {
@@ -12459,7 +12721,6 @@ BASE_TEST_SCENARIOS.push({
 } satisfies HarnessTest);
 
 BASE_TEST_SCENARIOS.push({
-  // eslint-disable-next-line sonarjs/no-duplicate-string
   id: 'run-test-xml-wrapper-as-tool',
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 3;

@@ -221,7 +221,7 @@ interface ToolExecutionState {
 
 ## Test Coverage
 
-**Phase 1 Tests**:
+**Phase 2 Tests**:
 - `run-test-task-status-standalone-first` - Standalone call allowed, session continues
 - `run-test-task-status-standalone-second` - Progress-only turns fail at maxTurns
 - `run-test-task-status-completed` - Completion forces final

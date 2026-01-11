@@ -161,7 +161,7 @@ Uses generic conversion from base class.
 
 ## Test Coverage
 
-**Phase 1**:
+**Phase 2**:
 - Provider construction
 - Thinking config building
 - Response conversion
