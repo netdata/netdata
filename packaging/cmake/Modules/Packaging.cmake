@@ -97,7 +97,7 @@ set(CPACK_DEBIAN_NETDATA_PACKAGE_PREDEPENDS "netdata-user, libcap2-bin")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_SUGGESTS
 		"netdata-plugin-cups, netdata-plugin-freeipmi, netdata-plugin-ibm")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_RECOMMENDS
-		"netdata-plugin-systemd-journal, netdata-plugin-systemd-units, \
+		"netdata-plugin-journal-viewer, netdata-plugin-systemd-units, \
 netdata-plugin-network-viewer")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_CONFLICTS
 		"netdata-core, netdata-plugins-bash, netdata-plugins-python, netdata-web")
@@ -518,23 +518,27 @@ set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_CONTROL_EXTRA
 set(CPACK_DEBIAN_PLUGIN-SLABINFO-DEBUGINFO_PACKAGE On)
 
 #
-# systemd-journal.plugin
+# journal-viewer.plugin
 #
 
-set(CPACK_COMPONENT_PLUGIN-SYSTEMD-JOURNAL_DEPENDS "netdata")
-set(CPACK_COMPONENT_PLUGIN-SYSTEMD-JOURNAL_DESCRIPTION
-		"The systemd-journal collector for the Netdata Agent
- This plugin allows the Netdata Agent to present logs from the systemd
- journal on Netdata Cloud or the local Agent dashboard.")
+set(CPACK_COMPONENT_PLUGIN-JOURNAL-VIEWER_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-JOURNAL-VIEWER_DESCRIPTION
+		"The journal viewer plugin for the Netdata Agent
+ This plugin provides systemd journal log viewing and querying functionality
+ with histogram analysis and faceted search capabilities.")
 
-set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_NAME "netdata-plugin-systemd-journal")
-set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_SECTION "net")
-set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
+set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_NAME "netdata-plugin-journal-viewer")
+set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
 
-set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES_PATH}/deb/plugin-systemd-journal/postinst")
+set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_CONTROL_EXTRA
+	  "${PKG_FILES_PATH}/deb/plugin-journal-viewer/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_DEBUGINFO_PACKAGE On)
+# Replaces old systemd-journal plugin
+set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_CONFLICTS "netdata-plugin-systemd-journal")
+set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_REPLACES "netdata-plugin-systemd-journal")
+
+set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_DEBUGINFO_PACKAGE Off)
 
 #
 # systemd-units.plugin
@@ -626,8 +630,8 @@ endif()
 if(ENABLE_PLUGIN_SLABINFO)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-slabinfo")
 endif()
-if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-systemd-journal")
+if(ENABLE_PLUGIN_OTEL)
+        list(APPEND CPACK_COMPONENTS_ALL "plugin-journal-viewer")
 endif()
 if(ENABLE_PLUGIN_SYSTEMD_UNITS)
   list(APPEND CPACK_COMPONENTS_ALL "plugin-systemd-units")
