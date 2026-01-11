@@ -6,7 +6,7 @@ Netdata supports multiple configuration layers for health alerts. Understanding 
 
 Stock alerts are distributed with Netdata and reside in `/usr/lib/netdata/conf.d/health.d/`. These files are installed by the Netdata package and updated with each release. Modifying stock files is not recommended because changes are overwritten during upgrades.
 
-Stock configurations define the default alert set. They are evaluated last in precedence, meaning custom configurations override stock configurations for the same alert.
+Stock configurations define the default alert set. They are evaluated first, so any custom configuration with the same alert name overrides the stock definition.
 
 ## Custom Configuration Layer
 
