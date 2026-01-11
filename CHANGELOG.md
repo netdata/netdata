@@ -148,6 +148,11 @@
 - Fix(go.d/pkg/logs):  fix ParserConfig.CSV omitempty behavior ([#21526](https://github.com/netdata/netdata/issues/21526))
 - Use the same type for all time_group_value values ([#21528](https://github.com/netdata/netdata/issues/21528))
 - Fix(diskspace.plugin): exclude ZFS datasets ([#21532](https://github.com/netdata/netdata/issues/21532))
+- Fix incorrect column index for `old_value` in SQLite health query ([#21533](https://github.com/netdata/netdata/issues/21533))
+- Build(deps): bump github.com/bmatcuk/doublestar/v4 from 4.9.1 to 4.9.2 in /src/go ([#21537](https://github.com/netdata/netdata/issues/21537))
+- Build(deps): bump gopkg.in/ini.v1 from 1.67.0 to 1.67.1 in /src/go ([#21535](https://github.com/netdata/netdata/issues/21535))
+- Build(deps): bump github.com/miekg/dns from 1.1.69 to 1.1.70 in /src/go ([#21536](https://github.com/netdata/netdata/issues/21536))
+- Build(deps): bump golang.org/x/text from 0.32.0 to 0.33.0 in /src/go ([#21534](https://github.com/netdata/netdata/issues/21534))
 
 ## [2.8.0] - 2025-11-19
 
