@@ -35,3 +35,9 @@ Use labels and tags to scope alerts appropriately. An alert should fire for the 
 Automate routine alert maintenance. Scripts can audit alert configurations for common problems, generate reports on alert volume, and identify alerts that have not fired recently.
 
 Automate alert deployment and testing. When alert configurations change, automated tests should validate correctness before deployment.
+
+## What's Next
+
+- **12.5 SLIs and SLOs** for connecting alerts to business objectives
+- **13. Alerts and Notifications Architecture** for internal behavior details
+- **1. Understanding Alerts in Netdata** to revisit fundamentals
