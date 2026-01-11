@@ -4,7 +4,7 @@
 
 | Factor | Impact | Recommendation |
 |--------|--------|----------------|
-| `every` frequency | Higher = more CPU | Use 1m for most alerts |
+| `every` frequency | Lower (more frequent) = more CPU | Use 1m for most alerts |
 | `lookup` window | Longer windows need more processing | Match to needs |
 | Number of alerts | More alerts = more evaluation | Disable unused alerts |
 
