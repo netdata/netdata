@@ -12,4 +12,7 @@
 ## What's Next
 
 - **10.1 Events Feed** for monitoring all alerts
+- **10.1 Events Feed** for monitoring all alerts
 - **10.2 Silencing Rules** for notification suppression
+- **10.3 Alert Deduplication** for suppressing duplicate incidents
+- **10.4 Room-Based Alerting** for scoping notifications to rooms
