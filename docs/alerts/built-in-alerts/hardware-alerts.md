@@ -2,7 +2,11 @@
 
 Hardware monitoring provides visibility into infrastructure that is often neglected until failure occurs. These alerts protect physical infrastructure health.
 
-## RAID Monitoring
+:::note
+Hardware monitoring requires collector support for your specific hardware. Check that IPMI, SMART, and sensor collectors are enabled for your platform.
+:::
+
+## 11.5.1 RAID Monitoring
 
 ### raid_degraded
 
@@ -18,7 +22,7 @@ Tracks individual disk failures within RAID arrays.
 **Context:** `raid.disk`
 **Thresholds:** CRIT > 0
 
-## SMART Monitoring
+## 11.5.2 SMART Monitoring
 
 ### smart_self_test
 
@@ -48,7 +52,7 @@ For SSDs, tracks remaining write endurance.
 **Context:** `smart.wear`
 **Thresholds:** WARN < 10% remaining
 
-## Temperature Monitoring
+## 11.5.3 Temperature Monitoring
 
 ### sensor_temperature
 
@@ -71,7 +75,7 @@ Critical alert for completely stopped fans.
 **Context:** `sensors.fan`
 **Thresholds:** CRIT == 0
 
-## Power Monitoring
+## 11.5.4 Power Monitoring
 
 ### ups_battery_charge
 
@@ -101,7 +105,7 @@ Tracks UPS load percentage to prevent overloading.
 **Context:** `ups.output`
 **Thresholds:** WARN > 80%, CRIT > 90%
 
-## BMC/IPMI Monitoring
+## 11.5.5 BMC/IPMI Monitoring
 
 ### bmc_temp
 
@@ -123,3 +127,10 @@ Tracks power consumption against baseline for anomaly detection.
 
 **Context:** `ipmi.power`
 **Thresholds:** WARN > baseline * 1.2
+
+## Related Sections
+
+- [11.1 Application Alerts](application-alerts.md) - Database, web server, cache, and message queue alerts
+- [11.2 Container Alerts](container-alerts.md) - Docker and Kubernetes monitoring
+- [11.3 Network Alerts](network-alerts.md) - Network interface and protocol monitoring
+- [11.4 System Resource Alerts](system-resource-alerts.md) - CPU, memory, disk, and load alerts

@@ -2,7 +2,11 @@
 
 Network alerts focus on endpoints and services rather than interface statistics. These alerts ensure that network-dependent services remain reachable.
 
-## Ping and Latency Monitoring
+:::note
+Network connectivity alerts require specific endpoints to be configured. Add the hosts, ports, or URLs you want to monitor using the appropriate collector configuration.
+:::
+
+## 11.4.1 Ping and Latency Monitoring
 
 ### ping_latency
 
@@ -18,7 +22,7 @@ Measures percentage of packets that do not receive responses. Network problems o
 **Context:** `ping.packets`
 **Thresholds:** WARN > 1%, CRIT > 5%
 
-## Port and Service Monitoring
+## 11.4.2 Port and Service Monitoring
 
 ### port_check_failed
 
@@ -48,7 +52,7 @@ Tracks SSL/TLS handshake failures which may indicate certificate or protocol pro
 **Context:** `ssl.handshake`
 **Thresholds:** WARN > 0
 
-## DNS Monitoring
+## 11.4.3 DNS Monitoring
 
 ### dns_query_time
 
@@ -71,7 +75,7 @@ Monitors for complete DNS non-responses.
 **Context:** `dns.response`
 **Thresholds:** CRIT > 0
 
-## HTTP Endpoint Monitoring
+## 11.4.4 HTTP Endpoint Monitoring
 
 ### http_response_code_not_2xx
 
@@ -86,3 +90,10 @@ Monitors 95th percentile latency for SLA compliance.
 
 **Context:** `httpcheck.response`
 **Thresholds:** WARN > 2s
+
+## Related Sections
+
+- [11.1 Application Alerts](application-alerts.md) - Database, web server, cache, and message queue alerts
+- [11.2 Container Alerts](container-alerts.md) - Docker and Kubernetes monitoring
+- [11.3 Hardware Alerts](hardware-alerts.md) - Physical server and storage device alerts
+- [11.5 System Resource Alerts](system-resource-alerts.md) - CPU, memory, disk, and load alerts
