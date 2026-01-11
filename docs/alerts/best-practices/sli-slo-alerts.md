@@ -1,0 +1,23 @@
+# 12.8 SLIs, SLOs, and Alert Design
+
+Service level indicators and objectives provide a framework for connecting alerts to business outcomes.
+
+## Defining SLIs for Your Services
+
+An SLI measures some aspect of service behavior. Common SLIs include latency, availability, throughput, and error rate. Define SLIs reflecting your users' experience.
+
+Align alerts with SLIs. A CPU alert at 90% may not map directly to any SLI, but a latency alert at 500ms does. The latency alert is more directly tied to user experience.
+
+When designing alerts, ask: "What SLI does this alert protect?" If no SLI connects to the alert, reconsider whether the alert serves a purpose.
+
+## Setting SLO-Based Thresholds
+
+SLOs define acceptable service behavior. An SLO might state that 99.9% of requests complete within 500ms. Alerts should fire before SLO violations occur.
+
+For an SLO with 99.9% availability, alerts should fire when availability drops below 99.9%. This allows investigation before the SLO is breached.
+
+Use historical data to calibrate SLO-based thresholds. Analyze SLI behavior over time to identify the relationship between warning signs and actual breaches.
+
+## Connecting Alerts to Business Impact
+
+Alerts should eventually connect to business impact. An alert that fires with no business impact wastes responder time; an alert connecting to revenue impact or user experience gets appropriate attention.
