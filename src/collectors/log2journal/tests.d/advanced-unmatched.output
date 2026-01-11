@@ -1,0 +1,7 @@
+RAW_MESSAGE=Parsing error on: VALID: test data
+ALWAYS_PRESENT=always here
+ERROR_TYPE=unmatched_log_line
+PARSE_ERROR=failed to match pattern
+PROCESSED_DATA=Processed: 
+SEVERITY=warning
+
