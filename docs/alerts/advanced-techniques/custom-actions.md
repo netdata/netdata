@@ -28,7 +28,7 @@ lookup: average -1m of status
 if [ "$NETDATA_STATUS" = "CRITICAL" ]; then
     curl -X POST https://events.pagerduty.com/v2/enqueue \
         -H 'Content-Type: application/json' \
-        -d "{\"routing_key\": \"YOUR_KEY\", \"event_action\": \"trigger\", \"dedup_key\": \"$NETDATA_ALARM_NAME\"}"
+        -d "{\"routing_key\": \"YOUR_KEY\", \"event_action\": \"trigger\", \"dedup_key\": \"$NETDATA_ALARM_NAME\", \"payload\": {\"summary\": \"Netdata alert $NETDATA_ALARM_NAME\", \"source\": \"$NETDATA_HOST\", \"severity\": \"critical\"}}"
 fi
 ```
 
