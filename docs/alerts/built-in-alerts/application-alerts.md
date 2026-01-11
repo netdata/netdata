@@ -2,7 +2,11 @@
 
 Application alerts cover common database, web server, cache, and message queue technologies. Each application has unique metrics that indicate health and performance.
 
-## Database Alerts
+:::note
+Application alerts require the appropriate database or service collector to be enabled. Check the **Collectors** tab in the dashboard to verify your application collectors are running.
+:::
+
+## 11.3.1 Database Alerts
 
 Databases are typically the most critical components in an infrastructure, and their alerts reflect this importance.
 
@@ -68,7 +72,7 @@ Catches eviction-based memory pressure, which indicates the working set exceeds 
 **Context:** `redis.keys`
 **Thresholds:** WARN > 0
 
-## Web Server Alerts
+## 11.3.2 Web Server Alerts
 
 ### Nginx
 
@@ -116,7 +120,7 @@ Monitors available worker threads to prevent connection queuing.
 **Context:** `apache.workers`
 **Thresholds:** WARN < 10% available
 
-## Cache Alerts
+## 11.3.3 Cache Alerts
 
 ### Memcached
 
@@ -134,7 +138,7 @@ Catches when items are being removed due to size limits.
 **Context:** `memcache.evictions`
 **Thresholds:** WARN > 0
 
-## Message Queue Alerts
+## 11.3.4 Message Queue Alerts
 
 ### RabbitMQ
 
@@ -167,3 +171,10 @@ Critical alert for partitions without leadership.
 
 **Context:** `kafka.replication`
 **Thresholds:** CRIT > 0
+
+## Related Sections
+
+- [11.1 System Resource Alerts](system-resource-alerts.md) - CPU, memory, disk, and load alerts
+- [11.2 Container Alerts](container-alerts.md) - Docker and Kubernetes monitoring
+- [11.4 Network Alerts](network-alerts.md) - Network interface and protocol monitoring
+- [11.5 Hardware Alerts](hardware-alerts.md) - Physical server and storage device alerts
