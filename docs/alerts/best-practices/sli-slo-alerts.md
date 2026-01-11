@@ -14,7 +14,7 @@ When designing alerts, ask: "What SLI does this alert protect?" If no SLI connec
 
 SLOs define acceptable service behavior. An SLO might state that 99.9% of requests complete within 500ms. Alerts should fire before SLO violations occur.
 
-For an SLO with 99.9% availability, alerts should fire when availability drops below 99.9%. This allows investigation before the SLO is breached.
+For an SLO with 99.9% availability, configure alerts to trigger before availability drops below 99.9% (for example, at 99.95%) so there is time to investigate before the SLO is breached.
 
 The gap between alert threshold and SLO breach provides reaction time. This buffer prevents SLO breaches from becoming routine.
 
