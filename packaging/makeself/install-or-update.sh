@@ -130,6 +130,21 @@ progress "Install (but not enable) netdata updater tool"
 install_netdata_updater || run_failed "Cannot install netdata updater tool."
 
 # -----------------------------------------------------------------------------
+progress "Cleaning up old dashboard files"
+
+NETDATA_WEB_DIR="/opt/netdata/usr/share/netdata/web"
+
+if [ -r "${NETDATA_WEB_DIR}/.MANIFEST" ]; then
+  tmp_manifest="/opt/netdata/.nd-dashboard-manifest"
+  old_pwd="$(pwd)"
+  grep -vE "^$" "${NETDATA_WEB_DIR}/.MANIFEST" > "${tmp_manifest}"
+  cd "${NETDATA_WEB_DIR}" && remove_files="$(find "." -type f -print0 | grep -vzFf "${tmp_manifest}")"
+  cd "${old_pwd}" || true
+  [ -n "${remove_files}" ] && echo "${remove_files}" | xargs -0 rm -f
+  rm -f "${tmp_manifest}"
+fi
+
+# -----------------------------------------------------------------------------
 progress "creating quick links"
 
 dir_should_be_link() {
