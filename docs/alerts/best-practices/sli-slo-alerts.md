@@ -1,6 +1,6 @@
-# 12.8 SLIs, SLOs, and Alert Design
+# 12.5 SLIs, SLOs, and How They Relate to Alerts
 
-Service level indicators and objectives provide a framework for connecting alerts to business outcomes.
+Service level indicators and objectives provide a framework for connecting alerts to business outcomes. This connection ensures that alerting investment focuses on what matters to the business.
 
 ## Defining SLIs for Your Services
 
@@ -16,8 +16,14 @@ SLOs define acceptable service behavior. An SLO might state that 99.9% of reques
 
 For an SLO with 99.9% availability, alerts should fire when availability drops below 99.9%. This allows investigation before the SLO is breached.
 
+The gap between alert threshold and SLO breach provides reaction time. This buffer prevents SLO breaches from becoming routine.
+
 Use historical data to calibrate SLO-based thresholds. Analyze SLI behavior over time to identify the relationship between warning signs and actual breaches.
 
 ## Connecting Alerts to Business Impact
 
 Alerts should eventually connect to business impact. An alert that fires with no business impact wastes responder time; an alert connecting to revenue impact or user experience gets appropriate attention.
+
+Define business impact categories for your organization. Map alerts to these categories during alert design. This mapping helps prioritization during incident response.
+
+Connect alert thresholds to business objectives. For example, an HTTP error rate alert might trigger at 0.3% because 0.3% error rate impacts an SLO of 99.9% availability.
