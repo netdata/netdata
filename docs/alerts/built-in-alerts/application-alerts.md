@@ -2,168 +2,70 @@
 
 Application alerts cover common database, web server, cache, and message queue technologies. Each application has unique metrics that indicate health and performance.
 
-## Database Alerts
+:::note
+Application alerts require the corresponding collector to be enabled (MySQL, PostgreSQL, Nginx, Redis, etc.).
+:::
+
+## 11.3.1 Database Alerts
 
 Databases are typically the most critical components in an infrastructure, and their alerts reflect this importance.
 
 ### MySQL and MariaDB
 
-#### mysql_gtid_binlog_gtid_0
-
-Tracks whether the GTID position is advancing, catching replication stalls immediately.
-
-**Context:** `mysql.gtid`
-**Thresholds:** WARN > 0 lag
-
-#### mysql_slow_queries
-
-Identifies workloads generating excessive slow query traffic, which often precedes performance degradation.
-
-**Context:** `mysql.global_status`
-**Thresholds:** WARN > 5/s
-
-#### mysql_innodb_buffer_pool_bytes
-
-Monitors InnoDB buffer pool usage to prevent memory pressure on buffer pool-intensive workloads.
-
-**Context:** `mysql.innodb`
-**Thresholds:** WARN > 90%
+| Alert | Context | Thresholds | Purpose |
+|-------|---------|------------|---------|
+| mysql_gtid_binlog_gtid_0 | `mysql.gtid` | WARN > 0 lag | Track replication stalls |
+| mysql_slow_queries | `mysql.global_status` | WARN > 5/s | Identify slow workloads |
+| mysql_innodb_buffer_pool_bytes | `mysql.innodb` | WARN > 90% | Monitor buffer pool usage |
 
 ### PostgreSQL
 
-#### pg_stat_database_deadlocks
+| Alert | Context | Thresholds | Purpose |
+|-------|---------|------------|---------|
+| pg_connections | `pg.stat.activity` | WARN > 80% max | Track connection exhaustion |
+| pg_replication_lag | `pg.replication` | WARN > 10s | Monitor replication delay |
+| pg_xlog_delay | `pg.xlog` | WARN > 100MB | Track WAL backlog |
 
-Detects deadlocks that indicate concurrent transaction conflicts.
+## 11.3.2 Web Server Alerts
 
-**Context:** `pg.stat_database`
-**Thresholds:** WARN > 0
-
-#### pg_stat_database_connections
-
-Tracks connection pool saturation to prevent connection exhaustion.
-
-**Context:** `pg.stat_database`
-**Thresholds:** WARN > 80% of max
-
-#### pg_replication_lag
-
-Monitors streaming replication lag to prevent data inconsistency.
-
-**Context:** `pg.replication`
-**Thresholds:** WARN > 10s, CRIT > 60s
-
-### Redis
-
-#### redis_memory_fragmentation
-
-Detects when memory fragmentation exceeds 1.5, indicating the allocator is struggling with the workload pattern.
-
-**Context:** `redis.mem`
-**Thresholds:** WARN > 1.5
-
-#### redis_evictions
-
-Catches eviction-based memory pressure, which indicates the working set exceeds capacity.
-
-**Context:** `redis.keys`
-**Thresholds:** WARN > 0
-
-## Web Server Alerts
+Web server alerts focus on request processing and error rates.
 
 ### Nginx
 
-#### nginx_requests
-
-Tracks request throughput as a baseline health indicator. A sudden change indicates availability problems.
-
-**Context:** `nginx.requests`
-**Thresholds:** WARN > 10000/s
-
-#### nginx_connections_active
-
-Monitors active connections against worker limits to prevent connection exhaustion.
-
-**Context:** `nginx.connections`
-**Thresholds:** WARN > 80% of limit
-
-#### nginx_4xx_requests
-
-Tracks client error rates which may indicate client problems or configuration errors.
-
-**Context:** `nginx.requests`
-**Thresholds:** WARN > 1%, CRIT > 5%
-
-#### nginx_5xx_requests
-
-Tracks server error rates which indicate server problems requiring investigation.
-
-**Context:** `nginx.requests`
-**Thresholds:** WARN > 0.1%, CRIT > 1%
+| Alert | Context | Thresholds | Purpose |
+|-------|---------|------------|---------|
+| nginx_connections_accepted | `nginx.connections` | WARN > capacity | Detect connection limits |
+| nginx_requests | `nginx.requests` | WARN > 10000/s | Monitor request volume |
+| nginx_upstream_5xx | `nginx.upstream` | WARN > 1% | Track backend errors |
 
 ### Apache
 
-#### apache_requests
+| Alert | Context | Thresholds | Purpose |
+|-------|---------|------------|---------|
+| apache_connections | `apache.connections` | WARN > max_workers | Detect worker exhaustion |
+| apache_requests_per_child | `apache.perchild` | WARN > 1000 | Monitor per-child load |
 
-Similar to nginx, tracks request throughput for baseline health.
+## 11.3.3 Cache and Message Queue Alerts
 
-**Context:** `apache.requests`
-**Thresholds:** WARN > 5000/s
+### Redis
 
-#### apache_idle_workers
-
-Monitors available worker threads to prevent connection queuing.
-
-**Context:** `apache.workers`
-**Thresholds:** WARN < 10% available
-
-## Cache Alerts
-
-### Memcached
-
-#### memcached_hit_rate
-
-Tracks the ratio of cache hits to total requests. A rate below 80% suggests the cache is not effective.
-
-**Context:** `memcache.hits`
-**Thresholds:** WARN < 80%
-
-#### memcached_evictions
-
-Catches when items are being removed due to size limits.
-
-**Context:** `memcache.evictions`
-**Thresholds:** WARN > 0
-
-## Message Queue Alerts
+| Alert | Context | Thresholds | Purpose |
+|-------|---------|------------|---------|
+| redis_memory_usage | `redis.memory` | WARN > 80% max | Track memory exhaustion |
+| redis_connected_clients | `redis.clients` | WARN > max_clients | Monitor client connections |
+| redis_keyspace_evictions | `redis.evictions` | WARN > 0 | Detect memory pressure |
 
 ### RabbitMQ
 
-#### rabbitmq_queue_messages_ready
+| Alert | Context | Thresholds | Purpose |
+|-------|---------|------------|---------|
+| rabbitmq_queue_messages_ready | `rabbitmq.queues` | WARN > 10000 | Track queue backlog |
+| rabbitmq_consumers | `rabbitmq.consumers` | WARN < 1 | Monitor consumer health |
+| rabbitmq_connection_channels | `rabbitmq.connections` | WARN > 1000/ch | Detect channel limits |
 
-Monitors messages ready for delivery to detect consumer backlog.
+## Related Sections
 
-**Context:** `rabbitmq.queue`
-**Thresholds:** WARN > 1000
-
-#### rabbitmq_queue_messages_unacknowledged
-
-Tracks unacknowledged messages indicating consumer problems.
-
-**Context:** `rabbitmq.queue`
-**Thresholds:** WARN > 100
-
-### Kafka
-
-#### kafka_under_replicated_partitions
-
-Monitors replication health to detect partition availability issues.
-
-**Context:** `kafka.replication`
-**Thresholds:** WARN > 0, CRIT > 0
-
-#### kafka_offline_partitions
-
-Critical alert for partitions without leadership.
-
-**Context:** `kafka.replication`
-**Thresholds:** CRIT > 0
+- [11.1 System Resource Alerts](system-resource-alerts.md) - CPU, memory, disk
+- [11.2 Hardware Alerts](hardware-alerts.md) - Disk SMART, sensors
+- [11.4 Network Alerts](network-alerts.md) - Interface monitoring
+- [11.5 Container Alerts](container-alerts.md) - Container metrics
