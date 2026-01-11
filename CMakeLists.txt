@@ -1414,6 +1414,8 @@ set(HEALTH_PLUGIN_FILES
         src/health/health.c
         src/health/health.h
         src/health/health_config.c
+        src/health/health-config-unittest.c
+        src/health/health-config-unittest.h
         src/health/health_json.c
         src/health/health_log.c
         src/health/health_prototypes.c
