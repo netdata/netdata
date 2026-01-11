@@ -2,7 +2,11 @@
 
 Container and orchestration alerts address the unique monitoring requirements of dynamic infrastructure. These alerts rely on collectors specific to container runtimes and orchestrators.
 
-## Docker Container Alerts
+:::note
+Container alerts require the appropriate collector to be enabled and collecting data. Check the **Collectors** tab in the dashboard to verify your container collectors are running.
+:::
+
+## 11.2.1 Docker Container Alerts
 
 Docker container alerts monitor both the runtime state of containers and their resource consumption.
 
@@ -41,7 +45,7 @@ Monitors restart counts which indicate application stability.
 **Context:** `docker.status`
 **Thresholds:** WARN > 3/hour, CRIT > 10/hour
 
-## Kubernetes Pod Alerts
+## 11.2.2 Kubernetes Pod Alerts
 
 Kubernetes pod alerts require the Netdata Kubernetes collector and provide visibility into pod health from the cluster perspective.
 
@@ -80,7 +84,7 @@ Fires when containers reach 90% of their configured memory limits.
 **Context:** `k8s.container.mem`
 **Thresholds:** WARN > 90% of limit
 
-## Kubernetes Node Alerts
+## 11.2.3 Kubernetes Node Alerts
 
 ### node_not_ready
 
@@ -102,3 +106,10 @@ Node memory pressure indicates the node is approaching memory exhaustion.
 
 **Context:** `k8s.node`
 **Thresholds:** WARN > 0
+
+## Related Sections
+
+- [11.1 Application Alerts](application-alerts.md) - Database, web server, cache, and message queue alerts
+- [11.3 Hardware Alerts](hardware-alerts.md) - Physical server and storage device alerts
+- [11.4 Network Alerts](network-alerts.md) - Network interface and protocol monitoring
+- [11.5 System Resource Alerts](system-resource-alerts.md) - CPU, memory, disk, and load alerts

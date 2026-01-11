@@ -2,7 +2,11 @@
 
 System resource alerts cover the fundamental building blocks of any server: CPU, memory, disk, network, and load. These alerts apply to every Netdata node and provide the baseline monitoring that every infrastructure should have.
 
-## CPU Alerts
+:::note
+System resource alerts are enabled by default on all Netdata installations. These alerts are foundational and apply to all nodes regardless of their role.
+:::
+
+## 11.1.1 CPU Alerts
 
 The CPU alerts monitor utilization, saturation, and scheduling behavior.
 
@@ -26,7 +30,7 @@ Detects when CPU frequency drops below 90% of the nominal maximum, which may ind
 **Context:** `system.cpu`
 **Thresholds:** WARN < 90% of max
 
-## Memory Alerts
+## 11.1.2 Memory Alerts
 
 Memory monitoring balances three competing concerns: availability for new allocations, pressure on cached data, and swapping activity that indicates the working set exceeds physical memory.
 
@@ -58,7 +62,7 @@ Provides the most sensitive early warning of memory exhaustion. Fires when avail
 **Context:** `system.ram`
 **Thresholds:** CRIT < 100MB
 
-## Disk Space Alerts
+## 11.1.3 Disk Space Alerts
 
 Disk space monitoring addresses space availability and inode exhaustion.
 
@@ -76,7 +80,7 @@ For filesystems with many small files, tracks inode exhaustion which can occur b
 **Context:** `disk.inodes`
 **Thresholds:** WARN > 80%, CRIT > 90%
 
-## Disk I/O Alerts
+## 11.1.4 Disk I/O Alerts
 
 Disk I/O monitoring catches performance problems that capacity metrics miss.
 
@@ -94,7 +98,7 @@ Average wait time for I/O operations. High latency indicates the disk cannot kee
 **Context:** `disk`
 **Thresholds:** WARN > 50ms, CRIT > 100ms
 
-## Network Interface Alerts
+## 11.1.5 Network Interface Alerts
 
 Network alerts focus on error conditions rather than throughput.
 
@@ -118,3 +122,10 @@ Detects when link negotiation resulted in speeds below expected maximum, indicat
 
 **Context:** `net.speed`
 **Thresholds:** WARN < nominal speed
+
+## Related Sections
+
+- [11.2 Container Alerts](container-alerts.md) - Docker and Kubernetes monitoring
+- [11.3 Network Alerts](network-alerts.md) - Network interface and protocol monitoring
+- [11.4 Hardware Alerts](hardware-alerts.md) - Physical server and storage device alerts
+- [11.5 Application Alerts](application-alerts.md) - Database, web server, cache, and message queue alerts
