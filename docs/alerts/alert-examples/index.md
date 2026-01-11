@@ -3,7 +3,9 @@
 This chapter provides **practical alert templates** you can adapt for common monitoring scenarios.
 
 :::tip
+
 These examples follow the structure established in **2.1 Quick Start: Create Your First Alert**. Use the Cloud UI or configuration files as preferred.
+
 :::
 
 ## What You'll Find in This Chapter
