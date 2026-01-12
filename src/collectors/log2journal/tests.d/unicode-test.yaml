@@ -1,0 +1,9 @@
+---
+# Unicode handling test
+pattern: "(?P<level>\\w+)\\s+(?P<user>[^\\s]+)\\s+(?P<message>.*)"
+
+inject:
+  - key: UNICODE_EMOJI
+    value: "🚀 ${user} 🎉"
+  - key: UNICODE_MIXED  
+    value: "User: ${user}, Message: ${message}"

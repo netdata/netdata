@@ -1,0 +1,27 @@
+---
+# Advanced filter feature test  
+# Tests include/exclude patterns for key filtering
+
+pattern: "(?P<level>\\w+)\\s+(?P<module>\\w+)\\s+(?P<message>.*)"
+
+inject:
+  - key: KEEP_THIS
+    value: "should be included"
+  - key: EXCLUDE_THIS
+    value: "should be filtered out"
+  - key: ALSO_KEEP
+    value: "another kept value"
+
+rewrite:
+  - key: COMPUTED_VALUE
+    value: "level=${level} module=${module}"
+    inject: yes
+
+filter:
+  # Include anything that matches these patterns
+  include: "(level|module|KEEP_.*|COMPUTED_.*)"
+  # Exclude specific patterns
+  exclude: "EXCLUDE_.*"
+
+filename:
+  key: FILENAME

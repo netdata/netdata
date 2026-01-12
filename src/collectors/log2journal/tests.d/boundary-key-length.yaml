@@ -1,0 +1,9 @@
+pattern: '(?P<MESSAGE>.*)'
+
+inject:
+  - key: EXACTLY_64_CHARS_1234567890123456789012345678901234567890123456
+    value: 'max_length'
+  - key: TOO_LONG_KEY_NAME_THAT_EXCEEDS_THE_MAXIMUM_ALLOWED_LENGTH_OF_64_CHARACTERS_FOR_JOURNAL_FIELDS
+    value: 'exceeds_limit'
+  - key: SHORT
+    value: 'ok'

@@ -1,0 +1,56 @@
+# Test duplicate key handling differences between parsers
+pattern: "(?P<level>\\w+)\\s+(?P<message>.*)"
+
+# Test duplicate keys in inject arrays (should deduplicate, last wins)
+inject:
+  - key: DUPLICATE_INJECT
+    value: "first_value"
+  - key: NORMAL_KEY
+    value: "normal"
+  - key: DUPLICATE_INJECT
+    value: "second_value"
+  - key: DUPLICATE_INJECT
+    value: "third_value_should_win"
+
+# Test duplicate keys in rewrite arrays (all should execute if stop=no)
+rewrite:
+  - key: DUPLICATE_REWRITE
+    value: "first_rewrite"
+    inject: yes
+    stop: no
+    
+  - key: DUPLICATE_REWRITE
+    value: "${DUPLICATE_REWRITE}_second"
+    stop: no
+    
+  - key: DUPLICATE_REWRITE  
+    value: "${DUPLICATE_REWRITE}_third"
+    stop: yes
+    
+  - key: DUPLICATE_REWRITE
+    value: "should_not_apply_due_to_stop"
+    
+  # Test duplicate with different conditions
+  - key: CONDITIONAL_DUPLICATE
+    match: "ERROR"
+    value: "error_case"
+    inject: yes
+    
+  - key: CONDITIONAL_DUPLICATE
+    match: "INFO"
+    value: "info_case"
+    inject: yes
+
+# Test duplicate keys in rename arrays (first should win)
+rename:
+  - old_key: level
+    new_key: FIRST_RENAME
+    
+  - old_key: level
+    new_key: SECOND_RENAME_SHOULD_NOT_APPLY
+    
+  - old_key: message
+    new_key: MSG_FIRST
+    
+  - old_key: message
+    new_key: MSG_SECOND_IGNORED

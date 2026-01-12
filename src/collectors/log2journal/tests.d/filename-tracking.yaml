@@ -1,0 +1,27 @@
+pattern: "(?P<level>\\w+)\\s+(?P<message>.*)"
+
+# Test filename tracking feature
+filename:
+  key: LOG_FILENAME
+
+inject:
+  - key: HOSTNAME
+    value: "testhost"
+  - key: SERVICE
+    value: "testservice"
+
+rewrite:
+  # Add filename to message if present
+  - key: FULL_MESSAGE
+    value: "[${LOG_FILENAME}] ${level}: ${message}"
+    inject: yes
+    
+  # Extract filename parts
+  - key: LOG_FILENAME
+    match: ".*/([^/]+)$"
+    value: "${1}"
+    
+  - key: LOG_DIR
+    match: "^(.*)/[^/]+$"
+    value: "${1}"
+    inject: yes

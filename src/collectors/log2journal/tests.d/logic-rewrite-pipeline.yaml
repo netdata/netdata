@@ -1,0 +1,40 @@
+# Test rewrite pipeline logic - multiple rules, stop/continue behavior
+pattern: "(?P<level>\\w+)\\s+(?P<code>\\d+)\\s+(?P<message>.*)"
+
+rewrite:
+  # Test stop=yes behavior (default)
+  - key: level
+    match: "ERROR"
+    value: "CRITICAL"
+    # stop: yes is default
+    
+  - key: level  
+    match: ".*"
+    value: "SHOULD_NOT_APPLY"  # This should not apply because previous rule stopped
+    
+  # Test stop=no behavior
+  - key: code
+    match: "(\\d+)"
+    value: "CODE_${1}"
+    stop: no
+    
+  - key: code
+    match: "CODE_(\\d+)"
+    value: "FORMATTED_${1}"
+    # This should apply because previous rule didn't stop
+    
+  # Test injection with rewrite
+  - key: SEVERITY_SCORE
+    value: "1"
+    inject: yes
+    stop: no
+    
+  - key: SEVERITY_SCORE
+    match: "1"
+    value: "2"
+    stop: no
+    
+  - key: SEVERITY_SCORE
+    match: "2" 
+    value: "3"
+    # Final value should be 3

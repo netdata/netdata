@@ -1,0 +1,1 @@
+level=info msg="Server started" port=8080 timeout="30s" tags="web,api" empty="" quoted_spaces="hello world" special_chars="key=value&data" boolean=true number=42.5

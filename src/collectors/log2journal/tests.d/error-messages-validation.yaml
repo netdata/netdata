@@ -1,0 +1,21 @@
+---
+# Error message validation test
+# Tests that error messages are consistent and helpful
+
+pattern: "(?P<data>.*)"
+
+inject:
+  VALID_INJECT: "This should work"
+
+filename:
+  key: FILENAME
+
+# Missing required match field - should generate specific error
+rewrite:
+  - key: MESSAGE
+    value: 'This rewrite has no match'
+
+# Invalid regex - should generate PCRE2 error  
+  - key: MESSAGE
+    match: '[unclosed'
+    value: 'Invalid regex test'

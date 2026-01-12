@@ -1,0 +1,7 @@
+CLINEWKEY1=value1
+CLINEWKEY2=value2
+CONFIG_KEY1=config_value1
+CONFIG_KEY2=config_value2
+LEVEL=INFO
+MESSAGE=test message
+

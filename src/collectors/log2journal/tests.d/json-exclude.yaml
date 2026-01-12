@@ -1,0 +1,6 @@
+---
+# JSON parsing with exclusion filter
+pattern: 'json'
+
+filter:
+  exclude: '^ARRAY_'

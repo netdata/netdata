@@ -1,0 +1,8 @@
+MESSAGE=Failed password for invalid user admin from 192.168.1.100 port 22 ssh2
+PRIORITY=6
+SYSLOG_HOSTNAME=webserver
+SYSLOG_IDENTIFIER=sshd
+SYSLOG_PID=1234
+SYSLOG_TAG=sshd
+SYSLOG_TIMESTAMP=Jan 15 10:30:25
+

@@ -1,0 +1,6 @@
+DUPLICATE_INJECT=first_valuesecond_valuethird_value_should_win
+DUPLICATE_REWRITE=_third
+LEVEL=ERROR
+MESSAGE=Test message
+NORMAL_KEY=normal
+

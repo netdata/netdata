@@ -1,0 +1,30 @@
+pattern: |
+  (?x)
+  ^Complex \s+ log: \s+
+  (?P<USER_EMAIL>(?P<USER_NAME>[^@]+)@(?P<USER_DOMAIN>[^ ]+)) \s+
+  accessed \s+
+  (?P<API_PATH>/[^ ?]+)(?:\?(?P<QUERY_PARAMS>[^ ]+))? \s+
+  with \s+ IP \s+ (?P<CLIENT_IP>(?P<IP_OCTETS>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})) \s+
+  at \s+ (?P<TIMESTAMP>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z) \s+
+  status=(?P<STATUS_CODE>\d+) \s+
+  time=(?P<RESPONSE_TIME_MS>\d+)ms
+
+inject:
+  - key: MESSAGE
+    value: 'API access by ${USER_EMAIL} to ${API_PATH}'
+  - key: SYSLOG_IDENTIFIER
+    value: api-server
+
+rewrite:
+  - key: PRIORITY
+    match: '^[123]'
+    value: 6
+  - key: PRIORITY
+    match: '^4'
+    value: 4
+  - key: PRIORITY
+    match: '^5'
+    value: 3
+  - key: STATUS_FAMILY
+    match: '^(?P<first_digit>[1-5])'
+    value: '${first_digit}xx'

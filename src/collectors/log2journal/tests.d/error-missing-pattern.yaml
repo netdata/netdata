@@ -1,0 +1,11 @@
+# Test configuration without required pattern field
+# This should generate an error
+
+inject:
+  - key: TEST_KEY
+    value: "some value"
+
+rewrite:
+  - key: ANOTHER_KEY
+    value: "test"
+    inject: yes

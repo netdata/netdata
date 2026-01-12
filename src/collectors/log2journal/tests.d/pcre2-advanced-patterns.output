@@ -1,0 +1,13 @@
+API_PATH=/api/v1/users
+CLIENT_IP=192.168.1.100
+IP_OCTETS=192.168.1.100
+MESSAGE=API access by user@example.com to /api/v1/users
+QUERY_PARAMS=limit=50&offset=100
+RESPONSE_TIME_MS=150
+STATUS_CODE=200
+SYSLOG_IDENTIFIER=api-server
+TIMESTAMP=2024-01-15T10:30:25Z
+USER_DOMAIN=example.com
+USER_EMAIL=user@example.com
+USER_NAME=user
+
