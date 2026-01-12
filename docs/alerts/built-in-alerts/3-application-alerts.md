@@ -151,22 +151,6 @@ Tracks unacknowledged messages indicating consumer problems.
 **Context:** `rabbitmq.queue`
 **Thresholds:** WARN > 100
 
-### Kafka
-
-#### kafka_under_replicated_partitions
-
-Monitors replication health to detect partition availability issues.
-
-**Context:** `kafka.replication`
-**Thresholds:** WARN > 0, CRIT > 0
-
-#### kafka_offline_partitions
-
-Critical alert for partitions without leadership.
-
-**Context:** `kafka.under_replicated_partitions`
-**Thresholds:** CRIT > 0
-
 ## Related Sections
 
 - [11.1 System Resource Alerts](1-system-resource-alerts.md) - CPU, memory, disk, and load alerts

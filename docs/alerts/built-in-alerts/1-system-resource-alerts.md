@@ -54,7 +54,7 @@ Tracks utilization percentage from the complementary perspective. Useful for ide
 
 Monitors swap space usage for systems with swap configured. Significant swap activity indicates working set exceeds physical memory.
 
-**Context:** `system.swap`
+**Context:** `mem.swap`
 **Thresholds:** WARN > 80%, CRIT > 95%
 
 ### low_memory_endanger
@@ -117,13 +117,6 @@ Tracks packet drops indicating the interface buffer filled faster than processin
 
 **Context:** `net.drops`
 **Thresholds:** WARN > 0, CRIT > 100
-
-### network_interface_speed
-
-Detects when link negotiation resulted in speeds below expected maximum, indicating configuration problems.
-
-**Context:** `net.speed`
-**Thresholds:** WARN < nominal speed
 
 ## Related Sections
 
