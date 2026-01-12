@@ -287,6 +287,10 @@ void nd_log_reopen_log_files(bool log) {
     if(log)
         netdata_log_info("Reopening all log files.");
 
+    // Flush async queue before reinitializing log destinations
+    // This ensures all pending messages are written to old fds before they're closed
+    nd_log_queue_flush();
+
     nd_log_initialize();
 
     if(log)
