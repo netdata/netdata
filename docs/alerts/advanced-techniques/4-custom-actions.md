@@ -3,11 +3,11 @@
 ## 8.4.1 Basic exec Syntax
 
 ```conf
-template: service_down
+template: service_failed
     on: systemd.service_unit_state
-lookup: average -1m of value
+    calc: $failed
     every: 1m
-     crit: $this == 0
+     crit: $this == 1
        exec: /usr/local/bin/alert-handler.sh
        to: ops-team
 ```

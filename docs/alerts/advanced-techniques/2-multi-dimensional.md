@@ -3,11 +3,11 @@
 ## 8.2.1 Dimension Selection
 
 ```conf
-template: network_quality
-    on: net.net
-lookup: average -1m of errors,dropped
+template: network_errors
+    on: net.errors
+lookup: average -1m of inbound,outbound
     every: 1m
-     warn: $errors > 10
+     warn: $this > 10
 ```
 
 ## 8.2.2 Scaling to All Instances
@@ -16,8 +16,8 @@ Templates automatically create one alert per matching chart.
 
 ```conf
 template: interface_errors
-    on: net.net
-lookup: average -5m of errors
+    on: net.errors
+lookup: average -5m of inbound
     every: 1m
      warn: $this > 10
 ```
