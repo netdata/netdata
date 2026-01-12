@@ -3,7 +3,9 @@
 Application alerts cover common database, web server, cache, and message queue technologies. Each application has unique metrics that indicate health and performance.
 
 :::note
+
 Application alerts require the appropriate database or service collector to be enabled. Check the **Collectors** tab in the dashboard to verify your application collectors are running.
+
 :::
 
 ## 11.3.1 Database Alerts

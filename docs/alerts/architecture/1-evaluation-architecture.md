@@ -3,7 +3,9 @@
 Alert evaluation is the process of checking metric values against configured conditions and determining alert status. This process happens entirely on the Agent or Parent node that owns the metrics.
 
 :::note
+
 Alert evaluation is local to each Agent. Netdata Cloud receives state changes but does not re-evaluate alerts.
+
 :::
 
 ## 13.1.1 Metric Collection Pipeline

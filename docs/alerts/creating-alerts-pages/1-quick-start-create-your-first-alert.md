@@ -88,11 +88,14 @@ Health configuration reloaded
 ```
 
 :::note
+
 If `netdatacli` is not available, restart the Netdata service:
 
 ```bash
 sudo systemctl restart netdata
 ```
+
+:::
 :::
 
 **Step 5: Verify the Alert Loaded**

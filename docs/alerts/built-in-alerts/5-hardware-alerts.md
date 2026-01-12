@@ -3,7 +3,9 @@
 Hardware monitoring provides visibility into infrastructure that is often neglected until failure occurs. These alerts protect physical infrastructure health.
 
 :::note
+
 Hardware monitoring requires collector support for your specific hardware. Check that IPMI, SMART, and sensor collectors are enabled for your platform.
+
 :::
 
 ## 11.5.1 RAID Monitoring

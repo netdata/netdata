@@ -3,7 +3,9 @@
 Container and orchestration alerts address the unique monitoring requirements of dynamic infrastructure. These alerts rely on collectors specific to container runtimes and orchestrators.
 
 :::note
+
 Container alerts require the appropriate collector to be enabled and collecting data. Check the **Collectors** tab in the dashboard to verify your container collectors are running.
+
 :::
 
 ## 11.2.1 Docker Container Alerts

@@ -3,7 +3,9 @@
 Network alerts focus on endpoints and services rather than interface statistics. These alerts ensure that network-dependent services remain reachable.
 
 :::note
+
 Network connectivity alerts require specific endpoints to be configured. Add the hosts, ports, or URLs you want to monitor using the appropriate collector configuration.
+
 :::
 
 ## 11.4.1 Ping and Latency Monitoring

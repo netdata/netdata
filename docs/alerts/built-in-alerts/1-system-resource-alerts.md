@@ -3,7 +3,9 @@
 System resource alerts cover the fundamental building blocks of any server: CPU, memory, disk, network, and load. These alerts apply to every Netdata node and provide the baseline monitoring that every infrastructure should have.
 
 :::note
+
 System resource alerts are enabled by default on all Netdata installations. These alerts are foundational and apply to all nodes regardless of their role.
+
 :::
 
 ## 11.1.1 CPU Alerts

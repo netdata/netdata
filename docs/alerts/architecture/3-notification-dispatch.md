@@ -3,7 +3,9 @@
 When an alert fires, the notification system handles delivery to configured destinations.
 
 :::note
+
 Notification delivery is asynchronous. Queue overflow can cause event loss. Monitor queue utilization for production systems.
+
 :::
 
 ## 13.4.1 Notification Queue
