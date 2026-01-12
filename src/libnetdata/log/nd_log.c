@@ -241,6 +241,9 @@ static bool nd_logger_log_fields_async(FILE *fp, bool limit, ND_LOG_FIELD_PRIORI
         .format = source->format,
         .fp = fp,
         .fd = nd_log.journal_direct.fd,
+        .journal_direct_initialized = nd_log.journal_direct.initialized,
+        .journal_libsystemd_initialized = nd_log.journal.initialized,
+        .syslog_initialized = nd_log.syslog.initialized,
         .message_len = 0,
         .message_allocated = NULL,
     };
