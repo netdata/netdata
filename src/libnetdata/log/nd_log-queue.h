@@ -48,6 +48,7 @@ bool nd_log_queue_init(void);
 
 // Shutdown the async logging queue
 // If flush is true, waits for all pending messages to be written
+// Returns when logger thread has acknowledged shutdown and exited
 void nd_log_queue_shutdown(bool flush);
 
 // Check if async logging is enabled
