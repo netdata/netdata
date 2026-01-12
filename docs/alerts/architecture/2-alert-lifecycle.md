@@ -3,7 +3,9 @@
 Understanding alert lifecycle helps in troubleshooting and in designing effective alert strategies.
 
 :::note
+
 The alert lifecycle is local to each Agent. Cloud receives state changes but does not re-evaluate alert conditions.
+
 :::
 
 ## 13.3.1 Initial Evaluation

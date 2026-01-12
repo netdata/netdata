@@ -3,7 +3,9 @@
 Alert configuration and notification configuration are independent concerns. An alert can fire correctly yet never reach the right people if notifications are misconfigured.
 
 :::tip
+
 Define clear ownership for every alert. When an alert fires, who receives it? If multiple people could respond, who should lead?
+
 :::
 
 ## 12.2.1 Routing Alerts to the Right People

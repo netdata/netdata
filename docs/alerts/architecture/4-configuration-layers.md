@@ -3,7 +3,9 @@
 Netdata supports multiple configuration layers for health alerts. Understanding precedence rules helps in making modifications that take effect as intended.
 
 :::important
+
 Stock configuration files in `/usr/lib/netdata/conf.d/health.d/` are overwritten during upgrades. Always place custom alerts in `/etc/netdata/health.d/`.
+
 :::
 
 ## 13.2.1 Stock Configuration Layer

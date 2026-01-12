@@ -3,7 +3,9 @@
 Service level indicators and objectives provide a framework for connecting alerts to business outcomes. This connection ensures that alerting investment focuses on what matters to the business.
 
 :::tip
+
 When designing any alert, ask: "What SLI does this alert protect?" If no SLI connects to the alert, reconsider whether it serves a purpose.
+
 :::
 
 ## 12.5.1 Defining SLIs for Your Services

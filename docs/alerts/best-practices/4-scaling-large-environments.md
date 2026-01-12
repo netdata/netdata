@@ -3,7 +3,9 @@
 Large environments face different challenges than small ones. Alert volume scales with environment size, and manual management becomes impossible.
 
 :::note
+
 In large environments, template-based configuration and automation are essential for sustainable alert management.
+
 :::
 
 ## 12.4.1 Template-Based Alert Configuration

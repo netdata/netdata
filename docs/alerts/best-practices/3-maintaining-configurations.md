@@ -3,7 +3,9 @@
 Alert configurations require ongoing maintenance to remain aligned with the environment they monitor. Without regular attention, they drift out of alignment and may miss genuine problems or generate excessive noise.
 
 :::note
+
 Schedule quarterly reviews to verify thresholds match current workloads and notification routing remains accurate.
+
 :::
 
 ## 12.3.1 Version Control for Alert Configurations
