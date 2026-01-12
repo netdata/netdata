@@ -31,8 +31,8 @@ lookup: average -1h of used
 
 ```conf
 template: connection_spike
-    on: net.connections
-lookup: average -1m of curr
+    on: net.packets
+lookup: average -1m of received
     every: 1m
  calc: abs($this - $this(-5m)) / $this(-5m) * 100
      warn: $this > 50

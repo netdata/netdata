@@ -18,8 +18,8 @@ lookup: average -5m of user,system,softirq,irq,guest
 
 ```conf
 template: ram_low_available
-    on: system.ram
-lookup: average -5m of available
+    on: mem.available
+lookup: average -5m of avail
     units: MB
     every: 1m
      warn: $this < 1024

@@ -19,7 +19,7 @@ Requires ML enabled with sufficient historical data.
 ```conf
 template: traffic_anomaly
     on: net.net
-lookup: average -5m of bandwidth
+lookup: average -5m of received
     units: Mbps
     every: 1m
      warn: ($this > ($this - 10m + 2 * $stddev)) && ($this > 100)

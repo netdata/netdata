@@ -89,13 +89,13 @@ This sends notifications once per day while the alert is active—not once per m
 ## 4.4.4 Combining Delay and Repeat
 
 ```conf
-template: service_health
-   on: health.service
-   lookup: average -3m of status
-   every: 1m
-   crit: $this == 0
-   delay: up 10m down 2m
-   repeat: 6h
+template: port_response_slow
+    on: portcheck.status
+    lookup: average -3m of time
+    every: 1m
+    warn: $this > 1000
+    delay: up 10m down 2m
+    repeat: 6h
 ```
 
 **Behavior:**
@@ -123,7 +123,7 @@ This means:
 - **Entering CRITICAL:** needs >95%
 - **Staying in CRITICAL:** tolerates up to 98%
 
-See **8.1 Hysteresis and Status-Based Conditions** for more examples.
+See **8.1 Hysteresis and Status-Based Conditions** for more examples of status-dependent thresholds.
 
 ## 4.4.6 Related Sections
 
