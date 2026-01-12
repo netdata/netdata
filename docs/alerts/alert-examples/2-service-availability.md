@@ -27,13 +27,13 @@ lookup: average -1m of bad_status
 
 ```conf
 template: collector_stale
-    on: health.collector
-lookup: average -5m of age
-    units: seconds
+    on: netdata.plugin_availability_status
+     calc: $now - $last_collected_t
+    units: seconds ago
     every: 1m
      warn: $this > 300
      crit: $this > 600
-       to: ops-team
+        to: ops-team
 ```
 
 ## 6.2.4 Related Sections

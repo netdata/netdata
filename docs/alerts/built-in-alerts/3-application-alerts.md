@@ -34,14 +34,14 @@ Identifies workloads generating excessive slow query traffic, which often preced
 
 Detects deadlocks that indicate concurrent transaction conflicts.
 
-**Context:** `postgres.stat_database`
+**Context:** `postgres.db_deadlocks_rate`
 **Thresholds:** WARN > 0
 
 #### pg_stat_database_connections
 
 Tracks connection pool saturation to prevent connection exhaustion.
 
-**Context:** `postgres.stat_database`
+**Context:** `postgres.connections_utilization`
 **Thresholds:** WARN > 80% of max
 
 #### pg_replication_lag
@@ -57,14 +57,14 @@ Monitors streaming replication lag to prevent data inconsistency.
 
 Detects when memory fragmentation exceeds 1.5, indicating the allocator is struggling with the workload pattern.
 
-**Context:** `redis.mem`
+**Context:** `redis.mem_fragmentation_ratio`
 **Thresholds:** WARN > 1.5
 
 #### redis_evictions
 
 Catches eviction-based memory pressure, which indicates the working set exceeds capacity.
 
-**Context:** `redis.keys`
+**Context:** `redis.key_eviction_events`
 **Thresholds:** WARN > 0
 
 ## 11.3.2 Web Server Alerts
@@ -164,7 +164,7 @@ Monitors replication health to detect partition availability issues.
 
 Critical alert for partitions without leadership.
 
-**Context:** `kafka.partition_under_replicated`
+**Context:** `kafka.under_replicated_partitions`
 **Thresholds:** CRIT > 0
 
 ## Related Sections
