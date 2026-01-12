@@ -40,6 +40,6 @@ Use `netdatacli health configuration` to view the effective merged configuration
 
 ## Related Sections
 
-- [13.1 Alert Lifecycle](alert-lifecycle.md) - How alerts transition states
-- [13.3 Evaluation Architecture](evaluation-architecture.md) - Where alerts are evaluated
-- [13.5 Scaling Topologies](scaling-topologies.md) - Behavior in distributed setups
+- [13.1 Alert Lifecycle](2-alert-lifecycle.md) - How alerts transition states
+- [13.3 Evaluation Architecture](1-evaluation-architecture.md) - Where alerts are evaluated
+- [13.5 Scaling Topologies](5-scaling-topologies.md) - Behavior in distributed setups

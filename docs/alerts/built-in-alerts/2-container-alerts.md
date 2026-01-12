@@ -109,7 +109,7 @@ Node memory pressure indicates the node is approaching memory exhaustion.
 
 ## Related Sections
 
-- [11.1 Application Alerts](application-alerts.md) - Database, web server, cache, and message queue alerts
-- [11.3 Hardware Alerts](hardware-alerts.md) - Physical server and storage device alerts
-- [11.4 Network Alerts](network-alerts.md) - Network interface and protocol monitoring
-- [11.5 System Resource Alerts](system-resource-alerts.md) - CPU, memory, disk, and load alerts
+- [11.1 Application Alerts](3-application-alerts.md) - Database, web server, cache, and message queue alerts
+- [11.3 Hardware Alerts](5-hardware-alerts.md) - Physical server and storage device alerts
+- [11.4 Network Alerts](4-network-alerts.md) - Network interface and protocol monitoring
+- [11.5 System Resource Alerts](1-system-resource-alerts.md) - CPU, memory, disk, and load alerts

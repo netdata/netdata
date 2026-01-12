@@ -174,7 +174,7 @@ Critical alert for partitions without leadership.
 
 ## Related Sections
 
-- [11.1 System Resource Alerts](system-resource-alerts.md) - CPU, memory, disk, and load alerts
-- [11.2 Container Alerts](container-alerts.md) - Docker and Kubernetes monitoring
-- [11.4 Network Alerts](network-alerts.md) - Network interface and protocol monitoring
-- [11.5 Hardware Alerts](hardware-alerts.md) - Physical server and storage device alerts
+- [11.1 System Resource Alerts](1-system-resource-alerts.md) - CPU, memory, disk, and load alerts
+- [11.2 Container Alerts](2-container-alerts.md) - Docker and Kubernetes monitoring
+- [11.4 Network Alerts](4-network-alerts.md) - Network interface and protocol monitoring
+- [11.5 Hardware Alerts](5-hardware-alerts.md) - Physical server and storage device alerts

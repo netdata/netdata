@@ -38,6 +38,6 @@ Repeat intervals prevent notification storms while maintaining awareness of unre
 
 ## Related Sections
 
-- [13.2 Configuration Layers](configuration-layers.md) - How configurations are merged
-- [13.4 Notification Dispatch](notification-dispatch.md) - How notifications are delivered
-- [13.5 Scaling Topologies](scaling-topologies.md) - Alert behavior in different topologies
+- [13.2 Configuration Layers](4-configuration-layers.md) - How configurations are merged
+- [13.4 Notification Dispatch](3-notification-dispatch.md) - How notifications are delivered
+- [13.5 Scaling Topologies](5-scaling-topologies.md) - Alert behavior in different topologies

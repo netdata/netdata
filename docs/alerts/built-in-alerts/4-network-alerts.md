@@ -93,7 +93,7 @@ Monitors 95th percentile latency for SLA compliance.
 
 ## Related Sections
 
-- [11.1 Application Alerts](application-alerts.md) - Database, web server, cache, and message queue alerts
-- [11.2 Container Alerts](container-alerts.md) - Docker and Kubernetes monitoring
-- [11.3 Hardware Alerts](hardware-alerts.md) - Physical server and storage device alerts
-- [11.5 System Resource Alerts](system-resource-alerts.md) - CPU, memory, disk, and load alerts
+- [11.1 Application Alerts](3-application-alerts.md) - Database, web server, cache, and message queue alerts
+- [11.2 Container Alerts](2-container-alerts.md) - Docker and Kubernetes monitoring
+- [11.3 Hardware Alerts](5-hardware-alerts.md) - Physical server and storage device alerts
+- [11.5 System Resource Alerts](1-system-resource-alerts.md) - CPU, memory, disk, and load alerts
