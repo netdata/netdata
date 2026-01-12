@@ -153,6 +153,8 @@
 - Build(deps): bump gopkg.in/ini.v1 from 1.67.0 to 1.67.1 in /src/go ([#21535](https://github.com/netdata/netdata/issues/21535))
 - Build(deps): bump github.com/miekg/dns from 1.1.69 to 1.1.70 in /src/go ([#21536](https://github.com/netdata/netdata/issues/21536))
 - Build(deps): bump golang.org/x/text from 0.32.0 to 0.33.0 in /src/go ([#21534](https://github.com/netdata/netdata/issues/21534))
+- Add VM templates and clones documentation ([#21527](https://github.com/netdata/netdata/issues/21527))
+- Docs: Add documentation review findings for quick-start-create-your-first-alert.md
 
 ## [2.8.0] - 2025-11-19
 
