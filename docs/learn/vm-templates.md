@@ -6,8 +6,8 @@
 
 The commands in this guide **permanently delete**:
 - All historical metrics
-- [Node identity](node-identities.md#agent-self-identity)
-- [Cloud connection](node-identities.md#agent-cloud-link-aclk-identity)
+- [Node identity](/docs/learn/node-identities.md#agent-self-identity)
+- [Cloud connection](/docs/learn/node-identities.md#agent-cloud-link-aclk-identity)
 - Alert history
 
 **This is irreversible. There is no undo.**
