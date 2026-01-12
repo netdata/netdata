@@ -1,8 +1,8 @@
 // Central options registry: single source of truth for option names, scopes, defaults, and rendering
 // This module intentionally avoids importing other local modules to prevent cycles.
 
-type OptionType = 'number' | 'boolean' | 'string' | 'string[]';
-type OptionScope = 'masterOnly' | 'masterDefault' | 'allAgents' | 'global';
+type OptionType = "number" | "boolean" | "string" | "string[]";
+type OptionScope = "masterOnly" | "masterDefault" | "allAgents" | "global";
 
 interface OptionDef {
   key: string; // internal camelCase key
@@ -21,513 +21,601 @@ interface OptionDef {
 }
 
 // Helper to define boolean with common negation flag
-function boolDef(init: Omit<OptionDef, 'type' | 'default'> & { default?: boolean }): OptionDef {
-  return { ...init, type: 'boolean', default: init.default ?? false };
+function boolDef(
+  init: Omit<OptionDef, "type" | "default"> & { default?: boolean },
+): OptionDef {
+  return { ...init, type: "boolean", default: init.default ?? false };
 }
 
 // Helper to define number (default can be number or null for "don't send" semantics)
-function numDef(init: Omit<OptionDef, 'type'> & { default: number | null }): OptionDef {
-  return { ...init, type: 'number' };
+function numDef(
+  init: Omit<OptionDef, "type"> & { default: number | null },
+): OptionDef {
+  return { ...init, type: "number" };
 }
 
 // Helper to define string
-function strDef(init: Omit<OptionDef, 'type'> & { default?: string }): OptionDef {
-  return { ...init, type: 'string' };
+function strDef(
+  init: Omit<OptionDef, "type"> & { default?: string },
+): OptionDef {
+  return { ...init, type: "string" };
 }
 
 // Helper to define string array (frontmatter/cli logical)
-function strArrDef(init: Omit<OptionDef, 'type'> & { default?: string[] }): OptionDef {
-  return { ...init, type: 'string[]' };
+function strArrDef(
+  init: Omit<OptionDef, "type"> & { default?: string[] },
+): OptionDef {
+  return { ...init, type: "string[]" };
 }
 
 // Group name constants to dedupe strings
-const G_MASTER_OVERRIDES = 'Master Agent Overrides';
-const G_MASTER_DEFAULTS = 'Master Defaults';
-const G_ALL_MODELS = 'All Models Overrides';
-const G_GLOBAL = 'Global Controls';
+const G_MASTER_OVERRIDES = "Master Agent Overrides";
+const G_MASTER_DEFAULTS = "Master Defaults";
+const G_ALL_MODELS = "All Models Overrides";
+const G_GLOBAL = "Global Controls";
 
 export const OPTIONS_REGISTRY: OptionDef[] = [
   // Master Agent Overrides (strict)
   strArrDef({
-    key: 'models',
+    key: "models",
     default: [],
-    description: 'Which LLM models to use for the master agent (e.g., "openai/gpt-4o,anthropic/claude-3.5-sonnet"); tries each in order if one fails',
-    cli: { names: ['--models'], showInHelp: true },
-    fm: { allowed: true, key: 'models' },
-    scope: 'masterOnly',
+    description:
+      'Which LLM models to use for the master agent (e.g., "openai/gpt-4o,anthropic/claude-3.5-sonnet"); tries each in order if one fails',
+    cli: { names: ["--models"], showInHelp: true },
+    fm: { allowed: true, key: "models" },
+    scope: "masterOnly",
     groups: [G_MASTER_OVERRIDES],
   }),
   strDef({
-    key: 'expectedOutputSchema',
+    key: "expectedOutputSchema",
     default: undefined,
-    description: 'JSON schema for the expected JSON output (inline JSON or @path). Forces expectedOutput.format=json for the master agent.',
-    cli: { names: ['--schema'], showInHelp: true },
+    description:
+      "JSON schema for the expected JSON output (inline JSON or @path). Forces expectedOutput.format=json for the master agent.",
+    cli: { names: ["--schema"], showInHelp: true },
     fm: { allowed: false },
-    scope: 'masterOnly',
+    scope: "masterOnly",
     groups: [G_MASTER_OVERRIDES],
   }),
   strArrDef({
-    key: 'tools',
+    key: "tools",
     default: [],
-    description: 'Which tools the master agent can use (MCP servers, sub-agents, etc.); comma-separated list',
-    cli: { names: ['--tools', '--tool', '--mcp', '--mcp-tool', '--mcp-tools'], showInHelp: true },
-    fm: { allowed: true, key: 'tools' },
-    scope: 'masterOnly',
+    description:
+      "Which tools the master agent can use (MCP servers, sub-agents, etc.); comma-separated list",
+    cli: {
+      names: ["--tools", "--tool", "--mcp", "--mcp-tool", "--mcp-tools"],
+      showInHelp: true,
+    },
+    fm: { allowed: true, key: "tools" },
+    scope: "masterOnly",
     groups: [G_MASTER_OVERRIDES],
   }),
   strArrDef({
-    key: 'agents',
+    key: "agents",
     default: [],
-    description: 'Sub-agent .ai files to load as tools for the master agent; enables multi-agent composition',
-    cli: { names: ['--agents'], showInHelp: true },
-    fm: { allowed: true, key: 'agents' },
-    scope: 'masterOnly',
+    description:
+      "Sub-agent .ai files to load as tools for the master agent; enables multi-agent composition",
+    cli: { names: ["--agents"], showInHelp: true },
+    fm: { allowed: true, key: "agents" },
+    scope: "masterOnly",
+    groups: [G_MASTER_OVERRIDES],
+  }),
+  strArrDef({
+    key: "routerDestinations",
+    default: [],
+    description:
+      "Router destinations for task type routing (format: name:agentPath)",
+    cli: { names: ["--router-destinations"], showInHelp: false },
+    fm: { allowed: true, key: "routerDestinations" },
+    scope: "masterOnly",
+    groups: [G_MASTER_OVERRIDES],
+  }),
+  strArrDef({
+    key: "advisors",
+    default: [],
+    description:
+      "Advisor agents to consult (format: agentPath or taskType:agentPath)",
+    cli: { names: ["--advisors"], showInHelp: false },
+    fm: { allowed: true, key: "advisors" },
+    scope: "masterOnly",
+    groups: [G_MASTER_OVERRIDES],
+  }),
+  strArrDef({
+    key: "handoff",
+    default: [],
+    description: "Handoff configurations for agent delegation",
+    cli: { names: ["--handoff"], showInHelp: false },
+    fm: { allowed: true, key: "handoff" },
+    scope: "masterOnly",
     groups: [G_MASTER_OVERRIDES],
   }),
 
   // Master Defaults
   numDef({
-    key: 'llmTimeout',
+    key: "llmTimeout",
     default: 600000,
-    description: 'How long to wait for the LLM to respond (ms or duration like 5s/2m); default 2 minutes',
-    cli: { names: ['--llm-timeout-ms', '--llmTimeoutMs'], showInHelp: true },
-    fm: { allowed: true, key: 'llmTimeout' },
-    config: { path: 'defaults.llmTimeout' },
-    scope: 'masterDefault',
+    description:
+      "How long to wait for the LLM to respond (ms or duration like 5s/2m); default 2 minutes",
+    cli: { names: ["--llm-timeout-ms", "--llmTimeoutMs"], showInHelp: true },
+    fm: { allowed: true, key: "llmTimeout" },
+    config: { path: "defaults.llmTimeout" },
+    scope: "masterDefault",
     groups: [G_MASTER_DEFAULTS],
     numeric: { min: 0, integer: true },
   }),
   numDef({
-    key: 'toolTimeout',
+    key: "toolTimeout",
     default: 300000,
-    description: 'How long to wait for each tool call to complete (ms or duration like 5s/2m); default 5 minutes',
-    cli: { names: ['--tool-timeout-ms', '--toolTimeoutMs'], showInHelp: true },
-    fm: { allowed: true, key: 'toolTimeout' },
-    config: { path: 'defaults.toolTimeout' },
-    scope: 'masterDefault',
+    description:
+      "How long to wait for each tool call to complete (ms or duration like 5s/2m); default 5 minutes",
+    cli: { names: ["--tool-timeout-ms", "--toolTimeoutMs"], showInHelp: true },
+    fm: { allowed: true, key: "toolTimeout" },
+    config: { path: "defaults.toolTimeout" },
+    scope: "masterDefault",
     groups: [G_MASTER_DEFAULTS],
     numeric: { min: 0, integer: true },
   }),
   strDef({
-    key: 'cache',
+    key: "cache",
     default: undefined,
-    description: 'Response cache TTL (off|<ms>|<N.Nu> where u=ms,s,m,h,d,w,mo,y); set per agent or via CLI',
-    cli: { names: ['--cache'], showInHelp: true },
-    fm: { allowed: true, key: 'cache' },
-    scope: 'allAgents',
+    description:
+      "Response cache TTL (off|<ms>|<N.Nu> where u=ms,s,m,h,d,w,mo,y); set per agent or via CLI",
+    cli: { names: ["--cache"], showInHelp: true },
+    fm: { allowed: true, key: "cache" },
+    scope: "allAgents",
     groups: [G_MASTER_DEFAULTS],
     render: { showInFrontmatterTemplate: true },
   }),
   numDef({
-    key: 'toolResponseMaxBytes',
+    key: "toolResponseMaxBytes",
     default: 12288,
-    description: 'Maximum size of tool output to keep; longer outputs get truncated to avoid overwhelming the LLM context',
-    cli: { names: ['--tool-response-max-bytes', '--toolResponseMaxBytes'], showInHelp: true },
-    fm: { allowed: true, key: 'toolResponseMaxBytes' },
-    config: { path: 'defaults.toolResponseMaxBytes' },
-    scope: 'masterDefault',
+    description:
+      "Maximum size of tool output to keep; longer outputs get truncated to avoid overwhelming the LLM context",
+    cli: {
+      names: ["--tool-response-max-bytes", "--toolResponseMaxBytes"],
+      showInHelp: true,
+    },
+    fm: { allowed: true, key: "toolResponseMaxBytes" },
+    config: { path: "defaults.toolResponseMaxBytes" },
+    scope: "masterDefault",
     groups: [G_MASTER_DEFAULTS],
     numeric: { min: 0, integer: true },
   }),
   numDef({
-    key: 'temperature',
+    key: "temperature",
     default: 0.0,
-    description: 'Response creativity/variance (0=focused, 1=balanced, 2=wild); use none/off/unset/default/null to let provider decide',
-    cli: { names: ['--temperature'], showInHelp: true },
-    fm: { allowed: true, key: 'temperature' },
-    config: { path: 'defaults.temperature' },
-    scope: 'masterDefault',
+    description:
+      "Response creativity/variance (0=focused, 1=balanced, 2=wild); use none/off/unset/default/null to let provider decide",
+    cli: { names: ["--temperature"], showInHelp: true },
+    fm: { allowed: true, key: "temperature" },
+    config: { path: "defaults.temperature" },
+    scope: "masterDefault",
     groups: [G_MASTER_DEFAULTS],
     numeric: { min: 0, max: 2 },
   }),
   numDef({
-    key: 'topP',
+    key: "topP",
     default: null,
-    description: 'Token selection diversity (0.0-1.0); use none/off/unset/default/null to let provider decide (default: not sent)',
-    cli: { names: ['--top-p', '--topP'], showInHelp: true },
-    fm: { allowed: true, key: 'topP' },
-    config: { path: 'defaults.topP' },
-    scope: 'masterDefault',
+    description:
+      "Token selection diversity (0.0-1.0); use none/off/unset/default/null to let provider decide (default: not sent)",
+    cli: { names: ["--top-p", "--topP"], showInHelp: true },
+    fm: { allowed: true, key: "topP" },
+    config: { path: "defaults.topP" },
+    scope: "masterDefault",
     groups: [G_MASTER_DEFAULTS],
     numeric: { min: 0, max: 1 },
   }),
   numDef({
-    key: 'topK',
+    key: "topK",
     default: null,
-    description: 'Limits token selection to the K most probable tokens; use none/off/unset/default/null to let provider decide (default: not sent)',
-    cli: { names: ['--top-k', '--topK'], showInHelp: true },
-    fm: { allowed: true, key: 'topK' },
-    config: { path: 'defaults.topK' },
-    scope: 'masterDefault',
+    description:
+      "Limits token selection to the K most probable tokens; use none/off/unset/default/null to let provider decide (default: not sent)",
+    cli: { names: ["--top-k", "--topK"], showInHelp: true },
+    fm: { allowed: true, key: "topK" },
+    config: { path: "defaults.topK" },
+    scope: "masterDefault",
     groups: [G_MASTER_DEFAULTS],
     numeric: { min: 1, integer: true },
   }),
   strDef({
-    key: 'reasoning',
-    description: 'Reasoning effort level: none, minimal, low, medium, or high; leave unset to use provider defaults',
-    cli: { names: ['--reasoning'], showInHelp: true },
-    fm: { allowed: true, key: 'reasoning' },
-    scope: 'masterDefault',
+    key: "reasoning",
+    description:
+      "Reasoning effort level: none, minimal, low, medium, or high; leave unset to use provider defaults",
+    cli: { names: ["--reasoning"], showInHelp: true },
+    fm: { allowed: true, key: "reasoning" },
+    scope: "masterDefault",
     groups: [G_MASTER_DEFAULTS],
     render: { showInFrontmatterTemplate: true },
     default: undefined,
   }),
   strDef({
-    key: 'defaultReasoning',
-    description: 'Default reasoning for agents that omit it (use none|minimal|low|medium|high; default/unset clears).',
-    cli: { names: ['--default-reasoning'], showInHelp: true },
-    config: { path: 'defaults.reasoning' },
-    scope: 'masterDefault',
+    key: "defaultReasoning",
+    description:
+      "Default reasoning for agents that omit it (use none|minimal|low|medium|high; default/unset clears).",
+    cli: { names: ["--default-reasoning"], showInHelp: true },
+    config: { path: "defaults.reasoning" },
+    scope: "masterDefault",
     groups: [G_MASTER_DEFAULTS],
     default: undefined,
   }),
   strDef({
-    key: 'reasoningTokens',
-    description: 'Reasoning token budget for Anthropics thinking mode (0 disables).',
-    cli: { names: ['--reasoning-tokens'], showInHelp: true },
-    fm: { allowed: true, key: 'reasoningTokens' },
-    config: { path: 'defaults.reasoningValue' },
-    scope: 'masterDefault',
+    key: "reasoningTokens",
+    description:
+      "Reasoning token budget for Anthropics thinking mode (0 disables).",
+    cli: { names: ["--reasoning-tokens"], showInHelp: true },
+    fm: { allowed: true, key: "reasoningTokens" },
+    config: { path: "defaults.reasoningValue" },
+    scope: "masterDefault",
     groups: [G_MASTER_DEFAULTS],
     default: undefined,
   }),
   numDef({
-    key: 'maxOutputTokens',
+    key: "maxOutputTokens",
     default: 4096,
-    description: 'Maximum response length per turn; controls how long the agent\'s answers can be',
-    cli: { names: ['--max-output-tokens'], showInHelp: true },
-    fm: { allowed: true, key: 'maxOutputTokens' },
-    config: { path: 'defaults.maxOutputTokens' },
-    scope: 'masterDefault',
+    description:
+      "Maximum response length per turn; controls how long the agent's answers can be",
+    cli: { names: ["--max-output-tokens"], showInHelp: true },
+    fm: { allowed: true, key: "maxOutputTokens" },
+    config: { path: "defaults.maxOutputTokens" },
+    scope: "masterDefault",
     groups: [G_MASTER_DEFAULTS],
     numeric: { min: 1, integer: true },
   }),
   numDef({
-    key: 'repeatPenalty',
+    key: "repeatPenalty",
     default: null,
-    description: 'Reduces repetitive text (1.0=off, higher=stronger); use none/off/unset/default/null to let provider decide (default: not sent)',
-    cli: { names: ['--repeat-penalty'], showInHelp: true },
-    fm: { allowed: true, key: 'repeatPenalty' },
-    config: { path: 'defaults.repeatPenalty' },
-    scope: 'masterDefault',
+    description:
+      "Reduces repetitive text (1.0=off, higher=stronger); use none/off/unset/default/null to let provider decide (default: not sent)",
+    cli: { names: ["--repeat-penalty"], showInHelp: true },
+    fm: { allowed: true, key: "repeatPenalty" },
+    config: { path: "defaults.repeatPenalty" },
+    scope: "masterDefault",
     groups: [G_MASTER_DEFAULTS],
     numeric: { min: 0 },
   }),
   numDef({
-    key: 'maxRetries',
+    key: "maxRetries",
     default: 5,
-    description: 'How many times to retry when LLM calls fail; goes through all fallback models before giving up',
-    cli: { names: ['--max-retries'], showInHelp: true },
-    fm: { allowed: true, key: 'maxRetries' },
-    config: { path: 'defaults.maxRetries' },
-    scope: 'masterDefault',
+    description:
+      "How many times to retry when LLM calls fail; goes through all fallback models before giving up",
+    cli: { names: ["--max-retries"], showInHelp: true },
+    fm: { allowed: true, key: "maxRetries" },
+    config: { path: "defaults.maxRetries" },
+    scope: "masterDefault",
     groups: [G_MASTER_DEFAULTS],
     numeric: { min: 0, integer: true },
   }),
   numDef({
-    key: 'maxTurns',
+    key: "maxTurns",
     default: 10,
-    description: 'Maximum number of tool-using turns before forcing the agent to give a final answer; prevents infinite loops',
-    cli: { names: ['--max-turns'], showInHelp: true },
-    fm: { allowed: true, key: 'maxTurns' },
-    config: { path: 'defaults.maxTurns' },
-    scope: 'masterDefault',
+    description:
+      "Maximum number of tool-using turns before forcing the agent to give a final answer; prevents infinite loops",
+    cli: { names: ["--max-turns"], showInHelp: true },
+    fm: { allowed: true, key: "maxTurns" },
+    config: { path: "defaults.maxTurns" },
+    scope: "masterDefault",
     groups: [G_MASTER_DEFAULTS],
     numeric: { min: 1, integer: true },
   }),
   numDef({
-    key: 'maxToolCallsPerTurn',
+    key: "maxToolCallsPerTurn",
     default: 10,
-    description: 'Maximum number of tools the agent can call in a single turn; caps parallel tool usage',
-    cli: { names: ['--max-tool-calls-per-turn'], showInHelp: true },
-    fm: { allowed: true, key: 'maxToolCallsPerTurn' },
-    config: { path: 'defaults.maxToolCallsPerTurn' },
-    scope: 'masterDefault',
+    description:
+      "Maximum number of tools the agent can call in a single turn; caps parallel tool usage",
+    cli: { names: ["--max-tool-calls-per-turn"], showInHelp: true },
+    fm: { allowed: true, key: "maxToolCallsPerTurn" },
+    config: { path: "defaults.maxToolCallsPerTurn" },
+    scope: "masterDefault",
     groups: [G_MASTER_DEFAULTS],
     numeric: { min: 1, integer: true },
   }),
   strDef({
-    key: 'caching',
-    description: 'Anthropic caching mode: full (default behaviour) or none to disable cache reuse',
-    cli: { names: ['--caching'], showInHelp: true },
-    fm: { allowed: true, key: 'caching' },
-    scope: 'masterDefault',
+    key: "caching",
+    description:
+      "Anthropic caching mode: full (default behaviour) or none to disable cache reuse",
+    cli: { names: ["--caching"], showInHelp: true },
+    fm: { allowed: true, key: "caching" },
+    scope: "masterDefault",
     groups: [G_MASTER_DEFAULTS],
     render: { showInFrontmatterTemplate: true },
-    default: 'full',
+    default: "full",
   }),
   // All Models Overrides
   strArrDef({
-    key: 'override',
+    key: "override",
     default: [],
-    description: 'Override settings for every agent/sub-agent (key=value). Supported keys: models, tools, agents, temperature, topP, topK, maxOutputTokens, repeatPenalty, llmTimeout, toolTimeout, maxRetries, maxTurns, maxToolCallsPerTurn, toolResponseMaxBytes, mcpInitConcurrency, stream, interleaved, reasoning, reasoningTokens, caching, contextWindow, no-batch, no-progress.',
-    cli: { names: ['--override'], showInHelp: true },
+    description:
+      "Override settings for every agent/sub-agent (key=value). Supported keys: models, tools, agents, temperature, topP, topK, maxOutputTokens, repeatPenalty, llmTimeout, toolTimeout, maxRetries, maxTurns, maxToolCallsPerTurn, toolResponseMaxBytes, mcpInitConcurrency, stream, interleaved, reasoning, reasoningTokens, caching, contextWindow, no-batch, no-progress.",
+    cli: { names: ["--override"], showInHelp: true },
     fm: { allowed: false },
-    scope: 'allAgents',
+    scope: "allAgents",
     groups: [G_ALL_MODELS],
   }),
   boolDef({
-    key: 'stream',
-    description: 'Show response as it\'s generated (streaming) instead of waiting for complete answer',
+    key: "stream",
+    description:
+      "Show response as it's generated (streaming) instead of waiting for complete answer",
     default: true,
-    cli: { names: ['--stream', '--no-stream'], showInHelp: true },
+    cli: { names: ["--stream", "--no-stream"], showInHelp: true },
     fm: { allowed: false },
-    config: { path: 'defaults.stream' },
-    scope: 'allAgents',
+    config: { path: "defaults.stream" },
+    scope: "allAgents",
     groups: [G_ALL_MODELS],
     flags: { allowNegation: true },
   }),
   boolDef({
-    key: 'traceLLM',
-    description: 'Show detailed logs of all LLM API calls for debugging (verbose)',
+    key: "traceLLM",
+    description:
+      "Show detailed logs of all LLM API calls for debugging (verbose)",
     default: false,
-    cli: { names: ['--trace-llm'], showInHelp: true },
+    cli: { names: ["--trace-llm"], showInHelp: true },
     fm: { allowed: false },
-    scope: 'allAgents',
+    scope: "allAgents",
     groups: [G_ALL_MODELS],
   }),
   boolDef({
-    key: 'traceMCP',
-    description: 'Show detailed logs of all tool calls (MCP protocol) for debugging (verbose)',
+    key: "traceMCP",
+    description:
+      "Show detailed logs of all tool calls (MCP protocol) for debugging (verbose)",
     default: false,
-    cli: { names: ['--trace-mcp'], showInHelp: true },
+    cli: { names: ["--trace-mcp"], showInHelp: true },
     fm: { allowed: false },
-    scope: 'allAgents',
+    scope: "allAgents",
     groups: [G_ALL_MODELS],
   }),
   boolDef({
-    key: 'traceSlack',
-    description: 'Show detailed logs of Slack bot communication for debugging (verbose)',
+    key: "traceSlack",
+    description:
+      "Show detailed logs of Slack bot communication for debugging (verbose)",
     default: false,
-    cli: { names: ['--trace-slack'], showInHelp: true },
+    cli: { names: ["--trace-slack"], showInHelp: true },
     fm: { allowed: false },
-    scope: 'allAgents',
+    scope: "allAgents",
     groups: [G_ALL_MODELS],
   }),
   boolDef({
-    key: 'traceSdk',
-    description: 'Dump raw UI/LLM payloads exchanged with the AI SDK for debugging',
+    key: "traceSdk",
+    description:
+      "Dump raw UI/LLM payloads exchanged with the AI SDK for debugging",
     default: false,
-    cli: { names: ['--trace-sdk'], showInHelp: true },
+    cli: { names: ["--trace-sdk"], showInHelp: true },
     fm: { allowed: false },
-    scope: 'allAgents',
+    scope: "allAgents",
     groups: [G_ALL_MODELS],
   }),
   boolDef({
-    key: 'verbose',
-    description: 'Show detailed execution logs including timing, tokens used, and internal state',
+    key: "verbose",
+    description:
+      "Show detailed execution logs including timing, tokens used, and internal state",
     default: false,
-    cli: { names: ['--verbose'], showInHelp: true },
+    cli: { names: ["--verbose"], showInHelp: true },
     fm: { allowed: false },
-    scope: 'allAgents',
+    scope: "allAgents",
     groups: [G_ALL_MODELS],
   }),
   strDef({
-    key: 'format',
-    default: '',
-    description: 'Output format (markdown, json, slack-block-kit, etc.); controls how the agent formats its response',
-    cli: { names: ['--format'], showInHelp: true },
+    key: "format",
+    default: "",
+    description:
+      "Output format (markdown, json, slack-block-kit, etc.); controls how the agent formats its response",
+    cli: { names: ["--format"], showInHelp: true },
     fm: { allowed: false },
-    scope: 'allAgents',
+    scope: "allAgents",
     groups: [G_ALL_MODELS],
   }),
 
   // Global Application Controls
   boolDef({
-    key: 'dryRun',
-    description: 'Check configuration and setup without actually running the agent; useful for testing config',
+    key: "dryRun",
+    description:
+      "Check configuration and setup without actually running the agent; useful for testing config",
     default: false,
-    cli: { names: ['--dry-run'], showInHelp: true },
+    cli: { names: ["--dry-run"], showInHelp: true },
     fm: { allowed: false },
-    scope: 'global',
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   numDef({
-    key: 'mcpInitConcurrency',
+    key: "mcpInitConcurrency",
     default: Number.NaN, // resolved elsewhere if provided
-    description: 'How many MCP tool servers to initialize in parallel; lower values reduce system load during startup',
-    cli: { names: ['--mcp-init-concurrency'], showInHelp: true },
+    description:
+      "How many MCP tool servers to initialize in parallel; lower values reduce system load during startup",
+    cli: { names: ["--mcp-init-concurrency"], showInHelp: true },
     fm: { allowed: false },
-    config: { path: 'defaults.mcpInitConcurrency' },
-    scope: 'global',
+    config: { path: "defaults.mcpInitConcurrency" },
+    scope: "global",
     groups: [G_GLOBAL],
     numeric: { min: 1, integer: true },
   }),
   boolDef({
-    key: 'quiet',
-    description: 'Suppress all log output except critical errors; makes output cleaner',
+    key: "quiet",
+    description:
+      "Suppress all log output except critical errors; makes output cleaner",
     default: false,
-    cli: { names: ['--quiet'], showInHelp: true },
+    cli: { names: ["--quiet"], showInHelp: true },
     fm: { allowed: false },
-    scope: 'global',
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   strDef({
-    key: 'config',
+    key: "config",
     default: undefined,
-    description: 'Path to configuration file; overrides all auto-discovered config files',
-    cli: { names: ['--config'], showInHelp: true },
+    description:
+      "Path to configuration file; overrides all auto-discovered config files",
+    cli: { names: ["--config"], showInHelp: true },
     fm: { allowed: false },
-    scope: 'global',
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   strDef({
-    key: 'sessionsDir',
+    key: "sessionsDir",
     default: undefined,
-    description: 'Where to save session data for resuming interrupted conversations',
-    cli: { names: ['--sessions-dir'], showInHelp: true },
+    description:
+      "Where to save session data for resuming interrupted conversations",
+    cli: { names: ["--sessions-dir"], showInHelp: true },
     fm: { allowed: false },
-    scope: 'global',
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   strDef({
-    key: 'billingFile',
+    key: "billingFile",
     default: undefined,
-    description: 'Where to log token usage and costs; useful for tracking LLM API expenses',
-    cli: { names: ['--billing-file'], showInHelp: true },
+    description:
+      "Where to log token usage and costs; useful for tracking LLM API expenses",
+    cli: { names: ["--billing-file"], showInHelp: true },
     fm: { allowed: false },
-    scope: 'global',
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   strDef({
-    key: 'resume',
+    key: "resume",
     default: undefined,
-    description: 'Resume a previously interrupted session by providing its session ID',
-    cli: { names: ['--resume'], showInHelp: true },
+    description:
+      "Resume a previously interrupted session by providing its session ID",
+    cli: { names: ["--resume"], showInHelp: true },
     fm: { allowed: false },
-    scope: 'global',
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   boolDef({
-    key: 'telemetryEnabled',
+    key: "telemetryEnabled",
     default: false,
-    description: 'Enable telemetry (OTLP metrics / Prometheus). Telemetry is opt-in.',
-    cli: { names: ['--telemetry-enabled'], showInHelp: true },
-    config: { path: 'telemetry.enabled' },
-    scope: 'global',
+    description:
+      "Enable telemetry (OTLP metrics / Prometheus). Telemetry is opt-in.",
+    cli: { names: ["--telemetry-enabled"], showInHelp: true },
+    config: { path: "telemetry.enabled" },
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   strDef({
-    key: 'telemetryOtlpEndpoint',
+    key: "telemetryOtlpEndpoint",
     default: undefined,
-    description: 'OTLP gRPC endpoint for telemetry exports (e.g., grpc://localhost:4317)',
-    cli: { names: ['--telemetry-otlp-endpoint'], showInHelp: true },
-    config: { path: 'telemetry.otlp.endpoint' },
-    scope: 'global',
+    description:
+      "OTLP gRPC endpoint for telemetry exports (e.g., grpc://localhost:4317)",
+    cli: { names: ["--telemetry-otlp-endpoint"], showInHelp: true },
+    config: { path: "telemetry.otlp.endpoint" },
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   strDef({
-    key: 'telemetryOtlpTimeoutMs',
+    key: "telemetryOtlpTimeoutMs",
     default: undefined,
-    description: 'OTLP export timeout (ms or duration like 5s/2m).',
-    cli: { names: ['--telemetry-otlp-timeout-ms'], showInHelp: true },
-    config: { path: 'telemetry.otlp.timeoutMs' },
-    scope: 'global',
+    description: "OTLP export timeout (ms or duration like 5s/2m).",
+    cli: { names: ["--telemetry-otlp-timeout-ms"], showInHelp: true },
+    config: { path: "telemetry.otlp.timeoutMs" },
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   boolDef({
-    key: 'telemetryPrometheusEnabled',
+    key: "telemetryPrometheusEnabled",
     default: false,
-    description: 'Expose Prometheus /metrics endpoint for telemetry (requires telemetry enabled).',
-    cli: { names: ['--telemetry-prometheus-enabled'], showInHelp: true },
-    config: { path: 'telemetry.prometheus.enabled' },
-    scope: 'global',
+    description:
+      "Expose Prometheus /metrics endpoint for telemetry (requires telemetry enabled).",
+    cli: { names: ["--telemetry-prometheus-enabled"], showInHelp: true },
+    config: { path: "telemetry.prometheus.enabled" },
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   strDef({
-    key: 'telemetryPrometheusHost',
+    key: "telemetryPrometheusHost",
     default: undefined,
-    description: 'Host interface for Prometheus /metrics endpoint',
-    cli: { names: ['--telemetry-prometheus-host'], showInHelp: true },
-    config: { path: 'telemetry.prometheus.host' },
-    scope: 'global',
+    description: "Host interface for Prometheus /metrics endpoint",
+    cli: { names: ["--telemetry-prometheus-host"], showInHelp: true },
+    config: { path: "telemetry.prometheus.host" },
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   strDef({
-    key: 'telemetryPrometheusPort',
+    key: "telemetryPrometheusPort",
     default: undefined,
-    description: 'Port for Prometheus /metrics endpoint',
-    cli: { names: ['--telemetry-prometheus-port'], showInHelp: true },
-    config: { path: 'telemetry.prometheus.port' },
-    scope: 'global',
+    description: "Port for Prometheus /metrics endpoint",
+    cli: { names: ["--telemetry-prometheus-port"], showInHelp: true },
+    config: { path: "telemetry.prometheus.port" },
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   boolDef({
-    key: 'telemetryTracesEnabled',
+    key: "telemetryTracesEnabled",
     default: false,
-    description: 'Enable OTLP tracing (requires telemetry enabled).',
-    cli: { names: ['--telemetry-traces-enabled'], showInHelp: true },
-    config: { path: 'telemetry.traces.enabled' },
-    scope: 'global',
+    description: "Enable OTLP tracing (requires telemetry enabled).",
+    cli: { names: ["--telemetry-traces-enabled"], showInHelp: true },
+    config: { path: "telemetry.traces.enabled" },
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   strDef({
-    key: 'telemetryTraceSampler',
+    key: "telemetryTraceSampler",
     default: undefined,
-    description: 'Tracing sampler (always_on, always_off, parent, ratio).',
-    cli: { names: ['--telemetry-trace-sampler'], showInHelp: true },
-    config: { path: 'telemetry.traces.sampler' },
-    scope: 'global',
+    description: "Tracing sampler (always_on, always_off, parent, ratio).",
+    cli: { names: ["--telemetry-trace-sampler"], showInHelp: true },
+    config: { path: "telemetry.traces.sampler" },
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   strDef({
-    key: 'telemetryTraceRatio',
+    key: "telemetryTraceRatio",
     default: undefined,
-    description: 'Sampling ratio (0-1) when sampler=ratio.',
-    cli: { names: ['--telemetry-trace-ratio'], showInHelp: true },
-    config: { path: 'telemetry.traces.ratio' },
-    scope: 'global',
+    description: "Sampling ratio (0-1) when sampler=ratio.",
+    cli: { names: ["--telemetry-trace-ratio"], showInHelp: true },
+    config: { path: "telemetry.traces.ratio" },
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   strArrDef({
-    key: 'telemetryLabels',
+    key: "telemetryLabels",
     default: [],
-    description: 'Additional telemetry labels (key=value). Specify multiple times for multiple labels.',
-    cli: { names: ['--telemetry-label'], showInHelp: true },
+    description:
+      "Additional telemetry labels (key=value). Specify multiple times for multiple labels.",
+    cli: { names: ["--telemetry-label"], showInHelp: true },
     fm: { allowed: false },
-    scope: 'global',
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   strArrDef({
-    key: 'telemetryLogFormat',
+    key: "telemetryLogFormat",
     default: [],
-    description: 'Preferred logging format(s): journald, logfmt, json, none (first valid entry wins).',
-    cli: { names: ['--telemetry-log-format'], showInHelp: true },
-    config: { path: 'telemetry.logging.formats' },
-    scope: 'global',
+    description:
+      "Preferred logging format(s): journald, logfmt, json, none (first valid entry wins).",
+    cli: { names: ["--telemetry-log-format"], showInHelp: true },
+    config: { path: "telemetry.logging.formats" },
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   strArrDef({
-    key: 'telemetryLogExtra',
+    key: "telemetryLogExtra",
     default: [],
-    description: 'Additional log sinks (e.g., otlp). Specify multiple times for multiple sinks.',
-    cli: { names: ['--telemetry-log-extra'], showInHelp: true },
-    config: { path: 'telemetry.logging.extra' },
-    scope: 'global',
+    description:
+      "Additional log sinks (e.g., otlp). Specify multiple times for multiple sinks.",
+    cli: { names: ["--telemetry-log-extra"], showInHelp: true },
+    config: { path: "telemetry.logging.extra" },
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   strDef({
-    key: 'telemetryLoggingOtlpEndpoint',
+    key: "telemetryLoggingOtlpEndpoint",
     default: undefined,
-    description: 'Override OTLP endpoint for log exports (defaults to telemetry OTLP endpoint).',
-    cli: { names: ['--telemetry-logging-otlp-endpoint'], showInHelp: true },
-    config: { path: 'telemetry.logging.otlp.endpoint' },
-    scope: 'global',
+    description:
+      "Override OTLP endpoint for log exports (defaults to telemetry OTLP endpoint).",
+    cli: { names: ["--telemetry-logging-otlp-endpoint"], showInHelp: true },
+    config: { path: "telemetry.logging.otlp.endpoint" },
+    scope: "global",
     groups: [G_GLOBAL],
   }),
   strDef({
-    key: 'telemetryLoggingOtlpTimeoutMs',
+    key: "telemetryLoggingOtlpTimeoutMs",
     default: undefined,
-    description: 'Override OTLP timeout for log exports (ms or duration like 5s/2m).',
-    cli: { names: ['--telemetry-logging-otlp-timeout-ms'], showInHelp: true },
-    config: { path: 'telemetry.logging.otlp.timeoutMs' },
-    scope: 'global',
+    description:
+      "Override OTLP timeout for log exports (ms or duration like 5s/2m).",
+    cli: { names: ["--telemetry-logging-otlp-timeout-ms"], showInHelp: true },
+    config: { path: "telemetry.logging.otlp.timeoutMs" },
+    scope: "global",
     groups: [G_GLOBAL],
   }),
 ];
 
 export function getFrontmatterAllowedKeys(): string[] {
-  return OPTIONS_REGISTRY.filter((o) => o.fm?.allowed === true).map((o) => o.fm?.key ?? o.key);
+  return OPTIONS_REGISTRY.filter((o) => o.fm?.allowed === true).map(
+    (o) => o.fm?.key ?? o.key,
+  );
 }
 
 export function getOptionsByGroup(): Map<string, OptionDef[]> {
@@ -542,5 +630,5 @@ export function getOptionsByGroup(): Map<string, OptionDef[]> {
 
 export function formatCliNames(opt: OptionDef): string {
   const names = opt.cli?.names ?? [];
-  return names.join(', ');
+  return names.join(", ");
 }

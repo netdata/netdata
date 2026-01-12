@@ -1,17 +1,23 @@
-import fs from 'node:fs';
-import path from 'node:path';
+import fs from "node:fs";
+import path from "node:path";
 
-import * as yaml from 'js-yaml';
+import * as yaml from "js-yaml";
 
-import type { ReasoningLevel, CachingMode } from './types.js';
+import type { ReasoningLevel, CachingMode } from "./types.js";
 
-import { getFrontmatterAllowedKeys, OPTIONS_REGISTRY } from './options-registry.js';
-import { parseNumericParam } from './utils.js';
+import {
+  getFrontmatterAllowedKeys,
+  OPTIONS_REGISTRY,
+} from "./options-registry.js";
+import { parseNumericParam } from "./utils.js";
 
 export interface FrontmatterOptions {
   models?: string | string[];
   tools?: string | string[];
   agents?: string | string[];
+  routerDestinations?: string | string[];
+  advisors?: string | string[];
+  handoff?: string | string[];
   usage?: string;
   maxTurns?: number;
   maxToolCallsPerTurn?: number;
@@ -25,54 +31,76 @@ export interface FrontmatterOptions {
   maxOutputTokens?: number;
   repeatPenalty?: number | null;
   toolResponseMaxBytes?: number;
-  reasoning?: ReasoningLevel | 'none';
+  reasoning?: ReasoningLevel | "none";
   reasoningTokens?: number | string;
   caching?: CachingMode;
 }
 
 export function parseFrontmatter(
   src: string,
-  opts?: { baseDir?: string; strict?: boolean }
-): {
-  expectedOutput?: { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> },
-  inputSpec?: { format: 'text' | 'json'; schema?: Record<string, unknown> },
-  toolName?: string,
-  options?: FrontmatterOptions,
-  description?: string,
-  usage?: string
-} | undefined {
+  opts?: { baseDir?: string; strict?: boolean },
+):
+  | {
+      expectedOutput?: {
+        format: "json" | "markdown" | "text";
+        schema?: Record<string, unknown>;
+      };
+      inputSpec?: { format: "text" | "json"; schema?: Record<string, unknown> };
+      toolName?: string;
+      options?: FrontmatterOptions;
+      description?: string;
+      usage?: string;
+    }
+  | undefined {
   // Allow a shebang on the first line (e.g., "#!/usr/bin/env ai-agent")
   let text = src;
-  if (text.startsWith('#!')) {
-    const nl = text.indexOf('\n');
-    text = nl >= 0 ? text.slice(nl + 1) : '';
+  if (text.startsWith("#!")) {
+    const nl = text.indexOf("\n");
+    text = nl >= 0 ? text.slice(nl + 1) : "";
   }
   const m = /^---\n([\s\S]*?)\n---\n/.exec(text);
   if (m === null) return undefined;
   try {
     const rawUnknown: unknown = yaml.load(m[1]);
-    if (typeof rawUnknown !== 'object' || rawUnknown === null) return undefined;
+    if (typeof rawUnknown !== "object" || rawUnknown === null) return undefined;
     const docObj = rawUnknown as {
       output?: { format?: string; schema?: unknown; schemaRef?: string };
       input?: { format?: string; schema?: unknown; schemaRef?: string };
       toolName?: unknown;
     } & Record<string, unknown>;
-    let expectedOutput: { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> } | undefined;
-    let inputSpec: { format: 'text'|'json'; schema?: Record<string, unknown> } | undefined;
+    let expectedOutput:
+      | {
+          format: "json" | "markdown" | "text";
+          schema?: Record<string, unknown>;
+        }
+      | undefined;
+    let inputSpec:
+      | { format: "text" | "json"; schema?: Record<string, unknown> }
+      | undefined;
     let toolName: string | undefined;
     let description: string | undefined;
     let usage: string | undefined;
-    if (docObj.output !== undefined && typeof docObj.output.format === 'string') {
+    if (
+      docObj.output !== undefined &&
+      typeof docObj.output.format === "string"
+    ) {
       const format = docObj.output.format.toLowerCase();
-      if (format === 'json' || format === 'markdown' || format === 'text') {
+      if (format === "json" || format === "markdown" || format === "text") {
         let schemaObj: Record<string, unknown> | undefined;
-        if (format === 'json') {
+        if (format === "json") {
           const s: unknown = docObj.output.schema;
-          const refVal: unknown = (docObj.output as { schemaRef?: unknown }).schemaRef;
-          const ref: string | undefined = typeof refVal === 'string' ? refVal : undefined;
+          const refVal: unknown = (docObj.output as { schemaRef?: unknown })
+            .schemaRef;
+          const ref: string | undefined =
+            typeof refVal === "string" ? refVal : undefined;
           schemaObj = loadSchemaValue(s, ref, opts?.baseDir);
         }
-        const fmt: 'json'|'markdown'|'text' = format === 'json' ? 'json' : (format === 'markdown' ? 'markdown' : 'text');
+        const fmt: "json" | "markdown" | "text" =
+          format === "json"
+            ? "json"
+            : format === "markdown"
+              ? "markdown"
+              : "text";
         expectedOutput = { format: fmt, schema: schemaObj };
       }
     }
@@ -81,89 +109,155 @@ export function parseFrontmatter(
     if (opts?.strict !== false) {
       const fmAllowed = getFrontmatterAllowedKeys();
       const allowedTopLevel = new Set([
-        'description', 'usage', 'output', 'input', 'toolName',
+        "description",
+        "usage",
+        "output",
+        "input",
+        "toolName",
         ...fmAllowed,
       ]);
-      const unknownKeys = Object.keys(raw).filter((k) => !allowedTopLevel.has(k));
+      const unknownKeys = Object.keys(raw).filter(
+        (k) => !allowedTopLevel.has(k),
+      );
       if (unknownKeys.length > 0) {
-        const bad = unknownKeys.join(', ');
-        throw new Error(`Unsupported frontmatter key(s): ${bad}. Remove these or move them to CLI/config. See README for valid keys.`);
+        const bad = unknownKeys.join(", ");
+        throw new Error(
+          `Unsupported frontmatter key(s): ${bad}. Remove these or move them to CLI/config. See README for valid keys.`,
+        );
       }
       // Explicitly reject runtime/app-global keys to guide users
-      const forbidden = ['traceLLM','traceMCP','verbose','accounting','save','load','stream','targets'];
-      const presentForbidden = forbidden.filter((k) => Object.prototype.hasOwnProperty.call(raw, k));
+      const forbidden = [
+        "traceLLM",
+        "traceMCP",
+        "verbose",
+        "accounting",
+        "save",
+        "load",
+        "stream",
+        "targets",
+      ];
+      const presentForbidden = forbidden.filter((k) =>
+        Object.prototype.hasOwnProperty.call(raw, k),
+      );
       if (presentForbidden.length > 0) {
-        const bad = presentForbidden.join(', ');
-        throw new Error(`Invalid frontmatter key(s): ${bad}. These are runtime application options; use CLI flags instead.`);
+        const bad = presentForbidden.join(", ");
+        throw new Error(
+          `Invalid frontmatter key(s): ${bad}. These are runtime application options; use CLI flags instead.`,
+        );
       }
     }
     // Parse input spec for sub-agent tools
-    if (docObj.input !== undefined && typeof docObj.input.format === 'string') {
+    if (docObj.input !== undefined && typeof docObj.input.format === "string") {
       const fmt = docObj.input.format.toLowerCase();
-      if (fmt === 'text' || fmt === 'json') {
+      if (fmt === "text" || fmt === "json") {
         let schemaObj: Record<string, unknown> | undefined;
-        if (fmt === 'json') {
+        if (fmt === "json") {
           const s: unknown = docObj.input.schema;
-          const refVal: unknown = (docObj.input as { schemaRef?: unknown }).schemaRef;
-          const ref: string | undefined = typeof refVal === 'string' ? refVal : undefined;
+          const refVal: unknown = (docObj.input as { schemaRef?: unknown })
+            .schemaRef;
+          const ref: string | undefined =
+            typeof refVal === "string" ? refVal : undefined;
           schemaObj = loadSchemaValue(s, ref, opts?.baseDir);
         }
         inputSpec = { format: fmt, schema: schemaObj };
       }
     }
-    if (typeof docObj.toolName === 'string' && docObj.toolName.trim().length > 0) {
+    if (
+      typeof docObj.toolName === "string" &&
+      docObj.toolName.trim().length > 0
+    ) {
       toolName = docObj.toolName.trim();
     }
     const options: FrontmatterOptions = {};
-    if (typeof raw.models === 'string' || Array.isArray(raw.models)) options.models = raw.models as (string | string[]);
-    if (typeof raw.tools === 'string' || Array.isArray(raw.tools)) options.tools = raw.tools as (string | string[]);
-    if (typeof raw.agents === 'string' || Array.isArray(raw.agents)) options.agents = raw.agents as (string | string[]);
-    if (typeof raw.maxTurns === 'number') options.maxTurns = raw.maxTurns;
-    if (typeof raw.maxToolCallsPerTurn === 'number') options.maxToolCallsPerTurn = raw.maxToolCallsPerTurn;
-    if (typeof raw.maxRetries === 'number') options.maxRetries = raw.maxRetries;
-    if (typeof raw.llmTimeout === 'number' || typeof raw.llmTimeout === 'string') options.llmTimeout = raw.llmTimeout;
-    if (typeof raw.toolTimeout === 'number' || typeof raw.toolTimeout === 'string') options.toolTimeout = raw.toolTimeout;
-    if (typeof raw.cache === 'number' || typeof raw.cache === 'string') options.cache = raw.cache;
-    if (typeof raw.toolResponseMaxBytes === 'number') options.toolResponseMaxBytes = raw.toolResponseMaxBytes;
-    if (typeof raw.maxOutputTokens === 'number') options.maxOutputTokens = raw.maxOutputTokens;
+    if (typeof raw.models === "string" || Array.isArray(raw.models))
+      options.models = raw.models as string | string[];
+    if (typeof raw.tools === "string" || Array.isArray(raw.tools))
+      options.tools = raw.tools as string | string[];
+    if (typeof raw.agents === "string" || Array.isArray(raw.agents))
+      options.agents = raw.agents as string | string[];
+    if (
+      typeof raw.routerDestinations === "string" ||
+      Array.isArray(raw.routerDestinations)
+    )
+      options.routerDestinations = raw.routerDestinations as string | string[];
+    if (typeof raw.advisors === "string" || Array.isArray(raw.advisors))
+      options.advisors = raw.advisors as string | string[];
+    if (typeof raw.handoff === "string" || Array.isArray(raw.handoff))
+      options.handoff = raw.handoff as string | string[];
+    if (typeof raw.maxTurns === "number") options.maxTurns = raw.maxTurns;
+    if (typeof raw.maxToolCallsPerTurn === "number")
+      options.maxToolCallsPerTurn = raw.maxToolCallsPerTurn;
+    if (typeof raw.maxRetries === "number") options.maxRetries = raw.maxRetries;
+    if (
+      typeof raw.llmTimeout === "number" ||
+      typeof raw.llmTimeout === "string"
+    )
+      options.llmTimeout = raw.llmTimeout;
+    if (
+      typeof raw.toolTimeout === "number" ||
+      typeof raw.toolTimeout === "string"
+    )
+      options.toolTimeout = raw.toolTimeout;
+    if (typeof raw.cache === "number" || typeof raw.cache === "string")
+      options.cache = raw.cache;
+    if (typeof raw.toolResponseMaxBytes === "number")
+      options.toolResponseMaxBytes = raw.toolResponseMaxBytes;
+    if (typeof raw.maxOutputTokens === "number")
+      options.maxOutputTokens = raw.maxOutputTokens;
     // Parse nullable numeric params (accept special strings like 'none', 'off', 'unset', 'default', 'null')
     const parsedRepeatPenalty = parseNumericParam(raw.repeatPenalty);
-    if (parsedRepeatPenalty !== undefined) options.repeatPenalty = parsedRepeatPenalty;
+    if (parsedRepeatPenalty !== undefined)
+      options.repeatPenalty = parsedRepeatPenalty;
     const parsedTemperature = parseNumericParam(raw.temperature);
-    if (parsedTemperature !== undefined) options.temperature = parsedTemperature;
+    if (parsedTemperature !== undefined)
+      options.temperature = parsedTemperature;
     const parsedTopP = parseNumericParam(raw.topP);
     if (parsedTopP !== undefined) options.topP = parsedTopP;
     const parsedTopK = parseNumericParam(raw.topK);
-    if (parsedTopK !== undefined) options.topK = parsedTopK !== null ? Math.trunc(parsedTopK) : null;
+    if (parsedTopK !== undefined)
+      options.topK = parsedTopK !== null ? Math.trunc(parsedTopK) : null;
     if (raw.reasoning === null) {
-      options.reasoning = 'none';
-    } else if (typeof raw.reasoning === 'string') {
+      options.reasoning = "none";
+    } else if (typeof raw.reasoning === "string") {
       const normalized = raw.reasoning.trim().toLowerCase();
-      if (normalized === 'none' || normalized === 'unset') {
-        options.reasoning = 'none';
-      } else if (normalized === 'default' || normalized === 'inherit' || normalized.length === 0) {
+      if (normalized === "none" || normalized === "unset") {
+        options.reasoning = "none";
+      } else if (
+        normalized === "default" ||
+        normalized === "inherit" ||
+        normalized.length === 0
+      ) {
         // Explicit inherit: treat as if the key was omitted entirely.
-      } else if (normalized === 'minimal' || normalized === 'low' || normalized === 'medium' || normalized === 'high') {
+      } else if (
+        normalized === "minimal" ||
+        normalized === "low" ||
+        normalized === "medium" ||
+        normalized === "high"
+      ) {
         options.reasoning = normalized as ReasoningLevel;
       } else {
-        throw new Error(`Invalid reasoning level '${raw.reasoning}' in frontmatter. Expected none, unset, default, minimal, low, medium, or high.`);
+        throw new Error(
+          `Invalid reasoning level '${raw.reasoning}' in frontmatter. Expected none, unset, default, minimal, low, medium, or high.`,
+        );
       }
     }
-    if (typeof raw.reasoningTokens === 'number') {
+    if (typeof raw.reasoningTokens === "number") {
       options.reasoningTokens = raw.reasoningTokens;
-    } else if (typeof raw.reasoningTokens === 'string') {
+    } else if (typeof raw.reasoningTokens === "string") {
       options.reasoningTokens = raw.reasoningTokens;
     }
-    if (typeof raw.caching === 'string') {
+    if (typeof raw.caching === "string") {
       const normalizedCaching = raw.caching.toLowerCase();
-      if (normalizedCaching === 'none' || normalizedCaching === 'full') {
+      if (normalizedCaching === "none" || normalizedCaching === "full") {
         options.caching = normalizedCaching as CachingMode;
       } else {
-        throw new Error(`Invalid caching mode '${raw.caching}' in frontmatter. Expected none or full.`);
+        throw new Error(
+          `Invalid caching mode '${raw.caching}' in frontmatter. Expected none or full.`,
+        );
       }
     }
-    if (typeof raw.description === 'string') description = raw.description;
-    if (typeof raw.usage === 'string') usage = raw.usage;
+    if (typeof raw.description === "string") description = raw.description;
+    if (typeof raw.usage === "string") usage = raw.usage;
     return { expectedOutput, inputSpec, toolName, options, description, usage };
   } catch (e) {
     if (opts?.strict !== false) {
@@ -174,20 +268,51 @@ export function parseFrontmatter(
   }
 }
 
-function loadSchemaValue(v: unknown, schemaRef?: string, baseDir?: string): Record<string, unknown> | undefined {
+function loadSchemaValue(
+  v: unknown,
+  schemaRef?: string,
+  baseDir?: string,
+): Record<string, unknown> | undefined {
   try {
-    if (v !== null && v !== undefined && typeof v === 'object') return v as Record<string, unknown>;
-    if (typeof v === 'string') {
-      try { return JSON.parse(v) as Record<string, unknown>; } catch (e) { try { process.stderr.write(`[warn] frontmatter JSON parse failed: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} }
-      try { return yaml.load(v) as Record<string, unknown>; } catch (e) { try { process.stderr.write(`[warn] frontmatter YAML parse failed: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} }
+    if (v !== null && v !== undefined && typeof v === "object")
+      return v as Record<string, unknown>;
+    if (typeof v === "string") {
+      try {
+        return JSON.parse(v) as Record<string, unknown>;
+      } catch (e) {
+        try {
+          process.stderr.write(
+            `[warn] frontmatter JSON parse failed: ${e instanceof Error ? e.message : String(e)}\n`,
+          );
+        } catch {}
+      }
+      try {
+        return yaml.load(v) as Record<string, unknown>;
+      } catch (e) {
+        try {
+          process.stderr.write(
+            `[warn] frontmatter YAML parse failed: ${e instanceof Error ? e.message : String(e)}\n`,
+          );
+        } catch {}
+      }
     }
-    if (typeof schemaRef === 'string' && schemaRef.length > 0) {
+    if (typeof schemaRef === "string" && schemaRef.length > 0) {
       try {
         const resolvedPath = path.resolve(baseDir ?? process.cwd(), schemaRef);
-        const content = fs.readFileSync(resolvedPath, 'utf-8');
-        if (/\.json$/i.test(resolvedPath)) return JSON.parse(content) as Record<string, unknown>;
-        if (/\.(ya?ml)$/i.test(resolvedPath)) return yaml.load(content) as Record<string, unknown>;
-        try { return JSON.parse(content) as Record<string, unknown>; } catch (e) { try { process.stderr.write(`[warn] frontmatter JSON parse failed: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} }
+        const content = fs.readFileSync(resolvedPath, "utf-8");
+        if (/\.json$/i.test(resolvedPath))
+          return JSON.parse(content) as Record<string, unknown>;
+        if (/\.(ya?ml)$/i.test(resolvedPath))
+          return yaml.load(content) as Record<string, unknown>;
+        try {
+          return JSON.parse(content) as Record<string, unknown>;
+        } catch (e) {
+          try {
+            process.stderr.write(
+              `[warn] frontmatter JSON parse failed: ${e instanceof Error ? e.message : String(e)}\n`,
+            );
+          } catch {}
+        }
         return yaml.load(content) as Record<string, unknown>;
       } catch {
         return undefined;
@@ -201,35 +326,50 @@ function loadSchemaValue(v: unknown, schemaRef?: string, baseDir?: string): Reco
 
 export function stripFrontmatter(src: string): string {
   const m = /^---\n([\s\S]*?)\n---\n/;
-  return src.replace(m, '');
+  return src.replace(m, "");
 }
 
 // Extract the body of a prompt file, removing shebang and YAML frontmatter if present
 export function extractBodyWithoutFrontmatter(src: string): string {
   let text = src;
-  if (text.startsWith('#!')) {
-    const nl = text.indexOf('\n');
-    text = nl >= 0 ? text.slice(nl + 1) : '';
+  if (text.startsWith("#!")) {
+    const nl = text.indexOf("\n");
+    text = nl >= 0 ? text.slice(nl + 1) : "";
   }
   return stripFrontmatter(text);
 }
 
-
 export function parseList(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map((s) => (typeof s === 'string' ? s : String(s))).map((s) => s.trim()).filter((s) => s.length > 0);
-  if (typeof value === 'string') return value.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+  if (Array.isArray(value))
+    return value
+      .map((s) => (typeof s === "string" ? s : String(s)))
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+  if (typeof value === "string")
+    return value
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
   return [];
 }
 
-export function parsePairs(value: unknown): { provider: string; model: string }[] {
-  const arr = Array.isArray(value) ? value.map((v) => (typeof v === 'string' ? v : String(v))) : (typeof value === 'string' ? value.split(',') : []);
+export function parsePairs(
+  value: unknown,
+): { provider: string; model: string }[] {
+  const arr = Array.isArray(value)
+    ? value.map((v) => (typeof v === "string" ? v : String(v)))
+    : typeof value === "string"
+      ? value.split(",")
+      : [];
   return arr
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
     .map((token) => {
-      const slash = token.indexOf('/');
+      const slash = token.indexOf("/");
       if (slash <= 0 || slash >= token.length - 1) {
-        throw new Error(`Invalid provider/model pair '${token}'. Expected format provider/model.`);
+        throw new Error(
+          `Invalid provider/model pair '${token}'. Expected format provider/model.`,
+        );
       }
       const provider = token.slice(0, slash).trim();
       const model = token.slice(slash + 1).trim();
@@ -249,19 +389,26 @@ export function buildFrontmatterTemplate(args: {
   numbers?: Record<string, number>;
   booleans?: Record<string, boolean>;
   strings?: Record<string, string | undefined>;
-  input?: { format: 'text'|'json'; schema?: Record<string, unknown> };
-  output?: { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> };
+  input?: { format: "text" | "json"; schema?: Record<string, unknown> };
+  output?: {
+    format: "json" | "markdown" | "text";
+    schema?: Record<string, unknown>;
+  };
 }): Record<string, unknown> {
   const toArray = (v: unknown): string[] => {
     if (Array.isArray(v)) return v.map((x) => String(x));
-    if (typeof v === 'string') return v.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+    if (typeof v === "string")
+      return v
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
     return [];
   };
 
   const fm = args.fmOptions;
-  const llmsVal: string[] = (fm !== undefined) ? toArray(fm.models) : [];
-  const toolsVal: string[] = (fm !== undefined) ? toArray(fm.tools) : [];
-  const agentsVal: string[] = (fm !== undefined) ? toArray(fm.agents) : [];
+  const llmsVal: string[] = fm !== undefined ? toArray(fm.models) : [];
+  const toolsVal: string[] = fm !== undefined ? toArray(fm.tools) : [];
+  const agentsVal: string[] = fm !== undefined ? toArray(fm.agents) : [];
 
   const tpl: Record<string, unknown> = {};
   tpl.description = args.description;
@@ -276,33 +423,39 @@ export function buildFrontmatterTemplate(args: {
   fmAllowed.forEach((opt) => {
     const key = opt.fm?.key ?? opt.key;
     // Avoid re-setting models/tools/agents already handled above
-    if (key === 'models' || key === 'tools' || key === 'agents') return;
+    if (key === "models" || key === "tools" || key === "agents") return;
     const fmVal = (fm as Record<string, unknown> | undefined)?.[key];
     let val: unknown = undefined;
     switch (opt.type) {
-      case 'number': {
+      case "number": {
         if (fmVal === null || opt.default === null) {
           // null means "don't send to model" - show as comment in template
           val = null;
-        } else if (typeof fmVal === 'number' && Number.isFinite(fmVal)) {
+        } else if (typeof fmVal === "number" && Number.isFinite(fmVal)) {
           val = fmVal;
-        } else if (typeof opt.default === 'number') {
+        } else if (typeof opt.default === "number") {
           val = opt.default;
         } else {
           val = 0;
         }
         break;
       }
-      case 'boolean': {
-        if (typeof fmVal === 'boolean') val = fmVal; else if (typeof opt.default === 'boolean') val = opt.default; else val = false;
+      case "boolean": {
+        if (typeof fmVal === "boolean") val = fmVal;
+        else if (typeof opt.default === "boolean") val = opt.default;
+        else val = false;
         break;
       }
-      case 'string': {
-        if (typeof fmVal === 'string') val = fmVal; else if (typeof opt.default === 'string') val = opt.default; else val = '';
+      case "string": {
+        if (typeof fmVal === "string") val = fmVal;
+        else if (typeof opt.default === "string") val = opt.default;
+        else val = "";
         break;
       }
-      case 'string[]': {
-        if (Array.isArray(fmVal)) val = toArray(fmVal); else if (Array.isArray(opt.default)) val = opt.default; else val = [];
+      case "string[]": {
+        if (Array.isArray(fmVal)) val = toArray(fmVal);
+        else if (Array.isArray(opt.default)) val = opt.default;
+        else val = [];
         break;
       }
       default:

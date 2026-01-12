@@ -12,6 +12,10 @@ import {
   getRouterDestination,
 } from "../../../orchestration/router.js";
 
+const ROUTER_HANDFOFF_TOOL = "router__handoff-to";
+const DESTINATION_LEGAL = "legal";
+const DESTINATION_TECH = "tech";
+
 function createRouterConfig(destinations: RouterDestination[]): RouterConfig {
   return {
     destinations,
@@ -33,24 +37,28 @@ describe("Router", () => {
 
       it("returns router__handoff-to tool for single destination", () => {
         const config = createRouterConfig([
-          { name: "legal", agent: "legal-agent", taskTypes: [] },
+          // eslint-disable-next-line sonarjs/no-duplicate-string
+          { name: DESTINATION_LEGAL, agent: "legal-agent", taskTypes: [] },
         ]);
         const provider = new RouterToolProvider({ config });
 
         const tools = provider.listTools();
 
         expect(tools).toHaveLength(1);
-        expect(tools[0]?.name).toBe("router__handoff-to");
+        expect(tools[0]?.name).toBe(ROUTER_HANDFOFF_TOOL);
         const schema = tools[0]?.inputSchema as {
           properties?: { destination?: { enum?: string[] } };
         };
-        expect(schema.properties?.destination?.enum).toEqual(["legal"]);
+        expect(schema.properties?.destination?.enum).toEqual([
+          DESTINATION_LEGAL,
+        ]);
       });
 
       it("returns router__handoff-to tool with multiple destinations", () => {
         const config = createRouterConfig([
-          { name: "legal", agent: "legal-agent", taskTypes: [] },
-          { name: "tech", agent: "tech-agent", taskTypes: [] },
+          { name: DESTINATION_LEGAL, agent: "legal-agent", taskTypes: [] },
+          // eslint-disable-next-line sonarjs/no-duplicate-string
+          { name: DESTINATION_TECH, agent: "tech-agent", taskTypes: [] },
         ]);
         const provider = new RouterToolProvider({ config });
 
@@ -60,7 +68,10 @@ describe("Router", () => {
         const schema = tools[0]?.inputSchema as {
           properties?: { destination?: { enum?: string[] } };
         };
-        expect(schema.properties?.destination?.enum).toEqual(["legal", "tech"]);
+        expect(schema.properties?.destination?.enum).toEqual([
+          DESTINATION_LEGAL,
+          DESTINATION_TECH,
+        ]);
       });
     });
 
@@ -71,7 +82,7 @@ describe("Router", () => {
         ]);
         const provider = new RouterToolProvider({ config });
 
-        expect(provider.hasTool("router__handoff-to")).toBe(true);
+        expect(provider.hasTool(ROUTER_HANDFOFF_TOOL)).toBe(true);
       });
 
       it("returns false for unknown tool", () => {
@@ -97,11 +108,11 @@ describe("Router", () => {
 
       it("returns error for missing destination", async () => {
         const config = createRouterConfig([
-          { name: "legal", agent: "legal-agent", taskTypes: [] },
+          { name: DESTINATION_LEGAL, agent: "legal-agent", taskTypes: [] },
         ]);
         const provider = new RouterToolProvider({ config });
 
-        const result = await provider.execute("router__handoff-to", {});
+        const result = await provider.execute(ROUTER_HANDFOFF_TOOL, {});
 
         expect(result.ok).toBe(false);
         expect(result.error).toContain("destination must be a string");
@@ -109,11 +120,11 @@ describe("Router", () => {
 
       it("returns error for unknown destination", async () => {
         const config = createRouterConfig([
-          { name: "legal", agent: "legal-agent", taskTypes: [] },
+          { name: DESTINATION_LEGAL, agent: "legal-agent", taskTypes: [] },
         ]);
         const provider = new RouterToolProvider({ config });
 
-        const result = await provider.execute("router__handoff-to", {
+        const result = await provider.execute(ROUTER_HANDFOFF_TOOL, {
           destination: "unknown",
         });
 
@@ -123,12 +134,12 @@ describe("Router", () => {
 
       it("selects destination successfully", async () => {
         const config = createRouterConfig([
-          { name: "legal", agent: "legal-agent", taskTypes: [] },
-          { name: "tech", agent: "tech-agent", taskTypes: [] },
+          { name: DESTINATION_LEGAL, agent: "legal-agent", taskTypes: [] },
+          { name: DESTINATION_TECH, agent: "tech-agent", taskTypes: [] },
         ]);
         const provider = new RouterToolProvider({ config });
 
-        const result = await provider.execute("router__handoff-to", {
+        const result = await provider.execute(ROUTER_HANDFOFF_TOOL, {
           destination: "legal",
         });
 
@@ -144,11 +155,11 @@ describe("Router", () => {
 
       it("tracks selected destination", async () => {
         const config = createRouterConfig([
-          { name: "tech", agent: "tech-agent", taskTypes: [] },
+          { name: DESTINATION_TECH, agent: "tech-agent", taskTypes: [] },
         ]);
         const provider = new RouterToolProvider({ config });
 
-        await provider.execute("router__handoff-to", { destination: "tech" });
+        await provider.execute(ROUTER_HANDFOFF_TOOL, { destination: "tech" });
 
         expect(provider.getSelectedDestination()).toBe("tech");
       });
@@ -164,14 +175,14 @@ describe("Router", () => {
 
       it("returns instruction for destinations", () => {
         const config = createRouterConfig([
-          { name: "legal", agent: "legal-agent", taskTypes: [] },
-          { name: "tech", agent: "tech-agent", taskTypes: [] },
+          { name: DESTINATION_LEGAL, agent: "legal-agent", taskTypes: [] },
+          { name: DESTINATION_TECH, agent: "tech-agent", taskTypes: [] },
         ]);
         const provider = new RouterToolProvider({ config });
 
         const instructions = provider.getInstructions();
 
-        expect(instructions).toContain("router__handoff-to");
+        expect(instructions).toContain(ROUTER_HANDFOFF_TOOL);
         expect(instructions).toContain("legal");
         expect(instructions).toContain("tech");
       });
