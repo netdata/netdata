@@ -14,22 +14,8 @@ Alert events are only useful if the right people see them. Netdata supports thre
 
 | Section | What It Covers |
 |---------|----------------|
-| **5.1 Notification Concepts** | The three dispatch models and when to use each |
-| **5.2 Agent and Parent Notifications** | Configuring local notification methods (email, Slack, PagerDuty, etc.) |
-| **5.3 Cloud Notifications** | Setting up Cloud-integrated notifications with roles and routing |
-| **5.4 Controlling Recipients** | Mapping severities to people, using Cloud roles |
-| **5.5 Testing and Troubleshooting** | Verifying notifications work, common issues |
-
-## How to Navigate This Chapter
-
-- Start at **5.1** to understand the three dispatch models
-- Jump to **5.2** if you configure notifications on Agents/Parents
-- Use **5.3** for Cloud-dispatched notifications
-- Go to **5.5** if notifications aren't arriving
-
-## What's Next
-
-- **5.1 Notification Concepts** explains where notifications originate
-- **5.2 Agent and Parent Notifications** covers local method configuration
-- **5.3 Cloud Notifications** for Cloud-integrated routing
-- **6.1 Core System Alerts** for example alert definitions
+| **[5.1 Notification Concepts](1-notification-concepts.md)** | The three dispatch models and when to use each |
+| **[5.2 Agent and Parent Notifications](2-agent-parent-notifications.md)** | Configuring local notification methods (email, Slack, PagerDuty, etc.) |
+| **[5.3 Cloud Notifications](3-cloud-notifications.md)** | Setting up Cloud-integrated notifications with roles and routing |
+| **[5.4 Controlling Recipients](4-controlling-recipients.md)** | Mapping severities to people, using Cloud roles |
+| **[5.5 Testing and Troubleshooting](5-testing-troubleshooting.md)** | Verifying notifications work, common issues |

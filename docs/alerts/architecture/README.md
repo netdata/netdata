@@ -61,11 +61,11 @@ Alert behavior varies depending on deployment topology.
 
 | Section | Description |
 |---------|-------------|
-| **13.1 Evaluation Architecture** | How alerts are evaluated against metric data |
-| **13.2 Configuration Layers** | Stock, custom, and cloud alert precedence |
-| **13.3 Alert Lifecycle** | States and transitions in alert lifecycle |
-| **13.4 Scaling Topologies** | Standalone, parent-child, and cloud models |
-| **13.5 Notification Dispatch** | How notifications are routed to recipients |
+| **[13.1 Evaluation Architecture](1-evaluation-architecture.md)** | How alerts are evaluated against metric data |
+| **[13.2 Alert Lifecycle](2-alert-lifecycle.md)** | States and transitions in alert lifecycle |
+| **[13.3 Notification Dispatch](3-notification-dispatch.md)** | How notifications are routed to recipients |
+| **[13.4 Configuration Layers](4-configuration-layers.md)** | Stock, custom, and cloud alert precedence |
+| **[13.5 Scaling Topologies](5-scaling-topologies.md)** | Standalone, parent-child, and cloud models |
 
 ## 13.0.6 Related Sections
 

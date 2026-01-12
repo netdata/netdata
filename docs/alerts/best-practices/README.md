@@ -52,11 +52,11 @@ As infrastructure grows, alert management becomes increasingly complex. Strategi
 
 | Section | Description |
 |---------|-------------|
-| **12.1 Designing Useful Alerts** | Principles for creating actionable alerts |
-| **12.2 Maintaining Configurations** | Version control, testing, and deployment strategies |
-| **12.3 Notification Strategy** | Routing alerts to the right people at the right time |
-| **12.4 Scaling Large Environments** | Managing alerts across hundreds of nodes |
-| **12.5 SLI and SLO Alerts** | Connecting alerts to service level objectives |
+| **[12.1 Designing Useful Alerts](best-practices/1-designing-useful-alerts.md)** | Principles for creating actionable alerts |
+| **[12.2 Notification Strategy](best-practices/2-notification-strategy.md)** | Routing alerts to the right people at the right time |
+| **[12.3 Maintaining Configurations](best-practices/3-maintaining-configurations.md)** | Version control, testing, and deployment strategies |
+| **[12.4 Scaling Large Environments](best-practices/4-scaling-large-environments.md)** | Managing alerts across hundreds of nodes |
+| **[12.5 SLI and SLO Alerts](best-practices/5-sli-slo-alerts.md)** | Connecting alerts to service level objectives |
 
 ## 12.0.5 Related Sections
 

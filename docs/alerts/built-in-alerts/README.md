@@ -35,11 +35,11 @@ Do not modify stock alerts directly—your changes will be lost during upgrades.
 
 | Section | Description |
 |---------|-------------|
-| **11.1 System Resource Alerts** | CPU, memory, disk space, network, load averages |
-| **11.2 Application Alerts** | MySQL, PostgreSQL, Redis, nginx, Apache, and more |
-| **11.3 Container Alerts** | Docker containers, Kubernetes pods, cgroup metrics |
-| **11.4 Network Alerts** | Interface errors, packet drops, bandwidth utilization |
-| **11.5 Hardware Alerts** | RAID controllers, UPS battery, SMART disk status |
+| **[11.1 System Resource Alerts](1-system-resource-alerts.md)** | CPU, memory, disk space, network, load averages |
+| **[11.2 Container Alerts](2-container-alerts.md)** | Docker containers, Kubernetes pods, cgroup metrics |
+| **[11.3 Application Alerts](3-application-alerts.md)** | MySQL, PostgreSQL, Redis, nginx, Apache, and more |
+| **[11.4 Network Alerts](4-network-alerts.md)** | Interface errors, packet drops, bandwidth utilization |
+| **[11.5 Hardware Alerts](5-hardware-alerts.md)** | RAID controllers, UPS battery, SMART disk status |
 
 ## 11.0.5 Related Sections
 

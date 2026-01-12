@@ -17,11 +17,11 @@ Both approaches produce alerts that **run on your Agents or Parents**, not in Cl
 
 | Section | What You'll Learn |
 |---------|-------------------|
-| **2.1 Quick Start: Create Your First Alert** | A minimal, step-by-step path to get one alert working fast (file-based or Cloud UI) |
-| **2.2 Creating and Editing Alerts via Configuration Files** | How to locate, edit, and reload health configuration files on disk |
-| **2.3 Creating and Editing Alerts via Netdata Cloud** | How to use the Cloud Alerts Configuration Manager to define alerts visually |
-| **2.4 Managing Stock versus Custom Alerts** | How to safely customize or override Netdata's built-in alerts |
-| **2.5 Reloading and Validating Alert Configuration** | How to apply changes and confirm alerts loaded correctly |
+| **[2.1 Quick Start: Create Your First Alert](1-quick-start-create-your-first-alert.md)** | A minimal, step-by-step path to get one alert working fast (file-based or Cloud UI) |
+| **[2.2 Creating and Editing Alerts via Configuration Files](2-creating-and-editing-alerts-via-config-files.md)** | How to locate, edit, and reload health configuration files on disk |
+| **[2.3 Creating and Editing Alerts via Netdata Cloud](3-creating-and-editing-alerts-via-cloud.md)** | How to use the Cloud Alerts Configuration Manager to define alerts visually |
+| **[2.4 Managing Stock versus Custom Alerts](4-managing-stock-vs-custom-alerts.md)** | How to safely customize or override Netdata's built-in alerts |
+| **[2.5 Reloading and Validating Alert Configuration](5-reloading-and-validating-alert-configuration.md)** | How to apply changes and confirm alerts loaded correctly |
 
 ## Which Workflow Should You Use?
 
@@ -51,9 +51,3 @@ flowchart TD
     class Cloud option
     class Quick option
 ```
-
-## What's Next
-
-- **2.1 Quick Start** Get your first alert running in under 5 minutes
-- **2.2 and 2.3** Detailed walkthroughs for file-based and Cloud UI workflows
-- **Chapter 3** Full syntax reference for writing alert definitions

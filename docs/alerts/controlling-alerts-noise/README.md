@@ -17,29 +17,7 @@ Netdata gives you multiple layers of control:
 
 | Section | What It Covers |
 |---------|----------------|
-| **4.1 Disabling Alerts** | How to completely stop alert evaluation (globally, per-host, or per-alert) |
-| **4.2 Silencing vs Disabling** | The critical difference between stopping evaluation vs. suppressing notifications |
-| **4.3 Silencing in Netdata Cloud** | How to use Cloud silencing rules for space-wide or scheduled quiet periods |
-| **4.4 Reducing Flapping and Noise** | Practical techniques: delays, hysteresis, repeat intervals, and smoothing |
-
-## How to Navigate This Chapter
-
-- Start at **4.1** if you need to permanently stop an alert from running
-- Jump to **4.2** if you're unsure whether to disable or silence
-- Use **4.3** for Cloud-managed silencing rules
-- Go to **4.4** if alerts are flapping between statuses
-
-:::note
-
-For temporary quiet periods (maintenance windows, overnight staffing), see **4.3 Silencing in Netdata Cloud**.
-
-For persistent issues (an alert is never relevant to your environment), see **4.1 Disabling Alerts**.
-
-:::
-
-## What's Next
-
-- **4.1 Disabling Alerts** covers permanent removal of alert evaluation
-- **4.2 Silencing vs Disabling** explains when to use each approach
-- **4.3 Silencing in Netdata Cloud** for Cloud-managed rules
-- **4.4 Reducing Flapping and Noise** for preventing rapid status changes
+| **[4.1 Disabling Alerts](1-disabling-alerts.md)** | How to completely stop alert evaluation (globally, per-host, or per-alert) |
+| **[4.2 Silencing vs Disabling](2-silencing-vs-disabling.md)** | The critical difference between stopping evaluation vs. suppressing notifications |
+| **[4.3 Silencing in Netdata Cloud](3-silencing-cloud.md)** | How to use Cloud silencing rules for space-wide or scheduled quiet periods |
+| **[4.4 Reducing Flapping and Noise](4-reducing-flapping.md)** | Practical techniques: delays, hysteresis, repeat intervals, and smoothing |

@@ -4,12 +4,7 @@
 
 | Section | Feature |
 |---------|---------|
-| **10.1 Events Feed** | Unified event stream |
-| **10.2 Silencing Rules Manager** | Cloud-based silencing |
-| **10.3 Alert Deduplication** | Cloud aggregation |
-| **10.4 Room-Based Alerting** | Room scoping |
-
-## What's Next
-
-- **10.1 Events Feed** for monitoring all alerts
-- **10.2 Silencing Rules** for notification suppression
+| **[10.1 Events Feed](1-events-feed.md)** | Unified event stream |
+| **[10.2 Silencing Rules Manager](2-room-based.md)** | Cloud-based silencing |
+| **[10.3 Alert Deduplication](3-silencing-rules.md)** | Cloud aggregation |
+| **[10.4 Room-Based Alerting](4-deduplication.md)** | Room scoping |
