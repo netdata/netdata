@@ -190,7 +190,7 @@ https://github.com/netdata/netdata/edit/master/docs/alerts/controlling-alerts-no
 https://github.com/netdata/netdata/edit/master/docs/alerts/controlling-alerts-noise/1-disabling-alerts.md,Disabling Alerts (Locally or Per-Host),Published,Alerts & Notifications/The Book/Controlling Alerts and Noise,,
 https://github.com/netdata/netdata/edit/master/docs/alerts/controlling-alerts-noise/2-silencing-vs-disabling.md,Silencing versus Disabling Alerts,Published,Alerts & Notifications/The Book/Controlling Alerts and Noise,,
 https://github.com/netdata/netdata/edit/master/docs/alerts/controlling-alerts-noise/3-silencing-cloud.md,Silencing in Netdata Cloud (Silencing Rules UI),Published,Alerts & Notifications/The Book/Controlling Alerts and Noise,,
-https://github.com/netdata/netdata/edit/master/docs/alerts/controlling-alerts-noise/4-reducing-flapping.md,"Reducing Flapping and Noise (Delays, Hysteresis, Repeats)",Silencing in Netdata Cloud (Silencing Rules UI),Published,Alerts & Notifications/The Book/Controlling Alerts and Noise,,
+https://github.com/netdata/netdata/edit/master/docs/alerts/controlling-alerts-noise/4-reducing-flapping.md,"Reducing Flapping and Noise (Delays, Hysteresis, Repeats)",Silencing in Netdata Cloud (Silencing Rules UI),Published,,
 ,,,,,
 https://github.com/netdata/netdata/edit/master/docs/alerts/receiving-notifications/README.md,Receiving Notifications,Published,Alerts & Notifications/The Book/Receiving Notifications,,
 https://github.com/netdata/netdata/edit/master/docs/alerts/receiving-notifications/1-notification-concepts.md,"Notification Concepts: Agent, Parent, and Cloud",Published,Alerts & Notifications/The Book/Receiving Notifications,,
