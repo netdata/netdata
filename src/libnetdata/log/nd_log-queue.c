@@ -18,11 +18,14 @@ struct nd_log_queue {
     SPINLOCK enqueue_spinlock;      // protects queue modifications (very short hold time)
     netdata_mutex_t mutex;          // for condition variable wait
     netdata_cond_t cond;            // signals logger thread
+    netdata_cond_t shutdown_ack_cond;   // signals shutdown acknowledgment
+    netdata_mutex_t shutdown_ack_mutex; // protects shutdown_acknowledged
 
     // State
     bool initialized;
     bool shutdown_requested;
     bool flush_requested;
+    bool shutdown_acknowledged;  // set by logger thread before exiting
 
     // Logger thread
     ND_THREAD *logger_thread;
@@ -47,6 +50,7 @@ static struct nd_log_queue log_queue = {
     .initialized = false,
     .shutdown_requested = false,
     .flush_requested = false,
+    .shutdown_acknowledged = false,
     .logger_thread = NULL,
     .entries_queued = 0,
     .entries_processed = 0,
@@ -195,6 +199,12 @@ static void *nd_log_queue_thread(void *arg __maybe_unused) {
 
         // Check if we should exit
         if (log_queue.shutdown_requested && log_queue.count == 0) {
+            // Signal acknowledgment before exiting
+            netdata_mutex_lock(&log_queue.shutdown_ack_mutex);
+            log_queue.shutdown_acknowledged = true;
+            netdata_cond_signal(&log_queue.shutdown_ack_cond);
+            netdata_mutex_unlock(&log_queue.shutdown_ack_mutex);
+
             netdata_mutex_unlock(&log_queue.mutex);
             break;
         }
@@ -262,6 +272,7 @@ bool nd_log_queue_init(void) {
     log_queue.count = 0;
     log_queue.shutdown_requested = false;
     log_queue.flush_requested = false;
+    log_queue.shutdown_acknowledged = false;
 
     // Initialize synchronization primitives
     spinlock_init(&log_queue.enqueue_spinlock);
@@ -278,6 +289,23 @@ bool nd_log_queue_init(void) {
         return false;
     }
 
+    if (netdata_mutex_init(&log_queue.shutdown_ack_mutex) != 0) {
+        netdata_cond_destroy(&log_queue.cond);
+        netdata_mutex_destroy(&log_queue.mutex);
+        freez(log_queue.entries);
+        log_queue.entries = NULL;
+        return false;
+    }
+
+    if (netdata_cond_init(&log_queue.shutdown_ack_cond) != 0) {
+        netdata_mutex_destroy(&log_queue.shutdown_ack_mutex);
+        netdata_cond_destroy(&log_queue.cond);
+        netdata_mutex_destroy(&log_queue.mutex);
+        freez(log_queue.entries);
+        log_queue.entries = NULL;
+        return false;
+    }
+
     // Start logger thread
     log_queue.logger_thread = nd_thread_create(
         "LOGGER",
@@ -287,6 +315,8 @@ bool nd_log_queue_init(void) {
     );
 
     if (!log_queue.logger_thread) {
+        netdata_cond_destroy(&log_queue.shutdown_ack_cond);
+        netdata_mutex_destroy(&log_queue.shutdown_ack_mutex);
         netdata_cond_destroy(&log_queue.cond);
         netdata_mutex_destroy(&log_queue.mutex);
         freez(log_queue.entries);
@@ -311,13 +341,22 @@ void nd_log_queue_shutdown(bool flush) {
     netdata_cond_signal(&log_queue.cond);
     netdata_mutex_unlock(&log_queue.mutex);
 
-    // Wait for logger thread to finish
+    // Wait for logger thread to acknowledge shutdown
+    netdata_mutex_lock(&log_queue.shutdown_ack_mutex);
+    while (!log_queue.shutdown_acknowledged) {
+        netdata_cond_wait(&log_queue.shutdown_ack_cond, &log_queue.shutdown_ack_mutex);
+    }
+    netdata_mutex_unlock(&log_queue.shutdown_ack_mutex);
+
+    // Now safe to join - thread has exited or is about to
     if (log_queue.logger_thread) {
         nd_thread_join(log_queue.logger_thread);
         log_queue.logger_thread = NULL;
     }
 
     // Cleanup
+    netdata_cond_destroy(&log_queue.shutdown_ack_cond);
+    netdata_mutex_destroy(&log_queue.shutdown_ack_mutex);
     netdata_cond_destroy(&log_queue.cond);
     netdata_mutex_destroy(&log_queue.mutex);
     freez(log_queue.entries);
