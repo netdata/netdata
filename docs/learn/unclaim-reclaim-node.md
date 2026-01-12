@@ -26,7 +26,7 @@ Use this process when you need to move a node from one Space to another without 
 
 - The node must have Netdata Agent installed
 - You need the claiming token and room keys for the **new** Space
-- Optionally: access to the node via SSH or terminal
+- Access to the node via SSH or terminal (required to run the unclaim commands)
 
 ## Unclaim a Node from Current Space
 
