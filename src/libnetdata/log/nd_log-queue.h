@@ -27,6 +27,9 @@ struct nd_log_queue_entry {
     FILE *fp;                                       // target file pointer (for NDLM_FILE)
     int fd;                                         // target fd (for journal direct)
     size_t message_len;
+    bool journal_direct_initialized;                // captured at enqueue time
+    bool journal_libsystemd_initialized;            // captured at enqueue time
+    bool syslog_initialized;                       // captured at enqueue time
     char *message_allocated;                        // mallocz'd for messages > INLINE_SIZE (NULL if inline)
     char message_inline[ND_LOG_QUEUE_INLINE_SIZE];  // inline buffer for short messages
 };

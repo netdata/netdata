@@ -97,8 +97,8 @@ static void nd_log_queue_write_entry(struct nd_log_queue_entry *entry) {
 
         case NDLM_JOURNAL:
             // For journal, the message should already be formatted appropriately
-            // Use direct journal write if available
-            if (nd_log.journal_direct.initialized && entry->fd >= 0) {
+            // Use captured state from enqueue time to avoid data races
+            if (entry->journal_direct_initialized && entry->fd >= 0) {
                 // Journal direct write - message already formatted as journal fields
                 struct iovec iov[1];
                 iov[0].iov_base = (void *)message;
@@ -108,10 +108,17 @@ static void nd_log_queue_write_entry(struct nd_log_queue_entry *entry) {
                     .msg_iov = iov,
                     .msg_iovlen = 1,
                 };
-                sendmsg(entry->fd, &mh, MSG_NOSIGNAL);
+                ssize_t sent = sendmsg(entry->fd, &mh, MSG_NOSIGNAL);
+                if (sent < 0) {
+                    // Failed to write to journal - write to stderr as fallback
+                    fprintf(stderr, "async-logger: sendmsg() to journal failed (fd=%d): %s\n",
+                            entry->fd, strerror(errno));
+                    fprintf(stderr, "%s\n", message);
+                    fflush(stderr);
+                }
             }
 #ifdef HAVE_SYSTEMD
-            else if (nd_log.journal.initialized) {
+            else if (entry->journal_libsystemd_initialized) {
                 // Fallback to libsystemd - for this we'd need structured fields
                 // For now, just write to stderr as fallback
                 fprintf(stderr, "%s\n", message);
@@ -126,8 +133,9 @@ static void nd_log_queue_write_entry(struct nd_log_queue_entry *entry) {
             break;
 
         case NDLM_SYSLOG:
-            // Convert priority to syslog priority
-            {
+            // Use captured state from enqueue time to avoid data races
+            if (entry->syslog_initialized) {
+                // Convert priority to syslog priority
                 int syslog_priority = LOG_INFO;
                 switch (entry->priority) {
                     case NDLP_EMERG:   syslog_priority = LOG_EMERG; break;
@@ -141,6 +149,10 @@ static void nd_log_queue_write_entry(struct nd_log_queue_entry *entry) {
                     default:           syslog_priority = LOG_INFO; break;
                 }
                 syslog(syslog_priority, "%s", message);
+            } else {
+                // Syslog not initialized, fallback to stderr
+                fprintf(stderr, "%s\n", message);
+                fflush(stderr);
             }
             break;
 
@@ -186,7 +198,7 @@ static void nd_log_queue_thread_cleanup(void *ptr __maybe_unused) {
     spinlock_unlock(&log_queue.enqueue_spinlock);
 }
 
-static void *nd_log_queue_thread(void *arg __maybe_unused) {
+static void nd_log_queue_thread(void *arg __maybe_unused) {
     netdata_thread_cleanup_push(nd_log_queue_thread_cleanup, NULL);
 
     while (true) {
@@ -253,7 +265,6 @@ static void *nd_log_queue_thread(void *arg __maybe_unused) {
     }
 
     netdata_thread_cleanup_pop(1);
-    return NULL;
 }
 
 // ----------------------------------------------------------------------------
@@ -386,6 +397,9 @@ bool nd_log_queue_enqueue(struct nd_log_queue_entry *entry) {
         dest->format = entry->format;
         dest->fp = entry->fp;
         dest->fd = entry->fd;
+        dest->journal_direct_initialized = entry->journal_direct_initialized;
+        dest->journal_libsystemd_initialized = entry->journal_libsystemd_initialized;
+        dest->syslog_initialized = entry->syslog_initialized;
         dest->message_len = entry->message_len;
 
         // Handle message content - transfer ownership of allocated pointer
