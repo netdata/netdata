@@ -651,7 +651,7 @@ func (c *Collector) addHostgroupCharts(hg string) {
 }
 
 func (c *Collector) removeHostgroupCharts(hg string) {
-	prefix := "hostgroup_" + hg
+	prefix := "hostgroup_" + hg + "_"
 
 	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {
