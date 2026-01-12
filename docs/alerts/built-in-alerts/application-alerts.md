@@ -16,21 +16,21 @@ Databases are typically the most critical components in an infrastructure, and t
 
 Tracks whether the GTID position is advancing, catching replication stalls immediately.
 
-**Context:** `mysql.gtid`
+**Context:** `mysql.slave_status`
 **Thresholds:** WARN > 0 lag
 
 #### mysql_slow_queries
 
 Identifies workloads generating excessive slow query traffic, which often precedes performance degradation.
 
-**Context:** `mysql.global_status`
+**Context:** `mysql.queries`
 **Thresholds:** WARN > 5/s
 
 #### mysql_innodb_buffer_pool_bytes
 
 Monitors InnoDB buffer pool usage to prevent memory pressure on buffer pool-intensive workloads.
 
-**Context:** `mysql.innodb`
+**Context:** `mysql.innodb_buffer_pool_bytes`
 **Thresholds:** WARN > 90%
 
 ### PostgreSQL
@@ -39,21 +39,21 @@ Monitors InnoDB buffer pool usage to prevent memory pressure on buffer pool-inte
 
 Detects deadlocks that indicate concurrent transaction conflicts.
 
-**Context:** `pg.stat_database`
+**Context:** `postgres.stat_database`
 **Thresholds:** WARN > 0
 
 #### pg_stat_database_connections
 
 Tracks connection pool saturation to prevent connection exhaustion.
 
-**Context:** `pg.stat_database`
+**Context:** `postgres.stat_database`
 **Thresholds:** WARN > 80% of max
 
 #### pg_replication_lag
 
 Monitors streaming replication lag to prevent data inconsistency.
 
-**Context:** `pg.replication`
+**Context:** `postgres.replication`
 **Thresholds:** WARN > 10s, CRIT > 60s
 
 ### Redis
@@ -128,14 +128,14 @@ Monitors available worker threads to prevent connection queuing.
 
 Tracks the ratio of cache hits to total requests. A rate below 80% suggests the cache is not effective.
 
-**Context:** `memcache.hits`
+**Context:** `memcached.hits`
 **Thresholds:** WARN < 80%
 
 #### memcached_evictions
 
 Catches when items are being removed due to size limits.
 
-**Context:** `memcache.evictions`
+**Context:** `memcached.evictions`
 **Thresholds:** WARN > 0
 
 ## 11.3.4 Message Queue Alerts
@@ -169,7 +169,7 @@ Monitors replication health to detect partition availability issues.
 
 Critical alert for partitions without leadership.
 
-**Context:** `kafka.replication`
+**Context:** `kafka.partition_under_replicated`
 **Thresholds:** CRIT > 0
 
 ## Related Sections

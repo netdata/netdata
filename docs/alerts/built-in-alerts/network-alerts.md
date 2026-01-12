@@ -12,14 +12,14 @@ Network connectivity alerts require specific endpoints to be configured. Add the
 
 Tracks round-trip time with thresholds calibrated for typical operational requirements.
 
-**Context:** `ping.latency`
+**Context:** `ping.host_rtt`
 **Thresholds:** WARN > 100ms, CRIT > 500ms
 
 ### ping_packet_loss
 
 Measures percentage of packets that do not receive responses. Network problems often manifest as partial packet loss before complete failure.
 
-**Context:** `ping.packets`
+**Context:** `ping.host_packet_loss`
 **Thresholds:** WARN > 1%, CRIT > 5%
 
 ## 11.4.2 Port and Service Monitoring
@@ -28,28 +28,28 @@ Measures percentage of packets that do not receive responses. Network problems o
 
 Attempts to connect to a specified port and fires when the connection fails. Can monitor any TCP service.
 
-**Context:** `net.port`
+**Context:** `portcheck.status`
 **Thresholds:** CRIT not responding
 
 ### port_response_time
 
 Tracks how long the connection takes to establish, catching slow services before they fail.
 
-**Context:** `net.port`
+**Context:** `portcheck.status`
 **Thresholds:** WARN > 1s
 
 ### ssl_certificate_expiry
 
 Monitors certificate validity period with sufficient lead time for renewal.
 
-**Context:** `ssl.cert`
+**Context:** `x509check.time_until_expiration`
 **Thresholds:** WARN < 30 days, CRIT < 7 days
 
 ### ssl_handshake_failure
 
 Tracks SSL/TLS handshake failures which may indicate certificate or protocol problems.
 
-**Context:** `ssl.handshake`
+**Context:** `x509check.revocation_status`
 **Thresholds:** WARN > 0
 
 ## 11.4.3 DNS Monitoring
@@ -58,21 +58,21 @@ Tracks SSL/TLS handshake failures which may indicate certificate or protocol pro
 
 Tracks resolution latency for DNS-dependent applications.
 
-**Context:** `dns.query`
+**Context:** `dns_query.query_time`
 **Thresholds:** WARN > 50ms, CRIT > 200ms
 
 ### dns_query_failures
 
 Fires when DNS resolution fails entirely, which causes cascading failures in dependent applications.
 
-**Context:** `dns.query`
+**Context:** `dns_query.query_status`
 **Thresholds:** WARN > 0
 
 ### dns_no_response
 
 Monitors for complete DNS non-responses.
 
-**Context:** `dns.response`
+**Context:** `dns_query.query_status`
 **Thresholds:** CRIT > 0
 
 ## 11.4.4 HTTP Endpoint Monitoring
@@ -81,14 +81,14 @@ Monitors for complete DNS non-responses.
 
 Tracks non-2xx responses indicating client or server errors.
 
-**Context:** `httpcheck.response`
+**Context:** `httpcheck.status`
 **Thresholds:** WARN > 0, CRIT > 10%
 
 ### http_response_time_percentile
 
 Monitors 95th percentile latency for SLA compliance.
 
-**Context:** `httpcheck.response`
+**Context:** `httpcheck.response_time`
 **Thresholds:** WARN > 2s
 
 ## Related Sections

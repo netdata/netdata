@@ -88,7 +88,7 @@ Disk I/O monitoring catches performance problems that capacity metrics miss.
 
 Measures the percentage of time the disk spends processing I/O requests. At 80% busy, most disks begin queuing delays; at 95%, degradation is nearly certain.
 
-**Context:** `disk利用率`
+**Context:** `disk.util`
 **Thresholds:** WARN > 80%, CRIT > 95%
 
 ### disk_wait
