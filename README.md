@@ -12,8 +12,32 @@ Key features at a glance:
 - Multi-provider support (OpenAI, Anthropic, Google, OpenRouter, Ollama, Test LLM)
 - MCP/REST/sub-agent/internal tools with concurrency queues and context guard
 - Three-phase test harness: Phase 1 (parallel unit), Phase 2 (sequential deterministic), Phase 3 (real LLM)
+- Orchestration patterns: advisors (pre-run), router (handoff-to), handoff (post-run), all configured in frontmatter
 - XML transport: fixed to `xml-final` (native tool calls for tools; final report must be emitted via `<ai-agent-NONCE-XXXX tool="agent__final_report">…</ai-agent-NONCE-XXXX>`). Progress remains native.
 - CLI override for tool transport has been removed; xml-final is mandatory.
+
+### Orchestration (Advisors, Router, Handoff)
+
+Configure orchestration in the agent frontmatter:
+
+```yaml
+---
+advisors:
+  - ./agents/compliance.ai
+  - ./agents/security.ai
+router:
+  destinations:
+    - ./agents/legal.ai
+    - ./agents/support.ai
+handoff: ./agents/manager.ai
+---
+```
+
+Behavior:
+- **Advisors** run in parallel before the main agent and their reports are injected into the main user prompt.
+- If an advisor fails, a synthetic advisory block describing the failure is injected so the primary agent can continue.
+- **Router** uses the `router__handoff-to` tool to choose a destination (optional message passed along).
+- **Handoff** always runs after the main session (and after any router chain).
 
 ## Architecture: Recursive Autonomous Agents
 

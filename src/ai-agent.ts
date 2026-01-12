@@ -8,23 +8,29 @@ import { SpanStatusCode, type Attributes } from '@opentelemetry/api';
 import type { ResponseCache } from './cache/response-cache.js';
 import type { ToolCacheResolver } from './cache/tool-cache-resolver.js';
 import type { OutputFormatId } from './formats.js';
+import type { AdvisorExecutionResult } from './orchestration/advisors.js';
 import type { SessionNode } from './session-tree.js';
-import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, SessionSnapshotPayload, AccountingFlushPayload, ReasoningLevel, ProviderReasoningMapping, ProviderReasoningValue, ToolChoiceMode, LogPayload, TurnRequestContextMetrics, LogDetailValue } from './types.js';
+import type { AIAgentSessionConfig, AIAgentResult, AccountingEntry, AccountingFlushPayload, Configuration, ConversationMessage, LogDetailValue, LogEntry, LLMAccountingEntry, MCPTool, OrchestrationConfig, OrchestrationRuntimeAgent, OrchestrationRuntimeConfig, ProgressMetrics, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, RestToolConfig, SessionSnapshotPayload, ToolAccountingEntry, ToolChoiceMode, TurnRequestContextMetrics, LogPayload } from './types.js';
 
 import { getResponseCache } from './cache/cache-factory.js';
 import { createToolCacheResolver } from './cache/tool-cache-resolver.js';
-import { validateProviders, validateMCPServers, validatePrompts } from './config.js';
+import { validateMCPServers, validatePrompts, validateProviders } from './config.js';
 import { ContextGuard, type ContextGuardBlockedEntry, type ContextGuardEvaluation, type TargetContextConfig } from './context-guard.js';
 import { FinalReportManager, type PendingFinalReportPayload } from './final-report-manager.js';
-import { parseFrontmatter, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
+import { extractBodyWithoutFrontmatter, parseFrontmatter, parsePairs } from './frontmatter.js';
 import { LLMClient } from './llm-client.js';
-import { buildPromptVars, applyFormat, expandVars } from './prompt-builder.js';
+import { executeAdvisors } from './orchestration/advisors.js';
+import { executeHandoff } from './orchestration/handoff.js';
+import { buildAdvisoryBlock, buildOriginalUserRequestBlock, joinTaggedBlocks } from './orchestration/prompt-tags.js';
+import { RouterToolProvider } from './orchestration/router.js';
+import { spawnOrchestrationChild } from './orchestration/spawn-child.js';
+import { applyFormat, buildPromptVars, expandVars } from './prompt-builder.js';
 import { SessionProgressReporter } from './session-progress-reporter.js';
 import { SessionToolExecutor, type SessionContext } from './session-tool-executor.js';
 import { SessionTreeBuilder } from './session-tree.js';
-import { TurnRunner, type TurnRunnerContext, type TurnRunnerCallbacks } from './session-turn-runner.js';
+import { TurnRunner, type TurnRunnerCallbacks, type TurnRunnerContext } from './session-turn-runner.js';
 import { SubAgentRegistry } from './subagent-registry.js';
-import { recordContextGuardMetrics, runWithSpan, addSpanEvent } from './telemetry/index.js';
+import { addSpanEvent, recordContextGuardMetrics, runWithSpan } from './telemetry/index.js';
 import { AgentProvider } from './tools/agent-provider.js';
 import { InternalToolProvider } from './tools/internal-provider.js';
 import { MCPProvider } from './tools/mcp-provider.js';
@@ -154,6 +160,7 @@ export class AIAgentSession {
   private readonly opTree: SessionTreeBuilder;
   private readonly progressReporter: SessionProgressReporter;
   private readonly taskStatusToolEnabled: boolean;
+  private readonly routerToolName?: string;
   private readonly expectedJsonSchema?: Record<string, unknown>;
   private readonly xmlTransport: XmlToolTransport;
   private turnFailureReasons: string[] = [];
@@ -275,6 +282,32 @@ export class AIAgentSession {
       return this.sessionConfig.agentId;
     }
     return this.getCallPathLabel();
+  }
+
+  public getAgentLabel(): string {
+    return this.getAgentIdLabel();
+  }
+
+  public getUserPrompt(): string {
+    return this.sessionConfig.userPrompt;
+  }
+
+  public setUserPrompt(userPrompt: string): void {
+    if (userPrompt === this.sessionConfig.userPrompt) return;
+    validatePrompts(this.sessionConfig.systemPrompt, userPrompt);
+    this.sessionConfig.userPrompt = userPrompt;
+  }
+
+  public getSessionConfigSnapshot(): AIAgentSessionConfig {
+    return this.sessionConfig;
+  }
+
+  public getOrchestrationRuntime(): OrchestrationRuntimeConfig | undefined {
+    return this.sessionConfig.orchestrationRuntime;
+  }
+
+  public getOrchestrationConfig(): OrchestrationConfig | undefined {
+    return this.sessionConfig.orchestration;
   }
 
   private getAgentDisplayName(): string {
@@ -725,6 +758,19 @@ export class AIAgentSession {
       );
       orch.register(internalProvider);
     }
+    // Router tool provider (orchestration)
+    {
+      const routerConfig = this.sessionConfig.orchestration?.router;
+      const destinations = routerConfig?.destinations ?? [];
+      const routerDestinations = destinations.map((dest) => dest.ref);
+      if (routerDestinations.length > 0) {
+        const routerProvider = new RouterToolProvider({
+          config: { destinations: routerDestinations },
+        });
+        this.routerToolName = RouterToolProvider.getToolName();
+        orch.register(routerProvider);
+      }
+    }
     if (this.subAgents !== undefined) {
       const subAgents = this.subAgents;
       const execFn = async (
@@ -786,6 +832,7 @@ export class AIAgentSession {
       isCanceled: () => this.canceled,
       taskStatusToolEnabled: this.taskStatusToolEnabled,
       finalReportToolName: AIAgentSession.FINAL_REPORT_TOOL,
+      routerToolName: this.routerToolName,
     };
 
     this.sessionExecutor = new SessionToolExecutor(
@@ -1551,6 +1598,7 @@ export class AIAgentSession {
         resolvedSystemPrompt: this.resolvedSystemPrompt,
         expectedJsonSchema: this.expectedJsonSchema,
         taskStatusToolEnabled: this.taskStatusToolEnabled,
+        finalTurnAllowedTools: this.routerToolName !== undefined ? new Set([this.routerToolName]) : undefined,
         abortSignal: this.sessionConfig.abortSignal,
         stopRef: this.sessionConfig.stopRef,
         isCanceled: () => this.canceled,
@@ -1621,6 +1669,7 @@ export class AIAgentSession {
         accounting: mergedAccounting,
         finalReport: result.finalReport,
         childConversations: result.childConversations,
+        routerSelection: result.routerSelection,
         // Provide ASCII tree for downstream consumers (CLI may choose to print)
         treeAscii: undefined,
         opTreeAscii: (() => { try { return this.opTree.renderAscii(); } catch { return undefined; } })(),
@@ -2188,5 +2237,228 @@ export class AIAgentSession {
 
 }
 
-// Export session class as main interface
-export { AIAgentSession as AIAgent };
+type ChildConversationEntry = NonNullable<AIAgentResult['childConversations']>[number];
+
+interface ResultSupplement {
+  logs: LogEntry[];
+  accounting: AccountingEntry[];
+  childConversations?: ChildConversationEntry[];
+}
+
+const mergeOptionalArrays = <T,>(
+  base: T[] | undefined,
+  extra: T[] | undefined,
+): T[] | undefined => {
+  const combined = [...(base ?? []), ...(extra ?? [])];
+  return combined.length > 0 ? combined : undefined;
+};
+
+const buildChildConversationEntry = (
+  result: AIAgentResult,
+  agent: OrchestrationRuntimeAgent,
+): ChildConversationEntry => ({
+  agentId: agent.agentId,
+  toolName: agent.toolName ?? agent.agentId,
+  promptPath: agent.promptPath,
+  conversation: result.conversation,
+});
+
+const mergeResultWithSupplement = (
+  base: AIAgentResult,
+  supplement: ResultSupplement,
+): AIAgentResult => {
+  const logs = base.logs.concat(supplement.logs);
+  const accounting = base.accounting.concat(supplement.accounting);
+  const childConversations = mergeOptionalArrays(
+    base.childConversations,
+    supplement.childConversations,
+  );
+  return { ...base, logs, accounting, childConversations };
+};
+
+const mergeResultWithChildFinal = (
+  base: AIAgentResult,
+  child: AIAgentResult,
+  agent: OrchestrationRuntimeAgent,
+): AIAgentResult => {
+  const childEntry = buildChildConversationEntry(child, agent);
+  const childChain = mergeOptionalArrays([childEntry], child.childConversations);
+  const childConversations = mergeOptionalArrays(base.childConversations, childChain);
+  const logs = base.logs.concat(child.logs);
+  const accounting = base.accounting.concat(child.accounting);
+  const finalReport = child.finalReport ?? base.finalReport;
+  const success = child.success;
+  const error = child.error ?? (child.success ? undefined : base.error);
+  const routerSelection = base.routerSelection ?? child.routerSelection;
+  return {
+    ...base,
+    success,
+    error,
+    finalReport,
+    logs,
+    accounting,
+    childConversations,
+    routerSelection,
+    finalAgentId: child.finalAgentId ?? base.finalAgentId,
+  };
+};
+
+const collectAdvisorSupplement = (
+  results: AdvisorExecutionResult[],
+  advisors: OrchestrationRuntimeAgent[],
+): ResultSupplement => {
+  const advisorMap = new Map(advisors.map((advisor) => [advisor.ref, advisor]));
+  const successful = results.filter((result) => result.result !== undefined);
+  const logs = successful.flatMap((result) => result.result?.logs ?? []);
+  const accounting = successful.flatMap((result) => result.result?.accounting ?? []);
+  const advisorEntries = successful
+    .map((result) => {
+      const advisor = advisorMap.get(result.advisorRef);
+      const childResult = result.result;
+      if (advisor === undefined || childResult === undefined) return undefined;
+      return buildChildConversationEntry(childResult, advisor);
+    })
+    .filter((entry): entry is ChildConversationEntry => entry !== undefined);
+  const nested = successful.flatMap((result) => result.result?.childConversations ?? []);
+  const childConversations = mergeOptionalArrays(advisorEntries, nested);
+  return { logs, accounting, childConversations };
+};
+
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class -- static facade for session orchestration
+export class AIAgent {
+  static create(sessionConfig: AIAgentSessionConfig): AIAgentSession {
+    return AIAgentSession.create(sessionConfig);
+  }
+
+  static async run(session: AIAgentSession): Promise<AIAgentResult> {
+    const runtime = session.getOrchestrationRuntime();
+    const advisors = runtime?.advisors ?? [];
+    const routerDestinations = runtime?.router?.destinations ?? [];
+    const handoffTarget = runtime?.handoff;
+    const hasAdvisors = advisors.length > 0;
+    const hasRouter = routerDestinations.length > 0;
+    const hasHandoff = handoffTarget !== undefined;
+    const hasOrchestration = hasAdvisors || hasRouter || hasHandoff;
+
+    const originalUserPrompt = session.getUserPrompt();
+    const parentSession = session.getSessionConfigSnapshot();
+    const orchestrationLogs: LogEntry[] = [];
+    const emitOrchestrationLog = (
+      message: string,
+      severity: 'WRN' | 'ERR' = 'WRN',
+    ): void => {
+      const entry: LogEntry = {
+        timestamp: Date.now(),
+        severity,
+        turn: 0,
+        subturn: 0,
+        direction: 'response',
+        type: 'llm',
+        remoteIdentifier: 'agent:orchestrator',
+        fatal: severity === 'ERR',
+        message,
+      };
+      orchestrationLogs.push(entry);
+      try {
+        parentSession.callbacks?.onLog?.(entry);
+      } catch (error) {
+        warn(
+          `orchestration log callback failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    };
+
+    const advisorResults = hasAdvisors
+      ? await executeAdvisors({
+          advisors,
+          userPrompt: originalUserPrompt,
+          parentSession,
+        })
+      : [];
+    if (advisorResults.length > 0) {
+      const advisoryBlocks = advisorResults.map((result) => result.block);
+      const enrichedPrompt = joinTaggedBlocks([
+        buildOriginalUserRequestBlock(originalUserPrompt),
+        ...advisoryBlocks,
+      ]);
+      session.setUserPrompt(enrichedPrompt);
+    }
+
+    const baseResult = await session.run();
+    baseResult.finalAgentId = session.getAgentLabel();
+    if (!hasOrchestration) {
+      return baseResult;
+    }
+
+    const advisorSupplement = collectAdvisorSupplement(advisorResults, advisors);
+    const logSupplement: ResultSupplement = {
+      logs: orchestrationLogs,
+      accounting: [],
+      childConversations: undefined,
+    };
+    let current = mergeResultWithSupplement(
+      mergeResultWithSupplement(baseResult, advisorSupplement),
+      logSupplement,
+    );
+    let currentAgentLabel = baseResult.finalAgentId ?? session.getAgentLabel();
+
+    if (hasRouter && current.routerSelection?.agent !== undefined) {
+      const selection = current.routerSelection.agent;
+      const destination = routerDestinations.find((agent) => agent.ref === selection);
+      if (destination === undefined) {
+        emitOrchestrationLog(`router_destination_missing: ${selection}`, 'ERR');
+        current = mergeResultWithSupplement(current, logSupplement);
+        current.finalAgentId = currentAgentLabel;
+        return { ...current, success: false, error: `router_destination_missing: ${selection}` };
+      }
+      const message = current.routerSelection.message?.trim();
+      const hasMessage = typeof message === 'string' && message.length > 0;
+      const routerBlocks = [
+        buildOriginalUserRequestBlock(originalUserPrompt),
+        ...(hasMessage
+          ? [buildAdvisoryBlock(currentAgentLabel, message)]
+          : []),
+      ];
+      const routerPrompt = joinTaggedBlocks(routerBlocks);
+      try {
+        const routed = await spawnOrchestrationChild({
+          agent: destination,
+          systemTemplate: destination.systemTemplate,
+          userPrompt: routerPrompt,
+          parentSession,
+        });
+        current = mergeResultWithChildFinal(current, routed, destination);
+        currentAgentLabel = routed.finalAgentId ?? destination.agentId;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        emitOrchestrationLog(`router_handoff_failed: ${message}`, 'ERR');
+        const merged = mergeResultWithSupplement(current, logSupplement);
+        merged.finalAgentId = currentAgentLabel;
+        return { ...merged, success: false, error: message };
+      }
+    }
+
+    if (handoffTarget !== undefined) {
+      try {
+        const handed = await executeHandoff({
+          target: handoffTarget,
+          parentResult: current,
+          originalUserPrompt,
+          parentAgentLabel: currentAgentLabel,
+          parentSession,
+        });
+        current = mergeResultWithChildFinal(current, handed, handoffTarget);
+        currentAgentLabel = handed.finalAgentId ?? handoffTarget.agentId;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        emitOrchestrationLog(`handoff_failed: ${message}`, 'ERR');
+        const merged = mergeResultWithSupplement(current, logSupplement);
+        merged.finalAgentId = currentAgentLabel;
+        return { ...merged, success: false, error: message };
+      }
+    }
+
+    current.finalAgentId = currentAgentLabel;
+    return current;
+  }
+}

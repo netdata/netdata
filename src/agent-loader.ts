@@ -5,7 +5,7 @@ import type { AIAgentSession } from './ai-agent.js';
 // keep type imports grouped at top
 import type { OutputFormatId } from './formats.js';
 import type { PreloadedSubAgent } from './subagent-registry.js';
-import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, Configuration, ConversationMessage, ProviderConfig, ProviderReasoningValue, ReasoningLevel, RestToolConfig } from './types.js';
+import type { AIAgentResult, AIAgentSessionConfig, AgentRunOptions, Configuration, OrchestrationAgentRef, OrchestrationConfig, OrchestrationRuntimeAgent, OrchestrationRuntimeConfig, ProviderConfig, ProviderReasoningValue, ReasoningLevel, RestToolConfig } from './types.js';
 // no runtime format validation here; caller must pass a valid OutputFormatId
 
 import { AIAgent as Agent } from './ai-agent.js';
@@ -17,6 +17,7 @@ import { parseFrontmatter, parseList, parsePairs, extractBodyWithoutFrontmatter 
 import { resolveIncludes } from './include-resolver.js';
 import { DEFAULT_TOOL_INPUT_SCHEMA, DEFAULT_TOOL_INPUT_SCHEMA_JSON, cloneJsonSchema, cloneOptionalJsonSchema } from './input-contract.js';
 import { isReservedAgentName } from './internal-tools.js';
+import { validateOrchestrationGraph } from './orchestration/cycle-detection.js';
 import { resolveEffectiveOptions } from './options-resolver.js';
 import { buildEffectiveOptionsSchema } from './options-schema.js';
 import { openApiToRestTools, parseOpenAPISpec } from './tools/openapi-importer.js';
@@ -25,26 +26,7 @@ import { clampToolName, sanitizeToolName } from './utils.js';
 import { mergeCallbacksWithPersistence, resolvePeristenceConfig } from './persistence.js';
 
 
-export interface LoadedAgentSessionOptions {
-  history?: ConversationMessage[];
-  callbacks?: AIAgentCallbacks;
-  trace?: AIAgentSessionConfig['trace'];
-  renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent';
-  outputFormat: OutputFormatId;
-  abortSignal?: AbortSignal;
-  stopRef?: { stopping: boolean };
-  initialTitle?: string;
-  ancestors?: string[];
-  headendId?: string;
-  telemetryLabels?: Record<string, string>;
-  wantsProgressUpdates?: boolean;
-  traceLLM?: boolean;
-  traceMCP?: boolean;
-  traceSdk?: boolean;
-  verbose?: boolean;
-  agentPath?: string;
-  turnPathPrefix?: string;
-}
+export type LoadedAgentSessionOptions = AgentRunOptions;
 
 export interface LoadedAgent {
   id: string; // canonical path (or synthetic when no file)
@@ -62,6 +44,8 @@ export interface LoadedAgent {
   tools: string[];
   accountingFile?: string;
   subAgents: PreloadedSubAgent[];
+  orchestration?: OrchestrationConfig;
+  orchestrationRuntime?: OrchestrationRuntimeConfig;
   effective: {
     temperature: number | null;
     topP: number | null;
@@ -100,6 +84,7 @@ export class LoadedAgentCache {
 
   get(key: string): LoadedAgent | undefined { return this.cache.get(key); }
   set(key: string, val: LoadedAgent): void { this.cache.set(key, val); }
+  entries(): IterableIterator<[string, LoadedAgent]> { return this.cache.entries(); }
 }
 
 function canonical(p: string): string {
@@ -115,6 +100,10 @@ function deriveToolNameFromPath(p: string): string {
   const sanitized = sanitizeToolName(base);
   const normalized = sanitized.length > 0 ? sanitized.toLowerCase() : sanitized;
   return clampToolName(normalized).name;
+}
+
+function deriveAgentIdFromPath(p: string): string {
+  return path.basename(p).replace(/\.[^.]+$/, '');
 }
 
 function loadFlattenedPrompt(promptPath: string): { content: string; systemTemplate: string } {
@@ -552,6 +541,103 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
     subAgentInfos.push(childInfo);
   });
 
+  const resolveOrchestrationAgentRef = (ref: string): OrchestrationAgentRef => {
+    const trimmed = ref.trim();
+    if (trimmed.length === 0) {
+      throw new Error(`Empty orchestration agent reference in ${promptPath}`);
+    }
+    const resolvedPath = canonical(path.resolve(baseDir, trimmed));
+    if (!fs.existsSync(resolvedPath)) {
+      throw new Error(`Orchestration agent not found: ${trimmed} (resolved to ${resolvedPath})`);
+    }
+    return { ref: trimmed, path: resolvedPath };
+  };
+
+  const loadOrchestrationAgent = (ref: OrchestrationAgentRef): LoadedAgent => {
+    return loadAgent(ref.path, registry, {
+      configLayers: layers,
+      verbose: options?.verbose,
+      defaultsForUndefined: mergedDefaultsForChildren,
+      ancestors: [...ancestorChain, id],
+      globalOverrides: options?.globalOverrides,
+    });
+  };
+
+  const buildRuntimeAgent = (ref: OrchestrationAgentRef, loaded: LoadedAgent): OrchestrationRuntimeAgent => ({
+    ref: ref.ref,
+    path: ref.path,
+    agentId: deriveAgentIdFromPath(loaded.promptPath),
+    promptPath: loaded.promptPath,
+    systemTemplate: loaded.systemTemplate,
+    toolName: loaded.toolName,
+    expectedOutput: loaded.expectedOutput !== undefined
+      ? { ...loaded.expectedOutput, schema: cloneOptionalJsonSchema(loaded.expectedOutput.schema) }
+      : undefined,
+    run: loaded.run,
+  });
+
+  const advisorRefs = parseList(fm?.options?.advisors);
+  const advisorEntries: OrchestrationRuntimeAgent[] = advisorRefs.map((ref) => {
+    const resolved = resolveOrchestrationAgentRef(ref);
+    const loaded = loadOrchestrationAgent(resolved);
+    return buildRuntimeAgent(resolved, loaded);
+  });
+
+  const handoffRefRaw = fm?.options?.handoff;
+  const handoffRef = typeof handoffRefRaw === 'string' ? handoffRefRaw.trim() : undefined;
+  const handoffEntry = handoffRef !== undefined && handoffRef.length > 0
+    ? (() => {
+        const resolved = resolveOrchestrationAgentRef(handoffRef);
+        const loaded = loadOrchestrationAgent(resolved);
+        return buildRuntimeAgent(resolved, loaded);
+      })()
+    : undefined;
+
+  const routerConfig = fm?.options?.router;
+  const routerDestRefs = parseList(routerConfig?.destinations);
+  if (routerConfig !== undefined && routerDestRefs.length === 0) {
+    throw new Error(`router.destinations must include at least one agent in ${promptPath}`);
+  }
+  const routerEntries: OrchestrationRuntimeAgent[] = routerDestRefs.map((ref) => {
+    const resolved = resolveOrchestrationAgentRef(ref);
+    const loaded = loadOrchestrationAgent(resolved);
+    return buildRuntimeAgent(resolved, loaded);
+  });
+
+  const orchestrationConfig: OrchestrationConfig | undefined = (() => {
+    const handoff = handoffEntry !== undefined ? { ref: handoffEntry.ref, path: handoffEntry.path } : undefined;
+    const advisors = advisorEntries.length > 0
+      ? advisorEntries.map((advisor) => ({ ref: advisor.ref, path: advisor.path }))
+      : undefined;
+    const routerDestinations = routerEntries.length > 0
+      ? routerEntries.map((dest) => ({ ref: dest.ref, path: dest.path }))
+      : undefined;
+    if (handoff === undefined && advisors === undefined && routerDestinations === undefined) {
+      return undefined;
+    }
+    return {
+      handoff,
+      advisors,
+      router: routerDestinations !== undefined ? { destinations: routerDestinations } : undefined,
+    };
+  })();
+
+  const orchestrationRuntime: OrchestrationRuntimeConfig | undefined = (() => {
+    if (handoffEntry === undefined && advisorEntries.length === 0 && routerEntries.length === 0) {
+      return undefined;
+    }
+    return {
+      handoff: handoffEntry,
+      advisors: advisorEntries.length > 0 ? advisorEntries : undefined,
+      router: routerEntries.length > 0 ? { destinations: routerEntries } : undefined,
+    };
+  })();
+
+  if (orchestrationConfig !== undefined) {
+    const entries = Array.from(registry.entries());
+    validateOrchestrationGraph(new Map(entries));
+  }
+
   const accountingFile: string | undefined = config.persistence?.billingFile ?? config.accounting?.file;
 
   const resolvedInput = resolveInputContract(fm?.inputSpec);
@@ -687,6 +773,8 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       tools: selectedTools,
       agentId: agentName,
       subAgents: subAgentInfos,
+      orchestration: orchestrationConfig,
+      orchestrationRuntime,
       systemPrompt,
       userPrompt,
       cacheTtlMs,
@@ -785,7 +873,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
     opts?: LoadedAgentSessionOptions
   ): Promise<AIAgentResult> => {
     const session = await createSession(systemPrompt, userPrompt, opts);
-    return await session.run();
+    return await Agent.run(session);
   };
 
   return {
@@ -803,6 +891,8 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
     targets: selectedTargets,
     tools: selectedTools,
     subAgents: subAgentInfos,
+    orchestration: orchestrationConfig,
+    orchestrationRuntime,
     accountingFile,
     subTools: [],
     effective: {

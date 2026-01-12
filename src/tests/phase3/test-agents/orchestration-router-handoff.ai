@@ -1,0 +1,9 @@
+---
+description: "Phase 3 orchestration master (router + handoff)"
+usage: "Validates router then parent handoff precedence"
+router:
+  destinations:
+    - ./router-destination.ai
+handoff: ./handoff-target.ai
+---
+You are the router+handoff orchestration master. Follow router instructions.

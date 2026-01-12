@@ -170,7 +170,7 @@ const sessions = await Promise.all([
     tools: ['fs'],
     systemPrompt: 'Code reviewer',
     temperature: 0.2
-  }).run(),
+  }),
   
   AIAgent.create({
     config: { providers: { anthropic: {...} }, mcpServers: { web: {...} } },
@@ -179,7 +179,7 @@ const sessions = await Promise.all([
     tools: ['web'],
     systemPrompt: 'Researcher',
     temperature: 0.8
-  }).run(),
+  }),
   
   AIAgent.create({
     config: { providers: { ollama: {...} }, mcpServers: { db: {...} } },
@@ -188,8 +188,11 @@ const sessions = await Promise.all([
     tools: ['db'],
     systemPrompt: 'Data analyst',
     temperature: 0.1
-  }).run()
+  })
 ]);
+const results = await Promise.all(
+  sessions.map((session) => AIAgent.run(session)),
+);
 ```
 
 ## Session State Management
@@ -199,7 +202,7 @@ Sessions are immutable after creation. Operations return new session objects:
 
 ```typescript
 const initialSession = await AIAgent.create(config);
-const result = await initialSession.run();
+const result = await AIAgent.run(initialSession);
 
 if (!result.success) {
   const retryResult = await result.retry(); // Returns new session
@@ -289,7 +292,7 @@ for turn in 0..maxTurns:
 ## Session Lifecycle
 
 1. **Creation**: `AIAgent.create(config)` returns configured session
-2. **Execution**: `session.run()` executes with retry logic
+2. **Execution**: `AIAgent.run(session)` executes with retry logic
 3. **Retry**: `session.retry()` returns new session with next provider
 4. **Result**: Session contains complete state (messages, accounting, logs)
 
@@ -601,7 +604,7 @@ const session = await AIAgent.create({
 Complete session logs enable post-execution analysis:
 
 ```typescript
-const result = await session.run();
+const result = await AIAgent.run(session);
 
 // Find all errors
 const errors = result.logs.filter(l => l.severity === 'ERR');
@@ -682,7 +685,7 @@ const session = await AIAgent.create({
   callbacks
 });
 
-const result = await session.run();
+const result = await AIAgent.run(session);
 // result.logs contains complete session log history
 ```
 

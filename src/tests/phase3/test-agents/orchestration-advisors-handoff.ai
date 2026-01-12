@@ -1,0 +1,8 @@
+---
+description: "Phase 3 orchestration master (advisors + handoff)"
+usage: "Validates advisors plus handoff composition"
+advisors:
+  - ./advisor-ok.ai
+handoff: ./handoff-target.ai
+---
+You are the advisors+handoff orchestration master. Respond in ${FORMAT}.

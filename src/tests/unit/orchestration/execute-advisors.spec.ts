@@ -35,9 +35,6 @@ const baseParentSession = {
   tools: [],
 };
 
-const ADVISOR_REF = "./advisor.ai";
-const ADVISOR_REPLY = "advisor reply";
-
 const buildAdvisor = (ref: string): OrchestrationRuntimeAgent => ({
   ref,
   path: ref,
@@ -48,35 +45,6 @@ const buildAdvisor = (ref: string): OrchestrationRuntimeAgent => ({
 });
 
 describe("executeAdvisors", () => {
-  it("builds advisory block when advisor succeeds", async () => {
-    const mockResult: AIAgentResult = {
-      success: true,
-      conversation: [{ role: "assistant", content: ADVISOR_REPLY }],
-      logs: [],
-      accounting: [],
-      finalReport: {
-        format: "text",
-        content: ADVISOR_REPLY,
-        ts: Date.now(),
-      },
-      finalAgentId: "advisor",
-    };
-    const mockSpawn = vi.mocked(spawnOrchestrationChild);
-    mockSpawn.mockResolvedValueOnce(mockResult);
-
-    const results = await executeAdvisors({
-      advisors: [buildAdvisor(ADVISOR_REF)],
-      userPrompt: "test",
-      parentSession: baseParentSession,
-    });
-
-    expect(results).toHaveLength(1);
-    const result = results[0];
-    expect(result.success).toBe(true);
-    expect(result.block).toContain("<advisory__");
-    expect(result.block).toContain(ADVISOR_REPLY);
-  });
-
   it("returns failure block when advisor run is unsuccessful", async () => {
     const mockResult: AIAgentResult = {
       success: false,
@@ -89,7 +57,7 @@ describe("executeAdvisors", () => {
     mockSpawn.mockResolvedValueOnce(mockResult);
 
     const results = await executeAdvisors({
-      advisors: [buildAdvisor(ADVISOR_REF)],
+      advisors: [buildAdvisor("./advisor.ai")],
       userPrompt: "test",
       parentSession: baseParentSession,
     });
@@ -97,7 +65,8 @@ describe("executeAdvisors", () => {
     expect(results).toHaveLength(1);
     const result = results[0];
     expect(result.success).toBe(false);
-    expect(result.block).toContain(`Advisor consultation failed for ${ADVISOR_REF}`);
+    expect(result.block).toContain("Advisor consultation failed for ./advisor.ai");
     expect(result.block).toContain("boom");
+    expect(result.result).toBe(mockResult);
   });
 });

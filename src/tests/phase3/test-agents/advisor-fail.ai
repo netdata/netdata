@@ -1,0 +1,23 @@
+---
+description: "Phase 3 advisor (forced failure)"
+usage: "Deterministic failure via unsatisfiable JSON schema"
+output:
+  format: json
+  schema:
+    allOf:
+      - type: object
+        properties:
+          ok:
+            const: true
+        required:
+          - ok
+      - type: object
+        properties:
+          ok:
+            const: false
+        required:
+          - ok
+maxRetries: 0
+maxTurns: 1
+---
+You are a failing advisor. Respond with plain text "ADVISOR-FAIL-REPLY". Do not output JSON or tool calls.

@@ -28,6 +28,7 @@ export interface XmlNextPayload {
   // Whether external tools (MCP, REST, etc.) are available
   hasExternalTools: boolean;
   forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion';
+  finalTurnTools?: string[];
 }
 
 export interface XmlPastEntry {
@@ -151,6 +152,7 @@ export function renderXmlNext(payload: XmlNextPayload): string {
     hasExternalTools: payload.hasExternalTools,
     taskStatusToolEnabled: payload.taskStatusToolEnabled,
     forcedFinalTurnReason: payload.forcedFinalTurnReason,
+    finalTurnTools: payload.finalTurnTools,
   }, 0);
   return buildXmlNextNotice(events);
 }

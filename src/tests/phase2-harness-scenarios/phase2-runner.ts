@@ -20,7 +20,7 @@ import type { AddressInfo } from 'node:net';
 
 import { loadAgent, loadAgentFromContent } from '../../agent-loader.js';
 import { AgentRegistry } from '../../agent-registry.js';
-import { AIAgentSession } from '../../ai-agent.js';
+import { AIAgent, AIAgentSession } from '../../ai-agent.js';
 import { sha256Hex } from '../../cache/hash.js';
 import { loadConfiguration } from '../../config.js';
 import { parseFrontmatter, parseList, parsePairs } from '../../frontmatter.js';
@@ -537,7 +537,7 @@ const runWithPatchedExecuteTurn = async (
   };
   try {
     const session = AIAgentSession.create(sessionConfig);
-    return await session.run();
+    return await AIAgent.run(session);
   } finally {
     LLMClient.prototype.executeTurn = originalExecuteTurn;
   }
@@ -3226,7 +3226,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         try { abort.abort(); } catch { /* ignore */ }
       }, 75);
       try {
-        return await session.run();
+        return await AIAgent.run(session);
       } finally {
         clearTimeout(timer);
       }
@@ -4747,7 +4747,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         };
         try {
           const session = AIAgentSession.create(sessionConfig);
-          return await session.run();
+          return await AIAgent.run(session);
         } finally {
           LLMClient.prototype.executeTurn = originalExecuteTurn;
         }
@@ -4797,7 +4797,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           },
         };
         const session = AIAgentSession.create(sessionConfig);
-        return await session.run();
+        return await AIAgent.run(session);
       },
       expect: (result: AIAgentResult) => {
         invariant(!result.success, 'Scenario run-test-61 should produce a usable final report (presence-based contract).');
@@ -4842,7 +4842,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         };
         try {
           const session = AIAgentSession.create(sessionConfig);
-          return await session.run();
+          return await AIAgent.run(session);
         } finally {
           LLMClient.prototype.executeTurn = originalExecute;
         }
@@ -4891,7 +4891,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         invariant(controller !== undefined, 'Abort controller should be initialized for run-test-62.');
         const session = AIAgentSession.create(sessionConfig);
         setTimeout(() => { controller.abort(); }, 25);
-        return await session.run();
+        return await AIAgent.run(session);
       },
       expect: (result: AIAgentResult) => {
         invariant(!result.success, 'Scenario run-test-62 should cancel.');
@@ -4933,7 +4933,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         };
         try {
           const session = AIAgentSession.create(sessionConfig);
-          return await session.run();
+          return await AIAgent.run(session);
         } finally {
           providerProto.initializeServer = originalInitialize;
         }
@@ -5947,7 +5947,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         };
         try {
           const session = AIAgentSession.create(sessionConfig);
-          return await session.run();
+          return await AIAgent.run(session);
         } finally {
           LLMClient.prototype.executeTurn = originalExecute;
         }
@@ -5980,7 +5980,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       },
       execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
         const session = AIAgentSession.create(sessionConfig);
-        return await session.run();
+        return await AIAgent.run(session);
       },
       expect: (result: AIAgentResult) => {
         invariant(result.success, 'Scenario run-test-70 expected success.');
@@ -6014,7 +6014,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       },
       execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
         const session = AIAgentSession.create(sessionConfig);
-        return await session.run();
+        return await AIAgent.run(session);
       },
       expect: (result: AIAgentResult) => {
         invariant(result.success, 'Scenario run-test-71 expected success.');
@@ -6050,7 +6050,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       },
       execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
         const session = AIAgentSession.create(sessionConfig);
-        return await session.run();
+        return await AIAgent.run(session);
       },
       expect: (result: AIAgentResult) => {
         invariant(result.success, 'Scenario run-test-72 expected success.');
@@ -7311,7 +7311,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       };
       try {
         const session = AIAgentSession.create(sessionConfig);
-        const result = await session.run();
+        const result = await AIAgent.run(session);
         (result as { __observedTools?: { isFinalTurn: boolean; input: string[]; output: string[] }[] }).__observedTools = observed;
         return result;
       } finally {
@@ -7722,7 +7722,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       };
       try {
         const session = AIAgentSession.create(sessionConfig);
-        return await session.run();
+        return await AIAgent.run(session);
       } finally {
         LLMClient.prototype.executeTurn = originalExecuteTurn;
       }
@@ -7814,7 +7814,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       };
       try {
         const session = AIAgentSession.create(sessionConfig);
-        return await session.run();
+        return await AIAgent.run(session);
       } finally {
         LLMClient.prototype.executeTurn = originalExecuteTurn;
       }
@@ -7924,7 +7924,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       };
       try {
         const session = AIAgentSession.create(sessionConfig);
-        return await session.run();
+        return await AIAgent.run(session);
       } finally {
         LLMClient.prototype.executeTurn = originalExecuteTurn;
       }
@@ -8163,7 +8163,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         return await originalExecuteTurn.call(this, request);
       };
       try {
-        return await AIAgentSession.create(sessionConfig).run();
+        return await AIAgent.run(AIAgentSession.create(sessionConfig));
       } finally {
         LLMClient.prototype.executeTurn = originalExecuteTurn;
       }
@@ -8226,7 +8226,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       };
       try {
         const session = AIAgentSession.create(sessionConfig);
-        return await session.run();
+        return await AIAgent.run(session);
       } finally {
         LLMClient.prototype.executeTurn = originalExecuteTurn;
       }
@@ -8287,7 +8287,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         };
       };
       try {
-        return await AIAgentSession.create(sessionConfig).run();
+        return await AIAgent.run(AIAgentSession.create(sessionConfig));
       } finally {
         LLMClient.prototype.executeTurn = originalExecuteTurn;
       }
@@ -8463,7 +8463,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       };
       try {
         const session = AIAgentSession.create(sessionConfig);
-        const result = await session.run();
+        const result = await AIAgent.run(session);
         (result as { __reasoningReplayVerified?: boolean }).__reasoningReplayVerified = replayVerified;
         return result;
       } finally {
@@ -8590,7 +8590,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       };
       try {
         const session = AIAgentSession.create(sessionConfig);
-        const result = await session.run();
+        const result = await AIAgent.run(session);
         (result as { __fallbackSignatureVerified?: boolean }).__fallbackSignatureVerified = fallbackSignatureVerified;
         return result;
       } finally {
@@ -8713,7 +8713,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       };
       try {
         const session = AIAgentSession.create(sessionConfig);
-        const result = await session.run();
+        const result = await AIAgent.run(session);
         (result as { __sendReasoningDisabled?: boolean }).__sendReasoningDisabled = sendReasoningDisabled;
         (result as { __sanitizedHistoryVerified?: boolean }).__sanitizedHistoryVerified = sanitizedHistoryVerified;
         return result;
@@ -8849,7 +8849,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       };
       try {
         const session = AIAgentSession.create(sessionConfig);
-        return await session.run();
+        return await AIAgent.run(session);
       } finally {
         LLMClient.prototype.executeTurn = originalExecuteTurn;
       }
@@ -8904,7 +8904,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       };
       try {
         const session = AIAgentSession.create(sessionConfig);
-        return await session.run();
+        return await AIAgent.run(session);
       } finally {
         LLMClient.prototype.executeTurn = originalExecuteTurn;
       }
@@ -8995,7 +8995,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       sessionConfig.stopRef = stopRef;
       const session = AIAgentSession.create(sessionConfig);
       setTimeout(() => { stopRef.stopping = true; }, 10);
-      return await session.run();
+      return await AIAgent.run(session);
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-49 should honor stop during rate limit backoff.');
@@ -9014,7 +9014,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     execute: async (_configuration, sessionConfig) => {
       const session = AIAgentSession.create(sessionConfig);
-      return await session.run();
+      return await AIAgent.run(session);
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-114 expected success.');
@@ -9550,7 +9550,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       sessionConfig.stopRef = stopRef;
       const session = AIAgentSession.create(sessionConfig);
       setTimeout(() => { stopRef.stopping = true; }, 10);
-      return await session.run();
+      return await AIAgent.run(session);
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-44 should honor graceful stop during rate limit.');
@@ -10012,7 +10012,7 @@ async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
     }
 
     try {
-      return await session.run();
+      return await AIAgent.run(session);
     } catch (error: unknown) {
       return failureResult(error);
     }
@@ -10649,7 +10649,7 @@ BASE_TEST_SCENARIOS.push({
     };
     try {
       const session = AIAgentSession.create(sessionConfig);
-      return await session.run();
+      return await AIAgent.run(session);
     } finally {
       LLMClient.prototype.executeTurn = originalExecuteTurn;
     }
@@ -10717,7 +10717,7 @@ BASE_TEST_SCENARIOS.push({
     };
     try {
       const session = AIAgentSession.create(sessionConfig);
-      return await session.run();
+      return await AIAgent.run(session);
     } finally {
       LLMClient.prototype.executeTurn = originalExecuteTurn;
     }
@@ -11822,7 +11822,7 @@ BASE_TEST_SCENARIOS.push({
     };
     try {
       const session = AIAgentSession.create(sessionConfig);
-      return await session.run();
+      return await AIAgent.run(session);
     } finally {
       LLMClient.prototype.executeTurn = originalExecuteTurn;
     }
@@ -12930,8 +12930,8 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.cacheTtlMs = 60000;
     sessionConfig.agentHash = sha256Hex('agent-cache-hit');
     sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
-    const first = await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-agent-first' }).run();
-    const second = await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-agent-second' }).run();
+    const first = await AIAgent.run(AIAgentSession.create({ ...sessionConfig, agentId: 'cache-agent-first' }));
+    const second = await AIAgent.run(AIAgentSession.create({ ...sessionConfig, agentId: 'cache-agent-second' }));
     return Object.assign(second, {
       __cacheBaseline: {
         accounting: first.accounting,
@@ -12978,8 +12978,8 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.cacheTtlMs = 0;
     sessionConfig.agentHash = sha256Hex('tool-cache-hit');
     sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
-    const first = await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-tool-first' }).run();
-    const second = await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-tool-second' }).run();
+    const first = await AIAgent.run(AIAgentSession.create({ ...sessionConfig, agentId: 'cache-tool-first' }));
+    const second = await AIAgent.run(AIAgentSession.create({ ...sessionConfig, agentId: 'cache-tool-second' }));
     return Object.assign(second, {
       __cacheBaseline: {
         finalReport: first.finalReport,
@@ -13016,8 +13016,8 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.cacheTtlMs = 0;
     sessionConfig.agentHash = sha256Hex('agent-cache-disabled');
     sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
-    await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-agent-disabled-first' }).run();
-    return await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-agent-disabled-second' }).run();
+    await AIAgent.run(AIAgentSession.create({ ...sessionConfig, agentId: 'cache-agent-disabled-first' }));
+    return await AIAgent.run(AIAgentSession.create({ ...sessionConfig, agentId: 'cache-agent-disabled-second' }));
   },
   expect: (result: AIAgentResult) => {
     const cacheLog = result.logs.find((entry) => entry.remoteIdentifier === AGENT_CACHE_REMOTE);
@@ -13036,9 +13036,9 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.cacheTtlMs = 5;
     sessionConfig.agentHash = sha256Hex('agent-cache-expired');
     sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
-    await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-agent-expired-first' }).run();
+    await AIAgent.run(AIAgentSession.create({ ...sessionConfig, agentId: 'cache-agent-expired-first' }));
     await new Promise((resolve) => { setTimeout(resolve, 10); });
-    return await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-agent-expired-second' }).run();
+    return await AIAgent.run(AIAgentSession.create({ ...sessionConfig, agentId: 'cache-agent-expired-second' }));
   },
   expect: (result: AIAgentResult) => {
     const cacheLog = result.logs.find((entry) => entry.remoteIdentifier === AGENT_CACHE_REMOTE);
@@ -13064,8 +13064,8 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.cacheTtlMs = 0;
     sessionConfig.agentHash = sha256Hex('tool-cache-disabled');
     sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
-    await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-tool-disabled-first' }).run();
-    return await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-tool-disabled-second' }).run();
+    await AIAgent.run(AIAgentSession.create({ ...sessionConfig, agentId: 'cache-tool-disabled-first' }));
+    return await AIAgent.run(AIAgentSession.create({ ...sessionConfig, agentId: 'cache-tool-disabled-second' }));
   },
   expect: (result: AIAgentResult) => {
     const cacheLog = result.logs.find((entry) => getLogDetail(entry, CACHE_KIND_DETAIL_KEY) === TOOL_CACHE_KIND);
@@ -13089,9 +13089,9 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.cacheTtlMs = 0;
     sessionConfig.agentHash = sha256Hex('tool-cache-expired');
     sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
-    await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-tool-expired-first' }).run();
+    await AIAgent.run(AIAgentSession.create({ ...sessionConfig, agentId: 'cache-tool-expired-first' }));
     await new Promise((resolve) => { setTimeout(resolve, 10); });
-    return await AIAgentSession.create({ ...sessionConfig, agentId: 'cache-tool-expired-second' }).run();
+    return await AIAgent.run(AIAgentSession.create({ ...sessionConfig, agentId: 'cache-tool-expired-second' }));
   },
   expect: (result: AIAgentResult) => {
     const cacheLog = result.logs.find((entry) => getLogDetail(entry, CACHE_KIND_DETAIL_KEY) === TOOL_CACHE_KIND);

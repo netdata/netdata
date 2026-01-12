@@ -82,7 +82,7 @@ Use these knobs in new scenarios whenever you need deterministic combinations of
 
 ## Phase 3: Real LLM Integration Tests
 
-Phase 3 uses the runner in `src/tests/phase3-runner.ts` to execute real-provider scenarios (`basic-llm`, `multi-turn`) in both streaming and non-streaming modes. There is no fixture replay path. `src/tests/phase3/phase3-suite.spec.ts` exposes the same runner to Vitest for opt-in automation.
+Phase 3 uses the runner in `src/tests/phase3-runner.ts` to execute real-provider scenarios (`basic-llm`, `multi-turn`) plus orchestration scenarios for **advisors**, **router**, and **handoff** (including composition and precedence). There is no fixture replay path. `src/tests/phase3/phase3-suite.spec.ts` exposes the same runner to Vitest for opt-in automation.
 
 ### Model Configuration
 Model configurations live in `src/tests/phase3-models.ts`. The default configuration uses free nova models:
@@ -95,7 +95,10 @@ Model configurations live in `src/tests/phase3-models.ts`. The default configura
 | `glm-4.6` | nova | 1 |
 | `glm-4.7` | nova | 1 |
 
-Test agents for the scenarios are located under `src/tests/phase3/test-agents/` (`test-master.ai`, `test-agent1.ai`, `test-agent2.ai`).
+Test agents for the scenarios are located under `src/tests/phase3/test-agents/`:
+- Base: `test-master.ai`, `test-agent1.ai`, `test-agent2.ai`
+- Orchestration masters: `orchestration-advisors.ai`, `orchestration-advisor-failure.ai`, `orchestration-handoff.ai`, `orchestration-router.ai`, `orchestration-router-handoff.ai`, `orchestration-advisors-handoff.ai`
+- Orchestration fixtures: `advisor-ok.ai`, `advisor-fail.ai`, `router-destination.ai`, `handoff-target.ai`
 
 ### Commands
 - `npm run test:phase3` — build + run every configured model/tier/stream combination.

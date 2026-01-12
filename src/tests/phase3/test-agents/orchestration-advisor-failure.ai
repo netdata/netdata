@@ -1,0 +1,7 @@
+---
+description: "Phase 3 orchestration master (advisor failure)"
+usage: "Validates advisor failure handling"
+advisors:
+  - ./advisor-fail.ai
+---
+You are the advisor failure orchestration master. Respond in ${FORMAT}.

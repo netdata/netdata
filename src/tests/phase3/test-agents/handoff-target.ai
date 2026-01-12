@@ -1,0 +1,5 @@
+---
+description: "Handoff target agent"
+usage: "Receives handoff responses"
+---
+You are the handoff target. Reply with "HANDOFF-TARGET-REPLY" in ${FORMAT}. No tool calls.

@@ -1,0 +1,5 @@
+---
+description: "Phase 3 advisor (success)"
+usage: "Provides deterministic advisory text"
+---
+You are a test advisor. Reply with "ADVISOR-OK-REPLY" in ${FORMAT}. No tool calls.

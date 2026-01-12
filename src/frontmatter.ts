@@ -15,9 +15,9 @@ export interface FrontmatterOptions {
   models?: string | string[];
   tools?: string | string[];
   agents?: string | string[];
-  routerDestinations?: string | string[];
+  router?: { destinations?: string | string[] };
   advisors?: string | string[];
-  handoff?: string | string[];
+  handoff?: string;
   usage?: string;
   maxTurns?: number;
   maxToolCallsPerTurn?: number;
@@ -114,6 +114,7 @@ export function parseFrontmatter(
         "output",
         "input",
         "toolName",
+        "router",
         ...fmAllowed,
       ]);
       const unknownKeys = Object.keys(raw).filter(
@@ -175,15 +176,29 @@ export function parseFrontmatter(
       options.tools = raw.tools as string | string[];
     if (typeof raw.agents === "string" || Array.isArray(raw.agents))
       options.agents = raw.agents as string | string[];
-    if (
-      typeof raw.routerDestinations === "string" ||
-      Array.isArray(raw.routerDestinations)
-    )
-      options.routerDestinations = raw.routerDestinations as string | string[];
+    if (raw.router !== undefined) {
+      const routerRaw = raw.router;
+      if (
+        routerRaw !== null &&
+        typeof routerRaw === "object" &&
+        !Array.isArray(routerRaw)
+      ) {
+        const destRaw = (routerRaw as { destinations?: unknown }).destinations;
+        if (typeof destRaw === "string" || Array.isArray(destRaw)) {
+          options.router = {
+            destinations: destRaw as string | string[],
+          };
+        }
+      }
+    }
     if (typeof raw.advisors === "string" || Array.isArray(raw.advisors))
       options.advisors = raw.advisors as string | string[];
-    if (typeof raw.handoff === "string" || Array.isArray(raw.handoff))
-      options.handoff = raw.handoff as string | string[];
+    if (Array.isArray(raw.handoff)) {
+      throw new Error(
+        "handoff must be a single string (pipelines are not supported yet)",
+      );
+    }
+    if (typeof raw.handoff === "string") options.handoff = raw.handoff;
     if (typeof raw.maxTurns === "number") options.maxTurns = raw.maxTurns;
     if (typeof raw.maxToolCallsPerTurn === "number")
       options.maxToolCallsPerTurn = raw.maxToolCallsPerTurn;
@@ -463,6 +478,19 @@ export function buildFrontmatterTemplate(args: {
     }
     tpl[key] = val;
   });
+  const routerVal = (fm as Record<string, unknown> | undefined)?.router;
+  const routerDestinations = (() => {
+    if (
+      routerVal !== null &&
+      typeof routerVal === "object" &&
+      !Array.isArray(routerVal)
+    ) {
+      const rawDest = (routerVal as { destinations?: unknown }).destinations;
+      return toArray(rawDest);
+    }
+    return [];
+  })();
+  tpl.router = { destinations: routerDestinations };
   if (args.input !== undefined) tpl.input = args.input;
   if (args.output !== undefined) tpl.output = args.output;
   return tpl;

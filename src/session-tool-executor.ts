@@ -9,6 +9,7 @@ import type {
   ConversationMessage,
   LogEntry,
   MCPTool,
+  RouterSelection,
 } from './types.js';
 import type { XmlToolTransport } from './xml-transport.js';
 
@@ -79,6 +80,7 @@ export interface ToolExecutionState {
   executedProgressBatchTools: number;
   unknownToolEncountered: boolean;
   lastTaskStatusCompleted?: boolean;
+  routerSelection?: RouterSelection;
   productiveToolExecutedThisTurn: boolean;
   // Callback to signal task completion to TurnRunner for immediate final turn
   onTaskCompletion?: () => void;
@@ -100,6 +102,7 @@ export interface SessionContext {
   isCanceled: () => boolean;
   taskStatusToolEnabled: boolean;
   finalReportToolName: string;
+  routerToolName?: string;
 }
 
 export type ToolResponseCapper = (result: string, context?: { server?: string; tool?: string; turn?: number; subturn?: number }) => string;
@@ -395,6 +398,23 @@ export class SessionToolExecutor {
               disableGlobalTimeout: isBatchTool,
             }
           );
+
+          if (
+            this.sessionContext.routerToolName !== undefined
+            && effectiveToolName === this.sessionContext.routerToolName
+            && managed.ok
+            && managed.dropped !== true
+          ) {
+            const agent = parameters.agent;
+            if (typeof agent === 'string' && agent.length > 0) {
+              const message = parameters.message;
+              const note =
+                typeof message === 'string' && message.trim().length > 0
+                  ? message
+                  : undefined;
+              state.routerSelection = note !== undefined ? { agent, message: note } : { agent };
+            }
+          }
 
           // For batch tools, count inner non-progress tools that were invoked
           if (isBatchTool && managed.result.length > 0) {

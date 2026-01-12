@@ -1,0 +1,6 @@
+---
+description: "Phase 3 orchestration master (handoff)"
+usage: "Validates post-run handoff"
+handoff: ./handoff-target.ai
+---
+You are the handoff orchestration master. Respond in ${FORMAT}.

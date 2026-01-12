@@ -8,11 +8,35 @@ export interface Phase3ModelConfig {
 // Phase 3 uses free nova models only (local inference)
 // All paid providers (openai, anthropic, google, openrouter) are disabled
 export const phase3ModelConfigs: readonly Phase3ModelConfig[] = [
-  // Tier 1: Fast, free models for basic validation
+  // Tier 1: Fast, free models for basic validation (nova GPUs)
+  {
+    label: "nova/gpt-oss-20b",
+    provider: "nova",
+    modelId: "gpt-oss-20b",
+    tier: 1,
+  },
   {
     label: "nova/minimax-m2.1",
     provider: "nova",
     modelId: "minimax-m2.1",
+    tier: 1,
+  },
+  {
+    label: "nova/glm-4.5-air",
+    provider: "nova",
+    modelId: "glm-4.5-air",
+    tier: 1,
+  },
+  {
+    label: "nova/glm-4.6",
+    provider: "nova",
+    modelId: "glm-4.6",
+    tier: 1,
+  },
+  {
+    label: "nova/glm-4.7",
+    provider: "nova",
+    modelId: "glm-4.7",
     tier: 1,
   },
 ] as const;

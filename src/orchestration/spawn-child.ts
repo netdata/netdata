@@ -1,13 +1,17 @@
-import type { LoadedAgent } from "../agent-loader.js";
-import type { OutputFormatId } from "../formats.js";
-import type { SessionNode } from "../session-tree.js";
-import type { SubAgentRegistry } from "../subagent-registry.js";
+import crypto from 'node:crypto';
+
+import type { OutputFormatId } from '../formats.js';
+import type { SessionNode } from '../session-tree.js';
+import type { SubAgentRegistry } from '../subagent-registry.js';
 import type {
   AIAgentSessionConfig,
   ConversationMessage,
   AccountingEntry,
   AIAgentResult,
-} from "../types.js";
+  OrchestrationRuntimeAgent,
+} from '../types.js';
+
+import { appendCallPathSegment } from '../utils.js';
 
 export interface SpawnChildOptions {
   parentSession: Pick<
@@ -31,6 +35,7 @@ export interface SpawnChildOptions {
     | "tools"
   > & {
     trace?: {
+      selfId?: string;
       originId?: string;
       parentId?: string;
       callPath?: string;
@@ -90,7 +95,7 @@ export function parseAgentReference(ref: string): {
 }
 
 export interface SpawnChildAgentOptions {
-  agent: LoadedAgent;
+  agent: OrchestrationRuntimeAgent;
   systemTemplate: string;
   userPrompt: string;
   parentSession: Pick<
@@ -114,6 +119,7 @@ export interface SpawnChildAgentOptions {
     | "tools"
   > & {
     trace?: {
+      selfId?: string;
       originId?: string;
       parentId?: string;
       callPath?: string;
@@ -147,26 +153,30 @@ export async function spawnOrchestrationChild(
   const parentAgentPath =
     parentAgentPathCandidates.length > 0
       ? parentAgentPathCandidates[0]
-      : "agent";
-  const childAgentPath = `${parentAgentPath}.${loaded.toolName ?? loaded.id}`;
+      : 'agent';
+  const childAgentPath = appendCallPathSegment(
+    parentAgentPath,
+    loaded.toolName ?? loaded.agentId,
+  );
+  const parentSelfId = parentSession.trace?.selfId;
   const childTrace = {
     selfId: crypto.randomUUID(),
     originId: opts.trace?.originId ?? parentSession.trace?.originId,
-    parentId: opts.trace?.parentId ?? parentSession.trace?.parentId,
+    parentId: parentSelfId ?? parentSession.trace?.parentId,
     callPath: childAgentPath,
     agentPath: childAgentPath,
-    turnPath: opts.trace?.turnPath ?? "",
+    turnPath: opts.trace?.turnPath ?? parentSession.trace?.turnPath ?? '',
   };
   const format = loaded.expectedOutput?.format;
   const outputFormat: OutputFormatId =
-    format === "json" ? "json" : format === "text" ? "pipe" : "markdown";
+    format === 'json' ? 'json' : format === 'text' ? 'pipe' : 'markdown';
   return await loaded.run(opts.systemTemplate, opts.userPrompt, {
     history: undefined,
     callbacks: parentSession.callbacks,
     trace: childTrace,
-    renderTarget: "sub-agent",
+    renderTarget: 'sub-agent',
     outputFormat,
-    initialTitle: `Consultation with ${loaded.id}`,
+    initialTitle: `Consultation with ${loaded.agentId}`,
     agentPath: childAgentPath,
     turnPathPrefix: childTrace.turnPath,
     abortSignal: parentSession.abortSignal,

@@ -13,32 +13,21 @@ function buildAdjacencyList(
 
   // eslint-disable-next-line functional/no-loop-statements
   for (const [agentId, agent] of agents) {
-    const orchestration = (
-      agent as {
-        orchestration?: { handoff?: string[]; routerDestinations?: string[] };
-      }
-    ).orchestration;
+    const orchestration = agent.orchestration;
     if (orchestration === undefined) continue;
 
     const neighbors: string[] = [];
 
-    const handoffs = orchestration.handoff;
-    if (handoffs !== undefined) {
-      // eslint-disable-next-line functional/no-loop-statements
-      for (const handoff of handoffs) {
-        if (agents.has(handoff)) {
-          neighbors.push(handoff);
-        }
-      }
+    const handoff = orchestration.handoff;
+    if (handoff !== undefined && agents.has(handoff.path)) {
+      neighbors.push(handoff.path);
     }
 
-    const destinations = orchestration.routerDestinations;
-    if (destinations !== undefined) {
-      // eslint-disable-next-line functional/no-loop-statements
-      for (const dest of destinations) {
-        if (agents.has(dest)) {
-          neighbors.push(dest);
-        }
+    const destinations = orchestration.router?.destinations ?? [];
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const dest of destinations) {
+      if (agents.has(dest.path)) {
+        neighbors.push(dest.path);
       }
     }
 

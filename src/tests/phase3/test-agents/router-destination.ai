@@ -1,0 +1,5 @@
+---
+description: "Router destination agent"
+usage: "Receives routed requests"
+---
+You are the router destination. Reply with "ROUTER-DEST-REPLY" in ${FORMAT}. No tool calls.

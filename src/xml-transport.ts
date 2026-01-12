@@ -64,6 +64,7 @@ export interface XmlBuildMessagesConfig {
   // Context window info (for percentage calculation)
   contextPercentUsed: number;
   forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion';
+  finalTurnTools?: string[];
   noticeContent?: string;
 }
 
@@ -186,6 +187,7 @@ export class XmlToolTransport {
       contextPercentUsed: config.contextPercentUsed,
       hasExternalTools,
       forcedFinalTurnReason: config.forcedFinalTurnReason,
+      finalTurnTools: config.finalTurnTools,
     });
 
     const nextMessage: ConversationMessage = {

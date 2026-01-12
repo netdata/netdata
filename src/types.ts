@@ -568,12 +568,68 @@ export interface AIAgentCallbacks {
   onOpTree?: (tree: unknown) => void;
 }
 
+export interface OrchestrationAgentRef {
+  ref: string;
+  path: string;
+}
+
+export interface OrchestrationConfig {
+  handoff?: OrchestrationAgentRef;
+  advisors?: OrchestrationAgentRef[];
+  router?: { destinations: OrchestrationAgentRef[] };
+}
+
+export interface AgentRunOptions {
+  history?: ConversationMessage[];
+  callbacks?: AIAgentCallbacks;
+  trace?: AIAgentSessionConfig['trace'];
+  renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent';
+  outputFormat: OutputFormatId;
+  abortSignal?: AbortSignal;
+  stopRef?: { stopping: boolean };
+  initialTitle?: string;
+  ancestors?: string[];
+  headendId?: string;
+  telemetryLabels?: Record<string, string>;
+  wantsProgressUpdates?: boolean;
+  traceLLM?: boolean;
+  traceMCP?: boolean;
+  traceSdk?: boolean;
+  verbose?: boolean;
+  agentPath?: string;
+  turnPathPrefix?: string;
+}
+
+export interface OrchestrationRuntimeAgent {
+  ref: string;
+  path: string;
+  agentId: string;
+  promptPath: string;
+  systemTemplate: string;
+  toolName?: string;
+  expectedOutput?: { format: 'json' | 'markdown' | 'text'; schema?: Record<string, unknown> };
+  run: (systemPrompt: string, userPrompt: string, opts?: AgentRunOptions) => Promise<AIAgentResult>;
+}
+
+export interface OrchestrationRuntimeConfig {
+  handoff?: OrchestrationRuntimeAgent;
+  advisors?: OrchestrationRuntimeAgent[];
+  router?: { destinations: OrchestrationRuntimeAgent[] };
+}
+
+export interface RouterSelection {
+  agent: string;
+  message?: string;
+}
+
 export interface AIAgentSessionConfig {
   config: Configuration;
   targets: { provider: string; model: string }[];
   tools: string[];
   // Optional preloaded sub-agent definitions (fully resolved at bootstrap)
   subAgents?: PreloadedSubAgent[];
+  orchestration?: OrchestrationConfig;
+  orchestrationRuntime?: OrchestrationRuntimeConfig;
   // Agent identity (prompt path or synthetic id)
   agentId?: string;
   headendId?: string;
@@ -650,6 +706,9 @@ export interface AIAgentResult {
     trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string };
     conversation: ConversationMessage[];
   }[];
+  routerSelection?: RouterSelection;
+  // The agent id that produced the final report/response (after orchestration)
+  finalAgentId?: string;
   // Isolated final report returned by the model via agent_final_report, when available
   finalReport?: {
     // Allow all known output formats plus legacy 'text'

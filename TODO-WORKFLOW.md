@@ -1,5 +1,171 @@
 # Multi-Agent Workflow Orchestration Design
 
+## Implementation + Verification Task (Jan 12 2026)
+
+### TL;DR
+- Implement + verify the 3 commits ahead of `origin/master` (cdd45d9, 4b158da, a8b3421).
+- Focus: testing framework rework + advisors/router/handoff runtime integration + docs/test alignment.
+- Run all non-commercial tests (including `nova/xxx`); report any gaps.
+
+### Analysis
+- Repo state: `master` is ahead of `origin/master` by 3 commits (cdd45d9, 4b158da, a8b3421).
+- Orchestration modules exist (`src/orchestration/*`), but runtime integration is missing:
+  - Tools registration only includes MCP/REST/Internal/Subagent providers; no router/advisor/handoff provider is registered. (`src/ai-agent.ts:560-771`)
+  - `AIAgentSession.run()` has no pre/post orchestration flow (no advisors/handoff/router orchestration layer). (`src/ai-agent.ts:1152-1290`)
+  - Frontmatter parsing accepts `routerDestinations`/`advisors`/`handoff`, but `LoadedAgent` has no orchestration fields to carry these values forward. (`src/frontmatter.ts:14-186`, `src/agent-loader.ts:49-96`)
+  - Router tool schema only accepts `destination` (no optional `message` payload) and uses `router__handoff-to`. (`src/orchestration/router.ts:21-125`)
+  - Orchestration types use trigger/condition objects (not the TODO-WORKFLOW frontmatter schema). (`src/orchestration/types.ts:1-58`)
+- Docs do not mention `routerDestinations`/`advisors`/`handoff` frontmatter keys (README + docs search).
+- Tests (from prior verification run):
+  - `npm run lint` ✅
+  - `npm run build` ✅
+  - `npm run test:phase1` ✅ (Vitest warning: deprecated `test.poolOptions`)
+  - `npm run test:phase2` ✅ (expected warning noise in harness)
+  - `npm run test:phase3:tier1` ❌ (router scenarios failed: `router__handoff-to` not invoked; tool not registered)
+
+### Current Status Review (Jan 12 2026)
+- **Frontmatter supports `router`, `advisors`, `handoff`** and rejects unknown keys (`routerDestinations` will error).  
+  Evidence: `src/frontmatter.ts:14-21`, `src/frontmatter.ts:109-127`, `src/frontmatter.ts:179-201`.
+- **Handoff is strict single string**; arrays are rejected.  
+  Evidence: `src/frontmatter.ts:196-199`.
+- **Options registry includes advisors/handoff keys (no routerDestinations alias)**.  
+  Evidence: `src/options-registry.ts:103-118`.
+- **Loader resolves orchestration runtime/config + validates router.destinations**.  
+  Evidence: `src/agent-loader.ts:579-633`, `src/agent-loader.ts:596-600`, `src/agent-loader.ts:636-639`.
+- **Router tool provider is registered per session when destinations exist**.  
+  Evidence: `src/ai-agent.ts:761-772`.
+- **Router tool schema supports optional `message` and name `router__handoff-to`**.  
+  Evidence: `src/orchestration/router.ts:11-55`.
+- **Router selection is captured on tool execution**.  
+  Evidence: `src/session-tool-executor.ts:402-416`.
+- **Router selection short-circuits session result in TurnRunner** (returns routerSelection result).  
+  Evidence: `src/session-turn-runner.ts:1786-1796`.
+- **Orchestration wrapper `AIAgent.run` executes advisors pre-run and router/handoff post-run**.  
+  Evidence: `src/ai-agent.ts:2332-2460`.
+- **Tagging uses nonce-suffixed XML-like blocks for advisory/response/original user**.  
+  Evidence: `src/orchestration/prompt-tags.ts:1-38`, `src/orchestration/handoff.ts:60-75`, `src/ai-agent.ts:2378-2421`.
+
+### Current Gaps / Test Mismatches (Jan 12 2026)
+- **Phase 3 test agents still use `routerDestinations`** (now rejected).  
+  Evidence: `src/tests/phase3/test-agents/orchestration-master.ai:9-10`, `src/tests/phase3/test-agents/legal-team.ai:4-5`.
+- **Phase 3 specialist-agent uses `handoff` as list** (now rejected).  
+  Evidence: `src/tests/phase3/test-agents/specialist-agent.ai:4-5`.
+- **Phase 3 router scenario expects router session to call sub-agent directly** (now impossible because router tool selection ends the session and routing happens in `AIAgent.run`).  
+  Evidence: `src/tests/phase3-runner.ts:195-214` (requires `agent__legal-team`), `src/session-turn-runner.ts:1786-1796` (routerSelection returns early).
+- **Phase 3 "advisor" scenario is still tool-driven** (calls `agent__legal-advisor`), not using `advisors:` frontmatter-based orchestration.  
+  Evidence: `src/tests/phase3-runner.ts:170-184`, `src/tests/phase3/test-agents/orchestration-master.ai:14-16`.
+- **Status**: Costa confirmed these Phase 3 tests are wrong and must be rewritten to match the orchestration design.
+
+### Decisions Required (Costa)
+1) **Phase 3 orchestration coverage scope (live LLM; flake-sensitive)**  
+   **Evidence**: Phase 3 runs real models (`docs/TESTING.md:61-116`), and orchestration is specified in README (`README.md:17-41`).  
+   - A) **Minimal core coverage**: 3 scenarios (advisors pre-run, router routing, handoff post-run).  
+     - Pros: lower flake risk/cost; still proves each pattern.  
+     - Cons: misses composition precedence.
+   - B) **Core + precedence**: add router+parent-handoff precedence scenario.  
+     - Pros: validates agreed precedence rule end-to-end.  
+     - Cons: extra runtime/cost; more flake surface.
+   - C) **Full composition**: add advisors+handoff and router+handoff scenarios.  
+     - Pros: strongest end-to-end proof.  
+     - Cons: highest flake/cost; more maintenance.
+   - **Recommendation: B**.
+
+2) **Phase 3 advisor failure testing**  
+   **Evidence**: Advisor failure is specified in TODO (synthetic failure blocks) but real LLM failures are nondeterministic.  
+   - A) **Skip in Phase 3** (keep in unit tests only).  
+     - Pros: stable; avoids nondeterministic failures.  
+     - Cons: no live-provider coverage for failure path.
+   - B) **Include a forced failure scenario** (advisor instructed to error).  
+     - Pros: live coverage.  
+     - Cons: fragile; may pass inconsistently.
+   - **Recommendation: A**.
+
+### Decisions Made (Costa, Jan 12 2026)
+1) **Phase 3 orchestration coverage scope**  
+   - **Chosen: C** — full composition coverage (core + precedence + advisors+handoff + router+handoff).
+2) **Phase 3 advisor failure testing**  
+   - **Chosen: B** — include a forced failure scenario for advisor failure in Phase 3.
+3) **Phase 3 model tiering**  
+   - **Chosen**: nova provider models are Tier 1 (non-commercial), not Tier 2.
+
+### Decisions
+1) **Which orchestration schema should be the source of truth?**
+   - A) **Align implementation to TODO-WORKFLOW spec** (frontmatter `handoff`, `router.destinations`, `advisors` list; router tool accepts destination + optional message; orchestration runs pre/post session).  
+     - Pros: matches existing design doc; clearer UX; supports handoff/router/advisor semantics as agreed.  
+     - Cons: requires wiring + docs updates + tests adjustments.
+   - B) **Adopt current trigger-based types** (`HandoffConfig`/`AdvisorConfig`/`RouterConfig`) and update TODO-WORKFLOW/docs to match.  
+     - Pros: less refactor in orchestration modules/tests.  
+     - Cons: deviates from agreed design; frontmatter format still undefined; higher complexity.
+   - C) **Pause orchestration integration** (leave modules as experimental, remove/skip router scenarios in Phase 3 for now).  
+     - Pros: minimal change now.  
+     - Cons: features remain incomplete; Phase 3 fails; TODO-WORKFLOW stays unfulfilled.
+   - **Recommendation: A** (keep TODO-WORKFLOW as contract and wire implementation to match it).
+   - **Chosen: A (Costa confirmed on Jan 12 2026)** — align implementation to TODO-WORKFLOW spec.
+
+2) **Orchestration config + runtime decisions (Costa, Jan 12 2026)**
+   - **Agent identifiers**: Frontmatter agent references include `.ai` and must reuse existing agent identification logic (no new resolution rules).
+   - **Tool namespaces**: Router/handoff tool must be namespaced; **chosen namespace: `router__`**. Namespace handling must work in final turns and existing namespace checks.
+   - **Missing agents**: Hard failure at load-time if any referenced agent is missing.
+   - **Router terminal choice**: Routers may call `final_report` for trivial replies (e.g., “hello”); allow terminal response per TODO.
+   - **Advisors**: Run with full tools enabled.
+   - **Prompt encapsulation**: Use XML-like tags with a **stable prefix + nonce suffix** and no escaping.
+     - Tag names: `<original_user_request__{nonce}>`, `<advisory__{nonce}>`, `<response__{nonce}>`
+     - Nonce format: **12-char hex**
+     - Nonce scope: **per block** (each tag gets its own nonce)
+     - Advisors: `<original_user_request__{n}>...</original_user_request__{n}>` + `<advisory__{n} agent="...">...</advisory__{n}>` per advisor.
+     - Router: `<original_user_request__{n}>...</original_user_request__{n}>` + optional `<advisory__{n} agent="router-agent-name">...</advisory__{n}>`.
+     - Handoff: `<original_user_request__{n}>...</original_user_request__{n}>` + `<response__{n} agent="agent-name">...</response__{n}>`.
+
+3) **Pending decisions (needs Costa before implementation continues)**
+   - **Orchestration entry-point** (to keep sessions pure while covering all headends).
+   - **Result merge semantics** for handoff/router (what becomes the top-level `AIAgentResult`: `success`, `error`, `finalReport`, `conversation`, `logs`, `accounting`, `opTree`).
+   - **Router + handoff precedence** if both are declared in frontmatter.
+   - **Handoff schema strictness**: accept only a single string or also allow a single-item list for backward tolerance.
+
+### Decisions Made
+1) **Orchestration entry-point** (Costa, Jan 12 2026)
+   - **Chosen**: introduce an orchestration wrapper (e.g., `AIOrchestration.run`) that replaces all direct `AIAgentSession.run` calls.
+   - Behavior: wrapper is **pass-through** when no advisors/router/handoff are configured; otherwise it performs orchestration and then calls the session internally.
+2) **Result merge semantics** (Costa, Jan 12 2026)
+   - **Chosen: 2A** — Parent is primary; child is attached.
+   - Keep parent conversation/logs as top-level; child logs/accounting appended; child final report becomes top-level final report.
+3) **Router + handoff precedence** (Costa, Jan 12 2026)
+   - **Chosen: 3C** — Always apply parent handoff **after** router chain completes.
+   - Flow: `parent -> (router-selected agent + its own handoffs) -> parent handoff target`.
+   - **Clarification**: parent handoff is **never bypassed**. If you want to bypass handoff for a route, attach the handoff to the router destination instead.
+4) **Handoff schema strictness** (Costa, Jan 12 2026)
+   - **Chosen**: strict single handoff only (string). Lists are invalid for now.
+   - If multiple are ever supported later, they must be a **pipeline** (sequential).
+5) **Agent label for XML tags** (Costa, Jan 12 2026)
+   - **Chosen**: use the session/agent ID (current `agentId` / basename) for `agent="..."` in advisory/response tags.
+6) **Orchestrator naming** (Costa, Jan 12 2026)
+   - **Chosen**: use `AIAgent.run` as the orchestration wrapper name (replacing AIOrchestrator).
+   - Rule: only `AIAgent.run` is allowed to call `AIAgentSession.run`; all other call sites must use `AIAgent.run`.
+7) **Current task scope** (Costa, Jan 12 2026)
+   - **Chosen**: verify current code status for routers/advisors/handoff and update TODO with concrete evidence.
+8) **Phase 3 test correction** (Costa, Jan 12 2026)
+   - **Chosen**: Phase 3 tests are incorrect; rewrite them to match the agreed orchestration design (routers/advisors/handoff).
+
+### Plan
+- Read required docs (SPECS, IMPLEMENTATION, DESIGN, MULTI-AGENT, TESTING, AI-AGENT-INTERNAL-API, README, AI-AGENT-GUIDE, SESSION-SNAPSHOTS).
+- Re-audit routers/advisors/handoff runtime against the design (confirm no missing behaviors).
+- Redesign Phase 3 orchestration scenarios to test **frontmatter-driven** advisors/router/handoff flows (ignore current Phase 3 files).
+- Update Phase 3 test agents + runner expectations accordingly (new prompts, new assertions, new agent frontmatter).
+- Update docs as needed (README/TESTING/etc) to describe the new Phase 3 orchestration coverage.
+- Run tests: `npm run lint`, `npm run build`, plus all non-commercial tests (confirm commands; run `nova/xxx`).
+- Report issues with concrete evidence (file + line references) and confirm completeness or list gaps.
+
+### Implied Decisions
+- Proceed with implementation to complete advisors/router/handoff runtime flow per TODO-WORKFLOW.
+
+### Testing Requirements
+- `npm run lint`
+- `npm run build`
+- All non-commercial tests; include `nova/xxx` (confirm exact script names in `package.json`).
+
+### Documentation Updates Required
+- Update docs when behavior changes (README, SPECS/specs, DESIGN, MULTI-AGENT, AI-AGENT-GUIDE, TESTING). Keep in same commit.
+
 ## TL;DR
 - Add 4 orchestration patterns: **Handoff**, **Router**, **Advisors**, **Team**
 - Patterns are frontmatter-driven (decentralized, each agent knows only its immediate needs)
@@ -59,7 +225,10 @@ handoff: approval-gateway
 agent.run(input)
   → session.start(input)
   → result = session output
-  → handoff_agent.run(result)  // recursive!
+  → handoff_agent.run(
+      <original_user_request>...</original_user_request>
+      <response agent="agent-name">...</response>
+    )
   → return handoff_agent's result
 ```
 
@@ -84,13 +253,12 @@ agent.run(input)
   → session.start(input)  // normal conversation with tools/sub-agents
   → router eventually calls handoff-to(destination, message?)
   → downstreamInput =
-      ## ORIGINAL USER REQUEST
-
+      <original_user_request>
       [original input]
-
-      ## MESSAGE FROM AGENT `router-agent-name` WHO ROUTED THIS REQUEST TO YOU
-
+      </original_user_request>
+      <advisory agent="router-agent-name">
       [optional message]
+      </advisory>
   → selectedAgent.run(downstreamInput)
   → return selectedAgent's result
 ```
@@ -137,24 +305,19 @@ agent.run(input)
 - The primary agent receives that failure text in place of the advisor's normal output and proceeds with whatever information is available.
 
 **Enriched message format**:
-```markdown
-## ORIGINAL USER REQUEST
-
+```text
+<original_user_request>
 [original input]
-
-## ANALYSIS GATHERED
-
-### From compliance-checker
-
+</original_user_request>
+<advisory agent="compliance-checker">
 [compliance-checker output]
-
-### From risk-assessor
-
+</advisory>
+<advisory agent="risk-assessor">
 [risk-assessor output]
-
-### From technical-reviewer
-
+</advisory>
+<advisory agent="technical-reviewer">
 [technical-reviewer output]
+</advisory>
 ```
 
 #### 4. Team (`team: { members: [...], ... }`)
@@ -517,9 +680,15 @@ The handoff pattern replaces the previous "next" chaining design. Key elements p
 ---
 
 ## Decisions from Nov 16 2025 Sync with Costa
-1. **Handoff payload shape** – Downstream agents receive only the upstream agent’s `final_report` body (markdown/JSON). No headers, metadata, or serialized `AIAgentResult` objects are forwarded.
+1. **Handoff payload shape** – Downstream agents receive:
+   - `<original_user_request>...</original_user_request>` containing the original user text, and
+   - `<response agent="agent-name">...</response>` containing the upstream `final_report` body.
+   No serialized `AIAgentResult` objects are forwarded.
 2. **Router guard-rails** – Routers retain `agent__final_report`. If the LLM calls it, the router is effectively terminal and no handoff occurs. Otherwise routers are expected to finish via `handoff-to`.
-3. **Advisor transcript formatting** – The enriched prompt includes a markdown header per advisor (e.g., `### From risk-assessor`) followed by the advisor output raw, without transformation or summarization. Failures still get a header but the body is the synthetic failure report as-is.
+3. **Advisor transcript formatting** – The enriched prompt uses XML-like tags:
+   - `<original_user_request>...</original_user_request>`
+   - `<advisory agent="advisor-name">...</advisory>` per advisor (raw output, no transformation).
+   Failures still produce an `<advisory>` block with the synthetic failure report.
 
 ## Clarification Decisions (Nov 17 2025)
 - **Phase 1 scope** – Deliver only “sub-agent chat”: every existing agent can continue talking to any sub-agent it already spawned. No new orchestration patterns ship in this phase.

@@ -17,7 +17,7 @@ import type { SessionProgressReporter } from './session-progress-reporter.js';
 import type { SessionNode, SessionTreeBuilder } from './session-tree.js';
 import type { SubAgentRegistry } from './subagent-registry.js';
 import type { ToolsOrchestrator } from './tools/tools.js';
-import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, CallbackMeta, Configuration, ConversationMessage, LogDetailValue, LogEntry, MCPTool, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, ToolCall, TurnResult, TurnRetryDirective, TurnStatus } from './types.js';
+import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, CallbackMeta, Configuration, ConversationMessage, LogDetailValue, LogEntry, MCPTool, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, RouterSelection, ToolCall, TurnResult, TurnRetryDirective, TurnStatus } from './types.js';
 
 import { ContextGuard, type ContextGuardBlockedEntry, type ContextGuardEvaluation } from './context-guard.js';
 import { FINAL_REPORT_FORMAT_VALUES, type FinalReportManager, type FinalReportSource, type PendingFinalReportPayload } from './final-report-manager.js';
@@ -84,6 +84,7 @@ export interface TurnRunnerContext {
   readonly resolvedSystemPrompt?: string;
   readonly expectedJsonSchema?: Record<string, unknown>;
   readonly taskStatusToolEnabled: boolean;
+  readonly finalTurnAllowedTools?: Set<string>;
   readonly abortSignal?: AbortSignal;
   readonly stopRef?: { stopping: boolean };
   isCanceled: () => boolean;
@@ -140,6 +141,7 @@ interface TurnRunnerState {
     conversation: ConversationMessage[];
     trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string };
   }[];
+  routerSelection?: RouterSelection;
   centralSizeCapHits: number;
   llmAttempts: number;
   llmSyntheticFailures: number;
@@ -216,6 +218,7 @@ export class TurnRunner {
             plannedSubturns: new Map<number, number>(),
             finalTurnEntryLogged: false,
             childConversations: [],
+            routerSelection: undefined,
             centralSizeCapHits: 0,
             llmAttempts: 0,
             llmSyntheticFailures: 0,
@@ -570,6 +573,9 @@ export class TurnRunner {
                         hasExternalTools: allTools.some((tool) => tool.name !== FINAL_REPORT_TOOL),
                         taskStatusToolEnabled: this.ctx.taskStatusToolEnabled,
                         forcedFinalTurnReason: xmlNextForcedReason,
+                        finalTurnTools: this.ctx.finalTurnAllowedTools !== undefined
+                            ? Array.from(this.ctx.finalTurnAllowedTools.values())
+                            : undefined,
                     }, this.state.xmlNextCounter);
                     this.state.xmlNextEvents = xmlNextEvents;
                     this.state.xmlNextCounter = nextOrder;
@@ -587,6 +593,9 @@ export class TurnRunner {
                         maxRetries,
                         contextPercentUsed,
                         forcedFinalTurnReason: xmlNextForcedReason,
+                        finalTurnTools: this.ctx.finalTurnAllowedTools !== undefined
+                            ? Array.from(this.ctx.finalTurnAllowedTools.values())
+                            : undefined,
                         noticeContent: xmlNextContent,
                     });
                     if (xmlResult.pastMessage !== undefined)
@@ -1774,6 +1783,18 @@ export class TurnRunner {
             catch (e) {
                 warn(`endTurn/onOpTree failed: ${e instanceof Error ? e.message : String(e)}`);
             }
+            if (this.state.routerSelection !== undefined) {
+                this.logExit('EXIT-ROUTER-HANDOFF', 'Router selected destination', currentTurn, { fatal: false, severity: 'VRB' });
+                this.emitFinalSummary(logs, accounting);
+                return {
+                    success: true,
+                    conversation,
+                    logs,
+                    accounting,
+                    childConversations: this.state.childConversations,
+                    routerSelection: this.state.routerSelection,
+                };
+            }
             // Preserve lastError for post-loop access
             this.state.lastTurnError = typeof lastError === 'string' ? lastError : undefined;
             this.state.lastTurnErrorType = typeof lastErrorType === 'string' ? lastErrorType : undefined;
@@ -1972,12 +1993,17 @@ export class TurnRunner {
         const filteredSelection = this.filterToolsForProvider(allTools, provider);
         const availableTools = filteredSelection.tools;
         const allowedToolNames = filteredSelection.allowedNames;
-        const toolsForTurn = isFinalTurn
-            ? (() => {
-                const filtered = availableTools.filter((tool: MCPTool) => sanitizeToolName(tool.name) === FINAL_REPORT_TOOL);
-                return filtered.length > 0 ? filtered : availableTools;
-            })()
-            : availableTools;
+        if (!isFinalTurn) {
+            return { availableTools, allowedToolNames, toolsForTurn: availableTools };
+        }
+        const finalAllowed = new Set<string>([FINAL_REPORT_TOOL]);
+        if (this.ctx.finalTurnAllowedTools !== undefined) {
+            this.ctx.finalTurnAllowedTools.forEach((tool) => {
+                finalAllowed.add(sanitizeToolName(tool));
+            });
+        }
+        const filtered = availableTools.filter((tool: MCPTool) => finalAllowed.has(sanitizeToolName(tool.name)));
+        const toolsForTurn = filtered.length > 0 ? filtered : availableTools;
         return { availableTools, allowedToolNames, toolsForTurn };
     }
     private logTurnStart(turn: number): void {
@@ -2000,7 +2026,15 @@ export class TurnRunner {
         const severity = reason === 'task_status_completed' ? 'VRB' as const : 'WRN' as const;
         const baseTurnLabel = `${String(turn)}/${String(originalMaxTurns)}`;
         const activeSuffix = activeMaxTurns !== originalMaxTurns ? `, active_max=${String(activeMaxTurns)}` : '';
-        const message = `Final turn detected (turn=${baseTurnLabel}${activeSuffix}, reason=${reason}); removing all tools to force final-report.`;
+        const allowedFinalTools = (() => {
+            if (this.ctx.finalTurnAllowedTools === undefined)
+                return [];
+            return Array.from(this.ctx.finalTurnAllowedTools.values());
+        })();
+        const toolSuffix = allowedFinalTools.length > 0
+            ? `allowing tools: ${allowedFinalTools.join(', ')}.`
+            : 'removing all tools to force final-report.';
+        const message = `Final turn detected (turn=${baseTurnLabel}${activeSuffix}, reason=${reason}); ${toolSuffix}`;
         const warnEntry: LogEntry = {
             timestamp: Date.now(),
             severity,
@@ -2818,6 +2852,7 @@ export class TurnRunner {
             executedProgressBatchTools: 0,
             unknownToolEncountered: false,
             lastTaskStatusCompleted: this.state.lastTaskStatusCompleted,
+            routerSelection: this.state.routerSelection,
             productiveToolExecutedThisTurn: false,
             onTaskCompletion: () => {
                 // Force final turn immediately when task completion is detected
@@ -2829,11 +2864,13 @@ export class TurnRunner {
         const executor = this.ctx.sessionExecutor.createExecutor(turn, provider, executionState);
 
         // Delegate to the module, passing executionState as stats reference
-        return processLeakedToolCalls({
+        const fallback = await processLeakedToolCalls({
             textContent,
             executor,
             executionStatsRef: executionState,
         });
+        this.state.routerSelection = executionState.routerSelection;
+        return fallback;
     }
 
     private applyToolNameCorrections(messages: ConversationMessage[]): void {
@@ -3244,6 +3281,7 @@ export class TurnRunner {
             executedProgressBatchTools: 0,
             unknownToolEncountered: false,
             lastTaskStatusCompleted: this.state.lastTaskStatusCompleted,
+            routerSelection: this.state.routerSelection,
             productiveToolExecutedThisTurn: false,
             onTaskCompletion: () => {
                 // Force final turn immediately when task completion is detected
@@ -3259,6 +3297,7 @@ export class TurnRunner {
                 this.state.toolLimitExceeded = executionState.toolLimitExceeded;
                 // Sync task status state back to main state
                 this.state.lastTaskStatusCompleted = executionState.lastTaskStatusCompleted;
+                this.state.routerSelection = executionState.routerSelection;
                 if (executionState.finalReportToolFailed) {
                     this.state.finalReportToolFailedThisTurn = true;
                     this.state.finalReportToolFailedEver = true;
@@ -3270,6 +3309,7 @@ export class TurnRunner {
                 this.state.toolLimitExceeded = executionState.toolLimitExceeded;
                 // Sync task status state back to main state
                 this.state.lastTaskStatusCompleted = executionState.lastTaskStatusCompleted;
+                this.state.routerSelection = executionState.routerSelection;
                 if (executionState.finalReportToolFailed) {
                     this.state.finalReportToolFailedThisTurn = true;
                     this.state.finalReportToolFailedEver = true;

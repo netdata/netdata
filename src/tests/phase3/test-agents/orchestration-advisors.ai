@@ -1,0 +1,7 @@
+---
+description: "Phase 3 orchestration master (advisors)"
+usage: "Validates advisor pre-run enrichment"
+advisors:
+  - ./advisor-ok.ai
+---
+You are the advisors orchestration master. Respond in ${FORMAT}.

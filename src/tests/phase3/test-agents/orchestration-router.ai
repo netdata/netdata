@@ -1,0 +1,8 @@
+---
+description: "Phase 3 orchestration master (router)"
+usage: "Validates router selection"
+router:
+  destinations:
+    - ./router-destination.ai
+---
+You are the router orchestration master. Follow router instructions.

@@ -100,29 +100,19 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
     groups: [G_MASTER_OVERRIDES],
   }),
   strArrDef({
-    key: "routerDestinations",
-    default: [],
-    description:
-      "Router destinations for task type routing (format: name:agentPath)",
-    cli: { names: ["--router-destinations"], showInHelp: false },
-    fm: { allowed: true, key: "routerDestinations" },
-    scope: "masterOnly",
-    groups: [G_MASTER_OVERRIDES],
-  }),
-  strArrDef({
     key: "advisors",
     default: [],
     description:
-      "Advisor agents to consult (format: agentPath or taskType:agentPath)",
+      "Advisor agents to consult (list of .ai paths)",
     cli: { names: ["--advisors"], showInHelp: false },
     fm: { allowed: true, key: "advisors" },
     scope: "masterOnly",
     groups: [G_MASTER_OVERRIDES],
   }),
-  strArrDef({
+  strDef({
     key: "handoff",
-    default: [],
-    description: "Handoff configurations for agent delegation",
+    default: undefined,
+    description: "Handoff target agent (.ai path)",
     cli: { names: ["--handoff"], showInHelp: false },
     fm: { allowed: true, key: "handoff" },
     scope: "masterOnly",

@@ -7,8 +7,10 @@ The library performs no direct I/O (no stdout/stderr/file writes). All output, l
 ## Overview
 
 - Library entry: `src/ai-agent.ts` (exported name: `AIAgent`)
-- Primary method: `AIAgent.create(sessionConfig)` → returns a session
-- Execute: `await session.run()` → returns `AIAgentResult`
+- Primary methods:
+  - `AIAgent.create(sessionConfig)` → returns an `AIAgentSession`
+  - `await AIAgent.run(session)` → runs orchestration + session loop, returns `AIAgentResult`
+- `AIAgentSession.run()` is the inner single-agent loop (called by `AIAgent.run`)
 - All diagnostics are available via:
   - Callbacks you provide (real-time stream)
   - The returned `AIAgentResult` (post-run snapshot)
@@ -19,6 +21,8 @@ The library performs no direct I/O (no stdout/stderr/file writes). All output, l
   - `config: Configuration` – providers + MCP servers
   - `targets: { provider: string; model: string }[]` – provider/model pairs
   - `tools: string[]` – MCP servers to expose
+  - `orchestration?: OrchestrationConfig` – resolved refs for advisors/router/handoff (loader only)
+  - `orchestrationRuntime?: OrchestrationRuntimeConfig` – loaded advisors/router/handoff runners
   - `headendId?: string` – optional identifier propagated to logging when the session is created from a headend (REST/MCP/OpenAI/Anthropic)
   - `systemPrompt: string`
   - `userPrompt: string`
@@ -41,6 +45,7 @@ The library performs no direct I/O (no stdout/stderr/file writes). All output, l
 - `AIAgentResult`
   - `success: boolean`
   - `error?: string`
+  - `finalAgentId?: string` – agent id that produced the final report after orchestration
   - `conversation: ConversationMessage[]`
   - `logs: LogEntry[]`
   - `accounting: AccountingEntry[]`
@@ -106,6 +111,8 @@ Emission timing (tool): Immediately after each tool execution completes or fails
 Persistence guidance: The CLI demonstrates persisting accounting to JSONL. As a library user, consume `onAccounting` in real time and/or persist `result.accounting` after `run()`.
 
 ## Lifecycle (what `run()` does)
+
+`AIAgent.run()` wraps the inner `AIAgentSession.run()` loop. When orchestration is configured (advisors/router/handoff), it runs those steps before/after the session and returns the final merged result. When no orchestration is configured it is a pure pass-through.
 
 1. Validate configuration and prompts.
 2. Initialize MCP servers (non-fatal; initialization failures logged as `WRN`).

@@ -8,6 +8,7 @@ import type { AccountingEntry, AIAgentCallbacks, CallbackMeta, LLMAccountingEntr
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 import type { Socket } from 'node:net';
 
+import { AIAgent } from '../ai-agent.js';
 import { mergeCallbacksWithPersistence } from '../persistence.js';
 import { getTelemetryLabels } from '../telemetry/index.js';
 import { normalizeCallPath } from '../utils.js';
@@ -790,7 +791,7 @@ export class OpenAICompletionsHeadend implements Headend {
         telemetryLabels,
         wantsProgressUpdates: true,
       });
-      const result = await session.run();
+      const result = await AIAgent.run(session);
       if (abortController.signal.aborted) {
         if (!res.writableEnded && !res.writableFinished) {
           if (streamed) { writeSseDone(res); } else { writeJson(res, 499, { error: CLIENT_CLOSED_ERROR }); }

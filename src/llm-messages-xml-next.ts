@@ -25,6 +25,7 @@ export interface XmlNextNoticeContext {
   hasExternalTools: boolean;
   taskStatusToolEnabled: boolean;
   forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion';
+  finalTurnTools?: string[];
 }
 
 export const XML_NEXT_SLUGS: Record<string, XmlNextSlugConfig> = {
@@ -33,27 +34,27 @@ export const XML_NEXT_SLUGS: Record<string, XmlNextSlugConfig> = {
     priority: 0,
   },
   final_turn_context: {
-    message: 'Final turn forced by context window limit. You MUST NOW provide your final report/answer and you are not allowed to call any other tool. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation in your final report.',
+    message: 'Final turn forced by context window limit. You MUST NOW provide your final report/answer. If any tools are allowed for this final turn, only call those. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation in your final report.',
     priority: 1,
     stop: true,
   },
   final_turn_max_turns: {
-    message: 'Final turn reached (max turns). You MUST NOW provide your final report/answer and you are not allowed to call any other tool. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation in your final report.',
+    message: 'Final turn reached (max turns). You MUST NOW provide your final report/answer. If any tools are allowed for this final turn, only call those. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation in your final report.',
     priority: 1,
     stop: true,
   },
   final_turn_task_status_completed: {
-    message: 'Task marked completed. You MUST NOW provide your final report/answer and you are not allowed to call any other tool. Use the required XML wrapper and format instructions to deliver your final report/answer.',
+    message: 'Task marked completed. You MUST NOW provide your final report/answer. If any tools are allowed for this final turn, only call those. Use the required XML wrapper and format instructions to deliver your final report/answer.',
     priority: 1,
     stop: true,
   },
   final_turn_task_status_only: {
-    message: 'Repeated standalone task status calls detected without calling any other tools, so final turn has been enforced. You MUST NOW provide your final report/answer and you are not allowed to call any other tool. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation explicitly in your final report/answer.',
+    message: 'Repeated standalone task status calls detected without calling any other tools, so final turn has been enforced. You MUST NOW provide your final report/answer. If any tools are allowed for this final turn, only call those. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation explicitly in your final report/answer.',
     priority: 1,
     stop: true,
   },
   final_turn_retry_exhaustion: {
-    message: 'All retry attempts exhausted, so final turn has been enforced. You MUST NOW provide your final report/answer and you are not allowed to call any other tool. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation explicitly in your final report.',
+    message: 'All retry attempts exhausted, so final turn has been enforced. You MUST NOW provide your final report/answer. If any tools are allowed for this final turn, only call those. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation explicitly in your final report.',
     priority: 1,
     stop: true,
   },
@@ -146,7 +147,10 @@ const buildTurnStatusReason = (context: XmlNextNoticeContext): string => {
 
 const buildFinalWrapperReason = (context: XmlNextNoticeContext): string => {
   const finalSlotId = `${context.nonce}-FINAL`;
-  return `expected format: ${context.expectedFinalFormat}; wrapper: <ai-agent-${finalSlotId} format="${context.expectedFinalFormat}">`;
+  const tools = Array.isArray(context.finalTurnTools) && context.finalTurnTools.length > 0
+    ? `; allowed tools: ${context.finalTurnTools.join(', ')}`
+    : '';
+  return `expected format: ${context.expectedFinalFormat}; wrapper: <ai-agent-${finalSlotId} format="${context.expectedFinalFormat}">${tools}`;
 };
 
 const buildReminderReason = (context: XmlNextNoticeContext): string => {

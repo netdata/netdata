@@ -5,13 +5,14 @@ import process from "node:process";
 import type { GlobalOverrides } from "../agent-loader.js";
 import type {
   AccountingEntry,
+  AIAgentResult,
   ConversationMessage,
   LogEntry,
   ReasoningLevel,
 } from "../types.js";
 
 import { loadAgent, LoadedAgentCache } from "../agent-loader.js";
-import { sanitizeToolName } from "../utils.js";
+import { isPlainObject, sanitizeToolName } from "../utils.js";
 
 import { phase3ModelConfigs } from "./phase3-models.js";
 
@@ -26,6 +27,18 @@ interface ScenarioDefinition {
   readonly minTurns: number;
   readonly requiredAgentTools?: readonly string[];
   readonly requireReasoningSignatures?: boolean;
+  readonly agentPath?: string;
+  readonly expectations?: ScenarioExpectations;
+}
+
+interface ScenarioExpectations {
+  readonly expectedFinalAgentId?: string;
+  readonly expectedRouterSelectionAgent?: string;
+  readonly expectedUserPromptIncludes?: readonly string[];
+  readonly expectedChildPrompts?: readonly {
+    readonly agentId: string;
+    readonly includes: readonly string[];
+  }[];
 }
 
 interface ScenarioVariant {
@@ -74,15 +87,54 @@ const TEST_AGENTS_DIR = path.resolve(
   "test-agents",
 );
 const MASTER_AGENT_PATH = path.join(TEST_AGENTS_DIR, "test-master.ai");
-const ORCHESTRATION_MASTER_PATH = path.join(
+const ORCH_ADVISORS_MASTER_PATH = path.join(
   TEST_AGENTS_DIR,
-  "orchestration-master.ai",
+  "orchestration-advisors.ai",
+);
+const ORCH_ADVISOR_FAILURE_MASTER_PATH = path.join(
+  TEST_AGENTS_DIR,
+  "orchestration-advisor-failure.ai",
+);
+const ORCH_HANDOFF_MASTER_PATH = path.join(
+  TEST_AGENTS_DIR,
+  "orchestration-handoff.ai",
+);
+const ORCH_ROUTER_MASTER_PATH = path.join(
+  TEST_AGENTS_DIR,
+  "orchestration-router.ai",
+);
+const ORCH_ROUTER_HANDOFF_MASTER_PATH = path.join(
+  TEST_AGENTS_DIR,
+  "orchestration-router-handoff.ai",
+);
+const ORCH_ADVISORS_HANDOFF_MASTER_PATH = path.join(
+  TEST_AGENTS_DIR,
+  "orchestration-advisors-handoff.ai",
 );
 const DEFAULT_CONFIG_PATH = path.resolve(PROJECT_ROOT, "neda/.ai-agent.json");
 const FINAL_REPORT_INSTRUCTION =
   'Produce your final answer using the XML wrapper <ai-agent-{nonce}-FINAL format="text">...content...</ai-agent-{nonce}-FINAL> with the required content.';
 const FINAL_REPORT_ARGS =
   '<ai-agent-{nonce}-FINAL format="text">CONTENT</ai-agent-{nonce}-FINAL>';
+const TAG_ORIGINAL = "<original_user_request__";
+const TAG_ADVISORY = "<advisory__";
+const TAG_RESPONSE = "<response__";
+const ATTR_AGENT_ADVISOR_OK = 'agent="advisor-ok"';
+const ADVISOR_PROMPT_PREFIX =
+  "You are the primary agent. Use advisory context if provided.\n\n";
+const ATTR_AGENT_ORCH_HANDOFF = 'agent="orchestration-handoff"';
+const ATTR_AGENT_ORCH_ROUTER = 'agent="orchestration-router"';
+const ATTR_AGENT_ORCH_ROUTER_HANDOFF = 'agent="orchestration-router-handoff"';
+const ATTR_AGENT_ORCH_ADVISORS_HANDOFF = 'agent="orchestration-advisors-handoff"';
+const ATTR_AGENT_ROUTER_DEST = 'agent="router-destination"';
+const ROUTER_NOTE = "ROUTER NOTE";
+const ROUTER_DEST_REF = "./router-destination.ai";
+const ROUTER_DEST_ID = "router-destination";
+const HANDOFF_TARGET_ID = "handoff-target";
+const ADVISOR_FAIL_REF = "./advisor-fail.ai";
+const ADVISOR_FAILURE_MESSAGE = `Advisor consultation failed for ${ADVISOR_FAIL_REF}`;
+const MASTER_HANDOFF_PAYLOAD = "MASTER-HANDOFF-PAYLOAD";
+const ADVISOR_HANDOFF_PAYLOAD = "ADVISOR-HANDOFF-PAYLOAD";
 const BASIC_PROMPT = `${FINAL_REPORT_INSTRUCTION} The content must be exactly "test".`;
 const BASIC_USER = `Output exactly ${FINAL_REPORT_ARGS.replace("CONTENT", "test")} as your final response. No tool calls.`;
 const MULTI_PROMPT = `You are a helpful CI tester helping the verification of multi-turn agentic operation.
@@ -117,101 +169,175 @@ const REQUIRED_AGENT_TOOLS: readonly string[] = [
   "agent__test-agent2",
 ] as const;
 
-const ADVISOR_PROMPT = `You are a legal compliance advisor.
+const ADVISORS_PROMPT =
+  ADVISOR_PROMPT_PREFIX +
+  'Respond with EXACTLY "advisor-enrichment-ok" in ${FORMAT}.';
 
-## Process
-1. Review the request for legal compliance issues
-2. Call agent__legal-advisor with the request parameters
-3. Once the advisor responds, provide your final answer
+const ADVISORS_USER = `Advisor enrichment test.`;
 
-You MUST call agent__legal-advisor tool to get guidance.`;
+const ADVISOR_FAILURE_PROMPT =
+  ADVISOR_PROMPT_PREFIX +
+  'Respond with EXACTLY "advisor-failure-ok" in ${FORMAT}.';
 
-const ADVISOR_USER = `Review contract for compliance
+const ADVISOR_FAILURE_USER = `Advisor failure test.`;
 
-CRITICAL: You MUST call agent__legal-advisor tool. Do not provide direct answers. Call the tool first, then report the guidance.`;
+const HANDOFF_PROMPT =
+  'You are the primary agent.\n\n' +
+  'Respond with EXACTLY "' + MASTER_HANDOFF_PAYLOAD + '" in ${FORMAT}.';
 
-const UNSTABLE_USER = `Check edge case
+const HANDOFF_USER = `Handoff test.`;
 
-CRITICAL: You MUST call agent__unstable-advisor tool. Do not provide direct answers. Call the tool first, then report the response.`;
+const ROUTER_PROMPT = `You are a router. You MUST call router__handoff-to exactly once.
 
-const SPECIALIST_PROMPT = `You are a specialist agent handling complex requests.
+Call router__handoff-to with:
+{"agent":"${ROUTER_DEST_REF}","message":"${ROUTER_NOTE}"}
 
-## Process
-1. Analyze the request
-2. Call agent__specialist-agent with the request
-3. Once the specialist responds, provide your final answer
+Do not answer directly.`;
 
-You MUST call agent__specialist-agent tool to handle this.`;
+const ROUTER_USER = `Routing test.`;
 
-const SPECIALIST_USER = `Handle complex analysis
+const ROUTER_HANDOFF_PROMPT = `You are a router. You MUST call router__handoff-to exactly once.
 
-CRITICAL: You MUST call agent__specialist-agent tool. Do not provide direct answers. Call the tool first, then report the response.`;
+Call router__handoff-to with:
+{"agent":"${ROUTER_DEST_REF}","message":"${ROUTER_NOTE}"}
 
-const ROUTER_PROMPT = `You are a routing agent. ALL requests MUST be routed using router__handoff-to.
+Do not answer directly.`;
 
-## Rules
-1. Every request must be routed - never answer directly
-2. Use router__handoff-to with destination="legal-team" for legal/compliance matters
-3. After routing, you MUST call agent__legal-team to handle the request
-4. Report the sub-agent response as your final answer
+const ROUTER_HANDOFF_USER = `Routing + handoff precedence test.`;
 
-You CANNOT answer questions directly. You MUST route AND call the sub-agent.`;
+const ADVISORS_HANDOFF_PROMPT =
+  ADVISOR_PROMPT_PREFIX +
+  'Respond with EXACTLY "' + ADVISOR_HANDOFF_PAYLOAD + '" in ${FORMAT}.';
 
-const ROUTER_USER = `Legal compliance review needed
-
-STEP 1: Call router__handoff-to with destination="legal-team"
-STEP 2: Call agent__legal-team with the request
-STEP 3: Report the sub-agent response
-
-Do NOT provide direct answers. Route then call sub-agent.`;
+const ADVISORS_HANDOFF_USER = `Advisors + handoff test.`;
 
 // Orchestration scenarios
 const ORCHESTRATION_SCENARIOS: readonly ScenarioDefinition[] = [
   {
     id: "advisor-enrichment",
     label: "advisor-enrichment",
-    systemPrompt: ADVISOR_PROMPT,
-    userPrompt: ADVISOR_USER,
-    minTurns: 2,
-    requiredAgentTools: ["agent__legal-advisor"],
+    systemPrompt: ADVISORS_PROMPT,
+    userPrompt: ADVISORS_USER,
+    minTurns: 1,
+    agentPath: ORCH_ADVISORS_MASTER_PATH,
+    expectations: {
+      expectedFinalAgentId: "orchestration-advisors",
+      expectedUserPromptIncludes: [
+        TAG_ORIGINAL,
+        TAG_ADVISORY,
+        ATTR_AGENT_ADVISOR_OK,
+      ],
+    },
   },
   {
     id: "advisor-failure",
     label: "advisor-failure",
-    systemPrompt: ADVISOR_PROMPT,
-    userPrompt: UNSTABLE_USER,
+    systemPrompt: ADVISOR_FAILURE_PROMPT,
+    userPrompt: ADVISOR_FAILURE_USER,
     minTurns: 1,
-    requiredAgentTools: ["agent__unstable-advisor"],
+    agentPath: ORCH_ADVISOR_FAILURE_MASTER_PATH,
+    expectations: {
+      expectedFinalAgentId: "orchestration-advisor-failure",
+      expectedUserPromptIncludes: [
+        TAG_ORIGINAL,
+        TAG_ADVISORY,
+        ADVISOR_FAILURE_MESSAGE,
+      ],
+    },
   },
   {
     id: "handoff-delegation",
     label: "handoff-delegation",
-    systemPrompt: SPECIALIST_PROMPT,
-    userPrompt: SPECIALIST_USER,
+    systemPrompt: HANDOFF_PROMPT,
+    userPrompt: HANDOFF_USER,
     minTurns: 1,
-    requiredAgentTools: ["agent__specialist-agent"],
+    agentPath: ORCH_HANDOFF_MASTER_PATH,
+    expectations: {
+      expectedFinalAgentId: HANDOFF_TARGET_ID,
+      expectedChildPrompts: [
+        {
+          agentId: HANDOFF_TARGET_ID,
+          includes: [
+            TAG_ORIGINAL,
+            TAG_RESPONSE,
+            ATTR_AGENT_ORCH_HANDOFF,
+          ],
+        },
+      ],
+    },
   },
   {
     id: "router-selection",
     label: "router-selection",
     systemPrompt: ROUTER_PROMPT,
     userPrompt: ROUTER_USER,
-    minTurns: 2,
-    requiredAgentTools: ["router__handoff-to", "agent__legal-team"],
+    minTurns: 1,
+    agentPath: ORCH_ROUTER_MASTER_PATH,
+    expectations: {
+      expectedFinalAgentId: ROUTER_DEST_ID,
+      expectedRouterSelectionAgent: ROUTER_DEST_REF,
+      expectedChildPrompts: [
+        {
+          agentId: ROUTER_DEST_ID,
+          includes: [
+            TAG_ORIGINAL,
+            TAG_ADVISORY,
+            ATTR_AGENT_ORCH_ROUTER,
+          ],
+        },
+      ],
+    },
   },
   {
-    id: "router-terminal",
-    label: "router-terminal-fallback",
-    systemPrompt: ROUTER_PROMPT,
-    userPrompt: `Unknown request type
-
-STEP 1: Call router__handoff-to with destination="unknown-dest"
-STEP 2: You will get error "Unknown destination: unknown-dest"
-STEP 3: Report this error as your final answer
-
-CRITICAL: You MUST call router__handoff-to tool. The router will fail, and you report that as your answer.`,
+    id: "router-handoff-precedence",
+    label: "router-handoff-precedence",
+    systemPrompt: ROUTER_HANDOFF_PROMPT,
+    userPrompt: ROUTER_HANDOFF_USER,
     minTurns: 1,
-    requiredAgentTools: ["router__handoff-to"],
+    agentPath: ORCH_ROUTER_HANDOFF_MASTER_PATH,
+    expectations: {
+      expectedFinalAgentId: HANDOFF_TARGET_ID,
+      expectedRouterSelectionAgent: ROUTER_DEST_REF,
+      expectedChildPrompts: [
+        {
+          agentId: ROUTER_DEST_ID,
+          includes: [
+            TAG_ORIGINAL,
+            TAG_ADVISORY,
+            ATTR_AGENT_ORCH_ROUTER_HANDOFF,
+          ],
+        },
+        {
+          agentId: HANDOFF_TARGET_ID,
+          includes: [TAG_RESPONSE, ATTR_AGENT_ROUTER_DEST],
+        },
+      ],
+    },
+  },
+  {
+    id: "advisors-handoff",
+    label: "advisors-handoff",
+    systemPrompt: ADVISORS_HANDOFF_PROMPT,
+    userPrompt: ADVISORS_HANDOFF_USER,
+    minTurns: 1,
+    agentPath: ORCH_ADVISORS_HANDOFF_MASTER_PATH,
+    expectations: {
+      expectedFinalAgentId: HANDOFF_TARGET_ID,
+      expectedUserPromptIncludes: [
+        TAG_ORIGINAL,
+        TAG_ADVISORY,
+        ATTR_AGENT_ADVISOR_OK,
+      ],
+      expectedChildPrompts: [
+        {
+          agentId: HANDOFF_TARGET_ID,
+          includes: [
+            TAG_RESPONSE,
+            ATTR_AGENT_ORCH_ADVISORS_HANDOFF,
+          ],
+        },
+      ],
+    },
   },
 ] as const;
 
@@ -286,7 +412,10 @@ const parseModelFilter = (value: string): Set<string> => {
 const scenarioVariants: readonly ScenarioVariant[] = (() => {
   const variants: ScenarioVariant[] = [];
   BASE_SCENARIOS.forEach((scenario) => {
-    STREAM_VARIANTS.forEach((stream) => {
+    const streams = scenario.requiredAgentTools !== undefined
+      ? [false]
+      : STREAM_VARIANTS;
+    streams.forEach((stream) => {
       variants.push({ scenario, stream });
     });
   });
@@ -378,18 +507,11 @@ const collectConversationToolCalls = (
   const map = new Map<string, string>();
   conversation.forEach((message) => {
     if (message.role !== "assistant") return;
-    const rawCalls = (message as { toolCalls?: unknown }).toolCalls;
+    const rawCalls = message.toolCalls;
     if (!Array.isArray(rawCalls)) return;
     rawCalls.forEach((call) => {
-      if (call === null || typeof call !== "object") return;
-      const callObj = call as { id?: unknown; name?: unknown };
-      const id =
-        typeof callObj.id === "string" && callObj.id.length > 0
-          ? callObj.id
-          : undefined;
-      const name = typeof callObj.name === "string" ? callObj.name : undefined;
-      if (id === undefined || name === undefined) return;
-      map.set(id, normalizeToolName(name));
+      if (call.id.length === 0 || call.name.length === 0) return;
+      map.set(call.id, normalizeToolName(call.name));
     });
   });
   return map;
@@ -404,7 +526,7 @@ const conversationHasToolCall = (
   if (callMap.size === 0) return false;
   return conversation.some((message) => {
     if (message.role !== "tool") return false;
-    const toolCallId = (message as { toolCallId?: unknown }).toolCallId;
+    const toolCallId = message.toolCallId;
     if (typeof toolCallId !== "string" || toolCallId.length === 0) return false;
     return callMap.get(toolCallId) === normalized;
   });
@@ -419,13 +541,11 @@ const conversationToolOrder = (
   // eslint-disable-next-line functional/no-loop-statements -- imperative scan is clearer for ordered assistant turns
   for (const message of conversation) {
     if (message.role !== "assistant") continue;
-    const rawCalls = (message as { toolCalls?: unknown }).toolCalls;
+    const rawCalls = message.toolCalls;
     if (!Array.isArray(rawCalls)) continue;
     const hasMatch = rawCalls.some((call) => {
-      if (call === null || typeof call !== "object") return false;
-      const nameValue = (call as { name?: unknown }).name;
-      if (typeof nameValue !== "string" || nameValue.length === 0) return false;
-      return normalizeToolName(nameValue) === normalized;
+      if (call.name.length === 0) return false;
+      return normalizeToolName(call.name) === normalized;
     });
     if (hasMatch) {
       return order;
@@ -460,6 +580,52 @@ const isAssistantWithReasoning = (
   );
 };
 
+type ReasoningSegment = NonNullable<ConversationMessage["reasoning"]>[number];
+
+const safeJsonSnippet = (value: unknown, limit = 80): string => {
+  try {
+    const serialized = JSON.stringify(value);
+    if (typeof serialized === "string") return serialized.slice(0, limit);
+  } catch {
+    return "[unstringifiable]";
+  }
+  return "";
+};
+
+const getReasoningSignature = (segment: ReasoningSegment): string | undefined => {
+  const value: unknown = segment;
+  if (!isPlainObject(value)) return undefined;
+  const signature = value.signature;
+  if (typeof signature !== "string" || signature.length === 0) return undefined;
+  return signature;
+};
+
+const describeReasoningSegment = (segment: ReasoningSegment): {
+  readonly keys: string[];
+  readonly providerMetadata?: unknown;
+  readonly textSnippet: string;
+} => {
+  const segmentValue: unknown = segment;
+  if (typeof segmentValue === "string") {
+    return { keys: [], textSnippet: segmentValue.slice(0, 80) };
+  }
+  if (isPlainObject(segmentValue)) {
+    const textValue = segmentValue.text;
+    let textSnippet = "";
+    if (typeof textValue === "string") {
+      textSnippet = textValue.slice(0, 80);
+    } else {
+      textSnippet = safeJsonSnippet(segmentValue);
+    }
+    return {
+      keys: Object.keys(segmentValue),
+      providerMetadata: segmentValue.providerMetadata,
+      textSnippet,
+    };
+  }
+  return { keys: [], textSnippet: safeJsonSnippet(segmentValue) };
+};
+
 interface ReasoningSignatureStatus {
   readonly present: boolean;
   readonly preserved: boolean;
@@ -474,23 +640,117 @@ const analyzeReasoningSignatures = (
   }
 
   const firstMessage = reasoningMessages[0];
-  const firstHasSignature = firstMessage.reasoning.some((segment) => {
-    const candidate = segment as { signature?: unknown };
-    return (
-      typeof candidate.signature === "string" && candidate.signature.length > 0
-    );
-  });
+  const firstHasSignature = firstMessage.reasoning.some(
+    (segment) => getReasoningSignature(segment) !== undefined,
+  );
   const othersHaveSignature = reasoningMessages.slice(1).every((message) => {
-    return message.reasoning.some((segment) => {
-      const candidate = segment as { signature?: unknown };
-      return (
-        typeof candidate.signature === "string" &&
-        candidate.signature.length > 0
-      );
-    });
+    return message.reasoning.some(
+      (segment) => getReasoningSignature(segment) !== undefined,
+    );
   });
   const preserved = firstHasSignature && othersHaveSignature;
   return { present: true, preserved };
+};
+
+const findFirstUserContent = (
+  messages: readonly ConversationMessage[],
+): string | undefined =>
+  messages.find(
+    (message) => message.role === "user" && typeof message.content === "string",
+  )?.content;
+
+type ChildConversation = NonNullable<AIAgentResult["childConversations"]>[number];
+
+const findChildConversation = (
+  childConversations: readonly ChildConversation[] | undefined,
+  agentId: string,
+) => childConversations?.find((entry) => entry.agentId === agentId);
+
+const parseSnippetList = (
+  value: ScenarioExpectations["expectedUserPromptIncludes"],
+): readonly string[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter((snippet): snippet is string => typeof snippet === "string");
+};
+
+const parseChildPromptExpectations = (
+  value: ScenarioExpectations["expectedChildPrompts"],
+): readonly { agentId: string; includes: readonly string[] }[] => {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!isPlainObject(entry)) return [];
+    const agentId = entry.agentId;
+    const includes = entry.includes;
+    if (typeof agentId !== "string" || !Array.isArray(includes)) return [];
+    const includeSnippets = includes.filter(
+      (snippet): snippet is string => typeof snippet === "string",
+    );
+    return [{ agentId, includes: includeSnippets }];
+  });
+};
+
+const applyScenarioExpectations = (
+  session: AIAgentResult,
+  scenario: ScenarioDefinition | undefined,
+  failures: string[],
+): void => {
+  if (scenario?.expectations === undefined) {
+    return;
+  }
+  const expectations = scenario.expectations;
+  if (
+    typeof expectations.expectedFinalAgentId === "string" &&
+    session.finalAgentId !== expectations.expectedFinalAgentId
+  ) {
+    failures.push(
+      `expected finalAgentId ${expectations.expectedFinalAgentId}, got ${session.finalAgentId ?? "undefined"}`,
+    );
+  }
+  if (
+    typeof expectations.expectedRouterSelectionAgent === "string" &&
+    session.routerSelection?.agent !== expectations.expectedRouterSelectionAgent
+  ) {
+    failures.push(
+      `expected routerSelection.agent ${expectations.expectedRouterSelectionAgent}, got ${session.routerSelection?.agent ?? "undefined"}`,
+    );
+  }
+  const userPromptIncludes = parseSnippetList(
+    expectations.expectedUserPromptIncludes,
+  );
+  if (userPromptIncludes.length > 0) {
+    const userContent = findFirstUserContent(session.conversation) ?? "";
+    userPromptIncludes.forEach((snippetText) => {
+      if (!userContent.includes(snippetText)) {
+        failures.push(`expected user prompt to include "${snippetText}"`);
+      }
+    });
+  }
+  const childPromptExpectations = parseChildPromptExpectations(
+    expectations.expectedChildPrompts,
+  );
+  if (childPromptExpectations.length > 0) {
+    childPromptExpectations.forEach((expectation) => {
+      const agentId = expectation.agentId;
+      const entry = findChildConversation(
+        session.childConversations,
+        agentId,
+      );
+      if (entry === undefined) {
+        failures.push(
+          `expected child conversation for agent ${agentId}`,
+        );
+        return;
+      }
+      const childUser = findFirstUserContent(entry.conversation) ?? "";
+      expectation.includes.forEach((snippetText) => {
+        if (!childUser.includes(snippetText)) {
+          failures.push(
+            `expected child ${agentId} prompt to include "${snippetText}"`,
+          );
+        }
+      });
+    });
+  }
 };
 
 const validateScenarioResult = (
@@ -591,6 +851,7 @@ const validateScenarioResult = (
         }
       }
     }
+    applyScenarioExpectations(session, scenario, failures);
     if (reasoningRequested) {
       const { present, preserved } = analyzeReasoningSignatures(
         session.conversation,
@@ -612,23 +873,14 @@ const validateScenarioResult = (
             .filter(isAssistantWithReasoning)
             .map((message, index) => {
               const segments = message.reasoning;
-              const signatureFlags = segments.map((segment) => {
-                const signature = (
-                  segment as unknown as { signature?: unknown }
-                ).signature;
-                return typeof signature === "string";
-              });
+              const signatureFlags = segments.map(
+                (segment) => getReasoningSignature(segment) !== undefined,
+              );
               return {
                 index,
                 segments: segments.length,
                 signatures: signatureFlags,
-                raw: segments.map((segment) => ({
-                  keys: Object.keys(
-                    segment as unknown as Record<string, unknown>,
-                  ),
-                  providerMetadata: segment.providerMetadata,
-                  textSnippet: segment.text.slice(0, 80),
-                })),
+                raw: segments.map((segment) => describeReasoningSegment(segment)),
               };
             });
           console.warn(
@@ -686,12 +938,7 @@ const runScenarioVariant = async (
     maxTurn: 0,
   };
 
-  const isOrchestrationScenario = ORCHESTRATION_SCENARIOS.some(
-    (s) => s.id === scenario.id,
-  );
-  const masterPath = isOrchestrationScenario
-    ? ORCHESTRATION_MASTER_PATH
-    : MASTER_AGENT_PATH;
+  const masterPath = scenario.agentPath ?? MASTER_AGENT_PATH;
 
   try {
     const agent = loadAgent(masterPath, cache, {
@@ -826,7 +1073,15 @@ const printUsage = (): void => {
 };
 
 async function main(): Promise<void> {
-  ensureFileExists("Master agent prompt", MASTER_AGENT_PATH);
+  const masterPaths = new Set<string>([
+    MASTER_AGENT_PATH,
+    ...ORCHESTRATION_SCENARIOS.map((scenario) => scenario.agentPath).filter(
+      (pathValue): pathValue is string => typeof pathValue === "string",
+    ),
+  ]);
+  masterPaths.forEach((promptPath) => {
+    ensureFileExists("Master agent prompt", promptPath);
+  });
   const argv = process.argv.slice(2);
   if (argv.includes("--help") || argv.includes("-h")) {
     printUsage();

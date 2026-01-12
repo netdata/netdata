@@ -7,6 +7,7 @@ import type { AIAgentCallbacks, LogEntry } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 import type { Socket } from 'node:net';
 
+import { AIAgent } from '../ai-agent.js';
 import { getTelemetryLabels } from '../telemetry/index.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
@@ -317,7 +318,7 @@ export class RestHeadend implements Headend {
         telemetryLabels: this.telemetryLabels,
         wantsProgressUpdates: true,
       });
-      const result = await session.run();
+      const result = await AIAgent.run(session);
       if (abortController.signal.aborted || res.writableEnded || res.writableFinished) return;
       if (result.success) {
         const payload: AgentSuccessResponse = {

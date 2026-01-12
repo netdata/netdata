@@ -16,6 +16,7 @@ import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/proto
 import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { Socket } from 'node:net';
 
+import { AIAgent } from '../ai-agent.js';
 import { describeFormat } from '../formats.js';
 import { resolveToolName, type AgentSchemaSummary } from '../schema-adapters.js';
 import { getTelemetryLabels } from '../telemetry/index.js';
@@ -424,7 +425,7 @@ export class McpHeadend implements Headend {
             telemetryLabels,
             wantsProgressUpdates: false,
           });
-          const result = await session.run();
+          const result = await AIAgent.run(session);
           let text = output;
           const finalReport = result.finalReport;
           if (finalReport?.content !== undefined && typeof finalReport.content === 'string' && finalReport.content.trim().length > 0) {

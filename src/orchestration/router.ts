@@ -1,54 +1,55 @@
-import type {
-  ToolExecuteOptions,
-  ToolExecuteResult,
-  ToolKind,
-} from "../tools/types.js";
-import type { MCPTool } from "../types.js";
-import type { RouterConfig, RouterDestination } from "./types.js";
+import type { ToolExecuteOptions, ToolExecuteResult, ToolKind } from '../tools/types.js';
+import type { MCPTool } from '../types.js';
+import type { RouterToolConfig } from './types.js';
 
-import { ToolProvider } from "../tools/types.js";
-
-export interface RoutingResult {
-  destination: string | null;
-  agent: string | null;
-  reason: string;
-}
+import { ToolProvider } from '../tools/types.js';
 
 export interface RouterToolProviderOptions {
-  config: RouterConfig;
+  config: RouterToolConfig;
 }
 
 export class RouterToolProvider extends ToolProvider {
-  readonly kind: ToolKind = "agent";
-  readonly namespace = "router";
-  private readonly config: RouterConfig;
-  private selectedDestination: string | null = null;
-  private static readonly HANDOFF_TOOL_NAME = "handoff-to";
+  static readonly TOOL_NAMESPACE = 'router';
+  static readonly TOOL_NAME = 'handoff-to';
+  static readonly FULL_TOOL_NAME = `${RouterToolProvider.TOOL_NAMESPACE}__${RouterToolProvider.TOOL_NAME}`;
+
+  readonly kind: ToolKind = 'agent';
+  readonly namespace = 'agent';
+  private readonly config: RouterToolConfig;
 
   constructor(opts: RouterToolProviderOptions) {
     super();
     this.config = opts.config;
   }
 
+  static getToolName(): string {
+    return RouterToolProvider.FULL_TOOL_NAME;
+  }
+
   listTools(): MCPTool[] {
     if (this.config.destinations.length === 0) {
       return [];
     }
-    const destinations = this.config.destinations.map((d) => d.name);
     return [
       {
-        name: `${this.namespace}__${RouterToolProvider.HANDOFF_TOOL_NAME}`,
-        description: `Select a destination for routing. Available destinations: ${destinations.join(", ")}`,
+        name: RouterToolProvider.FULL_TOOL_NAME,
+        description:
+          'Route the request to a destination agent, optionally with a note.',
         inputSchema: {
-          type: "object",
+          type: 'object',
           properties: {
-            destination: {
-              type: "string",
-              enum: destinations,
-              description: "The destination to route to",
+            agent: {
+              type: 'string',
+              enum: this.config.destinations,
+              description: 'The destination agent to route to',
+            },
+            message: {
+              type: 'string',
+              description:
+                'Optional context for the destination agent (plain text)',
             },
           },
-          required: ["destination"],
+          required: ['agent'],
           additionalProperties: false,
         },
       },
@@ -56,9 +57,24 @@ export class RouterToolProvider extends ToolProvider {
   }
 
   hasTool(name: string): boolean {
-    return (
-      name === `${this.namespace}__${RouterToolProvider.HANDOFF_TOOL_NAME}`
-    );
+    return name === RouterToolProvider.FULL_TOOL_NAME;
+  }
+
+  override resolveToolIdentity(name: string): {
+    namespace: string;
+    tool: string;
+  } {
+    if (name === RouterToolProvider.FULL_TOOL_NAME) {
+      return {
+        namespace: RouterToolProvider.TOOL_NAMESPACE,
+        tool: RouterToolProvider.TOOL_NAME,
+      };
+    }
+    return { namespace: RouterToolProvider.TOOL_NAMESPACE, tool: name };
+  }
+
+  override resolveLogProvider(): string {
+    return RouterToolProvider.TOOL_NAMESPACE;
   }
 
   async execute(
@@ -66,8 +82,7 @@ export class RouterToolProvider extends ToolProvider {
     parameters: Record<string, unknown>,
     _opts?: ToolExecuteOptions,
   ): Promise<ToolExecuteResult> {
-    const expectedName = `${this.namespace}__${RouterToolProvider.HANDOFF_TOOL_NAME}`;
-    if (name !== expectedName) {
+    if (name !== RouterToolProvider.FULL_TOOL_NAME) {
       return {
         ok: false,
         error: `Unknown tool: ${name}`,
@@ -76,167 +91,49 @@ export class RouterToolProvider extends ToolProvider {
         namespace: this.namespace,
       };
     }
-    const destination = parameters.destination;
-    if (typeof destination !== "string") {
+    const agent = parameters.agent;
+    if (typeof agent !== "string") {
       return {
         ok: false,
-        error: "destination must be a string",
+        error: 'agent must be a string',
         latencyMs: 0,
         kind: this.kind,
         namespace: this.namespace,
       };
     }
-    const dest = this.config.destinations.find((d) => d.name === destination);
-    if (dest === undefined) {
+    if (!this.config.destinations.includes(agent)) {
       return {
         ok: false,
-        error: `Unknown destination: ${destination}`,
+        error: `Unknown agent: ${agent}`,
         latencyMs: 0,
         kind: this.kind,
         namespace: this.namespace,
       };
     }
-    this.selectedDestination = destination;
-    const result: ToolExecuteResult = {
+    const message = parameters.message;
+    if (message !== undefined && typeof message !== 'string') {
+      return {
+        ok: false,
+        error: 'message must be a string when provided',
+        latencyMs: 0,
+        kind: this.kind,
+        namespace: this.namespace,
+      };
+    }
+    await Promise.resolve();
+    return {
       ok: true,
-      result: `Routed to destination: ${destination}`,
+      result: `Routed to agent: ${agent}`,
       latencyMs: 0,
       kind: this.kind,
       namespace: this.namespace,
-      extras: {
-        destination: destination,
-        agent: dest.agent,
-      },
     };
-    await Promise.resolve();
-    return result;
-  }
-
-  getSelectedDestination(): string | null {
-    return this.selectedDestination;
   }
 
   override getInstructions(): string {
     if (this.config.destinations.length === 0) {
-      return "";
+      return '';
     }
-    const destinations = this.config.destinations.map((d) => d.name).join(", ");
-    return `Use the router__handoff-to tool to route to one of the available destinations: ${destinations}`;
+    return `Use ${RouterToolProvider.FULL_TOOL_NAME} to route to one of: ${this.config.destinations.join(', ')}`;
   }
-}
-
-export function routeRequest(
-  config: RouterConfig,
-  context: {
-    taskType?: string;
-    taskDescription?: string;
-  },
-): RoutingResult {
-  if (config.destinations.length === 0) {
-    return {
-      destination: null,
-      agent: null,
-      reason: "No destinations configured",
-    };
-  }
-
-  switch (config.routingStrategy) {
-    case "task_type": {
-      const match = config.destinations.find((dest) =>
-        dest.taskTypes.some((tt) => {
-          const taskType = context.taskType;
-          if (taskType === undefined) return false;
-          return taskType.toLowerCase().includes(tt.toLowerCase());
-        }),
-      );
-      if (match !== undefined) {
-        return {
-          destination: match.name,
-          agent: match.agent,
-          reason: "Matched task type",
-        };
-      }
-      break;
-    }
-    case "priority": {
-      const sorted = [...config.destinations].sort(
-        (a, b) => (b.defaultPriority ?? 0) - (a.defaultPriority ?? 0),
-      );
-      return {
-        destination: sorted[0]?.name ?? null,
-        agent: sorted[0]?.agent ?? null,
-        reason: "Highest priority",
-      };
-    }
-    case "round_robin": {
-      const now = Date.now();
-      const index = now % config.destinations.length;
-      const dest = config.destinations[index];
-      return {
-        destination: dest.name,
-        agent: dest.agent,
-        reason: "Round robin selection",
-      };
-    }
-    case "dynamic": {
-      const scored = config.destinations.map((dest) => ({
-        dest,
-        score: scoreDestination(dest, context),
-      }));
-      scored.sort((a, b) => b.score - a.score);
-      if (scored[0].score > 0) {
-        return {
-          destination: scored[0].dest.name,
-          agent: scored[0].dest.agent,
-          reason: "Highest dynamic score",
-        };
-      }
-      break;
-    }
-  }
-
-  if (config.defaultDestination !== undefined) {
-    const defaultDest = config.destinations.find(
-      (d) => d.name === config.defaultDestination,
-    );
-    if (defaultDest !== undefined) {
-      return {
-        destination: defaultDest.name,
-        agent: defaultDest.agent,
-        reason: "Using default destination",
-      };
-    }
-  }
-
-  return { destination: null, agent: null, reason: "No matching destination" };
-}
-
-function scoreDestination(
-  dest: RouterDestination,
-  context: { taskType?: string; taskDescription?: string },
-): number {
-  let score = 0;
-  const taskType = context.taskType ?? "";
-  if (dest.taskTypes.includes(taskType)) {
-    score += 10;
-  }
-  const taskDesc = context.taskDescription?.toLowerCase() ?? "";
-  if (taskDesc.length > 0) {
-    const desc = dest.description;
-    if (desc !== undefined && taskDesc.includes(desc.toLowerCase())) {
-      score += 5;
-    }
-  }
-  return score;
-}
-
-export function listRouterDestinations(config: RouterConfig): string[] {
-  return config.destinations.map((d) => d.name);
-}
-
-export function getRouterDestination(
-  config: RouterConfig,
-  destinationName: string,
-): RouterDestination | undefined {
-  return config.destinations.find((d) => d.name === destinationName);
 }
