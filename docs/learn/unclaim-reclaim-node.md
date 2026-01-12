@@ -57,7 +57,7 @@ Use this process when you need to move a node from one Space to another without 
    rm /var/lib/netdata/registry/netdata.public.unique.id
    ```
 
-3. Exit the container and recreate it with the new claim token
+3. Exit the container. The node is now disconnected from the current Space.
 
 ## Reclaim to a New Space
 
