@@ -152,11 +152,11 @@ warn: $this > 60  # Warn if CPU data is >60 seconds old
 From Netdata's stock alerts (`disks.conf`):
 
 ```conf
-alarm: disk_space_usage
-   on: disk.space
- calc: $used * 100 / ($avail + $used)
- warn: $this > (($status >= $WARNING ) ? (80) : (90))
- crit: ($this > (($status == $CRITICAL) ? (90) : (98))) && $avail < 5
+template: disk_space_usage
+          on: disk.space
+       calc: $used * 100 / ($avail + $used)
+        warn: $this > (($status >= $WARNING ) ? (80) : (90))
+        crit: ($this > (($status == $CRITICAL) ? (90) : (98))) && $avail < 5
 ```
 
 Variables used: `$used`, `$avail`, `$this`, `$status`, `$WARNING`, `$CRITICAL`
@@ -507,10 +507,10 @@ alarm: high_cpu_and_low_memory
 
 **Example:**
 ```conf
-alarm: disk_space_usage
-   on: disk.space
- calc: $used * 100 / ($avail + $used)
- warn: $this > 80
+template: disk_space_usage
+          on: disk.space
+       calc: $used * 100 / ($avail + $used)
+        warn: $this > 80
 ```
 
 This works across all disk instances (sda, sdb, nvme0n1, etc.) because they all share the `disk.space` context.

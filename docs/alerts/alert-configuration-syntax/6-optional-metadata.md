@@ -60,14 +60,14 @@ These fields show up in Netdata Cloud alert views and event feeds, filtering UI,
 **Example:**
 
 ```conf
-alarm: disk_space_usage
-   on: disk.space
-  calc: $used * 100 / ($avail + $used)
-  warn: $this > (($status >= $WARNING) ? (80) : (90))
-  crit: ($this > (($status == $CRITICAL) ? (90) : (98))) && $avail < 5
- class: Utilization
-  type: System
-component: Disk
+template: disk_space_usage
+       on: disk.space
+   calc: $used * 100 / ($avail + $used)
+    warn: $this > (($status >= $WARNING) ? (80) : (90))
+    crit: ($this > (($status == $CRITICAL) ? (90) : (98))) && $avail < 5
+   class: Utilization
+    type: System
+ component: Disk
 ```
 
 In this example, `class: Utilization` indicates this is a resource usage alert. SREs can filter for all `Utilization` class alerts when doing capacity planning. You can build silencing rules that target all `Utilization` alerts in non-production environments.

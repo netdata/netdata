@@ -108,18 +108,18 @@ Add this alert definition:
 ```conf
 # Alert when root filesystem free space drops below 20%
 alarm: root_filesystem_low_space
-   on: disk.space./
- lookup: average -1m percentage of avail
-  units: %
-  every: 1m
-   warn: $this < 20
-   crit: $this < 10
-   info: Root filesystem has less than 20% free space
+   on: disk_space./
+  lookup: average -1m percentage of avail
+   units: %
+   every: 1m
+    warn: $this < 20
+    crit: $this < 10
+    info: Root filesystem has less than 20% free space
 ```
 
 **What this does:**
 - `alarm:` gives the alert a unique name
-- `on:` attaches it to the `disk.space./` chart (root filesystem)
+- `on:` attaches it to the `disk_space./` chart (root filesystem, chart ID uses underscore)
 - `lookup:` aggregates data over the last minute
 - `warn:` and `crit:` define warning and critical thresholds
 
@@ -152,7 +152,7 @@ Both chart IDs and contexts use **dots** in their naming convention.
 
 **The difference is specificity:**
 - **Chart IDs** (for `alarm` rules): Reference **specific chart instances**
-  - Example: `disk.space./` (root filesystem only)
+  - Example: `disk_space./` (root filesystem only)
   - Example: `system.cpu` (CPU chart on this specific node)
   
 - **Contexts** (for `template` rules): Reference **chart types**
