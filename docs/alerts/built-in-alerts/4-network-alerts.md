@@ -56,12 +56,7 @@ Tracks SSL/TLS handshake failures which may indicate certificate or protocol pro
 
 ## 11.4.3 DNS Monitoring
 
-### dns_query_time
 
-Tracks resolution latency for DNS-dependent applications.
-
-**Context:** `dns_query.query_time`
-**Thresholds:** WARN > 50ms, CRIT > 200ms
 
 ### dns_query_failures
 
@@ -90,7 +85,8 @@ Tracks non-2xx responses indicating client or server errors.
 
 Monitors 95th percentile latency for SLA compliance.
 
-**Context:** `httpcheck.response_time`
+**Context:** `httpcheck.status`
+**Dimensions:** response_time
 **Thresholds:** WARN > 2s
 
 ## Related Sections

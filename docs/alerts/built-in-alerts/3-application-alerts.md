@@ -28,13 +28,6 @@ Identifies workloads generating excessive slow query traffic, which often preced
 **Context:** `mysql.queries`
 **Thresholds:** WARN > 5/s
 
-#### mysql_innodb_buffer_pool_bytes
-
-Monitors InnoDB buffer pool usage to prevent memory pressure on buffer pool-intensive workloads.
-
-**Context:** `mysql.innodb_buffer_pool_bytes`
-**Thresholds:** WARN > 90%
-
 ### PostgreSQL
 
 #### pg_stat_database_deadlocks

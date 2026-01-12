@@ -51,27 +51,6 @@ Monitors restart counts which indicate application stability.
 
 Kubernetes pod alerts require the Netdata Kubernetes collector and provide visibility into pod health from the cluster perspective.
 
-### k8s_pod_ready
-
-Monitors the Kubernetes readiness probe status. Pods that fail readiness checks are not routable from Services.
-
-**Context:** `k8s_state.pod_condition`
-**Thresholds:** CRIT not ready
-
-### k8s_pod_restarting
-
-Container restart counts indicate application stability. Uses thresholds of three and ten restarts per hour.
-
-**Context:** `k8s_state.pod_container_restarts`
-**Thresholds:** WARN > 3, CRIT > 10
-
-### k8s_pod_not_scheduled
-
-Catches pods stuck in Pending state because no node has capacity to satisfy resource requests.
-
-**Context:** `k8s_state.pod_condition`
-**Thresholds:** CRIT > 5 minutes
-
 ### k8s_container_cpu_limits
 
 Fires when containers reach 90% of their configured CPU limits, indicating the limit may be constraining performance.
@@ -88,26 +67,14 @@ Fires when containers reach 90% of their configured memory limits.
 
 ## 11.2.3 Kubernetes Node Alerts
 
-### node_not_ready
+Kubernetes node alerts are available through kubelet metrics.
 
-Kubernetes node ready status. A not-ready node cannot schedule new workloads and may indicate hardware or system problems.
+### kubelet_node_ready
 
-**Context:** `k8s_state.node_condition`
-**Thresholds:** CRIT not ready
+Kubernetes node ready status from kubelet perspective.
 
-### node_disk_pressure
-
-Node disk pressure indicates that kubelet is managing pressure on local storage.
-
-**Context:** `k8s_state.node_condition`
-**Thresholds:** WARN > 0
-
-### node_memory_pressure
-
-Node memory pressure indicates the node is approaching memory exhaustion.
-
-**Context:** `k8s_state.node_condition`
-**Thresholds:** WARN > 0
+**Context:** `k8s_kubelet.kubelet_node_config_error`
+**Thresholds:** CRIT > 0 (config error)
 
 ## Related Sections
 

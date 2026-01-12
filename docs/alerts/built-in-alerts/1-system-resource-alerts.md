@@ -97,7 +97,7 @@ Measures the percentage of time the disk spends processing I/O requests. At 80% 
 
 Average wait time for I/O operations. High latency indicates the disk cannot keep up with workload demands.
 
-**Context:** `disk`
+**Context:** `disk.backlog`
 **Thresholds:** WARN > 50ms, CRIT > 100ms
 
 ## 11.1.5 Network Interface Alerts

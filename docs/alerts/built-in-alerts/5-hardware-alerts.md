@@ -24,60 +24,7 @@ Tracks individual disk failures within RAID arrays.
 **Context:** `adaptecraid.physical_device_state`
 **Thresholds:** CRIT > 0
 
-## 11.5.2 SMART Monitoring
-
-### smart_self_test
-
-Monitors the results of regular SMART self-tests. Self-test failures indicate imminent disk failure.
-
-**Context:** `smartctl.device_smart_status`
-**Thresholds:** WARN > 0, CRIT > 0
-
-### smart_reallocated_sectors
-
-Tracks bad sector remapping which indicates the disk is beginning to fail.
-
-**Context:** `smartctl.device_smart_attr_reallocated_sectors`
-**Thresholds:** WARN > 0
-
-### smart_pending_sectors
-
-Monitors pending sector remaps that indicate imminent failure.
-
-**Context:** `smartctl.device_smart_attr_pending_sectors`
-**Thresholds:** WARN > 0
-
-### smart_wear_level
-
-For SSDs, tracks remaining write endurance.
-
-**Context:** `smartctl.device_smart_attr_wear_level`
-**Thresholds:** WARN < 10% remaining
-
-## 11.5.3 Temperature Monitoring
-
-### sensor_temperature
-
-Monitors hardware temperatures with thresholds that vary by device specifications.
-
-**Context:** `sensors.temperature`
-**Thresholds:** WARN > 80C, CRIT > 90C
-
-### fan_speed_low
-
-Detects when fans are spinning below expected RPM, indicating potential cooling failure.
-
-**Context:** `sensors.tach`
-**Thresholds:** WARN < 90% of expected
-
-### fan_speed_zero
-
-Critical alert for completely stopped fans.
-
-**Context:** `sensors.tach`
-**Thresholds:** CRIT == 0
-
-## 11.5.4 Power Monitoring
+## 11.5.2 Power Monitoring
 
 ### ups_battery_charge
 
@@ -93,13 +40,6 @@ Fires immediately when mains power fails and system switches to battery.
 **Context:** `apcupsd.ups_status`
 **Thresholds:** CRIT > 0
 
-### ups_input_voltage
-
-Monitors input voltage for instability or power quality issues.
-
-**Context:** `apcupsd.ups_input_voltage`
-**Thresholds:** WARN > 10% deviation
-
 ### ups_load_percentage
 
 Tracks UPS load percentage to prevent overloading.
@@ -107,7 +47,7 @@ Tracks UPS load percentage to prevent overloading.
 **Context:** `apcupsd.ups_load_capacity_utilization`
 **Thresholds:** WARN > 80%, CRIT > 90%
 
-## 11.5.5 BMC/IPMI Monitoring
+## 11.5.3 BMC/IPMI Monitoring
 
 ### bmc_temp
 
