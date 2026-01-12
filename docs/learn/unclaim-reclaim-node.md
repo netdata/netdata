@@ -54,7 +54,6 @@ Use this process when you need to move a node from one Space to another without 
 
    ```bash
    rm -rf /var/lib/netdata/cloud.d/
-   rm /var/lib/netdata/registry/netdata.public.unique.id
    ```
 
 3. Exit the container. The node is now disconnected from the current Space.
