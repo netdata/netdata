@@ -44,6 +44,7 @@ const (
 	prioMySQLCommandExecutionDurationHistogram
 	prioMySQLUserConnectionsUtilization
 	prioMySQLUserConnectionsCount
+	prioHostgroupStatus
 	prioBackendStatus
 	prioBackendConnectionsUsage
 	prioBackendConnectionsRate
@@ -605,6 +606,62 @@ func (c *Collector) removeMySQLUserCharts(user string) {
 }
 
 var (
+	hostgroupChartsTmpl = module.Charts{
+		hostgroupBackendsStatusChartTmpl.Copy(),
+	}
+
+	hostgroupBackendsStatusChartTmpl = module.Chart{
+		ID:       "hostgroup_%s_backends_status",
+		Title:    "Hostgroup backends count in each status",
+		Units:    "backends",
+		Fam:      "hostgroup backends",
+		Ctx:      "proxysql.hostgroup_backends_status",
+		Priority: prioHostgroupStatus,
+		Dims: module.Dims{
+			{ID: "hostgroup_%s_backends_ONLINE", Name: "online"},
+			{ID: "hostgroup_%s_backends_SHUNNED", Name: "shunned"},
+			{ID: "hostgroup_%s_backends_OFFLINE_SOFT", Name: "offline_soft"},
+			{ID: "hostgroup_%s_backends_OFFLINE_HARD", Name: "offline_hard"},
+		},
+	}
+)
+
+func newHostgroupCharts(hg string) *module.Charts {
+	charts := hostgroupChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, hg)
+		chart.Labels = []module.Label{
+			{Key: "hostgroup", Value: hg},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, hg)
+		}
+	}
+
+	return charts
+}
+
+func (c *Collector) addHostgroupCharts(hg string) {
+	charts := newHostgroupCharts(hg)
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
+	}
+}
+
+func (c *Collector) removeHostgroupCharts(hg string) {
+	prefix := "hostgroup_" + hg
+
+	for _, chart := range *c.Charts() {
+		if strings.HasPrefix(chart.ID, prefix) {
+			chart.MarkRemove()
+			chart.MarkNotCreated()
+		}
+	}
+}
+
+var (
 	backendChartsTmpl = module.Charts{
 		backendStatusChartTmpl.Copy(),
 		backendConnectionsUsageChartTmpl.Copy(),
@@ -695,6 +752,7 @@ func newBackendCharts(hg, host, port string) *module.Charts {
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, backendID(hg, host, port))
 		chart.Labels = []module.Label{
+			{Key: "hostgroup", Value: hg},
 			{Key: "host", Value: host},
 			{Key: "port", Value: port},
 		}

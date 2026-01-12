@@ -389,9 +389,26 @@ modules:
               chart_type: line
               dimensions:
                 - name: used
+        - name: hostgroup
+          description: These metrics refer to the backends hostgroup.
+          labels:
+            - name: hostgroup
+              description: hostgroup identifier
+          metrics:
+            - name: proxysql.hostgroup_backends_status
+              description: Hostgroup backends count in each status
+              unit: backends
+              chart_type: line
+              dimensions:
+                - name: online
+                - name: shunned
+                - name: offline_soft
+                - name: offline_hard
         - name: backend
           description: These metrics refer to the backend server.
           labels:
+            - name: hostgroup
+              description: backend server hostgroup
             - name: host
               description: backend server host
             - name: port

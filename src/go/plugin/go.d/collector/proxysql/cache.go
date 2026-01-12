@@ -4,9 +4,10 @@ package proxysql
 
 type (
 	cache struct {
-		commands map[string]*commandCache
-		users    map[string]*userCache
-		backends map[string]*backendCache
+		commands   map[string]*commandCache
+		users      map[string]*userCache
+		backends   map[string]*backendCache
+		hostgroups map[string]*hostgroupCache
 	}
 	commandCache struct {
 		command            string
@@ -20,6 +21,10 @@ type (
 		hg, host, port     string
 		hasCharts, updated bool
 	}
+	hostgroupCache struct {
+		hg                 string
+		hasCharts, updated bool
+	}
 )
 
 func (c *cache) reset() {
@@ -31,6 +36,9 @@ func (c *cache) reset() {
 	}
 	for k, m := range c.backends {
 		c.backends[k] = &backendCache{hg: m.hg, host: m.host, port: m.port, hasCharts: m.hasCharts}
+	}
+	for k, m := range c.hostgroups {
+		c.hostgroups[k] = &hostgroupCache{hg: m.hg, hasCharts: m.hasCharts}
 	}
 }
 
@@ -58,6 +66,15 @@ func (c *cache) getBackend(hg, host, port string) *backendCache {
 	if !ok {
 		v = &backendCache{hg: hg, host: host, port: port}
 		c.backends[id] = v
+	}
+	return v
+}
+
+func (c *cache) getHostgroup(hg string) *hostgroupCache {
+	v, ok := c.hostgroups[hg]
+	if !ok {
+		v = &hostgroupCache{hg: hg}
+		c.hostgroups[hg] = v
 	}
 	return v
 }
