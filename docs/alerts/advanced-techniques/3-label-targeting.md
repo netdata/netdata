@@ -1,5 +1,7 @@
 # 8.3 Host, Chart, and Label-Based Targeting
 
+Labels enable fine-grained alert scoping to specific hosts, services, or chart instances using metadata attached to nodes and charts.
+
 ## 8.3.1 Understanding Labels
 
 Netdata supports:

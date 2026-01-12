@@ -1,5 +1,7 @@
 # 5.4 Controlling Who Gets Notified
 
+Recipient routing determines which people or teams receive alerts based on severity, role, or alert-specific rules.
+
 ### 5.4.1 Severity-to-Recipient Mapping
 
 In Cloud integrations, you can configure which severities trigger notifications:
@@ -40,12 +42,12 @@ integration: Email ops-team@company.com
 ```conf
 # In local health configuration
 template: critical_service
-   on: health.service
-   lookup: average -1m of status
-   every: 1m
-   crit: $this == 0
-   to: ops-pager@company.com
-   from: ops-team@company.com
+    on: systemd.service_unit_state
+    lookup: average -1m of status
+    every: 1m
+    crit: $this == 0
+    to: ops-pager@company.com
+    from: ops-team@company.com
 ```
 
 ## 5.4.4 Related Sections

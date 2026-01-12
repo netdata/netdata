@@ -1,5 +1,7 @@
 # 6.3 Application-Level Alerts
 
+These templates demonstrate application-specific monitoring using contexts provided by database and web server collectors.
+
 ## 6.3.1 MySQL Alerts
 
 ```conf

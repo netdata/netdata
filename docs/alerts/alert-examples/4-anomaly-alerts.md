@@ -1,5 +1,7 @@
 # 6.4 Anomaly-Based Alerts
 
+Anomaly detection uses Netdata's ML models to identify unusual metric behavior without fixed thresholds. Requires `ml.conf` enabled on the node.
+
 ## 6.4.1 Anomaly Bit Alert
 
 ```conf

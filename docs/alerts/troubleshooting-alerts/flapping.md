@@ -1,6 +1,6 @@
 # 7.3 Alert Flapping
 
-The alert rapidly switches between statuses.
+Rapid status transitions between CLEAR, WARNING, and CRITICAL create notification noise and erode trust in alerts.
 
 ## 7.3.1 Symptoms
 

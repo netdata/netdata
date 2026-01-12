@@ -1,6 +1,6 @@
 # 7.4 Variables or Metrics Not Found
 
-The alert fails to load or shows errors about missing variables.
+Configuration errors referencing non-existent variables or dimensions prevent alerts from loading.
 
 ## 7.4.1 Debugging Variables
 

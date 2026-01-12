@@ -69,12 +69,12 @@ DEFAULT_RECIPIENT_PD=" pagerduty-group"
 
 ```conf
 template: custom_alert
-   on: health.service
-   lookup: average -1m of status
-   every: 1m
-   crit: $this == 0
-   exec: /usr/lib/netdata/custom/alert-handler.sh
-   to: custom-recipient
+    on: systemd.service_unit_state
+    lookup: average -1m of status
+    every: 1m
+    crit: $this == 0
+    exec: /usr/lib/netdata/custom/alert-handler.sh
+    to: custom-recipient
 ```
 
 See **8.4 Custom Actions with `exec`** for full details.

@@ -1,5 +1,7 @@
 # 6.1 Core System Alerts
 
+These templates demonstrate the most common alerts for fundamental server resources. Each example targets the `system.` contexts that exist on every Netdata node.
+
 ## 6.1.1 CPU Utilization Alert
 
 ```conf

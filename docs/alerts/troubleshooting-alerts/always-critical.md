@@ -1,6 +1,6 @@
 # 7.2 Alert Always Critical or Warning
 
-The alert never returns to `CLEAR`.
+The alert never returns to `CLEAR`. This typically indicates threshold issues, calculation errors, or variable problems.
 
 ## 7.2.1 Common Causes
 

@@ -1,5 +1,7 @@
 # 6.5 Trend and Capacity Alerts
 
+Capacity planning alerts use `calc` to project when resources will be exhausted based on current usage trends.
+
 ## 6.5.1 Disk Days Remaining
 
 ```conf

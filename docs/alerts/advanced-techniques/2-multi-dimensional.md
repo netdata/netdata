@@ -1,5 +1,7 @@
 # 8.2 Multi-Dimensional and Per-Instance Alerts
 
+Multi-dimensional alerts target specific dimensions within a chart, while templates create alerts for every matching chart instance automatically.
+
 ## 8.2.1 Dimension Selection
 
 ```conf

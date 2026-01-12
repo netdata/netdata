@@ -1,5 +1,7 @@
 # 6.2 Service and Availability Alerts
 
+These templates monitor service reachability and collector health using the `portcheck` and `httpcheck` contexts.
+
 ## 6.2.1 TCP Port Unreachable
 
 ```conf
