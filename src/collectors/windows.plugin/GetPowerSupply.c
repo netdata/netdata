@@ -40,7 +40,7 @@ static inline void netdata_update_power_supply_values(
     if (bs.Capacity != BATTERY_UNKNOWN_CAPACITY) {
         NETDATA_DOUBLE num = bs.Capacity;
         NETDATA_DOUBLE den = bi->FullChargedCapacity;
-        num = (den) ? num/ den : 0;
+        num = (den) ? num / den : 0;
 
         power_supply_root->capacity->value = (unsigned long long)(num * 100.0);
     }
@@ -75,7 +75,7 @@ static void netdata_power_supply_plot(struct simple_property *voltage, int updat
 
 int do_GetPowerSupply(int update_every, usec_t dt __maybe_unused)
 {
-    static struct simple_property voltage;
+    static struct simple_property voltage = {0};
 
     HDEVINFO hdev = SetupDiGetClassDevs(&GUID_DEVCLASS_BATTERY, 0, 0, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
     if (hdev == INVALID_HANDLE_VALUE)
@@ -145,10 +145,13 @@ int do_GetPowerSupply(int update_every, usec_t dt __maybe_unused)
             freez(power_supply_root->name);
         if (likely(power_supply_root->capacity->filename))
             freez(power_supply_root->capacity->filename);
+        if (likely(voltage.filename))
+            freez(voltage.filename);
 
-        power_supply_root->name = power_supply_root->capacity->filename = NULL;
+        power_supply_root->name = power_supply_root->capacity->filename = voltage.filename = NULL;
         power_supply_root->name = strdupz(name);
         power_supply_root->capacity->filename = strdupz(power_supply_root->name);
+        voltage.filename = strdupz(power_supply_root->name);
 
         netdata_update_power_supply_values(hBattery, &voltage, &bi, &bqi);
 
