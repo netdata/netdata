@@ -2,6 +2,18 @@
 
 ### Merged Pull Requests:
 
+- Fix(go.d/vnodes): add additionalProperties to config_schema.json ([#21503](https://github.com/netdata/netdata/issues/21503))
+- Fix(edit-config): ignore container variable inherited from /etc/profile ([#21505](https://github.com/netdata/netdata/issues/21505))
+- Fix: add procfile parsing for non-seekable files ([#21507](https://github.com/netdata/netdata/issues/21507))
+- Fix(go.d/proxysql): correct backend status metric mapping ([#21524](https://github.com/netdata/netdata/issues/21524))
+- Fix(go.d/pkg/logs):  fix ParserConfig.CSV omitempty behavior ([#21526](https://github.com/netdata/netdata/issues/21526))
+- Use the same type for all time_group_value values ([#21528](https://github.com/netdata/netdata/issues/21528))
+- Fix(diskspace.plugin): exclude ZFS datasets ([#21532](https://github.com/netdata/netdata/issues/21532))
+
+## [2.8.4] - 2025-12-17
+
+### Merged Pull Requests:
+
 - Build(deps): update go toolchain to v1.25.5 ([#21459](https://github.com/netdata/netdata/issues/21459))
 - Chore(go.d): include Go version in build info ([#21473](https://github.com/netdata/netdata/issues/21473))
 
