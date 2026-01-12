@@ -44,9 +44,9 @@ lookup: average -1m percentage of avail
 
 ```conf
 template: net_errors_high
-    on: net.net
-lookup: average -5m of errors
-    units: packets
+    on: net.errors
+lookup: average -5m of inbound,outbound
+    units: errors
     every: 1m
      warn: $this > 0
      crit: $this > 10

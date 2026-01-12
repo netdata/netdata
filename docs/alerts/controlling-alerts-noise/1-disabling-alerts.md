@@ -64,8 +64,8 @@ If you want to stop the alert from **ever changing status** but still see it in 
 ```conf
 template: noisy_alert
    on: system.cpu
-   warn: ($this) = 0
-   crit: ($this) = 0
+   warn: ($this) == 0
+   crit: ($this) == 0
 ```
 
 This keeps the alert loaded but ensures it never triggers notifications.
