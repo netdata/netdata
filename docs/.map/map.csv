@@ -83,6 +83,7 @@ https://github.com/netdata/netdata/edit/master/docs/nodes-ephemerality.md,Node T
 ,,,,
 https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/README.md,Netdata Cloud,Published,Netdata Cloud,
 https://github.com/netdata/netdata/edit/master/src/claim/README.md,Connect Agent,Published,Netdata Cloud,
+https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/claim-agent.md,netdata-claim.sh,Published,Netdata Cloud,Complete reference for the netdata-claim.sh script for connecting Netdata Agents to Netdata Cloud.
 https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md,Spaces and Rooms,Published,Netdata Cloud/Spaces and Rooms,
 https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/node-rule-based-room-assignment.md,Node Rule-Based Room Assignment,Published,Netdata Cloud/Spaces and Rooms,
 https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/versions.md,Versions,Unpublished,Netdata Cloud/Versions,
