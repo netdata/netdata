@@ -1,12 +1,15 @@
 # Session Lifecycle
 
 ## TL;DR
-Session created via static factory, executes main loop with turn-level retries, finalizes with cleanup and accounting flush.
+Session created via static factory; `AIAgent.run()` wraps orchestration (advisors/router/handoff) around the inner `AIAgentSession.run()` loop.
 
 ## Source Files
 - `src/ai-agent.ts:769-837` - `AIAgentSession.create()`
-- `src/ai-agent.ts:1037-1388` - `AIAgentSession.run()`
-- `src/ai-agent.ts:1390-2600+` - `executeAgentLoop()`
+- `src/ai-agent.ts:1037-1388` - `AIAgentSession.run()` (inner loop)
+- `src/ai-agent.ts:2332-2460` - `AIAgent.run()` (orchestration wrapper)
+- `src/orchestration/*` - advisors/router/handoff helpers
+- `src/session-tool-executor.ts` - router selection capture
+- `src/session-turn-runner.ts` - router short-circuit
 
 ## Lifecycle Phases
 
@@ -55,7 +58,19 @@ Session created via static factory, executes main loop with turn-level retries, 
 - ToolsOrchestrator mapping populated before first turn
 - All providers registered synchronously
 
-### 3. Execution (`run()`)
+### 3. Orchestration Wrapper (`AIAgent.run`)
+**Location**: `src/ai-agent.ts:2332-2460`
+
+**Steps**:
+1. If no orchestration is configured, call `AIAgentSession.run()` directly.
+2. **Advisors**: run advisor sessions in parallel with the original user prompt.
+3. Build an enriched prompt containing `<original_user_request>` and `<advisory>` blocks (synthetic failures included).
+4. Run the main session with the enriched prompt.
+5. If the session selected a router destination, run the router target with an advisory block (optional router message).
+6. If `handoff` is configured, run the handoff target with `<original_user_request>` and `<response>` blocks.
+7. Merge results (parent conversation/logs + child accounting/logs; child final report becomes top-level).
+
+### 4. Execution (`AIAgentSession.run`)
 **Location**: `src/ai-agent.ts:1037-1388`
 
 **Steps**:
@@ -84,7 +99,7 @@ Session created via static factory, executes main loop with turn-level retries, 
 - Uncaught exception: log EXIT-UNCAUGHT-EXCEPTION, emit FIN summary, return failure
 - Always cleanup toolsOrchestrator in finally block
 
-### 4. Agent Loop (`executeAgentLoop`)
+### 5. Agent Loop (`executeAgentLoop`)
 **Location**: `src/ai-agent.ts:1390-2600+`
 
 **Structure**:
@@ -137,7 +152,7 @@ for turn = 1 to maxTurns:
 - If exceeds limit: enforce final turn or skip provider
 - Post-shrink warning if still over limit after enforcement
 
-### 5. Turn Execution (`executeSingleTurn`)
+### 6. Turn Execution (`executeSingleTurn`)
 **Location**: `src/ai-agent.ts:3521-3952`
 
 **Steps**:
@@ -154,7 +169,7 @@ for turn = 1 to maxTurns:
 5. Process streaming response (if enabled)
 6. Return turn result with messages, tokens, status
 
-### 6. Tool Execution
+### 7. Tool Execution
 **After successful LLM turn with tool calls**:
 
 1. Log assistant message with tool calls
@@ -169,7 +184,7 @@ for turn = 1 to maxTurns:
 3. When reservation succeeds: add tool result messages to conversation
 4. Continue to next turn (or retry if context guard enforced a final turn)
 
-### 7. Finalization
+### 8. Finalization
 **Triggered by**:
 - `agent__final_report` tool called
 - Max turns reached
@@ -183,7 +198,7 @@ for turn = 1 to maxTurns:
 4. End all open operations in opTree
 5. Return AIAgentResult
 
-### 8. Cleanup
+### 9. Cleanup
 **Finally block responsibilities**:
 
 1. `toolsOrchestrator.cleanup()` - closes MCP connections

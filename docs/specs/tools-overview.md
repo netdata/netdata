@@ -218,6 +218,25 @@ Final turn is forced only when all three conditions are met:
 }
 ```
 
+### RouterToolProvider (Orchestration)
+**Kind**: `agent`
+**Namespace**: `router` (logs) / `agent` (tool registry)
+
+**Tool**: `router__handoff-to`
+
+**Parameters**:
+```typescript
+{
+  agent: string;    // required, must be one of router.destinations
+  message?: string; // optional advisory text for the destination
+}
+```
+
+**Behavior**:
+- Registered only when `router.destinations` is configured in frontmatter.
+- A successful call records the router selection for the wrapper (`AIAgent.run`) to delegate.
+- The inner session returns early once a router selection exists.
+
 ### AgentProvider
 **Kind**: `agent`
 **Namespace**: `subagent`
@@ -248,6 +267,7 @@ Final turn is forced only when all three conditions are met:
 - `rest__weather_api` - REST tool 'weather_api'
 - `agent__researcher` - Sub-agent 'researcher'
 - `agent__final_report` - Internal tool
+- `router__handoff-to` - Router delegation tool
 
 **Sanitization**:
 - Replace invalid characters with underscores

@@ -12,6 +12,14 @@ Layered architecture with strict separation: CLI → Session → LLM Client → 
 
 ## Core Components
 
+### 0. AIAgent (Orchestration Wrapper)
+**Responsibility**: Runs advisors/router/handoff around the inner session loop.
+
+**Lifecycle**:
+1. `AIAgent.run(session)` executes orchestration if configured.
+2. Calls `AIAgentSession.run()` for the main loop.
+3. Applies router delegation and handoff after the main session.
+
 ### 1. AIAgentSession (`src/ai-agent.ts`)
 **Responsibility**: Multi-turn orchestration, retry logic, context management
 
@@ -59,6 +67,7 @@ Layered architecture with strict separation: CLI → Session → LLM Client → 
 - RestProvider - REST/OpenAPI tools
 - InternalToolProvider - Built-in tools (task_status, final_report, batch)
 - AgentProvider - Sub-agent invocation
+- RouterToolProvider - `router__handoff-to` (registered only when router destinations are configured)
 
 ### 4. SessionTreeBuilder (`src/session-tree.ts`)
 **Responsibility**: Hierarchical operation tracking (opTree)
@@ -81,6 +90,10 @@ Session
 ### Request Flow
 ```
 User Prompt
+    ↓
+AIAgent.run()
+    ↓
+(advisors pre-run, if configured)
     ↓
 AIAgentSession.run()
     ↓

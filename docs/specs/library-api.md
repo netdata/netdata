@@ -30,10 +30,7 @@ export { AIAgent, AIAgentSession } from './ai-agent.js';
 export { LLMClient } from './llm-client.js';
 ```
 
-`AIAgent` is an alias for `AIAgentSession`:
-```typescript
-export { AIAgentSession as AIAgent };
-```
+`AIAgent` is a wrapper class that runs orchestration (advisors/router/handoff) around the inner session loop.
 
 ### Type Exports
 ```typescript
@@ -75,7 +72,7 @@ export type {
 import { AIAgent, type AIAgentSessionConfig } from 'ai-agent-claude';
 
 const session = AIAgent.create(config);
-const result = await session.run();
+const result = await AIAgent.run(session);
 ```
 
 Static factory method validates and enriches configuration.
@@ -316,7 +313,7 @@ async function main() {
 
   // Create and run session
   const session = AIAgent.create(sessionConfig);
-  const result = await session.run();
+  const result = await AIAgent.run(session);
 
   // Process result
   if (result.success) {
@@ -372,7 +369,7 @@ const sessionConfig: AIAgentSessionConfig = {
 setTimeout(() => controller.abort(), 300000);
 
 const session = AIAgent.create(sessionConfig);
-const result = await session.run();
+const result = await AIAgent.run(session);
 ```
 
 ### With Trace Context
@@ -412,7 +409,7 @@ const sessionConfig: AIAgentSessionConfig = {
    - Creates LLM client
    - Initializes session state
 
-2. **Execution**: `session.run()`
+2. **Execution**: `AIAgent.run(session)` (applies orchestration when configured)
    - Prepares system/user prompts
    - Initializes MCP servers
    - Enters turn loop
@@ -505,7 +502,7 @@ All errors populate `result.error` and set `result.success = false`.
 
 1. **Factory pattern**: Private constructor, use `create()`
 2. **Immutable result**: Result is defensive copy
-3. **Single run**: Each session runs once
+3. **Single run**: Each session runs once (use `AIAgent.run`, not `session.run`, unless you intentionally want to skip orchestration)
 4. **Validation first**: All validation before session creation
 5. **Trace enrichment**: Transaction IDs auto-generated if missing
 6. **Callback isolation**: Callback errors don't crash session

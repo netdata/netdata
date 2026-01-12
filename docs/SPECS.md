@@ -26,6 +26,15 @@ Our conversation schemas, reasoning payloads, tool definitions, and streaming ex
 - A maximum tool-turns cap (`defaults.maxTurns`) is enforced. On the final allowed turn, tools are disabled and XML-NEXT carries the final-turn instruction; no additional system notices are injected outside XML-NEXT and TURN-FAILED. This guarantees a final answer without an error.
 - Stop-reason handling: if the upstream stop reason is exactly `refusal` or `content-filter`, the turn is treated as a hard failure (`invalid_response`); the truncated response is discarded, and the retry/fallback flow takes over.
 
+## Orchestration Patterns (Advisors, Router, Handoff)
+
+Orchestration is frontmatter-driven and executed by `AIAgent.run()` around the inner `AIAgentSession.run()` loop.
+
+- **Advisors (pre-run)**: each advisor runs in parallel with the original user prompt; their outputs are injected into the main user prompt as `<advisory>` blocks. Failures produce a synthetic advisory block describing the error so the main agent can continue.
+- **Router (post-run)**: when `router.destinations` is configured, the session exposes the internal tool `router__handoff-to` with parameters `{ agent, message? }`. If the router calls this tool, the request is delegated to the selected destination and the router’s optional message becomes an advisory block for that destination.
+- **Handoff (post-run)**: when `handoff` is configured, the agent’s final response is passed to the handoff target as `<response agent="...">` alongside the original user request.
+- **Precedence**: if both router and handoff are configured, the router chain completes first and the parent handoff runs last.
+
 ## Hardcoded Strings (LLM-facing)
 
 LLM-facing strings are centralized in `src/llm-messages.ts`, `src/llm-messages-xml-next.ts`, and `src/llm-messages-turn-failed.ts` (plus XML templates they render). This includes:

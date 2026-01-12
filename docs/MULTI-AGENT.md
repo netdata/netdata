@@ -34,6 +34,17 @@ This document proposes and specifies an in‑memory, preloaded, multi‑agent sy
 
 ## Architecture Overview
 
+### Frontmatter Orchestration (Advisors, Router, Handoff)
+- **Purpose**: deterministic, frontmatter‑driven coordination that runs outside the session loop via `AIAgent.run()`.
+- **How it differs from sub-agent tools**:
+  - Advisors/handoff/router are **not** tool calls; they are orchestration steps before/after the main session.
+  - Sub‑agents still run as tools (`agent__*`) inside the main session.
+  - Both paths preserve full session isolation.
+- **Flow**:
+  - Advisors run in parallel before the main session and inject advisory blocks into the user prompt.
+  - Routers expose `router__handoff-to` and can delegate to a destination agent with an optional message.
+  - Handoff runs last and passes the upstream response to the target agent.
+
 ### Parent Agent (Orchestrator)
 - Loads a Subagent Registry at startup (paths configured in a special config or the parent’s frontmatter).
 - Exposes one AI‑SDK‑compatible tool per sub‑agent to the parent LLM (tool name, description, input schema from child frontmatter).

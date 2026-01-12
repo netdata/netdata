@@ -31,6 +31,14 @@ output:
 models: anthropic/claude-3-5-sonnet
 tools: mcp-server-1,mcp-server-2
 agents: sub-agent-1,sub-agent-2
+advisors:
+  - ./agents/compliance.ai
+  - ./agents/security.ai
+router:
+  destinations:
+    - ./agents/legal.ai
+    - ./agents/support.ai
+handoff: ./agents/manager.ai
 maxTurns: 10
 maxToolCallsPerTurn: 20
 maxRetries: 3
@@ -118,6 +126,9 @@ interface FrontmatterOptions {
   models?: string | string[];
   tools?: string | string[];
   agents?: string | string[];
+  advisors?: string | string[];
+  router?: { destinations?: string | string[] };
+  handoff?: string;
   usage?: string;
   maxTurns?: number;
   maxToolCallsPerTurn?: number;
@@ -135,6 +146,14 @@ interface FrontmatterOptions {
   caching?: CachingMode;
 }
 ```
+
+## Orchestration Fields
+
+- `advisors`: string or string[] (agent paths). Parsed verbatim and resolved later by the agent loader.
+- `router.destinations`: string[] (agent paths). Must be an object with a `destinations` list.
+- `handoff`: string (single agent path). Arrays are rejected with an error.
+
+Validation occurs during frontmatter parsing (`src/frontmatter.ts`), and reference resolution happens in the loader (`src/agent-loader.ts`).
 
 ## Schema Loading
 

@@ -21,7 +21,22 @@ Architecture
   - `providers[providerName]`: `{ apiKey?: string; baseUrl?: string }`
   - `providers[providerName].models[modelName]`: `{ contextWindow?: number; tokenizer?: string; contextWindowBufferTokens?: number; overrides?: ...; interleaved?: boolean | string }`
   - `mcpServers[name]`: `{ type: 'stdio'|'websocket'|'http'|'sse', command?: string|[string,...], args?: string[], url?: string, headers?: Record<string,string>, env?: Record<string,string>, enabled?: boolean }`
-  - `defaults`: `{ llmTimeout?: number; toolTimeout?: number; temperature?: number; topP?: number; topK?: number; repeatPenalty?: number; contextWindowBufferTokens?: number }`
+- `defaults`: `{ llmTimeout?: number; toolTimeout?: number; temperature?: number; topP?: number; topK?: number; repeatPenalty?: number; contextWindowBufferTokens?: number }`
+
+Orchestration layer (advisors/router/handoff)
+
+- Entry point: `AIAgent.run(session)` wraps the inner `AIAgentSession.run()` loop.
+- Source files:
+  - `src/orchestration/execute-advisors.ts` (advisors pre-run)
+  - `src/orchestration/router.ts` + `src/orchestration/handle-router.ts` (router tool + routing)
+  - `src/orchestration/handoff.ts` (handoff post-run)
+  - `src/orchestration/prompt-tags.ts` (nonce-tagged prompt blocks)
+  - `src/ai-agent.ts` (orchestration wrapper + tool registration)
+- Behavior:
+  - Advisors run in parallel before the main session and inject `<advisory>` blocks into the user prompt. Failures return synthetic advisory blocks so the main agent can continue.
+  - Router registers `router__handoff-to` with `{ agent, message? }` and captures selections during tool execution (`src/session-tool-executor.ts`). The turn runner returns early when a router selection exists (`src/session-turn-runner.ts`), so the wrapper can delegate.
+  - Handoff runs after the main session (and after any router chain). The handoff prompt includes `<original_user_request>` and `<response agent="...">` blocks.
+  - If both router and handoff are configured, the router chain completes first and the parent handoff runs last.
 
 2) MCP client layer (libs/typescript-sdk)
 

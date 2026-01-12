@@ -3,6 +3,7 @@
 ## Core Principle: Complete Session Autonomy
 
 Each AI agent session is a **completely independent universe** with ZERO shared state. Agents running concurrently share absolutely nothing.
+Orchestration (advisors/router/handoff) is layered **outside** the session loop so the session itself stays pure and isolated.
 
 ## Architecture Overview
 
@@ -13,6 +14,7 @@ Each AI agent session is a **completely independent universe** with ZERO shared 
 #### ai-agent.ts (High-Level Business Logic)
 - AIAgent (Static factory for creating completely isolated sessions)
 - AIAgentSession (Autonomous agent with complete isolated state)
+- `AIAgent.run()` wraps the inner `AIAgentSession.run()` to execute advisors (pre-run) and router/handoff (post-run)
 - Main agent loop orchestrating turns, retries, and provider switching
 - Session state management and immutable operations
 - **Does NOT care about LLM details or tool execution mechanics**
@@ -99,6 +101,7 @@ interface ToolResult {
 ### Component Interaction Flow
 
 1. **ai-agent.ts** orchestrates the main loop:
+   - `AIAgent.run()` executes orchestration (advisors/router/handoff) and calls `AIAgentSession.run()` internally
    - Calls **llm-client.ts** for each turn
    - Receives `TurnResult` with clear status
    - Makes decisions on retries/provider switching based on status

@@ -87,6 +87,8 @@
    - **Chosen: B** — include a forced failure scenario for advisor failure in Phase 3.
 3) **Phase 3 model tiering**  
    - **Chosen**: nova provider models are Tier 1 (non-commercial), not Tier 2.
+4) **Documentation coverage for advisors/router/handoff** (Costa, Jan 12 2026)  
+   - **Chosen**: update all required docs (AI-AGENT-GUIDE, SPECS, IMPLEMENTATION, DESIGN, MULTI-AGENT) to include advisors/router/handoff and frontmatter keys.
 
 ### Decisions
 1) **Which orchestration schema should be the source of truth?**

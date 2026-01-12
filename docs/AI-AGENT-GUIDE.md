@@ -82,6 +82,45 @@
 | `reasoningTokens` | number or string | undefined | `0`/`disabled` disables provider reasoning cache. |
 | `caching` | `full|none` | `full` | Anthropic cache control. |
 
+## Orchestration (Advisors, Router, Handoff)
+- Orchestration is **frontmatter-driven** and runs outside the session loop.
+- `AIAgent.run()` applies orchestration: advisors **pre-run**, router/handoff **post-run**.
+- You do **not** write any tags yourself; the runtime injects them.
+
+### Orchestration keys
+
+| Key | Type | Required | Behavior |
+| --- | --- | --- | --- |
+| `advisors` | string \| string[] | no | Runs each advisor in parallel before the main session. Outputs are injected as advisory blocks. Failures become synthetic advisory blocks. |
+| `router.destinations` | string[] | no | Registers `router__handoff-to` with an enum of destinations. The router can call this tool to delegate. |
+| `handoff` | string | no | Runs after the main session (and after any router chain). The handoff agent receives the original user request + the upstream response. |
+
+### Router tool (when `router.destinations` is set)
+- Tool name: `router__handoff-to`
+- Parameters:
+  - `agent` (string, required): must be one of `router.destinations`
+  - `message` (string, optional): advisory text passed to the destination
+
+### Frontmatter example
+```yaml
+---
+advisors:
+  - ./agents/compliance.ai
+  - ./agents/security.ai
+router:
+  destinations:
+    - ./agents/legal.ai
+    - ./agents/support.ai
+handoff: ./agents/manager.ai
+---
+```
+
+### Execution order (when combined)
+1) Advisors run in parallel → outputs injected into the main user prompt.
+2) Main session runs.
+3) Router handoff (if invoked) routes to a destination agent.
+4) Parent handoff runs last (if configured).
+
 - **Example**:
 ```yaml
 #!/usr/bin/env ai-agent
@@ -118,6 +157,7 @@ You synthesize research data into concise briefs. Answer in ${FORMAT}.
 - [ ] Define `toolName` when exposing the agent as a callable tool.
 - [ ] Provide JSON schemas whenever `format: json` is declared.
 - [ ] Reference `${FORMAT}` in the prompt body so headends can inject target instructions.
+- [ ] If using orchestration, ensure all referenced agent paths exist and are registered.
 
 ## 3. Prompt Variable Expansion & Includes
 - **Include directives**: `${include:relative/path}` or `{{include:relative/path}}` inline files **before** frontmatter parsing (implementation: `src/include-resolver.ts`).
