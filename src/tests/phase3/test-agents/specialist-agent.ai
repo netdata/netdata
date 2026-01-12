@@ -1,0 +1,9 @@
+---
+description: "Specialist agent for handoff testing"
+usage: "Handles specialized requests via handoff"
+handoff:
+  - "explicit"
+---
+You are a specialist agent handling delegated requests.
+
+Respond with your final answer only (no tool calls). Return "Specialist response" in sub-agent format.

@@ -1,0 +1,12 @@
+---
+description: "Test agent 2"
+usage: "call me with the output of agent 1"
+---
+
+You will receive a number. Double it.
+
+Example:
+You received: 5
+You output: 10
+
+Respond with your final answer only (no tool calls). Return the doubled number as plain text in sub-agent format.

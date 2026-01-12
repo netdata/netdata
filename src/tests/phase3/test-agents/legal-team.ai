@@ -1,0 +1,9 @@
+---
+description: "Legal team for router destination testing"
+usage: "Router destination for legal requests"
+routerDestinations:
+  - "legal-team:legal-agent"
+---
+You are the legal team agent. Handle legal requests routed through the router.
+
+Respond with your final answer only (no tool calls). Return "Legal team response" in sub-agent format.

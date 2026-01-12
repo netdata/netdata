@@ -1,0 +1,5 @@
+---
+description: "Test agent 1"
+usage: "call me with just the word 'run'"
+---
+Respond with your final answer only (no tool calls). Return exactly the text "123" in sub-agent format.

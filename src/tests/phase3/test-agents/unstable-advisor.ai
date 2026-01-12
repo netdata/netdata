@@ -1,0 +1,8 @@
+---
+description: "Unstable advisor for failure testing"
+usage: "Testing advisor failure handling"
+advisors: []
+---
+You are an unstable advisor that may fail during consultations.
+
+(This agent is used to test advisor failure handling paths.)
