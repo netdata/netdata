@@ -527,7 +527,7 @@ lookup: METHOD(GROUPING OPTIONS) AFTER [at BEFORE] [every DURATION] [OPTIONS] [o
 
 | Parameter          | Purpose                     | Details                                                              |
 |--------------------|-----------------------------|----------------------------------------------------------------------|
-| `GROUPING OPTIONS` | Conditional processing      | `CONDITION VALUE` where condition is `!=`, `=`, `<=`, `<`, `>`, `>=` |
+| `GROUPING OPTIONS` | Conditional processing      | `CONDITION VALUE` where condition is `!=`, `=`, `==`, `<=`, `<`, `>`, `>=` |
 | `at BEFORE`        | End of lookup timeframe     | Default is 0 (now)                                                   |
 | `every DURATION`   | Update frequency            | Supports `s`, `m`, `h`, `d` units                                    |
 | `OPTIONS`          | Processing modifiers        | See options table below                                              |

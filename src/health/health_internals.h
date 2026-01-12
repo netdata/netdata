@@ -98,6 +98,9 @@ struct health_plugin_globals {
 extern struct health_plugin_globals health_globals;
 
 int health_readfile(const char *filename, void *data, bool stock_config);
+
+// for unit testing
+int health_parse_db_lookup(size_t line, const char *filename, char *string, struct rrd_alert_config *ac);
 void unlink_alarm_notify_in_progress(ALARM_ENTRY *ae);
 void wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up(void);
 
