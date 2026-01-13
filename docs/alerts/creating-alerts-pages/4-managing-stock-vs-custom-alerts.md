@@ -342,7 +342,7 @@ Look for:
 **Check:**
 1. **Alert name matches exactly** (stock and custom must use the same name)
 2. **Custom alert loads after stock** (it's in `/etc/netdata/health.d/`, not `/usr/lib/...`)
-3. **No syntax errors** (check `/var/log/netdata/error.log`)
+3. **No syntax errors** (check `/var/log/netdata/health.log`)
 4. **Health configuration reloaded** (`sudo netdatacli reload-health`)
 
 </details>

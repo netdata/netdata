@@ -76,10 +76,12 @@ You can also disable alerts programmatically:
 
 ```bash
 # Disable a specific alert
-curl -s "http://localhost:19999/api/v1/health?cmd=disable&alarm=my_alert"
+curl -s -H "X-Auth-Token: YOUR_TOKEN" \
+  "http://localhost:19999/api/v1/manage/health?cmd=disable&alarm=my_alert"
 
 # Disable all alerts
-curl -s "http://localhost:19999/api/v1/health?cmd=disable_all"
+curl -s -H "X-Auth-Token: YOUR_TOKEN" \
+  "http://localhost:19999/api/v1/manage/health?cmd=disable_all"
 ```
 
 See **9.4 Health Management API** for full documentation.

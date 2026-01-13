@@ -143,7 +143,7 @@ Look for messages mentioning `health configuration`, `loading health` or `reload
 On systems where Netdata writes to its own log file, you might see something like:
 
 ```bash
-sudo tail -n 200 /var/log/netdata/error.log
+sudo tail -n 200 /var/log/netdata/health.log
 ```
 
 Common issues you might see:
@@ -242,7 +242,7 @@ Use this checklist every time you change alerts:
 - **Cloud UI:** create/edit the alert in Health configuration, wait a few seconds for propagation (see **2.3.6**)
 
 **2. Check for errors**
-- Run `journalctl -u netdata` or check `/var/log/netdata/error.log`
+- Run `journalctl -u netdata` or check `/var/log/netdata/health.log`
 - Fix any syntax or load errors and reload health again
 
 **3. Confirm presence**

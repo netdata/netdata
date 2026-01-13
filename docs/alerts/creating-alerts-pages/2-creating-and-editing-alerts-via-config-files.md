@@ -263,7 +263,7 @@ After reloading, verify your alerts are active and error-free.
 ### Check for Errors in the Log
 
 ```bash
-sudo tail -n 100 /var/log/netdata/error.log | grep -iE "(health|alarm|template)"
+sudo tail -n 100 /var/log/netdata/health.log | grep -iE "(health|alarm|template)"
 ```
 
 Common issues:

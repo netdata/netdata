@@ -15,7 +15,7 @@ curl -s "http://localhost:19999/api/v1/alarms?test=1"
 **Check notification logs:**
 
 ```bash
-sudo tail -n 100 /var/log/netdata/error.log | grep -i notification
+sudo tail -n 100 /var/log/netdata/health.log | grep -i notification
 ```
 
 ## 5.5.2 Testing Cloud Notifications
@@ -41,7 +41,7 @@ sudo tail -n 100 /var/log/netdata/error.log | grep -i notification
 1. Is the alert firing? Check API: `curl http://localhost:19999/api/v1/alarms`
 2. Is the recipient correct? Check `to:` line
 3. Is the notification method enabled? Verify `SEND_SLACK=YES`
-4. Are logs showing errors? Check `/var/log/netdata/error.log`
+4. Are logs showing errors? Check `/var/log/netdata/health.log`
 5. Is Cloud connected? Verify Agent-Cloud link status
 
 ## 5.5.5 Related Sections

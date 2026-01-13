@@ -234,7 +234,7 @@ Both workflows (file-based and Cloud UI) produce alerts that **run on your Agent
 <details>
 <summary><strong>What if my alert didn't load?</strong></summary>
 
-- **File-based:** Check `/var/log/netdata/error.log` for syntax errors
+- **File-based:** Check `/var/log/netdata/health.log` for syntax errors
 - **Cloud UI:** Ensure your node is connected to Cloud and has a recent agent version
 - See **2.5 Reloading and Validating Alert Configuration** for detailed troubleshooting
 

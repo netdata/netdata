@@ -15,7 +15,7 @@ curl -s "http://localhost:19999/api/v1/alarms" | jq '.alerts.your_alert_name'
 
 1. Is recipient defined? `to: sysadmin` not `to: silent`
 2. Is channel enabled? `SEND_SLACK=YES`
-3. Check logs: `tail /var/log/netdata/error.log | grep notification`
+3. Check logs: `tail /var/log/netdata/health.log | grep notification`
 
 ## 7.5.3 Common Issues
 
