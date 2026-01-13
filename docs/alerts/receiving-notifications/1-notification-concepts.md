@@ -83,6 +83,6 @@ Many organizations use **Cloud-Dispatched** for most alerts and keep **Agent-Dis
 
 ## 5.1.3 Related Sections
 
-- **5.2 Agent and Parent Notifications** for local configuration
-- **5.3 Cloud Notifications** for Cloud-integrated setup
-- **9. APIs for Alerts and Events** for programmatic control
+- **[5.2 Agent and Parent Notifications](2-agent-parent-notifications.md)** for local configuration
+- **[5.3 Cloud Notifications](3-cloud-notifications.md)** for Cloud-integrated setup
+- **[Chapter 9: APIs for Alerts and Events](../apis-alerts-events/index.md)** for programmatic control

@@ -92,6 +92,6 @@ See **8.4 Custom Actions with `exec`** for full details on available environment
 
 ## 5.2.7 Related Sections
 
-- **5.1 Notification Concepts** - Understanding dispatch models
-- **5.3 Cloud Notifications** - Cloud-based configuration
-- **8.4 Custom Actions with `exec`** - Advanced script integration
+- **[5.1 Notification Concepts](1-notification-concepts.md)** - Understanding dispatch models
+- **[5.3 Cloud Notifications](3-cloud-notifications.md)** - Cloud-based configuration
+- **[8.4 Custom Actions with `exec`](../advanced-techniques/4-custom-actions.md)** - Advanced script integration
