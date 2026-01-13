@@ -30,5 +30,5 @@ curl -s "http://localhost:19999/api/v1/charts" | jq '.charts[] | select(.context
 
 ## 7.1.3 Related Sections
 
-- **7.2 Always Critical** for threshold issues
-- **7.4 Variables Not Found** for chart lookup problems
+- **[7.2 Always Critical or Warning](always-critical.md)** for threshold issues
+- **[7.4 Variables or Metrics Not Found](variables-not-found.md)** for chart lookup problems

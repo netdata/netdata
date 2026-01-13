@@ -27,5 +27,5 @@ curl -s "http://localhost:19999/api/v1/alarms" | jq '.alerts.your_alert_name'
 
 ## 7.5.4 Related Sections
 
-- **5.5 Testing and Troubleshooting** for delivery verification
-- **12.2 Notification Strategy** for routing best practices
+- **[5.5 Testing and Troubleshooting](receiving-notifications/5-testing-troubleshooting.md)** for delivery verification
+- **[12.2 Notification Strategy and On-Call Hygiene](../best-practices/2-notification-strategy.md)** for routing best practices

@@ -28,9 +28,9 @@ calc: $this / ($var - $var2)
 calc: ($this / ($var - $var2)) * ($var > $var2 ? 1 : 0)
 ```
 
-See **3.3 Calculations and Transformations**.
+See **[3.3 Calculations and Transformations](../alert-configuration-syntax/3-calculations-and-transformations.md)** for expression details.
 
 ## 7.2.4 Related Sections
 
-- **7.1 Alert Never Triggers** for complementary diagnosis
-- **7.3 Alert Flapping** for rapid status changes
+- **[7.1 Alert Never Triggers](alert-never-triggers.md)** for complementary diagnosis
+- **[7.3 Alert Flapping](flapping.md)** for rapid status changes
