@@ -26,7 +26,7 @@ Tracks whether the replication position is advancing, catching replication stall
 Identifies workloads generating excessive slow query traffic, which often precedes performance degradation.
 
 **Context:** `mysql.queries`
-**Thresholds:** WARN > 5/s, CRIT > 10/s
+**Thresholds:** WARN > 10/s (drops to 5/s while already WARNING), CRIT > 20/s (drops to 10/s while already CRITICAL)
 
 #### mysql_connections
 
