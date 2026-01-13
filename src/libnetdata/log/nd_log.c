@@ -252,9 +252,8 @@ static bool nd_logger_log_fields_async(FILE *fp, bool limit, ND_LOG_FIELD_PRIORI
     BUFFER *wb = buffer_create(1024, NULL);
 
     if(output == NDLM_JOURNAL) {
-        // For journal, we need special formatting
-        // Fall back to logfmt for now, journal direct needs special handling
-        nd_logger_logfmt(wb, fields, fields_max);
+        // Format using journal native protocol (KEY=VALUE\n format)
+        nd_logger_journal_format(wb, fields, fields_max);
     }
     else if(output == NDLM_FILE || output == NDLM_STDOUT || output == NDLM_STDERR) {
         if(source->format == NDLF_JSON)
