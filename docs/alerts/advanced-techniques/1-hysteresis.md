@@ -25,5 +25,10 @@ Behavior:
 
 ## 8.1.3 Related Sections
 
-- **4.4 Reducing Flapping** for delay techniques
-- **7.3 Alert Flapping** for debugging
+- **[4.4 Reducing Flapping](../controlling-alerts-noise/4-reducing-flapping.md)** for delay techniques
+- **[7.3 Alert Flapping](../troubleshooting-alerts/flapping.md)** for debugging
+
+## What's Next
+
+- **[8.2 Multi-Dimensional Alerts](2-multi-dimensional.md)** for dimension and instance-based targeting
+- **[8.3 Host and Label Targeting](3-label-targeting.md)** for fine-grained scoping with labels

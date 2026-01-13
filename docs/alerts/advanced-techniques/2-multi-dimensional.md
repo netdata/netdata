@@ -28,4 +28,9 @@ Creates alerts for: `interface_inbound_errors-eth0`, `interface_inbound_errors-e
 
 ## 8.2.3 Related Sections
 
-- **1.2 Alert Types: alarm vs template** for conceptual understanding
+- **[1.2 Alert Types: alarm vs template](../understanding-alerts/2-alert-types-alarm-vs-template.md)** for conceptual understanding
+
+## What's Next
+
+- **[8.3 Host and Label Targeting](3-label-targeting.md)** for fine-grained scoping with labels
+- **[8.4 Custom Actions](4-custom-actions.md)** for exec-based automation

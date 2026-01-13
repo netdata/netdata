@@ -27,4 +27,9 @@ lookup: average -1m of user,system
 
 ## 8.5.3 Related Sections
 
-- **13.1 Evaluation Architecture** for internal behavior
+- **[13.1 Evaluation Architecture](../architecture/1-evaluation-architecture.md)** for internal behavior
+
+## What's Next
+
+- **[Chapter 4: Controlling Alerts and Noise](../controlling-alerts-noise/index.md)** for reducing noise
+- **[Chapter 7: Troubleshooting](../troubleshooting-alerts/index.md)** for debugging alerts

@@ -67,4 +67,9 @@ fi
 
 ## 8.4.4 Related Sections
 
-- **5.2.6 Custom Scripts** for additional examples
+- **[5.2.6 Custom Scripts](../receiving-notifications/2-agent-parent-notifications.md)** for additional examples
+
+## What's Next
+
+- **[8.5 Performance Considerations](5-performance.md)** for optimizing alert evaluation
+- **[Chapter 5: Receiving Notifications](../receiving-notifications/index.md)** for notification routing options
