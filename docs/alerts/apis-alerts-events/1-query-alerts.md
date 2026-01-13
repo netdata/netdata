@@ -13,7 +13,7 @@ Response includes alert name, status, value, thresholds.
 curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.'
 
 # Get only active alerts (default)
-curl -s "http://localhost:19999/api/v1/alarms?active" | jq '.'
+curl -s "http://localhost:19999/api/v1/alarms" | jq '.'
 ```
 
 ## What's Next
