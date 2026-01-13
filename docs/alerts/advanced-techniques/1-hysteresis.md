@@ -17,7 +17,7 @@ lookup: average -10m unaligned of user,system
      units: %
      every: 1m
       warn: ($status == $CLEAR && $this > 80) || ($status >= $WARNING && $this > 70)
-      crit: ($this > 95) && ($status == $CLEAR || $this > 98)
+      crit: ($status < $CRITICAL && $this > 95) || ($status == $CRITICAL && $this > 90)
         ok: $this < 70
 ```
 
