@@ -30,7 +30,7 @@ Add the alert you want to disable:
 
 ```conf
 # Disable stock alert that doesn't apply to our environment
-alarm: mysql_gtid_binlog_gtid_0
+alarm: mysql_10s_slow_queries
 
 # Disable by setting enabled to no
 template: some_stock_alert
