@@ -55,4 +55,4 @@ flowchart TD
 ## What's Next
 
 - **[Chapter 3: Alert Configuration Syntax](../alert-configuration-syntax/index.md)** - Learn the full syntax for writing alerts
-- **[Chapter 1: Understanding Alerts](../understanding-alerts/index.md)** - Review alert concepts and lifecycle
+- **[Chapter 1: Understanding Alerts](../understanding-alerts/README.md)** - Review alert concepts and lifecycle
