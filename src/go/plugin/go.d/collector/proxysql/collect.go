@@ -152,24 +152,48 @@ func (c *Collector) collectStatsMySQLConnectionPool(mx map[string]int64) error {
 
 	var hg, host, port string
 	var px string
-	return c.doQuery(q, func(column, value string, rowEnd bool) {
+	hgStatusCounts := make(map[string]map[string]int64)
+	statuses := []string{"ONLINE", "SHUNNED", "OFFLINE_SOFT", "OFFLINE_HARD"}
+
+	err := c.doQuery(q, func(column, value string, rowEnd bool) {
 		switch column {
 		case "hg", "hostgroup":
 			hg = value
+			if _, ok := hgStatusCounts[hg]; !ok {
+				hgStatusCounts[hg] = make(map[string]int64)
+				for _, st := range statuses {
+					hgStatusCounts[hg][st] = 0
+				}
+			}
 		case "srv_host":
 			host = value
 		case "srv_port":
 			port = value
+			c.cache.getHostgroup(hg).updated = true
 			c.cache.getBackend(hg, host, port).updated = true
 			px = "backend_" + backendID(hg, host, port) + "_"
 		case "status":
-			for _, st := range []string{"ONLINE", "SHUNNED", "OFFLINE_SOFT", "OFFLINE_HARD"} {
+			for _, st := range statuses {
 				mx[px+"status_"+st] = metrix.Bool(value == st)
 			}
+			hgStatusCounts[hg][value]++
 		default:
 			mx[px+column] = parseInt(value)
 		}
 	})
+	if err != nil {
+		return err
+	}
+
+	// Set hostgroup backend counts
+	for hg, counts := range hgStatusCounts {
+		hgPrefix := "hostgroup_" + hg + "_backends_"
+		for _, st := range statuses {
+			mx[hgPrefix+st] = counts[st]
+		}
+	}
+
+	return nil
 }
 
 func (c *Collector) updateCharts() {
@@ -204,6 +228,17 @@ func (c *Collector) updateCharts() {
 		if !m.hasCharts {
 			m.hasCharts = true
 			c.addBackendCharts(m.hg, m.host, m.port)
+		}
+	}
+	for k, m := range c.cache.hostgroups {
+		if !m.updated {
+			delete(c.cache.hostgroups, k)
+			c.removeHostgroupCharts(m.hg)
+			continue
+		}
+		if !m.hasCharts {
+			m.hasCharts = true
+			c.addHostgroupCharts(m.hg)
 		}
 	}
 }

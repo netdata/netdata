@@ -37,9 +37,10 @@ func New() *Collector {
 		charts: baseCharts.Copy(),
 		once:   &sync.Once{},
 		cache: &cache{
-			commands: make(map[string]*commandCache),
-			users:    make(map[string]*userCache),
-			backends: make(map[string]*backendCache),
+			commands:   make(map[string]*commandCache),
+			users:      make(map[string]*userCache),
+			backends:   make(map[string]*backendCache),
+			hostgroups: make(map[string]*hostgroupCache),
 		},
 	}
 }
