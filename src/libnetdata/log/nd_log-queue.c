@@ -5,54 +5,49 @@
 #include "systemd-journal-helpers.h"
 
 // ----------------------------------------------------------------------------
-// Queue structure
+// Command pool (ring buffer for commands)
 
-struct nd_log_queue {
-    // Queue storage - array of entries for simplicity and cache efficiency
-    struct nd_log_queue_entry *entries;
-    size_t capacity;
-    size_t head;            // next position to read from
-    size_t tail;            // next position to write to
-    size_t count;           // current number of entries in queue
+struct nd_log_cmd_pool {
+    struct nd_log_queue_cmd *cmds;
+    size_t size;
+    size_t head;    // next position to write
+    size_t tail;    // next position to read
+    SPINLOCK spinlock;
+};
 
-    // Synchronization
-    SPINLOCK enqueue_spinlock;      // protects queue modifications (very short hold time)
-    netdata_mutex_t mutex;          // for condition variable wait
-    netdata_cond_t cond;            // signals logger thread
-    netdata_cond_t shutdown_ack_cond;   // signals shutdown acknowledgment
-    netdata_mutex_t shutdown_ack_mutex; // protects shutdown_acknowledged
+// ----------------------------------------------------------------------------
+// Event loop configuration
 
-    // State
+struct nd_log_event_loop {
+    ND_THREAD *thread;
+    uv_loop_t loop;
+    uv_async_t async;
+
+    // State (accessed atomically)
     bool initialized;
     bool shutdown_requested;
-    bool flush_requested;
-    bool shutdown_acknowledged;  // set by logger thread before exiting
 
-    // Logger thread
-    ND_THREAD *logger_thread;
+    // Command pool
+    struct nd_log_cmd_pool cmd_pool;
+
+    // Synchronization for init/shutdown
+    struct completion start_stop_complete;
 
     // Statistics (atomic)
     size_t entries_queued;
     size_t entries_processed;
     size_t entries_dropped;
-    size_t entries_allocated;   // entries that needed malloc
+    size_t entries_allocated;
     size_t bytes_queued;
     size_t bytes_written;
     size_t queue_high_water;
+    size_t current_queue_depth;
 };
 
-static struct nd_log_queue log_queue = {
-    .entries = NULL,
-    .capacity = 0,
-    .head = 0,
-    .tail = 0,
-    .count = 0,
-    .enqueue_spinlock = SPINLOCK_INITIALIZER,
+static struct nd_log_event_loop log_ev = {
+    .thread = NULL,
     .initialized = false,
     .shutdown_requested = false,
-    .flush_requested = false,
-    .shutdown_acknowledged = false,
-    .logger_thread = NULL,
     .entries_queued = 0,
     .entries_processed = 0,
     .entries_dropped = 0,
@@ -60,17 +55,75 @@ static struct nd_log_queue log_queue = {
     .bytes_queued = 0,
     .bytes_written = 0,
     .queue_high_water = 0,
+    .current_queue_depth = 0,
 };
 
 // ----------------------------------------------------------------------------
-// Internal: Get pointer to message content (inline or allocated)
+// Command pool functions
 
-static inline const char *nd_log_queue_entry_message(struct nd_log_queue_entry *entry) {
+static void cmd_pool_init(struct nd_log_cmd_pool *pool, size_t size) {
+    pool->cmds = callocz(size, sizeof(struct nd_log_queue_cmd));
+    pool->size = size;
+    pool->head = 0;
+    pool->tail = 0;
+    spinlock_init(&pool->spinlock);
+}
+
+static void cmd_pool_destroy(struct nd_log_cmd_pool *pool) {
+    // Free any allocated message buffers in remaining commands
+    for (size_t i = 0; i < pool->size; i++) {
+        if (pool->cmds[i].opcode == ND_LOG_OP_ENTRY && pool->cmds[i].entry.message_allocated) {
+            freez(pool->cmds[i].entry.message_allocated);
+            pool->cmds[i].entry.message_allocated = NULL;
+        }
+    }
+    freez(pool->cmds);
+    pool->cmds = NULL;
+    pool->size = 0;
+}
+
+static bool cmd_pool_push(struct nd_log_cmd_pool *pool, struct nd_log_queue_cmd *cmd) {
+    spinlock_lock(&pool->spinlock);
+
+    size_t next_head = (pool->head + 1) % pool->size;
+    if (next_head == pool->tail) {
+        // Queue full
+        spinlock_unlock(&pool->spinlock);
+        return false;
+    }
+
+    pool->cmds[pool->head] = *cmd;
+    pool->head = next_head;
+
+    spinlock_unlock(&pool->spinlock);
+    return true;
+}
+
+static struct nd_log_queue_cmd cmd_pool_pop(struct nd_log_cmd_pool *pool) {
+    struct nd_log_queue_cmd cmd = { .opcode = ND_LOG_OP_NOOP };
+
+    spinlock_lock(&pool->spinlock);
+
+    if (pool->tail != pool->head) {
+        cmd = pool->cmds[pool->tail];
+        // Clear the slot (important for allocated pointers)
+        pool->cmds[pool->tail].opcode = ND_LOG_OP_NOOP;
+        pool->cmds[pool->tail].entry.message_allocated = NULL;
+        pool->tail = (pool->tail + 1) % pool->size;
+    }
+
+    spinlock_unlock(&pool->spinlock);
+    return cmd;
+}
+
+// ----------------------------------------------------------------------------
+// Internal: Get pointer to message content
+
+static inline const char *entry_message(struct nd_log_queue_entry *entry) {
     return entry->message_allocated ? entry->message_allocated : entry->message_inline;
 }
 
-// Free any dynamically allocated message buffer
-static inline void nd_log_queue_entry_free_allocated(struct nd_log_queue_entry *entry) {
+static inline void entry_free_allocated(struct nd_log_queue_entry *entry) {
     if (entry->message_allocated) {
         freez(entry->message_allocated);
         entry->message_allocated = NULL;
@@ -80,11 +133,11 @@ static inline void nd_log_queue_entry_free_allocated(struct nd_log_queue_entry *
 // ----------------------------------------------------------------------------
 // Internal: Write a single entry to its destination
 
-static void nd_log_queue_write_entry(struct nd_log_queue_entry *entry) {
+static void write_entry(struct nd_log_queue_entry *entry) {
     if (!entry || entry->message_len == 0)
         return;
 
-    const char *message = nd_log_queue_entry_message(entry);
+    const char *message = entry_message(entry);
 
     switch (entry->method) {
         case NDLM_FILE:
@@ -97,12 +150,8 @@ static void nd_log_queue_write_entry(struct nd_log_queue_entry *entry) {
             break;
 
         case NDLM_JOURNAL:
-            // Message is already formatted in journal native protocol (KEY=VALUE\n)
-            // Use captured state from enqueue time to avoid data races
             if (entry->journal_direct_initialized && entry->fd >= 0) {
-                // Use journal_direct_send() which handles memfd fallback for large messages
                 if (!journal_direct_send(entry->fd, message, entry->message_len)) {
-                    // Failed to write to journal - write to stderr as fallback
                     fprintf(stderr, "async-logger: journal_direct_send() failed (fd=%d): %s\n",
                             entry->fd, strerror(errno));
                     fprintf(stderr, "%s\n", message);
@@ -111,23 +160,18 @@ static void nd_log_queue_write_entry(struct nd_log_queue_entry *entry) {
             }
 #ifdef HAVE_SYSTEMD
             else if (entry->journal_libsystemd_initialized) {
-                // Fallback to libsystemd - for this we'd need structured fields
-                // For now, just write to stderr as fallback
                 fprintf(stderr, "%s\n", message);
                 fflush(stderr);
             }
 #endif
             else {
-                // No journal available, fallback to stderr
                 fprintf(stderr, "%s\n", message);
                 fflush(stderr);
             }
             break;
 
         case NDLM_SYSLOG:
-            // Use captured state from enqueue time to avoid data races
             if (entry->syslog_initialized) {
-                // Convert priority to syslog priority
                 int syslog_priority = LOG_INFO;
                 switch (entry->priority) {
                     case NDLP_EMERG:   syslog_priority = LOG_EMERG; break;
@@ -142,7 +186,6 @@ static void nd_log_queue_write_entry(struct nd_log_queue_entry *entry) {
                 }
                 syslog(syslog_priority, "%s", message);
             } else {
-                // Syslog not initialized, fallback to stderr
                 fprintf(stderr, "%s\n", message);
                 fflush(stderr);
             }
@@ -151,326 +194,294 @@ static void nd_log_queue_write_entry(struct nd_log_queue_entry *entry) {
         case NDLM_DISABLED:
         case NDLM_DEVNULL:
         case NDLM_DEFAULT:
-            // Do nothing
             break;
 
         default:
-            // Unknown method, try stderr as fallback
             fprintf(stderr, "%s\n", message);
             fflush(stderr);
             break;
     }
 
-    __atomic_add_fetch(&log_queue.bytes_written, entry->message_len, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&log_ev.bytes_written, entry->message_len, __ATOMIC_RELAXED);
 }
 
 // ----------------------------------------------------------------------------
-// Logger thread
+// Internal: Reopen log files (called from logger thread)
 
-static void nd_log_queue_thread_cleanup(void *ptr __maybe_unused) {
-    // Drain any remaining entries on shutdown
-    spinlock_lock(&log_queue.enqueue_spinlock);
-    while (log_queue.count > 0) {
-        // Copy entry out of queue (including the allocated pointer)
-        struct nd_log_queue_entry entry_copy = log_queue.entries[log_queue.head];
-
-        // Clear the allocated pointer in the queue entry so it won't be double-freed
-        log_queue.entries[log_queue.head].message_allocated = NULL;
-
-        log_queue.head = (log_queue.head + 1) % log_queue.capacity;
-        log_queue.count--;
-        spinlock_unlock(&log_queue.enqueue_spinlock);
-
-        nd_log_queue_write_entry(&entry_copy);
-        nd_log_queue_entry_free_allocated(&entry_copy);
-        __atomic_add_fetch(&log_queue.entries_processed, 1, __ATOMIC_RELAXED);
-
-        spinlock_lock(&log_queue.enqueue_spinlock);
+static void do_reopen_log_files(void) {
+    // This runs in the logger thread, so no race with FILE* usage
+    for (size_t i = 0; i < _NDLS_MAX; i++) {
+        nd_log_open(&nd_log.sources[i], i);
     }
-    spinlock_unlock(&log_queue.enqueue_spinlock);
 }
 
-static void nd_log_queue_thread(void *arg __maybe_unused) {
-    netdata_thread_cleanup_push(nd_log_queue_thread_cleanup, NULL);
+// ----------------------------------------------------------------------------
+// Event loop callbacks
 
-    while (true) {
-        netdata_mutex_lock(&log_queue.mutex);
+static void async_cb(uv_async_t *handle __maybe_unused) {
+    // Just wake up the loop - actual processing happens in the main loop
+}
 
-        // Wait for entries or shutdown signal
-        while (log_queue.count == 0 && !log_queue.shutdown_requested) {
-            netdata_cond_wait(&log_queue.cond, &log_queue.mutex);
-        }
+// ----------------------------------------------------------------------------
+// Logger thread main function
 
-        // Check if we should exit
-        if (log_queue.shutdown_requested && log_queue.count == 0) {
-            // Signal acknowledgment before exiting
-            netdata_mutex_lock(&log_queue.shutdown_ack_mutex);
-            log_queue.shutdown_acknowledged = true;
-            netdata_cond_signal(&log_queue.shutdown_ack_cond);
-            netdata_mutex_unlock(&log_queue.shutdown_ack_mutex);
+static void logger_event_loop(void *arg) {
+    struct nd_log_event_loop *ev = arg;
+    uv_loop_t *loop = &ev->loop;
 
-            netdata_mutex_unlock(&log_queue.mutex);
-            break;
-        }
+    // Initialize libuv loop
+    int rc = uv_loop_init(loop);
+    if (rc) {
+        netdata_log_error("LOGGER: Failed to initialize event loop: %s", uv_strerror(rc));
+        completion_mark_complete(&ev->start_stop_complete);
+        return;
+    }
 
-        bool was_flush = log_queue.flush_requested;
-        netdata_mutex_unlock(&log_queue.mutex);
+    // Initialize async handle for wakeups
+    rc = uv_async_init(loop, &ev->async, async_cb);
+    if (rc) {
+        netdata_log_error("LOGGER: Failed to initialize async handle: %s", uv_strerror(rc));
+        uv_loop_close(loop);
+        completion_mark_complete(&ev->start_stop_complete);
+        return;
+    }
 
-        // Process entries - copy out with spinlock, write without any lock
-        while (true) {
-            struct nd_log_queue_entry entry_copy;
-            bool has_entry = false;
+    // Mark as initialized and signal completion
+    __atomic_store_n(&ev->initialized, true, __ATOMIC_RELEASE);
+    completion_mark_complete(&ev->start_stop_complete);
 
-            spinlock_lock(&log_queue.enqueue_spinlock);
-            if (log_queue.count > 0) {
-                // Copy entry out of queue (including the allocated pointer)
-                entry_copy = log_queue.entries[log_queue.head];
+    // Main event loop
+    while (likely(!__atomic_load_n(&ev->shutdown_requested, __ATOMIC_ACQUIRE))) {
+        // Run event loop (will block until async signal)
+        uv_run(loop, UV_RUN_ONCE);
 
-                // Clear the allocated pointer in the queue entry so it won't be double-freed
-                log_queue.entries[log_queue.head].message_allocated = NULL;
+        // Process all pending commands
+        struct nd_log_queue_cmd cmd;
+        while ((cmd = cmd_pool_pop(&ev->cmd_pool)).opcode != ND_LOG_OP_NOOP) {
 
-                log_queue.head = (log_queue.head + 1) % log_queue.capacity;
-                log_queue.count--;
-                has_entry = true;
+            switch (cmd.opcode) {
+                case ND_LOG_OP_ENTRY:
+                    write_entry(&cmd.entry);
+                    entry_free_allocated(&cmd.entry);
+                    __atomic_add_fetch(&ev->entries_processed, 1, __ATOMIC_RELAXED);
+                    __atomic_sub_fetch(&ev->current_queue_depth, 1, __ATOMIC_RELAXED);
+                    break;
+
+                case ND_LOG_OP_FLUSH:
+                    // All entries before this have been processed
+                    if (cmd.sync.completion)
+                        completion_mark_complete(cmd.sync.completion);
+                    break;
+
+                case ND_LOG_OP_REOPEN:
+                    // Reopen all log files - safe because we're in the logger thread
+                    do_reopen_log_files();
+                    if (cmd.sync.completion)
+                        completion_mark_complete(cmd.sync.completion);
+                    break;
+
+                case ND_LOG_OP_SHUTDOWN:
+                    __atomic_store_n(&ev->shutdown_requested, true, __ATOMIC_RELEASE);
+                    if (cmd.sync.completion)
+                        completion_mark_complete(cmd.sync.completion);
+                    break;
+
+                case ND_LOG_OP_NOOP:
+                default:
+                    break;
             }
-            spinlock_unlock(&log_queue.enqueue_spinlock);
-
-            if (!has_entry)
-                break;
-
-            // Write entry without holding any lock
-            nd_log_queue_write_entry(&entry_copy);
-
-            // Free any allocated message buffer
-            nd_log_queue_entry_free_allocated(&entry_copy);
-
-            __atomic_add_fetch(&log_queue.entries_processed, 1, __ATOMIC_RELAXED);
-        }
-
-        // If flush was requested and queue is now empty, signal completion
-        if (was_flush) {
-            netdata_mutex_lock(&log_queue.mutex);
-            log_queue.flush_requested = false;
-            netdata_cond_broadcast(&log_queue.cond);
-            netdata_mutex_unlock(&log_queue.mutex);
         }
     }
 
-    netdata_thread_cleanup_pop(1);
+    // Drain any remaining entries
+    struct nd_log_queue_cmd cmd;
+    while ((cmd = cmd_pool_pop(&ev->cmd_pool)).opcode != ND_LOG_OP_NOOP) {
+        if (cmd.opcode == ND_LOG_OP_ENTRY) {
+            write_entry(&cmd.entry);
+            entry_free_allocated(&cmd.entry);
+            __atomic_add_fetch(&ev->entries_processed, 1, __ATOMIC_RELAXED);
+        } else if (cmd.sync.completion) {
+            completion_mark_complete(cmd.sync.completion);
+        }
+    }
+
+    // Close handles
+    uv_close((uv_handle_t *)&ev->async, NULL);
+
+    // Run loop until all handles are closed
+    while (uv_loop_close(loop) == UV_EBUSY) {
+        uv_run(loop, UV_RUN_NOWAIT);
+    }
+
+    __atomic_store_n(&ev->initialized, false, __ATOMIC_RELEASE);
 }
 
 // ----------------------------------------------------------------------------
 // Public API
 
 bool nd_log_queue_init(void) {
-    if (log_queue.initialized)
+    if (__atomic_load_n(&log_ev.initialized, __ATOMIC_ACQUIRE))
         return true;
 
-    // Allocate queue entries
-    log_queue.capacity = ND_LOG_QUEUE_DEFAULT_SIZE;
-    log_queue.entries = callocz(log_queue.capacity, sizeof(struct nd_log_queue_entry));
+    // Initialize command pool
+    cmd_pool_init(&log_ev.cmd_pool, ND_LOG_QUEUE_CMD_POOL_SIZE);
 
-    log_queue.head = 0;
-    log_queue.tail = 0;
-    log_queue.count = 0;
-    log_queue.shutdown_requested = false;
-    log_queue.flush_requested = false;
-    log_queue.shutdown_acknowledged = false;
+    // Initialize synchronization
+    completion_init(&log_ev.start_stop_complete);
 
-    // Initialize synchronization primitives
-    spinlock_init(&log_queue.enqueue_spinlock);
-    if (netdata_mutex_init(&log_queue.mutex) != 0) {
-        freez(log_queue.entries);
-        log_queue.entries = NULL;
-        return false;
-    }
+    // Reset state
+    __atomic_store_n(&log_ev.shutdown_requested, false, __ATOMIC_RELEASE);
+    __atomic_store_n(&log_ev.entries_queued, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&log_ev.entries_processed, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&log_ev.entries_dropped, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&log_ev.entries_allocated, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&log_ev.bytes_queued, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&log_ev.bytes_written, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&log_ev.queue_high_water, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&log_ev.current_queue_depth, 0, __ATOMIC_RELEASE);
 
-    if (netdata_cond_init(&log_queue.cond) != 0) {
-        netdata_mutex_destroy(&log_queue.mutex);
-        freez(log_queue.entries);
-        log_queue.entries = NULL;
-        return false;
-    }
-
-    if (netdata_mutex_init(&log_queue.shutdown_ack_mutex) != 0) {
-        netdata_cond_destroy(&log_queue.cond);
-        netdata_mutex_destroy(&log_queue.mutex);
-        freez(log_queue.entries);
-        log_queue.entries = NULL;
-        return false;
-    }
-
-    if (netdata_cond_init(&log_queue.shutdown_ack_cond) != 0) {
-        netdata_mutex_destroy(&log_queue.shutdown_ack_mutex);
-        netdata_cond_destroy(&log_queue.cond);
-        netdata_mutex_destroy(&log_queue.mutex);
-        freez(log_queue.entries);
-        log_queue.entries = NULL;
-        return false;
-    }
-
-    // Start logger thread
-    log_queue.logger_thread = nd_thread_create(
+    // Create logger thread
+    log_ev.thread = nd_thread_create(
         "LOGGER",
         NETDATA_THREAD_OPTION_DONT_LOG,
-        nd_log_queue_thread,
-        NULL
+        logger_event_loop,
+        &log_ev
     );
 
-    if (!log_queue.logger_thread) {
-        netdata_cond_destroy(&log_queue.shutdown_ack_cond);
-        netdata_mutex_destroy(&log_queue.shutdown_ack_mutex);
-        netdata_cond_destroy(&log_queue.cond);
-        netdata_mutex_destroy(&log_queue.mutex);
-        freez(log_queue.entries);
-        log_queue.entries = NULL;
+    if (!log_ev.thread) {
+        cmd_pool_destroy(&log_ev.cmd_pool);
+        completion_destroy(&log_ev.start_stop_complete);
         return false;
     }
 
-    log_queue.initialized = true;
-    return true;
+    // Wait for initialization to complete
+    completion_wait_for(&log_ev.start_stop_complete);
+    completion_reset(&log_ev.start_stop_complete);
+
+    return __atomic_load_n(&log_ev.initialized, __ATOMIC_ACQUIRE);
 }
 
-void nd_log_queue_shutdown(bool flush) {
-    if (!log_queue.initialized)
+void nd_log_queue_shutdown(void) {
+    if (!__atomic_load_n(&log_ev.initialized, __ATOMIC_ACQUIRE))
         return;
 
-    if (flush)
-        nd_log_queue_flush();
+    // Send shutdown command and wait
+    struct completion shutdown_complete;
+    completion_init(&shutdown_complete);
 
-    // Signal shutdown
-    netdata_mutex_lock(&log_queue.mutex);
-    log_queue.shutdown_requested = true;
-    netdata_cond_signal(&log_queue.cond);
-    netdata_mutex_unlock(&log_queue.mutex);
+    struct nd_log_queue_cmd cmd = {
+        .opcode = ND_LOG_OP_SHUTDOWN,
+        .sync.completion = &shutdown_complete
+    };
 
-    // Wait for logger thread to acknowledge shutdown
-    netdata_mutex_lock(&log_queue.shutdown_ack_mutex);
-    while (!log_queue.shutdown_acknowledged) {
-        netdata_cond_wait(&log_queue.shutdown_ack_cond, &log_queue.shutdown_ack_mutex);
+    if (cmd_pool_push(&log_ev.cmd_pool, &cmd)) {
+        uv_async_send(&log_ev.async);
+        completion_wait_for(&shutdown_complete);
     }
-    netdata_mutex_unlock(&log_queue.shutdown_ack_mutex);
+    completion_destroy(&shutdown_complete);
 
-    // Now safe to join - thread has exited or is about to
-    if (log_queue.logger_thread) {
-        nd_thread_join(log_queue.logger_thread);
-        log_queue.logger_thread = NULL;
+    // Join thread
+    if (log_ev.thread) {
+        nd_thread_join(log_ev.thread);
+        log_ev.thread = NULL;
     }
 
     // Cleanup
-    netdata_cond_destroy(&log_queue.shutdown_ack_cond);
-    netdata_mutex_destroy(&log_queue.shutdown_ack_mutex);
-    netdata_cond_destroy(&log_queue.cond);
-    netdata_mutex_destroy(&log_queue.mutex);
-    freez(log_queue.entries);
-    log_queue.entries = NULL;
-    log_queue.initialized = false;
+    cmd_pool_destroy(&log_ev.cmd_pool);
+    completion_destroy(&log_ev.start_stop_complete);
 }
 
 bool nd_log_queue_enabled(void) {
-    return log_queue.initialized && !log_queue.shutdown_requested;
+    return __atomic_load_n(&log_ev.initialized, __ATOMIC_ACQUIRE) &&
+           !__atomic_load_n(&log_ev.shutdown_requested, __ATOMIC_ACQUIRE);
 }
 
 bool nd_log_queue_enqueue(struct nd_log_queue_entry *entry) {
-    if (!log_queue.initialized || log_queue.shutdown_requested)
+    if (!nd_log_queue_enabled())
         return false;
 
-    bool success = false;
+    struct nd_log_queue_cmd cmd = {
+        .opcode = ND_LOG_OP_ENTRY,
+        .entry = *entry  // Copy the entry
+    };
 
-    spinlock_lock(&log_queue.enqueue_spinlock);
-
-    if (log_queue.count < log_queue.capacity) {
-        struct nd_log_queue_entry *dest = &log_queue.entries[log_queue.tail];
-
-        // Copy fixed fields
-        dest->source = entry->source;
-        dest->priority = entry->priority;
-        dest->method = entry->method;
-        dest->format = entry->format;
-        dest->fp = entry->fp;
-        dest->fd = entry->fd;
-        dest->journal_direct_initialized = entry->journal_direct_initialized;
-        dest->journal_libsystemd_initialized = entry->journal_libsystemd_initialized;
-        dest->syslog_initialized = entry->syslog_initialized;
-        dest->message_len = entry->message_len;
-
-        // Handle message content - transfer ownership of allocated pointer
-        if (entry->message_allocated) {
-            // Large message - transfer the allocated pointer
-            dest->message_allocated = entry->message_allocated;
-            entry->message_allocated = NULL;  // caller no longer owns it
-            __atomic_add_fetch(&log_queue.entries_allocated, 1, __ATOMIC_RELAXED);
-        } else {
-            // Small message - copy inline buffer
-            dest->message_allocated = NULL;
-            memcpy(dest->message_inline, entry->message_inline, entry->message_len + 1);
-        }
-
-        log_queue.tail = (log_queue.tail + 1) % log_queue.capacity;
-        log_queue.count++;
-
-        // Update statistics
-        __atomic_add_fetch(&log_queue.entries_queued, 1, __ATOMIC_RELAXED);
-        __atomic_add_fetch(&log_queue.bytes_queued, entry->message_len, __ATOMIC_RELAXED);
-
-        // Update high water mark
-        size_t current_high = __atomic_load_n(&log_queue.queue_high_water, __ATOMIC_RELAXED);
-        if (log_queue.count > current_high) {
-            __atomic_store_n(&log_queue.queue_high_water, log_queue.count, __ATOMIC_RELAXED);
-        }
-
-        success = true;
-    } else {
-        // Queue full - drop message, but need to free any allocated buffer
-        if (entry->message_allocated) {
-            freez(entry->message_allocated);
-            entry->message_allocated = NULL;
-        }
-        __atomic_add_fetch(&log_queue.entries_dropped, 1, __ATOMIC_RELAXED);
+    // Transfer ownership of allocated pointer
+    if (entry->message_allocated) {
+        entry->message_allocated = NULL;
+        __atomic_add_fetch(&log_ev.entries_allocated, 1, __ATOMIC_RELAXED);
     }
 
-    spinlock_unlock(&log_queue.enqueue_spinlock);
-
-    if (success) {
-        // Signal logger thread (don't hold spinlock while signaling)
-        netdata_mutex_lock(&log_queue.mutex);
-        netdata_cond_signal(&log_queue.cond);
-        netdata_mutex_unlock(&log_queue.mutex);
+    if (!cmd_pool_push(&log_ev.cmd_pool, &cmd)) {
+        // Queue full - free allocated buffer if any
+        entry_free_allocated(&cmd.entry);
+        __atomic_add_fetch(&log_ev.entries_dropped, 1, __ATOMIC_RELAXED);
+        return false;
     }
 
-    return success;
+    // Update statistics
+    __atomic_add_fetch(&log_ev.entries_queued, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&log_ev.bytes_queued, entry->message_len, __ATOMIC_RELAXED);
+
+    size_t depth = __atomic_add_fetch(&log_ev.current_queue_depth, 1, __ATOMIC_RELAXED);
+    size_t high = __atomic_load_n(&log_ev.queue_high_water, __ATOMIC_RELAXED);
+    if (depth > high)
+        __atomic_store_n(&log_ev.queue_high_water, depth, __ATOMIC_RELAXED);
+
+    // Wake up logger thread
+    uv_async_send(&log_ev.async);
+
+    return true;
 }
 
 void nd_log_queue_get_stats(struct nd_log_queue_stats *stats) {
     if (!stats)
         return;
 
-    stats->entries_queued = __atomic_load_n(&log_queue.entries_queued, __ATOMIC_RELAXED);
-    stats->entries_processed = __atomic_load_n(&log_queue.entries_processed, __ATOMIC_RELAXED);
-    stats->entries_dropped = __atomic_load_n(&log_queue.entries_dropped, __ATOMIC_RELAXED);
-    stats->entries_allocated = __atomic_load_n(&log_queue.entries_allocated, __ATOMIC_RELAXED);
-    stats->bytes_queued = __atomic_load_n(&log_queue.bytes_queued, __ATOMIC_RELAXED);
-    stats->bytes_written = __atomic_load_n(&log_queue.bytes_written, __ATOMIC_RELAXED);
-    stats->queue_high_water = __atomic_load_n(&log_queue.queue_high_water, __ATOMIC_RELAXED);
+    stats->entries_queued = __atomic_load_n(&log_ev.entries_queued, __ATOMIC_RELAXED);
+    stats->entries_processed = __atomic_load_n(&log_ev.entries_processed, __ATOMIC_RELAXED);
+    stats->entries_dropped = __atomic_load_n(&log_ev.entries_dropped, __ATOMIC_RELAXED);
+    stats->entries_allocated = __atomic_load_n(&log_ev.entries_allocated, __ATOMIC_RELAXED);
+    stats->bytes_queued = __atomic_load_n(&log_ev.bytes_queued, __ATOMIC_RELAXED);
+    stats->bytes_written = __atomic_load_n(&log_ev.bytes_written, __ATOMIC_RELAXED);
+    stats->queue_high_water = __atomic_load_n(&log_ev.queue_high_water, __ATOMIC_RELAXED);
 }
 
 void nd_log_queue_flush(void) {
-    if (!log_queue.initialized)
+    if (!nd_log_queue_enabled())
         return;
 
-    netdata_mutex_lock(&log_queue.mutex);
-    log_queue.flush_requested = true;
-    netdata_cond_signal(&log_queue.cond);
+    struct completion flush_complete;
+    completion_init(&flush_complete);
 
-    // Wait until flush completes (queue empty)
-    while (log_queue.flush_requested && !log_queue.shutdown_requested) {
-        netdata_cond_wait(&log_queue.cond, &log_queue.mutex);
+    struct nd_log_queue_cmd cmd = {
+        .opcode = ND_LOG_OP_FLUSH,
+        .sync.completion = &flush_complete
+    };
+
+    if (cmd_pool_push(&log_ev.cmd_pool, &cmd)) {
+        uv_async_send(&log_ev.async);
+        completion_wait_for(&flush_complete);
     }
-    netdata_mutex_unlock(&log_queue.mutex);
+
+    completion_destroy(&flush_complete);
 }
 
-void nd_log_queue_write_sync(struct nd_log_queue_entry *entry) {
-    // Direct synchronous write - no queue, no locks (except file-level)
-    // Used for critical messages that must be written immediately
-    nd_log_queue_write_entry(entry);
+void nd_log_queue_reopen(void) {
+    if (!nd_log_queue_enabled())
+        return;
+
+    struct completion reopen_complete;
+    completion_init(&reopen_complete);
+
+    struct nd_log_queue_cmd cmd = {
+        .opcode = ND_LOG_OP_REOPEN,
+        .sync.completion = &reopen_complete
+    };
+
+    if (cmd_pool_push(&log_ev.cmd_pool, &cmd)) {
+        uv_async_send(&log_ev.async);
+        completion_wait_for(&reopen_complete);
+    }
+
+    completion_destroy(&reopen_complete);
 }
