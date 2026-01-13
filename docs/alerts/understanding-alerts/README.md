@@ -29,6 +29,10 @@ Because Netdata evaluates alerts locally on each Agent, you can still see alerts
 
 | Section | What It Covers |
 |---------|----------------|
-| **[1.1 What is a Netdata Alert?](understanding-alerts/1-what-is-a-netdata-alert.md)** | Status values, how alerts relate to charts and contexts |
-| **[1.2 Alert Types: `alarm` vs `template`](understanding-alerts/2-alarm-types.md)** | Chart-specific vs context-based rules |
-| **[1.3 Where Alerts Live](understanding-alerts/3-where-alerts-live.md)** | File paths, stock vs custom, Cloud integration |
+| **[1.1 What is a Netdata Alert?](1-what-is-a-netdata-alert.md)** | Status values, how alerts relate to charts and contexts |
+| **[1.2 Alert Types: `alarm` vs `template`](2-alert-types-alarm-vs-template.md)** | Chart-specific vs context-based rules |
+| **[1.3 Where Alerts Live](3-where-alerts-live.md)** | File paths, stock vs custom, Cloud integration |
+
+## What's Next
+
+- **[Chapter 2: Creating Alerts](../creating-alerts-pages/index.md)** - Learn to create and edit alerts

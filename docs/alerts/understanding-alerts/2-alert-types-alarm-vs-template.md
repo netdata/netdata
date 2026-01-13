@@ -82,18 +82,18 @@ If you need to target a specific chart instance (the use case for legacy `alarm`
 Example (legacy `alarm` vs equivalent `template`):
 ```conf
 # Legacy alarm syntax (discouraged)
-alarm: disk_fill_rate
-    on: disk space
-    to: disk
-    units: %
+alarm: my_eth0_alert
+    on: net.eth0
+    units: Mbits
     every: 10s
     warn: $this > 80
     crit: $this > 90
 
 # Preferred template syntax (future-compatible)
-template: disk_fill_rate
-    on: disk.space
-    chart labels: mount_point=/var
+template: my_network_alert
+    on: net.net
+    lookup: average -5m of inbound
+    units: Mbits
     warn: $this > 80
     crit: $this > 90
 ```

@@ -2,7 +2,7 @@
 
 A **Netdata alert** is a rule that continuously monitors one or more metrics from charts and assigns a **status** based on whether configured conditions are met. Alerts are the core of Netdata's health monitoring system, acting as component-level watchdogs that evaluate metrics at regular intervals.
 
-Each alert instance is uniquely identified by the combination of **node**, **alert name**, and **chart instance**. This means you cannot currently have a single alert instance that uses metrics data from multiple chart instances at once.
+Each alert instance is uniquely identified by the combination of **node**, **alert name**, and **chart instance**.
 
 ## How Alerts Work
 
@@ -15,7 +15,7 @@ At each evaluation cycle (typically every 10 seconds, configurable per alert via
 
 Alert events are:
 - Visible in the local Agent dashboard
-- Queryable via Agent APIs (`/api/v2/alerts`, `/api/v3/alerts`)
+- Queryable via Agent APIs (`/api/v1/alarms`)
 - Sent to Netdata Cloud and displayed in the Events Tab
 - Used to trigger notifications (email, Slack, PagerDuty, etc.)
 
@@ -101,4 +101,4 @@ For a given alert definition applied to a given chart instance, there is one **a
 ## What's Next
 
 - **[1.2 Alert Types: `alarm` vs `template`](2-alert-types-alarm-vs-template.md)** Detailed explanation of chart-specific vs context-based rules
-- **[1.3 Where Alerts Live (Files, Agent, Cloud)](3-where-alerts-live.md)** File paths, stock vs custom alerts, Cloud integration
+- **[1.3 Where Alerts Live](3-where-alerts-live.md)** File paths, stock vs custom alerts, Cloud integration
