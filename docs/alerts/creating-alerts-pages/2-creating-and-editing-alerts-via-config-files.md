@@ -106,15 +106,15 @@ sudo /etc/netdata/edit-config health.d/system.conf
 Add this alert definition:
 
 ```conf
-# Alert when root filesystem free space drops below 20%
-alarm: root_filesystem_low_space
-   on: disk_space./
-  lookup: average -1m percentage of avail
-   units: %
-   every: 1m
-    warn: $this < 20
-    crit: $this < 10
-    info: Root filesystem has less than 20% free space
+# Alert when any filesystem free space drops below 20%
+template: disk_space_usage
+    on: disk.space
+   lookup: average -1m percentage of avail
+    units: %
+    every: 1m
+     warn: $this < 20
+     crit: $this < 10
+     info: Filesystem has less than 20% free space
 ```
 
 **What this does:**
@@ -276,13 +276,13 @@ Common issues:
 Check if your alert is present:
 
 ```bash
-curl -s "http://localhost:19999/api/v1/alarms" | jq '.alarms | keys[]' | grep -i "root_filesystem"
+curl -s "http://localhost:19999/api/v1/alarms" | jq '.alarms | keys[]' | grep -i "disk_space_usage"
 ```
 
 Or view full details for a specific alert:
 
 ```bash
-curl -s "http://localhost:19999/api/v1/alarms" | jq '.alarms.root_filesystem_low_space'
+curl -s "http://localhost:19999/api/v1/alarms" | jq '.alarms.disk_space_usage'
 ```
 
 You should see:
@@ -295,7 +295,7 @@ You should see:
 
 1. Open the Netdata dashboard
 2. Click the **🔔 bell icon** (top-right)
-3. Search for your alert name (for example, `root_filesystem_low_space`)
+3. Search for your alert name (for example, `disk_space_usage`)
 
 If the alert is present and your metric is healthy, its status will be `CLEAR`.
 

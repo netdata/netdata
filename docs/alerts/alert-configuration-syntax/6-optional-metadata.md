@@ -207,20 +207,20 @@ To avoid inconsistent values (for example, `db`, `database`, `Database`), define
 Below is a complete example that pulls together all metadata fields with the configuration concepts from Chapter 3:
 
 ```conf
-alarm: api_latency_high
-   on: web_log.latency
-lookup: average -5m of p95
-  calc: $this / 1000    # convert ms to seconds
-  warn: ($this > 0.5) && ($status != $CRITICAL)
-  crit: $this > 1.0
- every: 10s
-  delay: up 1m down 2m
-   to: sysadmin
- class: Latency
-  type: Web Server
-component: API Gateway
-summary: High API p95 latency on ${label:service}
-  info: p95 latency above 500ms (warning) or 1s (critical) over the last 5 minutes
+template: httpcheck_web_service_bad_status
+       on: httpcheck.status
+    lookup: average -5m unaligned percentage of bad_status
+      calc: $this
+      units: %
+       warn: $this >= 10 AND $this < 40
+       crit: $this >= 40
+      delay: down 5m multiplier 1.5 max 1h
+        to: webmaster
+     class: Workload
+      type: Web Server
+  component: HTTP endpoint
+    summary: HTTP check for ${label:url} unexpected status
+       info: Percentage of HTTP responses from ${label:url} with unexpected status in the last 5 minutes
 ```
 
 In this definition:
