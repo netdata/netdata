@@ -37,9 +37,9 @@ Silencing rules support pattern matching:
 
 | Pattern | Matches | Example |
 |---------|---------|---------|
-| `*` | Any characters | `*cpu*` matches `high_cpu` and `cpu_usage` |
-| `?` | Single character | `disk_?` matches `disk_a`, `disk_b` |
-| `\|` | OR logic | `mysql\|postgres\|redis` matches any of these |
+| `*` | Any characters | `*cpu*` matches `10min_cpu_usage` and `10min_cpu_iowait` |
+| `?` | Single character | `disk_?` matches `disk_space_usage`, `disk_inode_usage` |
+| `|` | OR logic | `mysql|postgres|redis` matches any of these |
 
 ## 4.3.3 Personal Silencing Rules
 
@@ -71,6 +71,12 @@ curl -s "http://localhost:19999/api/v1/alarms?silenced=1" | jq '.'
 
 ## 4.3.5 Related Sections
 
-- **4.1 Disabling Alerts** - Permanent alert removal
-- **4.2 Silencing vs Disabling** - Conceptual differences
-- **4.4 Reducing Flapping and Noise** - Using delays for stability
+- **[4.1 Disabling Alerts](1-disabling-alerts.md)** - Permanent alert removal
+- **[4.2 Silencing vs Disabling](2-silencing-vs-disabling.md)** - Conceptual differences
+- **[4.4 Reducing Flapping and Noise](4-reducing-flapping.md)** - Using delays for stability
+
+## What's Next
+
+- **[4.4 Reducing Flapping](4-reducing-flapping.md)** - Delay and repeat techniques
+- **[8.1 Hysteresis](../advanced-techniques/1-hysteresis.md)** - Status-based conditions
+- **[Chapter 5: Receiving Notifications](../receiving-notifications/index.md)** - Notification configuration

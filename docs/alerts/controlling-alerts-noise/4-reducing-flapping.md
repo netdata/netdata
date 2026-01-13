@@ -123,10 +123,16 @@ This means:
 - **Entering CRITICAL:** needs >95%
 - **Staying in CRITICAL:** tolerates up to 98%
 
-See **8.1 Hysteresis and Status-Based Conditions** for more examples of status-dependent thresholds.
+See **[8.1 Hysteresis and Status-Based Conditions](../advanced-techniques/1-hysteresis.md)** for more examples of status-dependent thresholds.
 
 ## 4.4.6 Related Sections
 
-- **8.1 Hysteresis and Status-Based Conditions** - Advanced status-aware logic
-- **7.3 Alert Flapping** - Debugging and fixing flapping alerts
-- **5.5 Testing and Troubleshooting** - Verifying notification delivery
+- **[8.1 Hysteresis and Status-Based Conditions](../advanced-techniques/1-hysteresis.md)** - Advanced status-aware logic
+- **[7.3 Alert Flapping](../troubleshooting-alerts/flapping.md)** - Debugging and fixing flapping alerts
+- **[5.5 Testing and Troubleshooting](../receiving-notifications/5-testing-troubleshooting.md)** - Verifying notification delivery
+
+## What's Next
+
+- **[Chapter 5: Receiving Notifications](../receiving-notifications/index.md)** - Configure notifications
+- **[Chapter 8: Advanced Techniques](../advanced-techniques/index.md)** - Custom actions and performance
+- **[7. Troubleshooting Alerts](../troubleshooting-alerts/index.md)** - Debugging alert issues

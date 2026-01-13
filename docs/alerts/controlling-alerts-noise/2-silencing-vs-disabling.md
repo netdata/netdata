@@ -32,6 +32,12 @@ Silencing is like putting a "Do Not Disturb" sign on an alert—it keeps working
 
 ## 4.2.3 Related Sections
 
-- **4.1 Disabling Alerts** - How to permanently stop alert evaluation
-- **4.3 Silencing in Netdata Cloud** - Cloud-managed silencing rules
-- **4.4 Reducing Flapping and Noise** - Using delays to prevent flapping
+- **[4.1 Disabling Alerts](1-disabling-alerts.md)** - How to permanently stop alert evaluation
+- **[4.3 Silencing in Netdata Cloud](3-silencing-cloud.md)** - Cloud-managed silencing rules
+- **[4.4 Reducing Flapping and Noise](4-reducing-flapping.md)** - Using delays to prevent flapping
+
+## What's Next
+
+- **[4.3 Silencing in Netdata Cloud](3-silencing-cloud.md)** - Cloud-based silencing rules
+- **[4.4 Reducing Flapping](4-reducing-flapping.md)** - Delay and repeat techniques
+- **[8.1 Hysteresis](../advanced-techniques/1-hysteresis.md)** - Status-based conditions
