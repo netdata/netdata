@@ -108,7 +108,7 @@ Netdata supports many additional aggregation methods:
 |----------|-----------|-------------|
 | **Statistical** | `stddev`, `cv` | Standard deviation, coefficient of variation |
 | **Percentiles** | `percentile25`, `percentile50`, `percentile75`, `percentile80`, `percentile90`, `percentile95`, `percentile97`, `percentile98`, `percentile99` | Various percentile calculations |
-| **Trimmed aggregations** | `trimmed-mean`, `trimmed-median` | Remove outliers (1-25%) before aggregating |
+| **Trimmed aggregations** | `trimmed-mean`, `trimmed-median` | Remove a configurable percentage of outliers (default 5%, adjustable via `group_options`) before aggregating |
 | **Smoothing** | `ses`, `des` | Single/double exponential smoothing |
 | **Special** | `incremental_sum`, `countif`, `extremes` | Incremental sums, conditional counting, extreme values |
 
