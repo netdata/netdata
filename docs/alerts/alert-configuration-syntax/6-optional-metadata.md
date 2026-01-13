@@ -101,14 +101,14 @@ Keep the set of classes small and consistent (use the four recommended values). 
 **Example:**
 
 ```conf
-alarm: http_5xx_rate
-   on: web_log.http_statuses
-lookup: average -5m of response_5xx
-  calc: 100 * $this / $responses_total
-  warn: $this > 1
-  crit: $this > 5
- class: Errors
-  type: Web Server
+alarm: httpcheck_web_service_bad_status
+    on: httpcheck.status
+lookup: average -5m of bad_status
+   calc: 100 * $this / $success
+   warn: $this > 1
+   crit: $this > 5
+  class: Errors
+   type: Web Server
 component: nginx
 ```
 
@@ -142,13 +142,13 @@ Use `type` to describe the functional area (System, Database, Containers) rather
 **Example:**
 
 ```conf
-alarm: mysql_connections_high
-   on: mysql.connections
+alarm: mysql_connections
+    on: mysql.connections
 lookup: average -5m of connected_clients
-  warn: $this > 150
-  crit: $this > 190
- class: Utilization
-  type: Database
+   warn: $this > 150
+   crit: $this > 190
+  class: Utilization
+   type: Database
 component: MySQL
 ```
 

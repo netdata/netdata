@@ -68,7 +68,7 @@ DEFAULT_RECIPIENT_PD=" pagerduty-group"
 ## 5.2.6 Using Custom Scripts with `exec`
 
 ```conf
-template: custom_alert
+template: systemd_service_unit_failed_state
     on: systemd.service_unit_state
     lookup: average -1m of status
     every: 1m

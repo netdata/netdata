@@ -11,12 +11,12 @@ This causes flapping when CPU hovers around 80%.
 ## 8.1.2 Hysteresis Solution
 
 ```conf
-template: cpu_hysteresis
+template: 10min_cpu_usage
     on: system.cpu
 lookup: average -5m of user,system
-    every: 1m
-     warn: ($this > 80) && ($status != $WARNING)
-     crit: ($this > 95) && ($status != $CRITICAL)
+     every: 1m
+      warn: ($this > 80) && ($status != $WARNING)
+      crit: ($this > 95) && ($status != $CRITICAL)
 ```
 
 Behavior:

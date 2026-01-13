@@ -11,13 +11,13 @@ Rapid status transitions between CLEAR, WARNING, and CRITICAL create notificatio
 ## 7.3.2 Solution: Add Delays
 
 ```conf
-template: cpu_usage
+template: 10min_cpu_usage
     on: system.cpu
 lookup: average -5m of user,system
-    every: 1m
-     warn: $this > 80
-     crit: $this > 95
-   delay: up 5m down 2m
+     every: 1m
+      warn: $this > 80
+      crit: $this > 95
+    delay: up 5m down 2m
 ```
 
 This requires 5 minutes above threshold before WARNING fires.

@@ -158,8 +158,8 @@ sudo /etc/netdata/edit-config health.d/disabled_alerts.conf
 
 Add:
 ```conf
-# Disable stock alert that's not relevant to our environment
-alarm: some_stock_alert_name
+# Disable stock alert that doesn't apply to our environment
+alarm: mysql_10s_slow_queries
    to: silent
 ```
 
@@ -168,7 +168,7 @@ Setting `to: silent` prevents notifications without stopping evaluation.
 **Method 2: Disable evaluation entirely**
 ```conf
 # Completely disable alert evaluation
-alarm: some_stock_alert_name
+alarm: disk_space_usage
 enabled: no
 ```
 
@@ -203,7 +203,7 @@ If you're transitioning from a file-based setup to Cloud-managed alerts:
 3. Once verified, disable the file-based versions:
    ```conf
    # Migrated to Cloud, disabled locally
-   alarm: disk_space_alert
+    alarm: disk_space_usage
    enabled: no
    ```
 

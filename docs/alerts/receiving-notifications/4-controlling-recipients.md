@@ -41,7 +41,7 @@ integration: Email ops-team@company.com
 
 ```conf
 # In local health configuration
-template: critical_service
+template: systemd_service_unit_failed_state
     on: systemd.service_unit_state
     lookup: average -1m of status
     every: 1m

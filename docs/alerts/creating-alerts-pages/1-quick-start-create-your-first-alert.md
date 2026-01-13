@@ -40,7 +40,7 @@ Paste the following into the file:
 
 ```conf
 # Alert when any filesystem free space drops below 20%
-template: filesystem_low_space
+template: disk_space_usage
        on: disk.space
    lookup: average -1m percentage of avail
     units: %
@@ -103,12 +103,12 @@ sudo systemctl restart netdata
 Check that your alert is active:
 
 ```bash
-curl -s "http://localhost:19999/api/v1/alarms?all" | grep -i "filesystem_low_space"
+curl -s "http://localhost:19999/api/v1/alarms?all" | grep -i "disk_space_usage"
 ```
 
 You should see JSON output containing your alert name and current status. If all filesystems have more than 20% free space, the alert status will be `CLEAR` (healthy). This is expected, the alert is working correctly.
 
-Alternative: Open your local Netdata dashboard at `http://your-node-ip:19999`, click the 🔔 bell icon (top-right), and look for `filesystem_low_space` in the alerts list.
+Alternative: Open your local Netdata dashboard at `http://your-node-ip:19999`, click the 🔔 bell icon (top-right), and look for `disk_space_usage` in the alerts list.
 
 **Step 6: Test the Alert (Optional)**
 
@@ -156,7 +156,7 @@ Fill in the form as follows:
 
 | Field | Value |
 |-------|-------|
-| Alert Name | `filesystem_low_space` |
+| Alert Name | `disk_space_usage` |
 | Description | Filesystem has less than 20% free space |
 | Metric | Search for and select `disk.space` |
 | Dimension | `avail` (available space) |
@@ -186,10 +186,10 @@ Netdata Cloud will immediately push this alert definition to all connected nodes
 **Step 5: Verify the Alert is Active**
 
 1. Go to the Events Feed (left sidebar → Events)
-2. You should see a new event: `Alert filesystem_low_space created`
+2. You should see a new event: `Alert disk_space_usage created`
 3. Navigate to any node's dashboard (click Nodes → select a node)
 4. Click the 🔔 bell icon (top-right)
-5. Look for `filesystem_low_space` in the alerts list with status `CLEAR` (if your disks are healthy). If all filesystems have more than 20% free space, seeing `CLEAR` status is expected, the alert is working correctly.
+5. Look for `disk_space_usage` in the alerts list with status `CLEAR` (if your disks are healthy). If all filesystems have more than 20% free space, seeing `CLEAR` status is expected, the alert is working correctly.
 
 **Step 6: Test the Alert (Optional)**
 

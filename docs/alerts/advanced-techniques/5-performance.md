@@ -12,17 +12,17 @@
 
 ```conf
 # Efficient: 1-minute evaluation
-template: system_health
+template: 10min_cpu_usage
     on: system.cpu
 lookup: average -5m of user,system
-    every: 1m     # Good: 60 evaluations/hour
-     warn: $this > 80
+     every: 1m     # Good: 60 evaluations/hour
+      warn: $this > 80
 
 # Inefficient: 10-second evaluation
-template: system_fast
+template: 10min_cpu_usage
     on: system.cpu
 lookup: average -1m of user,system
-    every: 10s    # Bad: 360 evaluations/hour
+     every: 10s    # Bad: 360 evaluations/hour
 ```
 
 ## 8.5.3 Related Sections

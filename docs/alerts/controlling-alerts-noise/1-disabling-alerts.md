@@ -33,7 +33,7 @@ Add the alert you want to disable:
 alarm: mysql_10s_slow_queries
 
 # Disable by setting enabled to no
-template: some_stock_alert
+template: mysql_10s_slow_queries
    enabled: no
 ```
 
@@ -62,7 +62,7 @@ This is useful when:
 If you want to stop the alert from **ever changing status** but still see it in the UI, set both conditions to false:
 
 ```conf
-template: noisy_alert
+template: 10min_cpu_usage
    on: system.cpu
    warn: ($this) == 0
    crit: ($this) == 0

@@ -441,11 +441,11 @@ curl -s "http://localhost:19999/api/v1/alarm_variables?chart=system.cpu" | jq
 
 **Step 4:** Write your alert using those variable names
 ```conf
-alarm: cpu_user_high
-   on: system.cpu
- calc: $user + $system
- warn: $this > 80
- crit: $this > 95
+alarm: 10min_cpu_usage
+    on: system.cpu
+  calc: $user + $system
+   warn: $this > 80
+   crit: $this > 95
 ```
 
 **Step 5:** Reload health configuration
@@ -490,10 +490,10 @@ Shows all possible matches for a variable name with their scores (label-based ma
 
 **Example:**
 ```conf
-alarm: high_cpu_and_low_memory
-   on: system.cpu
- calc: $this + ($mem.available.available < 1000 ? 50 : 0)
- warn: $this > 100
+alarm: 10min_cpu_usage
+    on: system.cpu
+  calc: $this + ($ram_available < 1000 ? 50 : 0)
+   warn: $this > 100
 ```
 
 </details>
@@ -529,11 +529,11 @@ This works across all disk instances (sda, sdb, nvme0n1, etc.) because they all 
 **Example:**
 ```conf
 # Alert if both CPU and memory alerts are firing
-alarm: system_overload
-   on: system.cpu
- calc: $cpu_high_usage + $memory_low_available
- warn: $this > 1
- crit: $this > 2
+alarm: 10min_cpu_usage
+    on: system.cpu
+  calc: $10min_cpu_usage + $ram_available
+   warn: $this > 1
+   crit: $this > 2
 ```
 
 </details>

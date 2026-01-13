@@ -132,14 +132,14 @@ To monitor **all filesystems** with the same rule:
 
 ```conf
 # Template: watch free space on all filesystems
-template: fs_space_low
+template: disk_space_usage
     on: disk.space
 lookup: average -5m unaligned percentage of avail
-  units: %
-  every: 1m
-   warn: $this < 10
-   crit: $this < 5
-   info: Filesystem has very low free space
+   units: %
+   every: 1m
+    warn: $this < 10
+    crit: $this < 5
+    info: Filesystem has very low free space
 ```
 
 At runtime, Netdata instantiates this template for **every chart** that matches the `disk.space` context (one alert per filesystem).

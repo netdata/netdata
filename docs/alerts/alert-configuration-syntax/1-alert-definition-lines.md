@@ -24,8 +24,8 @@ For the conceptual difference, see 1.2 Alert Types: alarm versus template.
 A very simple `alarm` might look like this:
 
 ```conf
-alarm: high_cpu_usage
-   on: system.cpu
+alarm: 10min_cpu_usage
+    on: system.cpu
 lookup: average -5m of user,system
  every: 1m
   warn: $this > 80
@@ -97,8 +97,8 @@ The table below summarizes the most common optional lines you'll see in stock an
 A more complete alert might look like this:
 
 ```conf
-alarm: disk_space_critical
-   on: disk_space._
+alarm: disk_space_usage
+    on: disk_space._
 lookup: average -10m of used
  every: 1m
   warn: $this > 80

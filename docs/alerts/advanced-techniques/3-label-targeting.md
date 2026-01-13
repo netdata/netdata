@@ -11,12 +11,12 @@ Netdata supports:
 ## 8.3.2 Label-Based Alert Scope
 
 ```conf
-template: db_cpu_high
+template: 10min_cpu_usage
     on: system.cpu
 lookup: average -5m of user,system
-    every: 1m
-     warn: $this > 80
-   calc: if($host_labels.role == "database" && $host_labels.env == "production", $this, 0)
+     every: 1m
+      warn: $this > 80
+    calc: if($host_labels.role == "database" && $host_labels.env == "production", $this, 0)
 ```
 
 This targets only production database servers.

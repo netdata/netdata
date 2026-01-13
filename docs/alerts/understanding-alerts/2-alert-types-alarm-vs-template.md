@@ -82,7 +82,7 @@ If you need to target a specific chart instance (the use case for legacy `alarm`
 Example (legacy `alarm` vs equivalent `template`):
 ```conf
 # Legacy alarm syntax (discouraged)
-alarm: disk_fill_alarm
+alarm: disk_fill_rate
     on: disk space
     to: disk
     units: %
@@ -91,7 +91,7 @@ alarm: disk_fill_alarm
     crit: $this > 90
 
 # Preferred template syntax (future-compatible)
-template: disk_fill_alert
+template: disk_fill_rate
     on: disk.space
     chart labels: mount_point=/var
     warn: $this > 80

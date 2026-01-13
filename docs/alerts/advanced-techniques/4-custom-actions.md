@@ -3,13 +3,13 @@
 ## 8.4.1 Basic exec Syntax
 
 ```conf
-template: service_failed
+template: systemd_service_unit_failed_state
     on: systemd.service_unit_state
-    calc: $failed
-    every: 1m
-     crit: $this == 1
-       exec: /usr/local/bin/alert-handler.sh
-       to: ops-team
+     calc: $failed
+     every: 1m
+      crit: $this == 1
+        exec: /usr/local/bin/alert-handler.sh
+        to: ops-team
 ```
 
 ## 8.4.2 Argument Position

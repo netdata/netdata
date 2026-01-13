@@ -40,13 +40,13 @@ delay: [up|down] [seconds] [max]
 **Example: Basic Delay**
 
 ```conf
-template: high_cpu
-   on: system.cpu
-   lookup: average -5m of user,system
-   every: 1m
-   warn: $this > 80
-   crit: $this > 95
-   delay: up 5m down 1m
+template: 10min_cpu_usage
+    on: system.cpu
+    lookup: average -5m of user,system
+    every: 1m
+    warn: $this > 80
+    crit: $this > 95
+    delay: up 5m down 1m
 ```
 
 This means:
@@ -74,7 +74,7 @@ repeat: [warning] [critical] [all]
 **Example: Daily Repeat for Sustained Issues**
 
 ```conf
-template: disk_space_low
+template: disk_space_usage
    on: disk.space
    lookup: average -1m percentage of avail
    every: 1m
@@ -89,9 +89,9 @@ This sends notifications once per day while the alert is active—not once per m
 ## 4.4.4 Combining Delay and Repeat
 
 ```conf
-template: port_response_slow
+template: portcheck_connection_timeouts
     on: portcheck.status
-    lookup: average -3m of time
+    lookup: average -3m of timeout
     every: 1m
     warn: $this > 1000
     delay: up 10m down 2m
@@ -109,12 +109,12 @@ template: port_response_slow
 For advanced hysteresis, use `if` conditions that depend on the **current status**:
 
 ```conf
-template: cpu_trend
-   on: system.cpu
-   lookup: average -5m of user,system
-   every: 1m
-   warn: $this > ($status != CRITICAL ? 80 : 90)
-   crit: $this > ($status != CLEAR ? 95 : 98)
+template: 10min_cpu_usage
+    on: system.cpu
+    lookup: average -5m of user,system
+    every: 1m
+    warn: $this > ($status != CRITICAL ? 80 : 90)
+    crit: $this > ($status != CLEAR ? 95 : 98)
 ```
 
 This means:

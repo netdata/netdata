@@ -2,18 +2,12 @@
 
 Anomaly detection uses Netdata's ML models to identify unusual metric behavior without fixed thresholds. Requires `ml.conf` enabled on the node.
 
-:::note
-
-The examples below demonstrate anomaly detection concepts. They use `template:` names that describe their purpose. Adapt the template name and context to match your metrics.
-
-:::
-
 ## 6.4.1 Anomaly Bit Alert
 
 ```conf
-template: cpu_anomaly_alert
+template: 10min_cpu_usage
     on: system.cpu
-lookup: average -5m of user
+lookup: average -5m unaligned of user
      units: %
      every: 1m
       warn: $anomaly_bit > 0.5
@@ -25,12 +19,12 @@ Requires ML enabled with sufficient historical data.
 ## 6.4.2 Adaptive Threshold
 
 ```conf
-template: traffic_anomaly_alert
-    on: net.net
-lookup: average -5m of received
-     units: Mbps
+template: 10min_cpu_usage
+    on: system.cpu
+lookup: average -5m of user
+     units: %
      every: 1m
-      warn: ($this > ($this - 10m + 2 * $stddev)) && ($this > 100)
+      warn: ($this > ($this - 10m + 2 * $stddev)) && ($this > 80)
         to: netops
 ```
 

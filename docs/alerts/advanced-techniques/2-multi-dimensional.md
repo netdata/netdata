@@ -5,11 +5,11 @@ Multi-dimensional alerts target specific dimensions within a chart, while templa
 ## 8.2.1 Dimension Selection
 
 ```conf
-template: network_errors
+template: interface_inbound_errors
     on: net.errors
 lookup: average -1m of inbound,outbound
-    every: 1m
-     warn: $this > 10
+     every: 1m
+      warn: $this > 10
 ```
 
 ## 8.2.2 Scaling to All Instances
@@ -17,14 +17,14 @@ lookup: average -1m of inbound,outbound
 Templates automatically create one alert per matching chart.
 
 ```conf
-template: interface_errors
+template: interface_inbound_errors
     on: net.errors
 lookup: average -5m of inbound
-    every: 1m
-     warn: $this > 10
+     every: 1m
+      warn: $this > 10
 ```
 
-Creates alerts for: `interface_errors-eth0`, `interface_errors-eth1`, etc.
+Creates alerts for: `interface_inbound_errors-eth0`, `interface_inbound_errors-eth1`, etc.
 
 ## 8.2.3 Related Sections
 
