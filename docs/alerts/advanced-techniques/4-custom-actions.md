@@ -80,4 +80,4 @@ fi
 ## What's Next
 
 - **[8.5 Performance Considerations](5-performance.md)** for optimizing alert evaluation
-- **[Chapter 5: Receiving Notifications](../receiving-notifications/index.md)** for notification routing options
+- **[Chapter 13: Architecture](../architecture/index.md)** for deep-dive internals
