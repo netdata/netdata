@@ -619,6 +619,7 @@ When present, it MUST start with "The following community resources may be relev
 Optional. Add it only when the documentation and the code review need to be complemented with additional information.
 When present, it MUST start with "The following reflect my understanding, and therefore may not be accurate - use with care."
 
+```
 <response_self_evaluation format="json" user_visible="false">
 {
   "type": "object",
@@ -758,6 +759,7 @@ When present, it MUST start with "The following reflect my understanding, and th
   "additionalProperties": false
 }
 </response_self_evaluation>
+```
 </example_final_report>
 
 Always include the JSON `response_self_evaluation` section at the end of your final report.
