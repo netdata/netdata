@@ -33,7 +33,7 @@ export interface SpawnSessionArgs {
   format?: OutputFormatId;
   history?: ConversationMessage[];
   callbacks?: AIAgentCallbacks;
-  renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent';
+  renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'embed' | 'sub-agent';
   abortSignal?: AbortSignal;
   stopRef?: { stopping: boolean };
   initialTitle?: string;
@@ -41,6 +41,7 @@ export interface SpawnSessionArgs {
   headendId?: string;
   telemetryLabels?: Record<string, string>;
   wantsProgressUpdates?: boolean;
+  stream?: boolean;
 }
 
 export class AgentRegistry {
@@ -129,6 +130,7 @@ export class AgentRegistry {
       headendId: args.headendId,
       telemetryLabels: args.telemetryLabels,
       wantsProgressUpdates: args.wantsProgressUpdates,
+      stream: args.stream,
     });
   }
 

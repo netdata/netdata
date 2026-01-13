@@ -62,7 +62,8 @@ ai-agent \
   --mcp stdio \
   --mcp http:8124 \
   --openai-completions 8082 \
-  --anthropic-completions 8083
+  --anthropic-completions 8083 \
+  --embed 8090
 ```
 
 Every headend flag is repeatable. The headend manager instantiates each endpoint independently while sharing the same agent registry.
@@ -74,8 +75,9 @@ Every headend flag is repeatable. The headend manager instantiates each endpoint
 | `--mcp <transport>` | MCP headend | Accepted values: `stdio`, `http:PORT`, `sse:PORT`, `ws:PORT`. Tool calls **must** include a `format` argument; when `format=json` the payload must also provide a `schema` object. |
 | `--openai-completions <port>` | OpenAI Chat Completions compatibility | `/v1/models`, `/v1/chat/completions` (supports SSE streaming). |
 | `--anthropic-completions <port>` | Anthropic Messages compatibility | `/v1/models`, `/v1/messages` (streams via SSE). |
+| `--embed <port>` | Public embed headend | `GET /ai-agent-public.js`, `POST /v1/chat` (SSE), `GET /health`. |
 
-Optional per-headend concurrency guards are available: `--api-concurrency <n>`, `--openai-completions-concurrency <n>`, `--anthropic-completions-concurrency <n>`. Each incoming request acquires a slot before spawning an agent session.
+Optional per-headend concurrency guards are available: `--api-concurrency <n>`, `--openai-completions-concurrency <n>`, `--anthropic-completions-concurrency <n>`, `--embed-concurrency <n>`. Each incoming request acquires a slot before spawning an agent session.
 
 ### Direct Invocation
 
@@ -251,9 +253,11 @@ assistant message content for the same turn).
 | `--mcp <transport>` | Start MCP headend (`stdio`, `http:PORT`, `sse:PORT`, `ws:PORT`) | HTTP uses `POST /mcp`; SSE pair (`GET /mcp/sse`, `POST /mcp/sse/message`); WebSocket speaks the `mcp` subprotocol. |
 | `--openai-completions <port>` | Start OpenAI Chat Completions compatible headend | 4 concurrent requests (configurable via `--openai-completions-concurrency`) |
 | `--anthropic-completions <port>` | Start Anthropic Messages compatible headend | 4 concurrent requests (configurable via `--anthropic-completions-concurrency`) |
+| `--embed <port>` | Start public embed headend | Configurable via `--embed-concurrency` |
 | `--api-concurrency <n>` | Max concurrent REST sessions per headend | 4 |
 | `--openai-completions-concurrency <n>` | Max concurrent OpenAI chat sessions | 4 |
 | `--anthropic-completions-concurrency <n>` | Max concurrent Anthropic chat sessions | 4 |
+| `--embed-concurrency <n>` | Max concurrent embed sessions | 10 |
 | `--llm-timeout <ms>` | Inactivity timeout per LLM call (resets on stream) | 120000 |
 | `--tool-timeout <ms>` | Timeout for tool execution | 60000 |
 | `--trace-llm` | Trace LLM HTTP requests and responses (Authorization redacted) | off |

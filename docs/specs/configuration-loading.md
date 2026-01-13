@@ -54,7 +54,7 @@ const cfg = buildUnifiedConfiguration(
 - **REST tools & OpenAPI specs**: `resolveRestTool`/inline OpenAPI merging keep `${parameters.foo}` verbatim by short-circuiting placeholders that start with `parameters.` (`src/config-resolver.ts:240-269`, `src/config-resolver.ts:412-423`).
 - **Defaults/pricing/telemetry/accounting**: Helper resolvers (`resolveDefaults`, `resolvePricing`, `resolveTelemetry`, `resolveAccounting`) scan layers top-down and return the first entry containing the field (`src/config-resolver.ts:272-364`). Accounting files run through placeholder expansion with the same MissingVariable safeguards.
 - **Queues**: `resolveQueues` normalizes every declared queue entry, enforcing positive integers and adding `default` automatically when absent (`src/config-resolver.ts:306-334`). When multiple layers define the same queue, the highest concurrency wins.
-- **Return shape**: `buildUnifiedConfiguration` emits `{ providers, mcpServers, restTools, openapiSpecs, queues, defaults, accounting, pricing, telemetry, cache }`, matching `Configuration` in `src/types.ts`.
+- **Return shape**: `buildUnifiedConfiguration` emits `{ providers, mcpServers, restTools, openapiSpecs, queues, defaults, accounting, pricing, telemetry, cache, embed }`, matching `Configuration` in `src/types.ts`.
 
 ## Queue Defaults & Validation
 - `DEFAULT_QUEUE_CONCURRENCY = min(64, max(1, availableParallelism*2))` (`src/config.ts:9-26`) and is injected when `queues.default` is missing in merged config (`src/config-resolver.ts:334-335`).
@@ -82,6 +82,7 @@ const cfg = buildUnifiedConfiguration(
 | `queues` | Global concurrency envelopes consumed by MCP/REST tools |
 | `pricing` | Optional cost tables used when providers don’t report billing |
 | `telemetry` | Enables OTLP/Prometheus exporters plus logging formats |
+| `embed` | Embed headend defaults: CORS/origin policy, auth tiers, rate limits, metrics |
 | `persistence.sessionsDir` / `persistence.billingFile` | Snapshot and accounting sinks wired via `mergeCallbacksWithPersistence()` |
 | `cache` | Global response cache backend (SQLite/Redis) used by agent/tool cache TTLs (defaults to SQLite when a TTL is enabled) |
 

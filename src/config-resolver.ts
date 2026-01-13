@@ -18,7 +18,7 @@ export interface ResolvedConfigLayer {
 }
 
 class MissingVariableError extends Error {
-  public readonly scope: 'provider' | 'mcp' | 'defaults' | 'accounting';
+  public readonly scope: 'provider' | 'mcp' | 'defaults' | 'accounting' | 'embed';
 
   public readonly id: string;
 
@@ -26,7 +26,7 @@ class MissingVariableError extends Error {
 
   public readonly variable: string;
 
-  constructor(scope: 'provider' | 'mcp' | 'defaults' | 'accounting', id: string, origin: LayerOrigin, variable: string, message: string) {
+  constructor(scope: 'provider' | 'mcp' | 'defaults' | 'accounting' | 'embed', id: string, origin: LayerOrigin, variable: string, message: string) {
     super(message);
     this.scope = scope;
     this.id = id;
@@ -147,7 +147,7 @@ function expandPlaceholders(obj: unknown, vars: (name: string) => string): unkno
   return obj;
 }
 
-function buildMissingVarError(scope: 'provider'|'mcp'|'defaults'|'accounting', id: string, origin: LayerOrigin, name: string): MissingVariableError {
+function buildMissingVarError(scope: 'provider'|'mcp'|'defaults'|'accounting'|'embed', id: string, origin: LayerOrigin, name: string): MissingVariableError {
   const message = `Unresolved variable \${${name}} for ${scope} '${id}' at ${origin}. Define it in ${origin === '--config' ? 'the specified config path' : '.ai-agent.env or environment'}.`;
   return new MissingVariableError(scope, id, origin, name, message);
 }
@@ -419,6 +419,25 @@ function resolveTelemetry(layers: ResolvedConfigLayer[]): TelemetryConfig | unde
   return expanded;
 }
 
+function resolveEmbed(layers: ResolvedConfigLayer[]): Configuration['embed'] {
+  const found = layers.find((layer) => {
+    const j = layer.json as { embed?: Record<string, unknown> } | undefined;
+    return j?.embed !== undefined;
+  });
+  if (found === undefined) return undefined;
+  const source = found.json as { embed?: Record<string, unknown> } | undefined;
+  const embedRaw = source?.embed;
+  if (embedRaw === undefined) return undefined;
+  const env = found.env ?? {};
+  const expanded = expandPlaceholders(embedRaw, (name: string) => {
+    const envVal = Object.prototype.hasOwnProperty.call(env, name) ? env[name] : undefined;
+    const v = envVal ?? process.env[name];
+    if (v === undefined) throw buildMissingVarError('embed', 'embed', found.origin, name);
+    return v;
+  }) as Configuration['embed'];
+  return expanded;
+}
+
 const parseOptionalString = (value: unknown, context: string): string | undefined => {
   if (value === undefined) return undefined;
   if (typeof value === 'string') return value;
@@ -561,6 +580,7 @@ export function buildUnifiedConfiguration(
   const telemetry = resolveTelemetry(layers);
   const queues = resolveQueues(layers);
   const cache = resolveCache(layers);
+  const embed = resolveEmbed(layers);
 
-  return { providers, mcpServers, restTools, openapiSpecs, queues, defaults, accounting, pricing, telemetry, cache } as Configuration;
+  return { providers, mcpServers, restTools, openapiSpecs, queues, defaults, accounting, pricing, telemetry, cache, embed } as Configuration;
 }

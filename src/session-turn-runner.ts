@@ -48,7 +48,7 @@ import { ThinkTagStreamFilter } from './think-tag-filter.js';
 import { processLeakedToolCalls, type LeakedToolFallbackResult } from './tool-call-fallback.js';
 import { TRUNCATE_PREVIEW_BYTES, truncateToBytes } from './truncation.js';
 import { estimateMessagesBytes, formatToolRequestCompact, parseJsonValueDetailed, sanitizeToolName, warn } from './utils.js';
-import { XmlFinalReportFilter, type XmlToolTransport } from './xml-transport.js';
+import { XmlFinalReportFilter, XmlFinalReportStrictFilter, type XmlToolTransport } from './xml-transport.js';
 
 const TOOL_FAILED_PREFIX = '(tool failed:';
 const TEXT_EXTRACTION_REMOTE_ID = 'agent:text-extraction';
@@ -3461,11 +3461,13 @@ export class TurnRunner {
             turnMetadata.reasoningValue = effectiveReasoningValue;
         }
         const llmTools = toolsForTurn;
-        let xmlFilter: XmlFinalReportFilter | undefined;
+        let xmlFilter: XmlFinalReportFilter | XmlFinalReportStrictFilter | undefined;
         const thinkFilter = new ThinkTagStreamFilter();
         const nonce = this.ctx.xmlTransport.getNonce();
         if (nonce !== undefined) {
-            xmlFilter = new XmlFinalReportFilter(nonce);
+            xmlFilter = this.ctx.sessionConfig.renderTarget === 'embed'
+                ? new XmlFinalReportStrictFilter(nonce)
+                : new XmlFinalReportFilter(nonce);
         }
         // Reset streaming flag for this attempt
         this.finalReportStreamed = false;

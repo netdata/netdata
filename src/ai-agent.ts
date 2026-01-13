@@ -10,7 +10,7 @@ import type { ToolCacheResolver } from './cache/tool-cache-resolver.js';
 import type { OutputFormatId } from './formats.js';
 import type { AdvisorExecutionResult } from './orchestration/advisors.js';
 import type { SessionNode } from './session-tree.js';
-import type { AIAgentSessionConfig, AIAgentResult, AccountingEntry, AccountingFlushPayload, Configuration, ConversationMessage, LogDetailValue, LogEntry, LLMAccountingEntry, MCPTool, OrchestrationConfig, OrchestrationRuntimeAgent, OrchestrationRuntimeConfig, ProgressMetrics, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, RestToolConfig, SessionSnapshotPayload, ToolAccountingEntry, ToolChoiceMode, TurnRequestContextMetrics, LogPayload } from './types.js';
+import type { AIAgentSessionConfig, AIAgentResult, AccountingEntry, AccountingFlushPayload, Configuration, ConversationMessage, LogDetailValue, LogEntry, LLMAccountingEntry, MCPTool, OrchestrationConfig, OrchestrationRuntimeAgent, OrchestrationRuntimeConfig, ProgressMetrics, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, RestToolConfig, SessionSnapshotPayload, TaskStatusData, ToolAccountingEntry, ToolChoiceMode, TurnRequestContextMetrics, LogPayload } from './types.js';
 
 import { getResponseCache } from './cache/cache-factory.js';
 import { createToolCacheResolver } from './cache/tool-cache-resolver.js';
@@ -681,7 +681,7 @@ export class AIAgentSession {
           };
           this.log(entry);
         },
-        updateStatus: (text: string) => {
+        updateStatus: (text: string, taskStatus?: TaskStatusData) => {
           const t = text.trim();
           if (t.length > 0) {
             this.opTree.setLatestStatus(t);
@@ -713,6 +713,7 @@ export class AIAgentSession {
               parentTxnId: this.parentTxnId,
               originTxnId: this.originTxnId,
               message: t,
+              taskStatus,
             });
           }
         },

@@ -42,6 +42,7 @@ The library performs no direct I/O (no stdout/stderr/file writes). All output, l
   - `onThinking(text: string)` – “thinking”/reasoning stream
   - `onTurnStarted(turn: number)` – fired at the beginning of every LLM turn (1-indexed) before any reasoning/output
   - `onAccounting(entry: AccountingEntry)` – accounting events
+  - `onProgress(event: ProgressEvent)` – progress events; `agent_update` includes `taskStatus` with structured fields (`status`, `done`, `pending`, `now`, `ready_for_final_report`, `need_to_run_more_tools`) when emitted via `agent__task_status`
 - `AIAgentResult`
   - `success: boolean`
   - `error?: string`

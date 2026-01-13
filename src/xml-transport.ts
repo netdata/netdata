@@ -669,3 +669,104 @@ export class XmlFinalReportFilter {
     return ret;
   }
 }
+
+/**
+ * Strict filter for streaming XML final reports.
+ * Only emits content that appears inside the FINAL tag.
+ */
+export class XmlFinalReportStrictFilter {
+  private readonly openTagPrefix: string;
+  private readonly closeTag: string;
+  private buffer = '';
+  private state: 'search_open' | 'buffering_open' | 'inside' | 'buffering_close' | 'done' = 'search_open';
+  private _hasStreamedContent = false;
+  private readonly thinkFilter = new ThinkTagStreamFilter();
+
+  constructor(nonce: string) {
+    this.openTagPrefix = `<ai-agent-${nonce}-FINAL`;
+    this.closeTag = `</ai-agent-${nonce}-FINAL>`;
+  }
+
+  get hasStreamedContent(): boolean {
+    return this._hasStreamedContent;
+  }
+
+  process(chunk: string): string {
+    let output = '';
+    const split = this.thinkFilter.process(chunk);
+    if (split.content.length === 0) return '';
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const char of split.content) {
+      output += this.processNormalChar(char);
+    }
+    return output;
+  }
+
+  private processNormalChar(char: string): string {
+    if (this.state === 'search_open') {
+      if (char === '<') {
+        this.state = 'buffering_open';
+        this.buffer = char;
+      }
+      return '';
+    }
+
+    if (this.state === 'buffering_open') {
+      this.buffer += char;
+      if (this.buffer.length <= this.openTagPrefix.length) {
+        if (!this.openTagPrefix.startsWith(this.buffer)) {
+          this.buffer = '';
+          this.state = 'search_open';
+        }
+      } else {
+        if (this.buffer.startsWith(this.openTagPrefix)) {
+          if (char === '>') {
+            this.buffer = '';
+            this.state = 'inside';
+            this._hasStreamedContent = true;
+          }
+        } else {
+          this.buffer = '';
+          this.state = 'search_open';
+        }
+      }
+      return '';
+    }
+
+    if (this.state === 'inside') {
+      if (char === '<') {
+        this.state = 'buffering_close';
+        this.buffer = char;
+        return '';
+      }
+      return char;
+    }
+
+    if (this.state === 'buffering_close') {
+      this.buffer += char;
+      if (!this.closeTag.startsWith(this.buffer)) {
+        const out = this.buffer;
+        this.buffer = '';
+        this.state = 'inside';
+        return out;
+      }
+      if (this.buffer === this.closeTag) {
+        this.buffer = '';
+        this.state = 'done';
+      }
+      return '';
+    }
+
+    return '';
+  }
+
+  flush(): string {
+    if (this.state !== 'inside') {
+      this.buffer = '';
+      return '';
+    }
+    const ret = this.buffer;
+    this.buffer = '';
+    return ret;
+  }
+}

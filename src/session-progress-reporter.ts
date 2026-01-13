@@ -5,6 +5,7 @@ import type {
   AgentUpdateEvent,
   ProgressEvent,
   ProgressMetrics,
+  TaskStatusData,
   ToolFinishedEvent,
   ToolStartedEvent,
 } from './types.js';
@@ -29,6 +30,7 @@ interface AgentUpdatePayload {
   parentTxnId?: string;
   originTxnId?: string;
   message: string;
+  taskStatus?: TaskStatusData;
 }
 
 interface AgentCompletionPayload {
@@ -95,6 +97,7 @@ export class SessionProgressReporter {
       parentTxnId: payload.parentTxnId,
       originTxnId: payload.originTxnId,
       message: trimmed,
+      taskStatus: payload.taskStatus,
       timestamp: Date.now(),
     };
     this.emit(event);

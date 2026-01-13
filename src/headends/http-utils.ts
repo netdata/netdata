@@ -63,6 +63,12 @@ export const writeSseChunk = (res: http.ServerResponse, payload: unknown): void 
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
 };
 
+export const writeSseEvent = (res: http.ServerResponse, eventName: string, payload: unknown): void => {
+  if (res.writableEnded || res.writableFinished) return;
+  res.write(`event: ${eventName}\n`);
+  res.write(`data: ${JSON.stringify(payload)}\n\n`);
+};
+
 export const writeSseDone = (res: http.ServerResponse): void => {
   if (res.writableEnded || res.writableFinished) return;
   res.write('data: [DONE]\n\n');

@@ -578,7 +578,8 @@ ai-agent \
   --mcp stdio \
   --mcp http:8124 \
   --openai-completions 8082 \
-  --anthropic-completions 8083
+  --anthropic-completions 8083 \
+  --embed 8090
 ```
 
 Each flag is repeatable—every port or transport spins up an independent headend managed by a shared supervisor:
@@ -587,9 +588,10 @@ Each flag is repeatable—every port or transport spins up an independent headen
 - `--mcp stdio|http:PORT|sse:PORT|ws:PORT` – Model Context Protocol servers. Tool invocations must include a `format` argument, and when `format=json` the payload must also provide a `schema` object.
 - `--openai-completions <port>` – OpenAI Chat Completions compatible endpoint exposing agents as models via `/v1/models` and `/v1/chat/completions` (supports SSE streaming).
 - `--anthropic-completions <port>` – Anthropic Messages compatible endpoint with `/v1/models` and `/v1/messages`, including SSE streaming events.
+- `--embed <port>` – Public embed headend serving `/ai-agent-public.js` plus `/v1/chat` (SSE) and `/health`.
 - `--slack` – Slack Socket Mode headend with @mentions, DMs, channel posts, shortcuts, and slash commands. Real-time progress updates with Block Kit UI, per-channel routing, and interactive controls. See [docs/SLACK.md](docs/SLACK.md) for setup and configuration.
 
-Per-headend concurrency guards are available (e.g., `--api-concurrency 8`). Each incoming request acquires a slot before the agent session is spawned, keeping the system responsive under load.
+Per-headend concurrency guards are available (e.g., `--api-concurrency 8`, `--embed-concurrency 8`). Each incoming request acquires a slot before the agent session is spawned, keeping the system responsive under load.
 
 Graceful shutdown is built in: the supervisor listens for `SIGINT`/`SIGTERM`, flips a shared `stopRef` so active sessions finish their current turns, closes REST/MCP/Slack sockets, and finally tears down shared MCP transports. A single signal triggers the graceful path (with a watchdog to avoid hanging forever); sending a second signal forces an immediate exit. This keeps systemd/PM2 happy and prevents MCP restart loops after you've asked the process to stop.
 

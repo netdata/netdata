@@ -272,7 +272,7 @@ Use the research agent whenever you need canonical company data; use the sweeps 
 - **Defaults**: Under `defaults`, you may set the same knobs as frontmatter/CLI (timeouts, sampling, stream, tool limits, contextWindowBufferTokens, default output format, per-surface format preferences).
 - **Queues**: Declare process-wide concurrency in `queues.{name}.concurrent`. Every MCP/REST tool binds to a queue via `queue: name` (falling back to `default`). Use small queues (e.g., `fetcher`) to throttle heavy MCP servers like Playwright; internal tools never consume slots so deadlocks are impossible.
 - **Telemetry**: `telemetry` block controls OTLP exporters, Prometheus endpoint, trace sampler (`always_on|always_off|parent|ratio`), log formats (`journald|logfmt|json|none`), and extra sinks (`otlp`).
-- **Slack/API**: `slack` toggles bot behavior (see Section 10). `api` controls built-in REST headend defaults (`enabled`, `port`, `bearerKeys`).
+- **Slack/API/Embed**: `slack` toggles bot behavior (see Section 10). `api` controls built-in REST headend defaults (`enabled`, `port`, `bearerKeys`). `embed` configures the public embed headend (`defaultAgent`, CORS origins, rate limits, auth tiers, metrics path).
 - **Pricing**: Optional cost tables keyed by provider/model with per-1k or per-1M token rates for prompt/completion/cache hits.
 
 ### MCP server example
@@ -517,6 +517,10 @@ OpenAI‑compatible providers enable `includeUsage` for streaming token usage by
   - Supports `stream=true`, `response_format`, `payload` passthrough. Concurrency guard via `--openai-completions-concurrency` (default 10).
 - **Anthropic-compatible headend (`--anthropic-completions <port>`)**
   - Provides `/v1/models`, `/v1/messages` with SSE event stream semantics. Mirrors OpenAI headend behaviors for hints/format.
+- **Embed headend (`--embed <port>`)**
+  - Browser-native SSE endpoint (`/v1/chat`) plus public JS client (`/ai-agent-public.js`) and `/health`.
+  - Streams `status` updates and **final-report only** `report` chunks; closes with `done` (see `docs/specs/headend-embed.md`).
+  - Concurrency guard via `--embed-concurrency` (default 10).
 - **Headend startup**: Always register at least one agent via repeating `--agent <path>`. All headends share the same `AgentRegistry` and telemetry context.
 
 **Checklist**

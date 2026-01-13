@@ -18,6 +18,7 @@ import { buildUnifiedConfiguration, discoverLayers, resolveDefaults } from './co
 import { formatPromptValue, resolveFormatIdForCli } from './formats.js';
 import { parseFrontmatter, stripFrontmatter, parseList, parsePairs, buildFrontmatterTemplate } from './frontmatter.js';
 import { AnthropicCompletionsHeadend } from './headends/anthropic-completions-headend.js';
+import { EmbedHeadend } from './headends/embed-headend.js';
 import { HeadendManager } from './headends/headend-manager.js';
 import { McpHeadend } from './headends/mcp-headend.js';
 import { OpenAICompletionsHeadend } from './headends/openai-completions-headend.js';
@@ -898,6 +899,10 @@ const anthropicCompletionsHeadendOption = new Option('--anthropic-completions <p
   .argParser((value: string, previous: number[]) => appendValue(parsePort(value), previous))
   .default([], undefined);
 
+const embedHeadendOption = new Option('--embed <port>', 'Start public embed headend on the given port (repeatable)')
+  .argParser((value: string, previous: number[]) => appendValue(parsePort(value), previous))
+  .default([], undefined);
+
 const apiConcurrencyOption = new Option('--api-concurrency <n>', 'Maximum concurrent REST API sessions')
   .argParser(parsePositive);
 
@@ -905,6 +910,9 @@ const openaiCompletionsConcurrencyOption = new Option('--openai-completions-conc
   .argParser(parsePositive);
 
 const anthropicCompletionsConcurrencyOption = new Option('--anthropic-completions-concurrency <n>', 'Maximum concurrent Anthropic chat sessions')
+  .argParser(parsePositive);
+
+const embedConcurrencyOption = new Option('--embed-concurrency <n>', 'Maximum concurrent embed sessions')
   .argParser(parsePositive);
 
 const slackHeadendOption = new Option('--slack', 'Start Slack Socket Mode headend');
@@ -919,9 +927,11 @@ program.addOption(apiHeadendOption);
 program.addOption(mcpHeadendOption);
 program.addOption(openaiCompletionsHeadendOption);
 program.addOption(anthropicCompletionsHeadendOption);
+program.addOption(embedHeadendOption);
 program.addOption(apiConcurrencyOption);
 program.addOption(openaiCompletionsConcurrencyOption);
 program.addOption(anthropicCompletionsConcurrencyOption);
+program.addOption(embedConcurrencyOption);
 program.addOption(slackHeadendOption);
 program.addOption(listToolsOption);
 program.addOption(schemaValidateOption);
@@ -932,6 +942,7 @@ interface HeadendModeConfig {
   mcpTargets: string[];
   openaiCompletionsPorts: number[];
   anthropicCompletionsPorts: number[];
+  embedPorts: number[];
   enableSlack: boolean;
   options: Record<string, unknown>;
 }
@@ -1220,9 +1231,10 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
     && config.mcpTargets.length === 0
     && config.openaiCompletionsPorts.length === 0
     && config.anthropicCompletionsPorts.length === 0
+    && config.embedPorts.length === 0
     && !config.enableSlack
   ) {
-    exitWith(4, 'no headends specified; add --api/--mcp/--openai-completions/--anthropic-completions/--slack', 'EXIT-HEADEND-NO-HEADENDS');
+    exitWith(4, 'no headends specified; add --api/--mcp/--openai-completions/--anthropic-completions/--embed/--slack', 'EXIT-HEADEND-NO-HEADENDS');
   }
 
   const configPathValue = typeof config.options.config === 'string' && config.options.config.length > 0
@@ -1388,6 +1400,7 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   const apiConcurrency = readConcurrency('apiConcurrency');
   const openaiCompletionsConcurrency = readConcurrency('openaiCompletionsConcurrency');
   const anthropicCompletionsConcurrency = readConcurrency('anthropicCompletionsConcurrency');
+  const embedConcurrency = readConcurrency('embedConcurrency');
 
   let telemetryConfigSnapshot: Configuration | undefined;
   try {
@@ -1404,6 +1417,7 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
     overrides: telemetryOverrides,
     mode: 'server',
   });
+  const embedConfig = telemetryConfigSnapshot.embed;
   await initTelemetry(runtimeTelemetryConfig);
   markTelemetryInitialized();
 
@@ -1435,6 +1449,9 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   });
   config.anthropicCompletionsPorts.forEach((port) => {
     headends.push(new AnthropicCompletionsHeadend(registry, { port, concurrency: anthropicCompletionsConcurrency }));
+  });
+  config.embedPorts.forEach((port) => {
+    headends.push(new EmbedHeadend(registry, { port, concurrency: embedConcurrency, config: embedConfig }));
   });
 
   if (slackHeadend !== undefined) {
@@ -1586,6 +1603,7 @@ program
       const mcpTargets = Array.isArray(options.mcp) ? (options.mcp as string[]) : [];
       const openaiCompletionsPorts = Array.isArray(options.openaiCompletions) ? (options.openaiCompletions as number[]) : [];
       const anthropicCompletionsPorts = Array.isArray(options.anthropicCompletions) ? (options.anthropicCompletions as number[]) : [];
+      const embedPorts = Array.isArray(options.embed) ? (options.embed as number[]) : [];
       const listToolsTargets = Array.isArray(options.listTools) ? (options.listTools as string[]) : [];
 
       if (listToolsTargets.length > 0) {
@@ -1593,13 +1611,14 @@ program
         return;
       }
 
-      if (apiPorts.length > 0 || mcpTargets.length > 0 || openaiCompletionsPorts.length > 0 || anthropicCompletionsPorts.length > 0) {
+      if (apiPorts.length > 0 || mcpTargets.length > 0 || openaiCompletionsPorts.length > 0 || anthropicCompletionsPorts.length > 0 || embedPorts.length > 0) {
         await runHeadendMode({
           agentPaths: agentFlags,
           apiPorts,
           mcpTargets,
           openaiCompletionsPorts,
           anthropicCompletionsPorts,
+          embedPorts,
           enableSlack: options.slack === true,
           options,
         });

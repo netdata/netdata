@@ -185,6 +185,15 @@ interface AgentProgressBase {
   originTxnId?: string;
 }
 
+export interface TaskStatusData {
+  status: 'starting' | 'in-progress' | 'completed';
+  done: string;
+  pending: string;
+  now: string;
+  ready_for_final_report: boolean;
+  need_to_run_more_tools: boolean;
+}
+
 export interface AgentStartedEvent extends AgentProgressBase {
   type: 'agent_started';
   reason?: string;
@@ -193,6 +202,7 @@ export interface AgentStartedEvent extends AgentProgressBase {
 export interface AgentUpdateEvent extends AgentProgressBase {
   type: 'agent_update';
   message: string;
+  taskStatus?: TaskStatusData;
 }
 
 export interface AgentFinishedEvent extends AgentProgressBase {
@@ -385,6 +395,55 @@ export interface QueueConfig {
   concurrent: number;
 }
 
+export interface EmbedRateLimitConfig {
+  enabled?: boolean;
+  requestsPerMinute?: number;
+  burstSize?: number;
+}
+
+export interface EmbedTierRateLimitConfig {
+  requestsPerMinute?: number;
+  requestsPerMinutePerGuid?: number;
+  requestsPerMinutePerIp?: number;
+}
+
+export interface EmbedAuthTierConfig {
+  origins?: string[];
+  requireGuid?: boolean;
+  verifyGuidInCloud?: boolean;
+  allow?: boolean;
+  rateLimit?: EmbedTierRateLimitConfig;
+}
+
+export interface EmbedAuthConfig {
+  tiers?: {
+    netdataProperties?: EmbedAuthTierConfig;
+    agentDashboards?: EmbedAuthTierConfig;
+    unknown?: EmbedAuthTierConfig;
+  };
+  signedTokens?: {
+    enabled?: boolean;
+    secret?: string;
+    ttlSeconds?: number;
+  };
+}
+
+export interface EmbedMetricsConfig {
+  enabled?: boolean;
+  path?: string;
+}
+
+export interface EmbedHeadendConfig {
+  enabled?: boolean;
+  port?: number;
+  concurrency?: number;
+  defaultAgent?: string;
+  corsOrigins?: string[];
+  rateLimit?: EmbedRateLimitConfig;
+  auth?: EmbedAuthConfig;
+  metrics?: EmbedMetricsConfig;
+}
+
 export interface Configuration {
   providers: Record<string, ProviderConfig>;
   mcpServers: Record<string, MCPServerConfig>;
@@ -488,6 +547,7 @@ export interface Configuration {
     port?: number;             // ${PORT}
     bearerKeys?: string[];     // e.g., ["${API_BEARER_TOKEN}"] or multiple
   };
+  embed?: EmbedHeadendConfig;
 }
 
 // REST tool configuration (minimal phase 1)
@@ -583,7 +643,7 @@ export interface AgentRunOptions {
   history?: ConversationMessage[];
   callbacks?: AIAgentCallbacks;
   trace?: AIAgentSessionConfig['trace'];
-  renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent';
+  renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'embed' | 'sub-agent';
   outputFormat: OutputFormatId;
   abortSignal?: AbortSignal;
   stopRef?: { stopping: boolean };
@@ -596,6 +656,7 @@ export interface AgentRunOptions {
   traceMCP?: boolean;
   traceSdk?: boolean;
   verbose?: boolean;
+  stream?: boolean;
   agentPath?: string;
   turnPathPrefix?: string;
 }
@@ -642,7 +703,7 @@ export interface AIAgentSessionConfig {
   // Resolved output format for this session (must be provided by caller)
   outputFormat: OutputFormatId;
   // Optional rendering target for diagnostics
-  renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent';
+  renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'embed' | 'sub-agent';
   conversationHistory?: ConversationMessage[];
   // Expected output contract parsed from prompt frontmatter
   expectedOutput?: { format: 'json' | 'markdown' | 'text'; schema?: Record<string, unknown> };

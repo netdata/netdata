@@ -1,7 +1,7 @@
 # Headends Overview
 
 ## TL;DR
-Network service endpoints exposing agent functionality. Six types: MCP, OpenAI-compatible, Anthropic-compatible, REST API, Slack, custom. HeadendManager orchestrates lifecycle.
+Network service endpoints exposing agent functionality. Seven types: MCP, OpenAI-compatible, Anthropic-compatible, REST API, Slack, Embed, custom. HeadendManager orchestrates lifecycle.
 
 ## Source Files
 - `src/headends/types.ts` - Core headend interfaces
@@ -11,6 +11,10 @@ Network service endpoints exposing agent functionality. Six types: MCP, OpenAI-c
 - `src/headends/anthropic-completions-headend.ts` - Anthropic API compat (~37KB)
 - `src/headends/rest-headend.ts` - REST API endpoint (~16KB)
 - `src/headends/slack-headend.ts` - Slack Socket Mode (~33KB)
+- `src/headends/embed-headend.ts` - Embed SSE headend
+- `src/headends/embed-public-client.ts` - Public JS client (served as `/ai-agent-public.js`)
+- `src/headends/embed-transcripts.ts` - End-user transcript persistence
+- `src/headends/embed-metrics.ts` - Embed metrics exporter
 - `src/headends/concurrency.ts` - Request concurrency limiting
 - `src/headends/http-utils.ts` - HTTP utilities
 - `src/headends/summary-utils.ts` - Response summarization
@@ -40,6 +44,7 @@ type HeadendKind =
   | 'anthropic-completions'
   | 'api'
   | 'slack'
+  | 'embed'
   | 'custom';
 ```
 
@@ -198,6 +203,22 @@ type HeadendClosedEvent =
 - `success` – boolean
 - `output` – concatenated streamed text
 - `reasoning` – aggregated thinking output (if any)
+
+### Embed Headend
+**Kind**: `embed`
+**Protocol**: SSE over HTTP (browser-native events)
+
+**Features**:
+- `GET /ai-agent-public.js` serves the public JS client library
+- `POST /v1/chat` streams `status` and `report` events, finalizes with `done`
+- Stateless multi-turn (client sends history array)
+- Stable per-client UUID for follow-up questions + transcript persistence
+
+**Endpoints**:
+- `GET /health`
+- `GET /ai-agent-public.js`
+- `POST /v1/chat` (SSE)
+- `GET /metrics` (configurable path, when enabled)
 - `finalReport` – structured final_report payload
 - `error` – string when session fails
 

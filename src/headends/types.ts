@@ -6,6 +6,7 @@ export type HeadendKind =
   | 'anthropic-completions'
   | 'api'
   | 'slack'
+  | 'embed'
   | 'custom';
 
 export interface HeadendDescription {

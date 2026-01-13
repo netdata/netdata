@@ -290,7 +290,7 @@ The flow is **procedural**, not state-machine driven. Error handling is inline v
 ## Events
 
 - `agent_started` - Session began
-- `agent_update` - Progress update
+- `agent_update` - Progress update (includes `taskStatus` when emitted via `agent__task_status`)
 - `agent_finished` - Success completion
 - `agent_failed` - Error completion
 

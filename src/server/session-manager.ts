@@ -25,12 +25,12 @@ export class SessionManager {
   private readonly stopRefs = new Map<string, { stopping: boolean }>();
   private readonly callbacks: Callbacks;
   private readonly treeUpdateListeners = new Set<(runId: string) => void>();
-  private readonly runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web'; outputFormat?: string; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; headendId?: string; telemetryLabels?: Record<string, string> }) => Promise<AIAgentResult>;
+  private readonly runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web' | 'embed'; outputFormat?: string; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; headendId?: string; telemetryLabels?: Record<string, string> }) => Promise<AIAgentResult>;
   private readonly headendId?: string;
   private readonly telemetryLabels: Record<string, string>;
 
   public constructor(
-    runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web'; outputFormat?: string; abortSignal?: AbortSignal; initialTitle?: string; headendId?: string; telemetryLabels?: Record<string, string> }) => Promise<AIAgentResult>,
+    runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web' | 'embed'; outputFormat?: string; abortSignal?: AbortSignal; initialTitle?: string; headendId?: string; telemetryLabels?: Record<string, string> }) => Promise<AIAgentResult>,
     callbacks: Callbacks = {},
     options: { headendId?: string; telemetryLabels?: Record<string, string> } = {},
   ) {

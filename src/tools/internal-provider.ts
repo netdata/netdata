@@ -1,7 +1,7 @@
 import Ajv from 'ajv';
 
 import type { OutputFormatId } from '../formats.js';
-import type { MCPTool } from '../types.js';
+import type { MCPTool, TaskStatusData } from '../types.js';
 import type { ToolsOrchestrator } from './tools.js';
 import type { ToolExecuteOptions, ToolExecuteResult, ToolExecutionContext } from './types.js';
 import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
@@ -33,7 +33,7 @@ interface InternalToolProviderOptions {
   expectedOutputFormat?: OutputFormatId;
   expectedJsonSchema?: Record<string, unknown>;
   maxToolCallsPerTurn: number;
-  updateStatus: (text: string) => void;
+  updateStatus: (text: string, taskStatus?: TaskStatusData) => void;
   setTitle: (title: string, emoji?: string) => void;
   setFinalReport: (payload: { format: string; content?: string; content_json?: Record<string, unknown>; metadata?: Record<string, unknown>; messages?: unknown[] }) => void;
   logError: (message: string) => void;
@@ -496,7 +496,6 @@ export class InternalToolProvider extends ToolProvider {
     }
     if (name === TASK_STATUS_TOOL) {
       const { status, done, pending, now, ready_for_final_report, need_to_run_more_tools, taskStatusCompleted, statusMessage } = this.validateAndProcessTaskStatus(parameters);
-      this.opts.updateStatus(statusMessage);
 
       const taskStatusPayload = {
         status,
@@ -510,6 +509,7 @@ export class InternalToolProvider extends ToolProvider {
           need_to_run_more_tools,
         },
       };
+      this.opts.updateStatus(statusMessage, taskStatusPayload.taskStatusData);
 
       return {
         ok: true,
@@ -879,14 +879,15 @@ export class InternalToolProvider extends ToolProvider {
         // Handle task_status directly in batch
         if (tool === 'agent__task_status') {
           try {
-            // Validate the parameters but don't use the parsed values for response
-            this.validateAndProcessTaskStatus(callParameters);
-            const done = typeof callParameters.done === 'string' ? callParameters.done : '';
-            const pending = typeof callParameters.pending === 'string' ? callParameters.pending : '';
-            const now = typeof callParameters.now === 'string' ? callParameters.now : '';
-            const status = typeof callParameters.status === 'string' ? callParameters.status : '';
-            const statusMessage = [status, done, pending, now].filter(Boolean).join(' | ');
-            this.opts.updateStatus(statusMessage);
+            const { status, done, pending, now, ready_for_final_report, need_to_run_more_tools, statusMessage } = this.validateAndProcessTaskStatus(callParameters);
+            this.opts.updateStatus(statusMessage, {
+              status,
+              done,
+              pending,
+              now,
+              ready_for_final_report,
+              need_to_run_more_tools,
+            });
             return { id, tool, ok: true, elapsedMs: Date.now() - t0, output: 'status shown to user' };
           } catch (error) {
             const msg = error instanceof Error ? error.message : String(error);

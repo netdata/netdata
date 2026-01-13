@@ -189,13 +189,14 @@ interface AIAgentSessionConfig {
 
   // Optional miscellaneous
   headendWantsProgressUpdates?: boolean;    // Enable progress updates
-  renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent';
+  renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'embed' | 'sub-agent';
   initialTitle?: string;                    // Pre-set session title
   toolResponseMaxBytes?: number;            // Max tool response size
   mcpInitConcurrency?: number;              // MCP init concurrency
   ancestors?: string[];                     // Ancestor chain (recursion prevention)
   agentPath?: string;                       // Agent path override
   turnPathPrefix?: string;                  // Turn path prefix
+  stream?: boolean;                         // Override stream mode for this run
 }
 ```
 
@@ -228,7 +229,7 @@ interface AIAgentCallbacks {
 | `onAccounting` | Receive accounting entries |
 | `onSessionSnapshot` | Full session state snapshots |
 | `onAccountingFlush` | Batch accounting entries |
-| `onProgress` | Progress events (agent started/finished) |
+| `onProgress` | Progress events; `agent_update` includes structured `taskStatus` when emitted via `agent__task_status` |
 | `onOpTree` | Hierarchical operation tree updates |
 
 ## AIAgentResult

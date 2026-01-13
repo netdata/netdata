@@ -121,6 +121,11 @@ interface ToolExecutionState {
 3. Update status via callback
 4. Return result with completion signal
 
+## Progress Events (`onProgress`)
+- When `agent__task_status` is called, the progress reporter emits `agent_update` with both:
+  - `message`: the flattened `status | done | pending | now` string
+  - `taskStatus`: structured fields `{ status, done, pending, now, ready_for_final_report, need_to_run_more_tools }`
+
 ### Session Tracking (`session-tool-executor.ts`)
 1. Track `taskStatusCompleted` from tool result extras
 2. Do NOT reset completion flag when other tools run
@@ -240,4 +245,3 @@ interface ToolExecutionState {
 - Verify status is exactly `"completed"` (string)
 - Check that completion flag is propagated in extras
 - Verify batch handler returns completion signal
-

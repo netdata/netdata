@@ -221,6 +221,55 @@ const ApiConfigSchema = z.object({
   bearerKeys: z.array(z.string()).optional(),
 });
 
+const EmbedRateLimitSchema = z.object({
+  enabled: z.boolean().optional(),
+  requestsPerMinute: z.number().int().positive().optional(),
+  burstSize: z.number().int().positive().optional(),
+}).partial();
+
+const EmbedTierRateLimitSchema = z.object({
+  requestsPerMinute: z.number().int().positive().optional(),
+  requestsPerMinutePerGuid: z.number().int().positive().optional(),
+  requestsPerMinutePerIp: z.number().int().positive().optional(),
+}).partial();
+
+const EmbedAuthTierSchema = z.object({
+  origins: z.array(z.string()).optional(),
+  requireGuid: z.boolean().optional(),
+  verifyGuidInCloud: z.boolean().optional(),
+  allow: z.boolean().optional(),
+  rateLimit: EmbedTierRateLimitSchema.optional(),
+}).partial();
+
+const EmbedAuthSchema = z.object({
+  tiers: z.object({
+    netdataProperties: EmbedAuthTierSchema.optional(),
+    agentDashboards: EmbedAuthTierSchema.optional(),
+    unknown: EmbedAuthTierSchema.optional(),
+  }).partial().optional(),
+  signedTokens: z.object({
+    enabled: z.boolean().optional(),
+    secret: z.string().optional(),
+    ttlSeconds: z.number().int().positive().optional(),
+  }).partial().optional(),
+}).partial();
+
+const EmbedMetricsSchema = z.object({
+  enabled: z.boolean().optional(),
+  path: z.string().optional(),
+}).partial();
+
+const EmbedConfigSchema = z.object({
+  enabled: z.boolean().optional(),
+  port: z.number().int().positive().optional(),
+  concurrency: z.number().int().positive().optional(),
+  defaultAgent: z.string().optional(),
+  corsOrigins: z.array(z.string()).optional(),
+  rateLimit: EmbedRateLimitSchema.optional(),
+  auth: EmbedAuthSchema.optional(),
+  metrics: EmbedMetricsSchema.optional(),
+}).partial();
+
 const OutputFormatEnum = z.enum(['markdown','markdown+mermaid','slack-block-kit','tty','pipe','json','sub-agent']);
 
 const FormatsConfigSchema = z.object({
@@ -319,6 +368,7 @@ const ConfigurationSchema = z.object({
   telemetry: TelemetrySchema,
   slack: SlackConfigSchema.optional(),
   api: ApiConfigSchema.optional(),
+  embed: EmbedConfigSchema.optional(),
 });
 
 function hasMcpServers(x: unknown): x is { mcpServers: Record<string, unknown> } {

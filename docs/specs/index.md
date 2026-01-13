@@ -61,6 +61,7 @@
 - [headend-openai.md](headend-openai.md) - OpenAI-compatible chat API
 - [headend-anthropic.md](headend-anthropic.md) - Anthropic-compatible messages API
 - [headend-rest.md](headend-rest.md) - REST API headend
+- [headend-embed.md](headend-embed.md) - Public embed SSE headend
 
 ## Observability
 - [logging-overview.md](logging-overview.md) - Structured logging system
