@@ -23,4 +23,5 @@ curl -s "http://localhost:19999/api/v1/alarms?active" | jq '.'
 
 ## What's Next
 
-- **[7.1 Alert Never Triggers](../troubleshooting-alerts/alert-never-triggers.md)** for diagnostic approach
+- **[10.1 Events Feed](../cloud-alert-features/1-events-feed.md)** for Cloud-based history
+- **[9.2 Alert History](2-alert-history.md)** for alert transitions
