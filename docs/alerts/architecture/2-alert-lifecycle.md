@@ -1,4 +1,4 @@
-# 13.3 Alert Lifecycle and State Transitions
+# 13.2 Alert Lifecycle and State Transitions
 
 Understanding alert lifecycle helps in troubleshooting and in designing effective alert strategies.
 

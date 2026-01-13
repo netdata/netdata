@@ -69,7 +69,7 @@ Alert behavior varies depending on deployment topology.
 
 ## 13.0.6 Related Sections
 
-- **Chapter 3**: Alert configuration syntax reference
-- **Chapter 9**: API endpoints for alert management
-- **Chapter 5**: Receiving notifications
-- **Chapter 10**: Troubleshooting alert behavior
+- **[Chapter 3: Alert Configuration Syntax](../alert-configuration-syntax/index.md)** - Alert configuration syntax reference
+- **[Chapter 9: APIs for Alerts and Events](../apis-alerts-events/index.md)** - API endpoints for alert management
+- **[Chapter 5: Receiving Notifications](../receiving-notifications/index.md)** - Notification configuration
+- **[Chapter 7: Troubleshooting Alerts](../troubleshooting-alerts/index.md)** - Diagnose and fix alert behavior

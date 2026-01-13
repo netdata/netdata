@@ -1,4 +1,4 @@
-# 13.4 Notification Dispatch Architecture
+# 13.3 Notification Dispatch Architecture
 
 When an alert fires, the notification system handles delivery to configured destinations.
 
@@ -8,7 +8,7 @@ Notification delivery is asynchronous. Queue overflow can cause event loss. Moni
 
 :::
 
-## 13.4.1 Notification Queue
+## 13.3.1 Notification Queue
 
 Alert events enter a notification queue for asynchronous delivery. This queuing prevents alert evaluation from blocking on slow notification destinations.
 
@@ -20,7 +20,7 @@ Queue overflow causes event loss. When the queue fills, new events are discarded
 | **Filling** | Processing slower than arrival rate |
 | **Overflow** | New events discarded |
 
-## 13.4.2 Notification Methods
+## 13.3.2 Notification Methods
 
 Netdata supports multiple notification methods including email, Slack, PagerDuty, Discord, Telegram, and others. Each method has a dedicated handler that formats and delivers notifications.
 
@@ -34,13 +34,13 @@ Netdata supports multiple notification methods including email, Slack, PagerDuty
 
 Configuration files in `/etc/netdata/` define notification settings. The `health_alarm_notify.conf` file configures method-specific settings.
 
-## 13.4.3 Delivery Reliability
+## 13.3.3 Delivery Reliability
 
 Notification delivery is best-effort with configurable retry behavior. Failed delivery attempts are logged for troubleshooting.
 
 Critical notification delivery should use redundant paths. Configure multiple notification methods for critical alerts.
 
-## 13.4.4 Escalation and Routing
+## 13.3.4 Escalation and Routing
 
 Notification routing determines which recipients receive which alerts. Routing rules can filter by alert name, chart, host, or severity.
 
@@ -55,6 +55,6 @@ Escalation policies route unacknowledged alerts to secondary recipients after ti
 
 ## Related Sections
 
-- [13.3 Evaluation Architecture](./1-evaluation-architecture.md) - Alert evaluation process
+- [13.1 Evaluation Architecture](./1-evaluation-architecture.md) - Alert evaluation process
 - [13.5 Scaling Topologies](./5-scaling-topologies.md) - Distributed notification handling
 - [Receiving Notifications](../../receiving-notifications/index.md) - Complete notification guide
