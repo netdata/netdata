@@ -42,7 +42,7 @@ Tracks connection pool saturation to prevent connection exhaustion.
 Detects deadlocks that indicate concurrent transaction conflicts.
 
 **Context:** `postgres.db_deadlocks_rate`
-**Thresholds:** WARN > 0
+**Thresholds:** WARN > 10 deadlocks/min (tightens to >0 while already WARNING)
 
 #### postgres_total_connection_utilization
 
