@@ -1,6 +1,6 @@
 # 9.4 Health Management API
 
-:::note
+:::warning
 
 The health management API requires authentication. See [9.4.3 Authentication](#943-authentication) for details.
 
@@ -8,42 +8,48 @@ The health management API requires authentication. See [9.4.3 Authentication](#9
 
 ## 9.4.1 Enable/Disable Alerts
 
-The Health Management API uses `/api/v1/manage/health` endpoint.
+The Health Management API uses `/api/v1/manage/health` endpoint. Valid commands are:
+
+| Command | Description |
+|---------|-------------|
+| `DISABLE ALL` | Disable all health checks |
+| `SILENCE ALL` | Silence all notifications |
+| `DISABLE` | Disable health checks for specific alarms (requires `alarm=` parameter) |
+| `SILENCE` | Silence notifications for specific alarms (requires `alarm=` parameter) |
+| `RESET` | Reset all silencers and re-enable checks |
+| `LIST` | Return current silencer configuration as JSON |
 
 ```bash
-# Disable a specific alert (requires auth token)
+# Disable all health checks (requires auth token)
+curl "http://localhost:19999/api/v1/manage/health?cmd=DISABLE%20ALL" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Silence all notifications (requires auth token)
+curl "http://localhost:19999/api/v1/manage/health?cmd=SILENCE%20ALL" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Disable a specific alert
 curl "http://localhost:19999/api/v1/manage/health?cmd=DISABLE&alarm=10min_cpu_usage" \
-  -H "X-Auth-Token: YOUR_TOKEN"
+  -H "Authorization: Bearer YOUR_TOKEN"
 
 # Silence notifications for a specific alert
 curl "http://localhost:19999/api/v1/manage/health?cmd=SILENCE&alarm=10min_cpu_usage" \
-  -H "X-Auth-Token: YOUR_TOKEN"
+  -H "Authorization: Bearer YOUR_TOKEN"
 
 # Reset to default state (enable all checks and notifications)
 curl "http://localhost:19999/api/v1/manage/health?cmd=RESET" \
-  -H "X-Auth-Token: YOUR_TOKEN"
+  -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
 ## 9.4.2 Reload Configuration
 
-To reload health configuration, use the Netdata CLI:
+To reload health configuration without restarting Netdata, use the Netdata CLI:
 
 ```bash
 sudo netdatacli reload-health
 ```
 
-This is equivalent to sending SIGUSR2 to the Netdata process.
-
-## 9.4.3 Authentication
-
-The health management API requires an authorization token. Find the token in your `netdata.conf`:
-
-```ini
-[registry]
-    # netdata management api key file = /var/lib/netdata/netdata.api.key
-```
-
-Default access is from localhost only. Configure `allow management from` in `netdata.conf` for remote access.
+This triggers the health subsystem to reload configuration files. On success, the command returns exit code 0 with no output.
 
 ## 9.4.4 Related Sections
 

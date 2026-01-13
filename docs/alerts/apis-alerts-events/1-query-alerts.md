@@ -6,10 +6,14 @@ curl -s "http://localhost:19999/api/v1/alarms" | jq '.'
 
 Response includes alert name, status, value, thresholds.
 
-## 9.1.1 Filter by Status
+## 9.1.1 Filter Alerts
 
 ```bash
-curl -s "http://localhost:19999/api/v1/alarms?status=WARNING,CRITICAL" | jq '.'
+# Get all alerts including cleared
+curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.'
+
+# Get only active alerts (default)
+curl -s "http://localhost:19999/api/v1/alarms?active" | jq '.'
 ```
 
 ## 9.1.2 Related Sections
@@ -19,4 +23,4 @@ curl -s "http://localhost:19999/api/v1/alarms?status=WARNING,CRITICAL" | jq '.'
 
 ## What's Next
 
-- **[7.1 Alert Never Triggers](.../../troubleshooting-alerts/alert-never-triggers.md)** for diagnostic approach
+- **[7.1 Alert Never Triggers](../troubleshooting-alerts/alert-never-triggers.md)** for diagnostic approach
