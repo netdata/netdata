@@ -93,7 +93,7 @@ Tracks non-2xx responses indicating client or server errors.
 Monitors HTTP request timeouts.
 
 **Context:** `httpcheck.status`
-**Thresholds:** WARN > 0 timeouts
+**Thresholds:** WARN ≥ 10% timeouts, CRIT ≥ 40% timeouts
 
 ### httpcheck_web_service_up
 
