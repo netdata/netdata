@@ -31,7 +31,7 @@ This creates alerts only for hosts with `role=database` label. The alert still f
 ## 8.3.3 Related Sections
 
 - **[3.6 Optional Metadata](../alert-configuration-syntax/6-optional-metadata.md)** for labels documentation
-- **[4.4 Room-Based Alerting](../cloud-alert-features/2-room-based.md)** for Cloud label usage
+- **[10.4 Room-Based Alerting](../cloud-alert-features/2-room-based.md)** for Cloud label usage
 
 ## What's Next
 
