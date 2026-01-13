@@ -19,7 +19,7 @@ Databases are typically the most critical components in an infrastructure, and t
 Tracks whether the replication position is advancing, catching replication stalls immediately.
 
 **Context:** `mysql.slave_behind`
-**Thresholds:** WARN > 5s, CRIT > 10s
+**Thresholds:** WARN > 10s (tightens to 5s while already WARNING), CRIT > 30s (tightens to 10s while already CRITICAL)
 
 #### mysql_10s_slow_queries
 
