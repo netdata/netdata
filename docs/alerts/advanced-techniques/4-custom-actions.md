@@ -4,12 +4,20 @@
 
 ```conf
 template: systemd_service_unit_failed_state
-    on: systemd.service_unit_state
+      on: systemd.service_unit_state
+   class: Errors
+    type: Linux
+component: Systemd units
+chart labels: unit_name=!*
      calc: $failed
-     every: 1m
-      crit: $this == 1
-        exec: /usr/local/bin/alert-handler.sh
-        to: ops-team
+    units: state
+    every: 10s
+     warn: $this != nan AND $this == 1
+    delay: down 5m multiplier 1.5 max 1h
+  summary: systemd unit ${label:unit_name} state
+     info: systemd service unit in the failed state
+       exec: /usr/local/bin/alert-handler.sh
+        to: sysadmin
 ```
 
 ## 8.4.2 Argument Position

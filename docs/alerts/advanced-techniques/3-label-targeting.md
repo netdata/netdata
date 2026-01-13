@@ -10,16 +10,23 @@ Netdata supports:
 
 ## 8.3.2 Label-Based Alert Scope
 
+Labels enable scoping alerts to specific hosts or chart instances. Use `host labels:` to target hosts with specific labels:
+
 ```conf
 template: 10min_cpu_usage
-    on: system.cpu
-lookup: average -5m of user,system
+      on: system.cpu
+   class: Utilization
+    type: System
+host labels: role=database
+      lookup: average -10m unaligned of user,system
+     units: %
      every: 1m
       warn: $this > 80
-    calc: if($host_labels.role == "database" && $host_labels.env == "production", $this, 0)
+      crit: $this > 95
+       to: dba-team
 ```
 
-This targets only production database servers.
+This creates alerts only for hosts with `role=database` label. The alert still fires for all matching database hosts.
 
 ## 8.3.3 Related Sections
 

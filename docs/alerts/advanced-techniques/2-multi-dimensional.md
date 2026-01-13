@@ -4,13 +4,18 @@ Multi-dimensional alerts target specific dimensions within a chart, while templa
 
 ## 8.2.1 Dimension Selection
 
+Target specific dimensions within a chart:
+
 ```conf
 template: interface_inbound_errors
     on: net.errors
-lookup: average -1m of inbound,outbound
+lookup: sum -10m unaligned absolute of inbound
+     units: errors
      every: 1m
-      warn: $this > 10
+      warn: $this >= 5
 ```
+
+This monitors only the `inbound` dimension of net.errors charts.
 
 ## 8.2.2 Scaling to All Instances
 

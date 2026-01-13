@@ -13,15 +13,20 @@ This causes flapping when CPU hovers around 80%.
 ```conf
 template: 10min_cpu_usage
     on: system.cpu
-lookup: average -5m of user,system
+lookup: average -10m unaligned of user,system
+     units: %
      every: 1m
-      warn: ($this > 80) && ($status != $WARNING)
-      crit: ($this > 95) && ($status != $CRITICAL)
+      warn: ($this > 80) && ($status == $CLEAR || $this > 85)
+      crit: ($this > 95) && ($status == $CLEAR || $this > 98)
+        ok: $this < 70
 ```
 
-Behavior:
-- Enter WARNING at 80%, but only clear when below 70%
-- Enter CRITICAL at 95%, but only clear when below 85%
+This implements asymmetric hysteresis:
+- Enter WARNING at 80%, but stay WARNING until > 85%
+- Enter CRITICAL at 95%, but stay CRITICAL until > 98%
+- Clear only when below 70%
+
+The `$status` variable enables different thresholds based on current state.
 
 ## 8.1.3 Related Sections
 

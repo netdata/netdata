@@ -14,15 +14,20 @@
 # Efficient: 1-minute evaluation
 template: 10min_cpu_usage
     on: system.cpu
-lookup: average -5m of user,system
+lookup: average -10m unaligned of user,system
+     units: %
      every: 1m     # Good: 60 evaluations/hour
       warn: $this > 80
+      crit: $this > 95
 
 # Inefficient: 10-second evaluation
 template: 10min_cpu_usage
     on: system.cpu
-lookup: average -1m of user,system
+lookup: average -1m unaligned of user,system
+     units: %
      every: 10s    # Bad: 360 evaluations/hour
+      warn: $this > 80
+      crit: $this > 95
 ```
 
 ## 8.5.3 Related Sections
