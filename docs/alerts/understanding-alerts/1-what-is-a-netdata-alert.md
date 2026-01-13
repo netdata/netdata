@@ -15,7 +15,7 @@ At each evaluation cycle (typically every 10 seconds, configurable per alert via
 
 Alert events are:
 - Visible in the local Agent dashboard
-- Queryable via Agent APIs (`/api/v1/alerts`, `/api/v2/alerts`)
+- Queryable via Agent APIs (`/api/v2/alerts`, `/api/v3/alerts`)
 - Sent to Netdata Cloud and displayed in the Events Tab
 - Used to trigger notifications (email, Slack, PagerDuty, etc.)
 
