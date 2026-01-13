@@ -115,7 +115,7 @@ is ephemeral node = yes
 
 :::tip
 
-For nodes that are part of streaming configurations, see the [Nodes Ephemerality documentation](https://learn.netdata.cloud/docs/observability-centralization-points/nodes-ephemerality) for more advanced configuration options.
+For nodes that are part of streaming configurations, see [Nodes Ephemerality](/docs/nodes-ephemerality.md) for more advanced configuration options.
 
 :::
 
@@ -136,4 +136,8 @@ To prevent removed nodes from reappearing:
 
 ## Additional Resources
 
-For more advanced configuration options with streaming setups, see the [Nodes Ephemerality documentation](https://learn.netdata.cloud/docs/observability-centralization-points/nodes-ephemerality).
+For more advanced configuration options with streaming setups, see [Nodes Ephemerality](/docs/nodes-ephemerality.md).
+
+To avoid removal issues when cloning VMs, see [VM Templates](/docs/learn/vm-templates.md) for proper identity cleanup.
+
+To understand how node identity affects removal and cleanup, see [Node Identities](/docs/learn/node-identities.md).

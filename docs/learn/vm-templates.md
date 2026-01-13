@@ -41,6 +41,31 @@ To prepare a VM template:
 3. **Keep claim.conf** - Enable auto-claiming (optional)
 4. **Convert to template** - Without starting Netdata
 
+## Node Types: Ephemeral vs Permanent
+
+VMs cloned from templates can be configured as **ephemeral** or **permanent** nodes. This affects how Netdata handles disconnections, alerts, and cleanup.
+
+| Type | Behavior | Use Case |
+|------|-----------|----------|
+| **Ephemeral** | No alerts on disconnect, auto-cleanup after 24h | Auto-scaling instances, spot VMs, short-lived workloads |
+| **Permanent** | Alerts trigger on disconnect | Long-running production systems |
+
+### Configuring Ephemeral Nodes in Templates
+
+To make cloned VMs ephemeral by default, add to `/etc/netdata/netdata.conf` **in the template**:
+
+```ini
+[global]
+is ephemeral node = yes
+```
+
+### When to Use Each Type
+
+- **Ephemeral**: Auto-scaling groups, spot instances, Kubernetes pod templates, CI/CD build agents
+- **Permanent**: Production database servers, core infrastructure, stable monitoring targets
+
+See [Node Ephemerality](/docs/nodes-ephemerality.md) for full documentation.
+
 ## Files to Delete
 
 :::danger
@@ -276,5 +301,35 @@ No. Containers start with empty volumes, so each gets a unique identity automati
 <summary>Is my claim token secure in the template?</summary>
 
 The token only allows claiming to your Space. It cannot read data or modify other nodes. Treat it like an API key - don't expose publicly, but it's safe in private templates.
+
+</details>
+
+<details>
+<summary>Should I make my template VMs ephemeral or permanent?</summary>
+
+Use **ephemeral** for auto-scaling groups, spot instances, or any VMs that may terminate at any time. Use **permanent** for long-running production systems where disconnections indicate problems.
+
+Configure in the template before conversion:
+
+```ini
+# For ephemeral (auto-scaling, spot instances)
+[global]
+is ephemeral node = yes
+
+# For permanent (default - production systems)
+[global]
+is ephemeral node = no
+```
+
+See [Node Types](/docs/learn/vm-templates.md#node-types-ephemeral-vs-permanent) for full guidance.
+
+</details>
+
+<details>
+<summary>Does ephemerality affect cleanup behavior?</summary>
+
+Yes. Ephemeral nodes are automatically cleaned up after 24 hours of disconnection (configurable via `cleanup ephemeral hosts after`). Permanent nodes never auto-cleanup - they remain visible until manually removed, or their metrics are fully rotated due to retention.
+
+This prevents dashboards from cluttering with stale auto-scaled instances while preserving long-term monitoring data for permanent infrastructure.
 
 </details>
