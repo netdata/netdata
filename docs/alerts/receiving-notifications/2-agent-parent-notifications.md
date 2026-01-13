@@ -67,17 +67,28 @@ DEFAULT_RECIPIENT_PD=" pagerduty-group"
 
 ## 5.2.6 Using Custom Scripts with `exec`
 
+The `exec:` line runs a custom script when an alert fires. This is useful for integrating with incident management systems or custom workflows:
+
 ```conf
+# Example: Custom script for critical systemd service failures
 template: systemd_service_unit_failed_state
-    on: systemd.service_unit_state
-    lookup: average -1m of status
-    every: 1m
-    crit: $this == 0
-    exec: /usr/lib/netdata/custom/alert-handler.sh
-    to: custom-recipient
+      on: systemd.service_unit_state
+   class: Errors
+    type: Linux
+component: Systemd units
+chart labels: unit_name=!*
+     calc: $failed
+    units: state
+    every: 10s
+     warn: $this != nan AND $this == 1
+    delay: down 5m multiplier 1.5 max 1h
+  summary: systemd unit ${label:unit_name} state
+     info: systemd service unit in the failed state
+      exec: /usr/lib/netdata/custom/alert-handler.sh
+       to: incident-response
 ```
 
-See **8.4 Custom Actions with `exec`** for full details.
+See **8.4 Custom Actions with `exec`** for full details on available environment variables and script integration patterns.
 
 ## 5.2.7 Related Sections
 

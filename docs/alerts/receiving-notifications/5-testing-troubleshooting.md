@@ -5,11 +5,11 @@
 **Send a test notification:**
 
 ```bash
-# Using netdata-ui (if available)
-/usr/lib/netdata/netdata-ui send-test-notification --type slack
+# Test all configured notification methods
+sudo bash /usr/lib/netdata/health/alarm-test.sh
 
-# Or manually trigger a test
-curl -s "http://localhost:19999/api/v1/alarms?test=1"
+# Test a specific notification type (e.g., slack, email, pagerduty)
+sudo bash /usr/lib/netdata/health/alarm-test.sh slack
 ```
 
 **Check notification logs:**

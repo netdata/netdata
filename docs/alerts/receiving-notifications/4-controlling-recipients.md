@@ -39,15 +39,24 @@ integration: Email ops-team@company.com
 
 ### 5.4.3 Alert-Specific Routing
 
+Override the default recipient for specific alerts by setting `to:` in your local health configuration:
+
 ```conf
-# In local health configuration
+# In local health configuration (override stock alert recipient)
 template: systemd_service_unit_failed_state
-    on: systemd.service_unit_state
-    lookup: average -1m of status
-    every: 1m
-    crit: $this == 0
-    to: ops-pager@company.com
-    from: ops-team@company.com
+      on: systemd.service_unit_state
+   class: Errors
+    type: Linux
+component: Systemd units
+chart labels: unit_name=!*
+     calc: $failed
+    units: state
+    every: 10s
+     warn: $this != nan AND $this == 1
+    delay: down 5m multiplier 1.5 max 1h
+  summary: systemd unit ${label:unit_name} state
+     info: systemd service unit in the failed state
+       to: ops-team@company.com
 ```
 
 ## 5.4.4 Related Sections
