@@ -128,6 +128,22 @@ Metrics:
 | proxysql.mysql_user_connections_utilization | used | percentage |
 | proxysql.mysql_user_connections_count | used | connections |
 
+### Per hostgroup
+
+These metrics refer to the backends hostgroup.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| hostgroup | hostgroup identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| proxysql.hostgroup_backends_status | online, shunned, offline_soft, offline_hard | backends |
+
 ### Per backend
 
 These metrics refer to the backend server.
@@ -136,6 +152,7 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
+| hostgroup | backend server hostgroup |
 | host | backend server host |
 | port | backend server port |
 
