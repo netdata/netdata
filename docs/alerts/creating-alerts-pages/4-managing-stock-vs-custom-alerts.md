@@ -19,7 +19,7 @@ Your Netdata deployment can have alerts from three sources:
 All three sources **coexist** on your nodes:
 - Stock alerts load first
 - Custom file-based alerts load next and can override stock alerts **with the same alert name** (regardless of filename). Additionally, if a user file has the same filename as a stock file, the stock file is skipped entirely.
-- Cloud-defined alerts load at runtime (and use separate identifiers, so they don't automatically override file-based ones)
+- Cloud-defined alerts load at runtime and override file-based alerts when they reuse the same `alarm`/`template` name (otherwise they coexist).
 
 :::
 
