@@ -86,7 +86,7 @@ Fires when DNS resolution fails entirely, which causes cascading failures in dep
 Tracks non-2xx responses indicating client or server errors.
 
 **Context:** `httpcheck.status`
-**Thresholds:** WARN > 0 bad status, CRIT > 10% bad status
+**Thresholds:** WARN ≥ 10% bad status, CRIT ≥ 40% bad status
 
 ### httpcheck_web_service_timeouts
 
