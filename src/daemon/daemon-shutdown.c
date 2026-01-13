@@ -407,6 +407,10 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     fprintf(stderr, "All done, exiting...\n");
 #endif
 
+    // Shutdown async logging queue, flushing any remaining messages
+    // This must be done late in shutdown to allow logging during cleanup
+    nd_log_shutdown();
+
     if(!exit_when_done) {
         curl_global_cleanup();
         return;
