@@ -2,6 +2,7 @@
 
 #include "nd_log-queue.h"
 #include "nd_log-internals.h"
+#include "systemd-journal-helpers.h"
 
 // ----------------------------------------------------------------------------
 // Queue structure
@@ -96,22 +97,13 @@ static void nd_log_queue_write_entry(struct nd_log_queue_entry *entry) {
             break;
 
         case NDLM_JOURNAL:
-            // For journal, the message should already be formatted appropriately
+            // Message is already formatted in journal native protocol (KEY=VALUE\n)
             // Use captured state from enqueue time to avoid data races
             if (entry->journal_direct_initialized && entry->fd >= 0) {
-                // Journal direct write - message already formatted as journal fields
-                struct iovec iov[1];
-                iov[0].iov_base = (void *)message;
-                iov[0].iov_len = entry->message_len;
-
-                struct msghdr mh = {
-                    .msg_iov = iov,
-                    .msg_iovlen = 1,
-                };
-                ssize_t sent = sendmsg(entry->fd, &mh, MSG_NOSIGNAL);
-                if (sent < 0) {
+                // Use journal_direct_send() which handles memfd fallback for large messages
+                if (!journal_direct_send(entry->fd, message, entry->message_len)) {
                     // Failed to write to journal - write to stderr as fallback
-                    fprintf(stderr, "async-logger: sendmsg() to journal failed (fd=%d): %s\n",
+                    fprintf(stderr, "async-logger: journal_direct_send() failed (fd=%d): %s\n",
                             entry->fd, strerror(errno));
                     fprintf(stderr, "%s\n", message);
                     fflush(stderr);
