@@ -36,5 +36,5 @@ lookup: average -1m unaligned of user,system
 
 ## What's Next
 
-- **[Chapter 4: Controlling Alerts and Noise](../controlling-alerts-noise/index.md)** for reducing noise
-- **[Chapter 7: Troubleshooting](../troubleshooting-alerts/index.md)** for debugging alerts
+- **[Chapter 9: APIs for Alerts and Events](../apis-alerts-events/index.md)** for programmatic alert management
+- **[Chapter 13: Architecture](../architecture/index.md)** for deep-dive internals
