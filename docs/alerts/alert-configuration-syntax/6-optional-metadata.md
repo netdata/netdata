@@ -231,7 +231,7 @@ In this definition:
 
 :::note
 
-When this alert appears in Cloud, SREs can filter for `class: Latency` or `component: API Gateway`. On-call routing can treat all `API Gateway` latency alerts the same. Silencing rules can target specific components during controlled maintenance.
+When this alert appears in Cloud, SREs can filter for `class: Workload` or `component: HTTP endpoint`. On-call routing can treat all `HTTP endpoint` workload alerts the same. Silencing rules can target specific components during controlled maintenance.
 
 :::
 
