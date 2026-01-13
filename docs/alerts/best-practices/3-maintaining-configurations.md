@@ -81,8 +81,8 @@ Monitor the relationship between alert behavior and workload changes. When signi
 
 ## What's Next
 
-- [12.4 Large Environment Patterns](4-scaling-large-environments.md) - Parent-based and distributed setups
-- [12.5 SLI and SLO Alerts](5-sli-slo-alerts.md) - Connecting to business objectives
+- [12.4 Large Environment Patterns](./4-scaling-large-environments.md) - Parent-based and distributed setups
+- [12.5 SLI and SLO Alerts](./5-sli-slo-alerts.md) - Connecting to business objectives
 - [13. Alerts and Notifications Architecture](../architecture/index.md) - Deep-dive internals
 
 ## See Also

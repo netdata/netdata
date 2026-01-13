@@ -364,5 +364,5 @@ Keep `warn`/`crit` expressions simple, explicit, and well-grouped with parenthes
 
 ## What's Next
 
-- **3.5 Variables and Special Symbols** lists the variables you can use inside expressions (`$this`, `$status`, `$now`, chart and context variables) and how to inspect them via the `alarm_variables` API
-- **8.1 Hysteresis and Status-Based Conditions** shows advanced patterns for using status and expressions together to control alert transitions in more complex ways
+- **[3.5 Variables and Special Symbols](5-variables-and-special-symbols.md)** lists the variables you can use inside expressions (`$this`, `$status`, `$now`, chart and context variables) and how to inspect them via the `alarm_variables` API
+- **[8.1 Hysteresis and Status-Based Conditions](../advanced-techniques/1-hysteresis.md)** shows advanced patterns for using status and expressions together to control alert transitions in more complex ways

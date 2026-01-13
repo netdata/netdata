@@ -601,7 +601,7 @@ When writing alerts, always use the `alarm_variables` API to discover exact vari
 
 ## What's Next
 
-- **3.6 Optional Metadata: class, type, component, and labels** explains how to classify and organize alerts for filtering and UI display
-- **Chapter 4: Controlling Alerts and Noise** covers disabling, silencing, and reducing alert noise
-- **9.3 Inspect Alert Variables (alarm_variables API)** provides detailed API documentation with advanced filtering and debugging techniques
-- **8.1 Hysteresis and Status-Based Conditions** shows advanced patterns using `$status` and status constants for complex alert logic
+- **[3.6 Optional Metadata: class, type, component, and labels](6-optional-metadata.md)** explains how to classify and organize alerts for filtering and UI display
+- **[Chapter 4: Controlling Alerts and Noise](../controlling-alerts-noise/index.md)** covers disabling, silencing, and reducing alert noise
+- **[9.3 Inspect Alert Variables (alarm_variables API)](../apis-alerts-events/3-inspect-variables.md)** provides detailed API documentation with advanced filtering and debugging techniques
+- **[8.1 Hysteresis and Status-Based Conditions](../advanced-techniques/1-hysteresis.md)** shows advanced patterns using `$status` and status constants for complex alert logic

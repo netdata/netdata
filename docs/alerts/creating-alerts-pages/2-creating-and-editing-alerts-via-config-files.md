@@ -356,7 +356,7 @@ File-based alerts give you **maximum control and reproducibility**. Define rules
 
 ## What's Next
 
-- **2.3 Creating and Editing Alerts via Netdata Cloud** Learn the Cloud UI workflow for centralized alert management
-- **2.4 Managing Stock versus Custom Alerts** Patterns for combining built-in and custom rules
-- **2.5 Reloading and Validating Alert Configuration** Deeper troubleshooting and validation techniques
-- **Chapter 3: Alert Configuration Syntax** Detailed reference for every configuration line and option
+- **[2.3 Creating and Editing Alerts via Netdata Cloud](3-creating-and-editing-alerts-via-cloud.md)** Learn the Cloud UI workflow for centralized alert management
+- **[2.4 Managing Stock versus Custom Alerts](4-managing-stock-vs-custom-alerts.md)** Patterns for combining built-in and custom rules
+- **[2.5 Reloading and Validating Alert Configuration](5-reloading-and-validating-alert-configuration.md)** Deeper troubleshooting and validation techniques
+- **[Chapter 3: Alert Configuration Syntax](../alert-configuration-syntax/index.md)** Detailed reference for every configuration line and option

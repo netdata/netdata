@@ -137,5 +137,5 @@ Most alerts follow the same pattern: name it, point it at a chart or context, de
 
 ## What's Next
 
-- **3.2 Lookup and Time Windows** explains how `lookup` chooses functions, time windows, and dimensions, and how that affects the values your alerts see
-- **3.5 Variables and Special Symbols** covers `$this`, `$status`, and other variables used in `warn`/`crit` (jump ahead there if that's your main question and come back as needed)
+- **[3.2 Lookup and Time Windows](2-lookup-and-time-windows.md)** explains how `lookup` chooses functions, time windows, and dimensions, and how that affects the values your alerts see
+- **[3.5 Variables and Special Symbols](5-variables-and-special-symbols.md)** covers `$this`, `$status`, and other variables used in `warn`/`crit` (jump ahead there if that's your main question and come back as needed)

@@ -74,6 +74,6 @@ For alerts on rapidly changing metrics, frequent evaluation catches brief anomal
 
 ## Related Sections
 
-- [13.2 Configuration Layers](4-configuration-layers.md) - How configurations are merged
-- [13.4 Notification Dispatch](3-notification-dispatch.md) - How notifications are delivered
-- [13.5 Scaling Topologies](5-scaling-topologies.md) - Behavior in distributed setups
+- [13.2 Configuration Layers](./4-configuration-layers.md) - How configurations are merged
+- [13.4 Notification Dispatch](./3-notification-dispatch.md) - How notifications are delivered
+- [13.5 Scaling Topologies](./5-scaling-topologies.md) - Behavior in distributed setups

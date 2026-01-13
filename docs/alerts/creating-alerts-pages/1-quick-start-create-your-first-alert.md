@@ -268,7 +268,7 @@ See **Chapter 6: Alert Examples and Common Patterns** for more ideas.
 
 Now that you have a working alert, you can:
 
-- **Customize it further** Learn the full syntax in **Chapter 3: Alert Configuration Syntax**
-- **Create more alerts** Follow detailed workflows in **2.2** (files) or **2.3** (Cloud UI)
-- **Control notification noise** See **Chapter 4: Controlling Alerts and Noise**
-- **Set up notifications** See **Chapter 5: Receiving Notifications**
+- **[Customize it further](../alert-configuration-syntax/index.md)** Learn the full syntax in **Chapter 3: Alert Configuration Syntax**
+- **[Create more alerts](2-creating-and-editing-alerts-via-config-files.md)** Follow detailed workflows in **2.2** (files) or **[2.3](3-creating-and-editing-alerts-via-cloud.md)** (Cloud UI)
+- **[Control notification noise](../controlling-alerts-noise/index.md)** See **Chapter 4: Controlling Alerts and Noise**
+- **[Set up notifications](../receiving-notifications/index.md)** See **Chapter 5: Receiving Notifications**

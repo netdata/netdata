@@ -160,6 +160,6 @@ This layering means:
 
 ## What's Next
 
-- **Chapter 2: Creating and Managing Alerts** Step-by-step guides for creating alerts via config files (2.2) and Netdata Cloud UI (2.3)
-- **2.4 Managing Stock vs Custom Alerts** Detailed workflow for safely customizing stock alerts
-- **Chapter 3: Alert Configuration Syntax** The exact syntax and configuration lines for writing alert definitions
+- **[Chapter 2: Creating and Managing Alerts](../creating-alerts-pages/index.md)** Step-by-step guides for creating alerts via config files (2.2) and Netdata Cloud UI (2.3)
+- **[2.4 Managing Stock vs Custom Alerts](../creating-alerts-pages/4-managing-stock-vs-custom-alerts.md)** Detailed workflow for safely customizing stock alerts
+- **[Chapter 3: Alert Configuration Syntax](../alert-configuration-syntax/index.md)** The exact syntax and configuration lines for writing alert definitions

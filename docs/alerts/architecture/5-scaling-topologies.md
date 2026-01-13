@@ -53,6 +53,6 @@ Deployments spanning multiple regions should consider alert evaluation latency. 
 
 ## Related Sections
 
-- [13.1 Evaluation Architecture](1-evaluation-architecture.md) - Alert evaluation process
-- [13.2 Configuration Layers](4-configuration-layers.md) - How configurations work hierarchically
-- [13.4 Notification Dispatch](3-notification-dispatch.md) - Delivery architecture
+- [13.1 Evaluation Architecture](./1-evaluation-architecture.md) - Alert evaluation process
+- [13.2 Configuration Layers](./4-configuration-layers.md) - How configurations work hierarchically
+- [13.4 Notification Dispatch](./3-notification-dispatch.md) - Delivery architecture

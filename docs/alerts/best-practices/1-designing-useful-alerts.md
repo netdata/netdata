@@ -72,10 +72,10 @@ Group related alerts by service or component. This helps responders find relevan
 
 ## What's Next
 
-- [12.2 Notification Strategy](2-notification-strategy.md) - Routing alerts to the right people
-- [12.3 Maintaining Configurations](3-maintaining-configurations.md) - Ongoing upkeep
-- [12.4 Large Environment Patterns](4-scaling-large-environments.md) - Scaling best practices
-- [12.5 SLI and SLO Alerts](5-sli-slo-alerts.md) - Connecting alerts to business objectives
+- [12.2 Notification Strategy](./2-notification-strategy.md) - Routing alerts to the right people
+- [12.3 Maintaining Configurations](./3-maintaining-configurations.md) - Ongoing upkeep
+- [12.4 Large Environment Patterns](./4-scaling-large-environments.md) - Scaling best practices
+- [12.5 SLI and SLO Alerts](./5-sli-slo-alerts.md) - Connecting alerts to business objectives
 
 ## See Also
 

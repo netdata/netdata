@@ -241,6 +241,6 @@ Treat metadata as part of the design of your alerting system, not as an aftertho
 
 ## What's Next
 
-- **Chapter 4: Controlling Alerts and Noise** explains how to disable or silence alerts and use delays/hysteresis to reduce noise
-- **5.4 Controlling Who Gets Notified (Roles, Recipients, Severity)** shows how metadata and alert properties influence notification routing
-- **12.1 Designing Useful Alerts** and **12.3 Maintaining Alert Configurations Over Time** provide best practices for treating metadata as part of your alert design and lifecycle
+- **[Chapter 4: Controlling Alerts and Noise](../controlling-alerts-noise/index.md)** explains how to disable or silence alerts and use delays/hysteresis to reduce noise
+- **[5.4 Controlling Who Gets Notified (Roles, Recipients, Severity)](../receiving-notifications/4-controlling-recipients.md)** shows how metadata and alert properties influence notification routing
+- **[12.1 Designing Useful Alerts](../best-practices/1-designing-useful-alerts.md)** and **[12.3 Maintaining Alert Configurations Over Time](../best-practices/3-maintaining-configurations.md)** provide best practices for treating metadata as part of your alert design and lifecycle

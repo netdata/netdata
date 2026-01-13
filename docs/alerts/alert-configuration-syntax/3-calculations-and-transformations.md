@@ -348,5 +348,5 @@ Use `calc` to keep `warn`/`crit` expressions simple and human-readable, while st
 
 ## What's Next
 
-- **3.4 Expressions, Operators, and Functions** explains the expression language used in `warn`, `crit`, and `calc` lines: arithmetic, comparisons, logical operators, and helper functions
-- **3.5 Variables and Special Symbols** lists the variables you can use inside those expressions (`$this`, `$status`, `$now`, and chart/context variables) and how to inspect them via the `alarm_variables` API
+- **[3.4 Expressions, Operators, and Functions](4-expressions-operators-functions.md)** explains the expression language used in `warn`, `crit`, and `calc` lines: arithmetic, comparisons, logical operators, and helper functions
+- **[3.5 Variables and Special Symbols](5-variables-and-special-symbols.md)** lists the variables you can use inside those expressions (`$this`, `$status`, `$now`, and chart/context variables) and how to inspect them via the `alarm_variables` API

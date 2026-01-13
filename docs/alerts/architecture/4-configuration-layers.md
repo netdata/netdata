@@ -46,6 +46,6 @@ curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.'
 
 ## Related Sections
 
-- [13.1 Alert Lifecycle](2-alert-lifecycle.md) - How alerts transition states
-- [13.3 Evaluation Architecture](1-evaluation-architecture.md) - Where alerts are evaluated
-- [13.5 Scaling Topologies](5-scaling-topologies.md) - Behavior in distributed setups
+- [13.1 Alert Lifecycle](./2-alert-lifecycle.md) - How alerts transition states
+- [13.3 Evaluation Architecture](./1-evaluation-architecture.md) - Where alerts are evaluated
+- [13.5 Scaling Topologies](./5-scaling-topologies.md) - Behavior in distributed setups

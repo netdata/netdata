@@ -71,7 +71,7 @@ For filesystems with many small files, tracks inode exhaustion which can occur b
 
 ## Related Sections
 
-- [11.2 Container Alerts](2-container-alerts.md) - Docker and Kubernetes monitoring
-- [11.4 Network Alerts](4-network-alerts.md) - Network interface and protocol monitoring
-- [11.4 Hardware Alerts](5-hardware-alerts.md) - Physical server and storage device alerts
-- [11.5 Application Alerts](3-application-alerts.md) - Database, web server, cache, and message queue alerts
+- [11.2 Container Alerts](./2-container-alerts.md) - Docker and Kubernetes monitoring
+- [11.4 Network Alerts](./4-network-alerts.md) - Network interface and protocol monitoring
+- [11.4 Hardware Alerts](./5-hardware-alerts.md) - Physical server and storage device alerts
+- [11.5 Application Alerts](./3-application-alerts.md) - Database, web server, cache, and message queue alerts
