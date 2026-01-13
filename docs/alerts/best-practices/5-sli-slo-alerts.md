@@ -55,8 +55,6 @@ Connect alert thresholds to business objectives. For example, an HTTP error rate
 ## What's Next
 
 - [13. Alerts and Notifications Architecture](../architecture/index.md) - Deep-dive internals
-- [1. Understanding Alerts in Netdata](../../understanding-alerts/index.md) - Start building alerts
-- [2. Creating and Managing Alerts](../../creating-alerts-pages/creating-alerts.md) - Practical alert creation
 
 ## See Also
 
