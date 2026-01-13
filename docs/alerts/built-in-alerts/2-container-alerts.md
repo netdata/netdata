@@ -30,14 +30,14 @@ Tracks running state of each container. A critical alert fires when a previously
 
 Kubernetes pod alerts require the Netdata Kubernetes collector and provide visibility into pod health from the cluster perspective.
 
-### k8s_pod_cpu_utilization
+### k8s_cgroup_10min_cpu_usage
 
 Fires when containers reach 90% of their configured CPU limits, indicating the limit may be constraining performance.
 
 **Context:** `cgroup.cpu_limit`
 **Thresholds:** WARN > 90% of limit
 
-### k8s_pod_mem_utilization
+### k8s_cgroup_ram_in_use
 
 Fires when containers reach 90% of their configured memory limits.
 

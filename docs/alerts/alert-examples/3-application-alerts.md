@@ -5,36 +5,36 @@ These templates demonstrate application-specific monitoring using contexts provi
 ## 6.3.1 MySQL Alerts
 
 ```conf
-template: mysql_slow_queries
+template: mysql_10s_slow_queries
     on: mysql.queries
 lookup: average -5m of slow_queries
-    every: 1m
-     warn: $this > 10
-     crit: $this > 100
-       to: dba-team
+     every: 1m
+      warn: $this > 10
+      crit: $this > 100
+        to: dba-team
 ```
 
 ## 6.3.2 PostgreSQL Alerts
 
 ```conf
-template: pg_deadlocks_high
+template: postgres_db_deadlocks_rate
     on: postgres.db_deadlocks_rate
 lookup: average -5m of deadlocks
-    every: 1m
-     warn: $this > 0
-     crit: $this > 5
-       to: dba-team
+     every: 1m
+      warn: $this > 0
+      crit: $this > 5
+        to: dba-team
 ```
 
 ## 6.3.3 Redis Alerts
 
 ```conf
-template: redis_rejected_connections
+template: redis_connections_rejected
     on: redis.connections
 lookup: average -5m of rejected
-    every: 1m
-     warn: $this > 0
-       to: cache-team
+     every: 1m
+      warn: $this > 0
+        to: cache-team
 ```
 
 ## 6.3.4 Related Sections
