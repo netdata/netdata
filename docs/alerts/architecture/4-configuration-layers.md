@@ -38,7 +38,11 @@ Cloud-defined alerts are stored remotely and synchronized to Agents on demand.
 
 At startup and after configuration changes, Netdata merges all configuration layers into a single effective configuration.
 
-Use `netdatacli health configuration` to view the effective merged configuration.
+Use the Alarms API to verify loaded configuration:
+
+```bash
+curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.'
+```
 
 ## Related Sections
 
