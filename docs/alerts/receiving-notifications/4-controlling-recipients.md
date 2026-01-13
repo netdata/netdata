@@ -37,7 +37,11 @@ Then configure notification routing by role:
 
 ```yaml
 integration: Email ops-team@company.com
-  role:
+role:
+  - name: sre-on-call
+    severity: [critical, warning]
+  - name: manager
+    severity: [critical]
     - name: sre-on-call
       severity: [critical, warning]
     - name: manager
