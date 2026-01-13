@@ -31,7 +31,7 @@ SLOs define acceptable service behavior. An SLO might state that 99.9% of reques
 | 500ms latency | 450ms | 10% headroom |
 | 99.95% uptime | 99.97% | 0.02% reaction time |
 
-For an SLO with 99.9% availability, alerts should fire when availability drops below 99.9%. This allows investigation before the SLO is breached.
+For an SLO with 99.9% availability, alerts should fire when availability drops below 99.95%. This buffer creates time to investigate before the SLO is breached.
 
 The gap between alert threshold and SLO breach provides reaction time. This buffer prevents SLO breaches from becoming routine.
 
