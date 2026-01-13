@@ -9,7 +9,7 @@
 name: Weekend Maintenance
 scope:
   nodes: env:production
-  alerts: *
+  alerts: "*"
 schedule:
   - every: Saturday 1:00 AM
     to: Monday 6:00 AM
