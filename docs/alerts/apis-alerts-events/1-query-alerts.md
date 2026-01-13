@@ -16,12 +16,8 @@ curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.'
 curl -s "http://localhost:19999/api/v1/alarms?active" | jq '.'
 ```
 
-## 9.1.2 Related Sections
-
-- **[9.2 Alert History](2-alert-history.md)** for transition history
-- **[9.3 Inspect Variables](3-inspect-variables.md)** for variable debugging
-
 ## What's Next
 
-- **[10.1 Events Feed](../cloud-alert-features/1-events-feed.md)** for Cloud-based history
 - **[9.2 Alert History](2-alert-history.md)** for alert transitions
+- - **[9.3 Inspect Variables](3-inspect-variables.md)** for variable debugging
+- **[10.1 Events Feed](../cloud-alert-features/1-events-feed.md)** for Cloud-based history
