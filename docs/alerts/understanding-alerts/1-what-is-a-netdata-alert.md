@@ -6,7 +6,7 @@ Each alert instance is uniquely identified by the combination of **node**, **ale
 
 ## How Alerts Work
 
-At each evaluation cycle (typically every 10 seconds, configurable per alert via the `every` line):
+At each evaluation cycle (configurable per alert via the `every` line):
 
 1. The **health engine** running on the Agent reads metrics data from the relevant chart(s)
 2. It applies the alert's logic (for example, "average CPU over the last 5 minutes > 80%")
