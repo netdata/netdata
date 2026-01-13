@@ -19,5 +19,5 @@ Cloud automatically deduplicates alerts from multiple nodes.
 
 ## 10.3.3 Related Sections
 
-- **12.4 Large Environment Patterns** for multi-node setups
-- **13.5 Scaling Alerting** for complex topologies
+- **[12.4 Large Environment Patterns](../best-practices/4-scaling-large-environments.md)** for multi-node setups
+- **[13.6 Scaling Topologies](../architecture/5-scaling-topologies.md)** for complex topologies
