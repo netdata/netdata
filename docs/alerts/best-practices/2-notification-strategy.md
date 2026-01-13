@@ -74,5 +74,5 @@ Update alert configurations based on response patterns. Alerts that consistently
 ## See Also
 
 - [Receiving Notifications](../../receiving-notifications/index.md) - Notification configuration options
-- [Silencing Rules](../../cloud-alert-features/silencing-rules.md) - Cloud silencing rules
-- [Reducing Flapping and Noise](../../controlling-alerts-noise/reducing-flapping.md) - Managing alert frequency
+- [Silencing Rules](../../cloud-alert-features/3-silencing-rules.md) - Cloud silencing rules
+- [Reducing Flapping and Noise](../controlling-alerts-noise/reducing-flapping.md) - Managing alert frequency
