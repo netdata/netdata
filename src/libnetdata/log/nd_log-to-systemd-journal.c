@@ -192,9 +192,9 @@ bool nd_logger_journal_libsystemd(struct log_field *fields __maybe_unused, size_
 #endif
 }
 
-bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max) {
-    if(!nd_log.journal_direct.initialized)
-        return false;
+// Format fields into journal native protocol (KEY=VALUE\n format)
+// This function only formats - it does not send
+void nd_logger_journal_format(BUFFER *wb, struct log_field *fields, size_t fields_max) {
 
     //  --- FIELD_PARSER_VERSIONS ---
     //
@@ -210,7 +210,6 @@ bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max) {
     //
     // UPDATE ALL OF THEM FOR NEW FEATURES OR FIXES
 
-    CLEAN_BUFFER *wb = buffer_create(4096, NULL);
     CLEAN_BUFFER *tmp = NULL;
 
     for (size_t i = 0; i < fields_max; i++) {
@@ -282,6 +281,7 @@ bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max) {
                 buffer_putc(wb, '\n');
             }
             else {
+                // Binary encoding for values with embedded newlines
                 buffer_putc(wb, '\n');
                 size_t size = strlen(s);
                 uint64_t le_size = htole64(size);
@@ -291,6 +291,14 @@ bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max) {
             }
         }
     }
+}
+
+bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max) {
+    if(!nd_log.journal_direct.initialized)
+        return false;
+
+    CLEAN_BUFFER *wb = buffer_create(4096, NULL);
+    nd_logger_journal_format(wb, fields, fields_max);
 
     return journal_direct_send(nd_log.journal_direct.fd, buffer_tostring(wb), buffer_strlen(wb));
 }
