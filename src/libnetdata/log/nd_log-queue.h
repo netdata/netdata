@@ -6,19 +6,32 @@
 #include "../libnetdata.h"
 #include "nd_log-internals.h"
 
+// ----------------------------------------------------------------------------
+// Configuration
+
 // Inline buffer size for short messages (most messages fit here)
 #define ND_LOG_QUEUE_INLINE_SIZE 512
 
 // Maximum size for dynamically allocated messages
 #define ND_LOG_QUEUE_MESSAGE_MAX_SIZE 16384
 
-// Default queue size (number of entries)
-#define ND_LOG_QUEUE_DEFAULT_SIZE 1024
+// Command pool size (number of command slots)
+#define ND_LOG_QUEUE_CMD_POOL_SIZE 4096
 
-// Maximum queue size before dropping messages
-#define ND_LOG_QUEUE_MAX_SIZE 8192
+// ----------------------------------------------------------------------------
+// Opcodes for the logger event loop
 
-// Structure for a queued log entry (pre-formatted)
+typedef enum __attribute__((packed)) {
+    ND_LOG_OP_NOOP = 0,         // No operation (empty slot)
+    ND_LOG_OP_ENTRY,            // Log a message
+    ND_LOG_OP_FLUSH,            // Flush queue and signal completion
+    ND_LOG_OP_REOPEN,           // Reopen all log files (handled in logger thread)
+    ND_LOG_OP_SHUTDOWN,         // Drain queue and exit
+} ND_LOG_OPCODE;
+
+// ----------------------------------------------------------------------------
+// Log entry structure (pre-formatted message)
+
 struct nd_log_queue_entry {
     ND_LOG_SOURCES source;
     ND_LOG_FIELD_PRIORITY priority;
@@ -29,12 +42,27 @@ struct nd_log_queue_entry {
     size_t message_len;
     bool journal_direct_initialized;                // captured at enqueue time
     bool journal_libsystemd_initialized;            // captured at enqueue time
-    bool syslog_initialized;                       // captured at enqueue time
+    bool syslog_initialized;                        // captured at enqueue time
     char *message_allocated;                        // mallocz'd for messages > INLINE_SIZE (NULL if inline)
     char message_inline[ND_LOG_QUEUE_INLINE_SIZE];  // inline buffer for short messages
 };
 
+// ----------------------------------------------------------------------------
+// Command structure for the event loop
+
+struct nd_log_queue_cmd {
+    ND_LOG_OPCODE opcode;
+    union {
+        struct nd_log_queue_entry entry;    // for OP_ENTRY
+        struct {
+            struct completion *completion;  // for OP_FLUSH, OP_REOPEN, OP_SHUTDOWN
+        } sync;
+    };
+};
+
+// ----------------------------------------------------------------------------
 // Queue statistics
+
 struct nd_log_queue_stats {
     size_t entries_queued;      // total entries added to queue
     size_t entries_processed;   // total entries written
@@ -45,20 +73,22 @@ struct nd_log_queue_stats {
     size_t queue_high_water;    // maximum queue depth seen
 };
 
+// ----------------------------------------------------------------------------
+// Public API
+
 // Initialize the async logging queue and start the logger thread
 // Returns true on success, false on failure
 bool nd_log_queue_init(void);
 
 // Shutdown the async logging queue
-// If flush is true, waits for all pending messages to be written
-// Returns when logger thread has acknowledged shutdown and exited
-void nd_log_queue_shutdown(bool flush);
+// Drains all pending messages before returning
+void nd_log_queue_shutdown(void);
 
-// Check if async logging is enabled
+// Check if async logging is enabled and accepting entries
 bool nd_log_queue_enabled(void);
 
 // Enqueue a pre-formatted log message
-// Returns true if queued, false if dropped (queue full)
+// Returns true if queued, false if dropped (queue full or not initialized)
 bool nd_log_queue_enqueue(struct nd_log_queue_entry *entry);
 
 // Get queue statistics
@@ -67,8 +97,8 @@ void nd_log_queue_get_stats(struct nd_log_queue_stats *stats);
 // Flush all pending log messages (blocks until queue is empty)
 void nd_log_queue_flush(void);
 
-// For critical messages (ALERT and above) - write synchronously
-// This bypasses the queue for messages that must be written immediately
-void nd_log_queue_write_sync(struct nd_log_queue_entry *entry);
+// Reopen all log files (blocks until complete)
+// This is handled entirely in the logger thread, avoiding FILE* races
+void nd_log_queue_reopen(void);
 
 #endif // NETDATA_ND_LOG_QUEUE_H
