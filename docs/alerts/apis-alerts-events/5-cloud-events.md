@@ -15,5 +15,9 @@ curl -s "https://app.netdata.cloud/api/v2/events?space_id=YOUR_SPACE" \
 
 ## 9.5.2 Related Sections
 
-- **10.1 Events Feed** for Cloud UI features
-- **5.3 Cloud Notifications** for Cloud routing
+- **[10.1 Events Feed](../cloud-alert-features/1-events-feed.md)** for Cloud UI features
+- **[5.3 Cloud Notifications](../../receiving-notifications/3-cloud-notifications.md)** for Cloud routing
+
+## What's Next
+
+- **[Chapter 10: Cloud Alert Features](../cloud-alert-features/index.md)** for more Cloud capabilities

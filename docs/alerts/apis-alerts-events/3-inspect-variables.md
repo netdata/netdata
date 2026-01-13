@@ -21,5 +21,9 @@ Shows available variables for a chart.
 
 ## 9.3.2 Related Sections
 
-- **7.4 Variables Not Found** for troubleshooting
-- **3.5 Variables and Special Symbols** for reference
+- **[7.4 Variables Not Found](../../troubleshooting-alerts/variables-not-found.md)** for troubleshooting
+- **[3.5 Variables and Special Symbols](../../alert-configuration-syntax/5-variables-and-special-symbols.md)** for reference
+
+## What's Next
+
+- **[9.4 Health Management](4-health-management.md)** for API-based alert control

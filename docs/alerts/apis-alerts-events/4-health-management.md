@@ -2,7 +2,7 @@
 
 :::note
 
-The health management API requires authentication. See [9.4 Health Management API](#944-authentication) for details.
+The health management API requires authentication. See [9.4.3 Authentication](#943-authentication) for details.
 
 :::
 
@@ -45,7 +45,11 @@ The health management API requires an authorization token. Find the token in you
 
 Default access is from localhost only. Configure `allow management from` in `netdata.conf` for remote access.
 
-## 9.4.3 Related Sections
+## 9.4.4 Related Sections
 
-- **4.1 Disabling Alerts** for configuration-based disabling
-- **8.4 Custom Actions** for exec-based automation
+- **[4.1 Disabling Alerts](../../controlling-alerts-noise/1-disabling-alerts.md)** for configuration-based disabling
+- **[8.4 Custom Actions with exec](../advanced-techniques/4-custom-actions.md)** for exec-based automation
+
+## What's Next
+
+- **[9.5 Cloud Events API](5-cloud-events.md)** for Cloud-based event querying
