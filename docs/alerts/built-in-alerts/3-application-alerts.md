@@ -33,7 +33,7 @@ Identifies workloads generating excessive slow query traffic, which often preced
 Tracks connection pool saturation to prevent connection exhaustion.
 
 **Context:** `mysql.connections_active`
-**Thresholds:** WARN > 60% of limit, CRIT > 80% of limit
+**Thresholds:** WARN > 70% of limit (drops to 60% while already WARNING), CRIT > 90% (drops to 80% while already CRITICAL)
 
 ### PostgreSQL
 
