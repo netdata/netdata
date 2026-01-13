@@ -14,35 +14,42 @@ Databases are typically the most critical components in an infrastructure, and t
 
 ### MySQL and MariaDB
 
-#### mysql_gtid_binlog_gtid_0
+#### mysql_replication_lag
 
-Tracks whether the GTID position is advancing, catching replication stalls immediately.
+Tracks whether the replication position is advancing, catching replication stalls immediately.
 
-**Context:** `mysql.slave_status`
-**Thresholds:** WARN > 0 lag
+**Context:** `mysql.slave_behind`
+**Thresholds:** WARN > 5s, CRIT > 10s
 
-#### mysql_slow_queries
+#### mysql_10s_slow_queries
 
 Identifies workloads generating excessive slow query traffic, which often precedes performance degradation.
 
 **Context:** `mysql.queries`
-**Thresholds:** WARN > 5/s
+**Thresholds:** WARN > 5/s, CRIT > 10/s
+
+#### mysql_connections
+
+Tracks connection pool saturation to prevent connection exhaustion.
+
+**Context:** `mysql.connections_active`
+**Thresholds:** WARN > 60% of limit, CRIT > 80% of limit
 
 ### PostgreSQL
 
-#### pg_stat_database_deadlocks
+#### postgres_db_deadlocks_rate
 
 Detects deadlocks that indicate concurrent transaction conflicts.
 
 **Context:** `postgres.db_deadlocks_rate`
 **Thresholds:** WARN > 0
 
-#### pg_stat_database_connections
+#### postgres_total_connection_utilization
 
 Tracks connection pool saturation to prevent connection exhaustion.
 
 **Context:** `postgres.connections_utilization`
-**Thresholds:** WARN > 80% of max
+**Thresholds:** WARN > 70%, CRIT > 80%
 
 ## Related Sections
 

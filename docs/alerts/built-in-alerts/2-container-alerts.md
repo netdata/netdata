@@ -12,66 +12,45 @@ Container alerts require the appropriate collector to be enabled and collecting 
 
 Docker container alerts monitor both the runtime state of containers and their resource consumption.
 
-### docker_container_status
+### docker_container_unhealthy
 
-Tracks the running state of each container. A critical alert fires when a previously running container stops, which may indicate crashes, health check failures, or manual stops.
+Tracks container health status from Docker daemon perspective. Fires when container health check fails.
+
+**Context:** `docker.container_health_status`
+**Thresholds:** CRIT != 0
+
+### docker_container_down
+
+Tracks running state of each container. A critical alert fires when a previously running container stops, which may indicate crashes, health check failures, or manual stops.
 
 **Context:** `docker.container_state`
 **Thresholds:** CRIT not running
-
-### docker_container_cpu_usage
-
-Tracks CPU utilization within the container's configured limits. Helps identify containers approaching resource ceilings.
-
-**Context:** `cgroup.cpu_limit`
-**Thresholds:** WARN > 80%, CRIT > 95%
-
-### docker_container_mem_usage
-
-Tracks memory consumption against container limits. Prevents noisy neighbor problems from affecting other containers.
-
-**Context:** `cgroup.mem_usage`
-**Thresholds:** WARN > 80%, CRIT > 95%
-
-### docker_container_ooms
-
-Specifically tracks out-of-memory kills. When the Linux OOM killer terminates a container process, this alert fires immediately.
-
-**Context:** `docker.container_health_status`
-**Thresholds:** CRIT > 0
-
-### docker_container_restarts
-
-Monitors restart counts which indicate application stability.
-
-**Context:** `docker.container_state`
-**Thresholds:** WARN > 3/hour, CRIT > 10/hour
 
 ## 11.2.2 Kubernetes Pod Alerts
 
 Kubernetes pod alerts require the Netdata Kubernetes collector and provide visibility into pod health from the cluster perspective.
 
-### k8s_container_cpu_limits
+### k8s_pod_cpu_utilization
 
 Fires when containers reach 90% of their configured CPU limits, indicating the limit may be constraining performance.
 
-**Context:** `k8s.cgroup.cpu_limit`
+**Context:** `cgroup.cpu_limit`
 **Thresholds:** WARN > 90% of limit
 
-### k8s_container_mem_limits
+### k8s_pod_mem_utilization
 
 Fires when containers reach 90% of their configured memory limits.
 
-**Context:** `k8s.cgroup.mem_usage`
+**Context:** `cgroup.mem_usage`
 **Thresholds:** WARN > 90% of limit
 
 ## 11.2.3 Kubernetes Node Alerts
 
 Kubernetes node alerts are available through kubelet metrics.
 
-### kubelet_node_ready
+### kubelet_node_config_error
 
-Kubernetes node ready status from kubelet perspective.
+Kubernetes node configuration error status from kubelet perspective.
 
 **Context:** `k8s_kubelet.kubelet_node_config_error`
 **Thresholds:** CRIT > 0 (config error)
