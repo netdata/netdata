@@ -16,7 +16,7 @@ template: 10min_cpu_usage
 lookup: average -10m unaligned of user,system
      units: %
      every: 1m
-      warn: ($this > 80) && ($status == $CLEAR || $this > 85)
+      warn: ($status == $CLEAR && $this > 80) || ($status >= $WARNING && $this > 70)
       crit: ($this > 95) && ($status == $CLEAR || $this > 98)
         ok: $this < 70
 ```
