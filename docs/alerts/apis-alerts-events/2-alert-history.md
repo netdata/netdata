@@ -1,7 +1,7 @@
 # 9.2 Alert History
 
 ```bash
-curl -s "http://localhost:19999/api/v1/alarm_log?after=-3600" | jq '.'
+curl -s "http://localhost:19999/api/v1/alarm_log?after=${LAST_UNIQUEID}" | jq '.'
 ```
 
 Returns all transitions in the last hour.
