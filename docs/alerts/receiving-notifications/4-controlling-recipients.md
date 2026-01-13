@@ -8,7 +8,14 @@ In Cloud integrations, you can configure which severities trigger notifications:
 
 ```yaml
 integration: Slack #alerts
-  severity:
+severity:
+  critical:
+    - "#urgent"
+    - on-call-pager
+  warning:
+    - "#alerts"
+  clear:
+    - "#alerts"
     critical:
       - "#urgent"
       - on-call-pager
