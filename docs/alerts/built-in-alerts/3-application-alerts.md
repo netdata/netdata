@@ -49,7 +49,7 @@ Detects deadlocks that indicate concurrent transaction conflicts.
 Tracks connection pool saturation to prevent connection exhaustion.
 
 **Context:** `postgres.connections_utilization`
-**Thresholds:** WARN > 70%, CRIT > 80%
+**Thresholds:** WARN > 80% (drops to 70% while already WARNING), CRIT > 90% (drops to 80% while already CRITICAL)
 
 ## Related Sections
 
