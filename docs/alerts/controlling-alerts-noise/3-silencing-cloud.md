@@ -39,7 +39,7 @@ Silencing rules support pattern matching:
 |---------|---------|---------|
 | `*` | Any characters | `*cpu*` matches `10min_cpu_usage` and `10min_cpu_iowait` |
 | (single-character wildcard) | Not supported in Netdata simple patterns | Use `*disk*` or multiple explicit rules instead |
-| `|` | OR logic | `mysql|postgres|redis` matches any of these |
+| space-separated patterns | Provide OR behavior | `mysql* postgres* redis*` (multiple entries) |
 
 ## 4.3.3 Personal Silencing Rules
 
