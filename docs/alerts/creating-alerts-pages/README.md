@@ -51,3 +51,8 @@ flowchart TD
     class Cloud option
     class Quick option
 ```
+
+## What's Next
+
+- **[Chapter 3: Alert Configuration Syntax](../alert-configuration-syntax/index.md)** - Learn the full syntax for writing alerts
+- **[Chapter 1: Understanding Alerts](../understanding-alerts/index.md)** - Review alert concepts and lifecycle

@@ -118,8 +118,8 @@ template: disk_space_usage
 ```
 
 **What this does:**
-- `alarm:` gives the alert a unique name
-- `on:` attaches it to the `disk_space./` chart (root filesystem, chart ID uses underscore)
+- `template:` gives the alert a unique name
+- `on:` attaches it to the `disk.space` context (applies to all filesystems)
 - `lookup:` aggregates data over the last minute
 - `warn:` and `crit:` define warning and critical thresholds
 
