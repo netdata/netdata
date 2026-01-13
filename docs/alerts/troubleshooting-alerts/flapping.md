@@ -18,7 +18,7 @@ lookup: average -10m unaligned of user,system
      every: 1m
       warn: $this > 80
       crit: $this > 95
-    delay: down 5m multiplier 1.5 max 1h
+    delay: up 5m down 5m multiplier 1.5 max 1h
 ```
 
 This requires the condition to stay above/below threshold for 5 minutes (with 1.5x multiplier, up to 1h max) before status changes.
