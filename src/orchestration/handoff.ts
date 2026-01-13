@@ -63,8 +63,8 @@ export async function executeHandoff(
   const { target, parentResult, originalUserPrompt, parentAgentLabel } = opts;
   const response = extractHandoffContent(parentResult);
   const prompt = joinTaggedBlocks([
-    buildOriginalUserRequestBlock(originalUserPrompt),
     buildResponseBlock(parentAgentLabel, response),
+    buildOriginalUserRequestBlock(originalUserPrompt),
   ]);
   return await spawnOrchestrationChild({
     agent: target,

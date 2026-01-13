@@ -2379,8 +2379,8 @@ export class AIAgent {
     if (advisorResults.length > 0) {
       const advisoryBlocks = advisorResults.map((result) => result.block);
       const enrichedPrompt = joinTaggedBlocks([
-        buildOriginalUserRequestBlock(originalUserPrompt),
         ...advisoryBlocks,
+        buildOriginalUserRequestBlock(originalUserPrompt),
       ]);
       session.setUserPrompt(enrichedPrompt);
     }
@@ -2415,10 +2415,10 @@ export class AIAgent {
       const message = current.routerSelection.message?.trim();
       const hasMessage = typeof message === 'string' && message.length > 0;
       const routerBlocks = [
-        buildOriginalUserRequestBlock(originalUserPrompt),
         ...(hasMessage
           ? [buildAdvisoryBlock(currentAgentLabel, message)]
           : []),
+        buildOriginalUserRequestBlock(originalUserPrompt),
       ];
       const routerPrompt = joinTaggedBlocks(routerBlocks);
       try {
