@@ -2,16 +2,24 @@
 
 These templates demonstrate application-specific monitoring using contexts provided by database and web server collectors.
 
+:::tip
+
+The examples below show simplified alert configurations. Stock alerts include additional metadata fields and conditional thresholds. These examples highlight the essential parameters for quick implementation.
+
+:::
+
 ## 6.3.1 MySQL Alerts
 
 ```conf
 template: mysql_10s_slow_queries
     on: mysql.queries
-lookup: average -5m of slow_queries
-     every: 1m
-      warn: $this > 10
-      crit: $this > 100
-        to: dba-team
+lookup: sum -10s of slow_queries
+     units: slow queries
+     every: 10s
+       warn: $this > 5
+       crit: $this > 10
+      delay: down 5m multiplier 1.5 max 1h
+         to: dba-team
 ```
 
 ## 6.3.2 PostgreSQL Alerts

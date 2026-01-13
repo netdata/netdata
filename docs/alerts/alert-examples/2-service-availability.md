@@ -2,15 +2,22 @@
 
 These templates monitor service reachability and collector health using the `portcheck` and `httpcheck` contexts.
 
+:::tip
+
+The examples below show simplified alert configurations. Stock alerts include additional metadata fields and conditional thresholds. These examples highlight the essential parameters for quick implementation.
+
+:::
+
 ## 6.2.1 TCP Port Unreachable
 
 ```conf
 template: portcheck_connection_fails
     on: portcheck.status
-lookup: average -1m percentage of failed
-     every: 1m
-      crit: $this > 0
-        to: ops-team
+lookup: average -5m unaligned percentage of no_connection,failed
+     every: 10s
+       crit: $this >= 40
+      delay: down 5m multiplier 1.5 max 1h
+         to: ops-team
 ```
 
 ## 6.2.2 HTTP Endpoint Health
@@ -18,11 +25,12 @@ lookup: average -1m percentage of failed
 ```conf
 template: httpcheck_web_service_bad_status
     on: httpcheck.status
-lookup: average -1m percentage of bad_status
-     every: 1m
-      warn: $this > 0
-      crit: $this > 10
-        to: ops-team
+lookup: average -5m unaligned percentage of bad_status
+     every: 10s
+       warn: $this >= 10 AND $this < 40
+       crit: $this >= 40
+      delay: down 5m multiplier 1.5 max 1h
+         to: ops-team
 ```
 
 ## 6.2.3 Stale Collector Alert

@@ -2,9 +2,9 @@
 
 These templates demonstrate the most common alerts for fundamental server resources. Each example targets the `system.` contexts that exist on every Netdata node.
 
-:::note
+:::tip
 
-The examples below use real stock alert templates with custom thresholds for demonstration. You can use these directly or adapt the thresholds for your environment.
+The examples below use simplified syntax based on real stock alert templates. Stock alerts include additional fields like `class`, `type`, `component`, `delay`, and conditional thresholds. These examples show the essential fields for quick reference—you can copy, modify, and extend them for your needs.
 
 :::
 
@@ -13,7 +13,7 @@ The examples below use real stock alert templates with custom thresholds for dem
 ```conf
 template: 10min_cpu_usage
     on: system.cpu
-lookup: average -5m unaligned of user,system,softirq,irq,guest
+lookup: average -10m unaligned of user,system,softirq,irq,guest
      units: %
      every: 1m
       warn: $this > 80

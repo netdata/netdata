@@ -2,6 +2,12 @@
 
 Capacity planning alerts use `calc` to project when resources will be exhausted based on current usage trends.
 
+:::tip
+
+The examples below show simplified calc patterns for trend analysis. Stock alerts may use different time windows or thresholds. These examples demonstrate the calculation approach for capacity planning.
+
+:::
+
 ## 6.5.1 Disk Days Remaining
 
 ```conf
