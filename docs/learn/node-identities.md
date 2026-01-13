@@ -8,6 +8,27 @@ How Netdata identifies nodes across Agents, Parents, and Cloud - and why each id
 
 :::
 
+## Node Lifecycle and Ephemerality
+
+Every node has a **lifecycle** determined by its **ephemerality** setting. By default, all nodes are **permanent** - they are expected to maintain connectivity, and disconnections trigger alerts.
+
+Ephemeral nodes are designed for dynamic infrastructure:
+- No alerts when they disconnect
+- Automatic cleanup after configurable timeout
+- Perfect for auto-scaling and short-lived workloads
+
+To change a node's ephemerality, edit `netdata.conf`:
+
+```ini
+[global]
+is ephemeral node = yes   # Ephemeral - no alerts, auto-cleanup
+is ephemeral node = no    # Permanent (default) - alerts on disconnect
+```
+
+See [Node Ephemerality](/docs/nodes-ephemerality.md) for detailed configuration options.
+
+---
+
 Netdata uses several identity mechanisms to uniquely identify nodes, authenticate connections, and track metrics across your infrastructure. Understanding these identities is essential when:
 
 - Creating VM templates or golden images
@@ -242,5 +263,32 @@ Containers with ephemeral storage get unique GUIDs automatically on each start. 
 <summary>Can the same node exist in multiple Spaces?</summary>
 
 No. A node can only exist in one Space. To move a node to a different Space, unclaim it first, then claim to the new Space.
+
+</details>
+
+<details>
+<summary>Does ephemerality affect my node's identity?</summary>
+
+No. **Identity** and **ephemerality** are separate concepts:
+
+- **Identity** (Machine GUID, Node ID) uniquely identifies the node
+- **Ephemerality** determines lifecycle behavior (alerts, cleanup)
+
+A node can be permanent or ephemeral and still have a unique identity. Changing ephemerality does not change or reset identity.
+
+</details>
+
+<details>
+<summary>Can I change a node's ephemerality after cloning?</summary>
+
+Yes. Edit `/etc/netdata/netdata.conf` and restart Netdata:
+
+```ini
+[global]
+is ephemeral node = yes   # Enable ephemeral behavior
+is ephemeral node = no    # Revert to permanent (default)
+```
+
+Changes apply immediately. Ephemerality is stored as a host label and propagates to Parents and Netdata Cloud.
 
 </details>

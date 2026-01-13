@@ -158,5 +158,10 @@ flowchart TD
     class E alert
     class F alert
     class G database
-    class H database
+     class H database
 ```
+
+## See Also
+
+- [Node Identities](/docs/learn/node-identities.md) - Understand how node identity works alongside ephemerality
+- [VM Templates](/docs/learn/vm-templates.md) - Configure ephemerality in VM templates for auto-scaling groups
