@@ -155,6 +155,10 @@
 - Build(deps): bump golang.org/x/text from 0.32.0 to 0.33.0 in /src/go ([#21534](https://github.com/netdata/netdata/issues/21534))
 - Add VM templates and clones documentation ([#21527](https://github.com/netdata/netdata/issues/21527))
 - Docs: Add documentation review findings for quick-start-create-your-first-alert.md
+- Fix health alert db lookup parser ([#21529](https://github.com/netdata/netdata/issues/21529))
+- Docs: fix links in vm-templates.md ([#21546](https://github.com/netdata/netdata/issues/21546))
+- Code improvement (Windows.plugin) ([#21523](https://github.com/netdata/netdata/issues/21523))
+- Build(deps): bump golang.org/x/net from 0.48.0 to 0.49.0 in /src/go ([#21550](https://github.com/netdata/netdata/issues/21550))
 
 ## [2.8.0] - 2025-11-19
 
