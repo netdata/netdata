@@ -36,7 +36,7 @@ lookup: average -5m unaligned percentage of bad_status
 ## 6.2.3 Stale Collector Alert
 
 ```conf
-template: plugin_data_collection_status
+template: plugin_availability_status
     on: netdata.plugin_availability_status
      calc: $now - $last_collected_t
      units: seconds ago
