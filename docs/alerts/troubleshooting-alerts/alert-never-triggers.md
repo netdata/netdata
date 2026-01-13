@@ -11,7 +11,7 @@ curl -s "http://localhost:19999/api/v1/alarms" | jq '.alarms | keys[]' | grep "y
 
 2. Check current value:
 ```bash
-curl -s "http://localhost:19999/api/v1/alarms" | jq '.alerts.your_alert_name'
+curl -s "http://localhost:19999/api/v1/alarms" | jq '.alarms.your_alert_name'
 ```
 
 3. Verify the chart exists:
