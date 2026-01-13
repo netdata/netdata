@@ -82,7 +82,7 @@ If you need to target a specific chart instance (the use case for legacy `alarm`
 Example (legacy `alarm` vs equivalent `template`):
 ```conf
 # Legacy alarm syntax (discouraged)
-alarm: my_eth0_alert
+alarm: eth0_inbound_utilization
     on: net.eth0
     units: Mbits
     every: 10s
@@ -90,12 +90,12 @@ alarm: my_eth0_alert
     crit: $this > 90
 
 # Preferred template syntax (future-compatible)
-template: my_network_alert
+template: 1m_received_traffic_overflow
     on: net.net
-    lookup: average -5m of inbound
-    units: Mbits
-    warn: $this > 80
-    crit: $this > 90
+    lookup: average -1m unaligned absolute of received
+    units: %
+    warn: $this > (($status >= $WARNING) ? (85) : (90))
+    crit: $this > (($status >= $WARNING) ? (95) : (98))
 ```
 
 ## Key Takeaways

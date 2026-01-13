@@ -65,8 +65,8 @@ This is useful when:
 **Check via API:**
 
 ```bash
-# List active silencing rules
-curl -s "http://localhost:19999/api/v1/alarms?silenced=1" | jq '.'
+# List all alarms (includes silenced status in response)
+curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.'
 ```
 
 ## 4.3.5 Related Sections

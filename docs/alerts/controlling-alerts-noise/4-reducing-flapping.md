@@ -25,7 +25,7 @@ The `delay` line controls how long conditions must **hold** before the alert cha
 **Syntax:**
 
 ```conf
-delay: [up|down] [seconds] [max]
+delay: [up|down] [duration] [multiplier X] [max [duration]]
 ```
 
 **Parameters:**
@@ -34,8 +34,15 @@ delay: [up|down] [seconds] [max]
 |-------|-------------|---------|
 | `up` | Delay before entering WARNING/CRITICAL | Required |
 | `down` | Delay before returning to CLEAR | Optional |
-| `seconds` | Delay duration | Required |
-| `max` | Maximum total delay accumulated | Optional |
+| `duration` | Delay duration (e.g., `5m`, `1h`) | Required |
+| `multiplier X` | Multiply delay on each transition (e.g., `1.5`) | Optional |
+| `max duration` | Maximum total delay accumulated | Optional |
+
+**Common Pattern (from stock alerts):**
+
+```conf
+delay: up 5m down 1m multiplier 1.5 max 1h
+```
 
 **Example: Basic Delay**
 
@@ -60,16 +67,16 @@ The `repeat` line controls **how often notifications are sent** while the alert 
 **Syntax:**
 
 ```conf
-repeat: [warning] [critical] [all]
+repeat: [off] [warning DURATION] [critical DURATION]
 ```
 
 **Parameters:**
 
 | Param | Description | Default |
 |-------|-------------|---------|
-| `warning` | Interval between WARNING notifications | Required |
-| `critical` | Interval between CRITICAL notifications | Defaults to `warning` value |
-| `all` | Apply same interval to all severities | Optional flag |
+| `off` | Turn off repeating notifications | Optional |
+| `warning DURATION` | Interval between WARNING notifications (e.g., `24h`) | Optional |
+| `critical DURATION` | Interval between CRITICAL notifications (e.g., `6h`) | Optional |
 
 **Example: Daily Repeat for Sustained Issues**
 
@@ -80,11 +87,11 @@ template: disk_space_usage
    every: 1m
    warn: $this < 20
    crit: $this < 10
-   repeat: 24h
+   repeat: warning 24h critical 6h
    info: Disk space is running low
 ```
 
-This sends notifications once per day while the alert is active—not once per minute.
+This sends WARNING notifications once per day, and CRITICAL notifications every 6 hours while the alert is active.
 
 ## 4.4.4 Combining Delay and Repeat
 

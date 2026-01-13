@@ -98,7 +98,7 @@ A more complete alert might look like this:
 
 ```conf
 alarm: disk_space_usage
-    on: disk_space._
+    on: disk.space
 lookup: average -10m of used
  every: 1m
   warn: $this > 80
