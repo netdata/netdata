@@ -164,7 +164,7 @@ Examples:
 warn: ($this > 80) && ($status != $CRITICAL)
 
 # CRITICAL if either CPU or error rate is high
-crit: ($cpu_usage > 90) || ($error_rate > 5)
+crit: ($10min_cpu_usage > 90) || ($error_rate > 5)
 
 # WARNING only when above threshold and not already critical
 warn: ($this > 75) && !($status == $CRITICAL)

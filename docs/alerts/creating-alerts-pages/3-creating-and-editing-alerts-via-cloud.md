@@ -63,7 +63,7 @@ You'll see a form with fields like:
 
 | Field | Description | Example |
 |-------|-------------|---------|
-| **Alert Name** | Unique identifier for this alert | `high_cpu_usage` |
+| **Alert Name** | Unique identifier for this alert | `10min_cpu_usage` |
 | **Description** | Human-readable explanation of what this alert monitors | `CPU usage exceeds 80% for 5 minutes` |
 | **Metric / Chart** | The metric/chart to monitor on this node | Select `system.cpu` |
 | **Dimension** | Specific dimension within the chart (optional) | `user` (user CPU time) |

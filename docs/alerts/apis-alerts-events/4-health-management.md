@@ -12,11 +12,11 @@ The Health Management API uses `/api/v1/manage/health` endpoint.
 
 ```bash
 # Disable a specific alert (requires auth token)
-curl "http://localhost:19999/api/v1/manage/health?cmd=DISABLE&alarm=high_cpu" \
+curl "http://localhost:19999/api/v1/manage/health?cmd=DISABLE&alarm=10min_cpu_usage" \
   -H "X-Auth-Token: YOUR_TOKEN"
 
 # Silence notifications for a specific alert
-curl "http://localhost:19999/api/v1/manage/health?cmd=SILENCE&alarm=high_cpu" \
+curl "http://localhost:19999/api/v1/manage/health?cmd=SILENCE&alarm=10min_cpu_usage" \
   -H "X-Auth-Token: YOUR_TOKEN"
 
 # Reset to default state (enable all checks and notifications)

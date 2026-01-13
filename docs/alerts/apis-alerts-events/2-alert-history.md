@@ -9,7 +9,7 @@ Returns all transitions in the last hour.
 ## 9.2.1 Filter by Alert
 
 ```bash
-curl -s "http://localhost:19999/api/v1/alarm_log?alarm=high_cpu" | jq '.'
+curl -s "http://localhost:19999/api/v1/alarm_log?alarm=10min_cpu_usage" | jq '.'
 ```
 
 ## 9.2.2 Related Sections

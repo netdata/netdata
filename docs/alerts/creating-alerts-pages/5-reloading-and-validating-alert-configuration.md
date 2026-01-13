@@ -102,7 +102,7 @@ On the node, run:
 curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.'
 ```
 
-Check that your alert appears by name (for example, `high_cpu_usage`), the associated chart/context is correct, and the status is one of `CLEAR`, `WARNING`, `CRITICAL`, etc.
+Check that your alert appears by name (for example, `10min_cpu_usage`), the associated chart/context is correct, and the status is one of `CLEAR`, `WARNING`, `CRITICAL`, etc.
 
 **Filter for a Specific Alert**
 
@@ -110,7 +110,7 @@ To verify a specific alert by name:
 
 ```bash
 curl -s "http://localhost:19999/api/v1/alarms" \
-  | jq '.alarms | to_entries[] | select(.key | test("high_cpu"; "i"))'
+  | jq '.alarms | to_entries[] | select(.key | test("10min_cpu_usage"; "i"))'
 ```
 
 If you see your alert here, it is loaded and evaluating.
