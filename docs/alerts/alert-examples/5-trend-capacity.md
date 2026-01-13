@@ -45,5 +45,10 @@ lookup: average -1m of inbound
 
 ## 6.5.4 Related Sections
 
-- **12.5 SLIs and SLOs** - Connecting to business objectives
-- **13.1 Evaluation Architecture** - Understanding how alerts compute values
+- **[12.5 SLIs and SLOs](../best-practices/5-sli-slo-alerts.md)** - Connecting to business objectives
+- **[13.1 Evaluation Architecture](../architecture/1-evaluation-architecture.md)** - Understanding how alerts compute values
+
+## What's Next
+
+- **[Chapter 7: Troubleshooting Alerts](../troubleshooting-alerts/index.md)** - Debugging alert issues
+- **[Chapter 5: Receiving Notifications](../receiving-notifications/index.md)** - Configure alert delivery

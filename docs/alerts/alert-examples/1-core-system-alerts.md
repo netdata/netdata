@@ -63,5 +63,12 @@ lookup: average -5m of inbound
 
 ## 6.1.5 Related Sections
 
-- **6.2 Service and Availability** - Service health alerts
-- **6.3 Application Alerts** - Database and web server alerts
+- **[6.2 Service and Availability](2-service-availability.md)** - Service health alerts
+- **[6.3 Application Alerts](3-application-alerts.md)** - Database and web server examples
+- **[6.4 Anomaly-Based Alerts](4-anomaly-alerts.md)** - ML-driven detection
+- **[6.5 Trend and Capacity Alerts](5-trend-capacity.md)** - Capacity planning
+
+## What's Next
+
+- **[Chapter 7: Troubleshooting Alerts](../troubleshooting-alerts/index.md)** - Debugging alert issues
+- **[Chapter 5: Receiving Notifications](../receiving-notifications/index.md)** - Configure alert delivery

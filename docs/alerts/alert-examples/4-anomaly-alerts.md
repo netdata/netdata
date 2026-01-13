@@ -32,5 +32,10 @@ See **3.3 Calculations and Transformations** for complex expressions.
 
 ## 6.4.3 Related Sections
 
-- **6.5 Trend and Capacity Alerts** - Predictive alerts
-- **8.4 Custom Actions** - Automation with exec
+- **[6.5 Trend and Capacity Alerts](5-trend-capacity.md)** - Predictive alerts
+- **[8.4 Custom Actions with exec](../advanced-techniques/4-custom-actions.md)** - Automation with exec
+
+## What's Next
+
+- **[Chapter 7: Troubleshooting Alerts](../troubleshooting-alerts/index.md)** - Debugging alert issues
+- **[Chapter 5: Receiving Notifications](../receiving-notifications/index.md)** - Configure alert delivery

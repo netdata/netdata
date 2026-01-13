@@ -39,5 +39,10 @@ lookup: average -5m of rejected
 
 ## 6.3.4 Related Sections
 
-- **6.4 Anomaly-Based Alerts** - ML-based detection
-- **6.5 Trend Alerts** - Capacity planning examples
+- **[6.4 Anomaly-Based Alerts](4-anomaly-alerts.md)** - ML-based detection
+- **[6.5 Trend and Capacity Alerts](5-trend-capacity.md)** - Capacity planning examples
+
+## What's Next
+
+- **[Chapter 7: Troubleshooting Alerts](../troubleshooting-alerts/index.md)** - Debugging alert issues
+- **[Chapter 5: Receiving Notifications](../receiving-notifications/index.md)** - Configure alert delivery

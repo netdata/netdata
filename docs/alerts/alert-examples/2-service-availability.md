@@ -40,5 +40,11 @@ template: plugin_data_collection_status
 
 ## 6.2.4 Related Sections
 
-- **6.3 Application Alerts** - Database and web server examples
-- **6.4 Anomaly-Based Alerts** - ML-driven detection
+- **[6.3 Application Alerts](3-application-alerts.md)** - Database and web server examples
+- **[6.4 Anomaly-Based Alerts](4-anomaly-alerts.md)** - ML-driven detection
+- **[6.5 Trend and Capacity Alerts](5-trend-capacity.md)** - Predictive capacity
+
+## What's Next
+
+- **[Chapter 7: Troubleshooting Alerts](../troubleshooting-alerts/index.md)** - Debugging alert issues
+- **[Chapter 5: Receiving Notifications](../receiving-notifications/index.md)** - Configure alert delivery
