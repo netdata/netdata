@@ -213,11 +213,10 @@ USAGE: ${PROGRAM} [options]
   --disable-plugin-nfacct    Explicitly disable the nfacct plugin.
   --enable-plugin-xenstat    Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available.
   --disable-plugin-xenstat   Explicitly disable the xenstat plugin.
-  --enable-plugin-systemd-journal Enable the systemd journal plugin. Default: enable it when libsystemd is available.
-  --disable-plugin-systemd-journal Explicitly disable the systemd journal plugin.
-  --internal-systemd-journal Enable the internal journal file reader instead of using libsystemd
   --enable-plugin-otel Enable the Netdata OpenTelemetry plugin. Default: disabled
   --disable-plugin-otel Explicitly disable the Netdata OpenTelemetry plugin.
+  --enable-plugin-systemd-journal Enable the systemd journal reader plugin. Default: enabled if Rust is available and the build isn’t known broken
+  --disable-plugin-systemd-journal Explicitly disable the systemd journal reader plugin.
   --enable-plugin-ibm        Enable the IBM ecosystem monitoring plugin. Default: disabled
   --disable-plugin-ibm       Explicitly disable the IBM ecosystem monitoring plugin.
   --enable-exporting-kinesis Enable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis
@@ -301,7 +300,6 @@ while [ -n "${1}" ]; do
     "--disable-plugin-xenstat") ENABLE_XENSTAT=0 ;;
     "--enable-plugin-systemd-journal") ENABLE_SYSTEMD_JOURNAL=1 ;;
     "--disable-plugin-systemd-journal") ENABLE_SYSTEMD_JOURNAL=0 ;;
-    "--internal-systemd-journal") USE_RUST_JOURNAL_FILE=1 ;;
     "--enable-plugin-otel") ENABLE_OTEL=1 ;;
     "--disable-plugin-otel") ENABLE_OTEL=0 ;;
     "--enable-plugin-ibm") ENABLE_IBM=1 ;;
@@ -819,18 +817,18 @@ if [ "$(id -u)" -eq 0 ]; then
     fi
   fi
 
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/systemd-journal.plugin" ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/systemd-journal.plugin"
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/journal-viewer-plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/journal-viewer-plugin"
     capabilities=0
     if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
-      run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/systemd-journal.plugin"
-      if run setcap cap_dac_read_search+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/systemd-journal.plugin"; then
+      run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/journal-viewer-plugin"
+      if run setcap cap_dac_read_search+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/journal-viewer-plugin"; then
         capabilities=1
       fi
     fi
 
     if [ $capabilities -eq 0 ]; then
-      run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/systemd-journal.plugin"
+      run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/journal-viewer-plugin"
     fi
   fi
 

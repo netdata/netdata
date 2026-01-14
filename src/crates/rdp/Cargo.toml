@@ -1,0 +1,19 @@
+[package]
+name = "rdp"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "rdp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rdp"
+path = "src/main.rs"
+
+[dependencies]
+md5 = { workspace = true }

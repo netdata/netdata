@@ -19,22 +19,33 @@ ARG DEBUG_BUILD
 
 ENV DEBUG_BUILD=$DEBUG_BUILD
 
+ARG BUILD_ARCH
+
+ENV BUILD_ARCH=$BUILD_ARCH
+
 # Copy source
 COPY . /opt/netdata.git
 WORKDIR /opt/netdata.git
 
 # Install from source
 RUN chmod +x netdata-installer.sh && \
-   cp -rp /deps/* /usr/local/ && \
-   /bin/echo -e "INSTALL_TYPE='oci'\nPREBUILT_ARCH='$(uname -m)'" > ./system/.install-type && \
-   CFLAGS="$(packaging/docker/gen-cflags.sh)" LDFLAGS="-Wl,--gc-sections" ./netdata-installer.sh --dont-wait --dont-start-it \
-   --use-system-protobuf \
-   --disable-ebpf \
-   --enable-plugin-otel \
-   --internal-systemd-journal \
-   ${EXTRA_INSTALL_OPTS} \
-   --install-no-prefix / \
-   "$([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)"
+    cp -rp /deps/* /usr/local/ && \
+    BUILD_ARCH="${BUILD_ARCH:-"$(uname -m)"}" && \
+    /bin/echo -e "INSTALL_TYPE='oci'\nPREBUILT_ARCH='${BUILD_ARCH}'" > ./system/.install-type && \
+    if [ "${BUILD_ARCH}" = "armv7l" ]; then \
+        EXTRA_INSTALL_OPTS="${EXTRA_INSTALL_OPTS} --disable-plugin-systemd-journal" ; \
+    else \
+        EXTRA_INSTALL_OPTS="${EXTRA_INSTALL_OPTS} --enable-plugin-systemd-journal" ; \
+    fi && \
+    NETDATA_BUILD_DIR=/build \
+    CFLAGS="$(packaging/docker/gen-cflags.sh)" LDFLAGS="-Wl,--gc-sections" ./netdata-installer.sh --dont-wait --dont-start-it \
+    --use-system-protobuf \
+    --disable-ebpf \
+    --enable-plugin-otel \
+    ${EXTRA_INSTALL_OPTS} \
+    --install-no-prefix / \
+    "$([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)" && \
+    rm -rf /build /root/.cargo
 
 # files to one directory
 RUN mkdir -p /app/usr/sbin/ \
@@ -109,20 +120,20 @@ COPY --from=builder /app /
 # Create netdata user and apply the permissions as described in
 # https://docs.netdata.cloud/docs/netdata-security/#netdata-directories, but own everything by root group due to https://github.com/netdata/netdata/pull/6543
 # hadolint ignore=DL3013
-RUN addgroup --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
-    adduser --system --no-create-home --shell /usr/sbin/nologin --uid ${NETDATA_UID} --home /etc/netdata --group "${DOCKER_USR}" && \
-    chown -R root:root \
+RUN addgroup --stdoutmsglevel=info --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
+    adduser --stdoutmsglevel=info --system --no-create-home --shell /usr/sbin/nologin --uid ${NETDATA_UID} --home /etc/netdata --group "${DOCKER_USR}" && \
+    chown -vR root:root \
         /etc/netdata \
         /usr/share/netdata \
         /usr/libexec/netdata && \
-    chown -R netdata:root \
+    chown -vR netdata:root \
         /usr/lib/netdata \
         /var/cache/netdata \
         /var/lib/netdata \
         /var/log/netdata && \
-    chown -R netdata:netdata /var/lib/netdata/cloud.d && \
-    chmod 0700 /var/lib/netdata/cloud.d && \
-    chmod 0755 /usr/libexec/netdata/plugins.d/*.plugin && \
+    chown -vR netdata:netdata /var/lib/netdata/cloud.d && \
+    chmod -v 0700 /var/lib/netdata/cloud.d && \
+    chmod -v 0755 /usr/libexec/netdata/plugins.d/*.plugin && \
     for name in cgroup-network \
                 local-listeners \
                 apps.plugin \
@@ -134,12 +145,14 @@ RUN addgroup --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
                 slabinfo.plugin \
                 network-viewer.plugin \
                 otel-plugin \
-                systemd-journal.plugin; do \
-        [ -f "/usr/libexec/netdata/plugins.d/$name" ] && chmod 4755 "/usr/libexec/netdata/plugins.d/$name"; \
+                journal-viewer-plugin; do \
+        if [ -f "/usr/libexec/netdata/plugins.d/$name" ] ; then \
+            chmod -v 4755 "/usr/libexec/netdata/plugins.d/$name"; \
+        fi \
     done && \
     # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
-    find /var/lib/netdata /var/cache/netdata -type d -exec chmod 0770 {} \; && \
-    find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \
+    find /var/lib/netdata /var/cache/netdata -type d -exec chmod -v 0770 {} \; && \
+    find /var/lib/netdata /var/cache/netdata -type f -exec chmod -v 0660 {} \; && \
     cp -va /etc/netdata /etc/netdata.stock
 
 ENTRYPOINT ["/usr/sbin/run.sh"]

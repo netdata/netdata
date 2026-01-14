@@ -22,18 +22,17 @@ export IS_NETDATA_STATIC_BINARY="yes"
 NETDATA_BUILD_DIR="$(build_path netdata)"
 export NETDATA_BUILD_DIR
 
-# Needed to make Rust play nice with our static builds
-# Once Cargo’s profile-rustflags feature is a bit more widespread, we should switch to using that to specify this.
-export RUSTFLAGS="-C target-feature=+crt-static"
+export NETDATA_CMAKE_OPTIONS="-DSTATIC_BUILD=On -DENABLE_LIBBACKTRACE=On"
 
 case "${BUILDARCH}" in
     armv6l)
-        export NETDATA_CMAKE_OPTIONS="-DSTATIC_BUILD=On -DENABLE_LIBBACKTRACE=On"
-        export INSTALLER_ARGS="--disable-plugin-systemd-journal --disable-plugin-otel"
+        export INSTALLER_ARGS="--disable-plugin-otel --disable-plugin-systemd-journal"
+        ;;
+    armv7l)
+        export INSTALLER_ARGS="--enable-plugin-otel --disable-plugin-systemd-journal"
         ;;
     *)
-        export NETDATA_CMAKE_OPTIONS="-DSTATIC_BUILD=On -DENABLE_LIBBACKTRACE=On"
-        export INSTALLER_ARGS="--enable-plugin-systemd-journal --internal-systemd-journal --enable-plugin-otel"
+        export INSTALLER_ARGS="--enable-plugin-otel --enable-plugin-systemd-journal"
         ;;
 esac
 

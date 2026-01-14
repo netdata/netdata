@@ -1,0 +1,36 @@
+[package]
+name = "rt"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# Local crates
+foundation = { workspace = true }
+netdata-plugin-error = { path = "../error" }
+netdata-plugin-protocol = { path = "../protocol" }
+netdata-plugin-schema = { path = "../schema" }
+netdata-plugin-charts-derive = { path = "../charts-derive" }
+
+# Async runtime and tokio utilities
+tokio = { version = "1.0", features = ["full"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+
+async-trait = { workspace = true }
+futures = { workspace = true }
+tracing = { workspace = true }
+schemars = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
+tracing-futures = { workspace = true }
+parking_lot = { workspace = true }
+bytes = { workspace = true }
+itoa = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter", "json"] }
+tracing-journald = { workspace = true }
+
+[dev-dependencies]
+console-subscriber = "0.4"

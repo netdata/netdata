@@ -20,7 +20,7 @@ This means that if both certificates are issued by the same certificate authorit
 
 ## Self-signed certificates
 
-To simplify the process of creating and managing self-signed certificates, we have created [this bash script](https://github.com/netdata/netdata/blob/master/src/collectors/systemd-journal.plugin/systemd-journal-self-signed-certs.sh).
+To simplify the process of creating and managing self-signed certificates, we have created [this bash script](https://github.com/netdata/netdata/blob/master/docs/logs/systemd-journal-self-signed-certs.sh).
 
 This helps to also automate the distribution of the certificates to your servers (it generates a new bash script for each of your servers, which includes everything required, including the certificates).
 
@@ -34,7 +34,7 @@ On the server that will issue the certificates (usually the centralization serve
 sudo apt-get install systemd-journal-remote openssl
 
 # download the script and make it executable
-curl >systemd-journal-self-signed-certs.sh "https://raw.githubusercontent.com/netdata/netdata/master/src/collectors/systemd-journal.plugin/systemd-journal-self-signed-certs.sh"
+curl >systemd-journal-self-signed-certs.sh "https://raw.githubusercontent.com/netdata/netdata/master/docs/logs/systemd-journal-self-signed-certs.sh"
 chmod 750 systemd-journal-self-signed-certs.sh
 ```
 

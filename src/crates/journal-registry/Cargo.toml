@@ -1,0 +1,24 @@
+[package]
+name = "journal-registry"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+allocative = { workspace = true, optional = true }
+notify = { workspace = true }
+parking_lot = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
+tracing = { workspace = true }
+uuid = { workspace = true, features = ["v4", "serde"] }
+walkdir = { workspace = true }
+
+journal-common = { workspace = true }
+
+[features]
+allocative = ["dep:allocative", "journal-common/allocative"]
