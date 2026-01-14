@@ -241,33 +241,47 @@ static void pluginsd_main_cleanup(void *pptr) {
     worker_unregister();
 }
 
-static bool is_plugin(char *dst, size_t dst_size, const char *filename) {
 #if defined(OS_WINDOWS)
-    const char *suffixes[] = {
-        ".plugin.exe",
-        "_plugin.exe",
-        "-plugin.exe",
-        ".plugin",
-        NULL
-    };
+static const char *plugin_suffixes[] = {
+    ".plugin.exe",
+    "_plugin.exe",
+    "-plugin.exe",
+    ".plugin",
+    NULL
+};
 #else
-    const char *suffixes[] = {
-        ".plugin",
-        "_plugin",
-        "-plugin",
-        NULL
-    };
+static const char *plugin_suffixes[] = {
+    ".plugin",
+    "_plugin",
+    "-plugin",
+    NULL
+};
 #endif
 
+static bool is_plugin(char *dst, size_t dst_size, const char *filename) {
     size_t filename_len = strlen(filename);
 
-    for (int i = 0; suffixes[i] != NULL; i++) {
-        size_t suffix_len = strlen(suffixes[i]);
+    for (int i = 0; plugin_suffixes[i] != NULL; i++) {
+        size_t suffix_len = strlen(plugin_suffixes[i]);
 
         if (filename_len > suffix_len &&
-            strcmp(suffixes[i], &filename[filename_len - suffix_len]) == 0) {
+            strcmp(plugin_suffixes[i], &filename[filename_len - suffix_len]) == 0) {
             snprintfz(dst, dst_size, "%.*s", (int)(filename_len - suffix_len), filename);
             return true;
+        }
+    }
+
+    return false;
+}
+
+static bool plugin_exists(const char *pluginname) {
+    char path[FILENAME_MAX + 1];
+
+    for (int idx = 0; idx < PLUGINSD_MAX_DIRECTORIES && plugin_directories[idx]; idx++) {
+        for (int i = 0; plugin_suffixes[i] != NULL; i++) {
+            snprintfz(path, sizeof(path), "%s/%s%s", plugin_directories[idx], pluginname, plugin_suffixes[i]);
+            if (access(path, F_OK) == 0)
+                return true;
         }
     }
 
@@ -293,6 +307,8 @@ void *pluginsd_main(void *ptr) {
     // store the errno for each plugins directory
     // so that we don't log broken directories on each loop
     int directory_errors[PLUGINSD_MAX_DIRECTORIES] = { 0 };
+
+    bool journal_viewer_exists = plugin_exists("journal-viewer");
 
     while (service_running(SERVICE_COLLECTORS)) {
         int idx;
@@ -329,8 +345,12 @@ void *pluginsd_main(void *ptr) {
                 }
 
                 // Blacklist obsolete plugins that have been replaced
-                if (strcmp(pluginname, "systemd-journal") == 0) {
-                    netdata_log_info("plugin '%s' has been replaced by 'journal-viewer' and is no longer supported", file->d_name);
+                if (strcmp(pluginname, "systemd-journal") == 0 && journal_viewer_exists) {
+                    static bool logged = false;
+                    if (!logged) {
+                        netdata_log_info("plugin '%s' has been replaced by 'journal-viewer' and is no longer supported", file->d_name);
+                        logged = true;
+                    }
                     continue;
                 }
 
