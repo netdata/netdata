@@ -294,6 +294,30 @@ void *pluginsd_main(void *ptr) {
     // so that we don't log broken directories on each loop
     int directory_errors[PLUGINSD_MAX_DIRECTORIES] = { 0 };
 
+    // Check if journal-viewer exists in any plugin directory
+    // The Rust-based 'journal-viewer' plugin was added in 2.8-nightly to replace 'systemd-journal'.
+    // We only blacklist systemd-journal if journal-viewer is present to allow graceful transition.
+    // TODO: After 2.9 release and proper deprecation announcement, remove this check and unconditionally blacklist systemd-journal.
+    bool journal_viewer_exists = false;
+    for (int check_idx = 0; check_idx < PLUGINSD_MAX_DIRECTORIES && plugin_directories[check_idx]; check_idx++) {
+        DIR *check_dir = opendir(plugin_directories[check_idx]);
+        if (check_dir) {
+            struct dirent *check_file = NULL;
+            while ((check_file = readdir(check_dir))) {
+                char check_pluginname[CONFIG_MAX_NAME + 1];
+                if (is_plugin(check_pluginname, sizeof(check_pluginname), check_file->d_name)) {
+                    if (strcmp(check_pluginname, "journal-viewer") == 0) {
+                        journal_viewer_exists = true;
+                        break;
+                    }
+                }
+            }
+            closedir(check_dir);
+            if (journal_viewer_exists)
+                break;
+        }
+    }
+
     while (service_running(SERVICE_COLLECTORS)) {
         int idx;
         const char *directory_name;
@@ -329,8 +353,9 @@ void *pluginsd_main(void *ptr) {
                 }
 
                 // Blacklist obsolete plugins that have been replaced
-                if (strcmp(pluginname, "systemd-journal") == 0) {
-                    netdata_log_info("plugin '%s' has been replaced by 'journal-viewer' and is no longer supported", file->d_name);
+                if (strcmp(pluginname, "systemd-journal") == 0 && journal_viewer_exists) {
+                    nd_log_limit_static_global_var(erl, 3600, 0);
+                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING, "plugin '%s' has been replaced by 'journal-viewer' and is no longer supported", file->d_name);
                     continue;
                 }
 
