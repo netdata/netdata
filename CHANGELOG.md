@@ -159,6 +159,10 @@
 - Docs: fix links in vm-templates.md ([#21546](https://github.com/netdata/netdata/issues/21546))
 - Code improvement (Windows.plugin) ([#21523](https://github.com/netdata/netdata/issues/21523))
 - Build(deps): bump golang.org/x/net from 0.48.0 to 0.49.0 in /src/go ([#21550](https://github.com/netdata/netdata/issues/21550))
+- Improve(go.d/proxysql): add hostgroup summary metrics ([#21549](https://github.com/netdata/netdata/issues/21549))
+- Improve(health/proxysql): add alerts ([#21548](https://github.com/netdata/netdata/issues/21548))
+- Regenerate integrations docs ([#21551](https://github.com/netdata/netdata/issues/21551))
+- Docs: Add reciprocal links between ephemerality and identity docs ([#21552](https://github.com/netdata/netdata/issues/21552))
 
 ## [2.8.0] - 2025-11-19
 
