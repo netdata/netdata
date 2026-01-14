@@ -84,9 +84,6 @@ fn capture_request_error(
             scope.set_extra("time_range_start", Value::from(context.time_range_start));
             scope.set_extra("time_range_end", Value::from(context.time_range_end));
             scope.set_extra("file_count", Value::from(context.file_count));
-            if let Some(ref filter) = context.filter_expression {
-                scope.set_extra("filter_expression", Value::from(filter.clone()));
-            }
             if let Some(duration) = context.find_files_duration_ms {
                 scope.set_extra("find_files_duration_ms", Value::from(duration));
             }
@@ -106,7 +103,6 @@ struct RequestContext {
     time_range_start: i64,
     time_range_end: i64,
     file_count: usize,
-    filter_expression: Option<String>,
     find_files_duration_ms: Option<u64>,
     indexing_duration_ms: Option<u64>,
 }
@@ -600,7 +596,6 @@ impl FunctionHandler for CatalogFunction {
 
         // Build filter expression
         let filter_expr = build_filter_from_selections(&request.selections);
-        ctx.filter_expression = Some(filter_expr.to_string());
         info!("[{}] filter expression: {}", txn.id(), filter_expr);
 
         // Build facets for file indexes
