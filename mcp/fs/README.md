@@ -7,10 +7,10 @@ A high-performance MCP (Model Context Protocol) server providing comprehensive f
 The `fs-mcp-server` is a production-ready filesystem server that implements the MCP protocol, enabling AI assistants to safely interact with local filesystems. It features:
 
 - **Token-efficient output** - Compact markdown formatting reduces token usage by 60-75%
-- **Strong security** - Path traversal prevention, symlink validation, and root directory enforcement
+- **Strong security** - Path traversal prevention and root directory enforcement for requested paths (symlink targets are not validated)
 - **Comprehensive operations** - Read, search, list, tree visualization, and grep capabilities
-- **Robust error handling** - Graceful handling of binary files, broken symlinks, and invalid UTF-8
-- **Rich metadata** - File sizes, timestamps, symlink targets, and operation statistics
+- **Robust error handling** - Graceful handling of binary files and invalid UTF-8
+- **Rich metadata** - File sizes, timestamps, and operation statistics (symlink targets shown when underlying tools provide them)
 - **Exclusions** - Root-level `.mcpignore` for admin-controlled ignores
 
 ## Installation
@@ -57,8 +57,8 @@ The server enforces strict security boundaries:
 
 1. **Root Directory Confinement** - All operations are restricted to the specified root directory
 2. **Path Traversal Prevention** - Attempts to access parent directories (../) are blocked
-3. **Symlink Validation** - Symlinks are validated to ensure they don't escape the root
-4. **Absolute Path Rejection** - Absolute paths are converted to relative paths within root
+3. **Symlink Note** - Symlink targets are not validated; resolved targets may point outside root depending on OS/tool defaults
+4. **Absolute Path Rejection** - Absolute paths are rejected
 
 ## Available Tools
 
@@ -78,7 +78,7 @@ file1.txt                   1.2K
 file2.md                    456B
 subdir/                        -
 link -> target.txt         1.2K
-broken_link -> [broken]        -
+broken_link -> target.txt      -
 
 2 files, 2 directories in docs
 ```
@@ -114,7 +114,7 @@ Find files and directories matching glob patterns.
 
 **Features:**
 - Supports standard glob patterns (`*`, `?`, `**`)
-- Shows symlinks with targets
+- Symlink handling follows `rg --files` defaults (targets are not shown)
 - Includes statistics on files/directories examined
 
 **Output Format:**
@@ -194,7 +194,6 @@ Recursively search directory contents.
 
 **Features:**
 - Recursive directory traversal
-- Symlink warnings
 - Per-file match reporting
 - Overall statistics
 - If `maxFiles` is reached, output includes a warning that results are incomplete and suggests re-running with a higher limit
@@ -208,21 +207,19 @@ If you need all matches, re-run RGrep with a higher maxFiles value.
 Files matched under project:
 
 src/index.js
-
-WARNING: link -> target not followed
 ```
 
 ## Special Features
 
 ### Symlink Handling
 
-The server provides intelligent symlink handling:
+Symlink handling is best-effort and delegated to underlying tools (`ls`, `tree`, `rg`):
 
-- **Valid symlinks within root** - Followed for read operations
-- **Symlinks escaping root** - Blocked with clear error messages
-- **Broken symlinks** - Reported as `[broken]`
-- **Directory symlinks** - Not followed during traversal (prevents loops)
-- **Symlink loops** - Detected and reported
+- Symlink targets may be shown in listings when the tool provides them
+- The server does **not** validate or restrict resolved symlink targets
+- Read/Grep follow OS default symlink behavior
+- Directory traversal behavior depends on `tree`/`rg` defaults
+- No explicit symlink loop detection is performed
 
 ### Hidden Files
 
@@ -255,8 +252,7 @@ Binary files are handled gracefully:
 Clear, actionable error messages:
 ```
 "not a regular file"
-"broken symlink -> target.txt"
-"symlink target outside root: /etc/passwd"
+"no such file"
 "recursive grep on the entire tree from the root is disabled by --no-rgrep-root"
 ```
 

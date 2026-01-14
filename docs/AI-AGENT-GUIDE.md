@@ -46,7 +46,7 @@
 - **Malformed calls are echoed back**: Invalid tool parameters are preserved, short-circuited, and returned as tool failure messages (including the original payload). No TURN-FAILED is added for malformed tool payloads, but the turn is still consumed and remaining turns may collapse after repeated invalid attempts.
 - **Calling the XML wrapper as a tool is an error**: If the model emits `ai-agent-<nonce>-FINAL` as a tool call, the agent injects a specific tool failure, returns TURN-FAILED guidance with the actual nonce/format, and collapses remaining turns to a final attempt to prevent runaway retries.
 - **Synthetic failures trigger alerts**: If you never send a valid XML final report, the session emits `agent:failure-report` and surfaces a synthetic `status: failure` final report with `source='synthetic'`. Do **not** rely on this path.
-- **What you should do**: Always emit `<ai-agent-${nonce}-FINAL tool="agent__final_report" status="success" format="${FORMAT}">...</ai-agent-${nonce}-FINAL>` with `content_json` when JSON is expected or `report_content`/`messages` for text/slack formats.
+- **What you should do**: Always emit `<ai-agent-${nonce}-FINAL format="${FORMAT}">...</ai-agent-${nonce}-FINAL>` with `content_json` when JSON is expected or `report_content`/`messages` for text/slack formats.
 - [ ] Decide whether to expose tool instructions (default: appended automatically once).
 - [ ] Enable tracing/verbose flags when debugging provider/tool failures.
 

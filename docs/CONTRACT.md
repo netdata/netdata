@@ -466,7 +466,7 @@ Any deviation from the guarantees above is a **contract violation** and must be 
 - XML-NEXT (ephemeral, not stored/cached): the **only** per-turn system notice. It carries the current nonce, the XML final wrapper, and tool-vs-final guidance. In forced-final turns it only advertises the final-report wrapper. Tool schemas remain in native tool definitions, not in XML-NEXT.
 
 **Final-report via XML**
-- Final-report uses a reserved slot in XML-NEXT (`tool="agent__final_report"`, format attribute, raw content).
+- Final-report uses a reserved slot in XML-NEXT (reserved FINAL slot, format attribute, raw content).
 - Tag attributes: `format="<expected-format>"`.
 - Status is not provided by the model; system determines status based on source (model-provided = success, synthetic = failure).
 - Processing uses 3-layer architecture:
@@ -477,7 +477,7 @@ Any deviation from the guarantees above is a **contract violation** and must be 
 - Misuse handling: If the model emits the XML final wrapper tag (`ai-agent-<nonce>-FINAL`) as a tool call, the agent injects a specific tool failure message, emits TURN-FAILED guidance with the actual nonce/format, and collapses remaining turns to a single final attempt.
 
 **Unclosed final-report tag handling**
-- When a valid final-report opening tag is detected (`<ai-agent-NONCE-FINAL tool="agent__final_report">`) with content following it, the closing tag requirement depends on the LLM's `stopReason`:
+- When a valid final-report opening tag is detected (`<ai-agent-NONCE-FINAL format="...">`) with content following it, the closing tag requirement depends on the LLM's `stopReason`:
   - `stop`, `end_turn`, `end`, `eos` (normal completion): Accept content even without closing tag.
   - `length`, `max_tokens` (truncation): Behavior depends on output format (see below).
   - Unknown/undefined: Log warning but accept content.
