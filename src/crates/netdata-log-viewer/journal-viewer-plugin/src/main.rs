@@ -11,9 +11,41 @@ use plugin_config::PluginConfig;
 use rt::PluginRuntime;
 use tracing::{error, info};
 
+/// Initialize Sentry error tracking.
+///
+/// Returns a guard that must be kept alive for the duration of the program.
+fn init_sentry() -> Option<sentry::ClientInitGuard> {
+    if std::env::var("DISABLE_TELEMETRY").is_ok() {
+        return None;
+    }
+
+    let dsn =
+        "https://e6e6b1488ab279fc702439e15d6112cc@o382276.ingest.us.sentry.io/4510709226143744";
+
+    let guard = sentry::init((
+        dsn,
+        sentry::ClientOptions {
+            release: sentry::release_name!(),
+            // Enable session tracking for counting plugin starts
+            auto_session_tracking: true,
+            // Set sample rate for transactions (0.0 = no transactions, saves quota)
+            traces_sample_rate: 0.0,
+            ..Default::default()
+        },
+    ));
+
+    // Start a session to track this plugin run
+    sentry::start_session();
+
+    Some(guard)
+}
+
 #[tokio::main]
 async fn main() {
     println!("TRUST_DURATIONS 1");
+
+    // Initialize Sentry before tracing so panics are captured
+    let _sentry_guard = init_sentry();
 
     rt::init_tracing();
 
