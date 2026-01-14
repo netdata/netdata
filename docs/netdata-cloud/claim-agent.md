@@ -2,7 +2,11 @@
 
 The `netdata-claim.sh` script connects a Netdata Agent to Netdata Cloud via the [Agent-Cloud Link (ACLK)](docs/netdata-cloud/README.md). This page provides a complete reference for the script's CLI options, environment variables, and troubleshooting.
 
-> **Note:** The `netdata-claim.sh` script is **deprecated** and will be officially unsupported in the future. For new installations, use the kickstart script with `--claim-*` options instead. For existing installations, write the claiming configuration directly to `claim.conf`.
+:::note
+
+The `netdata-claim.sh` script is **deprecated** and will be officially unsupported in the future. For new installations, use the kickstart script with `--claim-*` options instead. For existing installations, write the claiming configuration directly to `claim.conf`.
+
+:::
 
 ## Prerequisites
 
@@ -109,9 +113,13 @@ You can configure proxy settings for the connection:
 
 ### Proxy Security Considerations
 
-> **Note:** Data between Netdata Agents and Netdata Cloud remains **end-to-end encrypted** when using a proxy. The agent establishes a TLS/SSL connection through the proxy tunnel directly with Netdata Cloud.
+::note
+
+Data between Netdata Agents and Netdata Cloud remains **end-to-end encrypted** when using a proxy. The agent establishes a TLS/SSL connection through the proxy tunnel directly with Netdata Cloud.
 
 The proxy only sees encrypted TLS traffic flowing through the tunnel; it never sees the decrypted content. This is standard HTTP CONNECT tunneling.
+
+:::
 
 ## Claim Status Messages
 
