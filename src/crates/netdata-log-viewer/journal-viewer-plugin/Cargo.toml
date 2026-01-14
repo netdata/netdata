@@ -43,3 +43,6 @@ journal-core = { workspace = true }
 journal-index = { workspace = true }
 journal-function = { workspace = true }
 journal-registry = { workspace = true }
+
+# Error tracking
+sentry = { workspace = true, features = ["reqwest", "rustls", "contexts"] }

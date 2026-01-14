@@ -6,6 +6,7 @@ use netdata_plugin_protocol::FunctionDeclaration;
 use netdata_plugin_schema::HttpAccess;
 use parking_lot::RwLock;
 use rt::FunctionHandler;
+use sentry::protocol::Value;
 use std::sync::Arc;
 use tracing::{debug, error, info, instrument, warn};
 
@@ -66,6 +67,44 @@ fn build_filter_from_selections(selections: &HashMap<String, Vec<String>>) -> Fi
     } else {
         Filter::and(field_filters)
     }
+}
+
+/// Captures an error to Sentry with request context.
+fn capture_request_error(
+    transaction_id: &str,
+    operation: &str,
+    error_message: &str,
+    context: &RequestContext,
+) {
+    // Capture the error event with context
+    sentry::with_scope(
+        |scope| {
+            scope.set_tag("transaction_id", transaction_id);
+            scope.set_tag("operation", operation);
+            scope.set_extra("time_range_start", Value::from(context.time_range_start));
+            scope.set_extra("time_range_end", Value::from(context.time_range_end));
+            scope.set_extra("file_count", Value::from(context.file_count));
+            if let Some(duration) = context.find_files_duration_ms {
+                scope.set_extra("find_files_duration_ms", Value::from(duration));
+            }
+            if let Some(duration) = context.indexing_duration_ms {
+                scope.set_extra("indexing_duration_ms", Value::from(duration));
+            }
+        },
+        || {
+            sentry::capture_message(error_message, sentry::Level::Error);
+        },
+    );
+}
+
+/// Context for a request, used for error reporting.
+#[derive(Default)]
+struct RequestContext {
+    time_range_start: i64,
+    time_range_end: i64,
+    file_count: usize,
+    find_files_duration_ms: Option<u64>,
+    indexing_duration_ms: Option<u64>,
 }
 
 fn accepted_params() -> Vec<netdata::RequestParam> {
@@ -503,10 +542,19 @@ impl FunctionHandler for CatalogFunction {
         };
         info!("[{}] started transaction", txn.id());
 
+        // Initialize request context for error reporting
+        let mut ctx = RequestContext {
+            time_range_start: request.after as i64,
+            time_range_end: request.before as i64,
+            ..Default::default()
+        };
+
         // Create query time range with automatic alignment
         let time_range = journal_function::QueryTimeRange::new(request.after, request.before)
-            .map_err(|e| netdata_plugin_error::NetdataPluginError::Other {
-                message: format!("[{}] {}", txn.id(), e),
+            .map_err(|e| {
+                let msg = format!("[{}] {}", txn.id(), e);
+                capture_request_error(&txn.id(), "time_range_creation", &msg, &ctx);
+                netdata_plugin_error::NetdataPluginError::Other { message: msg }
             })?;
 
         info!(
@@ -525,10 +573,14 @@ impl FunctionHandler for CatalogFunction {
             .inner
             .registry
             .find_files_in_range(Seconds(request.after), Seconds(request.before))
-            .map_err(|e| netdata_plugin_error::NetdataPluginError::Other {
-                message: format!("[{}] failed to find files in range: {}", txn.id(), e),
+            .map_err(|e| {
+                let msg = format!("[{}] failed to find files in range: {}", txn.id(), e);
+                capture_request_error(&txn.id(), "find_files", &msg, &ctx);
+                netdata_plugin_error::NetdataPluginError::Other { message: msg }
             })?;
         let find_files_duration = op_start.elapsed();
+        ctx.find_files_duration_ms = Some(find_files_duration.as_millis() as u64);
+        ctx.file_count = files.len();
         info!("[{}] found {} files in time range", txn.id(), files.len(),);
         if tracing::enabled!(tracing::Level::DEBUG) {
             for (idx, file_info) in files.iter().enumerate() {
@@ -542,7 +594,7 @@ impl FunctionHandler for CatalogFunction {
             }
         }
 
-        // Build fiter expression
+        // Build filter expression
         let filter_expr = build_filter_from_selections(&request.selections);
         info!("[{}] filter expression: {}", txn.id(), filter_expr);
 
@@ -583,10 +635,13 @@ impl FunctionHandler for CatalogFunction {
             timeout,
         )
         .await
-        .map_err(|e| netdata_plugin_error::NetdataPluginError::Other {
-            message: format!("[{}] failed to index files: {}", txn.id(), e),
+        .map_err(|e| {
+            let msg = format!("[{}] failed to index files: {}", txn.id(), e);
+            capture_request_error(&txn.id(), "file_indexing", &msg, &ctx);
+            netdata_plugin_error::NetdataPluginError::Other { message: msg }
         })?;
         let indexing_duration = op_start.elapsed();
+        ctx.indexing_duration_ms = Some(indexing_duration.as_millis() as u64);
 
         info!(
             "[{}] retrieved {}/{} file indexes for histogram buckets and log entries",
@@ -615,8 +670,10 @@ impl FunctionHandler for CatalogFunction {
             .inner
             .histogram_engine
             .compute_from_indexes(&indexed_files, &time_range, &request.facets, &filter_expr)
-            .map_err(|e| netdata_plugin_error::NetdataPluginError::Other {
-                message: format!("failed to compute histogram: {}", e),
+            .map_err(|e| {
+                let msg = format!("[{}] failed to compute histogram: {}", txn.id(), e);
+                capture_request_error(&txn.id(), "histogram_computation", &msg, &ctx);
+                netdata_plugin_error::NetdataPluginError::Other { message: msg }
             })?;
         let histogram_duration = op_start.elapsed();
 

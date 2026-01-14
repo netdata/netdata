@@ -1026,7 +1026,7 @@ static int discovery_is_cgroup_duplicate(struct cgroup *cg) {
     // https://github.com/netdata/netdata/issues/797#issuecomment-241248884
     struct cgroup *c;
     for (c = discovered_cgroup_root; c; c = c->discovered_next) {
-        if (c != cg && c->enabled && (is_cgroup_systemd_service(c) == is_cgroup_systemd_service(cg)) &&
+        if (c != cg && c->enabled && c->available && (is_cgroup_systemd_service(c) == is_cgroup_systemd_service(cg)) &&
             c->hash_chart_id == cg->hash_chart_id && !strcmp(c->chart_id, cg->chart_id)) {
             collector_error(
                     "CGROUP: chart id '%s' already exists with id '%s' and is enabled and available. Disabling cgroup with id '%s'.",
