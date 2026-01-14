@@ -8,7 +8,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { performance } from 'node:perf_hooks';
 
 import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions, ValidateFunction } from 'ajv';
-import type { MCPServerConfig, MCPTool, MCPServer, LogEntry } from '../types.js';
+import type { AIAgentEvent, MCPServerConfig, MCPTool, MCPServer, LogEntry } from '../types.js';
 import type { ToolCancelOptions, ToolExecuteOptions, ToolExecuteResult } from './types.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 
@@ -802,14 +802,14 @@ export class MCPProvider extends ToolProvider {
   private trace = false;
   private verbose = false;
   private requestTimeoutMs?: number;
-  private onLog?: (entry: LogEntry) => void;
+  private emitEvent?: (event: AIAgentEvent) => void;
   private initConcurrency?: number;
   private readonly sharedRegistry: SharedRegistry;
 
   constructor(
     public readonly namespace: string,
     servers: Record<string, MCPServerConfig>,
-    opts?: { trace?: boolean; verbose?: boolean; requestTimeoutMs?: number; onLog?: (entry: LogEntry) => void; initConcurrency?: number; sharedRegistry?: SharedRegistry }
+    opts?: { trace?: boolean; verbose?: boolean; requestTimeoutMs?: number; emitEvent?: (event: AIAgentEvent) => void; initConcurrency?: number; sharedRegistry?: SharedRegistry }
   ) {
     super();
     this.serversConfig = servers;
@@ -819,7 +819,7 @@ export class MCPProvider extends ToolProvider {
       const v = opts?.requestTimeoutMs;
       return typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.trunc(v) : undefined;
     })();
-    this.onLog = opts?.onLog;
+    this.emitEvent = opts?.emitEvent;
     const limit = opts?.initConcurrency;
     if (typeof limit === 'number' && Number.isFinite(limit) && limit > 0) {
       this.initConcurrency = Math.trunc(limit);
@@ -1174,7 +1174,7 @@ export class MCPProvider extends ToolProvider {
     const entry: LogEntry = {
       timestamp: Date.now(), severity, turn: 0, subturn: 0, direction: 'response', type: 'tool', toolKind: 'mcp', remoteIdentifier, fatal, message,
     };
-    try { this.onLog?.(entry); } catch (e) { warn(`mcp onLog failed: ${e instanceof Error ? e.message : String(e)}`); }
+    try { this.emitEvent?.({ type: 'log', entry }); } catch (e) { warn(`mcp emitEvent failed: ${e instanceof Error ? e.message : String(e)}`); }
   }
 
   private async closeClient(serverName: string): Promise<void> {

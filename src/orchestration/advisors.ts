@@ -36,6 +36,8 @@ export interface ExecuteAdvisorsOptions {
     | "toolResponseMaxBytes"
     | "targets"
     | "tools"
+    | "isMaster"
+    | "pendingHandoffCount"
   > & {
     trace?: {
       originId?: string;
@@ -83,6 +85,8 @@ export async function executeAdvisors(
         systemTemplate: advisor.systemTemplate,
         userPrompt,
         parentSession,
+        isMaster: false,
+        pendingHandoffCount: parentSession.pendingHandoffCount ?? 0,
         ancestors,
       });
       if (!result.success) {

@@ -304,7 +304,7 @@ The flow is **procedural**, not state-machine driven. Error handling is inline v
 - **Tool budget mutex**: Concurrent tool executions acquire a mutex before accounting for output bytes, ensuring the `(tool failed: response exceeded ...)` guard is deterministic (`src/ai-agent.ts:155-562`, `src/ai-agent.ts:516-562`).
 - **Pending retry deduplication**: `pushSystemRetryMessage` keeps a deduped queue of system reminders so multi-provider retries don't spam instructions in conversation history (`src/ai-agent.ts:198, 2959-3042`).
 - **Context limit warning gating**: `contextLimitWarningLogged` prevents repetitive warnings; once logged the session suppresses duplicate notices to keep logs clean (`src/ai-agent.ts:159, 2338-2368`).
-- **Snapshot + accounting flush**: After `executeAgentLoop()` succeeds, `persistSessionSnapshot('final')` streams the opTree through `onSessionSnapshot` callbacks and `flushAccounting()` pushes accumulated entries to `onAccountingFlush`; on uncaught exceptions the catch path skips both calls (`src/ai-agent.ts:360-420`, `src/ai-agent.ts:1256-1310`).
+- **Snapshot + accounting flush**: After `executeAgentLoop()` succeeds, `persistSessionSnapshot('final')` emits `onEvent(type='snapshot')` and `flushAccounting()` emits `onEvent(type='accounting_flush')`; on uncaught exceptions the catch path skips both calls (`src/ai-agent.ts:360-420`, `src/ai-agent.ts:1256-1310`).
 - **Child session capture**: `childConversations` stores prompt paths, agent IDs, and conversations for every sub-agent call, and FIN summaries aggregate their accounting so parent sessions can render nested timelines (`src/ai-agent.ts:700-884`, `src/ai-agent.ts:3120-3220`).
 
 10. **evaluateContextForProvider()**:

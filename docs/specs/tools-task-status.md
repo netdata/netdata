@@ -121,8 +121,11 @@ interface ToolExecutionState {
 3. Update status via callback
 4. Return result with completion signal
 
-## Progress Events (`onProgress`)
-- When `agent__task_status` is called, the progress reporter emits `agent_update` with both:
+## Progress Events (`onEvent` type `progress` / `status`)
+- When `agent__task_status` is called, the progress reporter emits `agent_update` as:
+  - `event.type='progress'` (full progress stream)
+  - `event.type='status'` (mirror of `agent_update` for headends that only want status)
+- Payload includes:
   - `message`: the flattened `status | done | pending | now` string
   - `taskStatus`: structured fields `{ status, done, pending, now, ready_for_final_report, need_to_run_more_tools }`
 

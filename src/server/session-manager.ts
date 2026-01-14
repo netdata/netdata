@@ -2,16 +2,14 @@ import crypto from 'node:crypto';
 
 import { SpanKind, SpanStatusCode } from '@opentelemetry/api';
 
-import type { AIAgentCallbacks, AIAgentResult, ConversationMessage, LogEntry, ProgressEvent } from '../types.js';
+import type { AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, AIAgentResult, ConversationMessage, ProgressEvent } from '../types.js';
 import { addSpanAttributes, addSpanEvent, recordSpanError, runWithSpan } from '../telemetry/index.js';
-import { warn } from '../utils.js';
+import { isPlainObject, warn } from '../utils.js';
 import type { RunKey, RunMeta } from './types.js';
 
 interface Callbacks {
   onTreeUpdate?: (runId: string) => void;
-  onLog?: (entry: LogEntry) => void;
-  onProgress?: (runId: string, event: ProgressEvent) => void;
-  onThinking?: (runId: string, chunk: string) => void;
+  onEvent?: (runId: string, event: AIAgentEvent, meta: AIAgentEventMeta) => void;
 }
 
 export class SessionManager {
@@ -25,12 +23,12 @@ export class SessionManager {
   private readonly stopRefs = new Map<string, { stopping: boolean }>();
   private readonly callbacks: Callbacks;
   private readonly treeUpdateListeners = new Set<(runId: string) => void>();
-  private readonly runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web' | 'embed'; outputFormat?: string; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; headendId?: string; telemetryLabels?: Record<string, string> }) => Promise<AIAgentResult>;
+  private readonly runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentEventCallbacks; renderTarget?: 'slack' | 'api' | 'web' | 'embed'; outputFormat?: string; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; headendId?: string; telemetryLabels?: Record<string, string> }) => Promise<AIAgentResult>;
   private readonly headendId?: string;
   private readonly telemetryLabels: Record<string, string>;
 
   public constructor(
-    runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web' | 'embed'; outputFormat?: string; abortSignal?: AbortSignal; initialTitle?: string; headendId?: string; telemetryLabels?: Record<string, string> }) => Promise<AIAgentResult>,
+    runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentEventCallbacks; renderTarget?: 'slack' | 'api' | 'web' | 'embed'; outputFormat?: string; abortSignal?: AbortSignal; initialTitle?: string; headendId?: string; telemetryLabels?: Record<string, string> }) => Promise<AIAgentResult>,
     callbacks: Callbacks = {},
     options: { headendId?: string; telemetryLabels?: Record<string, string> } = {},
   ) {
@@ -163,51 +161,64 @@ export class SessionManager {
             headendId: this.headendId,
             telemetryLabels: this.telemetryLabels,
             callbacks: {
-              onLog: (entry: LogEntry) => {
-                const m = this.runs.get(runId);
-                if (m) {
-                  m.updatedAt = Date.now();
-                  this.runs.set(runId, m);
+              onEvent: (event: AIAgentEvent, meta: AIAgentEventMeta) => {
+                const runMeta = this.runs.get(runId);
+                if (runMeta) {
+                  runMeta.updatedAt = Date.now();
+                  this.runs.set(runId, runMeta);
                 }
-                try { this.callbacks.onLog?.(entry); } catch (e) { warn(`callbacks.onLog failed: ${e instanceof Error ? e.message : String(e)}`); }
-                this.callbacks.onTreeUpdate?.(runId);
-              },
-              onOpTree: (tree) => {
-                try {
-                  const ingressAttributes = this.ingress.get(runId);
-                  if (ingressAttributes && tree && typeof tree === 'object') {
-                    const root = tree as Record<string, unknown>;
-                    const attrs = (root.attributes as Record<string, unknown> | undefined) ?? {};
-                    attrs.ingress = { ...(attrs.ingress as Record<string, unknown> ?? {}), ...ingressAttributes };
-                    root.attributes = attrs;
+
+                if (event.type === 'op_tree') {
+                  try {
+                    const ingressAttributes = this.ingress.get(runId);
+                    if (ingressAttributes && event.tree && typeof event.tree === 'object') {
+                      const baseAttrs = event.tree.attributes ?? {};
+                      const existingIngress = isPlainObject(baseAttrs.ingress) ? baseAttrs.ingress : {};
+                      event.tree.attributes = { ...baseAttrs, ingress: { ...existingIngress, ...ingressAttributes } };
+                    }
+                  } catch (e) {
+                    warn(`opTree ingress enrichment failed: ${e instanceof Error ? e.message : String(e)}`);
                   }
-                } catch (e) { warn(`opTree ingress enrichment failed: ${e instanceof Error ? e.message : String(e)}`); }
-                this.opTrees.set(runId, tree);
-                try { this.callbacks.onTreeUpdate?.(runId); } catch (e) { warn(`callbacks.onTreeUpdate failed: ${e instanceof Error ? e.message : String(e)}`); }
+                  this.opTrees.set(runId, event.tree);
+                }
+
+                if (event.type === 'output' && meta.isMaster) {
+                  if (!(meta.source === 'finalize' && meta.pendingHandoffCount > 0)) {
+                    outputBuf.push(event.text);
+                    this.outputs.set(runId, outputBuf.join(''));
+                  }
+                }
+
+                if (event.type === 'thinking') {
+                  addSpanEvent('session.thinking', { length: event.text.length });
+                }
+
+                if (event.type === 'progress') {
+                  const progressEvent: ProgressEvent = event.event;
+                  addSpanEvent('session.progress', {
+                    'progress.type': progressEvent.type,
+                    'progress.call_path': progressEvent.callPath,
+                    'progress.agent_id': 'agentId' in progressEvent ? progressEvent.agentId : undefined,
+                  });
+                }
+
+                try {
+                  this.callbacks.onEvent?.(runId, event, meta);
+                } catch (e) {
+                  warn(`callbacks.onEvent failed: ${e instanceof Error ? e.message : String(e)}`);
+                }
+
+                if (
+                  event.type === 'log'
+                  || event.type === 'op_tree'
+                  || event.type === 'output'
+                  || event.type === 'thinking'
+                  || event.type === 'accounting'
+                ) {
+                  try { this.callbacks.onTreeUpdate?.(runId); } catch (e) { warn(`callbacks.onTreeUpdate failed: ${e instanceof Error ? e.message : String(e)}`); }
+                  for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch (e) { warn(`treeUpdate listener failed: ${e instanceof Error ? e.message : String(e)}`); } }
+                }
               },
-              onOutput: (t: string) => {
-                outputBuf.push(t);
-                this.outputs.set(runId, outputBuf.join(''));
-                try { this.callbacks.onTreeUpdate?.(runId); } catch (e) { warn(`callbacks.onTreeUpdate failed: ${e instanceof Error ? e.message : String(e)}`); }
-              },
-              onThinking: (chunk: string) => {
-                addSpanEvent('session.thinking', { length: chunk.length });
-                try { this.callbacks.onThinking?.(runId, chunk); } catch (e) { warn(`callbacks.onThinking failed: ${e instanceof Error ? e.message : String(e)}`); }
-                try { this.callbacks.onTreeUpdate?.(runId); } catch (e) { warn(`callbacks.onTreeUpdate failed: ${e instanceof Error ? e.message : String(e)}`); }
-                for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch (e) { warn(`treeUpdate listener failed: ${e instanceof Error ? e.message : String(e)}`); } }
-              },
-              onProgress: (event: ProgressEvent) => {
-                addSpanEvent('session.progress', {
-                  'progress.type': event.type,
-                  'progress.call_path': event.callPath,
-                  'progress.agent_id': 'agentId' in event ? event.agentId : undefined,
-                });
-                try { this.callbacks.onProgress?.(runId, event); } catch (e) { warn(`callbacks.onProgress failed: ${e instanceof Error ? e.message : String(e)}`); }
-              },
-              onAccounting: (_a) => {
-                this.callbacks.onTreeUpdate?.(runId);
-                for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch (e) { warn(`treeUpdate listener failed: ${e instanceof Error ? e.message : String(e)}`); } }
-              }
             }
           });
           addSpanAttributes({ 'ai.session.success': res.success });

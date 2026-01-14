@@ -163,12 +163,39 @@ handleRequest(req, res): Promise<void> {
 
 5. **Setup callbacks**:
    ```typescript
-   const callbacks: AIAgentCallbacks = {
-     onOutput: (chunk) => { output += chunk; },
-     onThinking: (chunk) => { reasoningLog += chunk; },
-     onLog: (entry) => {
-       entry.headendId = this.id;
-       this.logEntry(entry);
+   const handoffSessions = new Set<string>();
+   const sessionKey = (meta: AIAgentEventMeta): string | undefined =>
+     meta.sessionId ?? meta.callPath ?? meta.agentId;
+
+   const callbacks: AIAgentEventCallbacks = {
+     onEvent: (event, meta) => {
+       if (event.type === 'output') {
+         if (!meta.isMaster) return;
+         if (meta.source === 'finalize' && meta.pendingHandoffCount > 0) return;
+         output += event.text;
+         return;
+       }
+       if (event.type === 'thinking') {
+         if (!meta.isMaster) return;
+         reasoningLog += event.text;
+         return;
+       }
+       if (event.type === 'handoff') {
+         const key = sessionKey(meta);
+         if (key !== undefined) handoffSessions.add(key);
+         return;
+       }
+       if (event.type === 'final_report') {
+         if (!meta.isMaster || !meta.isFinal) return;
+         const key = sessionKey(meta);
+         if (key !== undefined && handoffSessions.has(key)) return;
+         finalReport = event.report;
+         return;
+       }
+       if (event.type === 'log') {
+         event.entry.headendId = this.id;
+         this.logEntry(event.entry);
+       }
      },
    };
    ```
@@ -387,7 +414,7 @@ Graceful end then destroy after timeout.
 ## Business Logic Coverage (Verified 2025-11-16)
 
 - **Format passthrough**: Query parameter `format=json` merely sets the session payload; no separate `schema` query parameter exists, so JSON validation relies entirely on the agent’s own frontmatter schema (`src/headends/rest-headend.ts:242-314`).
-- **Progress + thinking streams**: Headend wiring forwards `onOutput`, `onThinking`, and `onLog` events into the HTTP response payload (fields `output`, `reasoning`, `finalReport`) so clients get both streamed text and isolated reports (`src/headends/rest-headend.ts:282-358`).
+- **Progress + thinking streams**: Headend wiring forwards `onEvent` output/thinking/log events into the HTTP response payload (fields `output`, `reasoning`, `finalReport`) so clients get both streamed text and isolated reports (`src/headends/rest-headend.ts:282-358`).
 - **Concurrency limiter**: Every request acquires a slot from `ConcurrencyLimiter`; aborted clients release slots immediately so hung HTTP clients cannot starve the process (`src/headends/rest-headend.ts:214-234`).
 - **Extra routes**: `registerRoute()` lets plugins add custom handlers before `start()` (e.g., Slack slash commands); REST headend checks these routes before built-ins, enabling extensions without forking core logic (`src/headends/rest-headend.ts:176-208`).
 - **Unauthenticated surface**: The headend does not inspect `Authorization` headers; deployments must place it behind an API gateway or restrict network access if authentication is required (`src/headends/rest-headend.ts`).

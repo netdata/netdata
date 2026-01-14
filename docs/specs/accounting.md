@@ -155,12 +155,12 @@ const accountingEntry: ToolAccountingEntry = {
 1. Create LLMAccountingEntry
 2. Push to session accounting array
 3. Append to opTree operation
-4. Emit via onAccounting callback
+4. Emit via `onEvent(type='accounting')`
 
 **Per tool execution**:
 1. Create ToolAccountingEntry
 2. Append to opTree operation
-3. Emit via onAccounting callback
+3. Emit via `onEvent(type='accounting')`
 
 ### 2. OpTree Attachment
 **Location**: `src/ai-agent.ts:1819`
@@ -175,22 +175,22 @@ if (llmOpId !== undefined) {
 **Location**: `src/ai-agent.ts:1820`
 
 ```typescript
-this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
+this.emitEvent({ type: 'accounting', entry: accountingEntry });
 ```
 
 ### 4. Session Flush
 **Location**: `src/ai-agent.ts:388-408`
 
 ```typescript
-private async flushAccounting(entries: AccountingEntry[]): Promise<void> {
-  const sink = this.sessionConfig.callbacks?.onAccountingFlush;
+private flushAccounting(entries: AccountingEntry[]): void {
+  // Emits accounting_flush event
   const payload: AccountingFlushPayload = {
     sessionId: this.txnId,
     originId: this.originTxnId ?? this.txnId,
     timestamp: Date.now(),
     entries: entries.map((entry) => ({ ...entry })),
   };
-  await sink(payload);
+  this.emitEvent({ type: 'accounting_flush', payload });
 }
 ```
 
@@ -247,8 +247,8 @@ interface SessionTotals {
 | Setting | Effect |
 |---------|--------|
 | `pricing` | Cost computation table |
-| `onAccounting` | Real-time entry callback |
-| `onAccountingFlush` | Batch flush callback |
+| `onEvent(type='accounting')` | Real-time entry callback |
+| `onEvent(type='accounting_flush')` | Batch flush callback |
 | `persistence.billingFile` | File persistence path |
 
 ## Telemetry
@@ -297,7 +297,7 @@ interface SessionTotals {
 
 - **Cache-aware totals**: LLM entries normalize `totalTokens` by adding cache read/write tokens when providers omit them, ensuring downstream dashboards match actual billing (`src/ai-agent.ts:1777-1797`).
 - **Cost resolution order**: Router metadata (e.g., OpenRouter `actualProvider`/`actualModel`, upstream and downstream costs) always overrides pricing-table estimates; only when metadata lacks cost do we evaluate `config.pricing` entries (`src/ai-agent.ts:1798-1844`).
-- **Ledger persistence**: `flushAccounting` merely invokes `callbacks.onAccountingFlush`; when `persistence.billingFile` is configured, `createPersistenceCallbacks` hooks that callback and appends each batch as JSONL lines on disk (`src/ai-agent.ts:388-408`, `src/persistence.ts:1-75`).
+- **Ledger persistence**: `flushAccounting` emits `onEvent(type='accounting_flush')`; when `persistence.billingFile` is configured, `createPersistenceCallbacks` hooks that event and appends each batch as JSONL lines on disk (`src/ai-agent.ts:388-408`, `src/persistence.ts:1-75`).
 - **Tool character counts**: Tool entries store the serialized parameter/result `.length` (approximate character count) for in/out payloads, so even truncated responses show the number of characters originally returned (`src/tools/tools.ts:330-520`).
 - **Trace propagation**: Entries capture `txnId`, `parentTxnId`, `originTxnId`, and `callPath` so multi-agent billing can be correlated through the session tree (`src/ai-agent.ts:1765-1868`, `src/types.ts:636-680`).
 
@@ -314,12 +314,12 @@ interface SessionTotals {
 - Compare with provider response
 
 ### Flush not called
-- Check onAccountingFlush callback
+- Check onEvent(type='accounting_flush') handling
 - Verify session completion
 - Check error paths
 
 ### Entries not appearing
-- Check onAccounting callback
+- Check onEvent(type='accounting') handling
 - Verify opTree attachment
 - Check accounting array population
 

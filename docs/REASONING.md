@@ -21,7 +21,7 @@ Document how Vercel AI SDK (v5.0.76) handles Anthropic "reasoning" blocks so we 
 - A turn is only marked “reasoning disabled” if reasoning was actually active (Level or budget was set). Otherwise, no warning is logged.
 - Master-only thinking updates: sub-agent thoughts are still recorded in the op-tree but do not emit status logs or headend updates. This prevents mixed progress streams across agents.
 - CLI/REST logs now include `reasoning=unset|disabled|minimal|low|medium|high` for every LLM request/response, making it obvious when reasoning is enabled and whether it was suppressed.
-- When a provider emits `<think>...</think>` inside normal content (streaming or non-streaming), the leading block is routed to `onThinking` and excluded from `onOutput` and XML parsing; leading whitespace before `<think>` is tolerated.
+- When a provider emits `<think>...</think>` inside normal content (streaming or non-streaming), the leading block is routed to `onEvent(type='thinking')` and excluded from `onEvent(type='output')` and XML parsing; leading whitespace before `<think>` is tolerated.
 - **Interleaved replay (OpenAI-compatible)**: per-model `interleaved` configuration injects merged reasoning into `providerOptions.openaiCompatible.<field>` for each assistant message (default field `reasoning_content`), only when that reasoning text does **not** already appear verbatim in the same turn’s assistant message content. No frontmatter/agent-level knob exists for this.
 
 ### Headend Coverage

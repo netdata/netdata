@@ -9,7 +9,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { WebSocketServer } from 'ws';
 
 import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
-import type { AIAgentCallbacks, LogDetailValue, LogEntry } from '../types.js';
+import type { AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, FinalReportPayload, LogDetailValue, LogEntry } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
@@ -26,6 +26,7 @@ type ZodExports = typeof import('zod');
 
 import { ConcurrencyLimiter } from './concurrency.js';
 import { McpWebSocketServerTransport } from './mcp-ws-transport.js';
+import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamOutput } from './shared-event-filter.js';
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -382,11 +383,35 @@ export class McpHeadend implements Headend {
 
         let output = '';
         const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
-        const callbacks: AIAgentCallbacks = {
-          onOutput: (chunk) => { output += chunk; },
-          onLog: (entry) => {
-            entry.headendId = this.id;
-            this.logEntry(entry);
+        const eventState = createHeadendEventState();
+        let finalReportFromEvent: FinalReportPayload | undefined;
+        const callbacks: AIAgentEventCallbacks = {
+          onEvent: (event: AIAgentEvent, meta: AIAgentEventMeta) => {
+            switch (event.type) {
+              case 'output': {
+                if (!shouldStreamOutput(event, meta)) return;
+                output += event.text;
+                return;
+              }
+              case 'handoff': {
+                markHandoffSeen(eventState, meta);
+                return;
+              }
+              case 'final_report': {
+                if (!shouldAcceptFinalReport(eventState, meta)) return;
+                finalReportFromEvent = event.report;
+                return;
+              }
+              case 'log': {
+                const entry = event.entry;
+                entry.headendId = this.id;
+                this.logEntry(entry);
+                return;
+              }
+              default: {
+                return;
+              }
+            }
           },
         };
         try {
@@ -427,7 +452,7 @@ export class McpHeadend implements Headend {
           });
           const result = await AIAgent.run(session);
           let text = output;
-          const finalReport = result.finalReport;
+          const finalReport = finalReportFromEvent ?? result.finalReport;
           if (finalReport?.content !== undefined && typeof finalReport.content === 'string' && finalReport.content.trim().length > 0) {
             text = text.length > 0 ? `${text}\n\n${finalReport.content}` : finalReport.content;
           }

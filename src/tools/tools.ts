@@ -116,10 +116,10 @@ export class ToolsOrchestrator {
   constructor(
     private readonly opts: { toolTimeout?: number; toolResponseMaxBytes?: number; traceTools?: boolean },
     private readonly opTree: SessionTreeBuilder,
-    private readonly onOpTreeSnapshot: (tree: SessionNode) => void,
-    // Unified logger: session-level log() (must never throw)
-    private readonly onLog: (entry: LogEntry, opts?: { opId?: string }) => void,
-    private readonly onAccounting?: (entry: AccountingEntry) => void,
+    private readonly emitOpTree: (tree: SessionNode) => void,
+    // Session-level logger (must never throw)
+    private readonly log: (entry: LogEntry, opts?: { opId?: string }) => void,
+    private readonly recordAccounting?: (entry: AccountingEntry) => void,
     sessionInfo?: { agentId?: string; agentPath?: string; callPath?: string; txnId?: string; headendId?: string; telemetryLabels?: Record<string, string>; agentHash?: string },
     private readonly progress?: SessionProgressReporter,
     private readonly budgetCallbacks?: ToolBudgetCallbacks,
@@ -372,7 +372,7 @@ export class ToolsOrchestrator {
           turns: [],
         };
         this.opTree.attachChildSession(opId, stub);
-        this.onOpTreeSnapshot(this.opTree.getSession());
+        this.emitOpTree(this.opTree.getSession());
       }
     } catch (e) { warn(`unknown tool '${name}' after refresh: ${toErrorMessage(e)}`); }
     const requestMsg = formatToolRequestCompact(effective, parameters);
@@ -400,7 +400,7 @@ export class ToolsOrchestrator {
       details: requestDetails,
     };
     // Single emission point via session logger
-    this.onLog(reqLog, { opId });
+    this.log(reqLog, { opId });
 
     if (instrumentTool) {
       this.progress?.toolStarted({
@@ -493,7 +493,7 @@ export class ToolsOrchestrator {
         fatal: false,
         message: `REQUEST ${effective}\n${fullParams}`,
       };
-      this.onLog(traceReq, { opId });
+      this.log(traceReq, { opId });
     }
     const start = Date.now();
     const serializedParameters = (() => {
@@ -539,7 +539,7 @@ export class ToolsOrchestrator {
         message: `Tool '${composedToolName}' skipped execution: token budget exceeded by previous tool.`,
         details: dropDetails,
       };
-      this.onLog(dropLog, { opId });
+      this.log(dropLog, { opId });
       if (instrumentTool) {
         const failureMetrics: ProgressMetrics = { latencyMs: latency, charactersIn, charactersOut: 0 };
         this.progress?.toolFinished({
@@ -651,7 +651,7 @@ export class ToolsOrchestrator {
           message: `cache hit: ${composedToolName}`,
           details: cacheDetails,
         };
-        this.onLog(cacheLog, { opId });
+        this.log(cacheLog, { opId });
       }
     }
 
@@ -709,7 +709,7 @@ export class ToolsOrchestrator {
             try {
               if (opId !== undefined) {
                 this.opTree.attachChildSession(opId, tree);
-                this.onOpTreeSnapshot(this.opTree.getSession());
+                this.emitOpTree(this.opTree.getSession());
               }
             } catch (e) { warn(`onChildOpTree snapshot failed: ${toErrorMessage(e)}`); }
           };
@@ -775,7 +775,7 @@ export class ToolsOrchestrator {
           fatal: false,
           message: `ERROR ${effective}\n${msg}`,
         };
-      this.onLog(traceErr, { opId });
+      this.log(traceErr, { opId });
       }
       const errMessage = batchToolSummary !== undefined
         ? `error ${composedToolName}: ${msg} (calls: ${batchToolSummary})`
@@ -793,7 +793,7 @@ export class ToolsOrchestrator {
         message: errMessage,
         details: failureDetails,
       };
-      this.onLog(errLog, { opId });
+      this.log(errLog, { opId });
       if (instrumentTool) {
         const failureMetrics: ProgressMetrics = {
           latencyMs: latency,
@@ -871,7 +871,7 @@ export class ToolsOrchestrator {
         fatal: false,
         message: `RESPONSE ${effective}\n${rawPayload}`,
       };
-      this.onLog(traceRes, { opId });
+      this.log(traceRes, { opId });
     }
     const sizeBytes = Buffer.byteLength(raw, 'utf8');
     const limit = this.opts.toolResponseMaxBytes;
@@ -929,7 +929,7 @@ export class ToolsOrchestrator {
           message: warnMessage,
           details: warnDetails,
         };
-        this.onLog(warnLog, { opId });
+        this.log(warnLog, { opId });
       } else {
         result = '(tool failed: response exceeded max size)';
         const finalBytes = Buffer.byteLength(result, 'utf8');
@@ -968,7 +968,7 @@ export class ToolsOrchestrator {
           message: warnMessage,
           details: warnDetails,
         };
-        this.onLog(warnLog, { opId });
+        this.log(warnLog, { opId });
       }
     }
 
@@ -1027,7 +1027,7 @@ export class ToolsOrchestrator {
             message: warnMessage,
             details: warnDetails,
           };
-          this.onLog(warnLog, { opId });
+          this.log(warnLog, { opId });
           // Retry reservation with truncated output
           reservation = await budgetCallbacks.reserveToolOutput(result);
         }
@@ -1070,7 +1070,7 @@ export class ToolsOrchestrator {
         message: `Tool '${composedToolName}' output dropped after execution: token budget exceeded.`,
         details: dropDetails,
       };
-      this.onLog(dropLog, { opId });
+      this.log(dropLog, { opId });
       if (instrumentTool) {
         const failureMetrics: ProgressMetrics = {
           latencyMs: latency,
@@ -1178,7 +1178,7 @@ export class ToolsOrchestrator {
       message: `ok preview: ${resPreview}`,
       details: responseDetails,
     };
-    this.onLog(resLog, { opId });
+    this.log(resLog, { opId });
     if (instrumentTool) {
       const successMetrics: ProgressMetrics = {
         latencyMs: latency,
@@ -1210,12 +1210,12 @@ export class ToolsOrchestrator {
       charactersIn,
       charactersOut: result.length,
     };
-    try { this.onAccounting?.(accOk); } catch (e) { warn(`tools accounting dispatch failed: ${toErrorMessage(e)}`); }
+    try { this.recordAccounting?.(accOk); } catch (e) { warn(`tools accounting dispatch failed: ${toErrorMessage(e)}`); }
     try { if (opId !== undefined) this.opTree.appendAccounting(opId, accOk); } catch (e) { warn(`tools accounting append failed: ${toErrorMessage(e)}`); }
     // accounting will be attached under op
     // Optional: child accounting (from sub-agents)
     // Do NOT forward child accounting to the parent execution tree here.
-    // Sub-agents already emit their own onAccounting callbacks (wired to the same SessionManager),
+    // Sub-agents already emit their own accounting events (wired to the same SessionManager),
     // and their full accounting is attached to the opTree via attachChildSession above.
     // Re-injecting entries here would double-count tokens/cost in Slack progress at finish.
     // end via opTree only
@@ -1232,8 +1232,8 @@ export class ToolsOrchestrator {
         } catch (e) { warn(`tools child attach failed: ${toErrorMessage(e)}`); }
         this.opTree.endOp(opId, 'ok', { latency, size: result.length });
         try {
-          this.onOpTreeSnapshot(this.opTree.getSession());
-        } catch (e) { warn(`tools onOpTreeSnapshot failed: ${toErrorMessage(e)}`); }
+          this.emitOpTree(this.opTree.getSession());
+        } catch (e) { warn(`tools opTree emit failed: ${toErrorMessage(e)}`); }
       }
     } catch (e) { warn(`tools finalize failed: ${toErrorMessage(e)}`); }
     const successMetrics = {
@@ -1370,7 +1370,7 @@ export class ToolsOrchestrator {
         queue_capacity: result.capacity,
       },
     };
-    this.onLog(entry);
+    this.log(entry);
   }
 
   private abortAllQueueControllers(): void {

@@ -3,7 +3,7 @@ import http from 'node:http';
 import { URL } from 'node:url';
 
 import type { AgentRegistry } from '../agent-registry.js';
-import type { AIAgentCallbacks, LogEntry } from '../types.js';
+import type { AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, FinalReportPayload, LogEntry } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 import type { Socket } from 'node:net';
 
@@ -12,6 +12,7 @@ import { getTelemetryLabels } from '../telemetry/index.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, writeJson } from './http-utils.js';
+import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamMasterContent, shouldStreamOutput } from './shared-event-filter.js';
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -294,16 +295,41 @@ export class RestHeadend implements Headend {
 
     let output = '';
     let reasoningLog = '';
-    const callbacks: AIAgentCallbacks = {
-      onOutput: (chunk) => {
-        output += chunk;
-      },
-      onThinking: (chunk) => {
-        reasoningLog += chunk;
-      },
-      onLog: (entry) => {
-        entry.headendId = this.id;
-        this.logEntry(entry);
+    const eventState = createHeadendEventState();
+    let finalReportFromEvent: FinalReportPayload | undefined;
+
+    const callbacks: AIAgentEventCallbacks = {
+      onEvent: (event: AIAgentEvent, meta: AIAgentEventMeta) => {
+        switch (event.type) {
+          case 'output': {
+            if (!shouldStreamOutput(event, meta)) return;
+            output += event.text;
+            return;
+          }
+          case 'thinking': {
+            if (!shouldStreamMasterContent(meta)) return;
+            reasoningLog += event.text;
+            return;
+          }
+          case 'handoff': {
+            markHandoffSeen(eventState, meta);
+            return;
+          }
+          case 'final_report': {
+            if (!shouldAcceptFinalReport(eventState, meta)) return;
+            finalReportFromEvent = event.report;
+            return;
+          }
+          case 'log': {
+            const entry = event.entry;
+            entry.headendId = this.id;
+            this.logEntry(entry);
+            return;
+          }
+          default: {
+            return;
+          }
+        }
       },
     };
 
@@ -320,11 +346,12 @@ export class RestHeadend implements Headend {
       });
       const result = await AIAgent.run(session);
       if (abortController.signal.aborted || res.writableEnded || res.writableFinished) return;
+      const finalReport = finalReportFromEvent ?? result.finalReport;
       if (result.success) {
         const payload: AgentSuccessResponse = {
           success: true,
           output,
-          finalReport: result.finalReport,
+          finalReport,
           reasoning: reasoningLog.length > 0 ? reasoningLog : undefined,
         };
         writeJson(res, 200, payload);
@@ -333,7 +360,7 @@ export class RestHeadend implements Headend {
         const payload: AgentErrorResponse = {
           success: false,
           output,
-          finalReport: result.finalReport,
+          finalReport,
           error: result.error ?? 'session_failed',
           reasoning: reasoningLog.length > 0 ? reasoningLog : undefined,
         };

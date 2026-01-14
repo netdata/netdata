@@ -10,7 +10,7 @@ import type { ToolCacheResolver } from './cache/tool-cache-resolver.js';
 import type { OutputFormatId } from './formats.js';
 import type { AdvisorExecutionResult } from './orchestration/advisors.js';
 import type { SessionNode } from './session-tree.js';
-import type { AIAgentSessionConfig, AIAgentResult, AccountingEntry, AccountingFlushPayload, Configuration, ConversationMessage, LogDetailValue, LogEntry, LLMAccountingEntry, MCPTool, OrchestrationConfig, OrchestrationRuntimeAgent, OrchestrationRuntimeConfig, ProgressMetrics, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, RestToolConfig, SessionSnapshotPayload, TaskStatusData, ToolAccountingEntry, ToolChoiceMode, TurnRequestContextMetrics, LogPayload } from './types.js';
+import type { AIAgentEvent, AIAgentEventMeta, AIAgentSessionConfig, AIAgentResult, AccountingEntry, AccountingFlushPayload, Configuration, ConversationMessage, LogDetailValue, LogEntry, LLMAccountingEntry, MCPTool, OrchestrationConfig, OrchestrationRuntimeAgent, OrchestrationRuntimeConfig, ProgressMetrics, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, RestToolConfig, SessionSnapshotPayload, TaskStatusData, ToolAccountingEntry, ToolChoiceMode, TurnRequestContextMetrics, LogPayload } from './types.js';
 
 import { getResponseCache } from './cache/cache-factory.js';
 import { createToolCacheResolver } from './cache/tool-cache-resolver.js';
@@ -155,6 +155,11 @@ export class AIAgentSession {
   private readonly callPath?: string;
   private readonly headendId?: string;
   private readonly telemetryLabels: Record<string, string>;
+  private eventSequence = 0;
+  private readonly isMaster: boolean;
+  private readonly pendingHandoffCount: number;
+  private readonly handoffConfigured: boolean;
+  private readonly isFinalEligible: boolean;
   // opTree-only tracking (canonical)
   private readonly toolsOrchestrator?: ToolsOrchestrator;
   private readonly opTree: SessionTreeBuilder;
@@ -412,11 +417,7 @@ export class AIAgentSession {
     return undefined;
   }
   
-  private async persistSessionSnapshot(reason?: string): Promise<void> {
-    const sink = this.sessionConfig.callbacks?.onSessionSnapshot;
-    if (sink === undefined) {
-      return;
-    }
+  private persistSessionSnapshot(reason?: string): void {
     try {
       const payload: SessionSnapshotPayload = {
         reason,
@@ -425,19 +426,18 @@ export class AIAgentSession {
         timestamp: Date.now(),
         snapshot: { version: 1, opTree: this.opTree.getSession() },
       };
-      await sink(payload);
+      const failure = this.emitEvent({ type: 'snapshot', payload });
+      if (failure !== undefined) {
+        throw new Error(failure);
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       warn(`persistSessionSnapshot(${reason ?? 'unspecified'}) failed: ${message}`);
     }
   }
 
-  private async flushAccounting(entries: AccountingEntry[]): Promise<void> {
+  private flushAccounting(entries: AccountingEntry[]): void {
     if (entries.length === 0) {
-      return;
-    }
-    const sink = this.sessionConfig.callbacks?.onAccountingFlush;
-    if (sink === undefined) {
       return;
     }
     try {
@@ -447,7 +447,10 @@ export class AIAgentSession {
         timestamp: Date.now(),
         entries: entries.map((entry) => ({ ...entry })),
       };
-      await sink(payload);
+      const failure = this.emitEvent({ type: 'accounting_flush', payload });
+      if (failure !== undefined) {
+        throw new Error(failure);
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       warn(`flushAccounting failed: ${message}`);
@@ -493,6 +496,12 @@ export class AIAgentSession {
       telemetryLabels.headend = this.headendId;
     }
     this.telemetryLabels = telemetryLabels;
+    this.isMaster = sessionConfig.isMaster ?? true;
+    const pending = sessionConfig.pendingHandoffCount;
+    this.pendingHandoffCount = typeof pending === 'number' && Number.isFinite(pending) && pending > 0 ? Math.trunc(pending) : 0;
+    this.handoffConfigured = sessionConfig.orchestrationRuntime?.handoff !== undefined
+      || sessionConfig.orchestration?.handoff !== undefined;
+    this.isFinalEligible = this.pendingHandoffCount === 0 && this.isMaster;
     // Build context guard with target configurations
     const sessionTargets = Array.isArray(this.sessionConfig.targets) ? this.sessionConfig.targets : [];
     const defaultBuffer = this.config.defaults?.contextWindowBufferTokens ?? ContextGuard.DEFAULT_CONTEXT_BUFFER_TOKENS;
@@ -570,10 +579,9 @@ export class AIAgentSession {
     this.opTree = new SessionTreeBuilder({ traceId: this.txnId, agentId: sessionConfig.agentId, callPath: this.callPath, sessionTitle: sessionConfig.initialTitle ?? '' });
 
     this.progressReporter = new SessionProgressReporter((event) => {
-      try {
-        this.sessionConfig.callbacks?.onProgress?.(event);
-      } catch (e) {
-        warn(`onProgress callback failed: ${e instanceof Error ? e.message : String(e)}`);
+      this.emitEvent({ type: 'progress', event });
+      if (event.type === 'agent_update') {
+        this.emitEvent({ type: 'status', event });
       }
     });
     const toolBudgetCallbacks = this.contextGuard.createToolBudgetCallbacks();
@@ -586,7 +594,7 @@ export class AIAgentSession {
       const sysInitOp = this.opTree.beginOp(0, 'system', { label: 'init' });
       this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:init', fatal: false, message: `session initialized (txnId: ${this.txnId})` }, { opId: sysInitOp });
       this.opTree.endOp(sysInitOp, 'ok');
-      this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
+      this.emitEvent({ type: 'op_tree', tree: this.opTree.getSession() });
     } catch (e) { warn(`system init logging failed: ${e instanceof Error ? e.message : String(e)}`); }
 
     // Tools orchestrator (MCP + REST + Internal + Subagents)
@@ -599,9 +607,9 @@ export class AIAgentSession {
       traceTools: sessionConfig.traceMCP === true,
     },
     this.opTree,
-    (tree: SessionNode) => { try { this.sessionConfig.callbacks?.onOpTree?.(tree); } catch (e) { warn(`onOpTree callback failed: ${e instanceof Error ? e.message : String(e)}`); } },
+    (tree: SessionNode) => { this.emitEvent({ type: 'op_tree', tree }); },
     (entry, opts) => { this.log(entry, opts); },
-    sessionConfig.callbacks?.onAccounting,
+    (entry) => { this.recordAccounting(entry); },
     {
       agentId: sessionConfig.agentId,
       agentPath: this.agentPath,
@@ -625,7 +633,7 @@ export class AIAgentSession {
       trace: sessionConfig.traceMCP,
       verbose: sessionConfig.verbose,
       requestTimeoutMs: providerRequestTimeout,
-      onLog: (e) => { this.log(e); },
+      emitEvent: (event) => { this.recordExternalEvent(event); },
       initConcurrency: sessionConfig.mcpInitConcurrency
     }));
     // Build selected REST tools by frontmatter selection
@@ -685,11 +693,7 @@ export class AIAgentSession {
           const t = text.trim();
           if (t.length > 0) {
             this.opTree.setLatestStatus(t);
-            try {
-              this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
-            } catch (e) {
-              warn(`onOpTree callback failed: ${e instanceof Error ? e.message : String(e)}`);
-            }
+            this.emitEvent({ type: 'op_tree', tree: this.opTree.getSession() });
             const ts = Date.now();
             const entry: LogEntry = {
               timestamp: ts,
@@ -810,7 +814,7 @@ export class AIAgentSession {
         }, { ...opts, parentTurnPath });
         // Keep child conversation list (may be reported in results for compatibility)
         this.childConversations.push({ agentId: exec.child.toolName, toolName: exec.child.toolName, promptPath: exec.child.promptPath, conversation: exec.conversation, trace: exec.trace });
-        await this.persistSessionSnapshot('subagent_finish');
+        this.persistSessionSnapshot('subagent_finish');
         return { result: exec.result, childAccounting: exec.accounting, childOpTree: exec.opTree };
       };
       // Register AgentProvider synchronously so sub-agent tools are known before first turn
@@ -842,10 +846,7 @@ export class AIAgentSession {
       this.finalReportManager,
       this.xmlTransport,
       (entry) => { this.log(entry); },
-      (entry) => {
-        this.accounting.push(entry);
-        try { this.sessionConfig.callbacks?.onAccounting?.(entry); } catch (e) { warn(`onAccounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
-      },
+      (entry) => { this.recordAccounting(entry); },
       (result, context) => this.applyToolResponseCap(result, this.sessionConfig.toolResponseMaxBytes, this.logs, context),
       sessionContext,
       this.subAgents !== undefined ? {
@@ -906,12 +907,12 @@ export class AIAgentSession {
       },
     };
 
-    // External log relay placeholder; bound after session instantiation to tree
-    let externalLogRelay: (entry: LogEntry) => void = (e: LogEntry) => { void e; };
-    // Wrap onLog to inject trace fields and route only through the execution tree (which fans out to callbacks)
-    const wrapLog = (_fn?: (entry: LogEntry) => void) => (entry: LogEntry): void => {
+    // External event relay placeholder; bound after session instantiation to tree
+    let externalEventRelay: (event: AIAgentEvent) => void = (event: AIAgentEvent) => { void event; };
+    const enrichExternalEvent = (event: AIAgentEvent): AIAgentEvent => {
+      if (event.type !== 'log') return event;
       const enriched: LogEntry = {
-        ...entry,
+        ...event.entry,
         agentId: enrichedSessionConfig.agentId,
         agentPath: enrichedSessionConfig.agentPath,
         callPath: enrichedSessionConfig.trace?.callPath ?? enrichedSessionConfig.agentPath,
@@ -919,14 +920,16 @@ export class AIAgentSession {
         parentTxnId: enrichedSessionConfig.trace?.parentId,
         originTxnId: enrichedSessionConfig.trace?.originId,
       };
-      try { externalLogRelay(enriched); } catch (e) { warn(`external log relay failed: ${e instanceof Error ? e.message : String(e)}`); }
+      return { type: 'log', entry: enriched };
     };
 
     // Create session-owned LLM client
     const llmClient = new LLMClient(enrichedSessionConfig.config.providers, {
       traceLLM: enrichedSessionConfig.traceLLM,
       traceSDK: enrichedSessionConfig.traceSdk,
-      onLog: wrapLog(enrichedSessionConfig.callbacks?.onLog),
+      emitEvent: (event) => {
+        try { externalEventRelay(enrichExternalEvent(event)); } catch (e) { warn(`external event relay failed: ${e instanceof Error ? e.message : String(e)}`); }
+      },
       pricing: enrichedSessionConfig.config.pricing,
     });
 
@@ -941,8 +944,8 @@ export class AIAgentSession {
       llmClient,
       enrichedSessionConfig
     );
-    // Bind external log relay to append into opTree and relay to callbacks
-    externalLogRelay = (e: LogEntry) => { try { sess.recordExternalLog(e); } catch (err) { warn(`recordExternalLog failed: ${err instanceof Error ? err.message : String(err)}`); } };
+    // Bind external event relay to append into opTree and relay to callbacks
+    externalEventRelay = (event) => { try { sess.recordExternalEvent(event); } catch (err) { warn(`recordExternalEvent failed: ${err instanceof Error ? err.message : String(err)}`); } };
     return sess;
   }
 
@@ -972,6 +975,45 @@ export class AIAgentSession {
       originTxnId: this.originTxnId
     };
     this.log(logEntry);
+  }
+
+  private nextEventSequence(): number {
+    this.eventSequence += 1;
+    return this.eventSequence;
+  }
+
+  private buildEventMeta(overrides?: Partial<AIAgentEventMeta>): AIAgentEventMeta {
+    const baseSequence = this.nextEventSequence();
+    const base: AIAgentEventMeta = {
+      agentId: this.sessionConfig.agentId,
+      callPath: this.callPath,
+      sessionId: this.txnId,
+      parentId: this.parentTxnId,
+      originId: this.originTxnId,
+      headendId: this.headendId,
+      renderTarget: this.sessionConfig.renderTarget,
+      isMaster: this.isMaster,
+      isFinal: this.isFinalEligible,
+      pendingHandoffCount: this.pendingHandoffCount,
+      handoffConfigured: this.handoffConfigured,
+      sequence: baseSequence,
+    };
+    if (overrides === undefined) return base;
+    return { ...base, ...overrides, sequence: baseSequence };
+  }
+
+  private emitEvent(event: AIAgentEvent, metaOverrides?: Partial<AIAgentEventMeta>): string | undefined {
+    const sink = this.sessionConfig.callbacks?.onEvent;
+    if (sink === undefined) return undefined;
+    const meta = this.buildEventMeta(metaOverrides);
+    try {
+      sink(event, meta);
+      return undefined;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      warn(`onEvent callback failed: ${message}`);
+      return message;
+    }
   }
 
   // Centralized helper to ensure all logs carry trace fields
@@ -1028,7 +1070,7 @@ export class AIAgentSession {
       if (typeof explicitOp === 'string' && explicitOp.length > 0) {
         this.opTree.appendLog(explicitOp, enriched);
         appendedOpId = explicitOp;
-        this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
+        this.emitEvent({ type: 'op_tree', tree: this.opTree.getSession() });
       } else if (enriched.type === 'llm') {
         const active = this.currentLlmOpId;
         const targetOp = (typeof active === 'string' && active.length > 0)
@@ -1037,7 +1079,7 @@ export class AIAgentSession {
         if (typeof targetOp === 'string' && targetOp.length > 0) {
           this.opTree.appendLog(targetOp, enriched);
           appendedOpId = targetOp;
-          this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
+          this.emitEvent({ type: 'op_tree', tree: this.opTree.getSession() });
         }
       }
     } catch (e) { warn(`addLog opTree anchor failed: ${e instanceof Error ? e.message : String(e)}`); }
@@ -1045,12 +1087,12 @@ export class AIAgentSession {
       try {
         const updated = this.applyLogPayloadToOp(appendedOpId, enriched);
         if (updated) {
-          this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
+          this.emitEvent({ type: 'op_tree', tree: this.opTree.getSession() });
         }
       } catch (e) { warn(`opTree payload update failed: ${e instanceof Error ? e.message : String(e)}`); }
     }
     // Single place try/catch for external sinks
-    try { this.sessionConfig.callbacks?.onLog?.(enriched); } catch (e) { warn(`onLog callback failed: ${e instanceof Error ? e.message : String(e)}`); }
+    this.emitEvent({ type: 'log', entry: enriched });
   }
 
   private captureStackTrace(skip = 0): string | undefined {
@@ -1062,8 +1104,13 @@ export class AIAgentSession {
     return pruned;
   }
 
-  // Relay for logs originating outside AIAgentSession (LLM/MCP internals)
-  recordExternalLog(entry: LogEntry): void {
+  // Relay for events originating outside AIAgentSession (LLM/MCP internals)
+  recordExternalEvent(event: AIAgentEvent): void {
+    if (event.type !== 'log') {
+      this.emitEvent(event);
+      return;
+    }
+    const entry = event.entry;
     // Delegate to unified logger with the active LLM opId when present
     let opId: string | undefined;
     if (entry.type === 'llm') {
@@ -1071,6 +1118,11 @@ export class AIAgentSession {
       if (typeof cid === 'string' && cid.length > 0) opId = cid;
     }
     this.log(entry, (typeof opId === 'string' && opId.length > 0) ? { opId } : undefined);
+  }
+
+  private recordAccounting(entry: AccountingEntry): void {
+    this.accounting.push(entry);
+    this.emitEvent({ type: 'accounting', entry });
   }
 
   // Optional: expose a snapshot for progress UIs or web monitoring
@@ -1363,8 +1415,8 @@ export class AIAgentSession {
           };
           this.emitAgentCompletion(true, undefined);
           try {
-            await this.persistSessionSnapshot('final');
-            await this.flushAccounting(resultShape.accounting);
+            this.persistSessionSnapshot('final');
+            this.flushAccounting(resultShape.accounting);
           } catch (e) {
             warn(`final persistence failed: ${e instanceof Error ? e.message : String(e)}`);
           }
@@ -1607,11 +1659,8 @@ export class AIAgentSession {
 
       const turnRunnerCallbacks: TurnRunnerCallbacks = {
         log: (entry, opts) => { this.log(entry, opts); },
-        onAccounting: (entry) => { try { this.sessionConfig.callbacks?.onAccounting?.(entry); } catch (e) { warn(`onAccounting callback failed: ${e instanceof Error ? e.message : String(e)}`); } },
-        onOpTree: (tree) => { try { this.sessionConfig.callbacks?.onOpTree?.(tree); } catch (e) { warn(`onOpTree callback failed: ${e instanceof Error ? e.message : String(e)}`); } },
-        onTurnStarted: (turn) => { try { this.sessionConfig.callbacks?.onTurnStarted?.(turn); } catch (e) { warn(`onTurnStarted callback failed: ${e instanceof Error ? e.message : String(e)}`); } },
-        onOutput: (chunk) => { try { this.sessionConfig.callbacks?.onOutput?.(chunk); } catch (e) { warn(`onOutput callback failed: ${e instanceof Error ? e.message : String(e)}`); } },
-        onThinking: (chunk) => { try { this.sessionConfig.callbacks?.onThinking?.(chunk); } catch (e) { warn(`onThinking callback failed: ${e instanceof Error ? e.message : String(e)}`); } },
+        recordAccounting: (entry) => { this.recordAccounting(entry); },
+        emitEvent: (event, meta) => { this.emitEvent(event, meta); },
         setCurrentTurn: (turn) => { this._currentTurn = turn; },
         setMasterLlmStartLogged: () => { this.masterLlmStartLogged = true; },
         isMasterLlmStartLogged: () => this.masterLlmStartLogged,
@@ -1699,8 +1748,8 @@ export class AIAgentSession {
       this.emitAgentCompletion(result.success, result.error);
       // Phase B/C: persist final session and accounting ledger
       try {
-        await this.persistSessionSnapshot('final');
-        await this.flushAccounting(resultShape.accounting);
+        this.persistSessionSnapshot('final');
+        this.flushAccounting(resultShape.accounting);
       } catch (e) {
         warn(`final persistence failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -2343,6 +2392,13 @@ export class AIAgent {
 
     const originalUserPrompt = session.getUserPrompt();
     const parentSession = session.getSessionConfigSnapshot();
+    const parentIsMaster = typeof parentSession.isMaster === 'boolean' ? parentSession.isMaster : true;
+    const parentPending = (() => {
+      const raw = parentSession.pendingHandoffCount;
+      if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) return 0;
+      return Math.trunc(raw);
+    })();
+    const decrementedPending = parentPending > 0 ? parentPending - 1 : 0;
     const orchestrationLogs: LogEntry[] = [];
     const emitOrchestrationLog = (
       message: string,
@@ -2361,7 +2417,7 @@ export class AIAgent {
       };
       orchestrationLogs.push(entry);
       try {
-        parentSession.callbacks?.onLog?.(entry);
+        session.recordExternalEvent({ type: 'log', entry });
       } catch (error) {
         warn(
           `orchestration log callback failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -2427,6 +2483,8 @@ export class AIAgent {
           systemTemplate: destination.systemTemplate,
           userPrompt: routerPrompt,
           parentSession,
+          isMaster: parentIsMaster,
+          pendingHandoffCount: parentPending,
         });
         current = mergeResultWithChildFinal(current, routed, destination);
         currentAgentLabel = routed.finalAgentId ?? destination.agentId;
@@ -2447,6 +2505,8 @@ export class AIAgent {
           originalUserPrompt,
           parentAgentLabel: currentAgentLabel,
           parentSession,
+          isMaster: parentIsMaster,
+          pendingHandoffCount: decrementedPending,
         });
         current = mergeResultWithChildFinal(current, handed, handoffTarget);
         currentAgentLabel = handed.finalAgentId ?? handoffTarget.agentId;

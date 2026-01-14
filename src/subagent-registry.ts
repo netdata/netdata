@@ -5,7 +5,7 @@ import Ajv from 'ajv';
 import type { LoadedAgent } from './agent-loader.js';
 import type { SessionNode } from './session-tree.js';
 import type {
-  AIAgentCallbacks,
+  AIAgentEventCallbacks,
   AIAgentResult,
   AIAgentSessionConfig,
   ConversationMessage,
@@ -162,7 +162,7 @@ export class SubAgentRegistry {
   async execute(
     exposedToolName: string,
     parameters: Record<string, unknown>,
-    parentSession: Pick<AIAgentSessionConfig, 'config' | 'callbacks' | 'stream' | 'traceLLM' | 'traceMCP' | 'traceSdk' | 'verbose' | 'temperature' | 'topP' | 'topK' | 'llmTimeout' | 'toolTimeout' | 'maxRetries' | 'maxTurns' | 'toolResponseMaxBytes' | 'targets'> & {
+    parentSession: Pick<AIAgentSessionConfig, 'config' | 'callbacks' | 'stream' | 'traceLLM' | 'traceMCP' | 'traceSdk' | 'verbose' | 'temperature' | 'topP' | 'topK' | 'llmTimeout' | 'toolTimeout' | 'maxRetries' | 'maxTurns' | 'toolResponseMaxBytes' | 'targets' | 'isMaster' | 'pendingHandoffCount'> & {
       // extra trace/metadata for child
       trace?: { originId?: string; parentId?: string; callPath?: string; agentPath?: string; turnPath?: string };
       // control signals to propagate
@@ -233,32 +233,30 @@ export class SubAgentRegistry {
       const loaded = info.loaded;
       // Build callbacks wrapper so parent observers still receive child events
       const orig = parentSession.callbacks;
-      const cb: AIAgentCallbacks | undefined = orig === undefined ? undefined : {
-        onLog: (e) => {
-          const cloned = { ...e };
-          // Prefix opTree-provided path labels with parent op path so logs are hierarchically greppable
-          try {
-            const parentPath = (opts !== undefined && typeof opts.parentOpPath === 'string' && opts.parentOpPath.length > 0) ? opts.parentOpPath : undefined;
-            const existingPath = (cloned as { path?: string }).path;
-            if (typeof existingPath === 'string' && existingPath.length > 0) {
-              const prefix = typeof parentPath === 'string' && parentPath.length > 0 ? parentPath : undefined;
-              if (typeof prefix === 'string' && prefix.length > 0) (cloned as { path?: string }).path = `${prefix}.${existingPath}`;
-            } else if (typeof parentPath === 'string' && parentPath.length > 0) {
-              (cloned as { path?: string }).path = parentPath;
-            }
-          } catch { /* ignore */ }
-          orig.onLog?.(cloned);
+      const cb: AIAgentEventCallbacks | undefined = orig === undefined ? undefined : {
+        onEvent: (event, meta) => {
+          if (event.type === 'log') {
+            const cloned = { ...event.entry };
+            // Prefix opTree-provided path labels with parent op path so logs are hierarchically greppable
+            try {
+              const parentPath = (opts !== undefined && typeof opts.parentOpPath === 'string' && opts.parentOpPath.length > 0) ? opts.parentOpPath : undefined;
+              const existingPath = (cloned as { path?: string }).path;
+              if (typeof existingPath === 'string' && existingPath.length > 0) {
+                const prefix = typeof parentPath === 'string' && parentPath.length > 0 ? parentPath : undefined;
+                if (typeof prefix === 'string' && prefix.length > 0) (cloned as { path?: string }).path = `${prefix}.${existingPath}`;
+              } else if (typeof parentPath === 'string' && parentPath.length > 0) {
+                (cloned as { path?: string }).path = parentPath;
+              }
+            } catch { /* ignore */ }
+            orig.onEvent?.({ type: 'log', entry: cloned }, meta);
+          } else {
+            orig.onEvent?.(event, meta);
+          }
+          if (event.type === 'op_tree') {
+            // Forward to parent session manager and to orchestrator live callback
+            try { parentSession.onChildOpTree?.(event.tree); } catch (e) { try { process.stderr.write(`[warn] parent onChildOpTree callback failed: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} }
+          }
         },
-        onOutput: (t) => { orig.onOutput?.(t, { agentId: childAgentPath, callPath: childTrace.callPath, sessionId: childTrace.selfId, parentId: childTrace.parentId, originId: childTrace.originId }); },
-        onThinking: (t) => { orig.onThinking?.(t, { agentId: childAgentPath, callPath: childTrace.callPath, sessionId: childTrace.selfId, parentId: childTrace.parentId, originId: childTrace.originId }); },
-        onTurnStarted: (_turn) => { /* Sub-agent turns should not affect parent */ },
-        onAccounting: (a) => { orig.onAccounting?.(a); },
-        onProgress: (event) => { orig.onProgress?.(event); },
-        onOpTree: (tree) => {
-          // Forward to parent session manager and to orchestrator live callback
-          try { orig.onOpTree?.(tree); } catch (e) { try { process.stderr.write(`[warn] child onOpTree callback failed: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} }
-          try { parentSession.onChildOpTree?.(tree as SessionNode); } catch (e) { try { process.stderr.write(`[warn] parent onChildOpTree callback failed: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} }
-        }
       };
 
       const history: ConversationMessage[] | undefined = undefined;
@@ -304,6 +302,8 @@ export class SubAgentRegistry {
         initialTitle: reason,
         agentPath: childAgentPath,
         turnPathPrefix: inheritedTurnPath,
+        isMaster: false,
+        pendingHandoffCount: parentSession.pendingHandoffCount ?? 0,
         // propagate control signals from parent session
         abortSignal: parentSession.abortSignal,
         stopRef: parentSession.stopRef,

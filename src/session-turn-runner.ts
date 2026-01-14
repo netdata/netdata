@@ -14,10 +14,10 @@ import crypto from 'node:crypto';
 import type { OutputFormatId } from './formats.js';
 import type { LLMClient } from './llm-client.js';
 import type { SessionProgressReporter } from './session-progress-reporter.js';
-import type { SessionNode, SessionTreeBuilder } from './session-tree.js';
+import type { SessionTreeBuilder } from './session-tree.js';
 import type { SubAgentRegistry } from './subagent-registry.js';
 import type { ToolsOrchestrator } from './tools/tools.js';
-import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, CallbackMeta, Configuration, ConversationMessage, LogDetailValue, LogEntry, MCPTool, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, RouterSelection, ToolCall, TurnResult, TurnRetryDirective, TurnStatus } from './types.js';
+import type { AIAgentEvent, AIAgentEventMeta, AIAgentResult, AIAgentSessionConfig, AccountingEntry, Configuration, ConversationMessage, EventSource, FinalReportPayload, LogDetailValue, LogEntry, MCPTool, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, RouterSelection, ToolCall, TurnResult, TurnRetryDirective, TurnStatus } from './types.js';
 
 import { ContextGuard, type ContextGuardBlockedEntry, type ContextGuardEvaluation } from './context-guard.js';
 import { FINAL_REPORT_FORMAT_VALUES, type FinalReportManager, type FinalReportSource, type PendingFinalReportPayload } from './final-report-manager.js';
@@ -95,11 +95,8 @@ export interface TurnRunnerContext {
  */
 export interface TurnRunnerCallbacks {
   log: (entry: LogEntry, opts?: { opId?: string }) => void;
-  onAccounting: (entry: AccountingEntry) => void;
-  onOpTree: (tree: SessionNode) => void;
-  onTurnStarted?: (turn: number) => void;
-  onOutput?: (chunk: string, meta?: CallbackMeta) => void;
-  onThinking?: (chunk: string, meta?: CallbackMeta) => void;
+  recordAccounting: (entry: AccountingEntry) => void;
+  emitEvent: (event: AIAgentEvent, meta?: Partial<AIAgentEventMeta>) => void;
   setCurrentTurn: (turn: number) => void;
   setMasterLlmStartLogged: () => void;
   isMasterLlmStartLogged: () => boolean;
@@ -320,12 +317,7 @@ export class TurnRunner {
             this.state.currentTurn = currentTurn;
             this.callbacks.setCurrentTurn(currentTurn);
             this.logTurnStart(currentTurn);
-            try {
-                this.callbacks.onTurnStarted?.(currentTurn);
-            }
-            catch (e) {
-                warn(`onTurnStarted callback failed: ${e instanceof Error ? e.message : String(e)}`);
-            }
+                this.callbacks.emitEvent({ type: 'turn_started', turn: currentTurn });
             try {
                 const turnAttrs = {
                     prompts: {
@@ -344,10 +336,10 @@ export class TurnRunner {
                     }
                 };
                 this.ctx.opTree.beginTurn(currentTurn, turnAttrs);
-                this.callbacks.onOpTree(this.ctx.opTree.getSession());
+                this.callbacks.emitEvent({ type: 'op_tree', tree: this.ctx.opTree.getSession() });
             }
             catch (e) {
-                warn(`beginTurn/onOpTree failed: ${e instanceof Error ? e.message : String(e)}`);
+                warn(`beginTurn/op_tree emit failed: ${e instanceof Error ? e.message : String(e)}`);
             }
             this.ctx.llmClient.setTurn(currentTurn, 0);
             let lastError: string | undefined;
@@ -897,10 +889,10 @@ export class TurnRunner {
                             warn(`appendAccounting failed: ${e instanceof Error ? e.message : String(e)}`);
                         }
                         try {
-                            this.callbacks.onAccounting(accountingEntry);
+                            this.callbacks.recordAccounting(accountingEntry);
                         }
                         catch (e) {
-                            warn(`onAccounting callback failed: ${e instanceof Error ? e.message : String(e)}`);
+                            warn(`recordAccounting callback failed: ${e instanceof Error ? e.message : String(e)}`);
                         }
                         // Update context guard with actual response tokens - only on success
                         // On errors (especially model_error with no output), tokens may be 0
@@ -926,7 +918,7 @@ export class TurnRunner {
                             const sz = respText.length > 0 ? Buffer.byteLength(respText, 'utf8') : 0;
                             this.ctx.opTree.setResponse(llmOpId, { payload: { textPreview: respText }, size: sz, truncated: false });
                             this.ctx.opTree.endOp(llmOpId, (turnResult.status.type === 'success') ? 'ok' : 'failed', { latency: turnResult.latencyMs });
-                            this.callbacks.onOpTree(this.ctx.opTree.getSession());
+                            this.callbacks.emitEvent({ type: 'op_tree', tree: this.ctx.opTree.getSession() });
                         }
                     }
                     catch (e) {
@@ -1778,14 +1770,16 @@ export class TurnRunner {
                 const assistantText = typeof lastAssistant?.content === 'string' ? lastAssistant.content : undefined;
                 const attrs = (typeof assistantText === 'string' && assistantText.length > 0) ? { assistant: { content: assistantText } } : {};
                 this.ctx.opTree.endTurn(currentTurn, attrs);
-                this.callbacks.onOpTree(this.ctx.opTree.getSession());
+                this.callbacks.emitEvent({ type: 'op_tree', tree: this.ctx.opTree.getSession() });
             }
             catch (e) {
-                warn(`endTurn/onOpTree failed: ${e instanceof Error ? e.message : String(e)}`);
+                warn(`endTurn/op_tree emit failed: ${e instanceof Error ? e.message : String(e)}`);
             }
             if (this.state.routerSelection !== undefined) {
                 this.logExit('EXIT-ROUTER-HANDOFF', 'Router selected destination', currentTurn, { fatal: false, severity: 'VRB' });
                 this.emitFinalSummary(logs, accounting);
+                const handoffReport = this.buildHandoffReport(conversation);
+                this.callbacks.emitEvent({ type: 'handoff', report: handoffReport }, { source: 'finalize' });
                 return {
                     success: true,
                     conversation,
@@ -2137,7 +2131,7 @@ export class TurnRunner {
         if (encoded === undefined)
             return;
         this.ctx.opTree.setRequest(opId, { kind: 'llm', payload: { sdk: encoded } });
-        this.callbacks.onOpTree(this.ctx.opTree.getSession());
+        this.callbacks.emitEvent({ type: 'op_tree', tree: this.ctx.opTree.getSession() });
     }
     private captureSdkResponseSnapshot(opId: string | undefined, payload: unknown): void {
         if (typeof opId !== 'string' || opId.length === 0)
@@ -2146,7 +2140,7 @@ export class TurnRunner {
         if (encoded === undefined)
             return;
         this.ctx.opTree.setResponse(opId, { payload: { sdk: encoded } });
-        this.callbacks.onOpTree(this.ctx.opTree.getSession());
+        this.callbacks.emitEvent({ type: 'op_tree', tree: this.ctx.opTree.getSession() });
     }
     private logFinalReportDump(turn: number, params: Record<string, unknown>, context: string, rawContent?: string): void {
         try {
@@ -2499,46 +2493,32 @@ export class TurnRunner {
                 return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn);
             }
         }
-        if (this.ctx.sessionConfig.renderTarget !== 'sub-agent' && this.callbacks.onOutput !== undefined) {
-            const finalOutput = (() => {
-                if (fr.format === 'json' && fr.content_json !== undefined) {
-                    try {
-                        return JSON.stringify(fr.content_json);
-                    }
-                    catch {
-                        return undefined;
-                    }
-                }
-                if (typeof fr.content === 'string' && fr.content.length > 0)
-                    return fr.content;
-                return undefined;
-            })();
-            if (finalOutput !== undefined) {
-                if (!this.finalReportStreamed && !this.hasStreamedFinalOutput(finalOutput)) {
-                    this.callbacks.onOutput(finalOutput, {
-                        agentId: this.ctx.agentId,
-                        callPath: this.ctx.callPath,
-                        sessionId: this.ctx.txnId,
-                        parentId: this.ctx.parentTxnId,
-                        originId: this.ctx.originTxnId,
-                    });
-                    this.appendStreamedOutputTail(finalOutput);
-                    if (!finalOutput.endsWith('\n')) {
-                        this.callbacks.onOutput('\n', {
-                            agentId: this.ctx.agentId,
-                            callPath: this.ctx.callPath,
-                            sessionId: this.ctx.txnId,
-                            parentId: this.ctx.parentTxnId,
-                            originId: this.ctx.originTxnId,
-                        });
-                        this.appendStreamedOutputTail('\n');
-                    }
-                    this.finalReportStreamed = true;
-                }
-                else {
-                    this.finalReportStreamed = true;
-                }
+        const pendingHandoffCount = this.ctx.sessionConfig.pendingHandoffCount ?? 0;
+        const routerHandoff = this.state.routerSelection?.agent !== undefined;
+        const finalOutput = (() => {
+            if (fr.format === 'json' && fr.content_json !== undefined) {
+                try { return JSON.stringify(fr.content_json); } catch { return undefined; }
             }
+            if (typeof fr.content === 'string' && fr.content.length > 0) {
+                return fr.content;
+            }
+            if (fr.content_json !== undefined) {
+                try { return JSON.stringify(fr.content_json); } catch { return undefined; }
+            }
+            return undefined;
+        })();
+        if (finalOutput !== undefined && finalOutput.length > 0) {
+            const alreadyStreamed = this.finalReportStreamed || this.hasStreamedFinalOutput(finalOutput);
+            if (!alreadyStreamed) {
+                this.callbacks.emitEvent({ type: 'output', text: finalOutput }, { source: 'finalize' });
+                this.appendStreamedOutputTail(finalOutput);
+                this.finalReportStreamed = true;
+            }
+        }
+        if (pendingHandoffCount > 0 || routerHandoff) {
+            this.callbacks.emitEvent({ type: 'handoff', report: fr }, { source: 'finalize' });
+        } else {
+            this.callbacks.emitEvent({ type: 'final_report', report: fr }, { source: 'finalize' });
         }
         const source = this.ctx.finalReportManager.getSource() ?? 'tool-call';
         this.log({
@@ -2615,7 +2595,7 @@ export class TurnRunner {
             const accountingOpId = this.ctx.opTree.beginOp(currentTurn, 'system', { label: 'final-report' });
             this.ctx.opTree.appendAccounting(accountingOpId, finalReportAccounting);
             this.ctx.opTree.endOp(accountingOpId, success ? 'ok' : 'failed');
-            this.callbacks.onOpTree(this.ctx.opTree.getSession());
+            this.callbacks.emitEvent({ type: 'op_tree', tree: this.ctx.opTree.getSession() });
         }
         catch (e) {
             warn(`final-report accounting append failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -2958,8 +2938,8 @@ export class TurnRunner {
             // XML transport parsing
             if (msg.role === 'assistant' && typeof msg.content === 'string') {
                 const parseResult = this.ctx.xmlTransport.parseAssistantMessage(msg.content, { turn: context.turn, resolvedFormat: this.ctx.resolvedFormat, stopReason: context.stopReason, maxOutputTokens: context.maxOutputTokens }, {
-                    onTurnFailure: (slug, reason) => { this.addTurnFailure(slug, reason); },
-                    onLog: (entry) => {
+                    recordTurnFailure: (slug, reason) => { this.addTurnFailure(slug, reason); },
+                    logWarning: (entry) => {
                         this.callbacks.log({
                             timestamp: Date.now(),
                             severity: entry.severity,
@@ -3084,13 +3064,24 @@ export class TurnRunner {
     }
     private emitReasoningChunks(chunks: string[]): void {
         chunks.forEach((chunk: string) => {
-            try {
-                this.callbacks.onThinking?.(chunk);
-            }
-            catch (e) {
-                warn(`onThinking callback failed: ${e instanceof Error ? e.message : String(e)}`);
-            }
+            this.callbacks.emitEvent({ type: 'thinking', text: chunk }, { source: 'replay' });
         });
+    }
+
+    private buildHandoffReport(conversation: ConversationMessage[]): FinalReportPayload {
+        const report = this.finalReport;
+        if (report !== undefined) {
+            return report;
+        }
+        const lastAssistant = conversation
+            .filter((m) => m.role === 'assistant')
+            .pop();
+        const content = typeof lastAssistant?.content === 'string' ? lastAssistant.content : '';
+        return {
+            format: 'text',
+            content,
+            ts: Date.now(),
+        };
     }
     private expandNestedLLMToolCalls(toolCalls: ToolCall[]): ToolCall[] | undefined {
         let mutated = false;
@@ -3233,13 +3224,6 @@ export class TurnRunner {
         reasoningLevel: ReasoningLevel | undefined,
         reasoningValue: ProviderReasoningValue | undefined
     ): Promise<TurnResult & { shownThinking: boolean; incompleteFinalReportDetected: boolean }> {
-        const callbackMeta = {
-            agentId: this.ctx.agentId,
-            callPath: this.ctx.callPath,
-            sessionId: this.ctx.txnId,
-            parentId: this.ctx.parentTxnId,
-            originId: this.ctx.originTxnId,
-        };
         const pendingSelection = this.state.pendingToolSelection;
         this.state.pendingToolSelection = undefined;
         const selection = pendingSelection ?? this.selectToolsForTurn(provider, isFinalTurn);
@@ -3473,8 +3457,9 @@ export class TurnRunner {
         this.finalReportStreamed = false;
         this.resetStreamedOutputTail();
 
-        const emitThinking = (thinkingChunk: string, isRootSession: boolean): void => {
-            if (thinkingChunk.length === 0) return;
+        const emitThinking = (thinkingChunk: string): void => {
+            if (thinkingChunk.length === 0)
+                return;
             if (!shownThinking && lastShownThinkingHeaderTurn !== currentTurn) {
                 const thinkingHeader = {
                     timestamp: Date.now(),
@@ -3488,11 +3473,11 @@ export class TurnRunner {
                     message: 'reasoning output stream'
                 };
                 this.log(thinkingHeader);
+            }
+            if (!shownThinking) {
                 shownThinking = true;
             }
-            if (isRootSession) {
-                this.callbacks.onThinking?.(thinkingChunk, callbackMeta);
-            }
+            this.callbacks.emitEvent({ type: 'thinking', text: thinkingChunk }, { source: 'stream' });
             try {
                 const opId = this.callbacks.getCurrentLlmOpId();
                 if (typeof opId === 'string')
@@ -3522,17 +3507,18 @@ export class TurnRunner {
             sendReasoning,
             interleaved: this.resolveInterleaved(provider, model),
             onChunk: (chunk: string, type: 'content' | 'thinking') => {
-                const isRootSession = this.ctx.parentTxnId === undefined;
                 if (type === 'content') {
                     const split = thinkFilter.process(chunk);
                     if (split.thinking.length > 0) {
-                        emitThinking(split.thinking, isRootSession);
+                        emitThinking(split.thinking);
                     }
-                    if (split.content.length === 0) return;
+                    if (split.content.length === 0)
+                        return;
                     if (xmlFilter !== undefined) {
                         const filtered = xmlFilter.process(split.content);
-                        if (filtered.length > 0 && this.callbacks.onOutput !== undefined) {
-                            this.callbacks.onOutput(filtered, callbackMeta);
+                        if (filtered.length > 0) {
+                            const outputSource: EventSource = xmlFilter.hasStreamedContent ? 'finalize' : 'stream';
+                            this.callbacks.emitEvent({ type: 'output', text: filtered }, { source: outputSource });
                             this.appendStreamedOutputTail(filtered);
                             // Only mark as streamed if we actually emitted content (and are inside the tag)
                             if (xmlFilter.hasStreamedContent) {
@@ -3540,13 +3526,13 @@ export class TurnRunner {
                             }
                         }
                     }
-                    else if (this.callbacks.onOutput !== undefined) {
-                        this.callbacks.onOutput(split.content, callbackMeta);
+                    else {
+                        this.callbacks.emitEvent({ type: 'output', text: split.content }, { source: 'stream' });
                         this.appendStreamedOutputTail(split.content);
                     }
                     return;
                 }
-                emitThinking(chunk, isRootSession);
+                emitThinking(chunk);
             },
             reasoningLevel: effectiveReasoningLevel,
             reasoningValue: effectiveReasoningValue ?? null,
@@ -3730,16 +3716,11 @@ export class TurnRunner {
             throw e;
         }
             finally {
-                if (xmlFilter !== undefined && this.callbacks.onOutput !== undefined) {
+                if (xmlFilter !== undefined) {
                     const left = xmlFilter.flush();
                     if (left.length > 0) {
-                        this.callbacks.onOutput(left, {
-                            agentId: this.ctx.agentId,
-                            callPath: this.ctx.callPath,
-                            sessionId: this.ctx.txnId,
-                            parentId: this.ctx.parentTxnId,
-                            originId: this.ctx.originTxnId,
-                        });
+                        const outputSource: EventSource = xmlFilter.hasStreamedContent ? 'finalize' : 'stream';
+                        this.callbacks.emitEvent({ type: 'output', text: left }, { source: outputSource });
                         this.appendStreamedOutputTail(left);
                         if (xmlFilter.hasStreamedContent) {
                             this.finalReportStreamed = true;

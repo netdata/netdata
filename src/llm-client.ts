@@ -12,6 +12,7 @@ import type {
   ConversationMessage,
   ProviderParameterWarning,
   LogPayload,
+  AIAgentEvent,
 } from './types.js';
 
 import { AnthropicProvider } from './llm-providers/anthropic.js';
@@ -30,7 +31,7 @@ export class LLMClient {
   private static readonly CONTENT_TYPE_HEADER = 'content-type';
   private providers = new Map<string, BaseLLMProvider>();
   private metadataCollectors = new Map<string, (payload: { url: string; response: Response }) => Promise<ProviderTurnMetadata | undefined>>();
-  private onLog?: (entry: LogEntry) => void;
+  private emitEvent?: (event: AIAgentEvent) => void;
   private traceLLM: boolean;
   private traceSdk: boolean;
   private currentTurn = 0;
@@ -56,14 +57,14 @@ export class LLMClient {
     options?: {
       traceLLM?: boolean;
       traceSDK?: boolean;
-      onLog?: (entry: LogEntry) => void;
+      emitEvent?: (event: AIAgentEvent) => void;
       pricing?: Partial<Record<string, Partial<Record<string, { unit?: 'per_1k'|'per_1m'; currency?: 'USD'; prompt?: number; completion?: number; cacheRead?: number; cacheWrite?: number }>>>>;
     }
   ) {
     this.traceLLM = options?.traceLLM ?? false;
     this.traceSdk = options?.traceSDK ?? false;
     updateAiSdkWarningPreference(this.traceLLM);
-    this.onLog = options?.onLog;
+    this.emitEvent = options?.emitEvent;
     this.pricing = options?.pricing;
 
     // Initialize providers - necessary for side effects
@@ -846,7 +847,7 @@ export class LLMClient {
     message: string,
     options: { fatal?: boolean; details?: Record<string, LogDetailValue>; payload?: { type: 'llmRequest' | 'llmResponse' | 'toolRequest' | 'toolResponse'; value: LogPayload } } = {}
   ): void {
-    if (this.onLog === undefined) return;
+    if (this.emitEvent === undefined) return;
 
     const entry: LogEntry = {
       timestamp: Date.now(),
@@ -869,7 +870,7 @@ export class LLMClient {
       else entry.toolResponsePayload = value;
     }
 
-    this.onLog(entry);
+    this.emitEvent({ type: 'log', entry });
   }
 
   private logParameterWarnings(remoteId: string, warnings?: ProviderParameterWarning[]): void {

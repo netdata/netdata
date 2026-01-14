@@ -124,7 +124,7 @@ constructor(namespace, servers, opts?) {
   this.trace = opts?.trace;
   this.verbose = opts?.verbose;
   this.requestTimeoutMs = opts?.requestTimeoutMs;
-  this.onLog = opts?.onLog;
+  this.emitEvent = opts?.emitEvent;
   this.initConcurrency = opts?.initConcurrency;
   this.sharedRegistry = opts?.sharedRegistry ?? defaultSharedRegistry;
 }

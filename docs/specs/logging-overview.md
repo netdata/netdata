@@ -174,7 +174,7 @@ ts=1699999999999 level=VRB turn=1 subturn=0 dir=response type=llm remote="openai
 - Falls back to logfmt when journald unavailable or disabled at runtime
 
 ### Callback Sink
-- `onLog(LogEntry)` callback passed via `AIAgentSessionConfig`
+- `onEvent(type='log')` callback passed via `AIAgentSessionConfig`
 - Custom processing / streaming to external systems
 - Receives the same enriched entries as built-in sinks
 
@@ -296,7 +296,7 @@ Logs feed into:
 ### Missing logs
 - Check severity filter level
 - Check callback registration
-- Verify onLog callback doesn't throw
+- Verify onEvent callback doesn't throw
 
 ### Truncated messages
 - Check format configuration

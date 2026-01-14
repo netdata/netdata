@@ -767,6 +767,13 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
     const o = (opts ?? {}) as LoadedAgentSessionOptions;
     if (o.outputFormat === undefined) throw new Error('outputFormat is required');
 
+    const basePending = (() => {
+      const raw = o.pendingHandoffCount;
+      if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) return 0;
+      return Math.trunc(raw);
+    })();
+    const pendingHandoffCount = basePending + (orchestrationRuntime?.handoff !== undefined ? 1 : 0);
+    const isMaster = typeof o.isMaster === 'boolean' ? o.isMaster : true;
     let sessionConfig: AIAgentSessionConfig = {
       config,
       targets: selectedTargets,
@@ -784,6 +791,8 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       conversationHistory: o.history,
       expectedOutput: resolvedExpectedOutput,
       callbacks: o.callbacks,
+      isMaster,
+      pendingHandoffCount,
       trace: o.trace,
       stopRef: o.stopRef,
       initialTitle: o.initialTitle,

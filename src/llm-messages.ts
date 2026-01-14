@@ -347,12 +347,12 @@ export const isUnknownToolFailureMessage = (content: string): boolean =>
 
 // =============================================================================
 // XML PROTOCOL ERRORS
-// Sent via onTurnFailure callback (become part of TURN-FAILED message)
+// Sent via recordTurnFailure callback (become part of TURN-FAILED message)
 // =============================================================================
 
 /**
  * Final report payload is not valid JSON (XML mode).
- * Used in: xml-transport.ts via onTurnFailure
+ * Used in: xml-transport.ts via recordTurnFailure
  *
  * CONDITION: XML mode && final_report tag found && JSON.parse(payload) fails
  */
@@ -361,7 +361,7 @@ export const XML_FINAL_REPORT_NOT_JSON =
 
 /**
  * Tool payload is not valid JSON (XML mode).
- * Used in: xml-transport.ts via onTurnFailure
+ * Used in: xml-transport.ts via recordTurnFailure
  *
  * CONDITION: XML mode && tool tag found && JSON.parse(payload) fails
  */
@@ -370,7 +370,7 @@ export const xmlToolPayloadNotJson = (toolName: string): string =>
 
 /**
  * XML tag slot mismatch.
- * Used in: xml-transport.ts via onTurnFailure
+ * Used in: xml-transport.ts via recordTurnFailure
  *
  * CONDITION: XML mode && tag slot attribute !== expected nonce/slot for this turn
  */
@@ -379,7 +379,7 @@ export const xmlSlotMismatch = (capturedSlot: string): string =>
 
 /**
  * XML missing closing tag.
- * Used in: xml-transport.ts via onTurnFailure
+ * Used in: xml-transport.ts via recordTurnFailure
  *
  * CONDITION: XML mode && opening tag found && corresponding closing tag not found
  */
@@ -388,7 +388,7 @@ export const xmlMissingClosingTag = (capturedSlot: string): string =>
 
 /**
  * XML malformed - nonce/slot/tool mismatch.
- * Used in: xml-transport.ts via onTurnFailure
+ * Used in: xml-transport.ts via recordTurnFailure
  *
  * CONDITION: XML mode && tag validation fails (nonce/slot mismatch or empty content)
  */
@@ -398,7 +398,7 @@ export const xmlMalformedMismatch = (slotInfo: string): string =>
 /**
  * Structured output (json, slack-block-kit) truncated due to stopReason=length.
  * Model must retry with shorter output.
- * Used in: xml-transport.ts via onTurnFailure
+ * Used in: xml-transport.ts via recordTurnFailure
  *
  * CONDITION: XML mode && final report detected && stopReason=length && format is structured
  */

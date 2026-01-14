@@ -181,7 +181,7 @@ Defined in `src/ai-agent.ts:16-44`:
 - **Pending retry deduplication**: System retry messages are de-duped and appended exactly once per turn using `pendingRetryMessages` so models do not see duplicate warnings when multiple providers are tried (`src/ai-agent.ts:2959-3042`).
 - **Rate-limit cycle gating**: The session counts rate-limit responses per provider/model cycle and only sleeps when *all* targets rate-limit simultaneously, honoring provider-specific `retryAfter` bounds before retrying (`src/ai-agent.ts:1456-2560`).
 - **Tool-budget mutex**: Tool output truncation and the `(tool failed: response exceeded max bytes)` guard run under a mutex so concurrent tool executions cannot race on `toolResponseMaxBytes` (`src/ai-agent.ts:516-562`).
-- **Progress + opTree sync**: `SessionProgressReporter` drives structured `[PROGRESS UPDATE]` logs, emits opTree snapshots via `onOpTree`, and is wired to Slack/CLI renderers in headends (`src/ai-agent.ts:600-720`).
+- **Progress + opTree sync**: `SessionProgressReporter` drives structured `[PROGRESS UPDATE]` logs, emits opTree snapshots via `onEvent(type='op_tree')`, and is wired to Slack/CLI renderers in headends (`src/ai-agent.ts:600-720`).
 - **Stop handling & sleepWithAbort**: Every wait (rate-limit backoffs, queue delays) invokes `sleepWithAbort` so `stopRef`/`AbortSignal` cancellations short-circuit loops and emit `EXIT-USER-STOP` when requested (`src/ai-agent.ts:2487-2510`, `src/ai-agent.ts:2757-2804`).
 - **Sub-agent isolation**: `SubAgentRegistry` spawns children with independent trace context (`originTxnId`, `parentTxnId`, `agentPath`) and aggregates child conversations for auditing (`src/ai-agent.ts:700-838`).
 - **Tool failure overrides**: Tool errors can be replaced with curated fallback messages via `toolFailureMessages`, guaranteeing downstream final reports mention failures consistently (`src/ai-agent.ts:1671-1895`, `src/ai-agent.ts:3707-3952`).
@@ -207,7 +207,7 @@ Defined in `src/ai-agent.ts:16-44`:
 - `toolResponseMaxBytes?: number` - Max tool response size
 - `abortSignal?: AbortSignal` - Cancellation signal
 - `stopRef?: { stopping: boolean }` - Graceful stop reference
-- `callbacks?: AIAgentCallbacks` - Event callbacks
+- `callbacks?: AIAgentEventCallbacks` - Event callbacks
 - `subAgents?: PreloadedSubAgent[]` - Preloaded sub-agent definitions
 - `agentId?: string` - Agent identifier
 - `headendId?: string` - Headend identifier
@@ -232,16 +232,19 @@ Defined in `src/ai-agent.ts:16-44`:
 - `turnPathPrefix?: string` - Turn path prefix
 - `ancestors?: string[]` - Ancestor agent IDs
 
-### Callbacks (`AIAgentCallbacks`)
-- `onLog(LogEntry)` - Log entry emitted
-- `onAccounting(AccountingEntry)` - Accounting entry emitted
-- `onProgress(ProgressEvent)` - Progress event emitted
-- `onOpTree(SessionNode)` - OpTree updated
-- `onTurnStarted(turn)` - Turn began
-- `onSessionSnapshot(payload)` - Session snapshot available
-- `onAccountingFlush(payload)` - Accounting batch ready
-- `onOutput(text)` - Text output emitted
-- `onThinking(text)` - Thinking/reasoning text emitted
+### Callbacks (`AIAgentEventCallbacks`)
+- `onEvent(type='log')` - Log entry emitted
+- `onEvent(type='accounting')` - Accounting entry emitted
+- `onEvent(type='progress')` - Progress event emitted
+- `onEvent(type='status')` - Progress mirror for `agent_update`
+- `onEvent(type='op_tree')` - OpTree updated
+- `onEvent(type='turn_started')` - Turn began
+- `onEvent(type='snapshot')` - Session snapshot available
+- `onEvent(type='accounting_flush')` - Accounting batch ready
+- `onEvent(type='output')` - Text output emitted
+- `onEvent(type='thinking')` - Thinking/reasoning text emitted
+- `onEvent(type='final_report')` - Final report payload
+- `onEvent(type='handoff')` - Handoff payload (non-terminal)
 
 ## Telemetry
 - OpenTelemetry spans: `agent.session`, turn operations

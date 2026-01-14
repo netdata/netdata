@@ -12,7 +12,7 @@ import type { StructuredLogEvent } from '../../logging/structured-log-event.js';
 import type { PreloadedSubAgent } from '../../subagent-registry.js';
 import type { MCPRestartFailedError, LogFn, SharedAcquireOptions, SharedRegistry, SharedRegistryHandle } from '../../tools/mcp-provider.js';
 import type { ToolExecuteResult } from '../../tools/types.js';
-import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogDetailValue, LogEntry, LogPayload, MCPServer, MCPServerConfig, MCPTool, ProviderConfig, ProviderReasoningValue, ReasoningLevel, TokenUsage, TurnRequest, TurnResult, TurnStatus, ToolChoiceMode } from '../../types.js';
+import type { AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogDetailValue, LogEntry, LogPayload, MCPServer, MCPServerConfig, MCPTool, ProviderConfig, ProviderReasoningValue, ReasoningLevel, TokenUsage, TurnRequest, TurnResult, TurnStatus, ToolChoiceMode } from '../../types.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { ModelMessage, LanguageModel, ToolSet } from 'ai';
 import type { ChildProcess } from 'node:child_process';
@@ -24,6 +24,7 @@ import { AIAgent, AIAgentSession } from '../../ai-agent.js';
 import { sha256Hex } from '../../cache/hash.js';
 import { loadConfiguration } from '../../config.js';
 import { parseFrontmatter, parseList, parsePairs } from '../../frontmatter.js';
+import { shouldStreamOutput } from '../../headends/shared-event-filter.js';
 import { resolveIncludes } from '../../include-resolver.js';
 import { DEFAULT_TOOL_INPUT_SCHEMA } from '../../input-contract.js';
 import { LLMClient } from '../../llm-client.js';
@@ -118,7 +119,16 @@ const SEQUENTIAL_TEST_IDS = new Set([
   'run-test-16',
   'run-test-20',
   'run-test-54',
+  'run-test-handoff-event-chain',
+  'run-test-router-handoff-event',
+  'run-test-advisor-event-meta',
+  'run-test-subagent-event-meta',
+  // Tests that mutate global queue manager state
+  'run-test-25',
+  'run-test-queue-cancel',
+  'run-test-queue-isolation',
   // Tests using runWithPatchedExecuteTurn (patches LLMClient.prototype globally)
+  'run-test-60',
   'run-test-69',
   'run-test-107',
   'run-test-empty-response',
@@ -339,7 +349,10 @@ class HarnessSharedHandle implements SharedRegistryHandle {
   }
 }
 
-const defaultPersistenceCallbacks = (configuration: Configuration, existing?: AIAgentCallbacks): AIAgentCallbacks => {
+const defaultPersistenceCallbacks = (
+  configuration: Configuration,
+  existing?: AIAgentEventCallbacks,
+): AIAgentEventCallbacks => {
   const callbacks = existing ?? {};
   const persistence = configuration.persistence ?? {};
   const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
@@ -351,9 +364,9 @@ const defaultPersistenceCallbacks = (configuration: Configuration, existing?: AI
     ? persistence.billingFile
     : configuration.accounting?.file ?? (defaultBase !== undefined ? path.join(defaultBase, 'accounting.jsonl') : undefined);
 
-  const snapshotHandler = callbacks.onSessionSnapshot ?? (sessionsDir !== undefined ? async (payload) => {
+  const snapshotHandler = sessionsDir !== undefined ? (payload: { reason?: string; originId: string; snapshot: { version: number; opTree: unknown } }) => {
     try {
-      await fs.promises.mkdir(sessionsDir, { recursive: true });
+      fs.mkdirSync(sessionsDir, { recursive: true });
       const json = JSON.stringify({
         version: payload.snapshot.version,
         reason: payload.reason,
@@ -362,39 +375,47 @@ const defaultPersistenceCallbacks = (configuration: Configuration, existing?: AI
       const gz = gzipSync(Buffer.from(json, 'utf8'));
       const filePath = path.join(sessionsDir, `${payload.originId}.json.gz`);
       const tmp = `${filePath}.tmp-${String(process.pid)}-${String(Date.now())}`;
-      await fs.promises.writeFile(tmp, gz);
-      await fs.promises.rename(tmp, filePath);
+      fs.writeFileSync(tmp, gz);
+      fs.renameSync(tmp, filePath);
     } catch (error: unknown) {
       const message = toErrorMessage(error);
       const reason = payload.reason ?? 'unspecified';
       warn(`persistSessionSnapshot(${reason}) failed: ${message}`);
     }
-  } : undefined);
+  } : undefined;
 
-  const ledgerHandler = callbacks.onAccountingFlush ?? (ledgerFile !== undefined ? async (payload) => {
+  const ledgerHandler = ledgerFile !== undefined ? (payload: { entries: AccountingEntry[] }) => {
     try {
       const dir = path.dirname(ledgerFile);
-      await fs.promises.mkdir(dir, { recursive: true });
+      fs.mkdirSync(dir, { recursive: true });
       if (payload.entries.length === 0) {
         return;
       }
       const lines = payload.entries.map((entry) => JSON.stringify(entry));
-      await fs.promises.appendFile(ledgerFile, `${lines.join('\n')}\n`, 'utf8');
+      fs.appendFileSync(ledgerFile, `${lines.join('\n')}\n`, 'utf8');
     } catch (error: unknown) {
       const message = toErrorMessage(error);
       warn(`final persistence failed: ${message}`);
     }
-  } : undefined);
+  } : undefined;
 
-  const needsSnapshot = snapshotHandler !== callbacks.onSessionSnapshot;
-  const needsLedger = ledgerHandler !== callbacks.onAccountingFlush;
+  const needsSnapshot = snapshotHandler !== undefined;
+  const needsLedger = ledgerHandler !== undefined;
   if (!needsSnapshot && !needsLedger) {
     return callbacks;
   }
+  const baseOnEvent = callbacks.onEvent;
   return {
     ...callbacks,
-    ...(needsSnapshot && snapshotHandler !== undefined ? { onSessionSnapshot: snapshotHandler } : {}),
-    ...(needsLedger && ledgerHandler !== undefined ? { onAccountingFlush: ledgerHandler } : {}),
+    onEvent: (event, meta) => {
+      if (event.type === 'snapshot' && snapshotHandler !== undefined) {
+        snapshotHandler(event.payload);
+      }
+      if (event.type === 'accounting_flush' && ledgerHandler !== undefined) {
+        ledgerHandler(event.payload);
+      }
+      baseOnEvent?.(event, meta);
+    },
   };
 };
 
@@ -788,6 +809,10 @@ let coverageSessionSnapshot: {
   filesAfterFailure: string[];
   warnOutput: string;
 } | undefined;
+let handoffEventCoverage: { events: { event: AIAgentEvent; meta: AIAgentEventMeta }[] } | undefined;
+let routerHandoffEventCoverage: { events: { event: AIAgentEvent; meta: AIAgentEventMeta }[] } | undefined;
+let advisorEventCoverage: { events: { event: AIAgentEvent; meta: AIAgentEventMeta }[] } | undefined;
+let subagentEventCoverage: { events: { event: AIAgentEvent; meta: AIAgentEventMeta }[] } | undefined;
 
 function invariant(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -3221,14 +3246,30 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     execute: async (_configuration, sessionConfig) => {
       const abort = new AbortController();
       sessionConfig.abortSignal = abort.signal;
+      let abortTimer: NodeJS.Timeout | undefined;
+      let queuePoller: NodeJS.Timeout | undefined;
+      const abortOnce = (): void => {
+        if (abortTimer !== undefined) return;
+        abortTimer = setTimeout(() => {
+          try { abort.abort(); } catch { /* ignore */ }
+        }, 0);
+      };
+      queuePoller = setInterval(() => {
+        const status = queueManager.getQueueStatus('default');
+        if (status?.waiting !== undefined && status.waiting > 0) {
+          if (queuePoller !== undefined) {
+            clearInterval(queuePoller);
+            queuePoller = undefined;
+          }
+          abortOnce();
+        }
+      }, 10);
       const session = AIAgentSession.create(sessionConfig);
-      const timer = setTimeout(() => {
-        try { abort.abort(); } catch { /* ignore */ }
-      }, 75);
       try {
         return await AIAgent.run(session);
       } finally {
-        clearTimeout(timer);
+        if (abortTimer !== undefined) clearTimeout(abortTimer);
+        if (queuePoller !== undefined) clearInterval(queuePoller);
       }
     },
     expect: (result) => {
@@ -3389,13 +3430,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const existingCallbacks = sessionConfig.callbacks ?? {};
         sessionConfig.callbacks = {
           ...existingCallbacks,
-          onThinking: (chunk) => {
-            capturedThinking += chunk;
-            existingCallbacks.onThinking?.(chunk);
-          },
-          onOutput: (chunk) => {
-            capturedOutput += chunk;
-            existingCallbacks.onOutput?.(chunk);
+          onEvent: (event, meta) => {
+            if (event.type === 'thinking') capturedThinking += event.text;
+            if (event.type === 'output') capturedOutput += event.text;
+            existingCallbacks.onEvent?.(event, meta);
           },
         };
       },
@@ -3425,13 +3463,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const existingCallbacks = sessionConfig.callbacks ?? {};
         sessionConfig.callbacks = {
           ...existingCallbacks,
-          onThinking: (chunk) => {
-            capturedThinking += chunk;
-            existingCallbacks.onThinking?.(chunk);
-          },
-          onOutput: (chunk) => {
-            capturedOutput += chunk;
-            existingCallbacks.onOutput?.(chunk);
+          onEvent: (event, meta) => {
+            if (event.type === 'thinking') capturedThinking += event.text;
+            if (event.type === 'output') capturedOutput += event.text;
+            existingCallbacks.onEvent?.(event, meta);
           },
         };
       },
@@ -3975,7 +4010,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         },
         {
           traceLLM: true,
-          onLog: (entry) => { logs.push(entry); },
+          emitEvent: (event) => { if (event.type === 'log') logs.push(event.entry); },
           pricing,
         }
       );
@@ -4111,7 +4146,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         await client.waitForMetadataCapture();
         const coverageClient = new LLMClient(
           { openrouter: { type: 'openrouter' } },
-          { traceLLM: true, onLog: (entry) => { logs.push(entry); } }
+          { traceLLM: true, emitEvent: (event) => { if (event.type === 'log') logs.push(event.entry); } }
         );
         coverageClient.setTurn(1, 1);
         const coverageFetch = (coverageClient as unknown as { createTracedFetch: () => typeof fetch }).createTracedFetch();
@@ -4296,11 +4331,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const existingCallbacks = sessionConfig.callbacks ?? {};
         sessionConfig.callbacks = {
           ...existingCallbacks,
-          onProgress: (event) => {
-            if (event.type === 'agent_update' && typeof event.message === 'string') {
-              progressMessages.push(event.message);
+          onEvent: (event, meta) => {
+            if (event.type === 'progress' && event.event.type === 'agent_update' && typeof event.event.message === 'string') {
+              progressMessages.push(event.event.message);
             }
-            existingCallbacks.onProgress?.(event);
+            existingCallbacks.onEvent?.(event, meta);
           },
         };
       },
@@ -4651,11 +4686,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const existingCallbacks = sessionConfig.callbacks ?? {};
         sessionConfig.callbacks = {
           ...existingCallbacks,
-          onProgress: (event) => {
-            if (event.type === 'agent_update' && typeof event.message === 'string') {
-              progressMessages.push(event.message);
+          onEvent: (event, meta) => {
+            if (event.type === 'progress' && event.event.type === 'agent_update' && typeof event.event.message === 'string') {
+              progressMessages.push(event.event.message);
             }
-            existingCallbacks.onProgress?.(event);
+            existingCallbacks.onEvent?.(event, meta);
           },
         };
       },
@@ -4791,9 +4826,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const existingCallbacks = sessionConfig.callbacks ?? {};
         sessionConfig.callbacks = {
           ...existingCallbacks,
-          onLog: (entry) => {
-            capturedLogs.push(entry);
-            existingCallbacks.onLog?.(entry);
+          onEvent: (event, meta) => {
+            if (event.type === 'log') {
+              capturedLogs.push(event.entry);
+            }
+            existingCallbacks.onEvent?.(event, meta);
           },
         };
         const session = AIAgentSession.create(sessionConfig);
@@ -4825,9 +4862,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const existingCallbacks = sessionConfig.callbacks ?? {};
         sessionConfig.callbacks = {
           ...existingCallbacks,
-          onLog: (entry) => {
-            capturedLogs.push(entry);
-            existingCallbacks.onLog?.(entry);
+          onEvent: (event, meta) => {
+            if (event.type === 'log') {
+              capturedLogs.push(event.entry);
+            }
+            existingCallbacks.onEvent?.(event, meta);
           },
         };
       },
@@ -5003,7 +5042,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       description: 'MCP provider filtering and logging coverage.',
       execute: () => {
         const logs: LogEntry[] = [];
-        const provider = new MCPProvider('deterministic', {}, { trace: true, verbose: true, onLog: (entry) => { logs.push(entry); } });
+        const provider = new MCPProvider('deterministic', {}, { trace: true, verbose: true, emitEvent: (event) => { if (event.type === 'log') logs.push(event.entry); } });
         const exposed = provider as unknown as {
           sanitizeNamespace: (name: string) => string;
           filterToolsForServer: (name: string, config: MCPServerConfig, tools: MCPTool[]) => MCPTool[];
@@ -5098,7 +5137,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const config: Record<string, MCPServerConfig> = {
           sharedServer: { type: 'stdio', command: 'mock', shared: true },
         } as Record<string, MCPServerConfig>;
-        const provider = new MCPProvider('mcp', config, { sharedRegistry: registry, onLog: (entry) => { logs.push(entry); } });
+        const provider = new MCPProvider('mcp', config, { sharedRegistry: registry, emitEvent: (event) => { if (event.type === 'log') logs.push(event.entry); } });
         await (provider as unknown as { ensureInitialized: () => Promise<void> }).ensureInitialized();
         const exec = await provider.execute('sharedServer__mock_tool', {});
         await provider.cancelTool('sharedServer__mock_tool', { reason: 'timeout' });
@@ -5164,7 +5203,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const config: Record<string, MCPServerConfig> = {
           sharedHttp: { type: 'http', url: 'https://example.com/mock', shared: true },
         } as Record<string, MCPServerConfig>;
-        const provider = new MCPProvider('mcp', config, { sharedRegistry: registry, onLog: (entry) => { logs.push(entry); } });
+        const provider = new MCPProvider('mcp', config, { sharedRegistry: registry, emitEvent: (event) => { if (event.type === 'log') logs.push(event.entry); } });
         await (provider as unknown as { ensureInitialized: () => Promise<void> }).ensureInitialized();
         const exec = await provider.execute('sharedHttp__mock_tool', {});
         await provider.cancelTool('sharedHttp__mock_tool', { reason: 'timeout' });
@@ -5387,7 +5426,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         } as Record<string, MCPServerConfig>;
         const provider = new MCPProvider('mcp', config, {
           requestTimeoutMs: 500,
-          onLog: (entry) => { logs.push(entry); },
+          emitEvent: (event) => { if (event.type === 'log') logs.push(event.entry); },
         });
         await provider.warmup();
         const hangingPromise = (async () => {
@@ -5489,7 +5528,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             },
           },
         } as Record<string, MCPServerConfig>;
-        const provider = new MCPProvider('mcp', config, { requestTimeoutMs: 2000, onLog: (entry) => { logs.push(entry); } });
+        const provider = new MCPProvider('mcp', config, { requestTimeoutMs: 2000, emitEvent: (event) => { if (event.type === 'log') logs.push(event.entry); } });
         await provider.warmup();
         const firstCall = await (async (): Promise<{ success: true } | { success: false; error: Error }> => {
           try {
@@ -5843,7 +5882,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             },
             {
               traceLLM: true,
-              onLog: (entry) => { logs.push(entry); },
+              emitEvent: (event) => { if (event.type === 'log') logs.push(event.entry); },
             }
           );
           const tracedFetch = (client as unknown as { createTracedFetch: () => typeof fetch }).createTracedFetch();
@@ -5970,11 +6009,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const existingCallbacks = sessionConfig.callbacks ?? {};
         sessionConfig.callbacks = {
           ...existingCallbacks,
-          onProgress: (event) => {
-            if (event.type === 'agent_finished') {
-              capturedEvents.push(event);
+          onEvent: (event, meta) => {
+            if (event.type === 'progress' && event.event.type === 'agent_finished') {
+              capturedEvents.push(event.event);
             }
-            existingCallbacks.onProgress?.(event);
+            existingCallbacks.onEvent?.(event, meta);
           },
         };
       },
@@ -6004,11 +6043,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const existingCallbacks = sessionConfig.callbacks ?? {};
         sessionConfig.callbacks = {
           ...existingCallbacks,
-          onProgress: (event) => {
-            if (event.type === 'agent_finished') {
-              capturedEvents.push(event);
+          onEvent: (event, meta) => {
+            if (event.type === 'progress' && event.event.type === 'agent_finished') {
+              capturedEvents.push(event.event);
             }
-            existingCallbacks.onProgress?.(event);
+            existingCallbacks.onEvent?.(event, meta);
           },
         };
       },
@@ -6040,11 +6079,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const existingCallbacks = sessionConfig.callbacks ?? {};
         sessionConfig.callbacks = {
           ...existingCallbacks,
-          onProgress: (event) => {
-            if (event.type === 'agent_finished') {
-              capturedEvent = event;
+          onEvent: (event, meta) => {
+            if (event.type === 'progress' && event.event.type === 'agent_finished') {
+              capturedEvent = event.event;
             }
-            existingCallbacks.onProgress?.(event);
+            existingCallbacks.onEvent?.(event, meta);
           },
         };
       },
@@ -6067,15 +6106,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       { role: 'system', content: 'Historical system guidance.' },
       { role: 'assistant', content: 'Historical assistant output.' },
     ];
-    const loaderCallbacks: AIAgentCallbacks = {
-      onLog: () => undefined,
-      onOutput: () => undefined,
-      onThinking: () => undefined,
-      onAccounting: () => undefined,
-      onProgress: () => undefined,
-      onOpTree: () => undefined,
-      onSessionSnapshot: () => Promise.resolve(),
-      onAccountingFlush: () => Promise.resolve(),
+    const loaderCallbacks: AIAgentEventCallbacks = {
+      onEvent: () => undefined,
     };
     const traceContext = { originId: 'origin-trace', parentId: 'parent-trace', callPath: 'loader/session' };
     const stopReference = { stopping: false };
@@ -8734,7 +8766,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   },
   {
     id: 'run-test-107',
-    description: 'Emits onTurnStarted for every LLM turn even if no thinking stream is emitted.',
+    description: 'Emits turn_started for every LLM turn even if no thinking stream is emitted.',
     execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
       sessionConfig.maxTurns = 2;
       sessionConfig.maxRetries = 1;
@@ -8742,9 +8774,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const observedTurns: number[] = [];
       sessionConfig.callbacks = {
         ...originalCallbacks,
-        onTurnStarted: (turnIndex) => {
-          observedTurns.push(turnIndex);
-          originalCallbacks?.onTurnStarted?.(turnIndex);
+        onEvent: (event, meta) => {
+          if (event.type === 'turn_started') {
+            observedTurns.push(event.turn);
+          }
+          originalCallbacks?.onEvent?.(event, meta);
         },
       };
       // Use runWithPatchedExecuteTurn pattern for consistent behavior
@@ -8807,8 +8841,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success, 'run-test-107 session should succeed with progress-only turn followed by final report.');
       const observed = result.__observedTurns;
       invariant(Array.isArray(observed), 'run-test-107 expects observed turn tracking.');
-      // Both turns should emit onTurnStarted: turn 1 (progress) and turn 2 (final report)
-      invariant(observed.length === 2 && observed[0] === 1 && observed[1] === 2, 'Both turns should emit onTurnStarted for run-test-107.');
+      // Both turns should emit turn_started: turn 1 (progress) and turn 2 (final report)
+      invariant(observed.length === 2 && observed[0] === 1 && observed[1] === 2, 'Both turns should emit turn_started for run-test-107.');
     },
   },
   {
@@ -9156,7 +9190,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     execute: async () => {
       coverageOpenrouterJson = undefined;
       const logs: LogEntry[] = [];
-      const client = new LLMClient({}, { traceLLM: true, onLog: (entry) => { logs.push(entry); } });
+      const client = new LLMClient({}, { traceLLM: true, emitEvent: (event) => { if (event.type === 'log') logs.push(event.entry); } });
       const tracedFetchFactory = getPrivateMethod(client, 'createTracedFetch');
       const tracedFetch = tracedFetchFactory.call(client) as typeof fetch;
       const originalFetch = globalThis.fetch;
@@ -9230,7 +9264,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     execute: async () => {
       coverageOpenrouterSse = undefined;
       const logs: LogEntry[] = [];
-      const client = new LLMClient({}, { traceLLM: true, onLog: (entry) => { logs.push(entry); } });
+      const client = new LLMClient({}, { traceLLM: true, emitEvent: (event) => { if (event.type === 'log') logs.push(event.entry); } });
       const tracedFetchFactory = getPrivateMethod(client, 'createTracedFetch');
       const tracedFetch = tracedFetchFactory.call(client) as typeof fetch;
       const originalFetch = globalThis.fetch;
@@ -9286,7 +9320,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     execute: async () => {
       coverageOpenrouterSseNonBlocking = undefined;
       const logs: LogEntry[] = [];
-      const client = new LLMClient({}, { traceLLM: true, onLog: (entry) => { logs.push(entry); } });
+      const client = new LLMClient({}, { traceLLM: true, emitEvent: (event) => { if (event.type === 'log') logs.push(event.entry); } });
       const tracedFetchFactory = getPrivateMethod(client, 'createTracedFetch');
       const tracedFetch = tracedFetchFactory.call(client) as typeof fetch;
       const originalFetch = globalThis.fetch;
@@ -9369,7 +9403,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     execute: async () => {
       coverageGenericJson = undefined;
       const logs: LogEntry[] = [];
-      const client = new LLMClient({}, { traceLLM: true, onLog: (entry) => { logs.push(entry); } });
+      const client = new LLMClient({}, { traceLLM: true, emitEvent: (event) => { if (event.type === 'log') logs.push(event.entry); } });
       const tracedFetchFactory = getPrivateMethod(client, 'createTracedFetch');
       const tracedFetch = tracedFetchFactory.call(client) as typeof fetch;
       const originalFetch = globalThis.fetch;
@@ -9417,7 +9451,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       await Promise.resolve();
       coverageLlmPayload = undefined;
       const logs: LogEntry[] = [];
-      const client = new LLMClient({}, { onLog: (entry) => { logs.push(entry); } });
+      const client = new LLMClient({}, { emitEvent: (event) => { if (event.type === 'log') logs.push(event.entry); } });
       client.setTurn(1, 0);
       const turnRequest: TurnRequest = {
         messages: [{ role: 'user', content: 'payload verification' }],
@@ -9468,7 +9502,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       setWarningSink((message) => { snapshotWarnings.push(message); });
 
       try {
-        const snapshotWriter = async (payload: Parameters<NonNullable<AIAgentCallbacks['onSessionSnapshot']>>[0]): Promise<void> => {
+        const snapshotWriter = (payload: { reason?: string; originId: string; snapshot: { version: number; opTree: unknown } }): void => {
           const json = JSON.stringify({
             version: payload.snapshot.version,
             reason: payload.reason,
@@ -9476,8 +9510,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           });
           const gz = gzipSync(Buffer.from(json, 'utf8'));
           const filePath = path.join(tempDir, `${payload.originId}.json.gz`);
-          await fs.promises.mkdir(tempDir, { recursive: true });
-          await fs.promises.writeFile(filePath, gz);
+          fs.mkdirSync(tempDir, { recursive: true });
+          fs.writeFileSync(filePath, gz);
         };
 
         const sessionConfig: AIAgentSessionConfig = {
@@ -9494,7 +9528,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           maxRetries: defaults.maxRetries,
           agentId: COVERAGE_SESSION_ID,
           abortSignal: new AbortController().signal,
-          callbacks: { onSessionSnapshot: snapshotWriter },
+          callbacks: {
+            onEvent: (event) => {
+              if (event.type === 'snapshot') snapshotWriter(event.payload);
+            },
+          },
         };
 
         const session = AIAgentSession.create(sessionConfig);
@@ -9504,16 +9542,21 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const filesAfterSuccess = await fs.promises.readdir(tempDir);
 
         const liveSessionConfig = getPrivateField(session, 'sessionConfig') as (AIAgentSessionConfig | undefined);
-        const originalSnapshotHandler = liveSessionConfig?.callbacks?.onSessionSnapshot;
+        const originalOnEvent = liveSessionConfig?.callbacks?.onEvent;
         if (liveSessionConfig?.callbacks !== undefined) {
-          liveSessionConfig.callbacks.onSessionSnapshot = () => { throw new Error('snapshot-write-failure'); };
+          liveSessionConfig.callbacks.onEvent = (event, meta) => {
+            if (event.type === 'snapshot') {
+              throw new Error('snapshot-write-failure');
+            }
+            originalOnEvent?.(event, meta);
+          };
         }
 
         try {
           await persistSessionSnapshot('coverage-failure');
         } finally {
           if (liveSessionConfig?.callbacks !== undefined) {
-            liveSessionConfig.callbacks.onSessionSnapshot = originalSnapshotHandler;
+            liveSessionConfig.callbacks.onEvent = originalOnEvent;
           }
         }
 
@@ -11968,9 +12011,11 @@ BASE_TEST_SCENARIOS.push((() => {
       const existingCallbacks = sessionConfig.callbacks ?? {};
       sessionConfig.callbacks = {
         ...existingCallbacks,
-        onOutput: (chunk) => {
-          streamedOutput += chunk;
-          existingCallbacks.onOutput?.(chunk);
+        onEvent: (event, meta) => {
+          if (event.type === 'output') {
+            streamedOutput += event.text;
+          }
+          existingCallbacks.onEvent?.(event, meta);
         },
       };
     },
@@ -11984,6 +12029,489 @@ BASE_TEST_SCENARIOS.push((() => {
     },
   } satisfies HarnessTest;
 })());
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-handoff-event-chain',
+  description: 'Static handoff emits handoff event for parent and final_report for child; output chunks are tagged finalize.',
+  execute: async () => {
+    handoffEventCoverage = undefined;
+    const tempDir = makeTempDir('handoff-chain');
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original for restoration after interception
+    const originalExecuteTurn = LLMClient.prototype.executeTurn;
+    const events: { event: AIAgentEvent; meta: AIAgentEventMeta }[] = [];
+    const parentToken = 'HANDOFF_PARENT_TOKEN';
+    const childToken = 'HANDOFF_CHILD_TOKEN';
+    try {
+      const configPath = path.join(tempDir, CONFIG_FILE_NAME);
+      const configData = makeBasicConfiguration();
+      fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), 'utf-8');
+
+      const childPath = path.join(tempDir, 'child.ai');
+      const childContent = [
+        '---',
+        'description: Handoff child agent',
+        `models:`,
+        `  - ${PRIMARY_PROVIDER}/${MODEL_NAME}`,
+        '---',
+        childToken,
+      ].join('\n');
+      fs.writeFileSync(childPath, childContent, 'utf-8');
+
+      const parentPath = path.join(tempDir, 'parent.ai');
+      const parentContent = [
+        '---',
+        'description: Handoff parent agent',
+        `models:`,
+        `  - ${PRIMARY_PROVIDER}/${MODEL_NAME}`,
+        `handoff: ${path.basename(childPath)}`,
+        '---',
+        parentToken,
+      ].join('\n');
+      fs.writeFileSync(parentPath, parentContent, 'utf-8');
+
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        const nonce = extractNonceFromMessages(request.messages, 'run-test-handoff-event-chain');
+        const systemMsg = request.messages.find((message) => message.role === 'system');
+        const systemContent = typeof systemMsg?.content === 'string' ? systemMsg.content : '';
+        const isChild = systemContent.includes(childToken);
+        const reportContent = isChild ? 'Child final report.' : 'Parent final report.';
+        const payload = { report_format: 'markdown', report_content: reportContent };
+        const tagged = `<ai-agent-${nonce}-FINAL status="success" format="markdown">${reportContent}</ai-agent-${nonce}-FINAL>`;
+        if (typeof request.onChunk === 'function') {
+          request.onChunk(tagged, 'content');
+        }
+        await request.toolExecutor('agent__final_report', payload, { toolCallId: `${nonce}-FINAL` });
+        const assistantMessage: ConversationMessage = {
+          role: 'assistant',
+          content: tagged,
+        };
+        return {
+          status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+          latencyMs: 5,
+          messages: [assistantMessage],
+          tokens: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+        };
+      };
+
+      const registry = new AgentRegistry([parentPath], { configPath });
+      const session = await registry.spawnSession({
+        agentId: path.basename(parentPath),
+        userPrompt: 'handoff-event-chain',
+        format: 'markdown',
+        stream: true,
+        callbacks: {
+          onEvent: (event, meta) => {
+            events.push({ event, meta });
+          },
+        },
+      });
+      const result = await AIAgent.run(session);
+      handoffEventCoverage = { events };
+      return result;
+    } finally {
+      LLMClient.prototype.executeTurn = originalExecuteTurn;
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(result.success, 'run-test-handoff-event-chain should succeed.');
+    invariant(handoffEventCoverage !== undefined, 'Handoff event coverage missing for run-test-handoff-event-chain.');
+    const events = handoffEventCoverage.events;
+    const handoffEvents = events.filter((entry) => entry.event.type === 'handoff');
+    invariant(handoffEvents.length === 1, 'Expected exactly one handoff event for run-test-handoff-event-chain.');
+    const handoffMeta = handoffEvents[0].meta;
+    invariant(handoffMeta.agentId === 'parent', 'Handoff event should be emitted by parent agent.');
+    invariant(handoffMeta.pendingHandoffCount > 0, 'Parent handoff event should report pending handoff count.');
+    invariant(handoffMeta.isMaster, 'Parent handoff event should preserve isMaster.');
+
+    const finalEvents = events.filter((entry) => entry.event.type === 'final_report');
+    invariant(finalEvents.length === 1, 'Expected exactly one final_report event for run-test-handoff-event-chain.');
+    const finalMeta = finalEvents[0].meta;
+    invariant(finalMeta.agentId === 'child', 'Final report should come from child agent.');
+    invariant(finalMeta.pendingHandoffCount === 0, 'Child final_report should have pendingHandoffCount=0.');
+    invariant(finalMeta.isMaster, 'Child final_report should inherit isMaster.');
+
+    const parentOutputFinalize = events.filter((entry) => entry.event.type === 'output'
+      && entry.meta.agentId === 'parent'
+      && entry.meta.source === 'finalize');
+    invariant(parentOutputFinalize.length > 0, 'Parent output should be tagged finalize for run-test-handoff-event-chain.');
+    const childOutputFinalize = events.filter((entry) => entry.event.type === 'output'
+      && entry.meta.agentId === 'child'
+      && entry.meta.source === 'finalize');
+    invariant(childOutputFinalize.length > 0, 'Child output should be tagged finalize for run-test-handoff-event-chain.');
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-router-handoff-event',
+  description: 'Router tool handoff emits handoff event for parent and final_report for child.',
+  execute: async () => {
+    routerHandoffEventCoverage = undefined;
+    const tempDir = makeTempDir('router-handoff');
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original for restoration after interception
+    const originalExecuteTurn = LLMClient.prototype.executeTurn;
+    const events: { event: AIAgentEvent; meta: AIAgentEventMeta }[] = [];
+    const parentToken = 'ROUTER_PARENT_TOKEN';
+    const childToken = 'ROUTER_CHILD_TOKEN';
+    try {
+      const configPath = path.join(tempDir, CONFIG_FILE_NAME);
+      const configData = makeBasicConfiguration();
+      fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), 'utf-8');
+
+      const childPath = path.join(tempDir, 'child.ai');
+      const childContent = [
+        '---',
+        'description: Router child agent',
+        `models:`,
+        `  - ${PRIMARY_PROVIDER}/${MODEL_NAME}`,
+        '---',
+        childToken,
+      ].join('\n');
+      fs.writeFileSync(childPath, childContent, 'utf-8');
+
+      const childRef = path.basename(childPath);
+      const parentPath = path.join(tempDir, 'parent.ai');
+      const parentContent = [
+        '---',
+        'description: Router parent agent',
+        `models:`,
+        `  - ${PRIMARY_PROVIDER}/${MODEL_NAME}`,
+        'router:',
+        '  destinations:',
+        `    - ${childRef}`,
+        '---',
+        parentToken,
+      ].join('\n');
+      fs.writeFileSync(parentPath, parentContent, 'utf-8');
+
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        const nonce = extractNonceFromMessages(request.messages, 'run-test-router-handoff-event');
+        const systemMsg = request.messages.find((message) => message.role === 'system');
+        const systemContent = typeof systemMsg?.content === 'string' ? systemMsg.content : '';
+        const isChild = systemContent.includes(childToken);
+        if (isChild) {
+          const reportContent = 'Child final report.';
+          const payload = { report_format: 'markdown', report_content: reportContent };
+          const tagged = `<ai-agent-${nonce}-FINAL status="success" format="markdown">${reportContent}</ai-agent-${nonce}-FINAL>`;
+          if (typeof request.onChunk === 'function') {
+            request.onChunk(tagged, 'content');
+          }
+          await request.toolExecutor('agent__final_report', payload, { toolCallId: `${nonce}-FINAL` });
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: tagged,
+          };
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+            latencyMs: 5,
+            messages: [assistantMessage],
+            tokens: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+          };
+        }
+
+        const routerCallId = `${nonce}-ROUTER`;
+        const assistantMessage: ConversationMessage = {
+          role: 'assistant',
+          content: '',
+          toolCalls: [
+            {
+              name: 'router__handoff-to',
+              id: routerCallId,
+              parameters: { agent: childRef, message: 'Route to child' },
+            },
+          ],
+        };
+        await request.toolExecutor('router__handoff-to', { agent: childRef, message: 'Route to child' }, { toolCallId: routerCallId });
+        return {
+          status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+          latencyMs: 5,
+          messages: [assistantMessage],
+          tokens: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+        };
+      };
+
+      const registry = new AgentRegistry([parentPath], { configPath });
+      const session = await registry.spawnSession({
+        agentId: path.basename(parentPath),
+        userPrompt: 'router-handoff-event',
+        format: 'markdown',
+        stream: true,
+        callbacks: {
+          onEvent: (event, meta) => {
+            events.push({ event, meta });
+          },
+        },
+      });
+      const result = await AIAgent.run(session);
+      routerHandoffEventCoverage = { events };
+      return result;
+    } finally {
+      LLMClient.prototype.executeTurn = originalExecuteTurn;
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(result.success, 'run-test-router-handoff-event should succeed.');
+    invariant(routerHandoffEventCoverage !== undefined, 'Router handoff coverage missing for run-test-router-handoff-event.');
+    const events = routerHandoffEventCoverage.events;
+    const handoffEvents = events.filter((entry) => entry.event.type === 'handoff');
+    invariant(handoffEvents.length === 1, 'Expected exactly one handoff event for run-test-router-handoff-event.');
+    const handoffMeta = handoffEvents[0].meta;
+    invariant(handoffMeta.agentId === 'parent', 'Handoff event should be emitted by parent agent.');
+    invariant(handoffMeta.pendingHandoffCount === 0, 'Router handoff should have pendingHandoffCount=0.');
+    invariant(handoffMeta.isMaster, 'Router handoff should preserve isMaster.');
+
+    const finalEvents = events.filter((entry) => entry.event.type === 'final_report');
+    invariant(finalEvents.length === 1, 'Expected exactly one final_report event for run-test-router-handoff-event.');
+    const finalMeta = finalEvents[0].meta;
+    invariant(finalMeta.agentId === 'child', 'Final report should come from child agent.');
+    invariant(finalMeta.pendingHandoffCount === 0, 'Child final_report should have pendingHandoffCount=0.');
+    invariant(finalMeta.isMaster, 'Child final_report should inherit isMaster.');
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-advisor-event-meta',
+  description: 'Advisor output events are flagged non-master for common gate suppression.',
+  execute: async () => {
+    advisorEventCoverage = undefined;
+    const tempDir = makeTempDir('advisor-event');
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original for restoration after interception
+    const originalExecuteTurn = LLMClient.prototype.executeTurn;
+    const events: { event: AIAgentEvent; meta: AIAgentEventMeta }[] = [];
+    const parentToken = 'ADVISOR_PARENT_TOKEN';
+    const advisorToken = 'ADVISOR_CHILD_TOKEN';
+    try {
+      const configPath = path.join(tempDir, CONFIG_FILE_NAME);
+      const configData = makeBasicConfiguration();
+      fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), 'utf-8');
+
+      const advisorPath = path.join(tempDir, 'advisor.ai');
+      const advisorContent = [
+        '---',
+        'description: Advisor agent',
+        `models:`,
+        `  - ${PRIMARY_PROVIDER}/${MODEL_NAME}`,
+        '---',
+        advisorToken,
+      ].join('\n');
+      fs.writeFileSync(advisorPath, advisorContent, 'utf-8');
+
+      const parentPath = path.join(tempDir, 'parent.ai');
+      const parentContent = [
+        '---',
+        'description: Parent agent',
+        `models:`,
+        `  - ${PRIMARY_PROVIDER}/${MODEL_NAME}`,
+        'advisors:',
+        `  - ${path.basename(advisorPath)}`,
+        '---',
+        parentToken,
+      ].join('\n');
+      fs.writeFileSync(parentPath, parentContent, 'utf-8');
+
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        const nonce = extractNonceFromMessages(request.messages, 'run-test-advisor-event-meta');
+        const systemMsg = request.messages.find((message) => message.role === 'system');
+        const systemContent = typeof systemMsg?.content === 'string' ? systemMsg.content : '';
+        const isAdvisor = systemContent.includes(advisorToken);
+        const reportContent = isAdvisor ? 'Advisor report.' : 'Parent report.';
+        const payload = { report_format: 'markdown', report_content: reportContent };
+        const tagged = `<ai-agent-${nonce}-FINAL status="success" format="markdown">${reportContent}</ai-agent-${nonce}-FINAL>`;
+        if (typeof request.onChunk === 'function') {
+          request.onChunk(tagged, 'content');
+        }
+        await request.toolExecutor('agent__final_report', payload, { toolCallId: `${nonce}-FINAL` });
+        const assistantMessage: ConversationMessage = {
+          role: 'assistant',
+          content: tagged,
+        };
+        return {
+          status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+          latencyMs: 5,
+          messages: [assistantMessage],
+          tokens: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+        };
+      };
+
+      const registry = new AgentRegistry([parentPath], { configPath });
+      const session = await registry.spawnSession({
+        agentId: path.basename(parentPath),
+        userPrompt: 'advisor-event-meta',
+        format: 'markdown',
+        stream: true,
+        callbacks: {
+          onEvent: (event, meta) => {
+            events.push({ event, meta });
+          },
+        },
+      });
+      const result = await AIAgent.run(session);
+      advisorEventCoverage = { events };
+      return result;
+    } finally {
+      LLMClient.prototype.executeTurn = originalExecuteTurn;
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(result.success, 'run-test-advisor-event-meta should succeed.');
+    invariant(advisorEventCoverage !== undefined, 'Advisor event coverage missing for run-test-advisor-event-meta.');
+    const events = advisorEventCoverage.events;
+    const advisorOutputEvents = events.filter((entry) => entry.event.type === 'output' && entry.meta.isMaster === false);
+    invariant(advisorOutputEvents.length > 0, 'Expected advisor output events marked non-master.');
+    const parentOutputEvents = events.filter((entry) => entry.event.type === 'output' && entry.meta.isMaster === true);
+    invariant(parentOutputEvents.length > 0, 'Expected parent output events marked master.');
+    const suppressed = advisorOutputEvents.every((entry) => shouldStreamOutput(entry.event, entry.meta) === false);
+    invariant(suppressed, 'Advisor output should be suppressed by the common gate.');
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-subagent-event-meta',
+  description: 'Sub-agent output events are flagged non-master for common gate suppression.',
+  execute: async () => {
+    subagentEventCoverage = undefined;
+    const tempDir = makeTempDir('subagent-event');
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original for restoration after interception
+    const originalExecuteTurn = LLMClient.prototype.executeTurn;
+    const events: { event: AIAgentEvent; meta: AIAgentEventMeta }[] = [];
+    const parentToken = 'SUBAGENT_PARENT_TOKEN';
+    const childToken = 'SUBAGENT_CHILD_TOKEN';
+    try {
+      const configPath = path.join(tempDir, CONFIG_FILE_NAME);
+      const configData = makeBasicConfiguration();
+      fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), 'utf-8');
+
+      const childPath = path.join(tempDir, 'child.ai');
+      const childContent = [
+        '---',
+        'description: Sub-agent child',
+        `models:`,
+        `  - ${PRIMARY_PROVIDER}/${MODEL_NAME}`,
+        '---',
+        childToken,
+      ].join('\n');
+      fs.writeFileSync(childPath, childContent, 'utf-8');
+
+      const parentPath = path.join(tempDir, 'parent.ai');
+      const parentContent = [
+        '---',
+        'description: Sub-agent parent',
+        `models:`,
+        `  - ${PRIMARY_PROVIDER}/${MODEL_NAME}`,
+        'agents:',
+        `  - ${path.basename(childPath)}`,
+        '---',
+        parentToken,
+      ].join('\n');
+      fs.writeFileSync(parentPath, parentContent, 'utf-8');
+
+      let parentInvocation = 0;
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        const nonce = extractNonceFromMessages(request.messages, 'run-test-subagent-event-meta');
+        const systemMsg = request.messages.find((message) => message.role === 'system');
+        const systemContent = typeof systemMsg?.content === 'string' ? systemMsg.content : '';
+        const isChild = systemContent.includes(childToken);
+        if (isChild) {
+          const reportContent = 'Child report.';
+          const payload = { report_format: 'markdown', report_content: reportContent };
+          const tagged = `<ai-agent-${nonce}-FINAL status="success" format="markdown">${reportContent}</ai-agent-${nonce}-FINAL>`;
+          if (typeof request.onChunk === 'function') {
+            request.onChunk(tagged, 'content');
+          }
+          await request.toolExecutor('agent__final_report', payload, { toolCallId: `${nonce}-FINAL` });
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: tagged,
+          };
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+            latencyMs: 5,
+            messages: [assistantMessage],
+            tokens: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+          };
+        }
+
+        parentInvocation += 1;
+        if (parentInvocation === 1) {
+          const callId = `${nonce}-SUBAGENT`;
+          const parameters = {
+            prompt: 'Run sub-agent.',
+            reason: 'coverage',
+            format: 'sub-agent',
+          };
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                id: callId,
+                name: 'agent__child',
+                parameters,
+              },
+            ],
+          };
+          await request.toolExecutor('agent__child', parameters, { toolCallId: callId });
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+            latencyMs: 5,
+            messages: [assistantMessage],
+            tokens: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+          };
+        }
+
+        const reportContent = 'Parent report.';
+        const payload = { report_format: 'markdown', report_content: reportContent };
+        const tagged = `<ai-agent-${nonce}-FINAL status="success" format="markdown">${reportContent}</ai-agent-${nonce}-FINAL>`;
+        if (typeof request.onChunk === 'function') {
+          request.onChunk(tagged, 'content');
+        }
+        await request.toolExecutor('agent__final_report', payload, { toolCallId: `${nonce}-FINAL` });
+        const assistantMessage: ConversationMessage = {
+          role: 'assistant',
+          content: tagged,
+        };
+        return {
+          status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+          latencyMs: 5,
+          messages: [assistantMessage],
+          tokens: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+        };
+      };
+
+      const registry = new AgentRegistry([parentPath], { configPath });
+      const session = await registry.spawnSession({
+        agentId: path.basename(parentPath),
+        userPrompt: 'subagent-event-meta',
+        format: 'markdown',
+        stream: true,
+        callbacks: {
+          onEvent: (event, meta) => {
+            events.push({ event, meta });
+          },
+        },
+      });
+      const result = await AIAgent.run(session);
+      subagentEventCoverage = { events };
+      return result;
+    } finally {
+      LLMClient.prototype.executeTurn = originalExecuteTurn;
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(result.success, 'run-test-subagent-event-meta should succeed.');
+    invariant(subagentEventCoverage !== undefined, 'Sub-agent event coverage missing for run-test-subagent-event-meta.');
+    const events = subagentEventCoverage.events;
+    const childOutputEvents = events.filter((entry) => entry.event.type === 'output' && entry.meta.isMaster === false);
+    invariant(childOutputEvents.length > 0, 'Expected sub-agent output events marked non-master.');
+    const parentOutputEvents = events.filter((entry) => entry.event.type === 'output' && entry.meta.isMaster === true);
+    invariant(parentOutputEvents.length > 0, 'Expected parent output events marked master.');
+    const suppressed = childOutputEvents.every((entry) => shouldStreamOutput(entry.event, entry.meta) === false);
+    invariant(suppressed, 'Sub-agent output should be suppressed by the common gate.');
+  },
+} satisfies HarnessTest);
 
 const filterScenarios = (ids: string[], logWarnings: boolean): HarnessTest[] => {
   if (ids.length === 0) return BASE_TEST_SCENARIOS;

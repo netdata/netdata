@@ -156,7 +156,9 @@ if (fr.format === 'json' && schema !== undefined && fr.content_json !== undefine
 ```
 
 ### 5. Output Emission (Streaming Deduplication)
-When a headend supplies an `onOutput` callback, the session runner may stream model output in real time. When the final report is accepted, the runner emits the final report content via `onOutput` only if it was not already streamed, preventing duplicated answers in streaming UIs.
+When a headend supplies `onEvent`, the session runner streams output in real time (`event.type='output'`, `meta.source='stream'`). When the final report is accepted, any additional output derived from the final report is emitted as `event.type='output'` with `meta.source='finalize'`, allowing headends to suppress duplicates (especially when handoff is pending).
+
+**Handoff note**: When a handoff is configured or a router handoff is selected, the final report payload is emitted as `event.type='handoff'` (not `final_report`). This payload is the input to the next agent and should not be treated as the user-visible final answer.
 
 ## Final Report Structure
 

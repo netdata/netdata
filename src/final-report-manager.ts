@@ -12,7 +12,7 @@
 import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
-import type { AIAgentResult } from './types.js';
+import type { FinalReportPayload } from './types.js';
 import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
 
 import { getFormatSchema } from './formats.js';
@@ -22,7 +22,7 @@ import { parseJsonRecord } from './utils.js';
 const FORMAT_SLACK_BLOCK_KIT: OutputFormatId = 'slack-block-kit';
 
 // Reusable type definitions
-export type FinalReportPayload = NonNullable<AIAgentResult['finalReport']>;
+export type { FinalReportPayload };
 export type PendingFinalReportPayload = Omit<FinalReportPayload, 'ts'>;
 export type FinalReportSource = 'tool-call' | 'tool-message' | 'synthetic';
 

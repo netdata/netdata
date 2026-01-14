@@ -54,10 +54,7 @@ interface AccountingFlushPayload {
 **Location**: `src/ai-agent.ts:368-386`
 
 ```typescript
-private async persistSessionSnapshot(reason?: string): Promise<void> {
-  const sink = this.sessionConfig.callbacks?.onSessionSnapshot;
-  if (sink === undefined) return;
-
+private persistSessionSnapshot(reason?: string): void {
   const payload: SessionSnapshotPayload = {
     reason,
     sessionId: this.txnId,
@@ -68,8 +65,7 @@ private async persistSessionSnapshot(reason?: string): Promise<void> {
       opTree: this.opTree.getSession()
     },
   };
-
-  await sink(payload);
+  this.emitEvent({ type: 'snapshot', payload });
 }
 ```
 
@@ -80,13 +76,13 @@ this.opTree.getSession();  // Returns SessionNode
 
 ### 3. Callback Invocation
 ```typescript
-await this.sessionConfig.callbacks?.onSessionSnapshot(payload);
+this.emitEvent({ type: 'snapshot', payload });
 ```
 
 ### 4. Error Handling
 ```typescript
 try {
-  await sink(payload);
+  this.emitEvent({ type: 'snapshot', payload });
 } catch (e) {
   warn(`persistSessionSnapshot failed: ${e.message}`);
 }
@@ -159,34 +155,37 @@ interface OperationNode {
 
 ### File-Based
 ```typescript
-onSessionSnapshot: async (payload) => {
-  const filename = `session-${payload.sessionId}.json`;
-  await fs.writeFile(filename, JSON.stringify(payload, null, 2));
+onEvent: async (event) => {
+  if (event.type !== 'snapshot') return;
+  const filename = `session-${event.payload.sessionId}.json`;
+  await fs.writeFile(filename, JSON.stringify(event.payload, null, 2));
 }
 ```
 
 ### Database Storage
 ```typescript
-onSessionSnapshot: async (payload) => {
+onEvent: async (event) => {
+  if (event.type !== 'snapshot') return;
   await db.sessions.upsert({
-    id: payload.sessionId,
-    origin: payload.originId,
-    timestamp: payload.timestamp,
-    snapshot: payload.snapshot,
+    id: event.payload.sessionId,
+    origin: event.payload.originId,
+    timestamp: event.payload.timestamp,
+    snapshot: event.payload.snapshot,
   });
 }
 ```
 
 ### Real-Time Streaming
 ```typescript
-onSessionSnapshot: async (payload) => {
-  await websocket.send(JSON.stringify(payload));
+onEvent: async (event) => {
+  if (event.type !== 'snapshot') return;
+  await websocket.send(JSON.stringify(event.payload));
 }
 ```
 
 ## Business Logic Coverage (Verified 2025-11-16)
 
-- **Callback isolation**: `persistSessionSnapshot` simply forwards the opTree payload to `callbacks.onSessionSnapshot` and wraps the await in `try/catch`, logging `[warn] persistSessionSnapshot(...) failed` without interrupting the session (`src/ai-agent.ts:368-386`).
+- **Callback isolation**: `persistSessionSnapshot` emits `onEvent(type='snapshot')` and wraps the call in `try/catch`, logging `[warn] persistSessionSnapshot(...) failed` without interrupting the session (`src/ai-agent.ts:368-386`).
 - **Reason tagging**: Snapshots are emitted with explicit reasons—`'subagent_finish'` after every child agent completes and `'final'` exactly once at session end—so downstream systems can distinguish mid-run updates from the terminal snapshot (`src/ai-agent.ts:737`, `src/ai-agent.ts:1307`).
 - **Child captures via opTree**: Because each agent tool execution attaches the child SessionNode to its parent op, snapshot consumers automatically inherit the full nested structure without needing a secondary API (`src/ai-agent.ts:700-884`, `src/session-tree.ts:90-200`).
 
@@ -203,7 +202,7 @@ private async flushAccounting(entries: AccountingEntry[]): Promise<void> {
     timestamp: Date.now(),
     entries: entries.map((entry) => ({ ...entry })),
   };
-  await sink(payload);
+  this.emitEvent({ type: 'accounting_flush', payload });
 }
 ```
 
@@ -240,8 +239,8 @@ private async flushAccounting(entries: AccountingEntry[]): Promise<void> {
 |---------|--------|
 | `persistence.sessionsDir` | Directory for snapshot files (default: `~/.ai-agent/sessions/`) |
 | `persistence.billingFile` | Path for accounting ledger (default: `~/.ai-agent/accounting.jsonl`) |
-| `onSessionSnapshot` | Custom snapshot sink callback (overrides file persistence) |
-| `onAccountingFlush` | Custom accounting sink callback (overrides file persistence) |
+| `onEvent(type='snapshot')` | Custom snapshot sink callback (overrides file persistence) |
+| `onEvent(type='accounting_flush')` | Custom accounting sink callback (overrides file persistence) |
 
 ### Default Persistence
 **Location**: `src/persistence.ts:22-30`
@@ -250,7 +249,7 @@ All entry points (CLI, headends, library API) apply the same defaults via `resol
 - Sessions saved to `~/.ai-agent/sessions/{originId}.json.gz`
 - Accounting appended to `~/.ai-agent/accounting.jsonl`
 
-User-provided `persistence` config values override defaults. Custom callbacks (`onSessionSnapshot`, `onAccountingFlush`) bypass file persistence entirely.
+User-provided `persistence` config values override defaults. Custom callbacks (`onEvent` for `snapshot` / `accounting_flush`) bypass file persistence entirely.
 
 ## Telemetry
 

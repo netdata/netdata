@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { AgentRegistry } from '../agent-registry.js';
 import type { OutputFormatId } from '../formats.js';
-import type { AccountingEntry, AIAgentCallbacks, ConversationMessage, EmbedAuthConfig, EmbedAuthTierConfig, EmbedHeadendConfig, EmbedTierRateLimitConfig, LogEntry, ProgressEvent } from '../types.js';
+import type { AccountingEntry, AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, ConversationMessage, EmbedAuthConfig, EmbedAuthTierConfig, EmbedHeadendConfig, EmbedTierRateLimitConfig, FinalReportPayload, LogEntry, ProgressEvent } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 import type { Socket } from 'node:net';
 
@@ -19,6 +19,7 @@ import { ConcurrencyLimiter } from './concurrency.js';
 import { EmbedMetrics } from './embed-metrics.js';
 import { appendTranscriptTurn, loadTranscript, writeTranscript, type EmbedTranscriptEntry } from './embed-transcripts.js';
 import { HttpError, readJson, writeJson, writeSseEvent } from './http-utils.js';
+import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamOutput, shouldStreamTurnStarted } from './shared-event-filter.js';
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -455,6 +456,8 @@ export class EmbedHeadend implements Headend {
       let reportBuffer = '';
       const statusEntries: EmbedTranscriptEntry[] = [];
       const accounting: AccountingEntry[] = [];
+      const eventState = createHeadendEventState();
+      let finalReportFromEvent: FinalReportPayload | undefined;
 
       const maybeEmitMeta = (): void => {
         if (sessionId === undefined || currentTurn === undefined) return;
@@ -481,39 +484,73 @@ export class EmbedHeadend implements Headend {
         writeSseEvent(res, 'status', statusPayload);
       };
 
-      const callbacks: AIAgentCallbacks = {
-        onOutput: (chunk: string, meta?: { agentId?: string; sessionId?: string }) => {
-          if (meta?.agentId !== undefined && meta.agentId !== agentId) return;
-          if (chunk.length === 0) return;
-          if (meta?.sessionId !== undefined && sessionId === undefined) {
-            sessionId = meta.sessionId;
-            maybeEmitMeta();
-          }
-          reportBuffer += chunk;
-          reportIndex += 1;
-          this.metrics.recordReportChunk();
-          writeSseEvent(res, 'report', { chunk, index: reportIndex });
-        },
-        onProgress: (event: ProgressEvent) => {
-          if (event.type === 'agent_update' || event.type === 'agent_started' || event.type === 'agent_finished' || event.type === 'agent_failed') {
-            const txnId = typeof event.txnId === 'string' ? event.txnId : undefined;
-            if (txnId !== undefined && sessionId === undefined) {
-              sessionId = txnId;
+      const callbacks: AIAgentEventCallbacks = {
+        onEvent: (event: AIAgentEvent, meta: AIAgentEventMeta) => {
+          switch (event.type) {
+            case 'output': {
+              if (!shouldStreamOutput(event, meta)) return;
+              const chunk = event.text;
+              if (chunk.length === 0) return;
+              if (meta.sessionId !== undefined && sessionId === undefined) {
+                sessionId = meta.sessionId;
+                maybeEmitMeta();
+              }
+              reportBuffer += chunk;
+              reportIndex += 1;
+              this.metrics.recordReportChunk();
+              writeSseEvent(res, 'report', { chunk, index: reportIndex });
+              return;
+            }
+            case 'turn_started': {
+              if (!shouldStreamTurnStarted(meta)) return;
+              currentTurn = event.turn;
               maybeEmitMeta();
+              return;
+            }
+            case 'progress': {
+              const progressEvent = event.event;
+              if (
+                progressEvent.type === 'agent_update'
+                || progressEvent.type === 'agent_started'
+                || progressEvent.type === 'agent_finished'
+                || progressEvent.type === 'agent_failed'
+              ) {
+                const txnId = typeof progressEvent.txnId === 'string' ? progressEvent.txnId : undefined;
+                if (txnId !== undefined && sessionId === undefined) {
+                  sessionId = txnId;
+                  maybeEmitMeta();
+                }
+              }
+              handleStatusEvent(progressEvent);
+              return;
+            }
+            case 'status': {
+              // avoid duplicate status handling (progress already includes agent_update)
+              return;
+            }
+            case 'handoff': {
+              markHandoffSeen(eventState, meta);
+              return;
+            }
+            case 'final_report': {
+              if (!shouldAcceptFinalReport(eventState, meta)) return;
+              finalReportFromEvent = event.report;
+              return;
+            }
+            case 'log': {
+              const entry = event.entry;
+              entry.headendId = this.id;
+              this.logEntry(entry);
+              return;
+            }
+            case 'accounting': {
+              accounting.push(event.entry);
+              return;
+            }
+            default: {
+              return;
             }
           }
-          handleStatusEvent(event);
-        },
-        onTurnStarted: (turn) => {
-          currentTurn = turn;
-          maybeEmitMeta();
-        },
-        onLog: (entry) => {
-          entry.headendId = this.id;
-          this.logEntry(entry);
-        },
-        onAccounting: (entry) => {
-          accounting.push(entry);
         },
       };
 
@@ -537,7 +574,7 @@ export class EmbedHeadend implements Headend {
       this.metrics.recordSessionEnd(durationMs);
       sessionActive = false;
 
-      const finalReport = result.finalReport;
+      const finalReport = finalReportFromEvent ?? result.finalReport;
       const finalText = (() => {
         if (finalReport === undefined) return '';
         if (finalReport.format === 'json' && finalReport.content_json !== undefined) {

@@ -3,7 +3,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 import type { GlobalOverrides } from '../agent-loader.js';
-import type { AccountingEntry, ConversationMessage, LogEntry, ReasoningLevel } from '../types.js';
+import type { AccountingEntry, AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, ConversationMessage, LogEntry, ReasoningLevel } from '../types.js';
 
 import { loadAgent, LoadedAgentCache } from '../agent-loader.js';
 import { sanitizeToolName } from '../utils.js';
@@ -483,9 +483,11 @@ const runScenarioVariant = async (
       stream,
       reasoning: scenario.reasoning,
     });
-    const callbacks = VERBOSE_LOGS
+    const callbacks: AIAgentEventCallbacks | undefined = VERBOSE_LOGS
       ? {
-          onLog: (entry: LogEntry) => {
+          onEvent: (event: AIAgentEvent, _meta: AIAgentEventMeta) => {
+            if (event.type !== 'log') return;
+            const entry: LogEntry = event.entry;
             const turnSegment = Number.isFinite(entry.turn) ? ` turn=${String(entry.turn)}` : '';
             console.log(`[LOG] ${entry.severity} ${entry.remoteIdentifier}${turnSegment}: ${entry.message}`);
           },

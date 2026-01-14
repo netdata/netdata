@@ -26,16 +26,16 @@ async function run(): Promise<void> {
   const tree = new SessionTreeBuilder({ traceId: 'txn', agentId: 'agent', callPath: 'agent' });
   tree.beginTurn(1, {});
   const logs: LogEntry[] = [];
-  const onLog = (entry: LogEntry, opts?: { opId?: string }) => {
+  const logEntry = (entry: LogEntry, opts?: { opId?: string }) => {
     const opId = opts?.opId;
-    if (typeof opId !== 'string' || opId.length === 0) throw new Error('missing opId in onLog');
+    if (typeof opId !== 'string' || opId.length === 0) throw new Error('missing opId in log handler');
     // anchor into tree
     tree.appendLog(opId, entry);
     logs.push(entry);
   };
   queueManager.reset();
   queueManager.configureQueues({ default: { concurrent: 8 } });
-  const orch = new ToolsOrchestrator({ toolTimeout: 2000, toolResponseMaxBytes: 1024, traceTools: true }, tree, (tr) => { void tr; }, onLog, undefined, { agentId: 'agent', callPath: 'agent' });
+  const orch = new ToolsOrchestrator({ toolTimeout: 2000, toolResponseMaxBytes: 1024, traceTools: true }, tree, (tr) => { void tr; }, logEntry, undefined, { agentId: 'agent', callPath: 'agent' });
   orch.register(new FakeRestProvider());
 
   // Success path
@@ -63,9 +63,9 @@ async function run(): Promise<void> {
   // Expect fixed count of logs on failure
   if (errLogs.length !== EXPECT) throw new Error(`expected ${String(EXPECT)} logs for error, got ${String(errLogs.length)}`);
 
-  // No double emission: onLog count should equal total logs on both ops
+  // No double emission: log handler count should equal total logs on both ops
   const totalOpLogs = succLogs.length + errLogs.length;
-  if (logs.length < totalOpLogs) throw new Error('missing logs in onLog capture');
+  if (logs.length < totalOpLogs) throw new Error('missing logs in log capture');
 }
 
 void run().then(() => {   console.log('smoke-logger ok'); }).catch((e: unknown) => {   console.error('smoke-logger failed', e instanceof Error ? e.message : String(e)); process.exit(1); });

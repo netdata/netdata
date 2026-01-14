@@ -37,10 +37,14 @@ export { LLMClient } from './llm-client.js';
 export type {
   AIAgentSessionConfig,
   AIAgentResult,
-  AIAgentCallbacks,
+  AIAgentEvent,
+  AIAgentEventCallbacks,
+  AIAgentEventMeta,
   AIAgentOptions,
   AIAgentRunOptions,
   Configuration,
+  EventSource,
+  FinalReportPayload,
   ProviderConfig,
   MCPServerConfig,
   MCPTool,
@@ -100,7 +104,10 @@ static create(sessionConfig: AIAgentSessionConfig): AIAgentSession {
   // 3. Create LLM client
   const llmClient = new LLMClient(enrichedSessionConfig.config.providers, {
     traceLLM: enrichedSessionConfig.traceLLM,
-    onLog: wrapLog(enrichedSessionConfig.callbacks?.onLog),
+    traceSDK: enrichedSessionConfig.traceSdk,
+    emitEvent: (event) => {
+      // relay external log/trace events into the session/event stream
+    },
     pricing: enrichedSessionConfig.config.pricing,
   });
 
@@ -171,7 +178,7 @@ interface AIAgentSessionConfig {
   verbose?: boolean;                        // Verbose logging
 
   // Optional callbacks
-  callbacks?: AIAgentCallbacks;             // Event callbacks
+  callbacks?: AIAgentEventCallbacks;        // Event callbacks
 
   // Optional trace context
   trace?: {
@@ -200,37 +207,40 @@ interface AIAgentSessionConfig {
 }
 ```
 
-## AIAgentCallbacks
+## AIAgentEventCallbacks
 
-**Location**: `src/types.ts:530-541`
+**Location**: `src/types.ts:650-656`
 
 ```typescript
-interface AIAgentCallbacks {
-  onLog?: (entry: LogEntry) => void;
-  onOutput?: (text: string) => void;
-  onThinking?: (text: string) => void;
-  onTurnStarted?: (turn: number) => void;
-  onAccounting?: (entry: AccountingEntry) => void;
-  onSessionSnapshot?: (payload: SessionSnapshotPayload) => void | Promise<void>;
-  onAccountingFlush?: (payload: AccountingFlushPayload) => void | Promise<void>;
-  onProgress?: (event: ProgressEvent) => void;
-  onOpTree?: (tree: unknown) => void;
+interface AIAgentEventCallbacks {
+  onEvent?: (event: AIAgentEvent, meta: AIAgentEventMeta) => void;
 }
 ```
 
-### Callback Purposes
+### Event Types
 
-| Callback | Purpose |
-|----------|---------|
-| `onLog` | Receive all log entries |
-| `onOutput` | Stream final output text |
-| `onThinking` | Stream reasoning content |
-| `onTurnStarted` | Notification of new LLM turn |
-| `onAccounting` | Receive accounting entries |
-| `onSessionSnapshot` | Full session state snapshots |
-| `onAccountingFlush` | Batch accounting entries |
-| `onProgress` | Progress events; `agent_update` includes structured `taskStatus` when emitted via `agent__task_status` |
-| `onOpTree` | Hierarchical operation tree updates |
+| Event type | Payload | Notes |
+|------------|---------|-------|
+| `output` | `{ text }` | Assistant output stream (meta.source = `stream|replay|finalize`) |
+| `thinking` | `{ text }` | Reasoning stream (meta.source = `stream|replay`) |
+| `turn_started` | `{ turn }` | LLM turn start notification |
+| `progress` | `{ event }` | Progress events (`agent_update` includes structured `taskStatus`) |
+| `status` | `{ event }` | Convenience mirror of `progress` when `event.type === 'agent_update'` |
+| `final_report` | `{ report }` | Final report payload for terminal agent |
+| `handoff` | `{ report }` | Handoff payload when a handoff is configured or selected |
+| `log` | `{ entry }` | Structured logs (LLM/tool/system) |
+| `accounting` | `{ entry }` | Accounting entries (LLM/tool) |
+| `snapshot` | `{ payload }` | Session snapshot payload |
+| `accounting_flush` | `{ payload }` | Batched accounting payload |
+| `op_tree` | `{ tree }` | Operation tree snapshot |
+
+### Meta Fields (high-level)
+
+- `isMaster` – true when this agent is the master (inherited across handoffs)
+- `pendingHandoffCount` – static count of pending handoffs known at session start
+- `handoffConfigured` – true when this agent has a configured handoff target
+- `isFinal` – **authoritative only for `final_report` events** (may be inconsistent for other event types)
+- `source?: 'stream' | 'replay' | 'finalize'` – stream source for output/thinking events
 
 ## AIAgentResult
 
@@ -298,15 +308,15 @@ async function main() {
     toolTimeout: 30000,
     stream: true,
     callbacks: {
-      onOutput: (text) => process.stdout.write(text),
-      onThinking: (text) => console.log(`[Thinking] ${text}`),
-      onTurnStarted: (turn) => console.log(`\n--- Turn ${turn} ---`),
-      onLog: (entry) => {
-        if (entry.severity === 'ERR') console.error(entry.message);
-      },
-      onAccounting: (entry) => {
-        if (entry.type === 'llm') {
-          console.log(`LLM: ${entry.tokens.inputTokens}/${entry.tokens.outputTokens} tokens`);
+      onEvent: (event) => {
+        if (event.type === 'output') process.stdout.write(event.text);
+        if (event.type === 'thinking') console.log(`[Thinking] ${event.text}`);
+        if (event.type === 'turn_started') console.log(`\n--- Turn ${event.turn} ---`);
+        if (event.type === 'log' && event.entry.severity === 'ERR') {
+          console.error(event.entry.message);
+        }
+        if (event.type === 'accounting' && event.entry.type === 'llm') {
+          console.log(`LLM: ${event.entry.tokens.inputTokens}/${event.entry.tokens.outputTokens} tokens`);
         }
       },
     },
@@ -496,9 +506,9 @@ All errors populate `result.error` and set `result.success = false`.
 ## Business Logic Coverage (Verified 2025-11-16)
 
 - **Result contract**: `run()` never throws for operational failures; it always resolves with `AIAgentResult` where `success=false` and `error` describes the failure, so embedders can rely on promise resolution semantics (`src/ai-agent.ts:1037-1388`).
-- **Callback isolation**: Callback exceptions (onLog/onOutput/onThinking/onAccounting/onOpTree/onSessionSnapshot) are caught and logged but do not crash the session, preventing user-provided handlers from destabilizing the run (`src/ai-agent.ts:330-410`).
+- **Callback isolation**: `onEvent` exceptions are caught and logged but do not crash the session, preventing user-provided handlers from destabilizing the run (`src/ai-agent.ts:330-410`).
 - **Final report exposure**: Regardless of streaming output, the result always includes `finalReport` with status/format/content so embedders can display the canonical answer without parsing streamed text (`src/ai-agent.ts:189-210`).
-- **Snapshot hooks**: `callbacks.onSessionSnapshot` and `onAccountingFlush` fire even on failure, enabling embedders to persist diagnostics or billing for crashed sessions (`src/ai-agent.ts:368-408`).
+- **Snapshot hooks**: `onEvent(type='snapshot' | 'accounting_flush')` fires even on failure, enabling embedders to persist diagnostics or billing for crashed sessions (`src/ai-agent.ts:368-408`).
 ## Invariants
 
 1. **Factory pattern**: Private constructor, use `create()`

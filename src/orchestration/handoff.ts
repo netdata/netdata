@@ -8,6 +8,8 @@ export interface ExecuteHandoffOptions {
   parentResult: AIAgentResult;
   originalUserPrompt: string;
   parentAgentLabel: string;
+  isMaster?: boolean;
+  pendingHandoffCount?: number;
   parentSession: Pick<
     AIAgentSessionConfig,
     | "config"
@@ -27,6 +29,8 @@ export interface ExecuteHandoffOptions {
     | "toolResponseMaxBytes"
     | "targets"
     | "tools"
+    | "isMaster"
+    | "pendingHandoffCount"
   > & {
     trace?: {
       originId?: string;
@@ -71,6 +75,8 @@ export async function executeHandoff(
     systemTemplate: target.systemTemplate,
     userPrompt: prompt,
     parentSession: opts.parentSession,
+    isMaster: opts.isMaster,
+    pendingHandoffCount: opts.pendingHandoffCount,
     ancestors: opts.ancestors,
   });
 }

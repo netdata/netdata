@@ -148,7 +148,7 @@ Uses generic conversion from base class.
 ## Invariants
 
 1. **Budget parsing**: Values must parse to finite numbers; otherwise they are ignored with a warning.
-2. **Include thoughts**: Always `true` when thinking is enabled so `onThinking` callbacks receive content.
+2. **Include thoughts**: Always `true` when thinking is enabled so `onEvent(type='thinking')` receives content.
 3. **Reasoning defaults**: The base class only uses `[1024, 32768]` bounds when deriving budgets from reasoning levels (not for explicit overrides).
 4. **Frequency penalty**: Direct mapping when finite.
 5. **Max tokens**: Integer truncation before sending to Google.
@@ -156,7 +156,7 @@ Uses generic conversion from base class.
 ## Business Logic Coverage (Verified 2025-11-16)
 
 - **Thinking config parsing**: Budgets are truncated to integers only after they pass a finite-number check; there is intentionally no upper clamp beyond what callers provide so internal harnesses can test out-of-range budgets (`src/llm-providers/google.ts:42-60`).
-- **Thought streaming**: When thinking is enabled `includeThoughts: true` guarantees reasoning text returns even if the request wasn’t explicitly streaming, matching ai-agent’s expectation for the `onThinking` callback (`src/llm-providers/google.ts:47-58`).
+- **Thought streaming**: When thinking is enabled `includeThoughts: true` guarantees reasoning text returns even if the request wasn’t explicitly streaming, matching ai-agent’s expectation for `onEvent(type='thinking')` (`src/llm-providers/google.ts:47-58`).
 - **Repeat penalty mapping**: `repeatPenalty` is passed through directly as Google’s `frequencyPenalty`, aligning CLI/frontmatter semantics across providers (`src/llm-providers/google.ts:42-58`).
 
 ## Test Coverage

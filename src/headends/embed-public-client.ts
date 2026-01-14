@@ -49,6 +49,15 @@ interface EmbedDoneData {
   reportLength: number;
 }
 
+type EmbedClientEvent =
+  | { type: 'client'; clientId: string; isNew: boolean }
+  | { type: 'meta'; sessionId: string; turn?: number; agentId?: string }
+  | { type: 'status'; data: EmbedStatusEventData }
+  | { type: 'report'; chunk: string; report: string; index: number }
+  | { type: 'done'; data: EmbedDoneData }
+  | { type: 'error'; error: { code: string; message: string } }
+  | { type: 'turn'; turn: number; isUser: boolean };
+
 interface NetdataSupportConfig {
   endpoint: string;
   agentId?: string;
@@ -63,12 +72,7 @@ interface NetdataSupportConfig {
     statusClass?: string;
   };
   supportsMermaid?: boolean;
-  onStatus?: (status: EmbedStatusEventData) => void;
-  onReportChunk?: (chunk: string, fullReport: string) => void;
-  onComplete?: (result: EmbedDoneData) => void;
-  onError?: (error: { code: string; message: string }) => void;
-  onTurnStart?: (turn: number, isUser: boolean) => void;
-  onClientId?: (clientId: string) => void;
+  onEvent?: (event: EmbedClientEvent) => void;
 }
 
 class NetdataSupport {
@@ -82,6 +86,11 @@ class NetdataSupport {
   constructor(config: NetdataSupportConfig) {
     this.config = config;
     this.clientId = typeof config.clientId === 'string' ? config.clientId : null;
+  }
+
+  private emitEvent(event: EmbedClientEvent): void {
+    if (this.config.onEvent === undefined) return;
+    this.config.onEvent(event);
   }
 
   async ask(message: string): Promise<void> {
@@ -107,7 +116,7 @@ class NetdataSupport {
     let report = '';
     const userEntry: EmbedHistoryEntry = { role: 'user', content: trimmed };
     try {
-      this.config.onTurnStart?.(this.history.length + 1, true);
+      this.emitEvent({ type: 'turn', turn: this.history.length + 1, isUser: true });
       const response = await fetch(`${this.config.endpoint.replace(/\/+$/, '')}/v1/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -144,30 +153,36 @@ class NetdataSupport {
           const payload = JSON.parse(dataStr) as Record<string, unknown>;
           if (eventName === 'client') {
             const nextId = typeof payload.clientId === 'string' ? payload.clientId : '';
+            const isNew = payload.isNew === true;
             if (nextId.length > 0) {
               this.clientId = nextId;
-              this.config.onClientId?.(nextId);
+              this.emitEvent({ type: 'client', clientId: nextId, isNew });
             }
             return;
           }
           if (eventName === 'meta') {
             const sessionId = typeof payload.sessionId === 'string' ? payload.sessionId : '';
-            if (sessionId.length > 0) this.sessionId = sessionId;
             const turn = typeof payload.turn === 'number' ? payload.turn : undefined;
-            if (turn !== undefined) this.config.onTurnStart?.(turn, false);
+            const agentId = typeof payload.agentId === 'string' ? payload.agentId : undefined;
+            if (sessionId.length > 0) {
+              this.sessionId = sessionId;
+              this.emitEvent({ type: 'meta', sessionId, turn, agentId });
+            }
+            if (turn !== undefined) this.emitEvent({ type: 'turn', turn, isUser: false });
             return;
           }
           if (eventName === 'status') {
             const statusPayload = payload as unknown as EmbedStatusEventData;
             this.history.push({ role: 'status', content: statusPayload.message });
-            this.config.onStatus?.(statusPayload);
+            this.emitEvent({ type: 'status', data: statusPayload });
             return;
           }
           if (eventName === 'report') {
             const chunk = typeof payload.chunk === 'string' ? payload.chunk : '';
             if (chunk.length > 0) {
               report += chunk;
-              this.config.onReportChunk?.(chunk, report);
+              const index = typeof payload.index === 'number' ? payload.index : report.length;
+              this.emitEvent({ type: 'report', chunk, report, index });
             }
             return;
           }
@@ -175,13 +190,13 @@ class NetdataSupport {
             const donePayload = payload as unknown as EmbedDoneData;
             this.history.push(userEntry);
             this.history.push({ role: 'assistant', content: report });
-            this.config.onComplete?.(donePayload);
+            this.emitEvent({ type: 'done', data: donePayload });
             return;
           }
           if (eventName === 'error') {
             const code = typeof payload.code === 'string' ? payload.code : 'unknown';
             const msg = typeof payload.message === 'string' ? payload.message : 'unknown error';
-            this.config.onError?.({ code, message: msg });
+            this.emitEvent({ type: 'error', error: { code, message: msg } });
             return;
           }
         } catch {
@@ -205,7 +220,7 @@ class NetdataSupport {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'unknown error';
-      this.config.onError?.({ code: 'request_failed', message: msg });
+      this.emitEvent({ type: 'error', error: { code: 'request_failed', message: msg } });
       throw err;
     } finally {
       this.loading = false;

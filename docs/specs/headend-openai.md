@@ -131,12 +131,15 @@ interface OpenAIChatRequestMessage {
 6. **Acquire concurrency slot**
 
 7. **Initialize callbacks**:
-   - `onOutput`: Accumulate and stream content (TurnRunner avoids duplicating final report output when it was already streamed)
-   - `onThinking`: Build reasoning structure
-   - `onTurnStarted`: Track turn progression
-   - `onProgress`: Handle progress events
-   - `onLog`: Forward logs
-   - `onAccounting`: Track token usage
+   - `onEvent(type='output')`: Accumulate and stream content. Suppress `meta.source='finalize'` when `meta.pendingHandoffCount > 0` to avoid streaming handoff inputs.
+   - `onEvent(type='thinking')`: Build reasoning structure
+   - `onEvent(type='turn_started')`: Track turn progression
+   - `onEvent(type='progress')`: Handle progress events
+   - `onEvent(type='status')`: Ignored (duplicate of progress `agent_update`)
+   - `onEvent(type='log')`: Forward logs
+   - `onEvent(type='accounting')`: Track token usage
+   - `onEvent(type='handoff')`: Mark handoff so final_report is ignored for this session
+   - `onEvent(type='final_report')`: Accept only if no handoff was observed
 
 8. **Stream response** (if `stream: true`):
    ```typescript

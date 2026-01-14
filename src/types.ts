@@ -606,26 +606,49 @@ export interface AccountingFlushPayload {
   entries: AccountingEntry[];
 }
 
-export interface CallbackMeta {
+export type EventSource = 'stream' | 'replay' | 'finalize';
+
+export interface AIAgentEventMeta {
   agentId?: string;
   callPath?: string;
   sessionId?: string;
   parentId?: string;
   originId?: string;
+  headendId?: string;
+  renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'embed' | 'sub-agent';
+  isMaster: boolean;
+  isFinal: boolean;
+  pendingHandoffCount: number;
+  handoffConfigured: boolean;
+  sequence: number;
+  source?: EventSource;
 }
 
+export interface FinalReportPayload {
+  format: 'json' | 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'sub-agent' | 'text';
+  content?: string;
+  content_json?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  ts: number;
+}
+
+export type AIAgentEvent =
+  | { type: 'output'; text: string }
+  | { type: 'thinking'; text: string }
+  | { type: 'progress'; event: ProgressEvent }
+  | { type: 'status'; event: ProgressEvent }
+  | { type: 'final_report'; report: FinalReportPayload }
+  | { type: 'handoff'; report: FinalReportPayload }
+  | { type: 'log'; entry: LogEntry }
+  | { type: 'accounting'; entry: AccountingEntry }
+  | { type: 'turn_started'; turn: number }
+  | { type: 'snapshot'; payload: SessionSnapshotPayload }
+  | { type: 'accounting_flush'; payload: AccountingFlushPayload }
+  | { type: 'op_tree'; tree: SessionNode };
+
 // Session configuration and callbacks
-export interface AIAgentCallbacks {
-  onLog?: (entry: LogEntry) => void;
-  onOutput?: (text: string, meta?: CallbackMeta) => void;
-  onThinking?: (text: string, meta?: CallbackMeta) => void;
-  onTurnStarted?: (turn: number) => void;
-  onAccounting?: (entry: AccountingEntry) => void;
-  onSessionSnapshot?: (payload: SessionSnapshotPayload) => void | Promise<void>;
-  onAccountingFlush?: (payload: AccountingFlushPayload) => void | Promise<void>;
-  onProgress?: (event: ProgressEvent) => void;
-  // Live snapshot of the hierarchical operation tree (Option C)
-  onOpTree?: (tree: unknown) => void;
+export interface AIAgentEventCallbacks {
+  onEvent?: (event: AIAgentEvent, meta: AIAgentEventMeta) => void;
 }
 
 export interface OrchestrationAgentRef {
@@ -641,7 +664,7 @@ export interface OrchestrationConfig {
 
 export interface AgentRunOptions {
   history?: ConversationMessage[];
-  callbacks?: AIAgentCallbacks;
+  callbacks?: AIAgentEventCallbacks;
   trace?: AIAgentSessionConfig['trace'];
   renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'embed' | 'sub-agent';
   outputFormat: OutputFormatId;
@@ -651,6 +674,8 @@ export interface AgentRunOptions {
   ancestors?: string[];
   headendId?: string;
   telemetryLabels?: Record<string, string>;
+  isMaster?: boolean;
+  pendingHandoffCount?: number;
   wantsProgressUpdates?: boolean;
   traceLLM?: boolean;
   traceMCP?: boolean;
@@ -696,6 +721,8 @@ export interface AIAgentSessionConfig {
   headendId?: string;
   headendWantsProgressUpdates?: boolean;
   telemetryLabels?: Record<string, string>;
+  isMaster?: boolean;
+  pendingHandoffCount?: number;
   systemPrompt: string;
   userPrompt: string;
   cacheTtlMs?: number;
@@ -718,7 +745,7 @@ export interface AIAgentSessionConfig {
   llmTimeout?: number;
   toolTimeout?: number;
   stream?: boolean;
-  callbacks?: AIAgentCallbacks;
+  callbacks?: AIAgentEventCallbacks;
   traceLLM?: boolean;
   traceMCP?: boolean;
   traceSdk?: boolean;
@@ -771,15 +798,7 @@ export interface AIAgentResult {
   // The agent id that produced the final report/response (after orchestration)
   finalAgentId?: string;
   // Isolated final report returned by the model via agent_final_report, when available
-  finalReport?: {
-    // Allow all known output formats plus legacy 'text'
-    format: 'json' | 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'sub-agent' | 'text';
-    content?: string;
-    content_json?: Record<string, unknown>;
-    // Optional provider-specific extras (e.g., Slack Block Kit messages)
-    metadata?: Record<string, unknown>;
-    ts: number;
-  };
+  finalReport?: FinalReportPayload;
 }
 
 // Accounting system
@@ -894,7 +913,7 @@ export interface AIAgentOptions {
   topP?: number | null;
   topK?: number | null;
   repeatPenalty?: number | null;
-  callbacks?: AIAgentCallbacks;
+  callbacks?: AIAgentEventCallbacks;
   traceLLM?: boolean;
   traceMCP?: boolean;
   traceSdk?: boolean;

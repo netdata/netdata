@@ -9,7 +9,7 @@ import type { LoadAgentOptions } from './agent-loader.js';
 import type { FrontmatterOptions } from './frontmatter.js';
 import type { McpTransportSpec } from './headends/mcp-headend.js';
 import type { Headend, HeadendLogSink } from './headends/types.js';
-import type { AccountingEntry, AIAgentCallbacks, CallbackMeta, Configuration, ConversationMessage, LogEntry, MCPTool, ProviderReasoningValue, ReasoningLevel, TelemetryLogExtra, TelemetryLogFormat, TelemetryTraceSampler } from './types.js';
+import type { AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, Configuration, ConversationMessage, LogEntry, MCPTool, ProviderReasoningValue, ReasoningLevel, TelemetryLogExtra, TelemetryLogFormat, TelemetryTraceSampler } from './types.js';
 import type { CommanderError } from 'commander';
 
 import { AgentRegistry } from './agent-registry.js';
@@ -23,6 +23,7 @@ import { HeadendManager } from './headends/headend-manager.js';
 import { McpHeadend } from './headends/mcp-headend.js';
 import { OpenAICompletionsHeadend } from './headends/openai-completions-headend.js';
 import { RestHeadend } from './headends/rest-headend.js';
+import { shouldStreamMasterContent, shouldStreamOutput } from './headends/shared-event-filter.js';
 import { SlackHeadend } from './headends/slack-headend.js';
 import { resolveIncludes } from './include-resolver.js';
 import { formatLog } from './log-formatter.js';
@@ -1476,7 +1477,23 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
         : undefined;
     })(), // Check if user explicitly requested a format
   });
-  const logSink: HeadendLogSink = (entry) => { ttyLog.onLog?.(entry); };
+  const buildLogMeta = (entry: LogEntry): AIAgentEventMeta => ({
+    agentId: entry.agentId,
+    callPath: entry.callPath,
+    sessionId: entry.txnId,
+    parentId: entry.parentTxnId,
+    originId: entry.originTxnId,
+    headendId: entry.headendId ?? 'cli',
+    renderTarget: 'cli',
+    isMaster: true,
+    isFinal: false,
+    pendingHandoffCount: 0,
+    handoffConfigured: false,
+    sequence: 0,
+  });
+  const logSink: HeadendLogSink = (entry) => {
+    ttyLog.onEvent?.({ type: 'log', entry }, buildLogMeta(entry));
+  };
   const emit = (message: string, severity: LogEntry['severity'] = 'VRB'): void => {
     logSink({
       timestamp: Date.now(),
@@ -1881,7 +1898,6 @@ program
         { traceLlm: effectiveTraceLLM, traceMcp: effectiveTraceMCP, traceSdk: effectiveTraceSdk, verbose: effectiveVerbose },
         loaded.config.persistence,
         accountingFile,
-        loaded.id,
       );
 
       if (options.dryRun === true) {
@@ -2111,9 +2127,8 @@ function expandPrompt(str: string, vars: Record<string, string>): string {
 function createCallbacks(
   options: Record<string, unknown>,
   persistence?: { sessionsDir?: string; billingFile?: string },
-  accountingFile?: string,
-  masterAgentId?: string
-): AIAgentCallbacks {
+  accountingFile?: string
+): AIAgentEventCallbacks {
   const colorize = (text: string, colorCode: string): string => {
     return process.stderr.isTTY ? `${colorCode}${text}[0m` : text;
   };
@@ -2143,43 +2158,51 @@ function createCallbacks(
     billingFile: accountingFile ?? resolved.billingFile,
   };
 
-  const baseCallbacks: AIAgentCallbacks = {
-    onLog: (entry: LogEntry) => {
-      if (entry.severity !== 'THK' && thinkingOpen && !lastCharWasNewline) {
-        try { process.stderr.write('\n'); } catch { /* ignore */ }
-        lastCharWasNewline = true;
-        thinkingOpen = false;
+  const baseCallbacks: AIAgentEventCallbacks = {
+    onEvent: (event: AIAgentEvent, meta: AIAgentEventMeta) => {
+      switch (event.type) {
+        case 'log': {
+          const entry = event.entry;
+          if (entry.severity !== 'THK' && thinkingOpen && !lastCharWasNewline) {
+            try { process.stderr.write('\n'); } catch { /* ignore */ }
+            lastCharWasNewline = true;
+            thinkingOpen = false;
+          }
+          ttyLog.onEvent?.(event, meta);
+          // Show THK header only in TTY mode (thinking is suppressed in non-TTY)
+          if (entry.severity === 'THK' && process.stderr.isTTY) {
+            const header = formatLog(entry, {
+              color: true,
+            });
+            try { process.stderr.write(`${header} `); } catch { /* ignore */ }
+            thinkingOpen = true;
+            lastCharWasNewline = false;
+          }
+          return;
+        }
+        case 'output': {
+          if (!shouldStreamOutput(event, meta)) return;
+          if (options.verbose === true) {
+            try { process.stderr.write(event.text); } catch { /* ignore */ }
+          }
+          return;
+        }
+        case 'thinking': {
+          if (!shouldStreamMasterContent(meta)) return;
+          // Suppress thinking output in non-TTY mode to prevent interleaving with logfmt/json logs
+          if (!process.stderr.isTTY) return;
+          const colored = colorize(event.text, '\x1b[2;37m');
+          process.stderr.write(colored);
+          if (event.text.length > 0) {
+            lastCharWasNewline = event.text.endsWith('\n');
+            thinkingOpen = true;
+          }
+          return;
+        }
+        default: {
+          return;
+        }
       }
-      ttyLog.onLog?.(entry);
-      // Show THK header only in TTY mode (thinking is suppressed in non-TTY)
-      if (entry.severity === 'THK' && process.stderr.isTTY) {
-        const header = formatLog(entry, {
-          color: true,
-        });
-        try { process.stderr.write(`${header} `); } catch { /* ignore */ }
-        thinkingOpen = true;
-        lastCharWasNewline = false;
-      }
-    },
-    onOutput: (text: string, meta?: CallbackMeta) => {
-      if (typeof masterAgentId === 'string' && meta?.agentId !== undefined && meta.agentId !== masterAgentId) return;
-      if (options.verbose === true) {
-        try { process.stderr.write(text); } catch { /* ignore */ }
-      }
-    },
-    onThinking: (text: string, meta?: CallbackMeta) => {
-      if (typeof masterAgentId === 'string' && meta?.agentId !== undefined && meta.agentId !== masterAgentId) return;
-      // Suppress thinking output in non-TTY mode to prevent interleaving with logfmt/json logs
-      if (!process.stderr.isTTY) return;
-      const colored = colorize(text, '\x1b[2;37m');
-      process.stderr.write(colored);
-      if (text.length > 0) {
-        lastCharWasNewline = text.endsWith('\n');
-        thinkingOpen = true;
-      }
-    },
-    onAccounting: (_entry: AccountingEntry) => {
-      // No per-entry file writes from CLI; consolidated flush occurs via onAccountingFlush.
     },
   };
 

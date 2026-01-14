@@ -323,25 +323,25 @@ The agent MUST properly display both content output and thinking/reasoning strea
 #### Standard Output (stdout)
 - **Content**: All LLM response/content text
 - **Formatting**: No color formatting applied
-- **Streaming mode**: Real-time display via `onOutput` callback as chunks arrive
-- **Non-streaming mode**: Complete response displayed after turn completion
+- **Streaming mode**: Real-time display via `onEvent(type='output')` as chunks arrive
+- **Non-streaming mode**: Complete response displayed after turn completion (emitted as `onEvent(type='output')`)
 
 #### Standard Error (stderr)  
 - **Content**: All LLM thinking/reasoning text
 - **Formatting**: Light gray color (`\x1b[90m`)
-- **Streaming mode**: Real-time display via `onThinking` callback as chunks arrive
-- **Turn notifications**: `onTurnStarted(turnIndex)` fires whenever the orchestrator begins a new LLM turn so downstream headends can annotate reasoning logs even if no thinking text streams.
+- **Streaming mode**: Real-time display via `onEvent(type='thinking')` as chunks arrive
+- **Turn notifications**: `onEvent(type='turn_started')` fires whenever the orchestrator begins a new LLM turn so downstream headends can annotate reasoning logs even if no thinking text streams.
 - **Provider support**: Only with providers supporting reasoning (e.g., OpenAI o1, Anthropic Claude)
 
 #### Implementation Details
 1. **Streaming Response Handling**:
    - Text chunks are passed to callbacks immediately as they arrive
-   - `onChunk(chunk, 'content')` → `onOutput(chunk)` → stdout
-   - `onChunk(chunk, 'thinking')` → `onThinking(chunk)` → stderr (gray)
+   - `onChunk(chunk, 'content')` → `onEvent(type='output')` → stdout
+   - `onChunk(chunk, 'thinking')` → `onEvent(type='thinking')` → stderr (gray)
 
 2. **Non-Streaming Response Handling**:
    - Complete response buffered during execution
-   - Output displayed via `onOutput` callback after turn completion
+   - Output displayed via `onEvent(type='output')` after turn completion
    - Only if response contains actual content (not just tool calls)
 
 3. **Tool Execution Context**:
@@ -527,7 +527,7 @@ class AIAgentSession {
     };
     
     this.logs.push(entry);              // Store in session
-    this.callbacks.onLog?.(entry);      // Real-time callback
+    this.callbacks.onEvent?.({ type: 'log', entry }, this.buildEventMeta());      // Real-time callback
   }
 }
 ```
@@ -535,14 +535,16 @@ class AIAgentSession {
 ### Real-Time Callbacks
 
 ```typescript
-interface AIAgentCallbacks {
-  onLog?: (entry: LogEntry) => void;    // Structured log streaming
+interface AIAgentEventCallbacks {
+  onEvent?: (event: AIAgentEvent, meta: AIAgentEventMeta) => void;    // Unified event stream
 }
 
 const session = await AIAgent.create({
   // ... config
   callbacks: {
-    onLog: (entry) => {
+    onEvent: (event) => {
+      if (event.type !== 'log') return;
+      const entry = event.entry;
       // CLI filters and formats based on severity and flags
       if (entry.severity === 'ERR') {
         console.error(`[ERR] ${entry.direction} [${entry.turn}.${entry.subturn}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`);
@@ -641,7 +643,9 @@ CLI creates single session per invocation with log filtering:
 
 ```typescript
 const callbacks = {
-  onLog: (entry: LogEntry) => {
+  onEvent: (event: AIAgentEvent) => {
+    if (event.type !== 'log') return;
+    const entry = event.entry;
     // Helper for consistent coloring - MANDATORY in TTY
     const colorize = (text: string, colorCode: string): string => {
       return process.stderr.isTTY ? `${colorCode}${text}\x1b[0m` : text;

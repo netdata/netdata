@@ -98,6 +98,8 @@ export interface SpawnChildAgentOptions {
   agent: OrchestrationRuntimeAgent;
   systemTemplate: string;
   userPrompt: string;
+  isMaster?: boolean;
+  pendingHandoffCount?: number;
   parentSession: Pick<
     AIAgentSessionConfig,
     | "config"
@@ -117,6 +119,8 @@ export interface SpawnChildAgentOptions {
     | "toolResponseMaxBytes"
     | "targets"
     | "tools"
+    | "isMaster"
+    | "pendingHandoffCount"
   > & {
     trace?: {
       selfId?: string;
@@ -170,6 +174,13 @@ export async function spawnOrchestrationChild(
   const format = loaded.expectedOutput?.format;
   const outputFormat: OutputFormatId =
     format === 'json' ? 'json' : format === 'text' ? 'pipe' : 'markdown';
+  const inheritedIsMaster = typeof opts.isMaster === 'boolean'
+    ? opts.isMaster
+    : (typeof parentSession.isMaster === 'boolean' ? parentSession.isMaster : true);
+  const inheritedPending = (() => {
+    const raw = typeof opts.pendingHandoffCount === 'number' ? opts.pendingHandoffCount : parentSession.pendingHandoffCount;
+    return typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? Math.trunc(raw) : 0;
+  })();
   return await loaded.run(opts.systemTemplate, opts.userPrompt, {
     history: undefined,
     callbacks: parentSession.callbacks,
@@ -179,6 +190,8 @@ export async function spawnOrchestrationChild(
     initialTitle: `Consultation with ${loaded.agentId}`,
     agentPath: childAgentPath,
     turnPathPrefix: childTrace.turnPath,
+    isMaster: inheritedIsMaster,
+    pendingHandoffCount: inheritedPending,
     abortSignal: parentSession.abortSignal,
     stopRef: parentSession.stopRef,
     ancestors: opts.ancestors,

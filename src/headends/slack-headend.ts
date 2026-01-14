@@ -999,7 +999,10 @@ export class SlackHeadend implements Headend {
         } as any);
       },
       {
-        onLog: (entry) => {
+        onEvent: (runId, event) => {
+          void runId;
+          if (event.type !== 'log') return;
+          const entry = event.entry;
           entry.headendId = this.id;
           this.context?.log(entry);
         },

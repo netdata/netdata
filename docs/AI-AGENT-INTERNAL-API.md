@@ -33,16 +33,30 @@ The library performs no direct I/O (no stdout/stderr/file writes). All output, l
   - Execution controls (optional): `temperature`, `topP`, `topK`, `repeatPenalty`, `maxRetries`, `maxTurns`, `llmTimeout`, `toolTimeout`, `stream`
   - UX flags (optional): `traceLLM`, `traceMCP`, `verbose`
   - Tool response cap (optional): `toolResponseMaxBytes` (bytes)
-  - `callbacks?: AIAgentCallbacks`
+  - `callbacks?: AIAgentEventCallbacks`
 - `Configuration`
   - `cache?: CacheConfig` – global response cache backend (SQLite/Redis); when absent, cache uses defaults only if a TTL is enabled
-- `AIAgentCallbacks`
-  - `onLog(entry: LogEntry)` – structured logs (see below)
-  - `onOutput(text: string)` – assistant output stream
-  - `onThinking(text: string)` – “thinking”/reasoning stream
-  - `onTurnStarted(turn: number)` – fired at the beginning of every LLM turn (1-indexed) before any reasoning/output
-  - `onAccounting(entry: AccountingEntry)` – accounting events
-  - `onProgress(event: ProgressEvent)` – progress events; `agent_update` includes `taskStatus` with structured fields (`status`, `done`, `pending`, `now`, `ready_for_final_report`, `need_to_run_more_tools`) when emitted via `agent__task_status`
+- `AIAgentEventCallbacks`
+  - `onEvent(event: AIAgentEvent, meta: AIAgentEventMeta)` – unified event stream (see below)
+- `AIAgentEvent`
+  - `output` – assistant output stream (`text`)
+  - `thinking` – reasoning stream (`text`)
+  - `turn_started` – LLM turn start notification (`turn`, 1-indexed)
+  - `progress` – progress events (`event: ProgressEvent`)
+  - `status` – convenience mirror of `progress` when `event.type === 'agent_update'` (headends can ignore)
+  - `final_report` – final report payload (`report: FinalReportPayload`)
+  - `handoff` – handoff payload (`report: FinalReportPayload`) when handoff is configured or selected
+  - `log` – structured logs (`entry: LogEntry`)
+  - `accounting` – accounting entries (`entry: AccountingEntry`)
+  - `snapshot` – session snapshot payload (`payload: SessionSnapshotPayload`)
+  - `accounting_flush` – batched accounting payload (`payload: AccountingFlushPayload`)
+  - `op_tree` – current opTree snapshot (`tree: SessionNode`)
+- `AIAgentEventMeta`
+  - `isMaster` – true if this agent is the master of the chain (inherited across handoffs)
+  - `pendingHandoffCount` – static count of pending handoffs at start (see “Final report + handoff”)
+  - `handoffConfigured` – true if this agent has a configured handoff target
+  - `isFinal` – only authoritative for `final_report` events (may be inconsistent for other event types)
+  - `source?: 'stream' | 'replay' | 'finalize'` – source of output/thinking events
 - `AIAgentResult`
   - `success: boolean`
   - `error?: string`
@@ -65,15 +79,15 @@ The library performs no direct I/O (no stdout/stderr/file writes). All output, l
 ## Library Guarantees
 
 - No direct I/O: The library never writes to stdout/stderr or files.
-- Real-time callbacks: If provided, callbacks receive logs/output/accounting as events occur.
+- Real-time callbacks: If provided, callbacks receive events as they occur.
 - Always returns a result: `run()` resolves with `AIAgentResult` even on errors; it does not throw for normal failures.
-- Unconditional FIN summaries: The library emits `FIN` summary logs for LLM and MCP at the end of every run, including when execution fails or ends early. These are delivered through `onLog` and included in `result.logs`.
+- Unconditional FIN summaries: The library emits `FIN` summary logs for LLM and MCP at the end of every run, including when execution fails or ends early. These are delivered through `onEvent(type='log')` and included in `result.logs`.
 - Error transparency: Errors are represented both in logs (`ERR`/`WRN` and `agent:EXIT-...` markers) and in the `AIAgentResult.error` string.
 - Accounting completeness: All accounting entries (LLM/tool; ok/failed) are recorded and returned, with `AIAgentResult.accounting` merging opTree accounting and session-level entries (e.g., context-guard drops).
 
 ## Accounting Records: Structure and Emission Semantics
 
-The library emits two accounting record types via `onAccounting(entry)` and also accumulates them in `AIAgentResult.accounting`.
+The library emits two accounting record types via `onEvent(type='accounting')` and also accumulates them in `AIAgentResult.accounting`.
 
 Common base fields (both types):
 - `timestamp: number` – Unix epoch (ms) when the operation completed
@@ -109,7 +123,7 @@ Emission timing (tool): Immediately after each tool execution completes or fails
 - Context overflow: If projecting a tool result would overflow the configured `contextWindow`, the agent injects `(tool failed: context window budget exceeded)`, records an accounting entry with `error: 'context_budget_exceeded'`, and populates `details` with `projected_tokens`, `limit_tokens`, and `remaining_tokens`.
 - Telemetry: every guard activation increments `ai_agent_context_guard_events_total{provider,model,trigger,outcome}` and updates the observable gauge `ai_agent_context_guard_remaining_tokens{provider,model,trigger,outcome}` so integrators can monitor how close sessions are to exhausting their budgets.
 
-Persistence guidance: The CLI demonstrates persisting accounting to JSONL. As a library user, consume `onAccounting` in real time and/or persist `result.accounting` after `run()`.
+Persistence guidance: The CLI demonstrates persisting accounting to JSONL. As a library user, consume `onEvent(type='accounting')` in real time and/or persist `result.accounting` after `run()`.
 
 ## Lifecycle (what `run()` does)
 
@@ -119,8 +133,8 @@ Persistence guidance: The CLI demonstrates persisting accounting to JSONL. As a 
 2. Initialize MCP servers (non-fatal; initialization failures logged as `WRN`).
 3. Build the effective system prompt (adds tools’ instructions; schemas are passed as tool defs, not appended to prompt).
 4. Execute multi-turn loop with fallback across `targets`:
-   - Streams assistant text via `onOutput`.
-   - Emits instrumentation via `onLog` and `onAccounting`.
+   - Streams assistant text via `onEvent(type='output')`.
+   - Emits instrumentation via `onEvent(type='log' | 'accounting')`.
    - Preserves message history (assistant/tool/tool-result order).
 5. Completion conditions:
    - Success: model calls internal `agent_final_report` tool → `EXIT-FINAL-ANSWER` logged, `FIN` summaries emitted, returns `success: true`.
@@ -154,10 +168,13 @@ Important nuance – “Can I specify one format and get another?”
 
 ## Final Report Delivery (Isolated)
 
-- Real-time stream (optional): The library calls `onOutput(...)` as it streams assistant content and again when emitting the final report.
-- Isolated final report: Regardless of any prior streamed output, the final report the model returns via `agent_final_report` is available as `result.finalReport` in `AIAgentResult`.
-  - Contains status, format, content (string for markdown/text), or `content_json` (for json), optional metadata, and timestamp.
+- Real-time stream (optional): The library emits `onEvent(type='output')` as chunks arrive (`meta.source: 'stream'`), and may emit additional chunks at finalize time (`meta.source: 'finalize'`) when output is derived from the final report (e.g., XML final wrapper).
+- Isolated final report:
+  - When the session is final, the library emits `onEvent(type='final_report')` with the final payload.
+  - When a handoff is configured or selected, the library emits `onEvent(type='handoff')` instead (same payload shape). This payload is the input to the next agent and should not be treated as a user-visible final answer.
+  - In all cases, the final report returned by the model (if any) is available as `result.finalReport` in `AIAgentResult`.
   - This lets embedders persist or present the definitive answer without including any intermediate assistant output.
+  - **Important:** `meta.isFinal` is authoritative only for `final_report` events; for other events treat it as informational.
 
 ## Final Report Failure Semantics
 
@@ -250,10 +267,14 @@ const sessionConfig: AIAgentSessionConfig = {
   toolResponseMaxBytes: 12 * 1024,
   // Callbacks: route anywhere you wish
   callbacks: {
-    onLog: (e) => { logs.push(e); },
-    onOutput: (t) => { capturedOutput += t; },
-    onThinking: (_t) => {},
-    onAccounting: (a) => { accounting.push(a); }
+    onEvent: (event, meta) => {
+      if (event.type === 'log') logs.push(event.entry);
+      if (event.type === 'accounting') accounting.push(event.entry);
+      if (event.type === 'output') {
+        // Filter finalize output if you only want streamed chunks.
+        if (meta.source !== 'finalize') capturedOutput += event.text;
+      }
+    }
   }
 };
 
@@ -271,7 +292,7 @@ console.log('accounting entries:', result.accounting.length);
 ## Notes for Embedders
 
 - Frontmatter parsing, file I/O, and command-line option resolution are CLI responsibilities; when embedding, pass plain strings and concrete values in `AIAgentSessionConfig`.
-- If you need redacted HTTP header logging, set `traceLLM/traceMCP` and handle `onLog` entries (headers are redacted in logs by the library). Bodies are not redacted by the library.
+- If you need redacted HTTP header logging, set `traceLLM/traceMCP` and handle `onEvent(type='log')` entries (headers are redacted in logs by the library). Bodies are not redacted by the library.
 - For durability, persist `result.logs` and `result.accounting` even when `result.success === false`.
 
 ## File Map

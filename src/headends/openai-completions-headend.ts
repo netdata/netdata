@@ -4,7 +4,7 @@ import path from 'node:path';
 import { URL } from 'node:url';
 
 import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
-import type { AccountingEntry, AIAgentCallbacks, CallbackMeta, LLMAccountingEntry, LogDetailValue, LogEntry, ProgressEvent, ProgressMetrics } from '../types.js';
+import type { AccountingEntry, AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, FinalReportPayload, LLMAccountingEntry, LogDetailValue, LogEntry, ProgressEvent, ProgressMetrics } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 import type { Socket } from 'node:net';
 
@@ -16,6 +16,7 @@ import { normalizeCallPath } from '../utils.js';
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
 import { renderReasoningMarkdown, type ReasoningTurnState } from './reasoning-markdown.js';
+import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamMasterContent, shouldStreamOutput, shouldStreamTurnStarted } from './shared-event-filter.js';
 import { escapeMarkdown, formatMetricsLine, formatSummaryLine, italicize, resolveAgentHeadingLabel } from './summary-utils.js';
 
 interface Deferred<T> {
@@ -705,66 +706,106 @@ export class OpenAICompletionsHeadend implements Headend {
     };
     const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
 
-    const baseCallbacks: AIAgentCallbacks = {
-      onOutput: (chunk, meta?: CallbackMeta) => {
-        if (meta?.agentId !== undefined && meta.agentId !== agent.id) return;
-        output += chunk;
-        if (streamed) {
-          // Buffer whitespace-only output if last sent was thinking (prevents closing thinking block)
-          if (lastSentType === 'thinking' && chunk.trim().length === 0) {
-            pendingOutputWhitespace += chunk;
+    const eventState = createHeadendEventState();
+    let finalReportFromEvent: FinalReportPayload | undefined;
+
+    const baseCallbacks: AIAgentEventCallbacks = {
+      onEvent: (event: AIAgentEvent, meta: AIAgentEventMeta) => {
+        switch (event.type) {
+          case 'output': {
+            if (!shouldStreamOutput(event, meta)) return;
+            const chunk = event.text;
+            output += chunk;
+            if (streamed) {
+              // Buffer whitespace-only output if last sent was thinking (prevents closing thinking block)
+              if (lastSentType === 'thinking' && chunk.trim().length === 0) {
+                pendingOutputWhitespace += chunk;
+                return;
+              }
+              // Prepend any buffered whitespace to real output
+              const fullChunk = pendingOutputWhitespace + chunk;
+              pendingOutputWhitespace = '';
+              emitAssistantRole();
+              const chunkPayload = {
+                id: responseId,
+                object: CHAT_CHUNK_OBJECT,
+                created,
+                model: body.model,
+                choices: [
+                  {
+                    index: 0,
+                    delta: { content: fullChunk },
+                    finish_reason: null,
+                  },
+                ],
+              };
+              writeSseChunk(res, chunkPayload);
+              lastSentType = 'output';
+              if (chunk.length > 0) {
+                streamedChunks += 1;
+              }
+            }
             return;
           }
-          // Prepend any buffered whitespace to real output
-          const fullChunk = pendingOutputWhitespace + chunk;
-          pendingOutputWhitespace = '';
-          emitAssistantRole();
-          const chunkPayload = {
-            id: responseId,
-            object: CHAT_CHUNK_OBJECT,
-            created,
-            model: body.model,
-            choices: [
-              {
-                index: 0,
-                delta: { content: fullChunk },
-                finish_reason: null,
-              },
-            ],
-          };
-          writeSseChunk(res, chunkPayload);
-          lastSentType = 'output';
-          if (chunk.length > 0) {
-            streamedChunks += 1;
+          case 'thinking': {
+            if (!shouldStreamMasterContent(meta)) return;
+            const chunk = event.text;
+            if (chunk.length === 0) return;
+            // Don't call ensureHeader here - wait for progress event with txnId
+            // Header will be created when thinking is flushed or progress event arrives
+            if (expectingNewTurn) {
+              startNextTurn();
+              expectingNewTurn = false;
+            }
+            appendThinkingChunk(chunk);
+            return;
           }
-        }
-      },
-      onThinking: (chunk, meta?: CallbackMeta) => {
-        if (meta?.agentId !== undefined && meta.agentId !== agent.id) return;
-        if (chunk.length === 0) return;
-        // Don't call ensureHeader here - wait for progress event with txnId
-        // Header will be created when thinking is flushed or progress event arrives
-        if (expectingNewTurn) {
-          startNextTurn();
-          expectingNewTurn = false;
-        }
-        appendThinkingChunk(chunk);
-      },
-      onTurnStarted: (turnIndex) => {
-        // Don't call ensureHeader here - wait for progress event with txnId
-        ensureTurnIndex(turnIndex);
-      },
-      onProgress: (event) => {
-        handleProgressEvent(event);
-      },
-      onLog: (entry) => {
-        entry.headendId = this.id;
-        this.logEntry(entry);
-      },
-      onAccounting: (entry) => {
-        accounting.push(entry);
-        if (entry.type === 'llm' && (entry.agentId === undefined || entry.agentId === agent.id)) {
-          expectingNewTurn = true;
+          case 'turn_started': {
+            if (!shouldStreamTurnStarted(meta)) return;
+            // Don't call ensureHeader here - wait for progress event with txnId
+            ensureTurnIndex(event.turn);
+            return;
+          }
+          case 'progress': {
+            handleProgressEvent(event.event);
+            return;
+          }
+          case 'status': {
+            // avoid duplicate status handling (progress already includes agent_update)
+            return;
+          }
+          case 'log': {
+            const entry = event.entry;
+            entry.headendId = this.id;
+            this.logEntry(entry);
+            return;
+          }
+          case 'accounting': {
+            const entry = event.entry;
+            accounting.push(entry);
+            if (entry.type === 'llm' && meta.isMaster) {
+              expectingNewTurn = true;
+            }
+            return;
+          }
+          case 'handoff': {
+            markHandoffSeen(eventState, meta);
+            return;
+          }
+          case 'final_report': {
+            if (shouldAcceptFinalReport(eventState, meta)) {
+              finalReportFromEvent = event.report;
+            }
+            return;
+          }
+          case 'snapshot':
+          case 'accounting_flush':
+          case 'op_tree': {
+            return;
+          }
+          default: {
+            return;
+          }
         }
       },
     };
@@ -798,7 +839,8 @@ export class OpenAICompletionsHeadend implements Headend {
         }
         return;
       }
-      const finalText = this.resolveContent(output, result.finalReport);
+      const finalReport = finalReportFromEvent ?? result.finalReport;
+      const finalText = this.resolveContent(output, finalReport);
       const fallbackError = (!result.success && typeof result.error === 'string' && result.error.length > 0)
         ? result.error
         : undefined;

@@ -87,8 +87,8 @@ export interface XmlParseContext {
 
 // Callback for logging/errors during parsing
 export interface XmlParseCallbacks {
-  onTurnFailure: (slug: TurnFailedSlug, reason?: string) => void;
-  onLog: (entry: { severity: 'WRN'; message: string }) => void;
+  recordTurnFailure: (slug: TurnFailedSlug, reason?: string) => void;
+  logWarning: (entry: { severity: 'WRN'; message: string }) => void;
 }
 
 // Result from parsing a single message
@@ -263,16 +263,16 @@ export class XmlToolTransport {
       if (isStructured) {
         // Structured format: MUST retry - log with content dump for diagnosis
         const preview = truncateToChars(extractedContent, 3000) ?? extractedContent;
-        callbacks.onLog({
+        callbacks.logWarning({
           severity: 'WRN',
           message: `Final report truncated (stopReason=${stopReason ?? 'unknown'}, format=${resolvedFormat}, length=${String(extractedContent.length)} chars). Will retry.\nTruncated output:\n${preview}`
         });
         const reason = typeof maxOutputTokens === 'number' ? `token_limit: ${String(maxOutputTokens)} tokens` : undefined;
-        callbacks.onTurnFailure('xml_structured_output_truncated', reason);
+        callbacks.recordTurnFailure('xml_structured_output_truncated', reason);
         return { truncatedRejected: true };
       } else {
         // Unstructured format: Accept - log without dump (content visible in final report)
-        callbacks.onLog({
+        callbacks.logWarning({
           severity: 'WRN',
           message: `Final report truncated (stopReason=${stopReason ?? 'unknown'}, format=${resolvedFormat ?? 'unknown'}, length=${String(extractedContent.length)} chars). Accepting truncated output.`
         });
@@ -286,7 +286,7 @@ export class XmlToolTransport {
     }
 
     // Unknown/undefined stop reason - log warning but accept
-    callbacks.onLog({ severity: 'WRN', message: `Accepting unclosed final report with unknown stopReason='${stopReason ?? 'undefined'}'.` });
+    callbacks.logWarning({ severity: 'WRN', message: `Accepting unclosed final report with unknown stopReason='${stopReason ?? 'undefined'}'.` });
     return { slotId: finalSlotId, content: extractedContent };
   }
 
@@ -315,7 +315,7 @@ export class XmlToolTransport {
     if (unclosedFinal !== undefined) {
       // Check if this was a structured format truncation that was rejected
       if ('truncatedRejected' in unclosedFinal) {
-        // Structured format truncation - already reported error via onTurnFailure, don't add more errors
+        // Structured format truncation - already reported error via recordTurnFailure, don't add more errors
         return { toolCalls: undefined, errors: [] };
       }
 
@@ -337,8 +337,8 @@ export class XmlToolTransport {
         if (expectedFormat === 'json') {
           // JSON expected but got text - this is an error even for unclosed tags
           const failureMessage = renderTurnFailedSlug('xml_final_report_not_json');
-          callbacks.onTurnFailure('xml_final_report_not_json');
-          callbacks.onLog({ severity: 'WRN', message: failureMessage });
+          callbacks.recordTurnFailure('xml_final_report_not_json');
+          callbacks.logWarning({ severity: 'WRN', message: failureMessage });
           return {
             toolCalls: undefined,
             errors: [{
@@ -387,7 +387,7 @@ export class XmlToolTransport {
       const reasonDetail = `slot: ${capturedSlot}`;
       const reasonMessage = renderTurnFailedSlug(slug, reasonDetail);
 
-      callbacks.onTurnFailure(slug, reasonDetail);
+      callbacks.recordTurnFailure(slug, reasonDetail);
 
       const errorEntry: XmlPastEntry = {
         slotId: slotMatch?.[1] ?? 'malformed',
@@ -399,7 +399,7 @@ export class XmlToolTransport {
       errors.push(errorEntry);
       this.thisTurnEntries.push(errorEntry);
 
-      callbacks.onLog({ severity: 'WRN', message: reasonMessage });
+      callbacks.logWarning({ severity: 'WRN', message: reasonMessage });
     }
 
     if (parsedSlots.length === 0) {
@@ -416,8 +416,8 @@ export class XmlToolTransport {
         const reasonDetail = `slot: ${slotInfo}`;
         const reasonMessage = renderTurnFailedSlug(slug, reasonDetail);
 
-        callbacks.onTurnFailure(slug, reasonDetail);
-        callbacks.onLog({ severity: 'WRN', message: reasonMessage });
+        callbacks.recordTurnFailure(slug, reasonDetail);
+        callbacks.logWarning({ severity: 'WRN', message: reasonMessage });
 
         const errorEntry: XmlPastEntry = {
           slotId: slotMatch?.[1] ?? 'malformed',
@@ -470,7 +470,7 @@ export class XmlToolTransport {
         } else {
           const reasonDetail = `tool: ${call.name}`;
           const reasonMessage = renderTurnFailedSlug('xml_tool_payload_not_json', reasonDetail);
-          callbacks.onTurnFailure('xml_tool_payload_not_json', reasonDetail);
+          callbacks.recordTurnFailure('xml_tool_payload_not_json', reasonDetail);
 
           const errorEntry: XmlPastEntry = {
             slotId: slot.slotId,

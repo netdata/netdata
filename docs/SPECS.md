@@ -409,13 +409,15 @@ For `stdio` servers, only the environment variables explicitly configured for th
 The system is designed as a library that can be embedded in larger applications:
 
 ```typescript
-import { AIAgent, AIAgentCallbacks } from './ai-agent';
+import { AIAgent, AIAgentEventCallbacks } from './ai-agent';
 
 // Optional callbacks for complete control over I/O
-const callbacks: AIAgentCallbacks = {
-  onLog: (level, message) => console.error(`[${level}] ${message}`),
-  onOutput: (text) => process.stdout.write(text),
-  onAccounting: (entry) => { /* custom accounting logic */ }
+const callbacks: AIAgentEventCallbacks = {
+  onEvent: (event) => {
+    if (event.type === 'log') console.error(`[${event.entry.severity}] ${event.entry.message}`);
+    if (event.type === 'output') process.stdout.write(event.text);
+    if (event.type === 'accounting') { /* custom accounting logic */ }
+  }
 };
 
 const agent = new AIAgent({
@@ -438,10 +440,12 @@ const result = await agent.run({
 
 ### Library Callbacks
 The library accepts optional callbacks for complete control and performs no I/O itself:
-- **onLog**: Custom logging handler (debug, info, warn, error)
-- **onOutput**: Custom output handler (replaces stdout output)
-- **onAccounting**: Custom accounting handler (replaces JSONL file writing)
+- **onEvent**: Unified event handler (log, output, accounting, progress, status, final_report, handoff, etc.)
 - **Silent Core**: The core library writes nothing (no files, no stdout/stderr). The CLI wires callbacks to provide default behavior.
+
+**Finality note (important)**:
+- `AIAgentEventMeta.isFinal` is **authoritative only for `final_report` events**. For all other event types treat it as informational.
+- When a handoff is configured or a router handoff is selected, the upstream payload is emitted as `onEvent(type='handoff')` (not `final_report`). Headends should use `handoff` plus `pendingHandoffCount` to decide what to display.
 
 ## Input/Output Specifications
 

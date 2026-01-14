@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { LoadAgentOptions, LoadedAgent } from './agent-loader.js';
 import type { AIAgentSession } from './ai-agent.js';
 import type { OutputFormatId } from './formats.js';
-import type { AIAgentCallbacks, ConversationMessage } from './types.js';
+import type { AIAgentEventCallbacks, ConversationMessage } from './types.js';
 
 import { loadAgent, loadAgentFromContent, LoadedAgentCache } from './agent-loader.js';
 import { formatPromptValue } from './formats.js';
@@ -32,7 +32,7 @@ export interface SpawnSessionArgs {
   userPrompt?: string;
   format?: OutputFormatId;
   history?: ConversationMessage[];
-  callbacks?: AIAgentCallbacks;
+  callbacks?: AIAgentEventCallbacks;
   renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'embed' | 'sub-agent';
   abortSignal?: AbortSignal;
   stopRef?: { stopping: boolean };

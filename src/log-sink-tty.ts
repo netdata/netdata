@@ -1,4 +1,4 @@
-import type { AIAgentCallbacks, LogEntry } from './types.js';
+import type { AIAgentEventCallbacks, LogEntry } from './types.js';
 
 import { createStructuredLogger, type LogFormat } from './logging/structured-logger.js';
 import { getTelemetryLabels } from './telemetry/index.js';
@@ -14,7 +14,7 @@ export function makeTTYLogCallbacks(
     explicitFormat?: string;
   },
   write?: (s: string) => void
-): Pick<AIAgentCallbacks, 'onLog'> {
+): Pick<AIAgentEventCallbacks, 'onEvent'> {
   const logfmtWriter = typeof write === 'function'
     ? write
     : (s: string) => {
@@ -50,7 +50,9 @@ export function makeTTYLogCallbacks(
   });
 
   return {
-    onLog: (entry: LogEntry) => {
+    onEvent: (event) => {
+      if (event.type !== 'log') return;
+      const entry: LogEntry = event.entry;
       if (entry.severity === 'THK') return;
       if (entry.severity === 'VRB' && opts.verbose !== true) return;
       if (entry.severity === 'TRC') {

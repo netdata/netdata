@@ -196,7 +196,7 @@ type HeadendClosedEvent =
 - GET `/health` and GET `/v1/{agentId}?q=...&format=...` endpoints (GET-only surface)
 - Requires `q` query parameter (escaped prompt)
 - Optional `format` query parameter; JSON validation relies on the agent’s own schema (no query-level schema)
-- Aggregates streamed `onOutput`/`onThinking` into `output` and `reasoning`, returning the final report alongside
+- Aggregates streamed `onEvent(type='output' | 'thinking')` into `output` and `reasoning`, returning the final report alongside
 - Supports extra routes registered by other modules (e.g., Slack slash commands)
 
 **Response Fields**:
@@ -350,11 +350,14 @@ Headends emit events through the context:
 - Error occurred
 - Shutdown initiated
 
+**Filtering note**:
+- `AIAgentEventMeta.isFinal` is authoritative only for `final_report` events. Headends should use `handoff` vs `final_report` (and `pendingHandoffCount`) to decide what to display.
+
 ## Business Logic Coverage (Verified 2025-11-16)
 
 - **Concurrency limiter**: All network headends share `ConcurrencyLimiter` (`src/headends/concurrency.ts`) which supports abortable acquire/release; CLI `--api-concurrency`, `--openai-completions-concurrency`, etc., feed those limits.
 - **Shared telemetry labels**: `getTelemetryLabels()` tags each headend with `{ headend: id }` so OTLP metrics/traces can filter per surface (`src/headends/*-headend.ts:70-90`).
-- **Progress propagation**: REST/OpenAI/Anthropic headends forward `onProgress` events to clients (Slack posts to threads), ensuring the `SUMMARY: <agent>, ...` line and the turn-by-turn Markdown transcript stay identical across surfaces (`src/headends/openai-completions-headend.ts:311-448`, `src/headends/anthropic-completions-headend.ts:300-360`, `src/headends/rest-headend.ts:242-358`).
+- **Progress propagation**: REST/OpenAI/Anthropic headends forward `onEvent(type='progress')` events to clients (Slack posts to threads), ensuring the `SUMMARY: <agent>, ...` line and the turn-by-turn Markdown transcript stay identical across surfaces (`src/headends/openai-completions-headend.ts:311-448`, `src/headends/anthropic-completions-headend.ts:300-360`, `src/headends/rest-headend.ts:242-358`).
 - **Slash route reuse**: Slack headend registers a REST extra route when available; otherwise it spawns a tiny fallback HTTP server, so slash commands work even without REST headend present (`src/headends/slack-headend.ts:98-305`, `src/headends/rest-headend.ts:176-208`).
 
 ## Test Coverage
