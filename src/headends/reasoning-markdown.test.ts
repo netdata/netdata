@@ -33,4 +33,15 @@ describe('renderReasoningMarkdown', () => {
     expect(markdown.includes('---')).toBe(false);
     expect(markdown).toContain('- fireflies started');
   });
+
+  it('renders turn headings with attempt and reason when provided', () => {
+    const turns: ReasoningTurnState[] = [
+      { index: 2, attempt: 3, reason: 'invalid_response', updates: [] },
+    ];
+    const markdown = renderReasoningMarkdown({
+      header: '## fireflies: txn-789',
+      turns,
+    });
+    expect(markdown).toContain('### Turn 2, Attempt 3, invalid_response');
+  });
 });

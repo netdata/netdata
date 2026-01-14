@@ -133,7 +133,7 @@ interface OpenAIChatRequestMessage {
 7. **Initialize callbacks**:
    - `onEvent(type='output')`: Accumulate and stream content. Suppress `meta.source='finalize'` when `meta.pendingHandoffCount > 0` to avoid streaming handoff inputs.
    - `onEvent(type='thinking')`: Build reasoning structure
-   - `onEvent(type='turn_started')`: Track turn progression
+   - `onEvent(type='turn_started')`: Track per-attempt progression (`turn`, `attempt`, retry/final reasons)
    - `onEvent(type='progress')`: Handle progress events
    - `onEvent(type='status')`: Ignored (duplicate of progress `agent_update`)
    - `onEvent(type='log')`: Forward logs

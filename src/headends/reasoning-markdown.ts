@@ -2,6 +2,8 @@ import { escapeMarkdown } from './summary-utils.js';
 
 export interface ReasoningTurnState {
   index: number;
+  attempt?: number;
+  reason?: string;
   summary?: string;
   thinking?: string;
   updates: string[];
@@ -48,7 +50,14 @@ export const renderReasoningMarkdown = ({ header, turns, summaryText }: RenderRe
   turns.forEach((turn) => {
     dropTrailingBlanks(lines);
     appendBlankLines(lines, 1);
-    lines.push(`### Turn ${String(turn.index)}`);
+    const headingParts = [`Turn ${String(turn.index)}`];
+    if (typeof turn.attempt === 'number' && Number.isFinite(turn.attempt)) {
+      headingParts.push(`Attempt ${String(turn.attempt)}`);
+    }
+    if (typeof turn.reason === 'string' && turn.reason.trim().length > 0) {
+      headingParts.push(escapeMarkdown(turn.reason.trim()));
+    }
+    lines.push(`### ${headingParts.join(', ')}`);
     if (typeof turn.summary === 'string' && turn.summary.length > 0) {
       lines.push(`(${turn.summary})`);
     }

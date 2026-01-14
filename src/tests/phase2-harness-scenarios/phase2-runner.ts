@@ -8775,7 +8775,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       sessionConfig.callbacks = {
         ...originalCallbacks,
         onEvent: (event, meta) => {
-          if (event.type === 'turn_started') {
+          if (event.type === 'turn_started' && event.isRetry !== true) {
             observedTurns.push(event.turn);
           }
           originalCallbacks?.onEvent?.(event, meta);
@@ -8843,6 +8843,86 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(Array.isArray(observed), 'run-test-107 expects observed turn tracking.');
       // Both turns should emit turn_started: turn 1 (progress) and turn 2 (final report)
       invariant(observed.length === 2 && observed[0] === 1 && observed[1] === 2, 'Both turns should emit turn_started for run-test-107.');
+    },
+  },
+  {
+    id: 'run-test-107-retry-turn-started',
+    description: 'Emits turn_started per attempt with retry slugs when a turn is retried.',
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      sessionConfig.maxTurns = 1;
+      sessionConfig.maxRetries = 2;
+      const originalCallbacks = sessionConfig.callbacks;
+      const observedStarts: {
+        turn: number;
+        attempt: number;
+        isRetry: boolean;
+        retrySlugs?: string[];
+        isFinalTurn: boolean;
+        forcedFinalReason?: string;
+      }[] = [];
+      sessionConfig.callbacks = {
+        ...originalCallbacks,
+        onEvent: (event, meta) => {
+          if (event.type === 'turn_started') {
+            observedStarts.push({
+              turn: event.turn,
+              attempt: event.attempt,
+              isRetry: event.isRetry,
+              retrySlugs: event.retrySlugs,
+              isFinalTurn: event.isFinalTurn,
+              forcedFinalReason: event.forcedFinalReason,
+            });
+          }
+          originalCallbacks?.onEvent?.(event, meta);
+        },
+      };
+      const result = await runWithPatchedExecuteTurn(sessionConfig, ({ invocation }) => {
+        if (invocation === 1) {
+          return Promise.resolve({
+            status: { type: 'invalid_response', message: 'invalid_response: missing report' },
+            latencyMs: 5,
+            messages: [],
+            response: '',
+            tokens: { inputTokens: 3, outputTokens: 1, totalTokens: 4 },
+          });
+        }
+        const finalCallId = 'call-final-turn-started-retry';
+        return Promise.resolve({
+          status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+          latencyMs: 6,
+          messages: [
+            {
+              role: 'assistant',
+              content: SECOND_TURN_FINAL_ANSWER,
+              toolCalls: [
+                {
+                  id: finalCallId,
+                  name: 'agent__final_report',
+                  parameters: {
+                    report_format: 'markdown',
+                    report_content: SECOND_TURN_FINAL_ANSWER,
+                  },
+                },
+              ],
+            },
+          ],
+          tokens: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+          response: '',
+          stopReason: STOP_REASON_TOOL_CALLS,
+        });
+      });
+      sessionConfig.callbacks = originalCallbacks;
+      (result as { __observedStarts?: typeof observedStarts }).__observedStarts = observedStarts;
+      return result;
+    },
+    expect: (result: AIAgentResult & { __observedStarts?: { turn: number; attempt: number; isRetry: boolean; retrySlugs?: string[] }[] }) => {
+      invariant(result.success, 'run-test-107-retry-turn-started should succeed after a retry.');
+      const observed = result.__observedStarts;
+      invariant(Array.isArray(observed) && observed.length === 2, 'run-test-107-retry-turn-started expects two turn_started events.');
+      const [first, second] = observed;
+      invariant(first.turn === 1 && first.attempt === 1 && first.isRetry === false, 'First attempt should be turn 1 attempt 1 with isRetry=false.');
+      invariant(second.turn === 1 && second.attempt === 2 && second.isRetry === true, 'Second attempt should be turn 1 attempt 2 with isRetry=true.');
+      invariant(Array.isArray(second.retrySlugs) && second.retrySlugs.includes('invalid_response'), 'Retry attempt should include invalid_response in retrySlugs.');
     },
   },
   {

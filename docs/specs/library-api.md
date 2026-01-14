@@ -223,7 +223,7 @@ interface AIAgentEventCallbacks {
 |------------|---------|-------|
 | `output` | `{ text }` | Assistant output stream (meta.source = `stream|replay|finalize`) |
 | `thinking` | `{ text }` | Reasoning stream (meta.source = `stream|replay`) |
-| `turn_started` | `{ turn }` | LLM turn start notification |
+| `turn_started` | `{ turn, attempt, isRetry, isFinalTurn, forcedFinalReason?, retrySlugs? }` | LLM attempt start notification |
 | `progress` | `{ event }` | Progress events (`agent_update` includes structured `taskStatus`) |
 | `status` | `{ event }` | Convenience mirror of `progress` when `event.type === 'agent_update'` |
 | `final_report` | `{ report }` | Final report payload for terminal agent |
@@ -311,7 +311,13 @@ async function main() {
       onEvent: (event) => {
         if (event.type === 'output') process.stdout.write(event.text);
         if (event.type === 'thinking') console.log(`[Thinking] ${event.text}`);
-        if (event.type === 'turn_started') console.log(`\n--- Turn ${event.turn} ---`);
+        if (event.type === 'turn_started') {
+          const parts = [];
+          if (Array.isArray(event.retrySlugs)) parts.push(...event.retrySlugs);
+          if (event.forcedFinalReason) parts.push(event.forcedFinalReason);
+          const reason = parts.length > 0 ? `, ${parts.join(', ')}` : '';
+          console.log(`\n--- Turn ${event.turn}, Attempt ${event.attempt}${reason} ---`);
+        }
         if (event.type === 'log' && event.entry.severity === 'ERR') {
           console.error(event.entry.message);
         }

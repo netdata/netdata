@@ -238,7 +238,7 @@ Defined in `src/ai-agent.ts:16-44`:
 - `onEvent(type='progress')` - Progress event emitted
 - `onEvent(type='status')` - Progress mirror for `agent_update`
 - `onEvent(type='op_tree')` - OpTree updated
-- `onEvent(type='turn_started')` - Turn began
+- `onEvent(type='turn_started')` - LLM attempt began (includes `turn`, `attempt`, retry/final annotations)
 - `onEvent(type='snapshot')` - Session snapshot available
 - `onEvent(type='accounting_flush')` - Accounting batch ready
 - `onEvent(type='output')` - Text output emitted

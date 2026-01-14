@@ -607,6 +607,7 @@ export interface AccountingFlushPayload {
 }
 
 export type EventSource = 'stream' | 'replay' | 'finalize';
+export type ForcedFinalReason = 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion';
 
 export interface AIAgentEventMeta {
   agentId?: string;
@@ -641,7 +642,7 @@ export type AIAgentEvent =
   | { type: 'handoff'; report: FinalReportPayload }
   | { type: 'log'; entry: LogEntry }
   | { type: 'accounting'; entry: AccountingEntry }
-  | { type: 'turn_started'; turn: number }
+  | { type: 'turn_started'; turn: number; attempt: number; isRetry: boolean; isFinalTurn: boolean; forcedFinalReason?: ForcedFinalReason; retrySlugs?: string[] }
   | { type: 'snapshot'; payload: SessionSnapshotPayload }
   | { type: 'accounting_flush'; payload: AccountingFlushPayload }
   | { type: 'op_tree'; tree: SessionNode };

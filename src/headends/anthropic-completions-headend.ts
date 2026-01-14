@@ -412,6 +412,18 @@ export class AnthropicCompletionsHeadend implements Headend {
       if (totals.costUsd > 0) parts.push(`cost $${totals.costUsd.toFixed(4)}`);
       return parts.length > 0 ? parts.join(', ') : undefined;
     };
+    const formatTurnReason = (event: Extract<AIAgentEvent, { type: 'turn_started' }>): string | undefined => {
+      const parts: string[] = [];
+      if (Array.isArray(event.retrySlugs)) {
+        event.retrySlugs.forEach((slug) => {
+          if (typeof slug === 'string' && slug.length > 0) parts.push(slug);
+        });
+      }
+      if (typeof event.forcedFinalReason === 'string' && event.forcedFinalReason.length > 0) {
+        parts.push(event.forcedFinalReason);
+      }
+      return parts.length > 0 ? parts.join(', ') : undefined;
+    };
     const renderReasoning = (): string => renderReasoningMarkdown({
       header: transactionHeader,
       turns,
@@ -506,12 +518,19 @@ export class AnthropicCompletionsHeadend implements Headend {
       emitReasoningDelta(PROGRESS_TO_MODEL_SEP);
       emitReasoningDelta(bufferedContent);
     };
-    const startNextTurn = (): void => {
+    const startNextTurn = (info?: { index: number; attempt?: number; reason?: string }): void => {
       // DO NOT flush thinking buffer here - it's independent of turns
       // DO NOT reset streamMode here - mode is controlled by thinking/progress flow
 
       turnCounter += 1;
-      const turn: ReasoningTurnState = { index: turnCounter, updates: [], progressSeen: false };
+      const turnIndex = info?.index ?? turnCounter;
+      const turn: ReasoningTurnState = { index: turnIndex, updates: [], progressSeen: false };
+      if (typeof info?.attempt === 'number' && Number.isFinite(info.attempt)) {
+        turn.attempt = info.attempt;
+      }
+      if (typeof info?.reason === 'string' && info.reason.length > 0) {
+        turn.reason = info.reason;
+      }
       if (turnCounter > 1) {
         const summary = formatTotals();
         if (summary !== undefined) turn.summary = summary;
@@ -520,12 +539,19 @@ export class AnthropicCompletionsHeadend implements Headend {
       expectingNewTurn = false;
       flushReasoning();
     };
-    const ensureTurnIndex = (target: number): void => {
-      if (!Number.isFinite(target) || target <= 0) return;
-      // eslint-disable-next-line functional/no-loop-statements -- deterministic numbering
-      while (turnCounter < target) {
-        startNextTurn();
+    const handleTurnStarted = (event: Extract<AIAgentEvent, { type: 'turn_started' }>): void => {
+      const reason = formatTurnReason(event);
+      if (turns.length > 0) {
+        const lastTurn = turns[turns.length - 1];
+        if (lastTurn.attempt === undefined && lastTurn.index === event.turn) {
+          lastTurn.attempt = event.attempt;
+          if (reason !== undefined) lastTurn.reason = reason;
+          flushReasoning();
+          expectingNewTurn = false;
+          return;
+        }
       }
+      startNextTurn({ index: event.turn, attempt: event.attempt, reason });
       expectingNewTurn = false;
     };
     const appendThinkingChunk = (chunk: string): void => {
@@ -745,7 +771,7 @@ export class AnthropicCompletionsHeadend implements Headend {
           case 'turn_started': {
             if (!shouldStreamTurnStarted(meta)) return;
             // Don't call ensureHeader here - wait for progress event with txnId
-            ensureTurnIndex(event.turn);
+            handleTurnStarted(event);
             return;
           }
           case 'progress': {

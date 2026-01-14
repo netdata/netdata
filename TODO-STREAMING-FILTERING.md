@@ -14,6 +14,7 @@
   - **Update (2026-01-14):** applied common-gate helper usage in CLI/REST/MCP/Embed headends; added Phase 2 scenarios for advisor/subagent stream isolation; removed review file.
 - **Post-restart verification (2026-01-14):**
   - Lint/build + Phase1/Phase2/Phase3:tier1 all ran and passed (see “Testing requirements” below for details + warnings).
+ - **Update (2026-01-14):** Implemented per-attempt `turn_started` event payload + attempt-aware thinking replay guard, updated LLM headend turn headings, added retry coverage, and synced docs/tests.
 
 ### Repo Review (2026-01-14)
 
@@ -653,21 +654,20 @@ Evidence:
    - **Evidence:** `src/tests/phase2-harness-scenarios/phase2-runner.ts:12273-12513`  
    - **Unit helper coverage:** `src/tests/unit/shared-event-filter.spec.ts:1-46`
 
+4. **Duplicate thinking replay (retry path):** Implement attempt-aware “emit once” ledger.  
+   - **Decision (2026-01-14):** Each attempt’s thinking must be emitted exactly once (stream OR replay), never skipped or double-emitted.  
+   - **Rationale:** Avoid duplicate thinking on final turn while preserving per-attempt visibility.
+
+5. **LLM headend turn labels:** Show retry/forced-final context.  
+   - **Decision (2026-01-14):** LLM headends must surface `Turn X, Attempt Y, {reason}`.
+   - **Reason format:** use raw reason/slug values (no friendly names).
+
+6. **Turn annotation event shape:** enrich `turn_started`.  
+   - **Decision (2026-01-14):** Single `turn_started` event emitted per attempt with annotations (`attempt`, `isRetry`, `isFinalTurn`, `forcedFinalReason`, `retrySlugs`); tests ignore `isRetry=true` when counting turns.
+
 ## Decisions Pending (2026-01-14)
 
-1. **Duplicate thinking on final turn (retry path):** Should replayed thinking be suppressed if *any* retry attempt already streamed thinking?  
-   - **Evidence (current behavior):**
-     - `turnResult.shownThinking` is set only within a single attempt (`src/session-turn-runner.ts:3247-3484`).
-     - The replay path runs only when `!turnResult.shownThinking` (`src/session-turn-runner.ts:742-776`).
-     - `lastTurnResult` is replaced on each retry attempt (`src/session-turn-runner.ts:677-680`), so earlier streamed thinking can be ignored if the final attempt doesn’t stream.
-   - **Options:**
-     1) **Track “ever streamed thinking this turn” across retries and skip replay when true.**  
-        - **Pros:** Prevents duplicate thinking after retries; aligns with user’s symptom (duplicate after final report).  
-        - **Cons:** If the final attempt has different reasoning but doesn’t stream, users won’t see that reasoning replay.
-     2) **Keep current behavior (replay based only on last attempt).**  
-        - **Pros:** Ensures reasoning from the final successful attempt is shown even if it didn’t stream.  
-        - **Cons:** Can duplicate thinking if earlier attempt streamed (likely user-visible bug).
-   - **Recommendation:** Option 1 (matches the reported behavior and avoids duplicate thinking).
+None.
 
 ---
 

@@ -41,7 +41,7 @@ The library performs no direct I/O (no stdout/stderr/file writes). All output, l
 - `AIAgentEvent`
   - `output` – assistant output stream (`text`)
   - `thinking` – reasoning stream (`text`)
-  - `turn_started` – LLM turn start notification (`turn`, 1-indexed)
+  - `turn_started` – LLM attempt start notification (`turn`, `attempt`, `isRetry`, `isFinalTurn`, `forcedFinalReason?`, `retrySlugs?`)
   - `progress` – progress events (`event: ProgressEvent`)
   - `status` – convenience mirror of `progress` when `event.type === 'agent_update'` (headends can ignore)
   - `final_report` – final report payload (`report: FinalReportPayload`)

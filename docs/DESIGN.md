@@ -330,7 +330,7 @@ The agent MUST properly display both content output and thinking/reasoning strea
 - **Content**: All LLM thinking/reasoning text
 - **Formatting**: Light gray color (`\x1b[90m`)
 - **Streaming mode**: Real-time display via `onEvent(type='thinking')` as chunks arrive
-- **Turn notifications**: `onEvent(type='turn_started')` fires whenever the orchestrator begins a new LLM turn so downstream headends can annotate reasoning logs even if no thinking text streams.
+- **Turn notifications**: `onEvent(type='turn_started')` fires once per LLM attempt with `{ turn, attempt, isRetry, isFinalTurn, forcedFinalReason?, retrySlugs? }` so downstream headends can annotate reasoning logs even if no thinking text streams.
 - **Provider support**: Only with providers supporting reasoning (e.g., OpenAI o1, Anthropic Claude)
 
 #### Implementation Details

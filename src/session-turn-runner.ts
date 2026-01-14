@@ -189,6 +189,7 @@ export class TurnRunner {
     private state: TurnRunnerState;
     private finalReportStreamed = false;
     private streamedOutputTail = '';
+    private thinkingEmittedAttempts = new Set<string>();
 
     constructor(ctx: TurnRunnerContext, callbacks: TurnRunnerCallbacks) {
         this.ctx = ctx;
@@ -247,6 +248,15 @@ export class TurnRunner {
         if (streamed.length === 0)
             return false;
         return streamed.endsWith(candidate);
+    }
+    private thinkingAttemptKey(turn: number, attempt: number): string {
+        return `${String(turn)}:${String(attempt)}`;
+    }
+    private markThinkingEmitted(turn: number, attempt: number): void {
+        this.thinkingEmittedAttempts.add(this.thinkingAttemptKey(turn, attempt));
+    }
+    private hasThinkingEmitted(turn: number, attempt: number): boolean {
+        return this.thinkingEmittedAttempts.has(this.thinkingAttemptKey(turn, attempt));
     }
     /**
      * Main entry point - executes the agent loop
@@ -317,7 +327,6 @@ export class TurnRunner {
             this.state.currentTurn = currentTurn;
             this.callbacks.setCurrentTurn(currentTurn);
             this.logTurnStart(currentTurn);
-                this.callbacks.emitEvent({ type: 'turn_started', turn: currentTurn });
             try {
                 const turnAttrs = {
                     prompts: {
@@ -348,6 +357,7 @@ export class TurnRunner {
         let lastTurnResult: (TurnResult & { shownThinking?: boolean; incompleteFinalReportDetected?: boolean }) | undefined;
             let turnHadFinalReportAttempt = false;
             let collapseLoggedThisTurn = false;
+            let retrySlugsForNextAttempt: string[] | undefined;
             const collapseRemainingTurns = (reason: 'incomplete_final_report' | 'final_report_attempt' | 'xml_wrapper_as_tool'): void => {
                 if (collapseLoggedThisTurn)
                     return;
@@ -447,6 +457,7 @@ export class TurnRunner {
                         maxTurns,
                         isFinalTurn: currentTurn === maxTurns,
                     });
+                    retrySlugsForNextAttempt = failureInfo.slugs.length > 0 ? [...failureInfo.slugs] : undefined;
                     this.logTurnFailure(failureInfo);
                 };
                 // Note: cycleIndex/cycleComplete tracking removed during extraction - may need to be reinstated
@@ -608,6 +619,19 @@ export class TurnRunner {
                     }
                     this.state.llmAttempts++;
                     attempts += 1;
+                    const attemptNumber = attempts;
+                    const isRetryAttempt = attemptNumber > 1;
+                    const forcedFinalReason = isFinalTurn ? (this.forcedFinalTurnReason ?? 'max_turns') : undefined;
+                    const retrySlugs = isRetryAttempt ? retrySlugsForNextAttempt : undefined;
+                    this.callbacks.emitEvent({
+                        type: 'turn_started',
+                        turn: currentTurn,
+                        attempt: attemptNumber,
+                        isRetry: isRetryAttempt,
+                        isFinalTurn,
+                        forcedFinalReason,
+                        retrySlugs,
+                    });
                     const cycleIndex = pairs.length > 0 ? (attempts - 1) % pairs.length : 0;
                     const cycleComplete = pairs.length > 0 ? (cycleIndex === pairs.length - 1) : false;
                     // Begin hierarchical LLM operation
@@ -739,7 +763,8 @@ export class TurnRunner {
                         this.state.toolFailureFallbacks.length = 0;
                     }
                     let reasoningHeaderEmitted = false;
-                    if (!turnResult.shownThinking) {
+                    const thinkingAlreadyEmitted = this.hasThinkingEmitted(currentTurn, attempts);
+                    if (!turnResult.shownThinking && !thinkingAlreadyEmitted) {
                         const reasoningChunks: string[] = [];
                         sanitizedMessages.forEach((message) => {
                             if (message.role !== 'assistant')
@@ -754,6 +779,7 @@ export class TurnRunner {
                         });
                         if (reasoningChunks.length > 0) {
                             reasoningHeaderEmitted = true;
+                            this.markThinkingEmitted(currentTurn, attempts);
                             if (lastShownThinkingHeaderTurn !== currentTurn) {
                                 const thinkingHeader = {
                                     timestamp: Date.now(),
@@ -3477,6 +3503,7 @@ export class TurnRunner {
             if (!shownThinking) {
                 shownThinking = true;
             }
+            this.markThinkingEmitted(currentTurn, attempt);
             this.callbacks.emitEvent({ type: 'thinking', text: thinkingChunk }, { source: 'stream' });
             try {
                 const opId = this.callbacks.getCurrentLlmOpId();
