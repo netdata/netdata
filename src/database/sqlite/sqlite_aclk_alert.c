@@ -751,12 +751,18 @@ void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_has
         return;
     }
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_CONFIG, &res))
-        return;
-
     nd_uuid_t hash_uuid;
-    if (uuid_parse(config_hash, hash_uuid))
+    if (uuid_parse(config_hash, hash_uuid)) {
+        freez(config_hash);
+        freez(node_id);
         return;
+    }
+
+    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_CONFIG, &res)) {
+        freez(config_hash);
+        freez(node_id);
+        return;
+    }
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &hash_uuid , sizeof(hash_uuid), SQLITE_STATIC));

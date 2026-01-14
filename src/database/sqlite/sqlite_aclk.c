@@ -849,6 +849,12 @@ static void aclk_synchronization_event_loop(void *arg)
                     else {
                         aclk_query_free(query);
                         aclk_query_batch->count--;
+                        
+                        // Clean up the batch structure if this was the first entry that failed
+                        if (aclk_query_batch->count == 0) {
+                            freez(aclk_query_batch);
+                            aclk_query_batch = NULL;
+                        }
                         break;
                     }
 
