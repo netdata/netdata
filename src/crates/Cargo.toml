@@ -125,6 +125,9 @@ tower = "0.5"
 
 flatten-serde-json = { git = "https://github.com/meilisearch/meilisearch", tag = "v1.22.1" }
 
+# Error tracking
+sentry = { version = "0.35", default-features = false }
+
 # Internal workspace crates
 journal-common = { path = "journal-common" }
 journal-core = { path = "journal-core" }
