@@ -34,6 +34,7 @@ func newTextHandler() slog.Handler {
 
 func newTerminalHandler() slog.Handler {
 	return tint.NewHandler(os.Stderr, &tint.Options{
+		NoColor:   runtime.GOOS == "windows",
 		AddSource: true,
 		Level:     Level.lvl,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
