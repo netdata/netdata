@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 
@@ -93,6 +94,10 @@ const PHASE3_MCP_ROOT = path.resolve(PROJECT_ROOT);
 if (process.env.MCP_ROOT === undefined || process.env.MCP_ROOT.length === 0) {
   process.env.MCP_ROOT = PHASE3_MCP_ROOT;
 }
+const PHASE3_DUMP_LLM = process.env.PHASE3_DUMP_LLM === "1";
+const PHASE3_DUMP_LLM_DIR =
+  process.env.PHASE3_DUMP_LLM_DIR ??
+  path.join(os.tmpdir(), "ai-agent-phase3-llm");
 const TEST_AGENTS_DIR = path.resolve(
   PROJECT_ROOT,
   "src",
@@ -186,6 +191,8 @@ const TOOL_OUTPUT_FIXTURE_PATH = path.join(
   "fixtures",
   "tool-output-large.txt",
 );
+const TOOL_OUTPUT_READ_START = 0;
+const TOOL_OUTPUT_READ_LINES = 200;
 const TOOL_OUTPUT_MODE_AUTO = "auto";
 const TOOL_OUTPUT_MODE_FULL = "full-chunked";
 const TOOL_OUTPUT_MODE_READ_GREP = "read-grep";
@@ -206,15 +213,16 @@ const buildToolOutputSystemPrompt = (
     "You are a CI test agent validating tool_output extraction.",
     "",
     "Follow these steps exactly:",
-    `1) Call ONLY filesystem_cwd__Read with {\"path\":\"${TOOL_OUTPUT_FIXTURE_PATH}\"}.`,
-    "2) The tool result will be replaced with a tool_output handle message.",
+    "1) Call ONLY filesystem_cwd__Read with:",
+    `   {\"file\":\"${TOOL_OUTPUT_FIXTURE_PATH}\",\"start\":${String(TOOL_OUTPUT_READ_START)},\"lines\":${String(TOOL_OUTPUT_READ_LINES)}}.`,
+    "2) The tool result will be replaced with a tool_output handle message. Do not answer yet.",
     "3) Call tool_output with:",
     "   - handle: the handle from the tool_output message",
     `   - extract: \"Return the exact line containing ${sentinel}.\"`,
     `   - mode: \"${mode}\"`,
     "4) After tool_output returns, respond with the XML final report wrapper:",
     "   <ai-agent-{nonce}-FINAL format=\"text\">tool_output complete</ai-agent-{nonce}-FINAL>",
-    "Do not call any other tools.",
+    "Do not call any other tools. Do not answer before tool_output completes.",
   ].join("\\n");
 };
 
@@ -224,6 +232,8 @@ const buildToolOutputUserPrompt = (mode: string, sentinel: string): string => {
     `- mode=${mode}`,
     `- sentinel=${sentinel}`,
     `- path=${TOOL_OUTPUT_FIXTURE_PATH}`,
+    `- read.start=${String(TOOL_OUTPUT_READ_START)}`,
+    `- read.lines=${String(TOOL_OUTPUT_READ_LINES)}`,
     "Follow the system prompt exactly.",
   ].join("\\n");
 };
@@ -531,6 +541,9 @@ const STREAM_OFF_LABEL = "stream-off";
 const TEMP_DISABLED_PROVIDERS = new Set<string>();
 const toErrorMessage = (value: unknown): string =>
   value instanceof Error ? value.message : String(value);
+
+const sanitizeFileComponent = (value: string): string =>
+  value.replace(/[^a-zA-Z0-9._-]+/g, "_");
 
 const ensureFileExists = (description: string, candidate: string): void => {
   if (!fs.existsSync(candidate)) {
@@ -1220,7 +1233,11 @@ const runScenarioVariant = async (
       traceMCP: TRACE_MCP,
       verbose: VERBOSE_LOGS,
     });
-    return validateScenarioResult(baseResult, { result });
+    const validated = validateScenarioResult(baseResult, { result });
+    if (!validated.success) {
+      dumpLlmRequests(result, validated);
+    }
+    return validated;
   } catch (error: unknown) {
     const message = toErrorMessage(error);
     return {
@@ -1317,11 +1334,114 @@ const printSummary = (runs: readonly ScenarioRunResult[]): void => {
 
 const printUsage = (): void => {
   console.log(
-    "Usage: node dist/tests/phase3-runner.js [--config=path] [--tier=1,2,3] [--model=label,modelId]",
+    "Usage: node dist/tests/phase3-runner.js [--config=path] [--tier=1,2,3] [--model=label,modelId] [--scenario=id,label]",
   );
   console.log("Environment override: PHASE3_CONFIG=/path/to/config.json");
   console.log(
     "Set PHASE3_STOP_ON_FAILURE=1 to halt immediately after the first failure (default: continue running all models).",
+  );
+  console.log(
+    "Set PHASE3_DUMP_LLM=1 to dump LLM request payloads for failing scenarios to /tmp (override with PHASE3_DUMP_LLM_DIR).",
+  );
+};
+
+const parseScenarioFilter = (value: string): Set<string> => {
+  const parts = value
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  if (parts.length === 0) {
+    throw new Error("scenario list cannot be empty");
+  }
+  return new Set(parts);
+};
+
+const matchesScenarioFilter = (
+  scenario: ScenarioDefinition,
+  filter: Set<string> | undefined,
+): boolean => {
+  if (filter === undefined) return true;
+  return filter.has(scenario.id) || filter.has(scenario.label);
+};
+
+const extractToolNamesFromPayload = (payload: unknown): string[] => {
+  if (!isPlainObject(payload)) return [];
+  const tools = payload.tools;
+  if (!Array.isArray(tools)) return [];
+  return tools
+    .map((entry) => (isPlainObject(entry) ? entry.name : undefined))
+    .filter((name): name is string => typeof name === "string");
+};
+
+const summarizeMessages = (payload: unknown): { role: string; preview: string }[] => {
+  if (!isPlainObject(payload)) return [];
+  const messages = payload.messages;
+  if (!Array.isArray(messages)) return [];
+  return messages
+    .map((entry) => {
+      if (!isPlainObject(entry)) return undefined;
+      const role = typeof entry.role === "string" ? entry.role : "unknown";
+      const content = entry.content;
+      const preview =
+        typeof content === "string"
+          ? content.slice(0, 240)
+          : Array.isArray(content)
+            ? JSON.stringify(content).slice(0, 240)
+            : "";
+      return { role, preview };
+    })
+    .filter((entry): entry is { role: string; preview: string } => entry !== undefined);
+};
+
+const dumpLlmRequests = (
+  session: AIAgentResult,
+  run: ScenarioRunResult,
+): void => {
+  if (!PHASE3_DUMP_LLM) return;
+  const entries = session.logs.filter((entry) => entry.llmRequestPayload !== undefined);
+  if (entries.length === 0) {
+    console.log(
+      `[TRACE] ${run.modelLabel} :: ${run.scenarioLabel} produced no LLM request payloads to dump.`,
+    );
+    return;
+  }
+  fs.mkdirSync(PHASE3_DUMP_LLM_DIR, { recursive: true });
+  const fileName = [
+    sanitizeFileComponent(run.modelLabel),
+    sanitizeFileComponent(run.scenarioId),
+    run.stream ? "stream-on" : "stream-off",
+  ].join("__");
+  const filePath = path.join(PHASE3_DUMP_LLM_DIR, `phase3-${fileName}.jsonl`);
+  const lines = entries.map((entry) => {
+    const payload = entry.llmRequestPayload;
+    const payloadBody = payload?.body;
+    const parsed = (() => {
+      if (typeof payloadBody !== "string" || payloadBody.length === 0) {
+        return undefined;
+      }
+      try {
+        return JSON.parse(payloadBody) as unknown;
+      } catch {
+        return undefined;
+      }
+    })();
+    const tools = parsed !== undefined ? extractToolNamesFromPayload(parsed) : [];
+    const messages = parsed !== undefined ? summarizeMessages(parsed) : [];
+    return JSON.stringify({
+      timestamp: entry.timestamp,
+      turn: entry.turn,
+      subturn: entry.subturn,
+      remoteIdentifier: entry.remoteIdentifier,
+      message: entry.message,
+      details: entry.details,
+      payload: payload,
+      toolNames: tools,
+      messagePreviews: messages,
+    });
+  });
+  fs.writeFileSync(filePath, lines.join("\n"));
+  console.log(
+    `[TRACE] dumped ${String(entries.length)} LLM request payloads to ${filePath}`,
   );
 };
 
@@ -1352,6 +1472,7 @@ async function main(): Promise<void> {
   let tierFilter: Set<Tier> | undefined;
   let tierThreshold: number | undefined;
   let modelFilter: Set<string> | undefined;
+  let scenarioFilter: Set<string> | undefined;
 
   argv.forEach((arg) => {
     if (arg.startsWith("--config=")) {
@@ -1361,6 +1482,8 @@ async function main(): Promise<void> {
       tierThreshold = Math.max(...Array.from(tierFilter));
     } else if (arg.startsWith("--model=")) {
       modelFilter = parseModelFilter(arg.slice("--model=".length));
+    } else if (arg.startsWith("--scenario=")) {
+      scenarioFilter = parseScenarioFilter(arg.slice("--scenario=".length));
     } else {
       throw new Error(`unknown argument '${arg}'`);
     }
@@ -1390,6 +1513,9 @@ async function main(): Promise<void> {
     }
     // eslint-disable-next-line functional/no-loop-statements
     for (const variant of scenarioVariants) {
+      if (!matchesScenarioFilter(variant.scenario, scenarioFilter)) {
+        continue;
+      }
       executed += 1;
       const streamLabel = variant.stream ? STREAM_ON_LABEL : STREAM_OFF_LABEL;
       const runIndexLabel = String(executed);

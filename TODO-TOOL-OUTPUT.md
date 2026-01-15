@@ -121,6 +121,14 @@
     - traced fetch clone warnings (fixtures)
     - unreadable env file warning (fixture)
     - lingering handles warning (fixture teardown)
+## Post-Change Test Runs (2026-01-15, trace/debug)
+- `PHASE3_TRACE_LLM=1 PHASE3_DUMP_LLM=1 node dist/tests/phase3-runner.js --tier=1 --model=nova/glm-4.5-air --scenario=tool-output-auto`
+  - **PASS** (latency ~62s; requests=6). Command **timed out** after 1200s despite summary (likely runner not exiting).
+- `PHASE3_TRACE_LLM=1 PHASE3_DUMP_LLM=1 node dist/tests/phase3-runner.js --tier=1 --model=nova/glm-4.6 --scenario=tool-output-read-grep`
+  - **FAIL**: `expected tool_output results but none were found`.
+  - LLM request dump written to `/tmp/ai-agent-phase3-llm/phase3-nova_glm-4.6__tool-output-read-grep__stream-off.jsonl`.
+  - Evidence from dump: tools list included **filesystem_cwd__Read** but **no tool_output** (expected before handle); model never invoked tools.
+  - Command **timed out** after 400s despite summary (likely runner not exiting).
 
 ## Feasibility Study (2026-01-14)
 ### Facts (with evidence)
@@ -541,6 +549,15 @@ OUTPUT FORMAT (required)
     - `mode=full-chunked`
     - `mode=read-grep`
     - `mode=truncate`
+
+## Pending / Open Issues (blocking completion)
+1) **Phase 3 Tier1 instability in tool_output scenarios**:
+   - Models sometimes **do not call filesystem_cwd__Read**, so no handle is created and `tool_output` never appears.
+   - Evidence: LLM request dump for `nova/glm-4.6` read-grep shows tools list **without** `tool_output` and no tool calls were made.
+   - Next step: tighten prompts or enforce tool call (e.g., stronger instruction or tool_choice) so the model must execute the first tool call.
+2) **Phase 3 runner hang after completion**:
+   - Trace runs printed final summary but the Node process did not exit before timeout.
+   - Next step: inspect runner teardown path, possible lingering handles, or add forced exit after summary in debug mode.
 
 ## Documentation Updates
 - `docs/SPECS.md`: new tool_output behavior, routing, and storage.

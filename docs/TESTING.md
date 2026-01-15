@@ -106,10 +106,12 @@ Test agents for the scenarios are located under `src/tests/phase3/test-agents/`:
 - `npm run test:phase3:tier2` — run Tiers 1 and 2.
 - `npm run test:phase3:vitest` — build + run the Phase 3 runner via Vitest (wraps `dist/tests/phase3-runner.js`, honoring `PHASE3_TIERS`).
 - `npm run test:all` — executes Phase 1, Phase 2, then Phase 3 Tier 1.
+- `node dist/tests/phase3-runner.js --model=nova/glm-4.7 --scenario=tool-output-auto` — run a single scenario for one model.
 
 ### Safeguards
 - The runner stops after the first failure when `PHASE3_STOP_ON_FAILURE=1` (default). Set `PHASE3_STOP_ON_FAILURE=0` to force the full matrix while debugging.
 - Optional tracing/logging toggles: `PHASE3_TRACE_LLM`, `PHASE3_TRACE_SDK`, `PHASE3_TRACE_MCP`, `PHASE3_VERBOSE`.
+- Set `PHASE3_DUMP_LLM=1` to dump LLM request payloads for failing scenarios to `/tmp/ai-agent-phase3-llm` (override with `PHASE3_DUMP_LLM_DIR`).
 - All runs are live. Verify credentials before invoking and budget for any provider costs if using paid models.
 
 ## Coverage And Debugging
