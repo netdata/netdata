@@ -1327,6 +1327,11 @@ Whether you're monitoring a single server or a global infrastructure, Netdata's 
 
 ---
 
+## Features that Netdata does **NOT** have
+
+- No native IPFIX (IP Flow Information eXport) support: IPFIX can be supported via community provided OpenMetrics/Prometheus/OpenTelemetry exporters and plugins.
+- No native SASE integration: SASE platforms sit in the traffic path and enforce policy. Netdata stays out of the path and measures what really happens on your systems and networks, at per-second resolution. That separation matters, because it gives you an independent view.
+
 ## Contact & Resources
 
 - **Website**: https://www.netdata.cloud
