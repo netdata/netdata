@@ -12,6 +12,7 @@ import { AIAgent } from '../ai-agent.js';
 import { getTelemetryLabels } from '../telemetry/index.js';
 import { createDeferred, normalizeCallPath } from '../utils.js';
 
+import { buildPromptSections } from './completions-prompt.js';
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
 import { renderReasoningMarkdown, type ReasoningTurnState } from './reasoning-markdown.js';
@@ -71,10 +72,6 @@ const buildLog = (
   headendId,
   details,
 });
-
-const SYSTEM_PREFIX = 'System context:\n';
-const HISTORY_PREFIX = 'Conversation so far:\n';
-const USER_PREFIX = 'User request:\n';
 
 const collectUsage = (entries: AccountingEntry[]): { input: number; output: number; total: number } => {
   const usage = entries
@@ -984,11 +981,7 @@ export class AnthropicCompletionsHeadend implements Headend {
     if (lastUser === undefined || lastUser.length === 0) {
       throw new HttpError(400, 'missing_user_prompt', 'Final user message is required');
     }
-    const segments: string[] = [];
-    if (systemParts.length > 0) segments.push(`${SYSTEM_PREFIX}${systemParts.join('\n')}`);
-    if (historyParts.length > 0) segments.push(`${HISTORY_PREFIX}${historyParts.join('\n')}`);
-    segments.push(`${USER_PREFIX}${lastUser}`);
-    return segments.join('\n\n');
+    return buildPromptSections({ systemParts, historyParts, lastUser });
   }
 
   private stringifyContent(content: string | AnthropicMessageContent[]): string {

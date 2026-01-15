@@ -13,6 +13,7 @@ import { mergeCallbacksWithPersistence } from '../persistence.js';
 import { getTelemetryLabels } from '../telemetry/index.js';
 import { createDeferred, normalizeCallPath } from '../utils.js';
 
+import { buildPromptSections } from './completions-prompt.js';
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
 import { renderReasoningMarkdown, type ReasoningTurnState } from './reasoning-markdown.js';
@@ -72,9 +73,6 @@ const buildLog = (
   details,
 });
 
-const SYSTEM_PREFIX = 'System context:\n';
-const HISTORY_PREFIX = 'Conversation so far:\n';
-const USER_PREFIX = 'User request:\n';
 const CHAT_COMPLETION_OBJECT = 'chat.completion';
 const CHAT_CHUNK_OBJECT = 'chat.completion.chunk';
 const CLIENT_CLOSED_ERROR = 'client_closed_request';
@@ -1020,11 +1018,7 @@ export class OpenAICompletionsHeadend implements Headend {
     if (lastUser === undefined || lastUser.length === 0) {
       throw new HttpError(400, 'missing_user_prompt', 'A user message is required as the final turn');
     }
-    const sections: string[] = [];
-    if (systemParts.length > 0) sections.push(`${SYSTEM_PREFIX}${systemParts.join('\n')}`);
-    if (historyParts.length > 0) sections.push(`${HISTORY_PREFIX}${historyParts.join('\n')}`);
-    sections.push(`${USER_PREFIX}${lastUser}`);
-    return sections.join('\n\n');
+    return buildPromptSections({ systemParts, historyParts, lastUser });
   }
 
   private resolveFormat(body: OpenAIChatRequest, agent: AgentMetadata): FormatResolution {
