@@ -1356,5 +1356,5 @@ void cgroup_discovery_worker(void *ptr)
     cgroup_cleanup_ebpf_integration();
     worker_unregister();
     service_exits();
-    __atomic_store_n(&discovery_thread.exited,1,__ATOMIC_RELAXED);
+    __atomic_store_n(&discovery_thread.exited, 1, __ATOMIC_RELEASE);
 }

@@ -1334,9 +1334,9 @@ static void cgroup_main_cleanup(void *pptr) {
 
     usec_t max = 2 * USEC_PER_SEC, step = 50000;
 
-    if (!__atomic_load_n(&discovery_thread.exited, __ATOMIC_RELAXED)) {
+    if (!__atomic_load_n(&discovery_thread.exited, __ATOMIC_ACQUIRE)) {
         collector_info("waiting for discovery thread to finish...");
-        while (!__atomic_load_n(&discovery_thread.exited, __ATOMIC_RELAXED) && max > 0) {
+        while (!__atomic_load_n(&discovery_thread.exited, __ATOMIC_ACQUIRE) && max > 0) {
             netdata_mutex_lock(&discovery_thread.mutex);
             netdata_cond_signal(&discovery_thread.cond_var);
             netdata_mutex_unlock(&discovery_thread.mutex);
@@ -1345,7 +1345,7 @@ static void cgroup_main_cleanup(void *pptr) {
         }
     }
     // We should be done, but just in case, avoid blocking shutdown
-    if (__atomic_load_n(&discovery_thread.exited, __ATOMIC_RELAXED))
+    if (__atomic_load_n(&discovery_thread.exited, __ATOMIC_ACQUIRE))
         (void) nd_thread_join(discovery_thread.thread);
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -1404,13 +1404,14 @@ void cgroups_main(void *ptr) {
     // Mark thread as "running" only after mutex/cond are initialized
     // but before creating the thread. This ensures cleanup won't try
     // to access uninitialized synchronization primitives.
-    __atomic_store_n(&discovery_thread.exited, 0, __ATOMIC_RELAXED);
+    // Use RELEASE ordering so readers with ACQUIRE see initialized mutex/cond.
+    __atomic_store_n(&discovery_thread.exited, 0, __ATOMIC_RELEASE);
 
     discovery_thread.thread = nd_thread_create("CGDISCOVER", NETDATA_THREAD_OPTION_DEFAULT, cgroup_discovery_worker, NULL);
 
     if (!discovery_thread.thread) {
         collector_error("CGROUP: cannot create thread worker");
-        __atomic_store_n(&discovery_thread.exited, 1, __ATOMIC_RELAXED);  // Reset since thread wasn't created
+        __atomic_store_n(&discovery_thread.exited, 1, __ATOMIC_RELEASE);  // Reset since thread wasn't created
         return;
     }
 
