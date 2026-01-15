@@ -908,8 +908,15 @@ void web_client_build_http_header(struct web_client *w) {
             buffer_sprintf(w->response.header_output, "Content-Length: %zu\r\n", (size_t)w->response.data->len);
         }
         else {
-            // we don't know the content length, disable keep-alive
-            web_client_disable_keepalive(w);
+            // For 304 Not Modified responses, we must send Content-Length: 0 to comply with HTTP spec
+            // and avoid closing the connection (keep-alive should work)
+            if(w->response.code == HTTP_RESP_NOT_MODIFIED) {
+                buffer_strcat(w->response.header_output, "Content-Length: 0\r\n");
+            }
+            else {
+                // we don't know the content length, disable keep-alive
+                web_client_disable_keepalive(w);
+            }
         }
     }
 
