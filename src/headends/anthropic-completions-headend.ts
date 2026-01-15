@@ -4,7 +4,7 @@ import path from 'node:path';
 import { URL } from 'node:url';
 
 import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
-import type { AccountingEntry, AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, FinalReportPayload, LLMAccountingEntry, LogDetailValue, LogEntry, ProgressEvent, ProgressMetrics } from '../types.js';
+import type { AccountingEntry, AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, FinalReportPayload, LogDetailValue, LogEntry, ProgressEvent, ProgressMetrics } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 import type { Socket } from 'node:net';
 
@@ -14,6 +14,7 @@ import { createDeferred, normalizeCallPath } from '../utils.js';
 
 import { buildPromptSections } from './completions-prompt.js';
 import { resolveFinalReportContent } from './completions-response.js';
+import { collectLlmUsage } from './completions-usage.js';
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
 import { renderReasoningMarkdown, type ReasoningTurnState } from './reasoning-markdown.js';
@@ -74,17 +75,9 @@ const buildLog = (
   details,
 });
 
-const collectUsage = (entries: AccountingEntry[]): { input: number; output: number; total: number } => {
-  const usage = entries
-    .filter((entry): entry is LLMAccountingEntry => entry.type === 'llm')
-    .reduce<{ input: number; output: number }>((acc, entry) => {
-      const tokens = entry.tokens;
-      acc.input += tokens.inputTokens;
-      acc.output += tokens.outputTokens;
-      return acc;
-    }, { input: 0, output: 0 });
-  return { ...usage, total: usage.input + usage.output };
-};
+const collectUsage = (entries: AccountingEntry[]): { input: number; output: number; total: number } => (
+  collectLlmUsage(entries)
+);
 
 export class AnthropicCompletionsHeadend implements Headend {
   public readonly id: string;

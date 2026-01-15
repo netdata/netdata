@@ -100,3 +100,43 @@ Append all you findings in this document.
 - Duplicated final report content resolution logic in completions headends:
   - `src/headends/openai-completions-headend.ts:1122-1131`
   - `src/headends/anthropic-completions-headend.ts:1004-1012`
+
+---
+
+## Iteration 3 - Consolidate LLM usage aggregation
+
+### TL;DR
+- Move duplicated LLM usage aggregation logic to a shared helper.
+- Keep headend response shapes the same by mapping the shared totals.
+
+### Analysis (facts only)
+- Both completions headends implement near-identical LLM usage aggregation:
+  - `src/headends/openai-completions-headend.ts:81-91`
+  - `src/headends/anthropic-completions-headend.ts:77-88`
+- Each filters `AccountingEntry` to LLM entries and sums `inputTokens`/`outputTokens`.
+- Differences are only naming (`prompt/completion` vs `input/output`).
+
+### Decisions
+- No user decisions required. Safe refactor with no behavior change.
+
+### Plan
+1. Add `src/headends/completions-usage.ts` with `collectLlmUsage()` returning `{ input, output, total }`.
+2. Replace the duplicated reduce logic in both headends with the helper.
+3. Add a unit test for the helper.
+4. Run `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Implied Decisions
+- Preserve OpenAI headend’s `prompt/completion` naming by mapping from shared totals.
+- Preserve Anthropic headend’s `input/output` naming.
+
+### Testing requirements
+- Unit test for `collectLlmUsage`.
+- Required checks: `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Documentation updates required
+- None. Refactor only.
+
+### Findings (append-only)
+- Duplicated LLM usage aggregation in completions headends:
+  - `src/headends/openai-completions-headend.ts:81-91`
+  - `src/headends/anthropic-completions-headend.ts:77-88`
