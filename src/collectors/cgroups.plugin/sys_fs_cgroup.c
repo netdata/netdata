@@ -1345,14 +1345,13 @@ static void cgroup_main_cleanup(void *pptr) {
         }
     }
     // We should be done, but just in case, avoid blocking shutdown
-    if (__atomic_load_n(&discovery_thread.exited, __ATOMIC_ACQUIRE))
-        (void) nd_thread_join(discovery_thread.thread);
-
-    // Clean up synchronization primitives if they were initialized
-    // (thread being non-NULL means initialization succeeded)
-    if (discovery_thread.thread) {
-        netdata_cond_destroy(&discovery_thread.cond_var);
-        netdata_mutex_destroy(&discovery_thread.mutex);
+    // Only join and destroy synchronization primitives if thread has exited
+    if (__atomic_load_n(&discovery_thread.exited, __ATOMIC_ACQUIRE)) {
+        if (discovery_thread.thread) {
+            (void) nd_thread_join(discovery_thread.thread);
+            netdata_cond_destroy(&discovery_thread.cond_var);
+            netdata_mutex_destroy(&discovery_thread.mutex);
+        }
     }
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
