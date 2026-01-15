@@ -40,6 +40,26 @@ Use this process when you need to move a node from one Space to another without 
    sudo rm -rf /var/lib/netdata/cloud.d/
    ```
 
+   :::warning
+
+   **Restart the agent after removing cloud.d/**
+
+   If you don't restart the agent after removing `/var/lib/netdata/cloud.d/`, the node will remain connected to Netdata Cloud until the agent restarts.
+
+   To apply the unclaiming change immediately, run:
+
+   ```bash
+   sudo systemctl restart netdata
+   ```
+
+   Or use the live reload command:
+
+   ```bash
+   sudo netdatacli reload-claiming-state
+   ```
+
+   :::
+
 3. Verify the node no longer appears in your Space
 
 ### Docker-based Installations
@@ -108,10 +128,10 @@ After reclaiming, verify the node appears in:
 **Node doesn't appear in new Space:**
 - Verify the claim token is correct for the new Space
 - Check `/var/lib/netdata/cloud.d/` was removed before reclaiming
-- Review agent logs: `grep -i CLAIM /var/log/netdata/error.log`
+- Review agent logs: `grep -i CLAIM /var/log/netdata/daemon.log`
 
 **Reconnection fails:**
-- Run `netdatacli aclk-state` to check connection status
+- Check connection status: `curl http://localhost:19999/api/v1/aclk`
 - Ensure the agent has internet access to `app.netdata.cloud`
 - Check for firewall blocking port 443
 
