@@ -39,7 +39,7 @@ Come up with 5 search queries, run them in parallel when helpful, get the result
 ## Tools
 
 ## Domain page fetch
-3. `web-fetch` with a URL like: `https://[company-domain-name]`
+1. `web-fetch` with a URL like: `https://[company-domain-name]`
 
 ---
 
