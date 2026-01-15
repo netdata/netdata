@@ -12,6 +12,7 @@ import { getTelemetryLabels } from '../telemetry/index.js';
 import { createDeferred, normalizeUrlPath } from '../utils.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
+import { signalHeadendClosed } from './headend-close-utils.js';
 import { HttpError, writeJson } from './http-utils.js';
 import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamMasterContent, shouldStreamOutput } from './shared-event-filter.js';
 import { handleHeadendShutdown } from './shutdown-utils.js';
@@ -457,8 +458,6 @@ export class RestHeadend implements Headend {
   }
 
   private signalClosed(event: HeadendClosedEvent): void {
-    if (this.closedSignaled) return;
-    this.closedSignaled = true;
-    this.closeDeferred.resolve(event);
+    this.closedSignaled = signalHeadendClosed(this.closedSignaled, this.closeDeferred, event);
   }
 }

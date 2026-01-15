@@ -414,3 +414,50 @@ Append all you findings in this document.
 - Duplicated `refreshModelMap` logic in completions headends:
   - `src/headends/openai-completions-headend.ts:1055-1061`
   - `src/headends/anthropic-completions-headend.ts:1025-1031`
+
+---
+
+## Iteration 11 - Consolidate headend close signaling
+
+### TL;DR
+- Extract the duplicated `signalClosed` logic from headends into a shared helper.
+- Add a unit test for the helper, then update each headend to use it with no behavior change.
+
+### Analysis (facts only)
+- Identical `signalClosed` implementations exist in multiple headends:
+  - `src/headends/openai-completions-headend.ts:1117-1121`
+  - `src/headends/anthropic-completions-headend.ts:1031-1035`
+  - `src/headends/rest-headend.ts:459-463`
+  - `src/headends/embed-headend.ts:808-812`
+  - `src/headends/mcp-headend.ts:594-598`
+- Each method:
+  - Returns early if `closedSignaled` is already true.
+  - Sets `closedSignaled = true`.
+  - Resolves `closeDeferred` with the given event.
+
+### Decisions
+- No user decisions required. Safe refactor with no behavior change.
+
+### Plan
+1. Add `src/headends/headend-close-utils.ts` with `signalHeadendClosed()` helper.
+2. Replace `signalClosed` bodies in the listed headends with the helper.
+3. Add a unit test for the helper under `src/tests/unit/`.
+4. Run `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Implied Decisions
+- Preserve per-headend closed signaling semantics and ordering.
+
+### Testing requirements
+- Unit test: shared close signaling helper.
+- Required checks: `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Documentation updates required
+- None. Refactor only.
+
+### Findings (append-only)
+- Duplicated `signalClosed` logic in headends:
+  - `src/headends/openai-completions-headend.ts:1117-1121`
+  - `src/headends/anthropic-completions-headend.ts:1031-1035`
+  - `src/headends/rest-headend.ts:459-463`
+  - `src/headends/embed-headend.ts:808-812`
+  - `src/headends/mcp-headend.ts:594-598`

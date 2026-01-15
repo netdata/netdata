@@ -18,6 +18,7 @@ import { createDeferred, globToRegex, isPlainObject } from '../utils.js';
 import { ConcurrencyLimiter } from './concurrency.js';
 import { EmbedMetrics } from './embed-metrics.js';
 import { appendTranscriptTurn, loadTranscript, writeTranscript, type EmbedTranscriptEntry } from './embed-transcripts.js';
+import { signalHeadendClosed } from './headend-close-utils.js';
 import { HttpError, readJson, writeJson, writeSseEvent } from './http-utils.js';
 import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamOutput, shouldStreamTurnStarted } from './shared-event-filter.js';
 
@@ -806,8 +807,6 @@ export class EmbedHeadend implements Headend {
   }
 
   private signalClosed(event: HeadendClosedEvent): void {
-    if (this.closedSignaled) return;
-    this.closedSignaled = true;
-    this.closeDeferred.resolve(event);
+    this.closedSignaled = signalHeadendClosed(this.closedSignaled, this.closeDeferred, event);
   }
 }

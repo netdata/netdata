@@ -19,6 +19,7 @@ import { buildPromptSections } from './completions-prompt.js';
 import { resolveFinalReportContent } from './completions-response.js';
 import { collectLlmUsage } from './completions-usage.js';
 import { ConcurrencyLimiter } from './concurrency.js';
+import { signalHeadendClosed } from './headend-close-utils.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
 import { buildHeadendModelId } from './model-id-utils.js';
 import { refreshModelIdMap } from './model-map-utils.js';
@@ -1115,8 +1116,6 @@ export class OpenAICompletionsHeadend implements Headend {
   }
 
   private signalClosed(event: HeadendClosedEvent): void {
-    if (this.closedSignaled) return;
-    this.closedSignaled = true;
-    this.closeDeferred.resolve(event);
+    this.closedSignaled = signalHeadendClosed(this.closedSignaled, this.closeDeferred, event);
   }
 }

@@ -26,6 +26,7 @@ import { createDeferred, isPlainObject } from '../utils.js';
 type ZodExports = typeof import('zod');
 
 import { ConcurrencyLimiter } from './concurrency.js';
+import { signalHeadendClosed } from './headend-close-utils.js';
 import { McpWebSocketServerTransport } from './mcp-ws-transport.js';
 import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamOutput } from './shared-event-filter.js';
 import { closeSockets } from './socket-utils.js';
@@ -592,9 +593,7 @@ export class McpHeadend implements Headend {
   }
 
   private signalClosed(event: HeadendClosedEvent): void {
-    if (this.closedSignaled) return;
-    this.closedSignaled = true;
-    this.closeDeferred.resolve(event);
+    this.closedSignaled = signalHeadendClosed(this.closedSignaled, this.closeDeferred, event);
   }
 
   private createServerInstance(): McpServer {
