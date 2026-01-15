@@ -110,18 +110,20 @@ NOT Supported (will return 400 Bad Request):
 - responder_id (agent): Not filterable
 
 Query Syntax Rules:
-- Enclose query in double quotes: "priority:4 AND status:2"
+- Do NOT wrap query in double quotes - the tool handles this automatically
 - Max 512 characters
 - Logical operators: AND, OR, ()
 - Relational operators: :> (>=), :< (<=) for dates and numbers
-- Null values: "field:null"
-- Query must be URL encoded
+- Dates MUST be in 'YYYY-MM-DD' format with SINGLE QUOTES (e.g., created_at:>'2024-01-01')
+- String values MUST be in single quotes (e.g., type:'Incident')
+- Null values: field:null
 - Max 10 pages (300 results total)
 
-Example valid queries:
-- "priority:>3 AND status:2" - High/Urgent priority open tickets
-- "tag:'enterprise' AND created_at:>'2024-01-01'" - Enterprise tagged tickets since Jan 2024
-- "requester_id:12345 AND status:2" - Open tickets from specific requester
+Example valid queries (pass exactly as shown - no outer double quotes):
+- priority:>3 AND status:2 - High/Urgent priority open tickets
+- tag:'enterprise' AND created_at:>'2024-01-01' - Enterprise tagged tickets since Jan 2024
+- requester_id:12345 AND status:2 - Open tickets from specific requester
+- created_at:>'2024-06-01' AND created_at:<'2024-07-01' - Tickets in date range
 
 Fallback Strategy for Company-Based Queries:
 Since company_id is NOT supported in search_tickets, use this approach:
