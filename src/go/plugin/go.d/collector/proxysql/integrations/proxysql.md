@@ -171,7 +171,14 @@ Metrics:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ proxysql_hostgroup_no_online_backends ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.hostgroup_backends_status | ProxySQL hostgroup ${label:hostgroup} has no ONLINE backends |
+| [ proxysql_backend_shunned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.backend_status | ProxySQL backend SHUNNED (${label:host}:${label:port} hostgroup ${label:hostgroup}) |
+| [ proxysql_backend_offline_hard ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.backend_status | ProxySQL backend OFFLINE_HARD (${label:host}:${label:port} hostgroup ${label:hostgroup}) |
 
 
 ## Setup
