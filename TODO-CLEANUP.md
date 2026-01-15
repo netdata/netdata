@@ -218,3 +218,42 @@ Append all you findings in this document.
 - Duplicated socket shutdown logic in completions headends:
   - `src/headends/openai-completions-headend.ts:1132-1136`
   - `src/headends/anthropic-completions-headend.ts:1013-1017`
+
+---
+
+## Iteration 6 - Reuse socket shutdown helper in REST + MCP headends
+
+### TL;DR
+- Replace duplicated socket shutdown logic in REST and MCP headends with the shared `closeSockets` helper.
+- Keep per-headend behavior unchanged (MCP still clears its socket sets).
+
+### Analysis (facts only)
+- REST headend has an inline socket shutdown helper:
+  - `src/headends/rest-headend.ts:431-439`
+- MCP headend has its own `closeSockets` method with the same logic:
+  - `src/headends/mcp-headend.ts:522-531`
+- Both match the shared implementation already used by completions headends.
+
+### Decisions
+- No user decisions required. Safe refactor with no behavior change.
+
+### Plan
+1. Import `closeSockets` in REST and MCP headends.
+2. Replace the inline socket shutdown logic with the helper.
+3. Keep MCP’s `set.clear()` behavior after calling the helper.
+4. Run `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Implied Decisions
+- Preserve the 0ms vs 1000ms destroy timing and error swallowing.
+- Preserve MCP’s socket set clearing semantics.
+
+### Testing requirements
+- Existing `socket-utils` unit test covers the helper; still run `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Documentation updates required
+- None. Refactor only.
+
+### Findings (append-only)
+- Duplicated socket shutdown logic in REST/MCP headends:
+  - `src/headends/rest-headend.ts:431-439`
+  - `src/headends/mcp-headend.ts:522-531`

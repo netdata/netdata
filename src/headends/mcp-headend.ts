@@ -28,6 +28,7 @@ type ZodExports = typeof import('zod');
 import { ConcurrencyLimiter } from './concurrency.js';
 import { McpWebSocketServerTransport } from './mcp-ws-transport.js';
 import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamOutput } from './shared-event-filter.js';
+import { closeSockets } from './socket-utils.js';
 
 const STREAMABLE_HTTP = 'streamable-http' as const;
 const require = createRequire(import.meta.url);
@@ -519,14 +520,6 @@ export class McpHeadend implements Headend {
     void this.stop();
   }
 
-  private closeSockets(set: Set<Socket>, force = false): void {
-    set.forEach((socket) => {
-      try { socket.end(); } catch { /* ignore */ }
-      setTimeout(() => { try { socket.destroy(); } catch { /* ignore */ } }, force ? 0 : 1000).unref();
-    });
-    set.clear();
-  }
-
   private logEntry(entry: LogEntry): void {
     if (this.context === undefined) return;
     this.context.log(entry);
@@ -652,7 +645,8 @@ export class McpHeadend implements Headend {
       try { await ctx.transport.close(); } catch (err) { this.logCloseFailure('transport', err); }
     }
     if (this.httpServer !== undefined) {
-      this.closeSockets(this.httpSockets, true);
+      closeSockets(this.httpSockets, true);
+      this.httpSockets.clear();
       await new Promise<void>((resolve) => {
         this.httpServer?.close(() => { resolve(); });
       });
@@ -696,7 +690,8 @@ export class McpHeadend implements Headend {
       await this.closeServer(ctx.server);
     }
     if (this.sseServer !== undefined) {
-      this.closeSockets(this.sseSockets, true);
+      closeSockets(this.sseSockets, true);
+      this.sseSockets.clear();
       await new Promise<void>((resolve) => { this.sseServer?.close(() => { resolve(); }); });
       this.sseServer = undefined;
     }

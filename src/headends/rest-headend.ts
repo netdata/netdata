@@ -14,6 +14,7 @@ import { createDeferred, normalizeUrlPath } from '../utils.js';
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, writeJson } from './http-utils.js';
 import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamMasterContent, shouldStreamOutput } from './shared-event-filter.js';
+import { closeSockets } from './socket-utils.js';
 
 const buildLog = (
   message: string,
@@ -432,14 +433,7 @@ export class RestHeadend implements Headend {
   }
 
   private closeActiveSockets(force = false): void {
-    this.sockets.forEach((socket) => {
-      try {
-        socket.end();
-      } catch { /* ignore */ }
-      setTimeout(() => {
-        try { socket.destroy(); } catch { /* ignore */ }
-      }, force ? 0 : 1000).unref();
-    });
+    closeSockets(this.sockets, force);
   }
 
   private matchExtraRoute(method: string | undefined, path: string): { method: RestExtraRoute['method']; path: string; handler: RestExtraRoute['handler']; originalPath: string } | undefined {
