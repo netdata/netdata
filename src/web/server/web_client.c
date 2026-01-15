@@ -897,26 +897,27 @@ void web_client_build_http_header(struct web_client *w) {
         buffer_strcat(w->response.header_output, buffer_tostring(w->response.header));
 
     // headers related to the transfer method
-    if(likely(w->response.zoutput))
-        buffer_strcat(w->response.header_output, "Content-Encoding: gzip\r\n");
+    // HTTP 304 Not Modified MUST NOT include Transfer-Encoding or Content-Encoding per RFC 7232
+    if(w->response.code != HTTP_RESP_NOT_MODIFIED) {
+        if(likely(w->response.zoutput))
+            buffer_strcat(w->response.header_output, "Content-Encoding: gzip\r\n");
 
-    if(likely(w->flags & WEB_CLIENT_CHUNKED_TRANSFER))
-        buffer_strcat(w->response.header_output, "Transfer-Encoding: chunked\r\n");
-    else {
+        if(likely(w->flags & WEB_CLIENT_CHUNKED_TRANSFER))
+            buffer_strcat(w->response.header_output, "Transfer-Encoding: chunked\r\n");
+    }
+    
+    // For 304 Not Modified, always send Content-Length: 0
+    if(w->response.code == HTTP_RESP_NOT_MODIFIED) {
+        buffer_strcat(w->response.header_output, "Content-Length: 0\r\n");
+    }
+    else if(!(w->flags & WEB_CLIENT_CHUNKED_TRANSFER)) {
         if(likely(w->response.data->len)) {
             // we know the content length, put it
             buffer_sprintf(w->response.header_output, "Content-Length: %zu\r\n", (size_t)w->response.data->len);
         }
         else {
-            // For 304 Not Modified responses, we must send Content-Length: 0 to comply with HTTP spec
-            // and avoid closing the connection (keep-alive should work)
-            if(w->response.code == HTTP_RESP_NOT_MODIFIED) {
-                buffer_strcat(w->response.header_output, "Content-Length: 0\r\n");
-            }
-            else {
-                // we don't know the content length, disable keep-alive
-                web_client_disable_keepalive(w);
-            }
+            // we don't know the content length, disable keep-alive
+            web_client_disable_keepalive(w);
         }
     }
 
