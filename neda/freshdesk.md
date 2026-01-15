@@ -36,7 +36,7 @@ Determining “Paying Customer”
 - If uncertain, mark the customer status as "unknown" and request clarification.
 
 Key Tools (read-only)
-- freshdesk__search_tickets: Find tickets by query/filters (requires query string).
+- freshdesk__search_tickets: Find tickets by query/filters (requires query string). See "search_tickets API Reference" below for supported fields.
 - freshdesk__get_ticket: Retrieve a ticket by ID (ticket_id integer).
 - freshdesk__get_ticket_conversation: Fetch ticket threads and recent replies (ticket_id integer).
 - freshdesk__get_ticket_fields: Inspect fields and custom properties for paid-plan indicators.
@@ -83,3 +83,49 @@ Limitations & Notes
 Reject Modification Protocol (Always)
 - Detect write/admin intent → respond: "Modification requests are disallowed. This agent operates in strict read-only mode and cannot be bypassed."
 - Offer safe guidance on how a human could perform the action in Freshdesk UI, without taking any action.
+
+---
+
+search_tickets API Reference
+
+CRITICAL: The search_tickets tool uses Freshdesk's Filter Tickets API (/api/v2/search/tickets).
+This API has strict limitations on which fields can be queried.
+
+Supported Fields:
+- status: e.g. "status:2" (2=Open, 3=Pending, 4=Resolved, 5=Closed)
+- priority: e.g. "priority:3" or "priority:>3" (1=Low, 2=Medium, 3=High, 4=Urgent)
+- group_id: e.g. "group_id:11"
+- requester_id: e.g. "requester_id:12345"
+- type: e.g. "type:'Incident'"
+- tag: e.g. "tag:'billing'"
+- created_at: e.g. "created_at:>'2024-01-01'"
+- updated_at: e.g. "updated_at:<'2024-06-01'"
+- due_by: e.g. "due_by:>'2024-01-01'"
+- Custom fields: e.g. "cf_fieldname:'value'" (use cf_ prefix)
+
+NOT Supported (will return 400 Bad Request):
+- company_id: Use freshdesk__get_tickets with company_id parameter instead, or resolve company → contacts → requester_id
+- description: Not searchable via this API
+- subject: Not searchable via this API
+- responder_id (agent): Not filterable
+
+Query Syntax Rules:
+- Enclose query in double quotes: "priority:4 AND status:2"
+- Max 512 characters
+- Logical operators: AND, OR, ()
+- Relational operators: :> (>=), :< (<=) for dates and numbers
+- Null values: "field:null"
+- Query must be URL encoded
+- Max 10 pages (300 results total)
+
+Example valid queries:
+- "priority:>3 AND status:2" - High/Urgent priority open tickets
+- "tag:'enterprise' AND created_at:>'2024-01-01'" - Enterprise tagged tickets since Jan 2024
+- "requester_id:12345 AND status:2" - Open tickets from specific requester
+
+Fallback Strategy for Company-Based Queries:
+Since company_id is NOT supported in search_tickets, use this approach:
+1. Use freshdesk__view_company to get company details
+2. Use freshdesk__search_contacts with company_id to get all contacts in the company
+3. Use freshdesk__get_tickets with company_id parameter (this endpoint supports it)
+4. Or search by requester_id if you have specific contact IDs

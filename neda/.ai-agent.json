@@ -510,6 +510,8 @@
       "type": "stdio",
       "command": "uvx",
       "args": [
+        "--from",
+        "git+https://github.com/ktsaou/freshdesk_mcp.git",
         "freshdesk-mcp"
       ],
       "env": {
