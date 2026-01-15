@@ -461,3 +461,47 @@ Append all you findings in this document.
   - `src/headends/rest-headend.ts:459-463`
   - `src/headends/embed-headend.ts:808-812`
   - `src/headends/mcp-headend.ts:594-598`
+
+---
+
+## Iteration 12 - Consolidate headend log entry dispatch
+
+### TL;DR
+- Extract the repeated "log entry if context exists" logic into a shared helper.
+- Add a unit test for the helper and use it in all headends with no behavior change.
+
+### Analysis (facts only)
+- Multiple headends repeat the same `logEntry` body (context guard + `context.log(entry)`):
+  - `src/headends/openai-completions-headend.ts:1113-1116`
+  - `src/headends/anthropic-completions-headend.ts:1011-1014`
+  - `src/headends/mcp-headend.ts:524-527`
+  - `src/headends/embed-headend.ts:781-784`
+  - `src/headends/rest-headend.ts:455-458` (after assigning `entry.headendId`)
+- The logic is identical aside from the REST headend’s `headendId` assignment.
+
+### Decisions
+- No user decisions required. Safe refactor with no behavior change.
+
+### Plan
+1. Add `src/headends/headend-log-utils.ts` with a helper to log an entry when context exists.
+2. Update `logEntry` in the listed headends to use the helper (REST still sets `headendId` first).
+3. Add a unit test under `src/tests/unit/` for the helper.
+4. Run `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Implied Decisions
+- Preserve existing logging behavior, including REST’s `headendId` assignment.
+
+### Testing requirements
+- Unit test: shared log-entry helper.
+- Required checks: `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Documentation updates required
+- None. Refactor only.
+
+### Findings (append-only)
+- Duplicated log entry dispatch logic across headends:
+  - `src/headends/openai-completions-headend.ts:1113-1116`
+  - `src/headends/anthropic-completions-headend.ts:1011-1014`
+  - `src/headends/mcp-headend.ts:524-527`
+  - `src/headends/embed-headend.ts:781-784`
+  - `src/headends/rest-headend.ts:455-458`

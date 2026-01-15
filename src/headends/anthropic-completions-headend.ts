@@ -19,6 +19,7 @@ import { resolveFinalReportContent } from './completions-response.js';
 import { collectLlmUsage } from './completions-usage.js';
 import { ConcurrencyLimiter } from './concurrency.js';
 import { signalHeadendClosed } from './headend-close-utils.js';
+import { logHeadendEntry } from './headend-log-utils.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
 import { buildHeadendModelId } from './model-id-utils.js';
 import { refreshModelIdMap } from './model-map-utils.js';
@@ -1009,8 +1010,7 @@ export class AnthropicCompletionsHeadend implements Headend {
   }
 
   private logEntry(entry: LogEntry): void {
-    if (this.context === undefined) return;
-    this.context.log(entry);
+    logHeadendEntry(this.context, entry);
   }
 
   private refreshModelMap(): void {

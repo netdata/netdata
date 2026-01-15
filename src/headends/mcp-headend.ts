@@ -27,6 +27,7 @@ type ZodExports = typeof import('zod');
 
 import { ConcurrencyLimiter } from './concurrency.js';
 import { signalHeadendClosed } from './headend-close-utils.js';
+import { logHeadendEntry } from './headend-log-utils.js';
 import { McpWebSocketServerTransport } from './mcp-ws-transport.js';
 import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamOutput } from './shared-event-filter.js';
 import { closeSockets } from './socket-utils.js';
@@ -522,8 +523,7 @@ export class McpHeadend implements Headend {
   }
 
   private logEntry(entry: LogEntry): void {
-    if (this.context === undefined) return;
-    this.context.log(entry);
+    logHeadendEntry(this.context, entry);
   }
 
   private logVerbose(

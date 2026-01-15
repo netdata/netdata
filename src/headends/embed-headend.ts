@@ -19,6 +19,7 @@ import { ConcurrencyLimiter } from './concurrency.js';
 import { EmbedMetrics } from './embed-metrics.js';
 import { appendTranscriptTurn, loadTranscript, writeTranscript, type EmbedTranscriptEntry } from './embed-transcripts.js';
 import { signalHeadendClosed } from './headend-close-utils.js';
+import { logHeadendEntry } from './headend-log-utils.js';
 import { HttpError, readJson, writeJson, writeSseEvent } from './http-utils.js';
 import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamOutput, shouldStreamTurnStarted } from './shared-event-filter.js';
 
@@ -781,7 +782,7 @@ export class EmbedHeadend implements Headend {
   }
 
   private logEntry(entry: LogEntry): void {
-    this.context?.log(entry);
+    logHeadendEntry(this.context, entry);
   }
 
   private closeActiveSockets(force: boolean): void {
