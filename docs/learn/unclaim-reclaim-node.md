@@ -15,71 +15,48 @@ If you want to **permanently remove a node** from Netdata Cloud entirely, see ou
 
 :::
 
-This guide covers two scenarios:
+This guide covers how to move a node from one Space to another without removing it from Netdata Cloud entirely.
 
-1. **Unclaiming** - Disconnect a node from your current Space (keeps agent running)
-2. **Reclaiming** - Connect an unclaimed node to a new Space
+## Why Move a Node Between Spaces?
 
-Use this process when you need to move a node from one Space to another without disrupting the agent's operation.
+You might need to move a node to a different Space when:
+- Reorganizing your infrastructure monitoring structure
+- Transferring node ownership between teams or departments
+- Consolidating multiple Spaces into one
 
 ## Prerequisites
 
 - The node must have Netdata Agent installed
 - You need the claiming token and room keys for the **new** Space
-- Optionally: access to the node via SSH or terminal
+- Access to the node via SSH or terminal
 
-## Unclaim a Node from Current Space
+## Step 1: Unclaim from Current Space
 
-### Linux-based Installations
+See our **[Reconnect Agent](/docs/netdata-cloud/connect-agent.md#reconnect-agent)** guide for the exact commands to:
+- Remove the Cloud connection directory (Linux)
+- Remove connection files and recreate container (Docker)
 
-1. SSH into the node or access its terminal
+:::warning
 
-2. Remove the Cloud connection directory:
+**Restart the agent after removing cloud.d/**
 
-   ```bash
-   sudo rm -rf /var/lib/netdata/cloud.d/
-   ```
+If you don't restart the agent after removing `/var/lib/netdata/cloud.d/`, the node will remain connected to Netdata Cloud until the agent restarts.
 
-   :::warning
+To apply the unclaiming change immediately, run:
 
-   **Restart the agent after removing cloud.d/**
+```bash
+sudo systemctl restart netdata
+```
 
-   If you don't restart the agent after removing `/var/lib/netdata/cloud.d/`, the node will remain connected to Netdata Cloud until the agent restarts.
+Or use the live reload command:
 
-   To apply the unclaiming change immediately, run:
+```bash
+sudo netdatacli reload-claiming-state
+```
 
-   ```bash
-   sudo systemctl restart netdata
-   ```
+:::
 
-   Or use the live reload command:
-
-   ```bash
-   sudo netdatacli reload-claiming-state
-   ```
-
-   :::
-
-3. Verify the node no longer appears in your Space
-
-### Docker-based Installations
-
-1. Enter the running container:
-
-   ```bash
-   docker exec -it CONTAINER_NAME sh
-   ```
-
-2. Remove the connection files:
-
-   ```bash
-   rm -rf /var/lib/netdata/cloud.d/
-   rm /var/lib/netdata/registry/netdata.public.unique.id
-   ```
-
-3. Exit the container and recreate it with the new claim token
-
-## Reclaim to a New Space
+## Step 2: Reclaim to New Space
 
 ### Option 1: Quick Reclaim (Recommended)
 
@@ -139,3 +116,4 @@ After reclaiming, verify the node appears in:
 
 - [Remove a node from Netdata Cloud entirely](/docs/learn/remove-node.md) - For permanent node removal
 - [Connect Agent to Cloud](/src/claim/README.md) - Initial connection setup
+- [Reconnect Agent](/docs/netdata-cloud/connect-agent.md#reconnect-agent) - Low-level unclaim commands
