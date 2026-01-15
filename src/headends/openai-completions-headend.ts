@@ -20,6 +20,7 @@ import { resolveFinalReportContent } from './completions-response.js';
 import { collectLlmUsage } from './completions-usage.js';
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
+import { buildHeadendModelId } from './model-id-utils.js';
 import { renderReasoningMarkdown, type ReasoningTurnState } from './reasoning-markdown.js';
 import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamMasterContent, shouldStreamOutput, shouldStreamTurnStarted } from './shared-event-filter.js';
 import { handleHeadendShutdown } from './shutdown-utils.js';
@@ -1044,27 +1045,15 @@ export class OpenAICompletionsHeadend implements Headend {
   }
 
   private buildModelId(meta: AgentMetadata, seen: Set<string>): string {
-    const baseSources = [
+    const sources = [
       typeof meta.toolName === 'string' ? meta.toolName : undefined,
       typeof meta.promptPath === 'string' ? path.basename(meta.promptPath) : undefined,
       (() => {
         const parts = meta.id.split(/[/\\]/);
         return parts[parts.length - 1];
       })(),
-    ].filter((value): value is string => typeof value === 'string' && value.length > 0);
-    let base = baseSources[0] ?? 'agent';
-    base = base.replace(/\.ai$/i, '');
-    if (base.length === 0) base = 'agent';
-    let candidate = base;
-    let counter = 2;
-    // eslint-disable-next-line functional/no-loop-statements
-    while (seen.has(candidate)) {
-      const suffix = String(counter);
-      candidate = `${base}-${suffix}`;
-      counter += 1;
-    }
-    seen.add(candidate);
-    return candidate;
+    ];
+    return buildHeadendModelId(sources, seen, '-');
   }
 
   private pickSchema(body: OpenAIChatRequest, agent: AgentMetadata): Record<string, unknown> | undefined {

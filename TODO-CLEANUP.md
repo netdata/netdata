@@ -338,3 +338,41 @@ Append all you findings in this document.
   - `src/headends/openai-completions-headend.ts:1126-1131`
   - `src/headends/anthropic-completions-headend.ts:1007-1012`
   - `src/headends/rest-headend.ts:424-429`
+
+---
+
+## Iteration 9 - Consolidate model ID generation for completions headends
+
+### TL;DR
+- Extract the shared model ID generation logic from OpenAI and Anthropic completions headends into a helper.
+- Keep separator differences (`-` vs `_`) as explicit parameters.
+
+### Analysis (facts only)
+- Both headends generate model IDs with the same algorithm (pick a base label, strip `.ai`, de-dup with suffix):
+  - `src/headends/openai-completions-headend.ts:1058-1079`
+  - `src/headends/anthropic-completions-headend.ts:1034-1061`
+- Only behavioral difference: OpenAI uses `-` while Anthropic uses `_` for de-dup suffixes.
+
+### Decisions
+- No user decisions required. Safe refactor with no behavior change.
+
+### Plan
+1. Add `src/headends/model-id-utils.ts` with `buildHeadendModelId(sources, seen, separator)`.
+2. Replace both headend `buildModelId` bodies to call the helper with the correct separator.
+3. Add a unit test covering base selection and de-dup behavior for both separators.
+4. Run `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Implied Decisions
+- Preserve current source preference order and suffix separator per headend.
+
+### Testing requirements
+- Unit test for model ID helper.
+- Required checks: `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Documentation updates required
+- None. Refactor only.
+
+### Findings (append-only)
+- Duplicated model ID generation in completions headends:
+  - `src/headends/openai-completions-headend.ts:1058-1079`
+  - `src/headends/anthropic-completions-headend.ts:1034-1061`

@@ -19,6 +19,7 @@ import { resolveFinalReportContent } from './completions-response.js';
 import { collectLlmUsage } from './completions-usage.js';
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
+import { buildHeadendModelId } from './model-id-utils.js';
 import { renderReasoningMarkdown, type ReasoningTurnState } from './reasoning-markdown.js';
 import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamMasterContent, shouldStreamOutput, shouldStreamTurnStarted } from './shared-event-filter.js';
 import { handleHeadendShutdown } from './shutdown-utils.js';
@@ -1020,7 +1021,7 @@ export class AnthropicCompletionsHeadend implements Headend {
   }
 
   private buildModelId(meta: AgentMetadata, seen: Set<string>): string {
-    const baseSources = [
+    const sources = [
       typeof meta.toolName === 'string' ? meta.toolName : undefined,
       typeof meta.promptPath === 'string' ? path.basename(meta.promptPath) : undefined,
       (() => {
@@ -1028,18 +1029,7 @@ export class AnthropicCompletionsHeadend implements Headend {
         return parts[parts.length - 1];
       })(),
     ];
-    const primary = baseSources.find((value): value is string => typeof value === 'string' && value.length > 0) ?? 'agent';
-    const root = primary.replace(/\.ai$/i, '') || 'agent';
-    let candidate = root;
-    let counter = 2;
-    // eslint-disable-next-line functional/no-loop-statements
-    while (seen.has(candidate)) {
-      const suffix = String(counter);
-      candidate = `${root}_${suffix}`;
-      counter += 1;
-    }
-    seen.add(candidate);
-    return candidate;
+    return buildHeadendModelId(sources, seen, '_');
   }
 
   private signalClosed(event: HeadendClosedEvent): void {
