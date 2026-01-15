@@ -140,3 +140,41 @@ Append all you findings in this document.
 - Duplicated LLM usage aggregation in completions headends:
   - `src/headends/openai-completions-headend.ts:81-91`
   - `src/headends/anthropic-completions-headend.ts:77-88`
+
+---
+
+## Iteration 4 - Consolidate completions headend log entry builder
+
+### TL;DR
+- Move the duplicated `buildLog` function into a shared helper for completions headends.
+- Keep the remote identifier per headend to preserve log identity.
+
+### Analysis (facts only)
+- `buildLog` is duplicated with identical structure in:
+  - `src/headends/openai-completions-headend.ts:52-73`
+  - `src/headends/anthropic-completions-headend.ts:52-73`
+- Only the `remoteIdentifier` value differs (`headend:openai-completions` vs `headend:anthropic-completions`).
+- This is a clear single‑source‑of‑truth violation for log construction.
+
+### Decisions
+- No user decisions required. Safe refactor with no behavior change.
+
+### Plan
+1. Add `src/headends/completions-log.ts` with `buildCompletionsLogEntry()` helper.
+2. Update both headends’ `buildLog` wrappers to call the helper with their identifier.
+3. Run `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Implied Decisions
+- Preserve log formatting and log metadata fields unchanged.
+- Keep per-headend remote identifiers as-is.
+
+### Testing requirements
+- No new tests required (pure refactor), but still run `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Documentation updates required
+- None. Refactor only.
+
+### Findings (append-only)
+- Duplicated completions headend log entry builder:
+  - `src/headends/openai-completions-headend.ts:52-73`
+  - `src/headends/anthropic-completions-headend.ts:52-73`

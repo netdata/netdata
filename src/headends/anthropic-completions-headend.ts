@@ -12,6 +12,7 @@ import { AIAgent } from '../ai-agent.js';
 import { getTelemetryLabels } from '../telemetry/index.js';
 import { createDeferred, normalizeCallPath } from '../utils.js';
 
+import { buildCompletionsLogEntry } from './completions-log.js';
 import { buildPromptSections } from './completions-prompt.js';
 import { resolveFinalReportContent } from './completions-response.js';
 import { collectLlmUsage } from './completions-usage.js';
@@ -54,6 +55,8 @@ interface AnthropicResponseBody {
   };
 }
 
+const REMOTE_IDENTIFIER = 'headend:anthropic-completions';
+
 const buildLog = (
   headendId: string,
   label: string,
@@ -61,19 +64,15 @@ const buildLog = (
   severity: LogEntry['severity'] = 'VRB',
   fatal = false,
   details?: Record<string, LogDetailValue>,
-): LogEntry => ({
-  timestamp: Date.now(),
-  severity,
-  turn: 0,
-  subturn: 0,
-  direction: 'response',
-  type: 'tool',
-  remoteIdentifier: 'headend:anthropic-completions',
-  fatal,
-  message: `${label}: ${message}`,
+): LogEntry => buildCompletionsLogEntry(
+  REMOTE_IDENTIFIER,
   headendId,
+  label,
+  message,
+  severity,
+  fatal,
   details,
-});
+);
 
 const collectUsage = (entries: AccountingEntry[]): { input: number; output: number; total: number } => (
   collectLlmUsage(entries)

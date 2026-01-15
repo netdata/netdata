@@ -13,6 +13,7 @@ import { mergeCallbacksWithPersistence } from '../persistence.js';
 import { getTelemetryLabels } from '../telemetry/index.js';
 import { createDeferred, normalizeCallPath } from '../utils.js';
 
+import { buildCompletionsLogEntry } from './completions-log.js';
 import { buildPromptSections } from './completions-prompt.js';
 import { resolveFinalReportContent } from './completions-response.js';
 import { collectLlmUsage } from './completions-usage.js';
@@ -54,6 +55,8 @@ interface OpenAIChatResponse {
   };
 }
 
+const REMOTE_IDENTIFIER = 'headend:openai-completions';
+
 const buildLog = (
   headendId: string,
   label: string,
@@ -61,19 +64,15 @@ const buildLog = (
   severity: LogEntry['severity'] = 'VRB',
   fatal = false,
   details?: Record<string, LogDetailValue>,
-): LogEntry => ({
-  timestamp: Date.now(),
-  severity,
-  turn: 0,
-  subturn: 0,
-  direction: 'response',
-  type: 'tool',
-  remoteIdentifier: 'headend:openai-completions',
-  fatal,
-  message: `${label}: ${message}`,
+): LogEntry => buildCompletionsLogEntry(
+  REMOTE_IDENTIFIER,
   headendId,
+  label,
+  message,
+  severity,
+  fatal,
   details,
-});
+);
 
 const CHAT_COMPLETION_OBJECT = 'chat.completion';
 const CHAT_CHUNK_OBJECT = 'chat.completion.chunk';
