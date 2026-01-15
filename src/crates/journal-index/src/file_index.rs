@@ -459,6 +459,7 @@ fn entry_matches_regex(
     regex: &Regex,
     data_match_cache: &mut HashMap<NonZeroU64, bool>,
     data_offsets_scratch: &mut Vec<NonZeroU64>,
+    scratch_buffer: &mut Vec<u8>,
 ) -> Result<bool> {
     // Collect all data object offsets for this entry
     data_offsets_scratch.clear();
@@ -479,9 +480,16 @@ fn entry_matches_regex(
 
         // Cache miss - load the data object and check if it matches
         let data_object = journal_file.data_ref(data_offset)?;
-        let payload = data_object.payload_bytes();
+        // FIXME: we need the decompression bit here as well.
 
-        let matches = if let Ok(payload_str) = std::str::from_utf8(payload) {
+        let payload_bytes = if data_object.is_compressed() {
+            data_object.decompress(scratch_buffer)?;
+            &scratch_buffer[..]
+        } else {
+            data_object.raw_payload()
+        };
+
+        let matches = if let Ok(payload_str) = std::str::from_utf8(payload_bytes) {
             regex.is_match(payload_str)
         } else {
             false
@@ -594,6 +602,9 @@ impl FileIndex {
             );
         }
 
+        // Scratch buffer for compressed payloads of data objects
+        let mut scratch_buffer = Vec::new();
+
         match params.direction() {
             Direction::Forward => {
                 // Determine starting index: use resume_position or binary search
@@ -657,6 +668,7 @@ impl FileIndex {
                             regex,
                             &mut data_match_cache,
                             &mut data_offsets_scratch,
+                            &mut scratch_buffer,
                         )? {
                             regex_filtered_count += 1;
                             continue;
@@ -756,6 +768,7 @@ impl FileIndex {
                             regex,
                             &mut data_match_cache,
                             &mut data_offsets_scratch,
+                            &mut scratch_buffer,
                         )? {
                             regex_filtered_count += 1;
                             continue;

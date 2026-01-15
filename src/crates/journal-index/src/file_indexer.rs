@@ -188,12 +188,12 @@ impl FileIndexer {
                     };
 
                     // Skip the remapping value
-                    if data_object.payload_bytes().ends_with(field_name.as_bytes()) {
+                    if data_object.raw_payload().ends_with(field_name.as_bytes()) {
                         continue;
                     };
 
                     let data_payload =
-                        String::from_utf8_lossy(data_object.payload_bytes()).into_owned();
+                        String::from_utf8_lossy(data_object.raw_payload()).into_owned();
                     let Some(inlined_cursor) = data_object.inlined_cursor() else {
                         continue;
                     };

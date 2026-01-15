@@ -470,6 +470,9 @@ fn extract_entry_data(log_entries: &[LogEntryId]) -> Result<Vec<LogEntryData>> {
     // Pre-allocate result vector with exact capacity
     let mut result = vec![None; log_entries.len()];
 
+    // Scratch buffer to keep any decompressed payload of data objects.
+    let mut decompress_buf = Vec::new();
+
     // Process each file's entries
     for (file, file_entries) in entries_by_file {
         let journal_file = JournalFile::<Mmap>::open(file, 8 * 1024 * 1024)?;
@@ -499,7 +502,12 @@ fn extract_entry_data(log_entries: &[LogEntryId]) -> Result<Vec<LogEntryData>> {
             let mut fields = Vec::new();
             for data_offset in data_offsets.iter().copied() {
                 let data_guard = journal_file.data_ref(data_offset)?;
-                let payload_bytes = data_guard.payload_bytes();
+                let payload_bytes = if data_guard.is_compressed() {
+                    data_guard.decompress(&mut decompress_buf)?;
+                    &decompress_buf[..]
+                } else {
+                    data_guard.raw_payload()
+                };
                 let payload_str = String::from_utf8_lossy(payload_bytes);
 
                 if let Some(mut pair) = FieldValuePair::parse(&payload_str) {

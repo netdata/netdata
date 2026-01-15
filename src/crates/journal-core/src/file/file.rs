@@ -532,7 +532,7 @@ impl<M: MemoryMap> JournalFile<M> {
 
                     for data_offset in data_offsets.iter().copied() {
                         let data_object = self.data_ref(data_offset)?;
-                        let payload = data_object.payload_bytes();
+                        let payload = data_object.raw_payload();
 
                         if payload == remapping_payload {
                             continue;

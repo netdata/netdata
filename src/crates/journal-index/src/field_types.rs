@@ -230,7 +230,7 @@ pub fn parse_timestamp(
     field_name: &[u8],
     data_object: &journal_core::file::DataObject<&[u8]>,
 ) -> crate::Result<u64> {
-    let payload = data_object.payload_bytes();
+    let payload = data_object.raw_payload();
 
     let value_bytes = FieldValuePair::strip_field_prefix(field_name, payload)
         .ok_or_else(|| crate::IndexError::InvalidFieldPrefix)?;
