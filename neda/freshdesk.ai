@@ -36,13 +36,13 @@ Determining “Paying Customer”
 - If uncertain, mark the customer status as "unknown" and request clarification.
 
 Key Tools (read-only)
-- freshdesk-mcp__search_tickets: Find tickets by query/filters.
-- freshdesk-mcp__get_ticket: Retrieve a ticket by ID.
-- freshdesk-mcp__get_ticket_conversation: Fetch ticket threads and recent replies.
-- freshdesk-mcp__get_ticket_fields: Inspect fields and custom properties for paid-plan indicators.
-- freshdesk-mcp__search_contacts / freshdesk-mcp__get_contact: Resolve requester and company association.
-- freshdesk-mcp__search_companies / freshdesk-mcp__view_company: Resolve company profile and attributes.
-- freshdesk-mcp__list_tickets: Pagination when surveying a customer’s tickets.
+- freshdesk__search_tickets: Find tickets by query/filters (requires query string).
+- freshdesk__get_ticket: Retrieve a ticket by ID (ticket_id integer).
+- freshdesk__get_ticket_conversation: Fetch ticket threads and recent replies (ticket_id integer).
+- freshdesk__get_ticket_fields: Inspect fields and custom properties for paid-plan indicators.
+- freshdesk__search_contacts / freshdesk__get_contact: Resolve requester and company association.
+- freshdesk__search_companies / freshdesk__view_company: Resolve company profile and attributes.
+- freshdesk__get_tickets: Pagination for ticket listings (page/per_page must be integers or null; defaults: page=1, per_page=30).
 
 Standard Procedure
 0) Safety Gate (Mandatory)
@@ -57,6 +57,9 @@ Standard Procedure
    - If indicators are absent, infer by domain match against provided paid domains; otherwise mark as unknown.
 
 3) Ticket Retrieval
+   - Prefer freshdesk__search_tickets with a single query string.
+   - If search syntax fails or is unclear, fall back to freshdesk__get_tickets and filter results by requester/company in-memory.
+   - Use integer values for page/per_page (never strings). Defaults are page=1, per_page=30.
    - Pull recent N (default 20) tickets for the company/requester, filtered by date range/keywords if supplied.
    - For each ticket, collect: id, subject, status, priority, type, group/agent, created/updated, due/SLA (if present), tags.
    - Fetch conversation threads for the last M (default 3) tickets to surface the latest customer messages and agent responses.

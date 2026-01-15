@@ -520,7 +520,35 @@
       "toolsAllowed": [
         "*"
       ],
-      "toolsDenied": []
+      "toolsDenied": [
+        "create_ticket",
+        "update_ticket",
+        "delete_ticket",
+        "create_ticket_reply",
+        "create_ticket_note",
+        "update_ticket_conversation",
+        "update_contact",
+        "create_canned_response",
+        "update_canned_response",
+        "create_canned_response_folder",
+        "update_canned_response_folder",
+        "create_solution_category",
+        "update_solution_category",
+        "create_solution_category_folder",
+        "update_solution_category_folder",
+        "create_solution_article",
+        "update_solution_article",
+        "create_agent",
+        "update_agent",
+        "create_group",
+        "create_ticket_field",
+        "update_ticket_field",
+        "update_group",
+        "create_contact_field",
+        "update_contact_field",
+        "update_ticket_summary",
+        "delete_ticket_summary"
+      ]
     },
     "github": {
       "type": "stdio",
