@@ -13,6 +13,7 @@ import { getTelemetryLabels } from '../telemetry/index.js';
 import { createDeferred, normalizeCallPath } from '../utils.js';
 
 import { buildPromptSections } from './completions-prompt.js';
+import { resolveFinalReportContent } from './completions-response.js';
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
 import { renderReasoningMarkdown, type ReasoningTurnState } from './reasoning-markdown.js';
@@ -1002,14 +1003,7 @@ export class AnthropicCompletionsHeadend implements Headend {
   }
 
   private resolveContent(output: string, finalReport: unknown): string {
-    if (finalReport !== undefined && finalReport !== null && typeof finalReport === 'object') {
-      const report = finalReport as { format?: string; content?: string; content_json?: Record<string, unknown> };
-      if (report.format === 'json' && report.content_json !== undefined) {
-        try { return JSON.stringify(report.content_json); } catch { /* ignore */ }
-      }
-      if (typeof report.content === 'string' && report.content.length > 0) return report.content;
-    }
-    return output;
+    return resolveFinalReportContent(output, finalReport);
   }
 
   private log(message: string, severity: LogEntry['severity'] = 'VRB', fatal = false, details?: Record<string, LogDetailValue>): void {

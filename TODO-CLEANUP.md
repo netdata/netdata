@@ -57,3 +57,46 @@ Append all you findings in this document.
   - `src/headends/openai-completions-headend.ts:75-77`, `src/headends/openai-completions-headend.ts:999-1027`
   - `src/headends/anthropic-completions-headend.ts:75-77`, `src/headends/anthropic-completions-headend.ts:964-991`
 - Instructions reference `docs/docs/AI-AGENT-INTERNAL-API.md`, but the file lives at `docs/AI-AGENT-INTERNAL-API.md` (path mismatch only; not in scope for this change).
+
+---
+
+## Iteration 2 - Consolidate final report content selection
+
+### TL;DR
+- Deduplicate the `resolveContent` logic in OpenAI/Anthropic completions headends into a shared helper.
+- Add a unit test for the shared helper, then refactor both headends to use it with no behavior change.
+
+### Analysis (facts only)
+- Identical `resolveContent` methods exist in both headends:
+  - `src/headends/openai-completions-headend.ts:1122-1131`
+  - `src/headends/anthropic-completions-headend.ts:1004-1012`
+- Both implementations:
+  - Prefer JSON when `finalReport.format === 'json'` and `content_json` exists.
+  - Otherwise return `content` when non-empty.
+  - Fallback to the streamed `output`.
+- This is a classic “single point of reference” violation with no behavioral differences.
+
+### Decisions
+- No user decisions required. Scope is a safe refactor with no behavior change.
+
+### Plan
+1. Add `src/headends/completions-response.ts` with `resolveFinalReportContent()` that matches current logic.
+2. Add a unit test for the helper under `src/tests/unit/`.
+3. Replace both headend `resolveContent` implementations to call the helper.
+4. Run `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Implied Decisions
+- Keep the existing input validation and error paths unchanged.
+- No changes to schemas, routing, or streaming behavior.
+
+### Testing requirements
+- Unit test: shared final report content resolver helper.
+- Required checks: `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Documentation updates required
+- None. Refactor only.
+
+### Findings (append-only)
+- Duplicated final report content resolution logic in completions headends:
+  - `src/headends/openai-completions-headend.ts:1122-1131`
+  - `src/headends/anthropic-completions-headend.ts:1004-1012`
