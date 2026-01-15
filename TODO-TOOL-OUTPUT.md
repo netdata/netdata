@@ -145,6 +145,8 @@
 - `PHASE3_DUMP_LLM=1 npm run test:phase3:tier1` — **PASS**
   - tool_output scenarios executed on `nova/glm-4.5-air`; other models skipped by allowlist.
   - Runner exited cleanly (no hang).
+- `PHASE3_DUMP_LLM=1 node dist/tests/phase3-runner.js --tier=1 --model=nova/minimax-m2.1 --scenario=tool-output-auto,tool-output-full,tool-output-read-grep,tool-output-truncate` — **PASS**
+- `PHASE3_DUMP_LLM=1 node dist/tests/phase3-runner.js --tier=1 --model=nova/glm-4.7 --scenario=tool-output-auto,tool-output-full,tool-output-read-grep,tool-output-truncate` — **PASS**
 
 ## Implementation Status Update (2026-01-15, Phase3 stability)
 - **Phase 3 tool_output stability changes**:

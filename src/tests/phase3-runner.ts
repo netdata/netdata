@@ -518,6 +518,8 @@ const TOOL_OUTPUT_SCENARIO_IDS = new Set(
 // Keep tool_output runs on models that reliably follow tool-call instructions.
 const TOOL_OUTPUT_MODEL_ALLOWLIST = new Set<string>([
   "nova/glm-4.5-air",
+  "nova/minimax-m2.1",
+  "nova/glm-4.7",
 ]);
 
 const isToolOutputScenario = (scenario: ScenarioDefinition): boolean =>
