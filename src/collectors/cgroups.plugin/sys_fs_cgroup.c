@@ -63,7 +63,9 @@ struct cgroups_systemd_config_setting cgroups_systemd_options[] = {
         { .name = NULL,      .setting = SYSTEMD_CGROUP_ERR     },
 };
 
-struct discovery_thread discovery_thread;
+struct discovery_thread discovery_thread = {
+    .exited = 1,  // Start as "exited" until properly initialized
+};
 
 
 /* on Fed systemd is not in PATH for some reason */
@@ -1390,8 +1392,6 @@ void cgroups_main(void *ptr) {
     // for the other nodes, the origin server should register it
     cgroup_netdev_link_init();
 
-    discovery_thread.exited = 0;
-
     if (netdata_mutex_init(&discovery_thread.mutex)) {
         collector_error("CGROUP: cannot initialize mutex for discovery thread");
         return;
@@ -1401,10 +1401,16 @@ void cgroups_main(void *ptr) {
         return;
     }
 
+    // Mark thread as "running" only after mutex/cond are initialized
+    // but before creating the thread. This ensures cleanup won't try
+    // to access uninitialized synchronization primitives.
+    discovery_thread.exited = 0;
+
     discovery_thread.thread = nd_thread_create("CGDISCOVER", NETDATA_THREAD_OPTION_DEFAULT, cgroup_discovery_worker, NULL);
 
     if (!discovery_thread.thread) {
         collector_error("CGROUP: cannot create thread worker");
+        discovery_thread.exited = 1;  // Reset since thread wasn't created
         return;
     }
 
