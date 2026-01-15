@@ -1,3 +1,4 @@
+import { cloneOptionalJsonSchema } from './input-contract.js';
 import { clampToolName, sanitizeToolName as coreSanitizeToolName } from './utils.js';
 
 export interface AgentSchemaSummary {
@@ -10,11 +11,6 @@ export interface AgentSchemaSummary {
 }
 
 const OPENAI_NAME_LIMIT = 64;
-
-const cloneSchema = (schema: Record<string, unknown> | undefined): Record<string, unknown> | undefined => {
-  if (schema === undefined) return undefined;
-  return JSON.parse(JSON.stringify(schema)) as Record<string, unknown>;
-};
 
 const sanitizeToolName = (name: string): string => {
   const sanitized = coreSanitizeToolName(name);
@@ -57,7 +53,7 @@ export const toOpenAIToolDefinition = (agent: AgentSchemaSummary): OpenAIToolDef
   function: {
     name: resolveToolName(agent),
     description: buildDescription(agent),
-    parameters: cloneSchema(agent.input.schema) ?? {},
+    parameters: cloneOptionalJsonSchema(agent.input.schema) ?? {},
     strict: true,
   }
 });
@@ -71,7 +67,7 @@ export interface AnthropicToolDefinition {
 export const toAnthropicToolDefinition = (agent: AgentSchemaSummary): AnthropicToolDefinition => ({
   name: resolveToolName(agent),
   description: buildDescription(agent),
-  input_schema: cloneSchema(agent.input.schema) ?? {},
+  input_schema: cloneOptionalJsonSchema(agent.input.schema) ?? {},
 });
 
 export interface McpToolDefinition {
@@ -84,6 +80,6 @@ export interface McpToolDefinition {
 export const toMcpToolDefinition = (agent: AgentSchemaSummary): McpToolDefinition => ({
   name: resolveToolName(agent),
   description: buildDescription(agent),
-  inputSchema: cloneSchema(agent.input.schema) ?? {},
-  outputSchema: cloneSchema(agent.outputSchema),
+  inputSchema: cloneOptionalJsonSchema(agent.input.schema) ?? {},
+  outputSchema: cloneOptionalJsonSchema(agent.outputSchema),
 });

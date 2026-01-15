@@ -4,7 +4,7 @@ import { gzipSync } from 'node:zlib';
 
 import type { AccountingFlushPayload, AIAgentEventCallbacks, SessionSnapshotPayload } from './types.js';
 
-import { warn } from './utils.js';
+import { getHomeDir, warn } from './utils.js';
 
 export interface PersistenceConfig {
   sessionsDir?: string;
@@ -17,7 +17,7 @@ export interface PersistenceConfig {
  * Billing:  ~/.ai-agent/accounting.jsonl
  */
 export function getDefaultPersistenceConfig(): PersistenceConfig {
-  const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
+  const home = getHomeDir();
   if (home.length === 0) return {};
   const base = path.join(home, '.ai-agent');
   return {

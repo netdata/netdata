@@ -171,7 +171,3 @@ export function estimateMessageTokens(tokenizer: Tokenizer, message: Conversatio
 export function estimateMessagesTokens(tokenizer: Tokenizer, messages: readonly ConversationMessage[]): number {
   return messages.reduce((total, message) => total + estimateMessageTokens(tokenizer, message), 0);
 }
-
-export function tokenizerKey(id?: string): string {
-  return id === undefined || id.trim().length === 0 ? APPROXIMATE_ID : id;
-}

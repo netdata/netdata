@@ -9,26 +9,11 @@ import type { Socket } from 'node:net';
 
 import { AIAgent } from '../ai-agent.js';
 import { getTelemetryLabels } from '../telemetry/index.js';
+import { createDeferred, normalizeUrlPath } from '../utils.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, writeJson } from './http-utils.js';
 import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamMasterContent, shouldStreamOutput } from './shared-event-filter.js';
-
-interface Deferred<T> {
-  promise: Promise<T>;
-  resolve: (value: T) => void;
-  reject: (reason?: unknown) => void;
-}
-
-const createDeferred = <T>(): Deferred<T> => {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-};
 
 const buildLog = (
   message: string,
@@ -121,7 +106,7 @@ export class RestHeadend implements Headend {
       throw new Error('Cannot register REST route after server start');
     }
     const method = route.method.toUpperCase() as RestExtraRoute['method'];
-    const path = this.normalizePath(route.path);
+    const path = normalizeUrlPath(route.path);
     this.extraRoutes.push({ method, path, handler: route.handler, originalPath: route.path });
   }
 
@@ -205,7 +190,7 @@ export class RestHeadend implements Headend {
       const urlRaw = req.url ?? '/';
       const parsedUrl = new URL(urlRaw, `http://localhost:${String(this.options.port)}`);
       const method = (req.method ?? 'GET').toUpperCase();
-      const normalizedPath = this.normalizePath(parsedUrl.pathname);
+      const normalizedPath = normalizeUrlPath(parsedUrl.pathname);
 
       const route = this.matchExtraRoute(method, normalizedPath);
       if (route !== undefined) {
@@ -461,12 +446,6 @@ export class RestHeadend implements Headend {
     if (method === undefined) return undefined;
     const upper = method.toUpperCase() as RestExtraRoute['method'];
     return this.extraRoutes.find((route) => route.method === upper && route.path === path);
-  }
-
-  private normalizePath(pathname: string): string {
-    const cleaned = pathname.replace(/\\+/g, '/');
-    if (cleaned === '' || cleaned === '/') return '/';
-    return cleaned.endsWith('/') ? cleaned.slice(0, -1) : cleaned;
   }
 
   private log(

@@ -2,6 +2,8 @@ import { compileSchema, draft04, draft06, draft07, draft2019, draft2020 } from '
 
 import type { Draft } from 'json-schema-library';
 
+import { isPlainObject } from '../utils.js';
+
 type DraftAlias = 'draft04' | 'draft06' | 'draft07' | 'draft2019' | 'draft2020';
 
 const DRAFT_ALIASES: Record<string, DraftAlias | undefined> = {
@@ -102,10 +104,6 @@ export const validateSchemaAgainstDraft = (schema: unknown, target: SchemaDraftT
     };
     return { ok: false, errors: [issue] };
   }
-};
-
-const isPlainObject = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 };
 
 const DRAFT_ORDER: Record<SchemaDraftTarget, number> = {

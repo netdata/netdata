@@ -13,7 +13,7 @@ import type { ToolCancelOptions, ToolExecuteOptions, ToolExecuteResult } from '.
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 
 import { createWebSocketTransport } from '../websocket-transport.js';
-import { UNKNOWN_TOOL_ERROR_PREFIX, warn } from '../utils.js';
+import { isPlainObject, UNKNOWN_TOOL_ERROR_PREFIX, warn } from '../utils.js';
 import { ToolProvider } from './types.js';
 import { killProcessTree } from '../utils/process-tree.js';
 
@@ -1329,16 +1329,15 @@ export class MCPProvider extends ToolProvider {
 
   private normalizeToolResult(res: unknown, parameters: Record<string, unknown>, namespace: string, start: number): ToolExecuteResult {
     const latency = Date.now() - start;
-    const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
     const text = (() => {
       let content: unknown;
-      if (isRecord(res) && Object.prototype.hasOwnProperty.call(res, 'content')) {
+      if (isPlainObject(res) && Object.prototype.hasOwnProperty.call(res, 'content')) {
         content = res.content;
       }
       if (typeof content === 'string') return content;
       if (Array.isArray(content)) {
         const texts = (content as unknown[])
-          .map((p) => (isRecord(p) && typeof p.text === 'string' ? p.text : undefined))
+          .map((p) => (isPlainObject(p) && typeof p.text === 'string' ? p.text : undefined))
           .filter((t): t is string => typeof t === 'string');
         if (texts.length > 0) return texts.join('');
       }

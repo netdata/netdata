@@ -3,7 +3,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import type { ReasoningLevel, TurnRequest, TurnResult, ProviderConfig, ConversationMessage, TokenUsage, TurnStatus, TurnRetryDirective } from '../types.js';
 import type { LanguageModel } from 'ai';
 
-import { warn } from '../utils.js';
+import { isPlainObject, warn } from '../utils.js';
 
 import { BaseLLMProvider, type ResponseMessage } from './base.js';
 
@@ -46,20 +46,19 @@ export class AnthropicProvider extends BaseLLMProvider {
       const finalMessages = this.buildFinalTurnMessages(messages, request.isFinalTurn);
       interface ProviderMessage { providerOptions?: Record<string, unknown>; }
       const extendedMessages = finalMessages as unknown as ProviderMessage[];
-      const isRecord = (val: unknown): val is Record<string, unknown> => val !== null && typeof val === 'object' && !Array.isArray(val);
       const cloneOptions = (opts: Record<string, unknown>): OptionsWithAnthropic => ({ ...opts });
       const cachingMode = request.caching ?? 'full';
 
       // eslint-disable-next-line functional/no-loop-statements
       for (const msg of extendedMessages) {
-        if (!isRecord(msg.providerOptions)) {
+        if (!isPlainObject(msg.providerOptions)) {
           msg.providerOptions = undefined;
           continue;
         }
 
         const nextOptions = cloneOptions(msg.providerOptions);
         const anthropicOptions = nextOptions.anthropic;
-        if (isRecord(anthropicOptions)) {
+        if (isPlainObject(anthropicOptions)) {
           const rest: Record<string, unknown> = { ...anthropicOptions };
           delete rest.cacheControl;
           if (Object.keys(rest).length > 0) {
@@ -100,8 +99,8 @@ export class AnthropicProvider extends BaseLLMProvider {
 
       if (cacheTargetIndex !== -1) {
         const lastMessage = extendedMessages[cacheTargetIndex];
-        const baseOptions: OptionsWithAnthropic = isRecord(lastMessage.providerOptions) ? cloneOptions(lastMessage.providerOptions) : {};
-        const existingAnthropic = isRecord(baseOptions.anthropic) ? baseOptions.anthropic : {};
+        const baseOptions: OptionsWithAnthropic = isPlainObject(lastMessage.providerOptions) ? cloneOptions(lastMessage.providerOptions) : {};
+        const existingAnthropic = isPlainObject(baseOptions.anthropic) ? baseOptions.anthropic : {};
         baseOptions.anthropic = {
           ...existingAnthropic,
           cacheControl: { type: 'ephemeral' }

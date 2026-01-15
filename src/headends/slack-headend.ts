@@ -24,6 +24,7 @@ import { discoverLayers } from "../config-resolver.js";
 import { SessionManager } from "../server/session-manager.js";
 import { initSlackHeadend } from "../server/slack.js";
 import { getTelemetryLabels } from "../telemetry/index.js";
+import { createDeferred, globToRegex, normalizeUrlPath } from "../utils.js";
 
 import { ConcurrencyLimiter } from "./concurrency.js";
 
@@ -101,7 +102,7 @@ export class SlackHeadend implements Headend {
   private readonly traceMCP: boolean;
   private readonly traceSdk: boolean;
   private readonly traceSlack: boolean;
-  private readonly closeDeferred = this.createDeferred<HeadendClosedEvent>();
+  private readonly closeDeferred = createDeferred<HeadendClosedEvent>();
   private readonly agentCache = new Map<string, LoadedAgentRecord>();
   private readonly loaderCache = new LoadedAgentCache();
   private readonly userLabelCache = new Map<string, string>();
@@ -305,7 +306,7 @@ export class SlackHeadend implements Headend {
         const method = (req.method ?? "GET").toUpperCase();
         const urlRaw = req.url ?? "/";
         const url = new URL(urlRaw, `http://localhost:${String(port)}`);
-        const pathNormalized = this.normalizePath(url.pathname);
+        const pathNormalized = normalizeUrlPath(url.pathname);
         if (method === route.method && pathNormalized === route.path) {
           await route.handler({
             req,
@@ -856,12 +857,6 @@ export class SlackHeadend implements Headend {
       rules: [],
     };
 
-    const escapeRegex = (s: string): string =>
-      s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const globToRegex = (pat: string): RegExp => {
-      const esc = escapeRegex(pat).replace(/\\\*/g, ".*").replace(/\\\?/g, ".");
-      return new RegExp(`^${esc}$`, "i");
-    };
     const parseChannels = (
       arr: unknown,
     ): { namePats: RegExp[]; idPats: RegExp[] } => {
@@ -1057,26 +1052,6 @@ export class SlackHeadend implements Headend {
     this.agentCache.forEach(({ sessions }) => {
       stopSessions(sessions);
     });
-  }
-
-  private createDeferred<T>(): {
-    promise: Promise<T>;
-    resolve: (value: T) => void;
-    reject: (reason?: unknown) => void;
-  } {
-    let resolve!: (value: T) => void;
-    let reject!: (reason?: unknown) => void;
-    const promise = new Promise<T>((res, rej) => {
-      resolve = res;
-      reject = rej;
-    });
-    return { promise, resolve, reject };
-  }
-
-  private normalizePath(pathname: string): string {
-    const cleaned = pathname.replace(/\\+/g, "/");
-    if (cleaned === "" || cleaned === "/") return "/";
-    return cleaned.endsWith("/") ? cleaned.slice(0, -1) : cleaned;
   }
 
   private attachSocketModeEventHandlers(): void {

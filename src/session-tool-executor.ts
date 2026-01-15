@@ -16,10 +16,11 @@ import type { XmlToolTransport } from './xml-transport.js';
 import { ContextGuard } from './context-guard.js';
 import { TOOL_NO_OUTPUT, unknownToolFailureMessage } from './llm-messages.js';
 import { addSpanEvent } from './telemetry/index.js';
-import { TRUNCATE_PREVIEW_BYTES, truncateToBytes } from './truncation.js';
+import { computeTruncationPercent, TRUNCATE_PREVIEW_BYTES, truncateToBytes } from './truncation.js';
 import {
   clampToolName,
   estimateMessagesBytes,
+  isPlainObject,
   parseJsonRecord,
   sanitizeTextForLLM,
   sanitizeToolName,
@@ -30,12 +31,6 @@ type AjvInstance = AjvClass;
 type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
 type AjvValidateFn = ValidateFunction;
 const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
-
-const computeTruncationPercent = (originalBytes: number, finalBytes: number): number => {
-  if (originalBytes <= 0) return 0;
-  const pct = ((originalBytes - finalBytes) / originalBytes) * 100;
-  return Number(Math.max(0, pct).toFixed(1));
-};
 
 export const TOOL_SANITIZATION_FAILED_KEY = '__sanitization_failed';
 export const TOOL_SANITIZATION_REASON_KEY = '__sanitization_reason';
@@ -238,9 +233,6 @@ export class SessionToolExecutor {
         return `invalid tool call payload. ${details.reason}. Original payload${truncationNote}: ${details.originalPayload}`;
       };
 
-      const isPlainObject = (value: unknown): value is Record<string, unknown> => (
-        value !== null && typeof value === 'object' && !Array.isArray(value)
-      );
       const sanitizationFailure = (() => {
         if (!isPlainObject(parameters)) {
           const payload = safeStringify(parameters);

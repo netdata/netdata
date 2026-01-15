@@ -21,7 +21,7 @@ import type { LanguageModel, ModelMessage, ProviderMetadata, ReasoningOutput, St
 import { XML_WRAPPER_CALLED_AS_TOOL_RESULT, isXmlFinalReportTagName } from '../llm-messages.js';
 import { ThinkTagStreamFilter } from '../think-tag-filter.js';
 import { truncateToBytes } from '../truncation.js';
-import { clampToolName, parseJsonRecord, sanitizeToolName, TOOL_NAME_MAX_LENGTH, warn } from '../utils.js';
+import { clampToolName, isPlainObject, parseJsonRecord, sanitizeToolName, TOOL_NAME_MAX_LENGTH, warn } from '../utils.js';
 
 const GUIDANCE_STRING_FORMATS = ['date-time', 'time', 'date', 'duration', 'email', 'hostname', 'ipv4', 'ipv6', 'uuid'] as const;
 const TOOL_FAILED_PREFIX = '(tool failed: ' as const;
@@ -436,6 +436,20 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
   }
 
+  protected deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+    const out: Record<string, unknown> = { ...target };
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const [key, value] of Object.entries(source)) {
+      const existing = out[key];
+      if (this.isPlainObject(existing) && this.isPlainObject(value)) {
+        out[key] = this.deepMerge(existing, value);
+      } else {
+        out[key] = value;
+      }
+    }
+    return out;
+  }
+
   protected isProviderMetadata(value: unknown): value is ProviderMetadata {
     return this.isPlainObject(value);
   }
@@ -451,16 +465,6 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
   protected toProviderOptions(value: ProviderMetadata): ProviderOptions {
     return value as unknown as ProviderOptions;
-  }
-
-  private extractProviderMetadata(part: { providerMetadata?: unknown; providerOptions?: unknown }): ProviderMetadata | undefined {
-    const direct = part.providerMetadata;
-    if (this.isProviderMetadata(direct)) return direct;
-    const opts = part.providerOptions;
-    if (this.isPlainObject(opts) && this.isPlainObject(opts.anthropic)) {
-      return { anthropic: opts.anthropic } as ProviderMetadata;
-    }
-    return undefined;
   }
 
   public prepareFetch(_details: { url: string; init: RequestInit }): { headers?: Record<string, string> } | undefined {
@@ -531,7 +535,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     return metadata;
   }
 
-  private toFiniteNumber(value: unknown): number | undefined {
+  protected toFiniteNumber(value: unknown): number | undefined {
     if (typeof value === 'number' && Number.isFinite(value)) {
       return value;
     }
@@ -669,14 +673,13 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
     const asString = (v: unknown): string | undefined => typeof v === 'string' ? v : undefined;
     // const asNumber = (v: unknown): number | undefined => typeof v === 'number' && Number.isFinite(v) ? v : undefined;
-    const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && v !== undefined && typeof v === 'object';
 
     // Unwrap common wrapper errors (e.g., RetryError with lastError, nested causes)
     const unwrap = (e: unknown): Record<string, unknown> => {
       let cur: unknown = e;
       // eslint-disable-next-line functional/no-loop-statements
       for (let i = 0; i < 4; i++) {
-        if (!isRecord(cur)) break;
+        if (!isPlainObject(cur)) break;
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
         const rec = cur as Record<string, unknown>;
         // Prefer lastError if available
@@ -690,7 +693,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         if (Array.isArray(errs) && errs.length > 0) { cur = errs[errs.length - 1] as unknown; continue; }
         break;
       }
-      return (isRecord(cur) ? cur : (e as Record<string, unknown>));
+      return (isPlainObject(cur) ? cur : (e as Record<string, unknown>));
     };
 
     const primary = unwrap(err);
@@ -985,7 +988,6 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       }
       return 0;
     };
-    const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object';
     const getNestedNum = (obj: Record<string, unknown>, path: string[]): number => {
       // Safe nested lookup for numeric fields; returns 0 if not found or not numeric
       let cur: unknown = obj;
@@ -997,7 +999,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       }
       return typeof cur === 'number' && Number.isFinite(cur) ? cur : (typeof cur === 'string' && Number.isFinite(Number(cur)) ? Number(cur) : 0);
     };
-    const u: Record<string, unknown> = isRecord(usage) ? usage : {};
+    const u: Record<string, unknown> = isPlainObject(usage) ? usage : {};
     const get = (key: string): unknown => (Object.prototype.hasOwnProperty.call(u, key) ? u[key] : undefined);
     const inputTokens = num(get('inputTokens')) || num(get('prompt_tokens')) || num(get('input_tokens'));
     const outputTokens = num(get('outputTokens')) || num(get('completion_tokens')) || num(get('output_tokens'));

@@ -2,11 +2,9 @@ import yaml from 'js-yaml';
 
 import type { RestToolConfig } from '../types.js';
 
-type UnknownRecord = Record<string, unknown>;
+import { isPlainObject } from '../utils.js';
 
-function isRecord(val: unknown): val is UnknownRecord {
-  return val !== null && typeof val === 'object' && !Array.isArray(val);
-}
+type UnknownRecord = Record<string, unknown>;
 
 function asString(val: unknown): string | undefined { return typeof val === 'string' ? val : undefined; }
 
@@ -48,7 +46,7 @@ function resolveRef(spec: UnknownRecord, ref: string): unknown {
   
   // eslint-disable-next-line functional/no-loop-statements
   for (const part of parts) {
-    if (!isRecord(current)) return undefined;
+    if (!isPlainObject(current)) return undefined;
     current = current[part];
   }
   
@@ -62,21 +60,21 @@ export function openApiToRestTools(specIn: string | UnknownRecord, opts?: OpenAP
   const serversVal = spec.servers;
   const serversArr: unknown[] = Array.isArray(serversVal) ? serversVal : [];
   let firstServer: UnknownRecord | undefined;
-  if (serversArr.length > 0 && isRecord(serversArr[0])) firstServer = serversArr[0];
+  if (serversArr.length > 0 && isPlainObject(serversArr[0])) firstServer = serversArr[0];
   const baseFromServer = firstServer !== undefined ? asString(firstServer.url) : undefined;
   const baseUrl = opts?.baseUrlOverride ?? baseFromServer ?? '';
 
   const pathsVal = spec.paths;
-  const paths: UnknownRecord = isRecord(pathsVal) ? pathsVal : {};
+  const paths: UnknownRecord = isPlainObject(pathsVal) ? pathsVal : {};
   const include = new Set<string>(opts?.includeMethods ?? (methodList() as string[]));
   const tagFilter = Array.isArray(opts?.tagFilter) && opts.tagFilter.length > 0 ? new Set(opts.tagFilter) : undefined;
 
   Object.entries(paths).forEach(([p, val]) => {
-    if (!isRecord(val)) return;
+    if (!isPlainObject(val)) return;
     methodList().forEach((m) => {
       if (!include.has(m)) return;
       const op = val[m];
-      if (!isRecord(op)) return;
+      if (!isPlainObject(op)) return;
       const opTagsRaw: unknown[] = Array.isArray(op.tags) ? (op.tags as unknown[]) : [];
       const opTags = opTagsRaw.filter((t: unknown): t is string => typeof t === 'string');
       if (tagFilter !== undefined && !opTags.some((t) => tagFilter.has(t))) return;
@@ -94,13 +92,12 @@ export function openApiToRestTools(specIn: string | UnknownRecord, opts?: OpenAP
       // Resolve $ref parameters
       const resolvedParams: UnknownRecord[] = [];
       [...pathParamsA, ...opParamsA].forEach((param) => {
-        if (isRecord(param)) {
-          const refObj = param as Record<string, unknown>;
-          const ref = '$ref' in refObj ? asString(refObj.$ref) : undefined;
+        if (isPlainObject(param)) {
+          const ref = '$ref' in param ? asString(param.$ref) : undefined;
           if (ref !== undefined) {
             // Resolve the reference
             const resolved = resolveRef(spec, ref);
-            if (isRecord(resolved)) {
+            if (isPlainObject(resolved)) {
               resolvedParams.push(resolved);
             }
           } else {
@@ -123,7 +120,7 @@ export function openApiToRestTools(specIn: string | UnknownRecord, opts?: OpenAP
       pathParams.forEach((prm) => {
         const nm = asString(prm.name) ?? '';
         if (nm.length === 0) return;
-        const schRaw = isRecord(prm.schema) ? prm.schema : undefined;
+        const schRaw = isPlainObject(prm.schema) ? prm.schema : undefined;
         props[nm] = schRaw ?? { type: 'string' };
         req.push(nm);
       });
@@ -135,15 +132,14 @@ export function openApiToRestTools(specIn: string | UnknownRecord, opts?: OpenAP
         const nm = asString(prm.name) ?? '';
         if (nm.length === 0) return;
         const required = Boolean(prm.required);
-        let schRaw = isRecord(prm.schema) ? prm.schema : undefined;
+        let schRaw = isPlainObject(prm.schema) ? prm.schema : undefined;
         
         // Resolve schema $ref if present
-        if (schRaw !== undefined && isRecord(schRaw)) {
-          const schemaRefObj = schRaw as Record<string, unknown>;
-          const schemaRef = '$ref' in schemaRefObj ? asString(schemaRefObj.$ref) : undefined;
+        if (schRaw !== undefined && isPlainObject(schRaw)) {
+          const schemaRef = '$ref' in schRaw ? asString(schRaw.$ref) : undefined;
           if (schemaRef !== undefined) {
             const resolvedSchema = resolveRef(spec, schemaRef);
-            if (isRecord(resolvedSchema)) {
+            if (isPlainObject(resolvedSchema)) {
               schRaw = resolvedSchema;
             }
           }
@@ -163,7 +159,7 @@ export function openApiToRestTools(specIn: string | UnknownRecord, opts?: OpenAP
       headerParams.forEach((prm) => {
         const nm = asString(prm.name) ?? '';
         if (nm.length === 0) return;
-        const schRaw = isRecord(prm.schema) ? prm.schema : undefined;
+        const schRaw = isPlainObject(prm.schema) ? prm.schema : undefined;
         props[nm] = schRaw ?? { type: 'string' };
         if (Boolean(prm.required)) req.push(nm);
       });
@@ -171,15 +167,15 @@ export function openApiToRestTools(specIn: string | UnknownRecord, opts?: OpenAP
       // Request body (application/json) => provide a top-level 'body' arg
       let hasBodyTemplate = false;
       let bodyTemplate: unknown;
-      const requestBody = isRecord(op.requestBody) ? op.requestBody : undefined;
-      const rbContent = requestBody !== undefined && isRecord(requestBody.content) ? requestBody.content : undefined;
+      const requestBody = isPlainObject(op.requestBody) ? op.requestBody : undefined;
+      const rbContent = requestBody !== undefined && isPlainObject(requestBody.content) ? requestBody.content : undefined;
       const jsonContentRaw = rbContent !== undefined ? rbContent['application/json'] : undefined;
-      const jsonContent = isRecord(jsonContentRaw) ? jsonContentRaw : undefined;
+      const jsonContent = isPlainObject(jsonContentRaw) ? jsonContentRaw : undefined;
       const bodySchemaRaw = jsonContent !== undefined ? jsonContent.schema : undefined;
-      const bodySchema = isRecord(bodySchemaRaw) ? bodySchemaRaw : undefined;
+      const bodySchema = isPlainObject(bodySchemaRaw) ? bodySchemaRaw : undefined;
       if (requestBody !== undefined && bodySchema !== undefined) {
         // Provide a raw body arg to maximize compatibility
-        props.body = isRecord(bodySchema) ? { type: 'object' } : {};
+        props.body = isPlainObject(bodySchema) ? { type: 'object' } : {};
         if (Boolean(requestBody.required)) req.push('body');
         bodyTemplate = '${parameters.body}';
         hasBodyTemplate = true;

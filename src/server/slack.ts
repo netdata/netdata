@@ -1,5 +1,5 @@
 import type { ConversationMessage, AIAgentResult } from '../types.js';
-import { parseJsonValueDetailed, warn } from '../utils.js';
+import { isPlainObject, parseJsonValueDetailed, warn } from '../utils.js';
 import { SessionManager } from './session-manager.js';
 import { buildSnapshotFromOpTree, formatSlackStatus, buildStatusBlocks, formatFooterLines } from './status-aggregator.js';
 
@@ -24,7 +24,6 @@ interface SlackHeadendOptions {
 const stripBotMention = (text: string, botUserId: string): string => text.replace(new RegExp(`<@${botUserId}>`, 'g'), '').trim();
 const containsBotMention = (text: string, botUserId: string): boolean => new RegExp(`<@${botUserId}>`).test(text);
 const truncate = (s: string, max: number): string => (s.length <= max ? s : `${s.slice(0, max)}…`);
-const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 const STOPPING_TEXT = '🛑 Stopping…';
 const fmtTs = (ts: unknown): string => {
   if (typeof ts !== 'string' && typeof ts !== 'number') return '';
@@ -80,7 +79,7 @@ function extractSlackMessages(result: AIAgentResult | undefined): { blocks?: unk
   if (!slack || typeof slack !== 'object') return undefined;
   const msgs = (slack as Record<string, unknown>).messages;
   if (!Array.isArray(msgs)) return undefined;
-  const arr = msgs.filter(isRecord) as { blocks?: unknown[] }[];
+  const arr = msgs.filter(isPlainObject) as { blocks?: unknown[] }[];
   return arr.length > 0 ? arr : undefined;
 }
 
@@ -99,7 +98,7 @@ function extractSlackMessagesFromContent(result: AIAgentResult | undefined): { b
     return undefined;
   })();
   if (!Array.isArray(candidate)) return undefined;
-  const arr = candidate.filter(isRecord) as { blocks?: unknown[] }[];
+  const arr = candidate.filter(isPlainObject) as { blocks?: unknown[] }[];
   return arr.length > 0 ? arr : undefined;
 }
 
@@ -171,16 +170,16 @@ const buildSlackFallbackText = (params: {
   metaError?: string;
 }): string => {
   const { result, opTree, metaError } = params;
-  const opTreeError = (isRecord(opTree) && typeof opTree.error === 'string') ? opTree.error : undefined;
+  const opTreeError = (isPlainObject(opTree) && typeof opTree.error === 'string') ? opTree.error : undefined;
   const errorText = metaError ?? result?.error ?? opTreeError;
-  const frMeta = isRecord(result?.finalReport?.metadata) ? result?.finalReport?.metadata : undefined;
-  const status = (isRecord(frMeta) && typeof frMeta.status === 'string') ? frMeta.status : undefined;
-  const reason = (isRecord(frMeta) && typeof frMeta.reason === 'string') ? frMeta.reason : undefined;
-  const slugs = (isRecord(frMeta) && Array.isArray(frMeta.slugs)) ? frMeta.slugs : undefined;
-  const turnsCompleted = (isRecord(frMeta) && typeof frMeta.turns_completed === 'number') ? frMeta.turns_completed : undefined;
-  const attempts = (isRecord(frMeta) && typeof frMeta.final_report_attempts === 'number') ? frMeta.final_report_attempts : undefined;
-  const lastStop = (isRecord(frMeta) && typeof frMeta.last_stop_reason === 'string') ? frMeta.last_stop_reason : undefined;
-  const opTurns = (isRecord(opTree) && Array.isArray(opTree.turns)) ? opTree.turns.length : undefined;
+  const frMeta = isPlainObject(result?.finalReport?.metadata) ? result?.finalReport?.metadata : undefined;
+  const status = (isPlainObject(frMeta) && typeof frMeta.status === 'string') ? frMeta.status : undefined;
+  const reason = (isPlainObject(frMeta) && typeof frMeta.reason === 'string') ? frMeta.reason : undefined;
+  const slugs = (isPlainObject(frMeta) && Array.isArray(frMeta.slugs)) ? frMeta.slugs : undefined;
+  const turnsCompleted = (isPlainObject(frMeta) && typeof frMeta.turns_completed === 'number') ? frMeta.turns_completed : undefined;
+  const attempts = (isPlainObject(frMeta) && typeof frMeta.final_report_attempts === 'number') ? frMeta.final_report_attempts : undefined;
+  const lastStop = (isPlainObject(frMeta) && typeof frMeta.last_stop_reason === 'string') ? frMeta.last_stop_reason : undefined;
+  const opTurns = (isPlainObject(opTree) && Array.isArray(opTree.turns)) ? opTree.turns.length : undefined;
   const isFailureStatus = status === 'failure';
   const isFailure = isFailureStatus || result?.success === false || typeof metaError === 'string' || typeof opTreeError === 'string';
 
@@ -718,30 +717,12 @@ const elog = (msg: string): void => { try { process.stderr.write(`[ERR] ← [0.0
         }
         // Post tiny stats footer as a separate small message (context)
         try {
-          // Use only opTree for structure and totals
+          // Use only opTree for structure and totals - buildSnapshotFromOpTree already calculates sessionCount and toolsRun
           const opTree = sm.getOpTree(runId) as any | undefined;
           const snap = opTree
             ? buildSnapshotFromOpTree(opTree as any, Date.now())
             : { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0, agentsRun: 0 }, sessionCount: 0 } as any;
-          const countFromOpTree = (node: any | undefined): { tools: number; sessions: number } => {
-            if (!node || typeof node !== 'object') return { tools: 0, sessions: 0 };
-            let tools = 0; let sessions = 1; // count this session
-            const turns = Array.isArray(node.turns) ? node.turns : [];
-            for (const t of turns) {
-              const ops = Array.isArray(t.ops) ? t.ops : [];
-              for (const o of ops) {
-                if (o?.kind === 'tool') tools += 1;
-                if (o?.kind === 'session' && o.childSession) {
-                  const rec = countFromOpTree(o.childSession);
-                  tools += rec.tools;
-                  sessions += rec.sessions;
-                }
-              }
-            }
-            return { tools, sessions };
-          };
-          const agCounts = countFromOpTree(opTree as any);
-          const footer = formatFooterLines(snap, { agentsCount: agCounts.sessions, toolsCount: agCounts.tools });
+          const footer = formatFooterLines(snap);
           await client.chat.postMessage({ channel, thread_ts: ts, text: footer.text, blocks: [ { type: 'context', elements: [ { type: 'mrkdwn', text: footer.text } ] } ] });
         } catch (e3) { elog(`stats footer post failed: ${(e3 as Error).message}`); }
       } else {
@@ -750,29 +731,12 @@ const elog = (msg: string): void => { try { process.stderr.write(`[ERR] ← [0.0
         await client.chat.update({ channel, ts, text: finalText, blocks: [] });
         // Post tiny stats footer as a separate small message (context)
         try {
+          // Use only opTree for structure and totals - buildSnapshotFromOpTree already calculates sessionCount and toolsRun
           const opTree = sessionManager.getOpTree(runId) as any | undefined;
           const snap = opTree
             ? buildSnapshotFromOpTree(opTree as any, Date.now())
             : { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0, agentsRun: 0 }, sessionCount: 0 } as any;
-          const countFromOpTree = (node: any | undefined): { tools: number; sessions: number } => {
-            if (!node || typeof node !== 'object') return { tools: 0, sessions: 0 };
-            let tools = 0; let sessions = 1;
-            const turns = Array.isArray(node.turns) ? node.turns : [];
-            for (const t of turns) {
-              const ops = Array.isArray(t.ops) ? t.ops : [];
-              for (const o of ops) {
-                if (o?.kind === 'tool') tools += 1;
-                if (o?.kind === 'session' && o.childSession) {
-                  const rec = countFromOpTree(o.childSession);
-                  tools += rec.tools;
-                  sessions += rec.sessions;
-                }
-              }
-            }
-            return { tools, sessions };
-          };
-          const agCounts = countFromOpTree(opTree as any);
-          const footer = formatFooterLines(snap, { agentsCount: agCounts.sessions, toolsCount: agCounts.tools });
+          const footer = formatFooterLines(snap);
           await client.chat.postMessage({ channel, thread_ts: ts, text: footer.text, blocks: [ { type: 'context', elements: [ { type: 'mrkdwn', text: footer.text } ] } ] });
         } catch (e3) { elog(`stats footer post failed: ${(e3 as Error).message}`); }
       }

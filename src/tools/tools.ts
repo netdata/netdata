@@ -10,7 +10,7 @@ import type { MCPTool, LogEntry, AccountingEntry, ProgressMetrics, LogDetailValu
 import type { ToolExecuteOptions, ToolExecuteResult, ToolKind, ToolProvider, ToolExecutionContext } from './types.js';
 
 import { recordToolMetrics, runWithSpan, addSpanAttributes, addSpanEvent, recordSpanError, recordQueueDepthMetrics, recordQueueWaitMetrics } from '../telemetry/index.js';
-import { truncateToBytesWithInfo } from '../truncation.js';
+import { computeTruncationPercent, truncateToBytesWithInfo } from '../truncation.js';
 import { appendCallPathSegment, formatToolRequestCompact, normalizeCallPath, sanitizeToolName, warn } from '../utils.js';
 
 import { queueManager, type AcquireResult, QueueAbortError } from './queue-manager.js';
@@ -45,12 +45,6 @@ const isCachedToolResult = (value: unknown): value is { result: string } => {
   if (value === null || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
   return typeof record.result === 'string';
-};
-
-const computeTruncationPercent = (originalBytes: number, finalBytes: number): number => {
-  if (originalBytes <= 0) return 0;
-  const pct = ((originalBytes - finalBytes) / originalBytes) * 100;
-  return Number(Math.max(0, pct).toFixed(1));
 };
 
 export interface ToolBudgetReservation {

@@ -12,6 +12,7 @@ type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
 const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
 
 import { describeFormatParameter, formatPromptValue, getFormatSchema } from '../formats.js';
+import { FINAL_REPORT_TOOL } from '../internal-tools.js';
 import {
   FINAL_REPORT_FIELDS_JSON,
   FINAL_REPORT_FIELDS_SLACK,
@@ -46,7 +47,6 @@ interface InternalToolProviderOptions {
 }
 
 const TASK_STATUS_TOOL = 'agent__task_status';
-const FINAL_REPORT_TOOL = 'agent__final_report';
 const BATCH_TOOL = 'agent__batch';
 const SLACK_BLOCK_KIT_FORMAT: OutputFormatId = 'slack-block-kit';
 const DEFAULT_PARAMETERS_DESCRIPTION = 'Parameters for selected tool';

@@ -18,7 +18,7 @@ import crypto from 'node:crypto';
 
 import type { ConversationMessage, ToolCall } from './types.js';
 
-import { parseJsonValueDetailed, sanitizeToolName } from './utils.js';
+import { isPlainObject, parseJsonValueDetailed, sanitizeToolName } from './utils.js';
 
 // =============================================================================
 // Types for the execution interface
@@ -106,12 +106,6 @@ const TAG_PATTERNS: readonly { name: string; open: RegExp; close: string }[] = [
   { name: 'function_call', open: /<function_call>/gi, close: '</function_call>' },
   { name: 'function', open: /<function>/gi, close: '</function>' },
 ];
-
-/**
- * Check if a value is a plain object (not null, not array).
- */
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /**
  * Normalize a parsed JSON object into a ToolCall.

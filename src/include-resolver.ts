@@ -7,10 +7,6 @@ import path from 'node:path';
 // - depth limit prevents infinite recursion
 // - refuses to include sensitive files like .env
 
-// no-op placeholder kept for future type-guard reuse (linted if unused)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function isPlainObject(_val: unknown): _val is Record<string, unknown> { return false; }
-
 function readTextSafe(p: string): string {
   const st = fs.statSync(p);
   if (!st.isFile()) throw new Error(`include target is not a file: ${p}`);

@@ -5,6 +5,46 @@ import type { AIAgentResult, AccountingEntry, ConversationMessage } from './type
 import { truncateToBytes } from './truncation.js';
 
 /**
+ * Get the user's home directory from environment variables.
+ * Returns empty string if neither HOME nor USERPROFILE is set.
+ */
+export const getHomeDir = (): string => process.env.HOME ?? process.env.USERPROFILE ?? '';
+
+/**
+ * Convert a glob pattern to a case-insensitive regex.
+ * Supports `*` (match any characters) and `?` (match single character).
+ * Example: `*.example.com` → `/^.*\.example\.com$/i`
+ */
+export const globToRegex = (pattern: string): RegExp => {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  const regex = `^${escaped.replace(/\*/g, '.*').replace(/\?/g, '.')}$`;
+  return new RegExp(regex, 'i');
+};
+
+/**
+ * A deferred promise with exposed resolve/reject functions.
+ * Useful for promise-based coordination patterns.
+ */
+export interface Deferred<T> {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+}
+
+/**
+ * Create a deferred promise with exposed resolve/reject functions.
+ */
+export const createDeferred = <T>(): Deferred<T> => {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
+
+/**
  * Special string values that indicate "do not send this parameter to the model".
  * When any of these strings are used, the parameter should resolve to `null`.
  */
@@ -687,4 +727,14 @@ export const safeJsonByteLength = (value: unknown): number => {
 export const estimateMessagesBytes = (messages: readonly ConversationMessage[] | undefined): number => {
   if (messages === undefined || messages.length === 0) return 0;
   return messages.reduce((total, message) => total + safeJsonByteLength(message), 0);
+};
+
+/**
+ * Normalizes a URL pathname: replaces backslashes with forward slashes,
+ * handles empty/root paths, and strips trailing slashes.
+ */
+export const normalizeUrlPath = (pathname: string): string => {
+  const cleaned = pathname.replace(/\\+/g, '/');
+  if (cleaned === '' || cleaned === '/') return '/';
+  return cleaned.endsWith('/') ? cleaned.slice(0, -1) : cleaned;
 };

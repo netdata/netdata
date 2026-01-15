@@ -20,10 +20,10 @@ import { GoogleProvider } from './llm-providers/google.js';
 import { OllamaProvider } from './llm-providers/ollama.js';
 import { OpenAICompatibleProvider } from './llm-providers/openai-compatible.js';
 import { OpenAIProvider } from './llm-providers/openai.js';
-import { OpenRouterProvider } from './llm-providers/openrouter.js';
+import { OpenRouterProvider, OPENROUTER_DEFAULT_REFERER, OPENROUTER_DEFAULT_TITLE } from './llm-providers/openrouter.js';
 import { TestLLMProvider } from './llm-providers/test-llm.js';
 import { updateAiSdkWarningPreference } from './setup-ai-sdk.js';
-import { warn } from './utils.js';
+import { isPlainObject, warn } from './utils.js';
 
 export class LLMClient {
   private static readonly CONTENT_TYPE_EVENT_STREAM = 'text/event-stream';
@@ -236,16 +236,14 @@ export class LLMClient {
         }
 
         if (url.includes('openrouter.ai')) {
-          const defaultReferer = process.env.OPENROUTER_REFERER ?? 'https://ai-agent.local';
-          const defaultTitle = process.env.OPENROUTER_TITLE ?? 'ai-agent';
           if (!headers.has('HTTP-Referer')) {
-            headers.set('HTTP-Referer', defaultReferer);
+            headers.set('HTTP-Referer', OPENROUTER_DEFAULT_REFERER);
           }
           if (!headers.has('X-OpenRouter-Title')) {
-            headers.set('X-OpenRouter-Title', defaultTitle);
+            headers.set('X-OpenRouter-Title', OPENROUTER_DEFAULT_TITLE);
           }
           if (!headers.has('User-Agent')) {
-            headers.set('User-Agent', `${defaultTitle}/1.0`);
+            headers.set('User-Agent', `${OPENROUTER_DEFAULT_TITLE}/1.0`);
           }
         }
 
@@ -343,7 +341,7 @@ export class LLMClient {
             const metadataClone = response.clone();
             metadataTask = (async () => {
               const metadataResult = await collector({ url, response: metadataClone });
-              if (metadataResult !== undefined && this.isPlainObject(metadataResult)) {
+              if (metadataResult !== undefined && isPlainObject(metadataResult)) {
                 const candidate = metadataResult as ProviderTurnMetadata;
                 if (candidate.actualProvider !== undefined || candidate.actualModel !== undefined) {
                   this.lastRouting = {
@@ -449,7 +447,7 @@ export class LLMClient {
             let parsedFallback: Record<string, unknown> | undefined;
             try {
               const candidate: unknown = JSON.parse(fallbackText);
-              parsedFallback = this.isPlainObject(candidate) ? candidate : undefined;
+              parsedFallback = isPlainObject(candidate) ? candidate : undefined;
             } catch {
               parsedFallback = undefined;
             }
@@ -619,10 +617,6 @@ export class LLMClient {
       }
     })();
     return task;
-  }
-
-  private isPlainObject(value: unknown): value is Record<string, unknown> {
-    return value !== null && typeof value === 'object' && !Array.isArray(value);
   }
 
   private logRequest(request: TurnRequest, payload?: LogPayload): void {
@@ -961,7 +955,7 @@ export class LLMClient {
       return { provider: directProvider, model: directModel };
     }
     const dataCandidate = record.data;
-    if (this.isPlainObject(dataCandidate)) {
+    if (isPlainObject(dataCandidate)) {
       return this.selectProviderFromRecord(dataCandidate);
     }
     return undefined;
@@ -969,10 +963,10 @@ export class LLMClient {
 
   private selectCostFromRecord(record: Record<string, unknown>): { costUsd?: number; upstreamInferenceCostUsd?: number } | undefined {
     const usageCandidate = record.usage;
-    if (!this.isPlainObject(usageCandidate)) return undefined;
+    if (!isPlainObject(usageCandidate)) return undefined;
     const cost = typeof usageCandidate.cost === 'number' && Number.isFinite(usageCandidate.cost) ? usageCandidate.cost : undefined;
     const detailsCandidate = usageCandidate.cost_details;
-    const details = this.isPlainObject(detailsCandidate) ? detailsCandidate : undefined;
+    const details = isPlainObject(detailsCandidate) ? detailsCandidate : undefined;
     const upstream = details !== undefined && typeof details.upstream_inference_cost === 'number' && Number.isFinite(details.upstream_inference_cost)
       ? details.upstream_inference_cost
       : undefined;
@@ -984,13 +978,13 @@ export class LLMClient {
 
   private extractUsageRecord(record: Record<string, unknown>): Record<string, unknown> | undefined {
     const direct = record.usage;
-    if (this.isPlainObject(direct)) {
+    if (isPlainObject(direct)) {
       return direct;
     }
     const dataCandidate = record.data;
-    if (this.isPlainObject(dataCandidate)) {
+    if (isPlainObject(dataCandidate)) {
       const nestedUsage = dataCandidate.usage;
-      if (this.isPlainObject(nestedUsage)) {
+      if (isPlainObject(nestedUsage)) {
         return nestedUsage;
       }
     }
@@ -999,7 +993,7 @@ export class LLMClient {
 
   private selectCacheWriteFromRecord(record: Record<string, unknown>): number | undefined {
     const usageCandidate = record.usage;
-    if (!this.isPlainObject(usageCandidate)) return undefined;
+    if (!isPlainObject(usageCandidate)) return undefined;
     const usage = usageCandidate;
     const candidates: unknown[] = [
       usage.cacheWriteInputTokens,
@@ -1025,12 +1019,12 @@ export class LLMClient {
     if (direct !== undefined) {
       return direct;
     }
-    const nested = this.isPlainObject(usage.cacheCreation)
+    const nested = isPlainObject(usage.cacheCreation)
       ? usage.cacheCreation
-      : this.isPlainObject(usage.cache_creation)
+      : isPlainObject(usage.cache_creation)
         ? usage.cache_creation
         : undefined;
-    if (this.isPlainObject(nested)) {
+    if (isPlainObject(nested)) {
       const nestedValue = parseCandidate(nested.ephemeral_5m_input_tokens);
       if (nestedValue !== undefined) {
         return nestedValue;
@@ -1068,7 +1062,7 @@ export class LLMClient {
       let parsed: Record<string, unknown> | undefined;
       try {
         const candidate: unknown = JSON.parse(body);
-        parsed = this.isPlainObject(candidate) ? candidate : undefined;
+        parsed = isPlainObject(candidate) ? candidate : undefined;
       } catch {
         parsed = undefined;
       }
@@ -1076,7 +1070,7 @@ export class LLMClient {
       const routing = this.selectProviderFromRecord(parsed);
       const usageRecord = this.extractUsageRecord(parsed);
       const costs = this.selectCostFromRecord(parsed);
-      const cacheWrite = this.isPlainObject(usageRecord)
+      const cacheWrite = isPlainObject(usageRecord)
         ? this.selectCacheWriteFromRecord({ usage: usageRecord })
         : undefined;
       apply({

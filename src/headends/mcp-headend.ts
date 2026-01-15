@@ -20,6 +20,7 @@ import { AIAgent } from '../ai-agent.js';
 import { describeFormat } from '../formats.js';
 import { resolveToolName, type AgentSchemaSummary } from '../schema-adapters.js';
 import { getTelemetryLabels } from '../telemetry/index.js';
+import { createDeferred, isPlainObject } from '../utils.js';
 
 /* eslint-disable-next-line @typescript-eslint/consistent-type-imports -- Need runtime type mapping for SDK's bundled Zod */
 type ZodExports = typeof import('zod');
@@ -28,32 +29,12 @@ import { ConcurrencyLimiter } from './concurrency.js';
 import { McpWebSocketServerTransport } from './mcp-ws-transport.js';
 import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamOutput } from './shared-event-filter.js';
 
-interface Deferred<T> {
-  promise: Promise<T>;
-  resolve: (value: T) => void;
-  reject: (reason?: unknown) => void;
-}
-
-const createDeferred = <T>(): Deferred<T> => {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-};
-
 const STREAMABLE_HTTP = 'streamable-http' as const;
 const require = createRequire(import.meta.url);
 const sdkPackagePath = require.resolve('@modelcontextprotocol/sdk/package.json');
 const sdkRequire = createRequire(sdkPackagePath);
 const { z: sdkZ } = sdkRequire('zod') as ZodExports;
 const MCP_SESSION_HEADER = 'mcp-session-id' as const;
-
-const isPlainObject = (value: unknown): value is Record<string, unknown> => (
-  value !== null && typeof value === 'object' && !Array.isArray(value)
-);
 
 const isSimplePromptSchema = (schema: Record<string, unknown>): boolean => {
   if (schema.type !== 'object') return false;

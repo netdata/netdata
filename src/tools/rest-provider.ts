@@ -4,7 +4,7 @@ import type { MCPTool, RestToolConfig } from '../types.js';
 import type { ToolExecuteOptions, ToolExecuteResult } from './types.js';
 import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
 
-import { warn } from '../utils.js';
+import { isPlainObject, warn } from '../utils.js';
 
 import { ToolProvider } from './types.js';
 
@@ -33,7 +33,7 @@ export class RestProvider extends ToolProvider {
     if (Array.isArray(value)) {
       const params: string[] = [];
       value.forEach((item, index) => {
-        if (this.isPlainObject(item)) {
+        if (isPlainObject(item)) {
           // For array of objects, serialize each object's properties
           Object.entries(item).forEach(([k, v]) => {
             params.push(...this.serializeQueryParam(k, v, `${fullKey}[${String(index)}]`));
@@ -47,7 +47,7 @@ export class RestProvider extends ToolProvider {
       return params;
     }
 
-    if (this.isPlainObject(value)) {
+    if (isPlainObject(value)) {
       const params: string[] = [];
       Object.entries(value).forEach(([k, v]) => {
         params.push(...this.serializeQueryParam(k, v, fullKey));
@@ -58,10 +58,6 @@ export class RestProvider extends ToolProvider {
     // Primitive value
     const valueStr = typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' ? String(value) : '';
     return [`${fullKey}=${encodeURIComponent(valueStr)}`];
-  }
-
-  private isPlainObject(val: unknown): val is Record<string, unknown> {
-    return val !== null && typeof val === 'object' && !Array.isArray(val);
   }
 
   constructor(public readonly namespace: string, config?: Record<string, RestToolConfig>) { 
@@ -131,7 +127,7 @@ export class RestProvider extends ToolProvider {
           
           // Special case: if value is a plain object (not an array), wrap it in an array
           // This handles cases like Encharge API where objects need array notation
-          if (this.isPlainObject(value)) {
+          if (isPlainObject(value)) {
             value = [value];
           }
           

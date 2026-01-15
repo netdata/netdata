@@ -5,6 +5,12 @@ const RESERVED_INTERNAL_AGENT_NAMES = new Set<string>([
   'tool_output',    // tool_output
 ]);
 
+/** Canonical internal tool name for final report submission */
+export const FINAL_REPORT_TOOL = 'agent__final_report';
+
+/** Aliases accepted for final report tool (normalized forms) */
+export const FINAL_REPORT_TOOL_ALIASES = new Set<string>(['agent__final_report', 'agent-final-report']);
+
 export function isReservedAgentName(name: string): boolean {
   return RESERVED_INTERNAL_AGENT_NAMES.has(name);
 }

@@ -30,6 +30,7 @@ import { formatLog } from './log-formatter.js';
 import { makeTTYLogCallbacks } from './log-sink-tty.js';
 import { getOptionsByGroup, formatCliNames, OPTIONS_REGISTRY } from './options-registry.js';
 import { mergeCallbacksWithPersistence, resolvePeristenceConfig } from './persistence.js';
+import { buildPromptVars } from './prompt-builder.js';
 import { ShutdownController } from './shutdown-controller.js';
 import { initTelemetry, shutdownTelemetry } from './telemetry/index.js';
 import { buildTelemetryRuntimeConfig, type TelemetryOverrides } from './telemetry/runtime-config.js';
@@ -2079,24 +2080,6 @@ async function readPrompt(value: string): Promise<string> {
 }
 
 function buildPromptVariables(maxTurns: number, maxTools: number): Record<string, string> {
-  function pad2(n: number): string { return n < 10 ? `0${String(n)}` : String(n); }
-  function formatRFC3339Local(d: Date): string {
-    const y = d.getFullYear();
-    const m = pad2(d.getMonth() + 1);
-    const da = pad2(d.getDate());
-    const hh = pad2(d.getHours());
-    const mm = pad2(d.getMinutes());
-    const ss = pad2(d.getSeconds());
-    const tzMin = -d.getTimezoneOffset();
-    const sign = tzMin >= 0 ? '+' : '-';
-    const abs = Math.abs(tzMin);
-    const tzh = pad2(Math.floor(abs / 60));
-    const tzm = pad2(abs % 60);
-    return `${String(y)}-${m}-${da}T${hh}:${mm}:${ss}${sign}${tzh}:${tzm}`;
-  }
-  function detectTimezone(): string {
-    try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return process.env.TZ ?? 'UTC'; }
-  }
   function detectOS(): string {
     try {
       const content = fs.readFileSync('/etc/os-release', 'utf-8');
@@ -2106,12 +2089,10 @@ function buildPromptVariables(maxTurns: number, maxTools: number): Record<string
     return `${os.type()} ${os.release()}`;
   }
 
-  const now = new Date();
+  // Use shared prompt vars from prompt-builder for DATETIME, TIMESTAMP, DAY, TIMEZONE
+  const base = buildPromptVars();
   return {
-    DATETIME: formatRFC3339Local(now),
-    TIMESTAMP: String(Math.floor(now.getTime() / 1000)),
-    DAY: now.toLocaleDateString(undefined, { weekday: 'long' }),
-    TIMEZONE: detectTimezone(),
+    ...base,
     MAX_TURNS: String(maxTurns),
     MAX_TOOLS: String(maxTools),
     OS: detectOS(),

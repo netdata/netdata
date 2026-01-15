@@ -5,7 +5,7 @@ import type { Configuration, MCPServerConfig, ProviderConfig, RestToolConfig, Op
 import { DEFAULT_QUEUE_CONCURRENCY } from './config.js';
 
 import { parseCacheDurationMsStrict, parseDurationMsStrict, type CacheDurationInput } from './cache/ttl.js';
-import { isPlainObject, warn } from './utils.js';
+import { getHomeDir, isPlainObject, warn } from './utils.js';
 
 type LayerOrigin = '--config' | 'cwd' | 'prompt' | 'binary' | 'home' | 'system';
 
@@ -89,7 +89,7 @@ export function discoverLayers(opts?: { configPath?: string; promptPath?: string
 
   const cwd = process.cwd();
   const binDir = path.dirname(fs.realpathSync(process.execPath));
-  const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
+  const home = getHomeDir();
   const HIDDEN_JSON = '.ai-agent.json';
   const HIDDEN_ENV = '.ai-agent.env';
   const HOME_DIR = '.ai-agent';

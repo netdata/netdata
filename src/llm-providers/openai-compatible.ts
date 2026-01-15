@@ -109,18 +109,6 @@ export class OpenAICompatibleProvider extends BaseLLMProvider {
     return true;
   }
 
-  private deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
-    return Object.entries(source).reduce<Record<string, unknown>>((acc, [key, value]) => {
-      const current = acc[key];
-      if (this.isPlainObject(current) && this.isPlainObject(value)) {
-        acc[key] = this.deepMerge({ ...current }, value);
-      } else {
-        acc[key] = value;
-      }
-      return acc;
-    }, { ...target });
-  }
-
   protected convertResponseMessages(messages: ResponseMessage[], provider: string, model: string, tokens: TokenUsage): ConversationMessage[] {
     // Use base class helper that handles AI SDK's content array format
     return this.convertResponseMessagesGeneric(messages, provider, model, tokens);

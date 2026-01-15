@@ -21,6 +21,7 @@ import type { AIAgentEvent, AIAgentEventMeta, AIAgentResult, AIAgentSessionConfi
 
 import { ContextGuard, type ContextGuardBlockedEntry, type ContextGuardEvaluation } from './context-guard.js';
 import { FINAL_REPORT_FORMAT_VALUES, type FinalReportManager, type FinalReportSource, type PendingFinalReportPayload } from './final-report-manager.js';
+import { FINAL_REPORT_TOOL, FINAL_REPORT_TOOL_ALIASES } from './internal-tools.js';
 import { buildTurnFailedNotice, type TurnFailedNoticeEvent, type TurnFailedSlug } from './llm-messages-turn-failed.js';
 import { buildXmlNextEvents, buildXmlNextNotice, type XmlNextNoticeEvent } from './llm-messages-xml-next.js';
 import {
@@ -47,7 +48,7 @@ import { addSpanAttributes, addSpanEvent, recordContextGuardMetrics, recordFinal
 import { ThinkTagStreamFilter } from './think-tag-filter.js';
 import { processLeakedToolCalls, type LeakedToolFallbackResult } from './tool-call-fallback.js';
 import { TRUNCATE_PREVIEW_BYTES, truncateToBytes } from './truncation.js';
-import { estimateMessagesBytes, formatToolRequestCompact, parseJsonValueDetailed, sanitizeToolName, warn } from './utils.js';
+import { estimateMessagesBytes, formatToolRequestCompact, isPlainObject, parseJsonValueDetailed, sanitizeToolName, warn } from './utils.js';
 import { XmlFinalReportFilter, XmlFinalReportStrictFilter, type XmlToolTransport } from './xml-transport.js';
 
 const TOOL_FAILED_PREFIX = '(tool failed:';
@@ -172,13 +173,10 @@ const REMOTE_CONTEXT = 'agent:context';
 const REMOTE_ORCHESTRATOR = 'agent:orchestrator';
 const REMOTE_SANITIZER = 'agent:sanitizer';
 const REMOTE_FAILURE_REPORT = 'agent:failure-report';
-const FINAL_REPORT_TOOL = 'agent__final_report';
 const SLACK_BLOCK_KIT_FORMAT = 'slack-block-kit';
-const FINAL_REPORT_TOOL_ALIASES = new Set(['agent__final_report', 'agent-final-report']);
 const RETRY_ACTION_SKIP_PROVIDER = 'skip-provider';
 const STREAMED_OUTPUT_DEDUPE_MAX_CHARS = 200_000;
 
-export { FINAL_REPORT_TOOL };
 /**
  * TurnRunner encapsulates all turn iteration logic
  */
@@ -1251,7 +1249,6 @@ export class TurnRunner {
                                 } else if (expectedFormat === SLACK_BLOCK_KIT_FORMAT) {
                                     // SLACK-BLOCK-KIT: Parse JSON, expect messages array
                                     // Source: rawPayload (XML) > messages (native)
-                                    const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
                                     const parsedSlack = parseSlackBlockKitPayload({
                                         rawPayload,
                                         messagesParam,
@@ -1337,7 +1334,7 @@ export class TurnRunner {
                                     }
 
                                     const slackValue = (commitMetadata as { slack?: unknown }).slack;
-                                    const slackMetaExisting = isRecord(slackValue) ? slackValue : {};
+                                    const slackMetaExisting = isPlainObject(slackValue) ? slackValue : {};
                                     commitMetadata = { ...commitMetadata, slack: { ...slackMetaExisting, messages: normalization.messages } };
                                     finalContent = JSON.stringify(normalization.messages);
 
@@ -2428,12 +2425,11 @@ export class TurnRunner {
             })();
             if ((slackMessages === undefined || slackMessages.length === 0) && typeof fr.content === 'string' && fr.content.trim().length > 0) {
                 const fallbackMessages = [{ type: 'section', text: { type: 'mrkdwn', text: fr.content } }];
-                const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
-                const baseMeta: Record<string, unknown> = isRecord(fr.metadata)
+                const baseMeta: Record<string, unknown> = isPlainObject(fr.metadata)
                     ? { ...fr.metadata }
                     : {};
                 const slackValue = baseMeta.slack;
-                const slackMetaExisting: Record<string, unknown> = isRecord(slackValue)
+                const slackMetaExisting: Record<string, unknown> = isPlainObject(slackValue)
                     ? slackValue
                     : {};
                 const mergedSlack: Record<string, unknown> = { ...slackMetaExisting, messages: fallbackMessages };
@@ -2911,7 +2907,6 @@ export class TurnRunner {
         let dropped = 0;
         let finalReportAttempted = false;
         const syntheticToolMessages: ConversationMessage[] = [];
-        const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
         const formatPayload = (value: unknown): string => {
             if (typeof value === 'string') {
                 return value;
@@ -2992,7 +2987,7 @@ export class TurnRunner {
             if (rawToolCalls !== undefined && Array.isArray(rawToolCalls)) {
                 const calls: { name: string; id: string; parameters: Record<string, unknown> }[] = [];
                 rawToolCalls.forEach((tc) => {
-                    if (!isRecord(tc)) {
+                    if (!isPlainObject(tc)) {
                         const id = crypto.randomUUID();
                         const payload = formatPayload(tc);
                         const reason = 'tool_call_not_object';
@@ -3039,14 +3034,14 @@ export class TurnRunner {
                     }
                     let parameters: Record<string, unknown> = {};
                     let invalidReason: string | undefined;
-                    if (isRecord(tc.parameters)) {
+                    if (isPlainObject(tc.parameters)) {
                         parameters = tc.parameters;
                     }
                     else if (typeof tc.parameters === 'string') {
                         const parsed = (() => {
                             try { return parseJsonValueDetailed(tc.parameters); } catch { return { value: null, error: 'parse_failed', repairs: [] }; }
                         })();
-                        if (parsed.value !== null && isRecord(parsed.value)) {
+                        if (parsed.value !== null && isPlainObject(parsed.value)) {
                             parameters = parsed.value;
                         }
                         else {

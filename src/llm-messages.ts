@@ -9,102 +9,16 @@
  * - Synthetic report content (not LLM instructions)
  *
  * Categories:
- * - TURN_CONTROL: Messages injected to control turn flow
  * - TURN_FAILURE: Validation errors sent via TURN-FAILED feedback
- * - FINAL_REPORT_REMINDER: Guidance for calling final_report
  * - TOOL_RESULTS: Messages returned as tool execution results
- * - XML_PROTOCOL: Errors for the XML final-report transport (via TURN-FAILED)
+ * - TASK_STATUS: Instructions for the agent__task_status tool
+ * - XML_TEMPLATES: Templates for XML-mode tool/report rendering
  */
 
-// =============================================================================
-// TURN CONTROL MESSAGES
-// Injected into the conversation to control agent behavior
-// =============================================================================
-
-/**
- * Injected when the agent reaches maximum turns.
- * Forces the model to provide its final report immediately.
- * Used in: session-turn-runner.ts (pushed to conversation)
- *
- * CONDITION: isFinalTurn && forcedFinalTurnReason !== 'context'
- * Where isFinalTurn = (currentTurn >= maxTurns - 1) || forcedFinalTurn
- */
-export const MAX_TURNS_FINAL_MESSAGE =
-  'Maximum number of turns/steps reached. You **MUST NOW** provide your final report/answer. Do NOT attempt to call any other tool. Read carefully the final report/answer instructions and provide your final report/answer based on the information already gathered. If the information is insufficient, provide the best possible answer based on what you have and note the limitation in your final report/answer.';
-
-/**
- * Injected when context window limit is reached.
- * Forces immediate finalization without further tool calls.
- * Used in: session-turn-runner.ts (pushed to conversation)
- *
- * CONDITION: isFinalTurn && forcedFinalTurnReason === 'context'
- * Where forcedFinalTurn is set when context budget is exhausted
- */
-export const CONTEXT_FINAL_MESSAGE =
-  'The conversation reached the context window limit. You **MUST NOW** provide your final report/answer. Do NOT attempt to call any other tool. Read carefully the final report/answer instructions and provide your final report/answer based on the information already gathered. If the information is insufficient, provide the best possible answer based on what you have and note the limitation in your final report/answer.';
-
-/**
- * Nudge to use tools instead of plain text.
- * Injected on last retry attempt before advancing turns.
- * Used in: session-turn-runner.ts (pushed as user message)
- *
- * CONDITION: (attempts === maxRetries - 1) && currentTurn < (maxTurns - 1)
- * (last retry attempt within a non-final turn)
- */
-export const toolReminderMessage = (excludeProgress: string): string =>
-  `Reminder: do not end with plain text. Use an available tool${excludeProgress} to make progress. When ready to conclude, provide your final report/answer in the required XML wrapper.`;
-
-/**
- * On final turn without final answer.
- * Used in: session-turn-runner.ts (pushed as system retry message)
- *
- * CONDITION: isFinalTurn && !turnResult.status.finalAnswer
- * (final turn reached, but response has no final report)
- */
-export const FINAL_TURN_NOTICE =
-  'This is the final turn. You **MUST NOW** provide your final report/answer and you are not allowed to call any other tool. Use the required XML wrapper and format instructions to deliver your final report/answer. If information is insufficient or missing, state the limitation explicitly in your final report.';
-
-/**
- * Injected when task completion is signaled via task_status tool.
- * Forces immediate finalization with task completion message.
- * Used in: session-turn-runner.ts (pushed to conversation)
- *
- * CONDITION: forcedFinalTurnReason === 'task_status_completed'
- * Where forcedFinalTurn is set when model calls task_status with status: completed
- */
-export const TASK_STATUS_COMPLETED_FINAL_MESSAGE = FINAL_TURN_NOTICE;
-
-/**
- * Injected when consecutive standalone task_status calls are detected.
- * Forces immediate finalization to prevent progress-only loops.
- *
- * CONDITION: forcedFinalTurnReason === 'task_status_only'
- * Where forcedFinalTurn is set after consecutive standalone task_status calls
- */
-export const TASK_STATUS_ONLY_FINAL_MESSAGE = FINAL_TURN_NOTICE;
-
-/**
- * Injected when all retry attempts are exhausted.
- * Forces graceful finalization instead of session failure.
- * Used in: session-turn-runner.ts (pushed to conversation)
- *
- * CONDITION: forcedFinalTurnReason === 'retry_exhaustion'
- * Where forcedFinalTurn is set when all retry attempts within a turn fail
- */
-export const RETRY_EXHAUSTION_FINAL_MESSAGE = FINAL_TURN_NOTICE;
-  
 // =============================================================================
 // TURN FAILURE MESSAGES
 // Sent to LLM via TURN-FAILED: prefix when validation fails
 // =============================================================================
-
-/**
- * Prefix for turn failure feedback to LLM.
- * Reasons are joined with ' | ' separator.
- * Used in: session-turn-runner.ts (sent as user message)
- */
-export const turnFailedPrefix = (reasons: string[]): string =>
-  `TURN-FAILED: ${reasons.join(' | ')}`;
 
 const JSON_PARSE_ERROR_MAX = 200;
 
@@ -121,10 +35,6 @@ export const formatJsonParseHint = (error?: string): string => {
   return trimmed.length > JSON_PARSE_ERROR_MAX ? `${trimmed.slice(0, JSON_PARSE_ERROR_MAX - 3)}...` : trimmed;
 };
 
-export const buildInvalidJsonFailure = (base: string, error?: string): string => (
-  `${base} invalid_json: ${formatJsonParseHint(error)}`
-);
-
 export const buildSchemaMismatchFailure = (errors: string, preview?: string): string => (
   `schema_mismatch: ${errors}${preview !== undefined ? ` (preview: ${preview})` : ''}`
 );
@@ -135,25 +45,6 @@ export const formatSchemaMismatchSummary = (value?: string): string => {
   const limit = 160;
   return trimmed.length > limit ? `${trimmed.slice(0, limit - 3)}...` : trimmed;
 };
-
-/**
- * When final report format doesn't match expected.
- * Used in: session-turn-runner.ts via addTurnFailure
- *
- * CONDITION: final_report tool called && report_format !== expectedFormat
- */
-export const finalReportFormatMismatch = (expected: string, received: string): string =>
-  `Final report format mismatch: expected "${expected}", received "${received}". Use the required format and resend your final report/answer.`;
-
-/**
- * When final report content is empty or missing.
- * Used in: session-turn-runner.ts via addTurnFailure
- *
- * CONDITION: final_report tool called && (format === 'sub-agent' || format === text/markdown/etc)
- *            && (rawPayload ?? contentParam) is undefined or empty
- */
-export const FINAL_REPORT_CONTENT_MISSING =
-  'Final report content is missing or empty. Provide non-empty content in the required format and resend your final report/answer.';
 
 /**
  * When JSON format expected but got non-JSON.
@@ -174,134 +65,6 @@ export const FINAL_REPORT_JSON_REQUIRED =
  */
 export const FINAL_REPORT_SLACK_MESSAGES_MISSING =
   'Slack Block Kit final report is missing a `messages` array. Provide valid Block Kit messages and retry.';
-
-/**
- * When final report fails schema validation.
- * Used in: session-turn-runner.ts via addTurnFailure
- *
- * CONDITION: final_report tool called && payload fails schema validation
- */
-export const finalReportSchemaValidationFailed = (summary: string): string =>
-  `Final report failed schema validation: ${summary}. Fix the payload to match the schema and resend your final report/answer.`;
-
-/**
- * When tool message fallback fails schema validation.
- * Used in: session-turn-runner.ts via addTurnFailure
- *
- * CONDITION: tool_message_fallback validation failed
- */
-export const toolMessageFallbackValidationFailed = (summary: string): string =>
-  `Fallback final report from tool output failed schema validation: ${summary}. Provide your valid final report/answer in the required format.`;
-
-/**
- * When response has content but no valid tool calls and no final report.
- * Used in: session-turn-runner.ts via addTurnFailure
- *
- * CONDITION: this.finalReport === undefined
- *            && !turnResult.status.finalAnswer
- *            && !sanitizedHasToolCalls (no valid tool calls after sanitization)
- *            && sanitizedHasText (response has non-empty text content)
- *
- * NOTE: This does NOT trigger for reasoning-only responses (sanitizedHasText checks
- *       assistantForAdoption.content, not reasoning blocks)
- */
-export const TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT =
-  'Text output detected without any tool calls or final report/answer. Call tool(s) or provide your final report/answer in the required wrapper exactly as instructed.';
-
-/**
- * When response is empty (no tools, no final report).
- * Used in: session-turn-runner.ts via addTurnFailure
- */
-export const TURN_FAILED_EMPTY_RESPONSE =
-  'Empty response detected: no tool calls and no final report/answer were received. Call a tool or output your final report/answer in the required XML wrapper.';
-
-/**
- * When response contains only reasoning (no visible content, no tools).
- * Used in: session-turn-runner.ts via addTurnFailure
- */
-export const TURN_FAILED_REASONING_ONLY =
-  'Reasoning-only output detected with no visible answer, tool calls, or final report. Call tools or provide your final report/answer in the required wrapper.';
-
-/**
- * When response contains only reasoning on a final turn (no visible content, no tools).
- * Used in: session-turn-runner.ts via addTurnFailure
- */
-export const TURN_FAILED_REASONING_ONLY_FINAL =
-  'Reasoning-only output detected with no visible final report/answer. Relax. This is easy. You must now summarize and provide your final report/answer. Output now the XML wrapper exactly as instructed, and then summarize your work in the requested format.';
-
-/**You MUST provide the final report/answer now using the required XML wrapper and do not call any tools.';
-
-/**
- * When response is truncated due to stopReason=length/max_tokens.
- * Used in: session-turn-runner.ts via addTurnFailure
- */
-export const turnFailedOutputTruncated = (maxOutputTokens?: number): string => {
-  const tokenLimit = maxOutputTokens !== undefined ? ` (maxOutputTokens=${String(maxOutputTokens)})` : '';
-  return `Output was truncated (stopReason=length${tokenLimit}). Retry with a shorter response that still includes the required tool calls or a complete final report.`;
-};
-
-/**
- * When final turn has no valid final report.
- * Used in: session-turn-runner.ts via addTurnFailure
- */
-export const TURN_FAILED_FINAL_TURN_NO_REPORT =
-  'Final turn ended without a valid final report. Provide the final report/answer now using the required XML wrapper and do not call any tools.';
-
-/**
- * When tool call parameters are malformed.
- * Used in: session-turn-runner.ts via addTurnFailure
- *
- * CONDITION: droppedInvalidToolCalls > 0
- * (one or more tool calls had malformed JSON payloads and were dropped)
- */
-export const TOOL_CALL_MALFORMED =
-  'Tool call payload is not valid JSON for the tool schema. Fix the arguments to match the schema and retry the tool call.';
-
-/**
- * When an unknown tool is called.
- * Used in: session-turn-runner.ts via addTurnFailure
- *
- * CONDITION: executionStats.unknownToolEncountered === true
- */
-export const TURN_FAILED_UNKNOWN_TOOL =
-  'Unknown tool name detected. Use only the tool names shown in your tools list (including the full namespace prefix) and retry. If this is the final turn, do not call tools; provide your final report/answer in the required wrapper.';
-
-/**
- * When tool calls exist but none executed.
- * Used in: session-turn-runner.ts via addTurnFailure
- *
- * CONDITION: had tool calls && executedTools === 0 && not unknown && not dropped-invalid
- */
-export const TURN_FAILED_TOOL_CALL_NOT_EXECUTED =
-  'Tool calls were not executed. This usually means the tool name is missing its namespace prefix or is not permitted on this turn. Retry with an allowed tool name exactly as listed, or provide your final report/answer if tools are not allowed.';
-
-/**
- * When per-turn tool limit blocks execution.
- * Used in: session-turn-runner.ts via addTurnFailure
- *
- * CONDITION: toolLimitExceeded === true
- */
-export const TURN_FAILED_TOOL_LIMIT_EXCEEDED =
-  'Per-turn tool limit reached, so tool calls were rejected. Reduce the number of tool calls in a single turn and retry. If you are done, provide your final report/answer in the required wrapper.';
-
-/**
- * When only task_status was called without any productive tools.
- * Used in: session-turn-runner.ts via addTurnFailure
- *
- * CONDITION: executedNonProgressBatchTools === 0 && executedProgressBatchTools > 0
- * (task_status was called but no other tools)
- */
-export const TURN_FAILED_PROGRESS_ONLY =
-  'You called agent__task_status without any other tools, so no work was performed. Call other tools to make progress, or if the task is complete, provide your final report/answer in the required XML wrapper.';
-
-/**
- * When model calls XML wrapper tag as a tool instead of outputting it as text.
- * Used in: session-turn-runner.ts via addTurnFailure
- *
- * CONDITION: Model emits tool_use with name matching ai-agent-{nonce}-FINAL pattern
- */
-export const turnFailedXmlWrapperAsTool = (sessionNonce: string, format: string): string =>
-  `You called the XML wrapper tag (ai-agent-${sessionNonce}-FINAL) as a tool, but it must be plain text in your response. Do NOT use tool-calling syntax; output the XML wrapper directly. Example: <ai-agent-${sessionNonce}-FINAL format="${format}">YOUR CONTENT HERE</ai-agent-${sessionNonce}-FINAL>`;
 
 /**
  * Check if a tool name matches the XML final report tag pattern.
@@ -346,69 +109,6 @@ export const isUnknownToolFailureMessage = (content: string): boolean =>
   content.includes(UNKNOWN_TOOL_FAILURE_PREFIX);
 
 // =============================================================================
-// XML PROTOCOL ERRORS
-// Sent via recordTurnFailure callback (become part of TURN-FAILED message)
-// =============================================================================
-
-/**
- * Final report payload is not valid JSON (XML mode).
- * Used in: xml-transport.ts via recordTurnFailure
- *
- * CONDITION: XML mode && final_report tag found && JSON.parse(payload) fails
- */
-export const XML_FINAL_REPORT_NOT_JSON =
-  'Final report payload is not valid JSON. Provide a JSON object that matches the final-report schema and retry.';
-
-/**
- * Tool payload is not valid JSON (XML mode).
- * Used in: xml-transport.ts via recordTurnFailure
- *
- * CONDITION: XML mode && tool tag found && JSON.parse(payload) fails
- */
-export const xmlToolPayloadNotJson = (toolName: string): string =>
-  `Tool \`${toolName}\` payload is not valid JSON. Provide a JSON object for the tool parameters and retry.`;
-
-/**
- * XML tag slot mismatch.
- * Used in: xml-transport.ts via recordTurnFailure
- *
- * CONDITION: XML mode && tag slot attribute !== expected nonce/slot for this turn
- */
-export const xmlSlotMismatch = (capturedSlot: string): string =>
-  `Tag ignored: slot '${capturedSlot}' does not match the current nonce/slot for this turn. Use the exact slot id from XML-NEXT and retry.`;
-
-/**
- * XML missing closing tag.
- * Used in: xml-transport.ts via recordTurnFailure
- *
- * CONDITION: XML mode && opening tag found && corresponding closing tag not found
- */
-export const xmlMissingClosingTag = (capturedSlot: string): string =>
-  `Malformed XML: missing closing tag for '${capturedSlot}'. Close the tag exactly as shown and retry.`;
-
-/**
- * XML malformed - nonce/slot/tool mismatch.
- * Used in: xml-transport.ts via recordTurnFailure
- *
- * CONDITION: XML mode && tag validation fails (nonce/slot mismatch or empty content)
- */
-export const xmlMalformedMismatch = (slotInfo: string): string =>
-  `Malformed XML: nonce/slot/tool mismatch or empty content for '${slotInfo}'. Use the exact nonce and slot, include non-empty content, and retry.`;
-
-/**
- * Structured output (json, slack-block-kit) truncated due to stopReason=length.
- * Model must retry with shorter output.
- * Used in: xml-transport.ts via recordTurnFailure
- *
- * CONDITION: XML mode && final report detected && stopReason=length && format is structured
- */
-export const turnFailedStructuredOutputTruncated = (maxOutputTokens?: number): string => {
-  const tokenLimit = maxOutputTokens !== undefined ? ` (${String(maxOutputTokens)} tokens)` : '';
-  return `Your response was truncated (stopReason=length) because it exceeded the output token limit${tokenLimit}. ` +
-    'Retry with a shorter output that still delivers your complete final report/answer in the required XML wrapper.';
-};
-
-
 // =============================================================================
 // TASK STATUS INSTRUCTIONS
 // Single source of truth for agent__task_status tool guidance.
@@ -476,13 +176,6 @@ What to report when tools fail:
 `;
 
 /**
- * Brief instructions for XML-NEXT progress slot.
- * Used in: xml-tools.ts renderXmlNext()
- */
-export const TASK_STATUS_TOOL_INSTRUCTIONS_BRIEF =
-  'Update the user about your current task status and progress:';
-
-/**
  * Batch-specific rules for task_status.
  * Used in: internal-provider.ts buildInstructions() batch section
  */
@@ -490,28 +183,7 @@ export const TASK_STATUS_TOOL_BATCH_RULES = `- Include at most one task_status p
 - task_status updates the user; to perform actions, use other tools in the same batch
 - task_status can be called standalone to track task progress`;
 
-/**
- * Mandatory workflow line mentioning task_status for XML-NEXT.
- * Used in: xml-tools.ts renderXmlNext()
- */
-export const TASK_STATUS_TOOL_WORKFLOW_LINE =
-  'Call one or more tools to collect data or perform actions (optionally include task_status to update the user)';
-
 // XML System Notices (moved from xml-tools.ts to keep all LLM-facing strings here)
-export interface XmlNextTemplatePayload {
-  nonce: string;
-  turn: number;
-  maxTurns?: number;
-  tools: { name: string; schema?: Record<string, unknown> }[];
-  slotTemplates: { slotId: string; tools: string[] }[];
-  taskStatusToolEnabled: boolean;
-  expectedFinalFormat: string;
-  attempt: number;
-  maxRetries: number;
-  contextPercentUsed: number;
-  hasExternalTools: boolean;
-}
-
 export interface XmlPastTemplateEntry {
   slotId: string;
   tool: string;
@@ -524,43 +196,6 @@ export interface XmlPastTemplateEntry {
 export interface XmlPastTemplatePayload {
   entries: XmlPastTemplateEntry[];
 }
-
-export const renderXmlNextTemplate = (payload: XmlNextTemplatePayload): string => {
-  const { nonce, turn, maxTurns, attempt, maxRetries, contextPercentUsed, hasExternalTools, expectedFinalFormat, taskStatusToolEnabled } = payload;
-  const finalSlotId = `${nonce}-FINAL`;
-  const lines: string[] = [];
-
-  lines.push('# System Notice');
-  lines.push('');
-
-  // Turn info with optional retry count
-  const turnInfo = `This is turn/step ${String(turn)}${maxTurns !== undefined ? ` of ${String(maxTurns)}` : ''}`;
-  const retryInfo = attempt > 1 ? ` (retry ${String(attempt)} of ${String(maxRetries)})` : '';
-  lines.push(`${turnInfo}${retryInfo}.`);
-  lines.push(`Your context window is ${String(contextPercentUsed)}% full.`);
-  lines.push('');
-
-  // Guidance based on tool availability
-  if (hasExternalTools) {
-    lines.push('You now need to decide your next move:');
-    lines.push('EITHER');
-    lines.push('- Call tools to advance your task following the main prompt instructions (pay attention to tool formatting and schema requirements).');
-    if (taskStatusToolEnabled) {
-      lines.push('- Together with these tool calls, also call `agent__task_status` to explain what you are doing and why you are calling these tools.');
-    }
-    lines.push('OR');
-    lines.push(`- Provide your final report/answer in the expected format (${expectedFinalFormat}) using the XML wrapper (\`<ai-agent-${finalSlotId} format="${expectedFinalFormat}">\`)`);
-    if (taskStatusToolEnabled) {
-      lines.push('');
-      lines.push('Call `agent__task_status` to track your progress and mark tasks as complete.');
-    }
-  } else {
-    lines.push(`You MUST now provide your final report/answer in the expected format (${expectedFinalFormat}) using the XML wrapper (\`<ai-agent-${finalSlotId} format="${expectedFinalFormat}">\`).`);
-  }
-  lines.push('');
-
-  return lines.join('\n');
-};
 
 export const renderXmlPastTemplate = (past: XmlPastTemplatePayload): string => {
   const lines: string[] = [];
@@ -722,15 +357,6 @@ Do not make this too wide; keep it within 50 characters width and up to 10 rows.
 
 export const finalReportFieldsText = (formatId: string): string =>
   `  - \`report_format\`: "${formatId}".\n  - \`report_content\`: the content of your final report, in the requested format.`;
-
-/**
- * Mandatory rules for tools section.
- * Used in: internal-provider.ts buildInstructions()
- */
-export const MANDATORY_TOOLS_RULES = `### MANDATORY RULE FOR TOOLS
-- You run in agentic mode, interfacing with software tools with specific formatting requirements.
-- Always respond with valid tool calls when invoking tools, and provide your final report/answer in the required XML final wrapper.
-- The CONTENT of your final report must be delivered inside the XML final wrapper only (no plain text outside the tags).`;
 
 /**
  * Mandatory rules for XML final report.

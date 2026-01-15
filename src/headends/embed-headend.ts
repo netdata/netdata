@@ -13,29 +13,13 @@ import type { Socket } from 'node:net';
 import { AIAgent } from '../ai-agent.js';
 import { resolvePeristenceConfig } from '../persistence.js';
 import { getTelemetryLabels } from '../telemetry/index.js';
-import { isPlainObject } from '../utils.js';
+import { createDeferred, globToRegex, isPlainObject } from '../utils.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
 import { EmbedMetrics } from './embed-metrics.js';
 import { appendTranscriptTurn, loadTranscript, writeTranscript, type EmbedTranscriptEntry } from './embed-transcripts.js';
 import { HttpError, readJson, writeJson, writeSseEvent } from './http-utils.js';
 import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamOutput, shouldStreamTurnStarted } from './shared-event-filter.js';
-
-interface Deferred<T> {
-  promise: Promise<T>;
-  resolve: (value: T) => void;
-  reject: (reason?: unknown) => void;
-}
-
-const createDeferred = <T>(): Deferred<T> => {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-};
 
 const CONTENT_TYPE_HEADER = 'Content-Type';
 const EVENT_STREAM_CONTENT_TYPE = 'text/event-stream';
@@ -147,12 +131,6 @@ const normalizeOrigin = (origin: string): { origin: string; host: string } => {
   } catch {
     return { origin, host: origin };
   }
-};
-
-const globToRegex = (pat: string): RegExp => {
-  const escaped = pat.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-  const regex = `^${escaped.replace(/\*/g, '.*').replace(/\?/g, '.')}$`;
-  return new RegExp(regex, 'i');
 };
 
 const matchOriginPatterns = (patterns: string[], origin: string): boolean => {

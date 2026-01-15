@@ -7,6 +7,10 @@ import { warn } from '../utils.js';
 
 import { BaseLLMProvider, type ResponseMessage } from './base.js';
 
+// OpenRouter-specific defaults (centralized to avoid duplication)
+export const OPENROUTER_DEFAULT_REFERER = process.env.OPENROUTER_REFERER ?? 'https://ai-agent.local';
+export const OPENROUTER_DEFAULT_TITLE = process.env.OPENROUTER_TITLE ?? 'ai-agent';
+
 export class OpenRouterProvider extends BaseLLMProvider {
   name = 'openrouter';
   private static readonly HOST = 'openrouter.ai';
@@ -32,8 +36,8 @@ export class OpenRouterProvider extends BaseLLMProvider {
       apiKey: config.apiKey,
       fetch: tracedFetch,
       headers: {
-        'HTTP-Referer': process.env.OPENROUTER_REFERER ?? 'https://ai-agent.local',
-        'X-OpenRouter-Title': process.env.OPENROUTER_TITLE ?? 'ai-agent',
+        'HTTP-Referer': OPENROUTER_DEFAULT_REFERER,
+        'X-OpenRouter-Title': OPENROUTER_DEFAULT_TITLE,
         'User-Agent': 'ai-agent/1.0',
         ...(config.headers ?? {}),
       },
@@ -46,8 +50,8 @@ export class OpenRouterProvider extends BaseLLMProvider {
   public override prepareFetch(details: { url: string; init: RequestInit }): { headers?: Record<string, string> } | undefined {
     if (!details.url.includes(OpenRouterProvider.HOST)) return undefined;
     const defaults = {
-      'HTTP-Referer': process.env.OPENROUTER_REFERER ?? 'https://ai-agent.local',
-      'X-OpenRouter-Title': process.env.OPENROUTER_TITLE ?? 'ai-agent',
+      'HTTP-Referer': OPENROUTER_DEFAULT_REFERER,
+      'X-OpenRouter-Title': OPENROUTER_DEFAULT_TITLE,
       'User-Agent': 'ai-agent/1.0',
     } as const;
     return { headers: defaults };
@@ -274,10 +278,6 @@ export class OpenRouterProvider extends BaseLLMProvider {
     return metadata;
   }
 
-  private isArray(val: unknown): val is unknown[] {
-    return Array.isArray(val);
-  }
-
   // Read per-provider providerOptions from config.custom
   private getRouterProviderConfig(): Record<string, unknown> {
     try {
@@ -305,21 +305,6 @@ export class OpenRouterProvider extends BaseLLMProvider {
     }
   }
 
-  // Lightweight deep merge for plain objects
-  private deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
-    const out: Record<string, unknown> = { ...target };
-    // eslint-disable-next-line functional/no-loop-statements
-    for (const [k, v] of Object.entries(source)) {
-      const tv = out[k];
-      if (this.isPlainObject(v) && this.isPlainObject(tv)) {
-        out[k] = this.deepMerge(tv, v);
-      } else {
-        out[k] = v;
-      }
-    }
-    return out;
-  }
-
   private extractUsageRecord(record: unknown): Record<string, unknown> | undefined {
     if (!this.isPlainObject(record)) {
       return undefined;
@@ -337,10 +322,10 @@ export class OpenRouterProvider extends BaseLLMProvider {
     if (!this.isPlainObject(usage)) {
       return {};
     }
-    const cost = this.toNumber(usage.cost);
+    const cost = this.toFiniteNumber(usage.cost);
     const detailsCandidate = usage.cost_details;
     const details = this.isPlainObject(detailsCandidate) ? detailsCandidate : undefined;
-    const upstream = this.toNumber(details?.upstream_inference_cost);
+    const upstream = this.toFiniteNumber(details?.upstream_inference_cost);
     return { costUsd: cost, upstreamCostUsd: upstream };
   }
 
@@ -356,7 +341,7 @@ export class OpenRouterProvider extends BaseLLMProvider {
     ];
     // eslint-disable-next-line functional/no-loop-statements
     for (const key of directKeys) {
-      const value = this.toNumber(usage[key]);
+      const value = this.toFiniteNumber(usage[key]);
       if (value !== undefined && value > 0) {
         return value;
       }
@@ -366,7 +351,7 @@ export class OpenRouterProvider extends BaseLLMProvider {
     for (const key of nestedKeys) {
       const nested = usage[key];
       if (this.isPlainObject(nested)) {
-        const value = this.toNumber(nested.ephemeral_5m_input_tokens);
+        const value = this.toFiniteNumber(nested.ephemeral_5m_input_tokens);
         if (value !== undefined && value > 0) {
           return value;
         }
@@ -380,9 +365,9 @@ export class OpenRouterProvider extends BaseLLMProvider {
     const target = this.isPlainObject(targetCandidate) ? targetCandidate : record;
     let provider = typeof target.provider === 'string' && target.provider.length > 0 ? target.provider : undefined;
     let model = typeof target.model === 'string' && target.model.length > 0 ? target.model : undefined;
-    const choices = this.isArray(target.choices) ? target.choices : undefined;
+    const choices: unknown[] | undefined = Array.isArray(target.choices) ? target.choices : undefined;
     if (choices !== undefined && choices.length > 0) {
-      const choice = choices[0];
+      const choice: unknown = choices[0];
       if (this.isPlainObject(choice)) {
         if (typeof choice.provider === 'string' && choice.provider.length > 0) {
           provider = choice.provider;
@@ -447,15 +432,6 @@ export class OpenRouterProvider extends BaseLLMProvider {
     } catch {
       return undefined;
     }
-  }
-
-  private toNumber(value: unknown): number | undefined {
-    if (typeof value === 'number' && Number.isFinite(value)) return value;
-    if (typeof value === 'string' && value.trim().length > 0) {
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : undefined;
-    }
-    return undefined;
   }
 
 }

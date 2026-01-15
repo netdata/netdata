@@ -18,6 +18,7 @@ import { validateMCPServers, validatePrompts, validateProviders } from './config
 import { ContextGuard, type ContextGuardBlockedEntry, type ContextGuardEvaluation, type TargetContextConfig } from './context-guard.js';
 import { FinalReportManager, type PendingFinalReportPayload } from './final-report-manager.js';
 import { extractBodyWithoutFrontmatter, parseFrontmatter, parsePairs } from './frontmatter.js';
+import { FINAL_REPORT_TOOL } from './internal-tools.js';
 import { LLMClient } from './llm-client.js';
 import { executeAdvisors } from './orchestration/advisors.js';
 import { executeHandoff } from './orchestration/handoff.js';
@@ -112,15 +113,6 @@ export class AIAgentSession {
   private static readonly REMOTE_AGENT_TOOLS = 'agent:tools';
   private static readonly REMOTE_FINAL_TURN = 'agent:final-turn';
   private static readonly REMOTE_CONTEXT = 'agent:context';
-  private static readonly REMOTE_ORCHESTRATOR = 'agent:orchestrator';
-  private static readonly REMOTE_SANITIZER = 'agent:sanitizer';
-  private static readonly FINAL_REPORT_TOOL = 'agent__final_report';
-  private static readonly FINAL_REPORT_TOOL_ALIASES = new Set<string>(['agent__final_report', 'agent-final-report']);
-  private static readonly FINAL_REPORT_SHORT = 'final_report';
-  private static readonly TOOL_NO_OUTPUT = '(tool failed: context window budget exceeded)';
-  private static readonly RETRY_ACTION_SKIP_PROVIDER = 'skip-provider';
-  private static readonly CONTEXT_LIMIT_WARN = 'Context limit exceeded; forcing final turn.';
-  private static readonly CONTEXT_LIMIT_TURN_WARN = 'Context limit exceeded during turn execution; proceeding with final turn.';
   private static readonly SESSION_FINALIZED_MESSAGE = 'session finalized';
   readonly config: Configuration;
   readonly conversation: ConversationMessage[];
@@ -487,7 +479,7 @@ export class AIAgentSession {
     this.toolCacheResolver = this.responseCache !== undefined ? toolCacheResolver : undefined;
     // Initialize FinalReportManager (format resolved later in run())
     this.finalReportManager = new FinalReportManager({
-      finalReportToolName: AIAgentSession.FINAL_REPORT_TOOL,
+      finalReportToolName: FINAL_REPORT_TOOL,
     });
     this.abortSignal = sessionConfig.abortSignal;
     this.stopRef = sessionConfig.stopRef;
@@ -705,7 +697,7 @@ export class AIAgentSession {
         if (normalized.length === 0) return false;
         if (normalized === 'batch') return false;
         if (normalized === 'agent__task_status') return false;
-        if (normalized === AIAgentSession.FINAL_REPORT_TOOL) return false;
+        if (normalized === FINAL_REPORT_TOOL) return false;
         return true;
       });
       const hasSubAgentsConfigured = Array.isArray(this.sessionConfig.subAgents) && this.sessionConfig.subAgents.length > 0;
@@ -889,7 +881,7 @@ export class AIAgentSession {
       stopRef: this.stopRef,
       isCanceled: () => this.canceled,
       taskStatusToolEnabled: this.taskStatusToolEnabled,
-      finalReportToolName: AIAgentSession.FINAL_REPORT_TOOL,
+      finalReportToolName: FINAL_REPORT_TOOL,
       routerToolName: this.routerToolName,
     };
 
@@ -2189,9 +2181,9 @@ export class AIAgentSession {
       return tool;
     });
 
-    if (!allowedNames.has(AIAgentSession.FINAL_REPORT_TOOL)) {
-      const fallback = tools.find((tool) => sanitizeToolName(tool.name) === AIAgentSession.FINAL_REPORT_TOOL);
-      if (fallback !== undefined) allowedNames.add(AIAgentSession.FINAL_REPORT_TOOL);
+    if (!allowedNames.has(FINAL_REPORT_TOOL)) {
+      const fallback = tools.find((tool) => sanitizeToolName(tool.name) === FINAL_REPORT_TOOL);
+      if (fallback !== undefined) allowedNames.add(FINAL_REPORT_TOOL);
     }
 
     return { tools: filtered, allowedNames };

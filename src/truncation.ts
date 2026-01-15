@@ -12,7 +12,6 @@
 // Worst-case marker: [···TRUNCATED 9999999999 bytes···] ≈ 34 bytes
 // Using 50 to be safe with any unit name variations and edge cases
 const MARKER_OVERHEAD = 50;
-const TRUNCATION_PREFIX_PLACEHOLDER = 9999999999;
 
 export type TruncationUnit = 'bytes' | 'tokens' | 'chars';
 
@@ -29,14 +28,20 @@ export function buildTruncationPrefix(omitted: number, unit: TruncationUnit): st
   return `[TRUNCATED IN THE MIDDLE BY ~${String(safeOmitted)} ${unitLabel}]`;
 }
 
-export function buildTruncationPrefixPlaceholder(unit: TruncationUnit): string {
-  return buildTruncationPrefix(TRUNCATION_PREFIX_PLACEHOLDER, unit);
-}
-
 // Minimum payload size for truncation - below this, truncation is not attempted
 const MIN_PAYLOAD_BYTES = 512;
 const MIN_JSON_STRING_BYTES = 128; // Minimum string size for JSON truncation
 export const TRUNCATE_PREVIEW_BYTES = 4096;
+
+/**
+ * Compute the percentage of content truncated (0-100).
+ * Returns 0 if original is empty or no truncation occurred.
+ */
+export const computeTruncationPercent = (originalBytes: number, finalBytes: number): number => {
+  if (originalBytes <= 0) return 0;
+  const pct = ((originalBytes - finalBytes) / originalBytes) * 100;
+  return Number(Math.max(0, pct).toFixed(1));
+};
 
 // Middle dot character for marker (U+00B7)
 const MIDDLE_DOT = '·';

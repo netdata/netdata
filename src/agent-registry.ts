@@ -7,12 +7,10 @@ import type { AIAgentEventCallbacks, ConversationMessage } from './types.js';
 
 import { loadAgent, loadAgentFromContent, LoadedAgentCache } from './agent-loader.js';
 import { formatPromptValue } from './formats.js';
+import { cloneJsonSchema, cloneOptionalJsonSchema } from './input-contract.js';
 import { applyFormat, buildPromptVars, expandVars } from './prompt-builder.js';
 
 const OUTPUT_FORMAT_VALUES: readonly OutputFormatId[] = ['markdown', 'markdown+mermaid', 'slack-block-kit', 'tty', 'pipe', 'json', 'sub-agent'] as const;
-
-const cloneSchema = (schema: Record<string, unknown>): Record<string, unknown> => JSON.parse(JSON.stringify(schema)) as Record<string, unknown>;
-const cloneSchemaOptional = (schema?: Record<string, unknown>): Record<string, unknown> | undefined => (schema === undefined ? undefined : cloneSchema(schema));
 const isOutputFormatId = (value: string): value is OutputFormatId => OUTPUT_FORMAT_VALUES.includes(value as OutputFormatId);
 
 export interface AgentMetadata {
@@ -62,10 +60,10 @@ export class AgentRegistry {
       usage: agent.usage,
       toolName: agent.toolName,
       expectedOutput: agent.expectedOutput !== undefined
-        ? { ...agent.expectedOutput, schema: cloneSchemaOptional(agent.expectedOutput.schema) }
+        ? { ...agent.expectedOutput, schema: cloneOptionalJsonSchema(agent.expectedOutput.schema) }
         : undefined,
-      input: { format: agent.input.format, schema: cloneSchema(agent.input.schema) },
-      outputSchema: cloneSchemaOptional(agent.outputSchema),
+      input: { format: agent.input.format, schema: cloneJsonSchema(agent.input.schema) },
+      outputSchema: cloneOptionalJsonSchema(agent.outputSchema),
     }));
   }
 
@@ -80,10 +78,10 @@ export class AgentRegistry {
       usage: agent.usage,
       toolName: agent.toolName,
       expectedOutput: agent.expectedOutput !== undefined
-        ? { ...agent.expectedOutput, schema: cloneSchemaOptional(agent.expectedOutput.schema) }
+        ? { ...agent.expectedOutput, schema: cloneOptionalJsonSchema(agent.expectedOutput.schema) }
         : undefined,
-      input: { format: agent.input.format, schema: cloneSchema(agent.input.schema) },
-      outputSchema: cloneSchemaOptional(agent.outputSchema),
+      input: { format: agent.input.format, schema: cloneJsonSchema(agent.input.schema) },
+      outputSchema: cloneOptionalJsonSchema(agent.outputSchema),
     };
   }
 

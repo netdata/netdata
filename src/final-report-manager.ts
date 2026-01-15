@@ -16,7 +16,7 @@ import type { FinalReportPayload } from './types.js';
 import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
 
 import { getFormatSchema } from './formats.js';
-import { parseJsonRecord } from './utils.js';
+import { isPlainObject, parseJsonRecord } from './utils.js';
 
 // Format constant to avoid string duplication
 const FORMAT_SLACK_BLOCK_KIT: OutputFormatId = 'slack-block-kit';
@@ -258,14 +258,12 @@ export class FinalReportManager {
     const json = this.extractJsonRecordFromText(trimmedText);
     if (json === undefined) return undefined;
 
-    const isRecord = (value: unknown): value is Record<string, unknown> =>
-      value !== null && typeof value === 'object' && !Array.isArray(value);
     const pickString = (value: unknown): string | undefined =>
       (typeof value === 'string' ? value : undefined);
 
     const formatRaw = pickString(json.report_format) ?? pickString(json.format);
     const contentJsonRaw = json.content_json;
-    const contentJson = isRecord(contentJsonRaw) ? contentJsonRaw : undefined;
+    const contentJson = isPlainObject(contentJsonRaw) ? contentJsonRaw : undefined;
     const contentCandidate = pickString(json.report_content) ?? pickString(json.content);
 
     const formatCandidate = (formatRaw ?? '').trim();
@@ -282,7 +280,7 @@ export class FinalReportManager {
     }
     if (finalContent === undefined || finalContent.trim().length === 0) return undefined;
 
-    const metadata = isRecord(json.metadata) ? json.metadata : undefined;
+    const metadata = isPlainObject(json.metadata) ? json.metadata : undefined;
 
     const payload: PendingFinalReportPayload = {
       format: formatMatch,
