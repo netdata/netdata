@@ -897,7 +897,7 @@ void web_client_build_http_header(struct web_client *w) {
         buffer_strcat(w->response.header_output, buffer_tostring(w->response.header));
 
     // headers related to the transfer method
-    // HTTP 304 Not Modified MUST NOT include Transfer-Encoding or Content-Encoding per RFC 7232
+    // HTTP 304 Not Modified MUST NOT include Transfer-Encoding or Content-Encoding per RFC 7232 Section 4.1
     if(w->response.code != HTTP_RESP_NOT_MODIFIED) {
         if(likely(w->response.zoutput))
             buffer_strcat(w->response.header_output, "Content-Encoding: gzip\r\n");
@@ -906,11 +906,13 @@ void web_client_build_http_header(struct web_client *w) {
             buffer_strcat(w->response.header_output, "Transfer-Encoding: chunked\r\n");
     }
     
-    // For 304 Not Modified, always send Content-Length: 0
+    // Content-Length header handling
     if(w->response.code == HTTP_RESP_NOT_MODIFIED) {
+        // For 304 Not Modified, always send Content-Length: 0 per RFC 7232 Section 4.1
         buffer_strcat(w->response.header_output, "Content-Length: 0\r\n");
     }
     else if(!(w->flags & WEB_CLIENT_CHUNKED_TRANSFER)) {
+        // For non-chunked responses, send Content-Length if we know it
         if(likely(w->response.data->len)) {
             // we know the content length, put it
             buffer_sprintf(w->response.header_output, "Content-Length: %zu\r\n", (size_t)w->response.data->len);

@@ -5,7 +5,7 @@
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
     buffer_reset(wb);
     
-    // HTTP 304 Not Modified MUST NOT include a message body per RFC 7232
+    // HTTP 304 Not Modified MUST NOT include a message body per RFC 7232 Section 4.1
     if(code != HTTP_RESP_NOT_MODIFIED) {
         buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
         buffer_json_member_add_int64(wb, "status", code);
