@@ -452,33 +452,6 @@ where
     Ok(left)
 }
 
-/// Check if an entry matches a regex pattern without using a cache (for benchmarking).
-///
-/// This is the original implementation that loads and checks each data object
-/// for every entry, without caching results.
-#[doc(hidden)]
-pub fn entry_matches_regex_uncached(
-    journal_file: &JournalFile<Mmap>,
-    entry_offset: NonZeroU64,
-    regex: &Regex,
-) -> Result<bool> {
-    let data_iter = journal_file.entry_data_objects(entry_offset)?;
-
-    for data_result in data_iter {
-        let data_object = data_result?;
-        let payload = data_object.payload_bytes();
-
-        // Try to match as UTF-8 string
-        if let Ok(payload_str) = std::str::from_utf8(payload) {
-            if regex.is_match(payload_str) {
-                return Ok(true);
-            }
-        }
-    }
-
-    Ok(false)
-}
-
 /// Check if an entry matches a regex pattern
 fn entry_matches_regex(
     journal_file: &JournalFile<Mmap>,

@@ -25,7 +25,6 @@ pub struct JournalReader<'a, M: MemoryMap> {
 
     // Field name remapping support
     remapping_registry: FieldMap,
-    translated_payload: Vec<u8>,
 }
 
 impl<M: MemoryMap> std::fmt::Debug for JournalReader<'_, M> {
@@ -49,7 +48,6 @@ impl<M: MemoryMap> Default for JournalReader<'_, M> {
             field_guard: None,
             data_guard: None,
             remapping_registry: FieldMap::new(),
-            translated_payload: Vec::new(),
         }
     }
 }
@@ -214,63 +212,6 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     pub fn entry_data_restart(&mut self) {
         self.drop_guards();
         self.entry_data_iterator = None;
-    }
-
-    pub fn entry_data_enumerate(
-        &mut self,
-        journal_file: &'a JournalFile<M>,
-    ) -> Result<Option<&ValueGuard<'_, DataObject<&'a [u8]>>>> {
-        self.drop_guards();
-
-        if self.entry_data_iterator.is_none() {
-            let entry_offset = self.cursor.position()?;
-            self.entry_data_iterator = Some(journal_file.entry_data_objects(entry_offset)?);
-        }
-
-        if let Some(iter) = &mut self.entry_data_iterator {
-            self.data_guard = iter.next().transpose()?;
-
-            // Translate field name if needed
-            if let Some(data_guard) = &self.data_guard {
-                let payload = data_guard.get_payload();
-
-                // Check if this field needs translation
-                if let Some(field_name) = extract_field_name(payload) {
-                    if field_name.starts_with(b"ND_") {
-                        // This looks like a remapped field
-                        if let Ok(systemd_name) = std::str::from_utf8(field_name) {
-                            if let Some(otel_name) =
-                                self.remapping_registry.get_otel_name(systemd_name)
-                            {
-                                // Translate: build new payload with original field name
-                                let eq_pos = payload.iter().position(|&b| b == b'=').unwrap();
-                                let value = &payload[eq_pos..]; // includes '='
-
-                                self.translated_payload.clear();
-                                self.translated_payload.extend_from_slice(otel_name);
-                                self.translated_payload.extend_from_slice(value);
-                            } else {
-                                // No mapping found - clear buffer
-                                self.translated_payload.clear();
-                            }
-                        } else {
-                            // Invalid UTF-8 - clear buffer
-                            self.translated_payload.clear();
-                        }
-                    } else {
-                        // Not a remapped field - clear buffer
-                        self.translated_payload.clear();
-                    }
-                } else {
-                    // No '=' found - clear buffer
-                    self.translated_payload.clear();
-                }
-            }
-
-            Ok(self.data_guard.as_ref())
-        } else {
-            Ok(None)
-        }
     }
 
     pub fn entry_data_offsets(
@@ -448,19 +389,5 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
         }
 
         Ok(())
-    }
-
-    /// Gets the current entry data payload, translating remapped field names if applicable.
-    ///
-    /// This should be called after `entry_data_enumerate()` to get the translated version
-    /// of the field name. If the field name doesn't need translation, returns the original.
-    pub fn get_entry_data_payload(&self) -> &[u8] {
-        if !self.translated_payload.is_empty() {
-            &self.translated_payload
-        } else if let Some(data_guard) = &self.data_guard {
-            data_guard.get_payload()
-        } else {
-            &[]
-        }
     }
 }
