@@ -30,6 +30,12 @@ You might need to move a node to a different Space when:
 - You need the claiming token and room keys for the **new** Space
 - Access to the node via SSH or terminal
 
+:::info
+
+**Need a claim token?** See **[Regenerate Claiming Token](/src/claim/README.md#regenerate-claiming-token)** to generate a new token for your Space (Space Administrator required).
+
+:::
+
 ## Step 1: Unclaim from Current Space
 
 See our **[Reconnect Agent](/docs/netdata-cloud/connect-agent.md#reconnect-agent)** guide for the exact commands to:
