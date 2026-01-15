@@ -8,9 +8,9 @@ models:
   - openai/gpt-5.1
 tools: []
 agents: []
-toolResponseMaxBytes: 12288
+toolResponseMaxBytes: 25000
+maxOutputTokens: 16384
 reasoning: high
-maxOutputTokens: 65536
 maxTurns: 10
 maxToolCallsPerTurn: 10
 caching: none

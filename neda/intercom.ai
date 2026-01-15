@@ -9,8 +9,8 @@ models:
   - anthropic/claude-sonnet-4-5
 tools:
   - intercom
-toolResponseMaxBytes: 100000
-maxOutputTokens: 8192
+toolResponseMaxBytes: 25000
+maxOutputTokens: 16384
 maxTurns: 30
 reasoning: none
 ---

@@ -58,7 +58,7 @@ output:
       date:
         type: string
         description: The date the pages was last modified, or created, or "unknown" if no date is available
-toolResponseMaxBytes: 300000
+toolResponseMaxBytes: 25000
 maxOutputTokens: 16384
 maxTurns: 5
 maxToolCallsPerTurn: 2

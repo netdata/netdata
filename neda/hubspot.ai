@@ -9,7 +9,7 @@ models:
   - openai/gpt-5.1
 tools:
   - hubspot
-toolResponseMaxBytes: 100000
+toolResponseMaxBytes: 25000
 maxOutputTokens: 16384
 maxTurns: 30
 reasoning: high

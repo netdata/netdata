@@ -13,7 +13,7 @@ tools:
 advisors:
   - support-request.ai
 toolResponseMaxBytes: 25000
-maxOutputTokens: 32768
+maxOutputTokens: 16384
 maxTurns: 30
 maxToolCallsPerTurn: 10
 reasoning: high

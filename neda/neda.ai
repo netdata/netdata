@@ -32,7 +32,7 @@ agents:
   - intercom.ai
   - product-messaging.ai
   - neda-second-opinion.ai
-toolResponseMaxBytes: 40000
+toolResponseMaxBytes: 25000
 maxOutputTokens: 16384
 maxTurns: 20
 ---

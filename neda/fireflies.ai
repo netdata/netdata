@@ -12,7 +12,7 @@ models:
   - openai/gpt-5.1
 tools:
   - fireflies
-toolResponseMaxBytes: 200000
+toolResponseMaxBytes: 25000
 maxOutputTokens: 16384
 maxTurns: 20
 reasoning: high

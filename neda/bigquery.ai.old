@@ -13,7 +13,7 @@ models:
   - openai/gpt-5.1
 tools:
   - bigquery
-toolResponseMaxBytes: 16384
+toolResponseMaxBytes: 25000
 maxOutputTokens: 16384
 maxTurns: 50
 reasoning: high

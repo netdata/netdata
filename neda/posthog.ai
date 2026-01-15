@@ -12,7 +12,7 @@ models:
   - openai/gpt-5.1
 tools:
   - posthog-query
-toolResponseMaxBytes: 65536
+toolResponseMaxBytes: 25000
 maxOutputTokens: 16384
 maxTurns: 30
 reasoning: high

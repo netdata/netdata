@@ -13,8 +13,8 @@ agents:
   - source-code.ai
 tools:
 maxTurns: 10
-toolResponseMaxBytes: 80000
-maxOutputTokens: 32000
+toolResponseMaxBytes: 25000
+maxOutputTokens: 16384
 caching: none
 reasoning: high
 ---

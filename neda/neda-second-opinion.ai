@@ -18,7 +18,7 @@ models:
 tools:
 #  - web-research
 agents:
-toolResponseMaxBytes: 40000
+toolResponseMaxBytes: 25000
 maxOutputTokens: 16384
 maxTurns: 20
 ---

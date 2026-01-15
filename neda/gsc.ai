@@ -13,7 +13,7 @@ models:
 tools:
   - gsc1
 #  - gsc2
-toolResponseMaxBytes: 100000
+toolResponseMaxBytes: 25000
 maxOutputTokens: 16384
 maxTurns: 100
 reasoning: none

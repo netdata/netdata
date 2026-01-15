@@ -14,8 +14,8 @@ models:
   - google/gemini-2.5-flash
 tools:
   - bigquery
-toolResponseMaxBytes: 120000
-maxOutputTokens: 32768
+toolResponseMaxBytes: 25000
+maxOutputTokens: 16384
 maxTurns: 50
 reasoning: high
 temperature: 1.0

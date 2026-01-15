@@ -13,7 +13,7 @@ tools:
 agents:
   - web-fetch.ai
   - web-search.ai
-toolResponseMaxBytes: 100000
+toolResponseMaxBytes: 25000
 maxToolCallsPerTurn: 20
 maxOutputTokens: 16384
 maxTurns: 20

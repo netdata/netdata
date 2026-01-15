@@ -13,7 +13,7 @@ models:
 tools:
   - reddit
 agents: []
-toolResponseMaxBytes: 300000
+toolResponseMaxBytes: 25000
 maxOutputTokens: 16384
 maxTurns: 10
 maxToolCallsPerTurn: 10

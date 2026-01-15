@@ -12,7 +12,7 @@ models:
   - anthropic/claude-sonnet-4-5
 tools:
   - stripe
-toolResponseMaxBytes: 100000
+toolResponseMaxBytes: 25000
 maxOutputTokens: 16384
 maxTurns: 30
 ---

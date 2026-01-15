@@ -20,8 +20,8 @@ agents:
   - reddit.ai
   - sourcegraph.ai
   - source-code.ai
-toolResponseMaxBytes: 100000
-maxOutputTokens: 32768
+toolResponseMaxBytes: 25000
+maxOutputTokens: 16384
 maxTurns: 30
 maxToolCallsPerTurn: 10
 reasoning: none

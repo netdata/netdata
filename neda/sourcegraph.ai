@@ -8,8 +8,8 @@ models:
   - anthropic/claude-haiku-4-5
 tools:
   - sourcegraph
-toolResponseMaxBytes: 16384
-maxOutputTokens: 32768
+toolResponseMaxBytes: 25000
+maxOutputTokens: 16384
 maxTurns: 30
 reasoning: none
 cache: 1d

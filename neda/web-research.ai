@@ -13,8 +13,8 @@ agents:
   - github-search.ai
   - reddit.ai
   - sourcegraph.ai
-toolResponseMaxBytes: 100000
-maxOutputTokens: 32000
+toolResponseMaxBytes: 25000
+maxOutputTokens: 16384
 maxTurns: 20
 maxToolCallsPerTurn: 5
 caching: full

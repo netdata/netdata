@@ -12,7 +12,7 @@ models:
   - openai/gpt-5.1
 tools:
   - analytics-mcp
-toolResponseMaxBytes: 100000
+toolResponseMaxBytes: 25000
 maxOutputTokens: 16384
 maxTurns: 100
 reasoning: none
