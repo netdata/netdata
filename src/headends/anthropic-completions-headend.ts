@@ -20,6 +20,7 @@ import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
 import { renderReasoningMarkdown, type ReasoningTurnState } from './reasoning-markdown.js';
 import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamMasterContent, shouldStreamOutput, shouldStreamTurnStarted } from './shared-event-filter.js';
+import { closeSockets } from './socket-utils.js';
 import { escapeMarkdown, formatMetricsLine, formatSummaryLine, italicize, resolveAgentHeadingLabel } from './summary-utils.js';
 
 interface AnthropicMessageContent {
@@ -1011,10 +1012,7 @@ export class AnthropicCompletionsHeadend implements Headend {
   }
 
   private closeActiveSockets(force = false): void {
-    this.sockets.forEach((socket) => {
-      try { socket.end(); } catch { /* ignore */ }
-      setTimeout(() => { try { socket.destroy(); } catch { /* ignore */ } }, force ? 0 : 1000).unref();
-    });
+    closeSockets(this.sockets, force);
   }
 
   private logEntry(entry: LogEntry): void {

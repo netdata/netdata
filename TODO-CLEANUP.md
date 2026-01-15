@@ -178,3 +178,43 @@ Append all you findings in this document.
 - Duplicated completions headend log entry builder:
   - `src/headends/openai-completions-headend.ts:52-73`
   - `src/headends/anthropic-completions-headend.ts:52-73`
+
+---
+
+## Iteration 5 - Consolidate completions socket cleanup
+
+### TL;DR
+- Extract shared socket shutdown logic into a helper used by both completions headends.
+- Add a small unit test to lock the helper behavior.
+
+### Analysis (facts only)
+- Identical `closeActiveSockets` implementations exist in both headends:
+  - `src/headends/openai-completions-headend.ts:1132-1136`
+  - `src/headends/anthropic-completions-headend.ts:1013-1017`
+- The method logic is purely mechanical: `socket.end()` then `socket.destroy()` after a timeout.
+- This duplication risks future divergence if the shutdown behavior needs to change.
+
+### Decisions
+- No user decisions required. Safe refactor with no behavior change.
+
+### Plan
+1. Add `src/headends/socket-utils.ts` with `closeSockets(sockets, force)` helper.
+2. Replace both `closeActiveSockets` bodies to delegate to the helper.
+3. Add a unit test for `closeSockets` using fake timers.
+4. Run `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Implied Decisions
+- Preserve timing (0ms when forced, 1000ms otherwise) and error swallowing behavior.
+- Keep public behavior unchanged.
+
+### Testing requirements
+- Unit test: `closeSockets` helper.
+- Required checks: `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Documentation updates required
+- None. Refactor only.
+
+### Findings (append-only)
+- Duplicated socket shutdown logic in completions headends:
+  - `src/headends/openai-completions-headend.ts:1132-1136`
+  - `src/headends/anthropic-completions-headend.ts:1013-1017`
