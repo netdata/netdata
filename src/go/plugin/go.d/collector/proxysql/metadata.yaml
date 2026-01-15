@@ -110,7 +110,19 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
+    alerts:
+      - name: proxysql_hostgroup_no_online_backends
+        metric: proxysql.hostgroup_backends_status
+        info: ProxySQL hostgroup ${label:hostgroup} has no ONLINE backends
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf
+      - name: proxysql_backend_shunned
+        metric: proxysql.backend_status
+        info: ProxySQL backend SHUNNED (${label:host}:${label:port} hostgroup ${label:hostgroup})
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf
+      - name: proxysql_backend_offline_hard
+        metric: proxysql.backend_status
+        info: ProxySQL backend OFFLINE_HARD (${label:host}:${label:port} hostgroup ${label:hostgroup})
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf
     metrics:
       folding:
         title: Metrics
