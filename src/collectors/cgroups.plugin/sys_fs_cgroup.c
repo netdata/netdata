@@ -1348,6 +1348,13 @@ static void cgroup_main_cleanup(void *pptr) {
     if (__atomic_load_n(&discovery_thread.exited, __ATOMIC_ACQUIRE))
         (void) nd_thread_join(discovery_thread.thread);
 
+    // Clean up synchronization primitives if they were initialized
+    // (thread being non-NULL means initialization succeeded)
+    if (discovery_thread.thread) {
+        netdata_cond_destroy(&discovery_thread.cond_var);
+        netdata_mutex_destroy(&discovery_thread.mutex);
+    }
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
@@ -1398,6 +1405,7 @@ void cgroups_main(void *ptr) {
     }
     if (netdata_cond_init(&discovery_thread.cond_var)) {
         collector_error("CGROUP: cannot initialize conditional variable for discovery thread");
+        netdata_mutex_destroy(&discovery_thread.mutex);
         return;
     }
 
@@ -1412,6 +1420,8 @@ void cgroups_main(void *ptr) {
     if (!discovery_thread.thread) {
         collector_error("CGROUP: cannot create thread worker");
         __atomic_store_n(&discovery_thread.exited, 1, __ATOMIC_RELEASE);  // Reset since thread wasn't created
+        netdata_cond_destroy(&discovery_thread.cond_var);
+        netdata_mutex_destroy(&discovery_thread.mutex);
         return;
     }
 
