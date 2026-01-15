@@ -63,6 +63,8 @@ export class ToolOutputProvider extends ToolProvider {
   }
 
   override getInstructions(): string {
+    if (!this.config.enabled) return '';
+    if (!this.store.hasEntries()) return '';
     return [
       '### tool_output — Extract from oversized tool results',
       '- When a tool result is too large, you will receive a handle and instructions to call tool_output.',

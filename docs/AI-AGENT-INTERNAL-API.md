@@ -33,7 +33,7 @@ The library performs no direct I/O (no stdout/stderr/file writes). All output, l
   - Execution controls (optional): `temperature`, `topP`, `topK`, `repeatPenalty`, `maxRetries`, `maxTurns`, `llmTimeout`, `toolTimeout`, `stream`
   - UX flags (optional): `traceLLM`, `traceMCP`, `verbose`
   - Tool response cap (optional): `toolResponseMaxBytes` (bytes) — oversized outputs are stored and replaced with a `tool_output` handle
-  - Tool output module config (optional): `toolOutput` (object with `enabled`, `storeDir`, `maxChunks`, `overlapPercent`, `avgLineBytesThreshold`, `models`)
+  - Tool output module config (optional): `toolOutput` (object with `enabled`, `maxChunks`, `overlapPercent`, `avgLineBytesThreshold`, `models`; `storeDir` is ignored—root is always `/tmp/ai-agent-<run-hash>`)
   - `callbacks?: AIAgentEventCallbacks`
 - `Configuration`
   - `cache?: CacheConfig` – global response cache backend (SQLite/Redis); when absent, cache uses defaults only if a TTL is enabled
@@ -131,18 +131,19 @@ Persistence guidance: The CLI demonstrates persisting accounting to JSONL. As a 
 `AIAgent.run()` wraps the inner `AIAgentSession.run()` loop. When orchestration is configured (advisors/router/handoff), it runs those steps before/after the session and returns the final merged result. When no orchestration is configured it is a pure pass-through.
 
 1. Validate configuration and prompts.
-2. Initialize MCP servers (non-fatal; initialization failures logged as `WRN`).
-3. Build the effective system prompt (adds tools’ instructions; schemas are passed as tool defs, not appended to prompt).
-4. Execute multi-turn loop with fallback across `targets`:
+2. Preflight `tool_output`: ensure `/tmp/ai-agent-<run-hash>` exists and the filesystem MCP server script is present; failures abort session creation.
+3. Initialize MCP servers (non-fatal; initialization failures logged as `WRN`).
+4. Build the effective system prompt (adds tools’ instructions; schemas are passed as tool defs, not appended to prompt).
+5. Execute multi-turn loop with fallback across `targets`:
    - Streams assistant text via `onEvent(type='output')`.
    - Emits instrumentation via `onEvent(type='log' | 'accounting')`.
    - Preserves message history (assistant/tool/tool-result order).
-5. Completion conditions:
+6. Completion conditions:
    - Success: model calls internal `agent_final_report` tool → `EXIT-FINAL-ANSWER` logged, `FIN` summaries emitted, returns `success: true`.
    - Context guard: projected token use exceeds `contextWindow` → tool call rejected, `EXIT-TOKEN-LIMIT` logged, forced final turn instructs the model to answer with existing information.
    - Max turns exceeded: `EXIT-MAX-TURNS-NO-RESPONSE` logged, `FIN` summaries emitted, returns failure.
    - Other failures (auth/quota/timeouts/model errors or uncaught exception): logs error, logs an `agent:EXIT-...` reason, emits `FIN` summaries, returns failure.
-6. Cleanup: MCP transports closed gracefully.
+7. Cleanup: MCP transports closed gracefully.
 
 ## Output Format Contract (`expectedOutput.format`)
 
@@ -228,6 +229,7 @@ Recommendation for JSON output: include an explicit error structure in the schem
 
 - Configurable via `sessionConfig.toolResponseMaxBytes`.
 - Tool output module overrides via `sessionConfig.toolOutput`.
+- `tool_output` is mandatory: session creation fails if `/tmp/ai-agent-<run-hash>` cannot be created or if the embedded filesystem MCP server is unavailable.
 - When an MCP tool response exceeds the cap (or would overflow the context budget):
   - Stores the sanitized output under the per-run tool_output root (`/tmp/ai-agent-<run-hash>/session-<uuid>/...`).
   - Returns a handle message instructing the model to call `tool_output(handle=..., extract=...)`; handles are relative paths (`session-<uuid>/<file-uuid>`).

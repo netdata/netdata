@@ -109,7 +109,13 @@ export class LLMClient {
       request.sdkTraceLogger = undefined;
     }
 
-    this.activeHttpContext = { request, requestLogged: false };
+    const activeContext: {
+      request: TurnRequest;
+      requestLogged: boolean;
+      requestPayload?: LogPayload;
+      responsePayload?: LogPayload;
+    } = { request, requestLogged: false };
+    this.activeHttpContext = activeContext;
     const startTime = Date.now();
 
     try {
@@ -134,7 +140,7 @@ export class LLMClient {
       this.lastCacheWriteInputTokens = undefined;
       // Log response
       this.flushPendingLlmRequestLog();
-      this.logResponse(request, result, Date.now() - startTime, this.activeHttpContext.responsePayload);
+      this.logResponse(request, result, Date.now() - startTime, activeContext.responsePayload);
       return result;
     } catch (error) {
       await this.awaitLastMetadataTask();
@@ -146,11 +152,13 @@ export class LLMClient {
         messages: []
       };
       this.flushPendingLlmRequestLog();
-      this.logResponse(request, errorResult, latencyMs, this.activeHttpContext.responsePayload);
+      this.logResponse(request, errorResult, latencyMs, activeContext.responsePayload);
       return errorResult;
     }
     finally {
-      this.activeHttpContext = undefined;
+      if (this.activeHttpContext === activeContext) {
+        this.activeHttpContext = undefined;
+      }
     }
   }
 

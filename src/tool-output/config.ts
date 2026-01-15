@@ -1,13 +1,12 @@
-import os from 'node:os';
-import path from 'node:path';
-
 import type { ToolOutputConfig, ToolOutputConfigInput, ToolOutputTarget } from './types.js';
 
 import { parsePairs } from '../frontmatter.js';
+import { warn } from '../utils.js';
 
 const DEFAULT_MAX_CHUNKS = 1;
 const DEFAULT_OVERLAP_PERCENT = 10;
 const DEFAULT_AVG_LINE_BYTES_THRESHOLD = 1000;
+const DEFAULT_STORE_DIR = '/tmp';
 
 const normalizePositiveInt = (value: unknown, fallback: number): number => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
@@ -33,15 +32,15 @@ const normalizeModels = (value: unknown): ToolOutputTarget[] | undefined => {
 export function resolveToolOutputConfig(args: {
   config?: ToolOutputConfigInput;
   overrides?: ToolOutputConfigInput;
-  baseDir?: string;
 }): ToolOutputConfig {
   const base = args.config ?? {};
   const overrides = args.overrides ?? {};
   const enabled = overrides.enabled ?? base.enabled ?? true;
   const storeDirRaw = overrides.storeDir ?? base.storeDir;
-  const storeDir = storeDirRaw !== undefined && storeDirRaw.length > 0
-    ? path.resolve(args.baseDir ?? process.cwd(), storeDirRaw)
-    : os.tmpdir();
+  if (typeof storeDirRaw === 'string' && storeDirRaw.trim().length > 0) {
+    warn(`tool_output storeDir override ignored (using ${DEFAULT_STORE_DIR}).`);
+  }
+  const storeDir = DEFAULT_STORE_DIR;
   const maxChunks = normalizePositiveInt(overrides.maxChunks ?? base.maxChunks, DEFAULT_MAX_CHUNKS);
   const overlapPercent = normalizePercent(overrides.overlapPercent ?? base.overlapPercent, DEFAULT_OVERLAP_PERCENT);
   const avgLineBytesThreshold = normalizePositiveInt(overrides.avgLineBytesThreshold ?? base.avgLineBytesThreshold, DEFAULT_AVG_LINE_BYTES_THRESHOLD);

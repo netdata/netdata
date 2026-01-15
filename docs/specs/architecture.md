@@ -205,7 +205,7 @@ Defined in `src/ai-agent.ts:16-44`:
 - `llmTimeout?: number` - LLM request timeout (ms)
 - `toolTimeout?: number` - Tool execution timeout (ms)
 - `toolResponseMaxBytes?: number` - Max tool response size (oversize stored + tool_output handle)
-- `toolOutput?: ToolOutputConfigInput` - tool_output module overrides
+- `toolOutput?: ToolOutputConfigInput` - tool_output module overrides (storeDir ignored; root is `/tmp/ai-agent-<run-hash>`)
 - `abortSignal?: AbortSignal` - Cancellation signal
 - `stopRef?: { stopping: boolean }` - Graceful stop reference
 - `callbacks?: AIAgentEventCallbacks` - Event callbacks

@@ -33,6 +33,8 @@ import { mergeCallbacksWithPersistence, resolvePeristenceConfig } from './persis
 import { ShutdownController } from './shutdown-controller.js';
 import { initTelemetry, shutdownTelemetry } from './telemetry/index.js';
 import { buildTelemetryRuntimeConfig, type TelemetryOverrides } from './telemetry/runtime-config.js';
+import { assertToolOutputFsServerAvailable } from './tool-output/fs-server.js';
+import { registerToolOutputRunRootCleanup } from './tool-output/runtime.js';
 import { MCPProvider, shutdownSharedRegistry } from './tools/mcp-provider.js';
 import { normalizeSchemaDraftTarget, schemaDraftDisplayName, validateSchemaAgainstDraft, type SchemaDraftTarget } from './utils/schema-validation.js';
 // eslint-disable-next-line perfectionist/sort-imports
@@ -860,6 +862,13 @@ program.helpInformation = function() {
 };
 
 const shutdownController = new ShutdownController();
+try {
+  assertToolOutputFsServerAvailable();
+  registerToolOutputRunRootCleanup(shutdownController);
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  exitWith(1, `tool_output preflight failed: ${message}`, 'EXIT-TOOL-OUTPUT-PREFLIGHT');
+}
 shutdownController.register('mcp-shared-registry', async () => {
   await shutdownSharedRegistry();
 });

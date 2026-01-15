@@ -250,7 +250,7 @@ The flow is **procedural**, not state-machine driven. Error handling is inline v
 | `conversationHistory` | Initial conversation state |
 | `toolTimeout` | Per-tool execution timeout |
 | `toolResponseMaxBytes` | Oversize tool outputs stored + tool_output handle inserted |
-| `toolOutput` | Overrides tool_output extraction/storage behavior |
+| `toolOutput` | Overrides tool_output extraction/storage behavior (`storeDir` ignored; root is `/tmp/ai-agent-<run-hash>`) |
 
 ## Telemetry
 

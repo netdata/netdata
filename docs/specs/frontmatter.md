@@ -52,7 +52,6 @@ repeatPenalty: 1.0
 toolResponseMaxBytes: 100000
 toolOutput:
   enabled: true
-  storeDir: /tmp
   maxChunks: 1
   overlapPercent: 10
   avgLineBytesThreshold: 1000
@@ -333,7 +332,7 @@ function buildFrontmatterTemplate(args): Record<string, unknown> {
 - `output`: Output specification
 - `input`: Input specification (sub-agent tools)
 - `toolName`: Custom tool name
-- `toolOutput`: tool_output module overrides (object)
+- `toolOutput`: tool_output module overrides (object; `storeDir` is accepted but ignored, root is `/tmp/ai-agent-<run-hash>`)
 
 ### Option Keys (from OPTIONS_REGISTRY)
 - `models`: LLM providers and models

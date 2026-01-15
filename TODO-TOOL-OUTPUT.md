@@ -42,6 +42,10 @@
 - **opTree + snapshots must include tool_output sub‑agent and extraction LLM calls.**
 - **Phase 3 Tier1 must cover all `tool_output` modes with a real LLM.**
 - **Remove `nova/gpt-oss-20b` from Phase 3 Tier1 model list.**
+- **tool_output is mandatory: ai-agent must fail to start if `/tmp/ai-agent-<run>` cannot be created.**
+- **tool_output must be fully enabled unless explicitly disabled in config.**
+- **Filesystem MCP is a required dependency: if unavailable, ai-agent must fail to start.**
+- **Run root created at process start and deleted on exit; session subdir created on start and deleted on finish.**
 
 ## Pre‑Change Test Baseline (2026-01-15T01:46:04+02:00)
 - `npm run lint` — **PASS**
@@ -88,6 +92,16 @@
   - Batch tool_output handle detection now parses JSON payloads. (Evidence: `src/tests/phase2-harness-scenarios/phase2-runner.ts`)
   - context-token-double-count selects post-tool request log by turn/subturn instead of log order. (Evidence: `src/tests/phase2-harness-scenarios/phase2-runner.ts`)
   - run-test-budget-truncation-preserves-output moved to sequential to avoid shared MCP restart contention. (Evidence: `src/tests/phase2-harness-scenarios/phase2-runner.ts`)
+
+## Implementation Status Update (2026-01-15, tool_output mandatory + Phase3)
+- **tool_output runtime preflight**:
+  - Run root now fixed to `/tmp/ai-agent-<run-hash>` (storeDir ignored).
+  - CLI + session creation fail fast if run root cannot be created or tool_output filesystem MCP server is missing.
+  - CLI registers run-root cleanup on shutdown; process exit handler remains as fallback.
+- **Phase 3 coverage updates**:
+  - Added real-LLM tool_output scenarios for `auto`, `full-chunked`, `read-grep`, and `truncate`.
+  - Added Phase3 tool_output agent + fixture for filesystem_cwd Read.
+  - Removed `nova/gpt-oss-20b` from Phase3 Tier1 list.
 
 ## Post-Change Test Runs (2026-01-15)
 - `npm run lint` — **PASS**
@@ -291,12 +305,12 @@ OUTPUT FORMAT (required)
 
 ## Decisions / Questions (need user input)
 1) **Storage type**
-   - A) `/tmp/ai-agent-{session-trxid}/` (current proposal)
+   - A) Shared run root `/tmp/ai-agent-<run-hash>/` with per-session subdir
    - B) In-memory only
    - C) Hybrid
-   - Decision: **A** (uses existing MCP guardrails + dynamic sub-agent)
-   - Note: base path must be configurable in `ai-agent.json`.
-   - Directory name fixed: `ai-agent-{session-trxid}`. Each tool output uses a random UUID filename/handle.
+   - Decision: **A** (shared MCP root + session subdirs; uses existing MCP guardrails + dynamic sub-agent)
+   - Note: `storeDir` config is ignored; base root is always `/tmp/ai-agent-<run-hash>`.
+   - Directory name fixed: `ai-agent-<run-hash>`; each session writes to `session-<uuid>/` and each tool output uses a random UUID filename/handle (`session-<uuid>/<file-uuid>`).
 
 2) **ToolOutputStore limits**
    - A) No TTL, delete only on session end
@@ -336,8 +350,8 @@ OUTPUT FORMAT (required)
    - Decision: **A** (Read + Grep only).
 
 9) **Session tmp directory naming**
-   - Decision: **A** (`ai-agent-{session-trxid}`).
-   - Each tool output uses a random UUID filename/handle.
+   - Decision: **A** (run root `ai-agent-<run-hash>` + session subdir `session-<uuid>`).
+   - Each tool output uses a random UUID filename/handle (`session-<uuid>/<file-uuid>`).
 
 10) **Store policy**
    - A) Store only oversized outputs
@@ -481,7 +495,7 @@ OUTPUT FORMAT (required)
 ## Plan (implementation in progress)
 1) Decisions finalized (18–23 complete). ✅
 2) Create `src/tool-output/` module (store + policy + extraction strategies). ✅ (scaffolded)
-3) Add ToolOutputStore (session scoped) + write oversized tool outputs to configurable `/tmp/ai-agent-{session-trxid}/`. ✅
+3) Add ToolOutputStore (session scoped) + write oversized tool outputs to `/tmp/ai-agent-<run-hash>/session-<uuid>/` (storeDir ignored). ✅
 4) Refactor tool-output pipeline:
    - Intercept raw tool outputs at the chosen layer. ✅
    - Replace truncation with handle message (per 2a) when oversized. ✅
@@ -496,10 +510,10 @@ OUTPUT FORMAT (required)
 9) Update Phase 1 + Phase 2 tests (size cap + context‑guard scenarios), plus any truncation‑dependent fixtures. ✅
 10) Run full lint/build and test suites per project rules. ✅ (lint/build/phase1/phase2 pass)
 11) Update documentation (specs + guide + internal API + README). ✅
-12) Update Phase 3 Tier1:
+12) Update Phase 3 Tier1: ✅
    - Remove `nova/gpt-oss-20b` from Tier1 model list.
    - Add Tier1 scenarios that exercise all `tool_output` modes with a real LLM.
-   - Update documentation in `docs/TESTING.md` to reflect the Tier1 model list. ⬜
+   - Update documentation in `docs/TESTING.md` to reflect the Tier1 model list. ✅
 13) Update tool_output shared MCP:
    - Use shared base root with run-level hash.
    - Update handle format to `session-<uuid>/<file-uuid>`.
@@ -524,7 +538,6 @@ OUTPUT FORMAT (required)
 - Phase 3 Tier1:
   - Real LLM coverage for all `tool_output` modes:
     - `auto` → full-chunked
-    - `auto` → read-grep
     - `mode=full-chunked`
     - `mode=read-grep`
     - `mode=truncate`

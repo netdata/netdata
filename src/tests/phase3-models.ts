@@ -10,12 +10,6 @@ export interface Phase3ModelConfig {
 export const phase3ModelConfigs: readonly Phase3ModelConfig[] = [
   // Tier 1: Fast, free models for basic validation (nova GPUs)
   {
-    label: "nova/gpt-oss-20b",
-    provider: "nova",
-    modelId: "gpt-oss-20b",
-    tier: 1,
-  },
-  {
     label: "nova/minimax-m2.1",
     provider: "nova",
     modelId: "minimax-m2.1",

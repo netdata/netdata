@@ -11,6 +11,7 @@ One simple format (`.ai` files) works as standalone agents, sub-agents, master o
 Key features at a glance:
 - Multi-provider support (OpenAI, Anthropic, Google, OpenRouter, Ollama, Test LLM)
 - MCP/REST/sub-agent/internal tools with concurrency queues and context guard
+- Oversized tool outputs are stored and retrieved via `tool_output` handles (no blind truncation)
 - Three-phase test harness: Phase 1 (parallel unit), Phase 2 (sequential deterministic), Phase 3 (real LLM)
 - Orchestration patterns: advisors (pre-run), router (handoff-to), handoff (post-run), all configured in frontmatter
 - XML transport: fixed to `xml-final` (native tool calls for tools; final report must be emitted via `<ai-agent-NONCE-XXXX tool="agent__final_report">…</ai-agent-NONCE-XXXX>`). Progress remains native.

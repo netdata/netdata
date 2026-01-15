@@ -199,7 +199,7 @@ interface AIAgentSessionConfig {
   renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'embed' | 'sub-agent';
   initialTitle?: string;                    // Pre-set session title
   toolResponseMaxBytes?: number;            // Max tool response size (oversize stored + tool_output handle)
-  toolOutput?: ToolOutputConfigInput;       // tool_output module overrides
+  toolOutput?: ToolOutputConfigInput;       // tool_output module overrides (storeDir ignored; root is /tmp/ai-agent-<run-hash>)
   mcpInitConcurrency?: number;              // MCP init concurrency
   ancestors?: string[];                     // Ancestor chain (recursion prevention)
   agentPath?: string;                       // Agent path override

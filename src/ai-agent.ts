@@ -33,10 +33,10 @@ import { SubAgentRegistry } from './subagent-registry.js';
 import { addSpanEvent, recordContextGuardMetrics, runWithSpan } from './telemetry/index.js';
 import { resolveToolOutputConfig } from './tool-output/config.js';
 import { ToolOutputExtractor } from './tool-output/extractor.js';
-import { buildToolOutputFsServerConfig } from './tool-output/fs-server.js';
+import { assertToolOutputFsServerAvailable, buildToolOutputFsServerConfig } from './tool-output/fs-server.js';
 import { ToolOutputHandler } from './tool-output/handler.js';
 import { ToolOutputProvider } from './tool-output/provider.js';
-import { cleanupToolOutputSessionDir, ensureToolOutputSessionDir } from './tool-output/runtime.js';
+import { cleanupToolOutputSessionDir, ensureToolOutputRunRoot, ensureToolOutputSessionDir } from './tool-output/runtime.js';
 import { ToolOutputStore } from './tool-output/store.js';
 import { AgentProvider } from './tools/agent-provider.js';
 import { InternalToolProvider } from './tools/internal-provider.js';
@@ -590,9 +590,8 @@ export class AIAgentSession {
     const toolOutputConfig = resolveToolOutputConfig({
       config: sessionConfig.config.toolOutput,
       overrides: sessionConfig.toolOutput,
-      baseDir: process.cwd(),
     });
-    const toolOutputSession = ensureToolOutputSessionDir(this.txnId, toolOutputConfig.storeDir);
+    const toolOutputSession = ensureToolOutputSessionDir(this.txnId);
     this.toolOutputSessionDir = toolOutputSession.sessionDir;
     const toolOutputStore = toolOutputConfig.enabled
       ? new ToolOutputStore(toolOutputSession.runRootDir, this.txnId)
@@ -936,6 +935,8 @@ export class AIAgentSession {
     validateProviders(sessionConfig.config, sessionConfig.targets.map((t) => t.provider));
     validateMCPServers(sessionConfig.config, sessionConfig.tools);
     validatePrompts(sessionConfig.systemPrompt, sessionConfig.userPrompt);
+    assertToolOutputFsServerAvailable();
+    ensureToolOutputRunRoot();
 
     // Generate a unique span id (self) for this session and enrich trace context
     const sessionTxnId = crypto.randomUUID();

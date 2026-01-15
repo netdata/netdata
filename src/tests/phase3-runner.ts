@@ -31,7 +31,13 @@ interface ScenarioDefinition {
   readonly requiredAgentTools?: readonly string[];
   readonly requireReasoningSignatures?: boolean;
   readonly agentPath?: string;
+  readonly streamModes?: readonly boolean[];
   readonly expectations?: ScenarioExpectations;
+}
+
+interface ToolOutputExpectation {
+  readonly mode: "full-chunked" | "read-grep" | "truncate";
+  readonly includes?: readonly string[];
 }
 
 interface ScenarioExpectations {
@@ -42,6 +48,7 @@ interface ScenarioExpectations {
     readonly agentId: string;
     readonly includes: readonly string[];
   }[];
+  readonly expectedToolOutputs?: readonly ToolOutputExpectation[];
 }
 
 interface ScenarioVariant {
@@ -82,6 +89,10 @@ interface AccountingSummary {
 }
 
 const PROJECT_ROOT = process.cwd();
+const PHASE3_MCP_ROOT = path.resolve(PROJECT_ROOT);
+if (process.env.MCP_ROOT === undefined || process.env.MCP_ROOT.length === 0) {
+  process.env.MCP_ROOT = PHASE3_MCP_ROOT;
+}
 const TEST_AGENTS_DIR = path.resolve(
   PROJECT_ROOT,
   "src",
@@ -166,6 +177,56 @@ const MULTI_USER = `CI verification scenario: follow the multi-turn process exac
 3) After agent__test-agent2 responds, emit your final answer as XML: <ai-agent-{nonce}-FINAL format="text">I received this from agent2: [agent2 response]</ai-agent-{nonce}-FINAL>. Do NOT call tools for the final answer.
 
 If you skip a step or call any other tool, the CI test fails.`;
+
+const TOOL_OUTPUT_AGENT_PATH = path.join(TEST_AGENTS_DIR, "tool-output-agent.ai");
+const TOOL_OUTPUT_FIXTURE_PATH = path.join(
+  "src",
+  "tests",
+  "phase3",
+  "fixtures",
+  "tool-output-large.txt",
+);
+const TOOL_OUTPUT_MODE_AUTO = "auto";
+const TOOL_OUTPUT_MODE_FULL = "full-chunked";
+const TOOL_OUTPUT_MODE_READ_GREP = "read-grep";
+const TOOL_OUTPUT_MODE_TRUNCATE = "truncate";
+const TOOL_OUTPUT_SENTINEL_AUTO = "TOOL_OUTPUT_SENTINEL_AUTO=BRAVO";
+const TOOL_OUTPUT_SENTINEL_FULL = "TOOL_OUTPUT_SENTINEL_FULL=CHARLIE";
+const TOOL_OUTPUT_SENTINEL_READ_GREP = "TOOL_OUTPUT_SENTINEL_READ_GREP=DELTA";
+const TOOL_OUTPUT_SENTINEL_TRUNCATE = "TOOL_OUTPUT_SENTINEL_TRUNCATE=ECHO";
+
+const buildToolOutputSystemPrompt = (
+  mode: typeof TOOL_OUTPUT_MODE_AUTO
+  | typeof TOOL_OUTPUT_MODE_FULL
+  | typeof TOOL_OUTPUT_MODE_READ_GREP
+  | typeof TOOL_OUTPUT_MODE_TRUNCATE,
+  sentinel: string,
+): string => {
+  return [
+    "You are a CI test agent validating tool_output extraction.",
+    "",
+    "Follow these steps exactly:",
+    `1) Call ONLY filesystem_cwd__Read with {\"path\":\"${TOOL_OUTPUT_FIXTURE_PATH}\"}.`,
+    "2) The tool result will be replaced with a tool_output handle message.",
+    "3) Call tool_output with:",
+    "   - handle: the handle from the tool_output message",
+    `   - extract: \"Return the exact line containing ${sentinel}.\"`,
+    `   - mode: \"${mode}\"`,
+    "4) After tool_output returns, respond with the XML final report wrapper:",
+    "   <ai-agent-{nonce}-FINAL format=\"text\">tool_output complete</ai-agent-{nonce}-FINAL>",
+    "Do not call any other tools.",
+  ].join("\\n");
+};
+
+const buildToolOutputUserPrompt = (mode: string, sentinel: string): string => {
+  return [
+    "tool_output test run.",
+    `- mode=${mode}`,
+    `- sentinel=${sentinel}`,
+    `- path=${TOOL_OUTPUT_FIXTURE_PATH}`,
+    "Follow the system prompt exactly.",
+  ].join("\\n");
+};
 
 const REQUIRED_AGENT_TOOLS: readonly string[] = [
   "agent__test-agent1",
@@ -344,6 +405,101 @@ const ORCHESTRATION_SCENARIOS: readonly ScenarioDefinition[] = [
   },
 ] as const;
 
+const TOOL_OUTPUT_SCENARIOS: readonly ScenarioDefinition[] = [
+  {
+    id: "tool-output-auto",
+    label: "tool-output-auto",
+    systemPrompt: buildToolOutputSystemPrompt(
+      TOOL_OUTPUT_MODE_AUTO,
+      TOOL_OUTPUT_SENTINEL_AUTO,
+    ),
+    userPrompt: buildToolOutputUserPrompt(
+      TOOL_OUTPUT_MODE_AUTO,
+      TOOL_OUTPUT_SENTINEL_AUTO,
+    ),
+    minTurns: 2,
+    agentPath: TOOL_OUTPUT_AGENT_PATH,
+    streamModes: [false],
+    expectations: {
+      expectedToolOutputs: [
+        {
+          mode: TOOL_OUTPUT_MODE_FULL,
+          includes: [TOOL_OUTPUT_SENTINEL_AUTO],
+        },
+      ],
+    },
+  },
+  {
+    id: "tool-output-full",
+    label: "tool-output-full-chunked",
+    systemPrompt: buildToolOutputSystemPrompt(
+      TOOL_OUTPUT_MODE_FULL,
+      TOOL_OUTPUT_SENTINEL_FULL,
+    ),
+    userPrompt: buildToolOutputUserPrompt(
+      TOOL_OUTPUT_MODE_FULL,
+      TOOL_OUTPUT_SENTINEL_FULL,
+    ),
+    minTurns: 2,
+    agentPath: TOOL_OUTPUT_AGENT_PATH,
+    streamModes: [false],
+    expectations: {
+      expectedToolOutputs: [
+        {
+          mode: TOOL_OUTPUT_MODE_FULL,
+          includes: [TOOL_OUTPUT_SENTINEL_FULL],
+        },
+      ],
+    },
+  },
+  {
+    id: "tool-output-read-grep",
+    label: "tool-output-read-grep",
+    systemPrompt: buildToolOutputSystemPrompt(
+      TOOL_OUTPUT_MODE_READ_GREP,
+      TOOL_OUTPUT_SENTINEL_READ_GREP,
+    ),
+    userPrompt: buildToolOutputUserPrompt(
+      TOOL_OUTPUT_MODE_READ_GREP,
+      TOOL_OUTPUT_SENTINEL_READ_GREP,
+    ),
+    minTurns: 2,
+    agentPath: TOOL_OUTPUT_AGENT_PATH,
+    streamModes: [false],
+    expectations: {
+      expectedToolOutputs: [
+        {
+          mode: TOOL_OUTPUT_MODE_READ_GREP,
+          includes: [TOOL_OUTPUT_SENTINEL_READ_GREP],
+        },
+      ],
+    },
+  },
+  {
+    id: "tool-output-truncate",
+    label: "tool-output-truncate",
+    systemPrompt: buildToolOutputSystemPrompt(
+      TOOL_OUTPUT_MODE_TRUNCATE,
+      TOOL_OUTPUT_SENTINEL_TRUNCATE,
+    ),
+    userPrompt: buildToolOutputUserPrompt(
+      TOOL_OUTPUT_MODE_TRUNCATE,
+      TOOL_OUTPUT_SENTINEL_TRUNCATE,
+    ),
+    minTurns: 2,
+    agentPath: TOOL_OUTPUT_AGENT_PATH,
+    streamModes: [false],
+    expectations: {
+      expectedToolOutputs: [
+        {
+          mode: TOOL_OUTPUT_MODE_TRUNCATE,
+          includes: ["WARNING: tool_output fallback to truncate", TOOL_OUTPUT_SENTINEL_TRUNCATE],
+        },
+      ],
+    },
+  },
+] as const;
+
 const BASE_SCENARIOS: readonly ScenarioDefinition[] = [
   {
     id: "basic",
@@ -412,12 +568,30 @@ const parseModelFilter = (value: string): Set<string> => {
   return new Set(parts);
 };
 
+const isBooleanArray = (value: unknown): value is readonly boolean[] => {
+  return Array.isArray(value) && value.every((item) => typeof item === "boolean");
+};
+
+const resolveStreamModes = (scenario: ScenarioDefinition): readonly boolean[] => {
+  if (isBooleanArray(scenario.streamModes) && scenario.streamModes.length > 0) {
+    return scenario.streamModes;
+  }
+  if (scenario.requiredAgentTools !== undefined) {
+    return [false];
+  }
+  return STREAM_VARIANTS;
+};
+
 const scenarioVariants: readonly ScenarioVariant[] = (() => {
   const variants: ScenarioVariant[] = [];
   BASE_SCENARIOS.forEach((scenario) => {
-    const streams = scenario.requiredAgentTools !== undefined
-      ? [false]
-      : STREAM_VARIANTS;
+    const streams = resolveStreamModes(scenario);
+    streams.forEach((stream) => {
+      variants.push({ scenario, stream });
+    });
+  });
+  TOOL_OUTPUT_SCENARIOS.forEach((scenario) => {
+    const streams = resolveStreamModes(scenario);
     streams.forEach((stream) => {
       variants.push({ scenario, stream });
     });
@@ -518,6 +692,28 @@ const collectConversationToolCalls = (
     });
   });
   return map;
+};
+
+const collectToolResults = (
+  conversation: readonly ConversationMessage[],
+  toolName: string,
+): string[] => {
+  const normalized = normalizeToolName(toolName);
+  const callMap = collectConversationToolCalls(conversation);
+  return conversation.flatMap((message) => {
+    if (message.role !== "tool") return [];
+    const toolCallId = message.toolCallId;
+    if (typeof toolCallId !== "string" || toolCallId.length === 0) return [];
+    if (callMap.get(toolCallId) !== normalized) return [];
+    return [message.content];
+  });
+};
+
+const TOOL_OUTPUT_STRATEGY_REGEX = /STRATEGY:([a-z-]+)/;
+
+const extractToolOutputMode = (payload: string): string | undefined => {
+  const match = TOOL_OUTPUT_STRATEGY_REGEX.exec(payload);
+  return match?.[1];
 };
 
 const conversationHasToolCall = (
@@ -692,6 +888,29 @@ const parseChildPromptExpectations = (
   });
 };
 
+const parseToolOutputExpectations = (
+  value: ScenarioExpectations["expectedToolOutputs"],
+): readonly ToolOutputExpectation[] => {
+  if (!Array.isArray(value)) return [];
+  const allowedModes: readonly ToolOutputExpectation["mode"][] = [
+    "full-chunked",
+    "read-grep",
+    "truncate",
+  ];
+  return value.flatMap((entry) => {
+    if (!isPlainObject(entry)) return [];
+    const rawMode = entry.mode;
+    if (typeof rawMode !== "string" || rawMode.length === 0) return [];
+    const mode = allowedModes.find((item) => item === rawMode);
+    if (mode === undefined) return [];
+    const includesRaw = entry.includes;
+    const includes = Array.isArray(includesRaw)
+      ? includesRaw.filter((item): item is string => typeof item === "string")
+      : [];
+    return [{ mode, includes }];
+  });
+};
+
 const applyScenarioExpectations = (
   session: AIAgentResult,
   scenario: ScenarioDefinition | undefined,
@@ -754,6 +973,32 @@ const applyScenarioExpectations = (
       });
     });
   }
+  const toolOutputExpectations = parseToolOutputExpectations(
+    expectations.expectedToolOutputs,
+  );
+  if (toolOutputExpectations.length > 0) {
+    const toolOutputs = collectToolResults(session.conversation, "tool_output");
+    if (toolOutputs.length === 0) {
+      failures.push("expected tool_output results but none were found");
+    } else {
+      toolOutputExpectations.forEach((expectation) => {
+        const matches = toolOutputs.some((payload) => {
+          const mode = extractToolOutputMode(payload);
+          if (mode !== expectation.mode) return false;
+          if (expectation.includes === undefined || expectation.includes.length === 0) {
+            return true;
+          }
+          return expectation.includes.every((snippet) => payload.includes(snippet));
+        });
+        if (!matches) {
+          const snippetList = expectation.includes?.join(", ") ?? "no snippets";
+          failures.push(
+            `expected tool_output strategy ${expectation.mode} containing [${snippetList}]`,
+          );
+        }
+      });
+    }
+  }
 };
 
 const validateScenarioResult = (
@@ -804,6 +1049,9 @@ const validateScenarioResult = (
 
   const scenario =
     BASE_SCENARIOS.find((candidate) => candidate.id === result.scenarioId) ??
+    TOOL_OUTPUT_SCENARIOS.find(
+      (candidate) => candidate.id === result.scenarioId,
+    ) ??
     ORCHESTRATION_SCENARIOS.find(
       (candidate) => candidate.id === result.scenarioId,
     );
@@ -1080,6 +1328,9 @@ const printUsage = (): void => {
 async function main(): Promise<void> {
   const masterPaths = new Set<string>([
     MASTER_AGENT_PATH,
+    ...TOOL_OUTPUT_SCENARIOS.map((scenario) => scenario.agentPath).filter(
+      (pathValue): pathValue is string => typeof pathValue === "string",
+    ),
     ...ORCHESTRATION_SCENARIOS.map((scenario) => scenario.agentPath).filter(
       (pathValue): pathValue is string => typeof pathValue === "string",
     ),
@@ -1087,6 +1338,10 @@ async function main(): Promise<void> {
   masterPaths.forEach((promptPath) => {
     ensureFileExists("Master agent prompt", promptPath);
   });
+  ensureFileExists(
+    "tool_output fixture",
+    path.resolve(PROJECT_ROOT, TOOL_OUTPUT_FIXTURE_PATH),
+  );
   const argv = process.argv.slice(2);
   if (argv.includes("--help") || argv.includes("-h")) {
     printUsage();

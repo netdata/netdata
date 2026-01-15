@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import type { Configuration, MCPServerConfig } from '../types.js';
@@ -6,6 +7,20 @@ const resolveFsServerScript = (): string => {
   const scriptUrl = new URL('../../mcp/fs/fs-mcp-server.js', import.meta.url);
   return fileURLToPath(scriptUrl);
 };
+
+export function assertToolOutputFsServerAvailable(): void {
+  const scriptPath = resolveFsServerScript();
+  try {
+    fs.accessSync(scriptPath, fs.constants.R_OK);
+    const stat = fs.statSync(scriptPath);
+    if (!stat.isFile()) {
+      throw new Error('not a file');
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`tool_output filesystem MCP server missing at ${scriptPath}: ${message}`);
+  }
+}
 
 export function buildToolOutputFsServerConfig(
   baseConfig: Configuration,

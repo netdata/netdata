@@ -338,13 +338,14 @@ Notes:
   - Replaces the tool result with a handle message instructing the model to call `tool_output(handle=..., extract=...)`; handles are relative paths (`session-<uuid>/<file-uuid>`).
   - Logs a warning that includes `handle`, `reason` (`size_cap|token_budget|reserve_failed`), `bytes`, `lines`, and `tokens`.
 - The per-run tool_output root is created at process start and removed on exit; each session creates `session-<uuid>/` on start and deletes it when the session finishes.
+- **Mandatory**: ai-agent fails to start if the per-run tool_output root cannot be created or if the embedded filesystem MCP server is missing.
 - Truncation happens **only inside the `tool_output` module** as a fallback when extraction fails.
 - Configuration surfaces (highest precedence first):
   - CLI: `--tool-response-max-bytes <n>`
   - Frontmatter: `toolResponseMaxBytes: <number>`
   - Config defaults: `.ai-agent.json` → `defaults.toolResponseMaxBytes`
 - Tool output module overrides (optional):
-  - Frontmatter: `toolOutput: { enabled, storeDir, maxChunks, overlapPercent, avgLineBytesThreshold, models }`
+  - Frontmatter: `toolOutput: { enabled, maxChunks, overlapPercent, avgLineBytesThreshold, models }` (`storeDir` is ignored; root is `/tmp/ai-agent-<run-hash>`)
   - Config: `.ai-agent.json` → `toolOutput`
 - Default when unspecified: `12288` (12 KB).
 
