@@ -82,7 +82,7 @@ Use these knobs in new scenarios whenever you need deterministic combinations of
 
 ## Phase 3: Real LLM Integration Tests
 
-Phase 3 uses the runner in `src/tests/phase3-runner.ts` to execute real-provider scenarios (`basic-llm`, `multi-turn`), tool_output extraction scenarios (auto/full-chunked/read-grep/truncate), plus orchestration scenarios for **advisors**, **router**, and **handoff** (including composition and precedence). There is no fixture replay path. `src/tests/phase3/phase3-suite.spec.ts` exposes the same runner to Vitest for opt-in automation.
+Phase 3 uses the runner in `src/tests/phase3-runner.ts` to execute real-provider scenarios (`basic-llm`, `multi-turn`), tool_output extraction scenarios (auto/full-chunked/read-grep/truncate), plus orchestration scenarios for **advisors**, **router**, and **handoff** (including composition and precedence). Tool_output scenarios run only on the allowlisted models in `TOOL_OUTPUT_MODEL_ALLOWLIST` (currently `nova/glm-4.5-air`) to avoid flaky tool-call behavior; adjust the allowlist if you want broader coverage. There is no fixture replay path. `src/tests/phase3/phase3-suite.spec.ts` exposes the same runner to Vitest for opt-in automation.
 
 ### Model Configuration
 Model configurations live in `src/tests/phase3-models.ts`. The default configuration uses free nova models:

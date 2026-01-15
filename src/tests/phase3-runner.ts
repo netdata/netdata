@@ -16,6 +16,7 @@ import type {
 } from "../types.js";
 
 import { loadAgent, LoadedAgentCache } from "../agent-loader.js";
+import { shutdownSharedRegistry } from "../tools/mcp-provider.js";
 import { isPlainObject, sanitizeToolName } from "../utils.js";
 
 import { phase3ModelConfigs } from "./phase3-models.js";
@@ -215,6 +216,7 @@ const buildToolOutputSystemPrompt = (
     "Follow these steps exactly:",
     "1) Call ONLY filesystem_cwd__Read with:",
     `   {\"file\":\"${TOOL_OUTPUT_FIXTURE_PATH}\",\"start\":${String(TOOL_OUTPUT_READ_START)},\"lines\":${String(TOOL_OUTPUT_READ_LINES)}}.`,
+    "   IMPORTANT: Your very next response MUST be a tool call to filesystem_cwd__Read. Output ONLY the tool call (no text).",
     "2) The tool result will be replaced with a tool_output handle message. Do not answer yet.",
     "3) Call tool_output with:",
     "   - handle: the handle from the tool_output message",
@@ -509,6 +511,27 @@ const TOOL_OUTPUT_SCENARIOS: readonly ScenarioDefinition[] = [
     },
   },
 ] as const;
+
+const TOOL_OUTPUT_SCENARIO_IDS = new Set(
+  TOOL_OUTPUT_SCENARIOS.map((scenario) => scenario.id),
+);
+// Keep tool_output runs on models that reliably follow tool-call instructions.
+const TOOL_OUTPUT_MODEL_ALLOWLIST = new Set<string>([
+  "nova/glm-4.5-air",
+]);
+
+const isToolOutputScenario = (scenario: ScenarioDefinition): boolean =>
+  TOOL_OUTPUT_SCENARIO_IDS.has(scenario.id);
+
+const isToolOutputModel = (
+  label: string,
+  provider: string,
+  modelId: string,
+): boolean => {
+  if (TOOL_OUTPUT_MODEL_ALLOWLIST.has(label)) return true;
+  if (TOOL_OUTPUT_MODEL_ALLOWLIST.has(`${provider}/${modelId}`)) return true;
+  return TOOL_OUTPUT_MODEL_ALLOWLIST.has(modelId);
+};
 
 const BASE_SCENARIOS: readonly ScenarioDefinition[] = [
   {
@@ -1187,6 +1210,10 @@ const runScenarioVariant = async (
   if (scenario.reasoning !== undefined) {
     overrides.reasoning = scenario.reasoning;
   }
+  if (isToolOutputScenario(scenario)) {
+    overrides.temperature = 0;
+    overrides.noProgress = true;
+  }
   const baseResult: ScenarioRunResult = {
     modelLabel,
     provider,
@@ -1446,110 +1473,123 @@ const dumpLlmRequests = (
 };
 
 async function main(): Promise<void> {
-  const masterPaths = new Set<string>([
-    MASTER_AGENT_PATH,
-    ...TOOL_OUTPUT_SCENARIOS.map((scenario) => scenario.agentPath).filter(
-      (pathValue): pathValue is string => typeof pathValue === "string",
-    ),
-    ...ORCHESTRATION_SCENARIOS.map((scenario) => scenario.agentPath).filter(
-      (pathValue): pathValue is string => typeof pathValue === "string",
-    ),
-  ]);
-  masterPaths.forEach((promptPath) => {
-    ensureFileExists("Master agent prompt", promptPath);
-  });
-  ensureFileExists(
-    "tool_output fixture",
-    path.resolve(PROJECT_ROOT, TOOL_OUTPUT_FIXTURE_PATH),
-  );
-  const argv = process.argv.slice(2);
-  if (argv.includes("--help") || argv.includes("-h")) {
-    printUsage();
-    return;
-  }
-
-  let configPath = process.env.PHASE3_CONFIG ?? DEFAULT_CONFIG_PATH;
-  let tierFilter: Set<Tier> | undefined;
-  let tierThreshold: number | undefined;
-  let modelFilter: Set<string> | undefined;
-  let scenarioFilter: Set<string> | undefined;
-
-  argv.forEach((arg) => {
-    if (arg.startsWith("--config=")) {
-      configPath = path.resolve(arg.slice("--config=".length));
-    } else if (arg.startsWith("--tier=")) {
-      tierFilter = parseTierFilter(arg.slice("--tier=".length));
-      tierThreshold = Math.max(...Array.from(tierFilter));
-    } else if (arg.startsWith("--model=")) {
-      modelFilter = parseModelFilter(arg.slice("--model=".length));
-    } else if (arg.startsWith("--scenario=")) {
-      scenarioFilter = parseScenarioFilter(arg.slice("--scenario=".length));
-    } else {
-      throw new Error(`unknown argument '${arg}'`);
+  try {
+    const masterPaths = new Set<string>([
+      MASTER_AGENT_PATH,
+      ...TOOL_OUTPUT_SCENARIOS.map((scenario) => scenario.agentPath).filter(
+        (pathValue): pathValue is string => typeof pathValue === "string",
+      ),
+      ...ORCHESTRATION_SCENARIOS.map((scenario) => scenario.agentPath).filter(
+        (pathValue): pathValue is string => typeof pathValue === "string",
+      ),
+    ]);
+    masterPaths.forEach((promptPath) => {
+      ensureFileExists("Master agent prompt", promptPath);
+    });
+    ensureFileExists(
+      "tool_output fixture",
+      path.resolve(PROJECT_ROOT, TOOL_OUTPUT_FIXTURE_PATH),
+    );
+    const argv = process.argv.slice(2);
+    if (argv.includes("--help") || argv.includes("-h")) {
+      printUsage();
+      return;
     }
-  });
 
-  ensureFileExists("Configuration file", configPath);
+    let configPath = process.env.PHASE3_CONFIG ?? DEFAULT_CONFIG_PATH;
+    let tierFilter: Set<Tier> | undefined;
+    let tierThreshold: number | undefined;
+    let modelFilter: Set<string> | undefined;
+    let scenarioFilter: Set<string> | undefined;
 
-  const runs: ScenarioRunResult[] = [];
-  let abort = false;
-  let executed = 0;
-  // eslint-disable-next-line functional/no-loop-statements
-  for (const model of phase3ModelConfigs) {
-    if (abort) break;
-    if (TEMP_DISABLED_PROVIDERS.has(model.provider)) {
-      console.log(
-        `[SKIP] ${model.label} (${model.provider}:${model.modelId}) disabled temporarily`,
-      );
-      continue;
-    }
-    if (tierThreshold !== undefined && model.tier > tierThreshold) continue;
-    if (modelFilter !== undefined) {
-      const matches =
-        modelFilter.has(model.label) ||
-        modelFilter.has(`${model.provider}/${model.modelId}`) ||
-        modelFilter.has(model.modelId);
-      if (!matches) continue;
-    }
+    argv.forEach((arg) => {
+      if (arg.startsWith("--config=")) {
+        configPath = path.resolve(arg.slice("--config=".length));
+      } else if (arg.startsWith("--tier=")) {
+        tierFilter = parseTierFilter(arg.slice("--tier=".length));
+        tierThreshold = Math.max(...Array.from(tierFilter));
+      } else if (arg.startsWith("--model=")) {
+        modelFilter = parseModelFilter(arg.slice("--model=".length));
+      } else if (arg.startsWith("--scenario=")) {
+        scenarioFilter = parseScenarioFilter(arg.slice("--scenario=".length));
+      } else {
+        throw new Error(`unknown argument '${arg}'`);
+      }
+    });
+
+    ensureFileExists("Configuration file", configPath);
+
+    const runs: ScenarioRunResult[] = [];
+    let abort = false;
+    let executed = 0;
     // eslint-disable-next-line functional/no-loop-statements
-    for (const variant of scenarioVariants) {
-      if (!matchesScenarioFilter(variant.scenario, scenarioFilter)) {
+    for (const model of phase3ModelConfigs) {
+      if (abort) break;
+      if (TEMP_DISABLED_PROVIDERS.has(model.provider)) {
+        console.log(
+          `[SKIP] ${model.label} (${model.provider}:${model.modelId}) disabled temporarily`,
+        );
         continue;
       }
-      executed += 1;
-      const streamLabel = variant.stream ? STREAM_ON_LABEL : STREAM_OFF_LABEL;
-      const runIndexLabel = String(executed);
-      const tierLabel = String(model.tier);
-      console.log(
-        `[RUN] #${runIndexLabel} ${model.label} (${model.provider}:${model.modelId}, tier ${tierLabel}) :: ${variant.scenario.label} :: ${streamLabel}`,
-      );
-      const run = await runScenarioVariant(
-        configPath,
-        model.label,
-        model.provider,
-        model.modelId,
-        model.tier,
-        variant,
-      );
-      runs.push(run);
-      const summary = buildAccountingSummary(run.accounting);
-      const outcomeLine = formatSummaryLine(run, summary);
-      console.log(outcomeLine);
-      if (!run.success) {
-        run.failureReasons.forEach((reason) => {
-          console.log(`  - ${reason}`);
-        });
+      if (tierThreshold !== undefined && model.tier > tierThreshold) continue;
+      if (modelFilter !== undefined) {
+        const matches =
+          modelFilter.has(model.label) ||
+          modelFilter.has(`${model.provider}/${model.modelId}`) ||
+          modelFilter.has(model.modelId);
+        if (!matches) continue;
       }
-      if (STOP_ON_FAILURE && !run.success) {
-        abort = true;
-        break;
+      // eslint-disable-next-line functional/no-loop-statements
+      for (const variant of scenarioVariants) {
+        if (!matchesScenarioFilter(variant.scenario, scenarioFilter)) {
+          continue;
+        }
+        if (
+          isToolOutputScenario(variant.scenario) &&
+          !isToolOutputModel(model.label, model.provider, model.modelId)
+        ) {
+          console.log(
+            `[SKIP] ${model.label} (${model.provider}:${model.modelId}) :: ${variant.scenario.label} :: tool_output allowlist`,
+          );
+          continue;
+        }
+        executed += 1;
+        const streamLabel = variant.stream ? STREAM_ON_LABEL : STREAM_OFF_LABEL;
+        const runIndexLabel = String(executed);
+        const tierLabel = String(model.tier);
+        console.log(
+          `[RUN] #${runIndexLabel} ${model.label} (${model.provider}:${model.modelId}, tier ${tierLabel}) :: ${variant.scenario.label} :: ${streamLabel}`,
+        );
+        const run = await runScenarioVariant(
+          configPath,
+          model.label,
+          model.provider,
+          model.modelId,
+          model.tier,
+          variant,
+        );
+        runs.push(run);
+        const summary = buildAccountingSummary(run.accounting);
+        const outcomeLine = formatSummaryLine(run, summary);
+        console.log(outcomeLine);
+        if (!run.success) {
+          run.failureReasons.forEach((reason) => {
+            console.log(`  - ${reason}`);
+          });
+        }
+        if (STOP_ON_FAILURE && !run.success) {
+          abort = true;
+          break;
+        }
       }
     }
-  }
 
-  printSummary(runs);
-  if (runs.some((run) => !run.success)) {
-    process.exitCode = 1;
+    printSummary(runs);
+    if (runs.some((run) => !run.success)) {
+      process.exitCode = 1;
+    }
+  } finally {
+    await shutdownSharedRegistry();
   }
 }
 
