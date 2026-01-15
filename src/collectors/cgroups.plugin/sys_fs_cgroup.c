@@ -1404,13 +1404,13 @@ void cgroups_main(void *ptr) {
     // Mark thread as "running" only after mutex/cond are initialized
     // but before creating the thread. This ensures cleanup won't try
     // to access uninitialized synchronization primitives.
-    discovery_thread.exited = 0;
+    __atomic_store_n(&discovery_thread.exited, 0, __ATOMIC_RELAXED);
 
     discovery_thread.thread = nd_thread_create("CGDISCOVER", NETDATA_THREAD_OPTION_DEFAULT, cgroup_discovery_worker, NULL);
 
     if (!discovery_thread.thread) {
         collector_error("CGROUP: cannot create thread worker");
-        discovery_thread.exited = 1;  // Reset since thread wasn't created
+        __atomic_store_n(&discovery_thread.exited, 1, __ATOMIC_RELAXED);  // Reset since thread wasn't created
         return;
     }
 
