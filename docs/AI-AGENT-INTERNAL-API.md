@@ -120,7 +120,7 @@ Type `tool` (MCP tool calls and internal tools):
 Emission timing (tool): Immediately after each tool execution completes or fails:
 - Internal tools `agent__task_status`: `status: 'ok'`, `mcpServer: 'agent'`, variable `charactersOut` (based on done/pending/now fields), `agent__final_report`: `status: 'ok'`, `mcpServer: 'agent'`, fixed `charactersOut` (12), `charactersIn` reflects parameter size.
 - External MCP tools: `status: 'ok'` with the resolved `mcpServer` on success; `status: 'failed'`, `mcpServer: 'unknown'`, and `charactersOut: 0` on error.
-- Oversized outputs: If a tool response exceeds `toolResponseMaxBytes` **or** would overflow the context budget, the output is stored in the per-session `tool_output` store and replaced with a handle message instructing the model to call `tool_output(handle=..., extract=...)`. `charactersOut` reflects the handle message length. Warnings include `handle`, `reason` (`size_cap|token_budget|reserve_failed`), `bytes`, `lines`, and `tokens`.
+- Oversized outputs: If a tool response exceeds `toolResponseMaxBytes` **or** would overflow the context budget, the output is stored under the per-run tool_output root (`/tmp/ai-agent-<run-hash>/session-<uuid>/...`) and replaced with a handle message instructing the model to call `tool_output(handle=..., extract=...)`. Handles are relative paths like `session-<uuid>/<file-uuid>`. `charactersOut` reflects the handle message length. Warnings include `handle`, `reason` (`size_cap|token_budget|reserve_failed`), `bytes`, `lines`, and `tokens`.
 - Context overflow: If projecting a tool result would overflow the configured `contextWindow`, the agent injects `(tool failed: context window budget exceeded)`, records an accounting entry with `error: 'context_budget_exceeded'`, and populates `details` with `projected_tokens`, `limit_tokens`, and `remaining_tokens`.
 - Telemetry: every guard activation increments `ai_agent_context_guard_events_total{provider,model,trigger,outcome}` and updates the observable gauge `ai_agent_context_guard_remaining_tokens{provider,model,trigger,outcome}` so integrators can monitor how close sessions are to exhausting their budgets.
 
@@ -229,8 +229,8 @@ Recommendation for JSON output: include an explicit error structure in the schem
 - Configurable via `sessionConfig.toolResponseMaxBytes`.
 - Tool output module overrides via `sessionConfig.toolOutput`.
 - When an MCP tool response exceeds the cap (or would overflow the context budget):
-  - Stores the sanitized output in the per-session `tool_output` store.
-  - Returns a handle message instructing the model to call `tool_output(handle=..., extract=...)`.
+  - Stores the sanitized output under the per-run tool_output root (`/tmp/ai-agent-<run-hash>/session-<uuid>/...`).
+  - Returns a handle message instructing the model to call `tool_output(handle=..., extract=...)`; handles are relative paths (`session-<uuid>/<file-uuid>`).
   - Emits a `WRN` log (response, mcp) with `handle`, `reason` (`size_cap|token_budget|reserve_failed`), `bytes`, `lines`, and `tokens`.
   - Any truncation happens **only** inside the `tool_output` module as a fallback when extraction fails.
 - Headend surfaces (REST/MCP/OpenAI/Anthropic) apply the same cap via their session configuration and surface errors through HTTP/SSE/WebSocket semantics. Their incoming request payloads must include `format`, and when `format` is `json`, a `schema` object is required so the library can validate structured content.

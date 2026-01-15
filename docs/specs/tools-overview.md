@@ -420,7 +420,7 @@ interface MCPTool {
 - **Tool filtering**: MCP servers and providers respect `toolsAllowed` / `toolsDenied` lists so administrators can expose only safe operations (`src/tools/mcp-provider.ts:120-220`). Internal helper `sanitizeToolName` ensures comparisons ignore `<|prefix|>` wrappers (`src/utils.ts`).
 - **Process tree killing**: Stdio MCP provider tracks child PIDs and uses `killProcessTree` to terminate servers on shutdown/restart, preventing orphaned processes (`src/tools/mcp-provider.ts:460-520`).
 - **Shared MCP registry**: Shared servers (`shared !== false`) keep a reference count so multiple sessions reuse the same transport and automatically restart if `onclose` fires (`src/tools/mcp-provider.ts:540-680`).
-- **Tool budget + tool_output**: Orchestrator stores oversize outputs (size cap or token budget) and replaces them with a `tool_output` handle message. Warnings include `handle`, `reason`, `bytes`, `lines`, and `tokens` (`src/tools/tools.ts`).
+- **Tool budget + tool_output**: Orchestrator stores oversize outputs (size cap or token budget) and replaces them with a `tool_output` handle message. Handles are relative paths (`session-<uuid>/<file-uuid>`) under the per-run root (`/tmp/ai-agent-<run-hash>`). Warnings include `handle`, `reason`, `bytes`, `lines`, and `tokens` (`src/tools/tools.ts`).
 - **Legacy size cap fallback**: When tool_output is disabled, `toolResponseMaxBytes` is still enforced by truncating tool outputs in the orchestrator to avoid unbounded payloads (`src/tools/tools.ts`).
 
 ### OpenAPI Importer

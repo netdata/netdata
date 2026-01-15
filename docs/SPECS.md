@@ -334,9 +334,10 @@ Notes:
 #### Tool Response Size Cap
 - A configurable maximum size (bytes) determines when a tool result is **stored** and replaced with a `tool_output` handle message.
 - If a tool returns content larger than the limit **or** would overflow the context budget, the agent:
-  - Stores the sanitized output in the per-session `tool_output` store.
-  - Replaces the tool result with a handle message instructing the model to call `tool_output(handle=..., extract=...)`.
+  - Stores the sanitized output under the per-run tool_output root (`/tmp/ai-agent-<run-hash>/session-<uuid>/...`).
+  - Replaces the tool result with a handle message instructing the model to call `tool_output(handle=..., extract=...)`; handles are relative paths (`session-<uuid>/<file-uuid>`).
   - Logs a warning that includes `handle`, `reason` (`size_cap|token_budget|reserve_failed`), `bytes`, `lines`, and `tokens`.
+- The per-run tool_output root is created at process start and removed on exit; each session creates `session-<uuid>/` on start and deletes it when the session finishes.
 - Truncation happens **only inside the `tool_output` module** as a fallback when extraction fails.
 - Configuration surfaces (highest precedence first):
   - CLI: `--tool-response-max-bytes <n>`

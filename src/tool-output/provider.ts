@@ -22,7 +22,7 @@ const TOOL_OUTPUT_SCHEMA: MCPTool = {
       handle: {
         type: 'string',
         minLength: 1,
-        description: 'UUID handle of the stored tool output (provided in the tool-result message: tool_output(handle = "<uuid>", ...)).'
+        description: 'Handle of the stored tool output (relative path under the tool_output root, e.g. session-<uuid>/<file-uuid>; provided in the tool-result message: tool_output(handle = "...", ...)).'
       },
       extract: {
         type: 'string',
@@ -66,6 +66,7 @@ export class ToolOutputProvider extends ToolProvider {
     return [
       '### tool_output — Extract from oversized tool results',
       '- When a tool result is too large, you will receive a handle and instructions to call tool_output.',
+      '- The handle is a relative path under the tool_output root (session-<uuid>/<file-uuid>).',
       '- Always provide a detailed `extract` instruction describing exactly what you need from the stored output.',
       '- Use mode=auto unless you must override the strategy (full-chunked, read-grep, truncate).',
     ].join('\n');

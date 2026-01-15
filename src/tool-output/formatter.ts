@@ -1,7 +1,7 @@
 import type { ToolOutputStats } from './types.js';
 
 export function formatHandleMessage(handle: string, stats: ToolOutputStats): string {
-  return `Tool output is too large (${String(stats.bytes)} bytes, ${String(stats.lines)} lines, ${String(stats.tokens)} tokens).\nCall tool_output(handle = "${handle}", extract = "what to extract").\nProvide precise and detailed instructions in \`extract\` about what you are looking for.`;
+  return `Tool output is too large (${String(stats.bytes)} bytes, ${String(stats.lines)} lines, ${String(stats.tokens)} tokens).\nCall tool_output(handle = "${handle}", extract = "what to extract").\nThe handle is a relative path under the tool_output root.\nProvide precise and detailed instructions in \`extract\` about what you are looking for.`;
 }
 
 export function formatToolOutputSuccess(args: {

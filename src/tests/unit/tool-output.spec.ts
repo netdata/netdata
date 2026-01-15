@@ -35,6 +35,14 @@ vi.mock('../../ai-agent.js', () => ({
 
 const makeTempDir = (): string => fs.mkdtempSync(path.join(os.tmpdir(), 'tool-output-'));
 
+const cleanupTempRoot = (root: string): void => {
+  try {
+    fs.rmSync(root, { recursive: true, force: true });
+  } catch {
+    // ignore cleanup errors
+  }
+};
+
 const buildConfig = (storeDir: string): ToolOutputConfig => ({
   enabled: true,
   storeDir,
@@ -102,6 +110,7 @@ describe('ToolOutputHandler', () => {
     const read = await store.read(handle);
     expect(read?.content).toBe('X'.repeat(200));
     await store.cleanup();
+    cleanupTempRoot(root);
   });
 
   it('stores oversized output when budget preview fails', async () => {
@@ -125,6 +134,7 @@ describe('ToolOutputHandler', () => {
     expect(result).toBeDefined();
     expect(result?.reason).toBe('token_budget');
     await store.cleanup();
+    cleanupTempRoot(root);
   });
 });
 
@@ -179,6 +189,7 @@ describe('ToolOutputExtractor', () => {
     expect(result.mode).toBe('full-chunked');
     expect(result.text).toBe('final answer');
     expect(result.childOpTree).toBeDefined();
+    cleanupTempRoot(root);
   });
 
   it('extracts via read-grep with mocked sub-agent', async () => {
@@ -225,6 +236,7 @@ describe('ToolOutputExtractor', () => {
     expect(result.mode).toBe('read-grep');
     expect(result.text).toBe('read-grep-extracted');
     expect(result.childOpTree).toBeDefined();
+    cleanupTempRoot(root);
   });
 });
 
@@ -268,5 +280,6 @@ describe('ToolOutputProvider', () => {
     expect(result.ok).toBe(true);
     expect(result.result).toContain('No stored tool output found');
     await store.cleanup();
+    cleanupTempRoot(root);
   });
 });

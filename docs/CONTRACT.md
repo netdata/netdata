@@ -39,7 +39,7 @@ See Section 2 “Context Management Contract” for the complete definition of c
 **`toolResponseMaxBytes`**
 - Tool responses exceeding this size are **stored** and replaced with a `tool_output` handle message.
 - Handle warnings include `handle`, `reason` (`size_cap|token_budget|reserve_failed`), `bytes`, `lines`, and `tokens`.
-- Original response is preserved in the per-session `tool_output` store; it is **not** embedded in conversation history.
+- Original response is preserved under the per-run tool_output root (`/tmp/ai-agent-<run-hash>/session-<uuid>/...`); it is **not** embedded in conversation history. Handles are relative paths (`session-<uuid>/<file-uuid>`).
 - `tool_output` results are never cached; they are extracted on demand by handle.
 - **Exception:** `agent__batch` meta-tool output is not size-capped as a whole; individual tools within the batch can still trigger `tool_output` storage.
 

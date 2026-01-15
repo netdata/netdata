@@ -36,6 +36,7 @@ import { ToolOutputExtractor } from './tool-output/extractor.js';
 import { buildToolOutputFsServerConfig } from './tool-output/fs-server.js';
 import { ToolOutputHandler } from './tool-output/handler.js';
 import { ToolOutputProvider } from './tool-output/provider.js';
+import { cleanupToolOutputSessionDir, ensureToolOutputSessionDir } from './tool-output/runtime.js';
 import { ToolOutputStore } from './tool-output/store.js';
 import { AgentProvider } from './tools/agent-provider.js';
 import { InternalToolProvider } from './tools/internal-provider.js';
@@ -188,6 +189,7 @@ export class AIAgentSession {
   private llmSyntheticFailures = 0;
 
   private readonly sessionExecutor: SessionToolExecutor;
+  private readonly toolOutputSessionDir?: string;
 
   // Delegation accessors for FinalReportManager
   private get finalReport(): NonNullable<AIAgentResult['finalReport']> | undefined { return this.finalReportManager.getReport(); }
@@ -590,7 +592,11 @@ export class AIAgentSession {
       overrides: sessionConfig.toolOutput,
       baseDir: process.cwd(),
     });
-    const toolOutputStore = toolOutputConfig.enabled ? new ToolOutputStore(toolOutputConfig.storeDir, this.txnId) : undefined;
+    const toolOutputSession = ensureToolOutputSessionDir(this.txnId, toolOutputConfig.storeDir);
+    this.toolOutputSessionDir = toolOutputSession.sessionDir;
+    const toolOutputStore = toolOutputConfig.enabled
+      ? new ToolOutputStore(toolOutputSession.runRootDir, this.txnId)
+      : undefined;
     const toolOutputHandler = toolOutputStore !== undefined
       ? new ToolOutputHandler(toolOutputStore, toolOutputConfig)
       : undefined;
@@ -623,7 +629,7 @@ export class AIAgentSession {
         pricing: sessionConfig.config.pricing,
         countTokens: toolBudgetCallbacks.countTokens,
         recordAccounting: (entry) => { this.recordAccounting(entry); },
-        fsRootDir: toolOutputStore.getRootDir(),
+        fsRootDir: toolOutputSession.runRootDir,
         buildFsServerConfig: (rootDir: string) => buildToolOutputFsServerConfig(sessionConfig.config, rootDir),
       })
       : undefined;
@@ -1785,6 +1791,7 @@ export class AIAgentSession {
       return failShape;
       } finally {
         await this.toolsOrchestrator?.cleanup();
+        await cleanupToolOutputSessionDir(this.toolOutputSessionDir);
       }
     });
   }

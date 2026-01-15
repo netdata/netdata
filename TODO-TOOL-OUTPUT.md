@@ -40,6 +40,8 @@
 - **Core loops must not grow**; they must **shrink** (move logic out).
 - **`tool_output` accounting must be aggregated at the session level**, similar to sub‑agents.
 - **opTree + snapshots must include tool_output sub‑agent and extraction LLM calls.**
+- **Phase 3 Tier1 must cover all `tool_output` modes with a real LLM.**
+- **Remove `nova/gpt-oss-20b` from Phase 3 Tier1 model list.**
 
 ## Pre‑Change Test Baseline (2026-01-15T01:46:04+02:00)
 - `npm run lint` — **PASS**
@@ -79,6 +81,9 @@
   - toolResponseMaxBytes truncation re-applied when tool_output handler is absent. (Evidence: `src/tools/tools.ts`)
 - **Phase 2 OOM resolved**:
   - Guarded InternalToolProvider batch schema rebuild to avoid recursive listTools during listTools. (Evidence: `src/tools/internal-provider.ts`)
+- **Shared tool_output MCP root + handle format updated**:
+  - Per-run root `/tmp/ai-agent-<run-hash>` with per-session `session-<uuid>/` subdirs.
+  - Handles are `session-<uuid>/<file-uuid>`; read/grep prompts updated. (Evidence: `src/tool-output/runtime.ts`, `src/tool-output/store.ts`, `src/tool-output/extractor.ts`)
 - **Harness stability + handle detection updates**:
   - Batch tool_output handle detection now parses JSON payloads. (Evidence: `src/tests/phase2-harness-scenarios/phase2-runner.ts`)
   - context-token-double-count selects post-tool request log by turn/subturn instead of log order. (Evidence: `src/tests/phase2-harness-scenarios/phase2-runner.ts`)
@@ -462,9 +467,16 @@ OUTPUT FORMAT (required)
    - Rationale: avoids memory blowups while still including extraction LLM calls in opTree/snapshots.
 
 25) **Size cap when tool_output is disabled**
-   - Context: without tool_output handler, toolResponseMaxBytes is no longer enforced.
-   - Decision: **Restore legacy truncation when tool_output is disabled** (preserve size cap only in that path).
-   - Rationale: maintain backward compatibility and prevent unbounded tool outputs (e.g., read/grep sub-agent).
+  - Context: without tool_output handler, toolResponseMaxBytes is no longer enforced.
+  - Decision: **Restore legacy truncation when tool_output is disabled** (preserve size cap only in that path).
+  - Rationale: maintain backward compatibility and prevent unbounded tool outputs (e.g., read/grep sub-agent).
+
+26) **Shared tool_output MCP root + handle format**
+  - Decision: **Use a shared `tool_output_fs` MCP server** rooted at a per-run base directory (`/tmp/ai-agent-<run-hash>`).
+  - Each session writes to `session-<uuid>/...` under that base root.
+  - Handles will be `session-<uuid>/<file-uuid>` (relative path under the shared root).
+  - Tools exposed: **Read + Grep only**.
+  - Implication: tool_output must not depend on `.ai-agent.json`; it injects its own MCP config.
 
 ## Plan (implementation in progress)
 1) Decisions finalized (18–23 complete). ✅
@@ -484,6 +496,14 @@ OUTPUT FORMAT (required)
 9) Update Phase 1 + Phase 2 tests (size cap + context‑guard scenarios), plus any truncation‑dependent fixtures. ✅
 10) Run full lint/build and test suites per project rules. ✅ (lint/build/phase1/phase2 pass)
 11) Update documentation (specs + guide + internal API + README). ✅
+12) Update Phase 3 Tier1:
+   - Remove `nova/gpt-oss-20b` from Tier1 model list.
+   - Add Tier1 scenarios that exercise all `tool_output` modes with a real LLM.
+   - Update documentation in `docs/TESTING.md` to reflect the Tier1 model list. ⬜
+13) Update tool_output shared MCP:
+   - Use shared base root with run-level hash.
+   - Update handle format to `session-<uuid>/<file-uuid>`.
+   - Ensure read/grep sub-agent uses the shared MCP config (no config-file dependency). ✅
 
 ## Implied Decisions
 - Truncation is now an **extraction fallback**, not a main-session default.
@@ -501,6 +521,13 @@ OUTPUT FORMAT (required)
   - Huge single-line JSON → forces full-chunked
   - Standard multi-line text → read/grep path
   - Update all existing truncation scenarios to validate handle + tool_output behavior
+- Phase 3 Tier1:
+  - Real LLM coverage for all `tool_output` modes:
+    - `auto` → full-chunked
+    - `auto` → read-grep
+    - `mode=full-chunked`
+    - `mode=read-grep`
+    - `mode=truncate`
 
 ## Documentation Updates
 - `docs/SPECS.md`: new tool_output behavior, routing, and storage.

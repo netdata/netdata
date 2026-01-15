@@ -6,15 +6,27 @@ import type { ToolOutputEntry, ToolOutputStats, ToolOutputTarget } from './types
 
 export class ToolOutputStore {
   private readonly entries = new Map<string, ToolOutputEntry>();
-  private readonly rootDir: string;
+  private readonly runRootDir: string;
+  private readonly sessionDirName: string;
+  private readonly sessionDir: string;
 
-  constructor(baseDir: string, sessionId: string) {
-    this.rootDir = path.join(baseDir, `ai-agent-${sessionId}`);
-    fs.mkdirSync(this.rootDir, { recursive: true });
+  constructor(runRootDir: string, sessionId: string) {
+    this.runRootDir = runRootDir;
+    this.sessionDirName = `session-${sessionId}`;
+    this.sessionDir = path.join(this.runRootDir, this.sessionDirName);
+    fs.mkdirSync(this.sessionDir, { recursive: true });
   }
 
-  getRootDir(): string {
-    return this.rootDir;
+  getRunRootDir(): string {
+    return this.runRootDir;
+  }
+
+  getSessionDirName(): string {
+    return this.sessionDirName;
+  }
+
+  getSessionDir(): string {
+    return this.sessionDir;
   }
 
   hasEntries(): boolean {
@@ -47,8 +59,9 @@ export class ToolOutputStore {
     stats: ToolOutputStats;
     sourceTarget?: ToolOutputTarget;
   }): Promise<ToolOutputEntry> {
-    const handle = crypto.randomUUID();
-    const outPath = path.join(this.rootDir, handle);
+    const fileId = crypto.randomUUID();
+    const handle = path.posix.join(this.sessionDirName, fileId);
+    const outPath = path.join(this.runRootDir, ...handle.split('/'));
     await fs.promises.writeFile(outPath, args.content, 'utf8');
     const entry: ToolOutputEntry = {
       handle,
@@ -68,7 +81,7 @@ export class ToolOutputStore {
   async cleanup(): Promise<void> {
     this.entries.clear();
     try {
-      await fs.promises.rm(this.rootDir, { recursive: true, force: true });
+      await fs.promises.rm(this.sessionDir, { recursive: true, force: true });
     } catch {
       // ignore cleanup failures
     }

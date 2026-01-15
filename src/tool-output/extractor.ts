@@ -154,8 +154,8 @@ const buildReadGrepSystemPrompt = (args: {
   return [
     'You are an internal extraction agent. You can only use Read and Grep tools.',
     '',
-    'IMPORTANT: The handle is the filename.',
-    'Use the filename exactly as given when calling Read or Grep.',
+    'IMPORTANT: The handle is a relative path under the root directory.',
+    'Use the handle exactly as given when calling Read or Grep.',
     '',
     SOURCE_TOOL_LABEL,
     `- Name: ${args.toolName}`,
