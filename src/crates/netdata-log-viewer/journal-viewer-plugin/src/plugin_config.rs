@@ -130,6 +130,13 @@ impl PluginConfig {
         config.cache.directory =
             resolve_relative_path(&config.cache.directory, netdata_env.cache_dir.as_deref());
 
+        // Add host-prefixed journal paths for containerized environments
+        if let Some(ref host_prefix) = netdata_env.host_prefix {
+            if !host_prefix.is_empty() {
+                expand_paths_with_host_prefix(&mut config.journal.paths, host_prefix);
+            }
+        }
+
         // Validate configuration (also performs deduplication)
         Self::validate(&mut config)?;
 
@@ -206,4 +213,26 @@ fn resolve_relative_path(path: &str, base_dir: Option<&Path>) -> String {
     } else {
         path.to_string_lossy().to_string()
     }
+}
+
+/// Standard journal paths that should be expanded with host prefix in containerized environments
+const STANDARD_JOURNAL_PATHS: &[&str] = &["/var/log/journal", "/run/log/journal"];
+
+/// Expand journal paths with host prefix for containerized environments
+///
+/// When running in a container with the host filesystem mounted (e.g., at /host),
+/// this adds prefixed versions of standard journal paths so we can read both
+/// container-local and host journals.
+fn expand_paths_with_host_prefix(paths: &mut Vec<String>, host_prefix: &str) {
+    let mut prefixed_paths = Vec::new();
+
+    for base_path in STANDARD_JOURNAL_PATHS {
+        let prefixed = format!("{}/{}", host_prefix, base_path);
+        // Only add if not already in the list
+        if !paths.contains(&prefixed) {
+            prefixed_paths.push(prefixed);
+        }
+    }
+
+    paths.extend(prefixed_paths);
 }
