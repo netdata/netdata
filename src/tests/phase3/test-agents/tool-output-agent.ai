@@ -1,0 +1,10 @@
+---
+description: "Tool output Phase 3 test agent"
+usage: "Validates tool_output extraction modes via filesystem_cwd"
+tools:
+  - filesystem_cwd
+toolResponseMaxBytes: 1024
+toolOutput:
+  enabled: true
+---
+You are a CI test agent. Follow the system prompt instructions exactly.
