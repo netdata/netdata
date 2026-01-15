@@ -51,7 +51,6 @@
 - MCP tools auto-converted to SDK tools
 - REST/OpenAPI tool support with queue binding
 - Tool output storage (`tool_output` handles) for oversized responses
-- Per-tool TTL caching (SQLite or Redis backend)
 
 ### MCP (Model Context Protocol)
 
@@ -66,7 +65,42 @@
 - Multi-level resolution: CLI → config file → prompt dir → user home → system
 - YAML frontmatter in `.ai` files drives all agent behavior
 - Environment variable expansion (`${VAR}`) with `.ai-agent.env` sidecar
-- Per-agent overrides: temperature, maxTurns, timeout, cache TTL, reasoning level
+- Per-agent overrides: temperature, maxTurns, timeout, reasoning level
+
+---
+
+## Caching
+
+### Cache Accounting (LLM Responses)
+
+- **Provider Cache Tokens**: All providers report `cacheReadInputTokens` and `cacheWriteInputTokens`
+- **Accounting Integration**: Cache tokens included in cost calculations and LLM accounting entries
+- **Pricing Tables**: Optional per-model pricing for cache reads/writes (different from regular token pricing)
+- **Telemetry**: `ai_agent_llm_cache_read_tokens_total`, `ai_agent_llm_cache_write_tokens_total` counters
+
+### Anthropic Cache Control
+
+- **Strategies**:
+  - `full` (default): Apply ephemeral cache control to the last valid user message per turn
+  - `none`: Skip cache control entirely
+- **Implementation**: Applies `cacheControl: { type: 'ephemeral' }` to the last non-XML-notice message
+- **Benefit**: Significant cost savings on repeated context patterns
+
+### Agent Response Caching
+
+- **Backend Options**: SQLite (default) or Redis
+- **Per-Agent TTL**: `cache: off | <ms> | <N.Nu>` (e.g., `5m`, `1h`)
+- **Key Components**: Hash of agent hash + user prompt + expected format/schema
+- **Logging**: Cache hits logged; misses silent
+
+### Tool Response Caching
+
+- **Per-Tool TTL Configuration**:
+  - `mcpServers.<name>.cache`: Entire server cache TTL
+  - `mcpServers.<name>.toolsCache.<tool>`: Per-tool override
+  - `restTools.<tool>.cache`: REST tool cache TTL
+- **Key Components**: Tool namespace + name + request payload
+- **Same Backend**: Uses same SQLite/Redis backend as agent caching
 
 ---
 
