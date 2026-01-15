@@ -1266,6 +1266,51 @@ export class AIAgentSession {
       });
       return combined;
     };
+    const mergeLogEntries = (primary: LogEntry[], secondary: LogEntry[]): LogEntry[] => {
+      const combined = [...primary];
+      const seen = new Set<string>();
+      combined.forEach((entry) => {
+        const key = `${String(entry.timestamp)}:${entry.remoteIdentifier}:${entry.message}`;
+        seen.add(key);
+      });
+      secondary.forEach((entry) => {
+        const key = `${String(entry.timestamp)}:${entry.remoteIdentifier}:${entry.message}`;
+        if (!seen.has(key)) {
+          combined.push(entry);
+          seen.add(key);
+        }
+      });
+      return combined;
+    };
+    const safeFlatten = (): { logs: LogEntry[]; accounting: AccountingEntry[] } => {
+      try {
+        return this.opTree.flatten();
+      } catch {
+        return { logs: this.logs, accounting: this.accounting };
+      }
+    };
+    const finalizeOpTree = (params: { message: string; success: boolean; error?: string }): void => {
+      try {
+        if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
+        const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
+        this.log({
+          timestamp: Date.now(),
+          severity: 'VRB',
+          turn: 0,
+          subturn: 0,
+          direction: 'response',
+          type: 'llm',
+          remoteIdentifier: 'agent:fin',
+          fatal: false,
+          message: params.message,
+        }, { opId: finOp });
+        this.opTree.endOp(finOp, 'ok');
+        this.opTree.endTurn(0);
+        this.opTree.endSession(params.success, params.error);
+      } catch (e) {
+        warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    };
 
     return await runWithSpan('agent.session', { attributes: sessionSpanAttributes }, async (span) => {
       let currentConversation = [...this.conversation];
@@ -1335,31 +1380,9 @@ export class AIAgentSession {
           };
           this.log(cacheLog);
           const cachedPayload = hit.value;
-          try {
-            if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
-            const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
-            this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: AIAgentSession.SESSION_FINALIZED_MESSAGE }, { opId: finOp });
-            this.opTree.endOp(finOp, 'ok');
-            this.opTree.endTurn(0);
-            this.opTree.endSession(true);
-          } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
-          const flat = (() => { try { return this.opTree.flatten(); } catch { return { logs: this.logs, accounting: this.accounting }; } })();
-          const mergedLogs = (() => {
-            const combined = [...flat.logs];
-            const seen = new Set<string>();
-            combined.forEach((entry) => {
-              const key = `${String(entry.timestamp)}:${entry.remoteIdentifier}:${entry.message}`;
-              seen.add(key);
-            });
-            this.logs.forEach((entry) => {
-              const key = `${String(entry.timestamp)}:${entry.remoteIdentifier}:${entry.message}`;
-              if (!seen.has(key)) {
-                combined.push(entry);
-                seen.add(key);
-              }
-            });
-            return combined;
-          })();
+          finalizeOpTree({ message: AIAgentSession.SESSION_FINALIZED_MESSAGE, success: true });
+          const flat = safeFlatten();
+          const mergedLogs = mergeLogEntries(flat.logs, this.logs);
           const mergedAccounting = mergeAccountingEntries(flat.accounting, this.accounting);
           const resultShape: AIAgentResult = {
             success: true,
@@ -1641,34 +1664,11 @@ export class AIAgentSession {
       );
 
       // System finalization log - must be added before merging logs
-      try {
-        if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
-        const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
-        this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: AIAgentSession.SESSION_FINALIZED_MESSAGE }, { opId: finOp });
-        this.opTree.endOp(finOp, 'ok');
-        // End system turn
-        this.opTree.endTurn(0);
-        this.opTree.endSession(result.success, result.error);
-      } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
+      finalizeOpTree({ message: AIAgentSession.SESSION_FINALIZED_MESSAGE, success: result.success, error: result.error });
 
       // Derive arrays from opTree for canonical output
-      const flat = (() => { try { return this.opTree.flatten(); } catch { return { logs: this.logs, accounting: this.accounting }; } })();
-      const mergedLogs = (() => {
-        const combined = [...flat.logs];
-        const seen = new Set<string>();
-        combined.forEach((entry) => {
-          const key = `${String(entry.timestamp)}:${entry.remoteIdentifier}:${entry.message}`;
-          seen.add(key);
-        });
-        this.logs.forEach((entry) => {
-          const key = `${String(entry.timestamp)}:${entry.remoteIdentifier}:${entry.message}`;
-          if (!seen.has(key)) {
-            combined.push(entry);
-            seen.add(key);
-          }
-        });
-        return combined;
-      })();
+      const flat = safeFlatten();
+      const mergedLogs = mergeLogEntries(flat.logs, this.logs);
       const mergedAccounting = mergeAccountingEntries(flat.accounting, this.accounting);
       const resultShape = {
         success: result.success,
@@ -1741,23 +1741,8 @@ export class AIAgentSession {
 
       // Emit FIN summary even on failure
       this.emitFinalSummary(currentLogs, currentAccounting);
-      const flatFail = (() => { try { return this.opTree.flatten(); } catch { return { logs: this.logs, accounting: this.accounting }; } })();
-      const mergedFailLogs = (() => {
-        const combined = [...flatFail.logs];
-        const seen = new Set<string>();
-        combined.forEach((entry) => {
-          const key = `${String(entry.timestamp)}:${entry.remoteIdentifier}:${entry.message}`;
-          seen.add(key);
-        });
-        this.logs.forEach((entry) => {
-          const key = `${String(entry.timestamp)}:${entry.remoteIdentifier}:${entry.message}`;
-          if (!seen.has(key)) {
-            combined.push(entry);
-            seen.add(key);
-          }
-        });
-        return combined;
-      })();
+      const flatFail = safeFlatten();
+      const mergedFailLogs = mergeLogEntries(flatFail.logs, this.logs);
       const mergedFailAccounting = mergeAccountingEntries(flatFail.accounting, this.accounting);
       const failShape = {
         success: false,
@@ -1766,14 +1751,7 @@ export class AIAgentSession {
         logs: mergedFailLogs,
         accounting: mergedFailAccounting
       } as AIAgentResult;
-      try {
-        if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
-        const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
-        this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: `session finalization (error)` }, { opId: finOp });
-        this.opTree.endOp(finOp, 'ok');
-        this.opTree.endTurn(0);
-        this.opTree.endSession(false, message);
-      } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
+      finalizeOpTree({ message: 'session finalization (error)', success: false, error: message });
       this.emitAgentCompletion(false, message);
       if (error instanceof Error) {
         span.recordException(error);
@@ -1789,41 +1767,6 @@ export class AIAgentSession {
     });
   }
 
-
-  private finalizeCanceledSession(
-    conversation: ConversationMessage[],
-    logs: LogEntry[],
-    accounting: AccountingEntry[]
-  ): AIAgentResult {
-    const errMsg = 'canceled';
-    this.emitFinalSummary(logs, accounting);
-    try {
-      if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
-      const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
-      this.log({ timestamp: Date.now(), severity: 'ERR', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: 'session finalized after uncaught error' }, { opId: finOp });
-      this.opTree.endOp(finOp, 'ok');
-      this.opTree.endTurn(0);
-      this.opTree.endSession(false, errMsg);
-    } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
-    return { success: false, error: errMsg, conversation, logs: this.logs, accounting };
-  }
-
-  private finalizeGracefulStopSession(
-    conversation: ConversationMessage[],
-    logs: LogEntry[],
-    accounting: AccountingEntry[]
-  ): AIAgentResult {
-    this.emitFinalSummary(logs, accounting);
-    try {
-      if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
-      const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
-      this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: AIAgentSession.SESSION_FINALIZED_MESSAGE }, { opId: finOp });
-      this.opTree.endOp(finOp, 'ok');
-      this.opTree.endTurn(0);
-      this.opTree.endSession(true);
-    } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
-    return { success: true, conversation, logs: this.logs, accounting } as AIAgentResult;
-  }
 
   private async sleepWithAbort(
     ms: number
