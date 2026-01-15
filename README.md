@@ -182,32 +182,6 @@ Each headend flag is repeatable. All headends share the same agent registry and 
 
 ---
 
-## Quick Start
-
-```bash
-# Clone and build
-git clone https://github.com/netdata/ai-agent.git
-cd ai-agent
-npm install
-npm run build
-
-# Create your first agent
-cat > assistant.ai << 'EOF'
----
-description: Helpful Assistant
-llms: gpt-4o-mini
-tools: filesystem
----
-
-You are a helpful assistant. Answer the user's questions concisely and accurately.
-EOF
-
-# Run it
-./assistant.ai "What files are in the current directory?"
-```
-
----
-
 ## Support
 
 - GitHub Issues: https://github.com/netdata/ai-agent/issues
