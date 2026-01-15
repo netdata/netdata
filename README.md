@@ -134,7 +134,7 @@ Each headend flag is repeatable. All headends share the same agent registry and 
 ## Testing & Quality Assurance
 
 - **Phase 1**: Parallel unit tests (~200 tests, ~300ms)
-- **Phase 2**: Sequential deterministic harness (~260 scenarios)
+- **Phase 2**: End-to-end deterministic harness (~260 scenarios)
 - **Phase 3**: Real LLM integration tests (nova models)
 - Built-in accounting and session snapshots for debugging
 
