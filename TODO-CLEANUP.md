@@ -205,6 +205,40 @@ Append all you findings in this document.
 
 ---
 
+## Structural split opportunities (god object extraction targets)
+
+## TL;DR
+- `AIAgentSession` still contains multiple large, unrelated responsibilities.
+- These blocks can be split into focused modules without changing behavior.
+
+## Evidence-based targets
+1. **Session tooling bootstrap (constructor)**
+   - Evidence: `src/ai-agent.ts:498-719`
+   - Responsibilities mixed: context guard setup, tool_output pipeline, tool orchestrator registration (MCP/REST/internal).
+   - Candidate split: `session-tooling-bootstrap.ts` (build `ContextGuard`, `ToolOutput*`, `ToolsOrchestrator`).
+
+2. **Tool_output pipeline assembly**
+   - Evidence: `src/ai-agent.ts:582-629`
+   - Responsibilities: store/handler/extractor/provider wiring + tool_output config resolution.
+   - Candidate split: `tool-output/factory.ts` returning `{ store, handler, extractor, provider }`.
+
+3. **Cache handling in run()**
+   - Evidence: `src/ai-agent.ts:1331-1416`
+   - Responsibilities: cache key build, cache read, cache hit logging, early return.
+   - Candidate split: `session-cache.ts` (build key + read/write + log).
+
+4. **Result assembly + opTree finalization**
+   - Evidence: `src/ai-agent.ts:1656-1718`
+   - Responsibilities: finalize opTree, merge logs/accounting, build result, persist artifacts.
+   - Candidate split: `session-result-assembler.ts`.
+
+5. **Final summary computation**
+   - Evidence: `src/ai-agent.ts:1841-1918` and similar logic in `src/session-turn-runner.ts:2634-2723`
+   - Responsibilities: aggregate LLM/tool stats + format FIN logs.
+   - Candidate split: `summary-formatter.ts` shared by both callers.
+
+---
+
 ## Cleanup Candidate 2: Consolidate duplicate log-merge logic (single point of reference)
 
 ## TL;DR
