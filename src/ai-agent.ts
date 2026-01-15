@@ -1289,6 +1289,17 @@ export class AIAgentSession {
         return { logs: this.logs, accounting: this.accounting };
       }
     };
+    const persistFinalArtifacts = (accounting: AccountingEntry[]): void => {
+      try {
+        this.persistSessionSnapshot('final');
+        this.flushAccounting(accounting);
+      } catch (e) {
+        warn(`final persistence failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    };
+    const mergeAccountingSnapshot = (primary: AccountingEntry[]): AccountingEntry[] => (
+      mergeAccountingEntries(primary, this.accounting)
+    );
     const finalizeOpTree = (params: { message: string; success: boolean; error?: string }): void => {
       try {
         if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
@@ -1383,7 +1394,7 @@ export class AIAgentSession {
           finalizeOpTree({ message: AIAgentSession.SESSION_FINALIZED_MESSAGE, success: true });
           const flat = safeFlatten();
           const mergedLogs = mergeLogEntries(flat.logs, this.logs);
-          const mergedAccounting = mergeAccountingEntries(flat.accounting, this.accounting);
+          const mergedAccounting = mergeAccountingSnapshot(flat.accounting);
           const resultShape: AIAgentResult = {
             success: true,
             error: undefined,
@@ -1397,12 +1408,7 @@ export class AIAgentSession {
             opTree: (() => { try { return this.opTree.getSession(); } catch { return undefined; } })(),
           };
           this.emitAgentCompletion(true, undefined);
-          try {
-            this.persistSessionSnapshot('final');
-            this.flushAccounting(resultShape.accounting);
-          } catch (e) {
-            warn(`final persistence failed: ${e instanceof Error ? e.message : String(e)}`);
-          }
+          persistFinalArtifacts(resultShape.accounting);
           span.setAttributes({
             'ai.agent.success': resultShape.success,
             'ai.agent.turn_count': currentTurn,
@@ -1669,7 +1675,7 @@ export class AIAgentSession {
       // Derive arrays from opTree for canonical output
       const flat = safeFlatten();
       const mergedLogs = mergeLogEntries(flat.logs, this.logs);
-      const mergedAccounting = mergeAccountingEntries(flat.accounting, this.accounting);
+      const mergedAccounting = mergeAccountingSnapshot(flat.accounting);
       const resultShape = {
         success: result.success,
         error: result.error,
@@ -1706,12 +1712,7 @@ export class AIAgentSession {
       // Model status (success/failure/partial) is semantic for parent agent, not a system failure indicator
       this.emitAgentCompletion(result.success, result.error);
       // Phase B/C: persist final session and accounting ledger
-      try {
-        this.persistSessionSnapshot('final');
-        this.flushAccounting(resultShape.accounting);
-      } catch (e) {
-        warn(`final persistence failed: ${e instanceof Error ? e.message : String(e)}`);
-      }
+      persistFinalArtifacts(resultShape.accounting);
       span.setAttributes({
         'ai.agent.success': resultShape.success,
         'ai.agent.turn_count': currentTurn,
@@ -1743,7 +1744,7 @@ export class AIAgentSession {
       this.emitFinalSummary(currentLogs, currentAccounting);
       const flatFail = safeFlatten();
       const mergedFailLogs = mergeLogEntries(flatFail.logs, this.logs);
-      const mergedFailAccounting = mergeAccountingEntries(flatFail.accounting, this.accounting);
+      const mergedFailAccounting = mergeAccountingSnapshot(flatFail.accounting);
       const failShape = {
         success: false,
         error: message,

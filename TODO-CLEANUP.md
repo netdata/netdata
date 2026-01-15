@@ -135,6 +135,76 @@ Append all you findings in this document.
 
 ---
 
+## Cleanup Candidate 5: Consolidate final persistence block
+
+## TL;DR
+- The final persistence block (snapshot + accounting flush) is duplicated twice in `AIAgentSession.run()`.
+- Extract a small helper to keep a single reference and reduce duplication.
+- Behavior stays identical, including warning text.
+
+## Analysis (code review evidence)
+- Duplicated block in `src/ai-agent.ts`:
+  - Cache-hit path: `src/ai-agent.ts:1377-1382`
+  - Normal path: `src/ai-agent.ts:1709-1714`
+- Both blocks run:
+  - `persistSessionSnapshot('final')`
+  - `flushAccounting(...)`
+  - Same warning message on failure
+
+## Decisions
+- None required. Pure consolidation with no behavior change.
+
+## Plan
+1. Add a `persistFinalArtifacts(accounting)` helper inside `AIAgentSession.run()`.
+2. Replace the two duplicate blocks with the helper call.
+
+## Implied decisions
+- Keep warning message text identical: `final persistence failed: ...`.
+
+## Testing requirements
+- `npm run lint`
+- `npm run build`
+- Phase 2 optional (no behavior change).
+
+## Documentation updates required
+- None (no runtime behavior change).
+
+---
+
+## Cleanup Candidate 6: Consolidate repeated accounting merge
+
+## TL;DR
+- `mergeAccountingEntries` is called with the same secondary array in three places.
+- Add a tiny helper to keep the merge calls consistent and reduce repetition.
+- Behavior stays identical.
+
+## Analysis (code review evidence)
+- Repeated merge calls in `src/ai-agent.ts`:
+  - Cache-hit path: `src/ai-agent.ts:1394`
+  - Normal path: `src/ai-agent.ts:1675`
+  - Uncaught error path: `src/ai-agent.ts:1744`
+- All three merge `flat(.accounting)` with `this.accounting`.
+
+## Decisions
+- None required. Pure consolidation with no behavior change.
+
+## Plan
+1. Add `mergeAccountingSnapshot(primary)` helper inside `AIAgentSession.run()`.
+2. Replace the three duplicate calls with the helper.
+
+## Implied decisions
+- Keep `mergeAccountingEntries` logic unchanged.
+
+## Testing requirements
+- `npm run lint`
+- `npm run build`
+- Phase 2 optional (no behavior change).
+
+## Documentation updates required
+- None (no runtime behavior change).
+
+---
+
 ## Cleanup Candidate 2: Consolidate duplicate log-merge logic (single point of reference)
 
 ## TL;DR
