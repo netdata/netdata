@@ -163,6 +163,14 @@
 - Improve(health/proxysql): add alerts ([#21548](https://github.com/netdata/netdata/issues/21548))
 - Regenerate integrations docs ([#21551](https://github.com/netdata/netdata/issues/21551))
 - Docs: Add reciprocal links between ephemerality and identity docs ([#21552](https://github.com/netdata/netdata/issues/21552))
+- Add SOC2 badge to security and privacy doc ([#21554](https://github.com/netdata/netdata/issues/21554))
+- OTEL logs ([#21356](https://github.com/netdata/netdata/issues/21356))
+- Additional checks in error paths ([#21541](https://github.com/netdata/netdata/issues/21541))
+- Adjust lock to prevent crash during ML calculations  ([#21555](https://github.com/netdata/netdata/issues/21555))
+- Fix(go.d/snmp): fix nil dereferencing when no profiles found ([#21557](https://github.com/netdata/netdata/issues/21557))
+- Fix(cgroups.plugin): correct is_cgroup_duplicate check ([#21559](https://github.com/netdata/netdata/issues/21559))
+- Add sentry error reporting ([#21558](https://github.com/netdata/netdata/issues/21558))
+- Allow systemd-journal plugin if journal-viewer does not exist. ([#21561](https://github.com/netdata/netdata/issues/21561))
 
 ## [2.8.0] - 2025-11-19
 
