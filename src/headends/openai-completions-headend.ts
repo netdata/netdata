@@ -21,6 +21,7 @@ import { collectLlmUsage } from './completions-usage.js';
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
 import { buildHeadendModelId } from './model-id-utils.js';
+import { refreshModelIdMap } from './model-map-utils.js';
 import { renderReasoningMarkdown, type ReasoningTurnState } from './reasoning-markdown.js';
 import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamMasterContent, shouldStreamOutput, shouldStreamTurnStarted } from './shared-event-filter.js';
 import { handleHeadendShutdown } from './shutdown-utils.js';
@@ -1036,12 +1037,7 @@ export class OpenAICompletionsHeadend implements Headend {
   }
 
   private refreshModelMap(): void {
-    this.modelIdMap.clear();
-    const seen = new Set<string>();
-    this.registry.list().forEach((meta) => {
-      const modelId = this.buildModelId(meta, seen);
-      this.modelIdMap.set(modelId, meta.id);
-    });
+    refreshModelIdMap(this.registry, this.modelIdMap, (meta, seen) => this.buildModelId(meta, seen));
   }
 
   private buildModelId(meta: AgentMetadata, seen: Set<string>): string {

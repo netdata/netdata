@@ -376,3 +376,41 @@ Append all you findings in this document.
 - Duplicated model ID generation in completions headends:
   - `src/headends/openai-completions-headend.ts:1058-1079`
   - `src/headends/anthropic-completions-headend.ts:1034-1061`
+
+---
+
+## Iteration 10 - Consolidate completions model map refresh
+
+### TL;DR
+- Extract the shared `refreshModelMap` logic into a helper used by OpenAI and Anthropic completions headends.
+- Add a unit test to lock the mapping behavior.
+
+### Analysis (facts only)
+- Both completions headends implement identical `refreshModelMap` logic:
+  - `src/headends/openai-completions-headend.ts:1055-1061`
+  - `src/headends/anthropic-completions-headend.ts:1025-1031`
+- Each clears the map, builds a `seen` set, iterates registry agents, and fills the map with `buildModelId(meta, seen)`.
+
+### Decisions
+- No user decisions required. Safe refactor with no behavior change.
+
+### Plan
+1. Add `src/headends/model-map-utils.ts` with `refreshModelIdMap(registry, map, buildModelId)`.
+2. Replace both headends’ `refreshModelMap` bodies to call the helper.
+3. Add a unit test under `src/tests/unit/`.
+4. Run `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Implied Decisions
+- Preserve the same `seen`-based de-dup semantics.
+
+### Testing requirements
+- Unit test for `refreshModelIdMap`.
+- Required checks: `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Documentation updates required
+- None. Refactor only.
+
+### Findings (append-only)
+- Duplicated `refreshModelMap` logic in completions headends:
+  - `src/headends/openai-completions-headend.ts:1055-1061`
+  - `src/headends/anthropic-completions-headend.ts:1025-1031`
