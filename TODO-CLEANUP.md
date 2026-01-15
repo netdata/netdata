@@ -505,3 +505,39 @@ Append all you findings in this document.
   - `src/headends/mcp-headend.ts:524-527`
   - `src/headends/embed-headend.ts:781-784`
   - `src/headends/rest-headend.ts:455-458`
+
+---
+
+## Iteration 13 - Reuse log entry helper for completions log messages
+
+### TL;DR
+- Replace duplicated context guards in completions headend `log` methods with the shared `logHeadendEntry` helper.
+- Keep log entry formatting unchanged.
+
+### Analysis (facts only)
+- OpenAI and Anthropic completions `log` methods are identical:
+  - `src/headends/openai-completions-headend.ts:1101-1104`
+  - `src/headends/anthropic-completions-headend.ts:999-1002`
+- Each method guards `this.context` then logs a `buildLog(...)` entry.
+- A shared helper `logHeadendEntry` already exists in `src/headends/headend-log-utils.ts` (Iteration 12).
+
+### Decisions
+- No user decisions required. Safe refactor with no behavior change.
+
+### Plan
+1. Update both completions headends to call `logHeadendEntry(this.context, buildLog(...))`.
+2. Run `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Implied Decisions
+- Preserve log entry structure and severity/detail handling.
+
+### Testing requirements
+- Existing unit coverage for `logHeadendEntry` plus standard checks.
+
+### Documentation updates required
+- None. Refactor only.
+
+### Findings (append-only)
+- Duplicated completions log methods with the same context guard:
+  - `src/headends/openai-completions-headend.ts:1101-1104`
+  - `src/headends/anthropic-completions-headend.ts:999-1002`

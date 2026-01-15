@@ -1099,8 +1099,7 @@ export class OpenAICompletionsHeadend implements Headend {
   }
 
   private log(message: string, severity: LogEntry['severity'] = 'VRB', fatal = false, details?: Record<string, LogDetailValue>): void {
-    if (this.context === undefined) return;
-    this.context.log(buildLog(this.id, this.label, message, severity, fatal, details));
+    logHeadendEntry(this.context, buildLog(this.id, this.label, message, severity, fatal, details));
   }
 
   private handleShutdownSignal(): void {
