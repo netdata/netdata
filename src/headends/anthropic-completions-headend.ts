@@ -12,6 +12,7 @@ import { AIAgent } from '../ai-agent.js';
 import { getTelemetryLabels } from '../telemetry/index.js';
 import { createDeferred, normalizeCallPath } from '../utils.js';
 
+import { resolveCompletionsAgent } from './completions-agent-resolution.js';
 import { buildCompletionsLogEntry } from './completions-log.js';
 import { buildPromptSections } from './completions-prompt.js';
 import { resolveFinalReportContent } from './completions-response.js';
@@ -940,16 +941,7 @@ export class AnthropicCompletionsHeadend implements Headend {
   }
 
   private resolveAgent(model: string): AgentMetadata | undefined {
-    this.refreshModelMap();
-    const direct = this.modelIdMap.get(model);
-    if (direct !== undefined) {
-      return this.registry.getMetadata(direct);
-    }
-    const resolved = this.registry.resolveAgentId(model);
-    if (resolved !== undefined) {
-      return this.registry.getMetadata(resolved);
-    }
-    return undefined;
+    return resolveCompletionsAgent(model, this.registry, this.modelIdMap, () => this.refreshModelMap());
   }
 
   private composePrompt(system: string | string[] | undefined, messages: AnthropicRequestMessage[]): string {

@@ -257,3 +257,44 @@ Append all you findings in this document.
 - Duplicated socket shutdown logic in REST/MCP headends:
   - `src/headends/rest-headend.ts:431-439`
   - `src/headends/mcp-headend.ts:522-531`
+
+---
+
+## Iteration 7 - Consolidate completions agent resolution
+
+### TL;DR
+- Extract the identical `resolveAgent` logic from OpenAI and Anthropic completions headends into a shared helper.
+- Add a focused unit test for the helper.
+
+### Analysis (facts only)
+- `resolveAgent` implementations are identical in both completions headends:
+  - `src/headends/openai-completions-headend.ts:986-996`
+  - `src/headends/anthropic-completions-headend.ts:951-961`
+- Logic flow:
+  - Refresh model map.
+  - Check direct model ID mapping.
+  - Fallback to registry alias resolution.
+
+### Decisions
+- No user decisions required. Safe refactor with no behavior change.
+
+### Plan
+1. Add `src/headends/completions-agent-resolution.ts` with `resolveCompletionsAgent()`.
+2. Replace both headends’ `resolveAgent` bodies to use the helper.
+3. Add a unit test under `src/tests/unit/`.
+4. Run `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Implied Decisions
+- Keep refresh timing and resolution order unchanged.
+
+### Testing requirements
+- Unit test: shared `resolveCompletionsAgent` helper.
+- Required checks: `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Documentation updates required
+- None. Refactor only.
+
+### Findings (append-only)
+- Duplicated `resolveAgent` logic in completions headends:
+  - `src/headends/openai-completions-headend.ts:986-996`
+  - `src/headends/anthropic-completions-headend.ts:951-961`
