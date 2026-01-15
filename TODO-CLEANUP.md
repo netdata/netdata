@@ -298,3 +298,43 @@ Append all you findings in this document.
 - Duplicated `resolveAgent` logic in completions headends:
   - `src/headends/openai-completions-headend.ts:986-996`
   - `src/headends/anthropic-completions-headend.ts:951-961`
+
+---
+
+## Iteration 8 - Consolidate shutdown signal handling for headends
+
+### TL;DR
+- Extract shared shutdown handling logic used by OpenAI/Anthropic/REST headends into one helper.
+- Add a unit test for the helper.
+
+### Analysis (facts only)
+- Identical `handleShutdownSignal` logic exists in three headends:
+  - `src/headends/openai-completions-headend.ts:1126-1131`
+  - `src/headends/anthropic-completions-headend.ts:1007-1012`
+  - `src/headends/rest-headend.ts:424-429`
+- Each method sets `globalStopRef.stopping = true` (if present) and then closes sockets.
+
+### Decisions
+- No user decisions required. Safe refactor with no behavior change.
+
+### Plan
+1. Add `src/headends/shutdown-utils.ts` with a helper to set stopRef and close sockets.
+2. Replace the three `handleShutdownSignal` bodies to call the helper.
+3. Add a unit test for the helper.
+4. Run `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Implied Decisions
+- Preserve exact shutdown behavior and call ordering.
+
+### Testing requirements
+- Unit test for shutdown helper.
+- Required checks: `npm run lint`, `npm run build`, `npm run test:phase1`.
+
+### Documentation updates required
+- None. Refactor only.
+
+### Findings (append-only)
+- Duplicated shutdown signal handling in OpenAI/Anthropic/REST headends:
+  - `src/headends/openai-completions-headend.ts:1126-1131`
+  - `src/headends/anthropic-completions-headend.ts:1007-1012`
+  - `src/headends/rest-headend.ts:424-429`

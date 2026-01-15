@@ -14,6 +14,7 @@ import { createDeferred, normalizeUrlPath } from '../utils.js';
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, writeJson } from './http-utils.js';
 import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamMasterContent, shouldStreamOutput } from './shared-event-filter.js';
+import { handleHeadendShutdown } from './shutdown-utils.js';
 import { closeSockets } from './socket-utils.js';
 
 const buildLog = (
@@ -426,10 +427,7 @@ export class RestHeadend implements Headend {
   }
 
   private handleShutdownSignal(): void {
-    if (this.globalStopRef !== undefined) {
-      this.globalStopRef.stopping = true;
-    }
-    this.closeActiveSockets();
+    handleHeadendShutdown(this.globalStopRef, () => { this.closeActiveSockets(); });
   }
 
   private closeActiveSockets(force = false): void {

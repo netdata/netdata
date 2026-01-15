@@ -22,6 +22,7 @@ import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
 import { renderReasoningMarkdown, type ReasoningTurnState } from './reasoning-markdown.js';
 import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamMasterContent, shouldStreamOutput, shouldStreamTurnStarted } from './shared-event-filter.js';
+import { handleHeadendShutdown } from './shutdown-utils.js';
 import { closeSockets } from './socket-utils.js';
 import { escapeMarkdown, formatMetricsLine, formatSummaryLine, italicize, resolveAgentHeadingLabel } from './summary-utils.js';
 
@@ -978,7 +979,7 @@ export class OpenAICompletionsHeadend implements Headend {
   }
 
   private resolveAgent(model: string): AgentMetadata | undefined {
-    return resolveCompletionsAgent(model, this.registry, this.modelIdMap, () => this.refreshModelMap());
+    return resolveCompletionsAgent(model, this.registry, this.modelIdMap, () => { this.refreshModelMap(); });
   }
 
   private buildPrompt(messages: OpenAIChatRequestMessage[]): string {
@@ -1116,10 +1117,7 @@ export class OpenAICompletionsHeadend implements Headend {
   }
 
   private handleShutdownSignal(): void {
-    if (this.globalStopRef !== undefined) {
-      this.globalStopRef.stopping = true;
-    }
-    this.closeActiveSockets();
+    handleHeadendShutdown(this.globalStopRef, () => { this.closeActiveSockets(); });
   }
 
   private closeActiveSockets(force = false): void {
