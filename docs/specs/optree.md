@@ -326,9 +326,9 @@ Features:
 ## Business Logic Coverage (Verified 2025-11-16)
 
 - **Reasoning capture**: `appendReasoningChunk` timestamps thinking deltas per operation and `setReasoningFinal` stores the merged summary so headends can render thinking transcripts after the fact (`src/session-tree.ts:200-260`).
-- **Child embedding**: `attachChildSession` nests sub-agent SessionNodes, preserving their entire turn/op trees; totals recomputation aggregates child tokens/costs into the parent (`src/session-tree.ts:300-446`).
+- **Child embedding**: `attachChildSession` nests sub-agent and tool_output SessionNodes, preserving their entire turn/op trees; totals recomputation aggregates child tokens/costs into the parent (`src/session-tree.ts:300-446`).
 - **Status/title publishing**: `setLatestStatus` and `setSessionTitle` update the root node and trigger callback invocations so UI clients see live progress (`src/session-tree.ts:120-190`).
-- **Operation payload retention**: Request/response payloads are stored in base64 under `payload.raw` (full HTTP/SSE capture) and `payload.sdk` (serialized SDK request/response). `truncated` is only set when upstream limits already shortened the payload (e.g., toolResponseMaxBytes or token-budget truncation) (`src/session-tree.ts:230-320`, `src/ai-agent.ts`, `src/session-turn-runner.ts`, `src/llm-client.ts`).
+- **Operation payload retention**: Request/response payloads are stored under `payload.raw` (full HTTP/SSE capture) and `payload.sdk` (serialized SDK request/response). LLM ops store a compact request summary (message count + bytes) and a response preview capped to `TRUNCATE_PREVIEW_BYTES`, including tool_output extraction calls. `truncated` is set when a tool response was replaced by a tool_output handle or when legacy size caps shorten a payload (`src/session-tree.ts:230-320`, `src/session-turn-runner.ts`, `src/tool-output/extractor.ts`, `src/tools/tools.ts`).
 
 ## Use Cases
 

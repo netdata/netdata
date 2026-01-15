@@ -10,13 +10,7 @@ import type { MCPTool, LogEntry, AccountingEntry, ProgressMetrics, LogDetailValu
 import type { ToolExecuteOptions, ToolExecuteResult, ToolKind, ToolProvider, ToolExecutionContext } from './types.js';
 
 import { recordToolMetrics, runWithSpan, addSpanAttributes, addSpanEvent, recordSpanError, recordQueueDepthMetrics, recordQueueWaitMetrics } from '../telemetry/index.js';
-import {
-  buildTruncationPrefix,
-  buildTruncationPrefixPlaceholder,
-  truncateJsonStringsWithInfo,
-  truncateToBytesWithInfo,
-  truncateToTokensWithInfo,
-} from '../truncation.js';
+import { truncateToBytesWithInfo } from '../truncation.js';
 import { appendCallPathSegment, formatToolRequestCompact, normalizeCallPath, sanitizeToolName, warn } from '../utils.js';
 
 import { queueManager, type AcquireResult, QueueAbortError } from './queue-manager.js';
@@ -53,17 +47,6 @@ const isCachedToolResult = (value: unknown): value is { result: string } => {
   return typeof record.result === 'string';
 };
 
-const TRUNCATION_PREFIX_SEPARATOR = '\n';
-
-const buildTruncationPrefixWithSeparator = (omitted: number, unit: 'bytes' | 'tokens'): string =>
-  `${buildTruncationPrefix(omitted, unit)}${TRUNCATION_PREFIX_SEPARATOR}`;
-
-const getTruncationPrefixBytesBudget = (unit: 'bytes' | 'tokens'): number =>
-  Buffer.byteLength(`${buildTruncationPrefixPlaceholder(unit)}${TRUNCATION_PREFIX_SEPARATOR}`, 'utf8');
-
-const getTruncationPrefixTokensBudget = (unit: 'bytes' | 'tokens', countTokens: (s: string) => number): number =>
-  countTokens(`${buildTruncationPrefixPlaceholder(unit)}${TRUNCATION_PREFIX_SEPARATOR}`);
-
 const computeTruncationPercent = (originalBytes: number, finalBytes: number): number => {
   if (originalBytes <= 0) return 0;
   const pct = ((originalBytes - finalBytes) / originalBytes) * 100;
@@ -79,8 +62,30 @@ export interface ToolBudgetReservation {
 
 export interface ToolBudgetCallbacks {
   reserveToolOutput: (output: string) => Promise<ToolBudgetReservation>;
+  previewToolOutput?: (output: string) => Promise<ToolBudgetReservation>;
   canExecuteTool: () => boolean;
   countTokens: (text: string) => number;  // Tokenizer for accurate budget truncation
+}
+
+export interface ToolOutputHandleRequest {
+  toolName: string;
+  toolArgsJson: string;
+  output: string;
+  sizeLimitBytes?: number;
+  budgetCallbacks?: ToolBudgetCallbacks;
+  sourceTarget?: { provider: string; model: string };
+  forceReason?: 'reserve_failed';
+}
+
+export interface ToolOutputHandleResult {
+  handle: string;
+  message: string;
+  stats: { bytes: number; lines: number; tokens: number };
+  reason: 'size_cap' | 'token_budget' | 'reserve_failed';
+}
+
+export interface ToolOutputHandler {
+  maybeStore: (req: ToolOutputHandleRequest) => Promise<ToolOutputHandleResult | undefined>;
 }
 
 interface ToolCacheContext {
@@ -123,6 +128,7 @@ export class ToolsOrchestrator {
     sessionInfo?: { agentId?: string; agentPath?: string; callPath?: string; txnId?: string; headendId?: string; telemetryLabels?: Record<string, string>; agentHash?: string },
     private readonly progress?: SessionProgressReporter,
     private readonly budgetCallbacks?: ToolBudgetCallbacks,
+    private readonly toolOutputHandler?: ToolOutputHandler,
     cacheContext?: ToolCacheContext,
   ) {
     const normalizedCallPath = sessionInfo?.callPath !== undefined ? normalizeCallPath(sessionInfo.callPath) : undefined;
@@ -334,9 +340,10 @@ export class ToolsOrchestrator {
     });
     // no spans; opTree is canonical
     // Begin hierarchical op (Option C).
-    // Only treat actual sub-agents as child 'session' ops (provider.namespace === 'subagent').
-    // Internal agent-scoped tools (provider.namespace === 'agent') should remain regular 'tool' ops to avoid ghost sessions.
-    const opKind = (kind === 'agent' && provider.namespace === 'subagent') ? 'session' : 'tool';
+    // Only treat sub-agents and tool_output as child 'session' ops.
+    // Internal agent-scoped tools (provider.namespace === 'agent') remain regular 'tool' ops.
+    const isSessionTool = kind === 'agent' && (provider.namespace === 'subagent' || provider.namespace === 'tool-output');
+    const opKind = isSessionTool ? 'session' : 'tool';
     const opId = (() => {
       try { return this.opTree.beginOp(ctx.turn, opKind, { name: effective, provider: logProviderNamespace, kind }); } catch { return undefined; }
     })();
@@ -702,8 +709,8 @@ export class ToolsOrchestrator {
     if (exec === undefined) {
       try {
         // Do not apply parent-level withTimeout to sub-agents; they manage their own timing
-        const isSubAgent = (kind === 'agent' && provider.namespace === 'subagent');
-        if (isSubAgent) {
+        const isSessionToolExec = isSessionTool;
+        if (isSessionToolExec) {
           const parentOpPath = (() => { try { return (opId !== undefined) ? this.opTree.getOpPath(opId) : undefined; } catch { return undefined; } })();
           const onChildOpTree = (tree: SessionNode) => {
             try {
@@ -848,6 +855,7 @@ export class ToolsOrchestrator {
 
     const safeExec = (() => { if (exec === undefined) { throw new Error('unexpected_undefined_execution_result'); } return exec; })();
     const raw = typeof safeExec.result === 'string' ? safeExec.result : '';
+    const rawBytes = Buffer.byteLength(raw, 'utf8');
     // Optional full response trace (raw, before truncation)
     if (this.opts.traceTools === true) {
       // Prefer provider-supplied raw payload when available
@@ -873,49 +881,113 @@ export class ToolsOrchestrator {
       };
       this.log(traceRes, { opId });
     }
-    const sizeBytes = Buffer.byteLength(raw, 'utf8');
     const limit = this.opts.toolResponseMaxBytes;
     const providerLabel = kind === 'mcp' ? safeExec.namespace : logProviderNamespace; // namespace label
     const providerField = kind === 'mcp'
       ? `${kind}:${providerLabel}`
       : logProviderLabel;
+    const toolOutputHandler = this.toolOutputHandler;
+    const isToolOutputTool = toolIdentity.tool === 'tool_output' || effective === 'tool_output';
+    const canHandleToolOutput = toolOutputHandler !== undefined && !isToolOutputTool && !isInternalAgentTool;
+    const toolArgsJson = (() => {
+      try {
+        return JSON.stringify(preparedParameters);
+      } catch {
+        return '{}';
+      }
+    })();
     let result = raw;
-    let truncatedForSize = false;
-    if (!isBatchTool && typeof limit === 'number' && limit > 0 && sizeBytes > limit) {
-      // Truncate first, because downstream token accounting (context guard) must
-      // operate on the already-clamped payload; do not reorder this block.
-      const prefixBudgetBytes = getTruncationPrefixBytesBudget('bytes');
-      const contentBudget = limit - prefixBudgetBytes;
-      const truncatedPayload = contentBudget > 0
-        ? (truncateJsonStringsWithInfo(raw, contentBudget) ?? truncateToBytesWithInfo(raw, contentBudget))
-        : undefined;
-      if (truncatedPayload?.truncated === true) {
-        const prefix = buildTruncationPrefixWithSeparator(truncatedPayload.omitted, 'bytes');
-        result = `${prefix}${truncatedPayload.value}`;
-        truncatedForSize = true;
-        const finalBytes = Buffer.byteLength(result, 'utf8');
-        const truncatedPct = computeTruncationPercent(sizeBytes, finalBytes);
+    let storedHandle: ToolOutputHandleResult | undefined;
+    let resultTruncated = false;
+    const logToolOutputHandle = (stored: ToolOutputHandleResult): void => {
+      const warnDetails: Record<string, LogDetailValue> = {
+        tool: composedToolName,
+        tool_namespace: toolIdentity.namespace,
+        provider: providerField,
+        tool_kind: kind,
+        handle: stored.handle,
+        reason: stored.reason,
+        bytes: stored.stats.bytes,
+        lines: stored.stats.lines,
+        tokens: stored.stats.tokens,
+        tool_output: true,
+      };
+      if (batchToolSummary !== undefined) {
+        warnDetails.batch_tools = batchToolSummary;
+      }
+      const warnLog: LogEntry = {
+        timestamp: Date.now(),
+        severity: 'WRN',
+        turn: ctx.turn,
+        subturn: ctx.subturn,
+        direction: 'response',
+        type: 'tool',
+        toolKind: kind,
+        remoteIdentifier,
+        fatal: false,
+        message: `Tool '${composedToolName}' output stored for tool_output (${stored.reason}).`,
+        details: warnDetails,
+      };
+      this.log(warnLog, { opId });
+    };
+    if (canHandleToolOutput) {
+      try {
+        storedHandle = await toolOutputHandler.maybeStore({
+          toolName: effective,
+          toolArgsJson,
+          output: raw,
+          sizeLimitBytes: limit,
+          budgetCallbacks,
+          sourceTarget: opts?.sourceTarget,
+        });
+      } catch (e) {
+        const msg = toErrorMessage(e);
+        const errLog: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'ERR',
+          turn: ctx.turn,
+          subturn: ctx.subturn,
+          direction: 'response',
+          type: 'tool',
+          toolKind: kind,
+          remoteIdentifier,
+          fatal: false,
+          message: `tool_output store failed: ${msg}`,
+          details: {
+            tool: composedToolName,
+            provider: providerField,
+          },
+        };
+        this.log(errLog, { opId });
+      }
+      if (storedHandle !== undefined) {
+        result = storedHandle.message;
+        logToolOutputHandle(storedHandle);
+      }
+    }
+
+    if (!canHandleToolOutput && !isBatchTool && typeof limit === 'number' && limit > 0) {
+      const originalBytes = Buffer.byteLength(result, 'utf8');
+      if (originalBytes > limit) {
+        const truncated = truncateToBytesWithInfo(result, limit);
+        const fallback = truncated?.value ?? Buffer.from(result, 'utf8').subarray(0, limit).toString('utf8');
+        const finalValue = fallback.length > 0 ? fallback : ' ';
+        const finalBytes = Buffer.byteLength(finalValue, 'utf8');
+        const truncatedPct = computeTruncationPercent(originalBytes, finalBytes);
+        result = finalValue;
+        resultTruncated = true;
         const warnDetails: Record<string, LogDetailValue> = {
           tool: composedToolName,
           tool_namespace: toolIdentity.namespace,
           provider: providerField,
           tool_kind: kind,
-          actual_bytes: sizeBytes,
-          original_bytes: sizeBytes,
+          original_bytes: originalBytes,
           final_bytes: finalBytes,
           truncated_pct: truncatedPct,
-          limit_bytes: limit,
+          reason: 'size_cap_truncated',
           truncated: true,
-          dropped: false,
-          reason: 'size_cap_exceeded',
         };
-        if (batchToolSummary !== undefined) {
-          warnDetails.batch_tools = batchToolSummary;
-        }
-        const sizeDescriptor = `actual ${String(sizeBytes)} B > limit ${String(limit)} B`;
-        const warnMessage = batchToolSummary !== undefined
-          ? `Tool '${composedToolName}' output truncated: response exceeded max size (${sizeDescriptor}; calls: ${batchToolSummary}).`
-          : `Tool '${composedToolName}' output truncated: response exceeded max size (${sizeDescriptor}).`;
+        if (batchToolSummary !== undefined) warnDetails.batch_tools = batchToolSummary;
         const warnLog: LogEntry = {
           timestamp: Date.now(),
           severity: 'WRN',
@@ -926,46 +998,7 @@ export class ToolsOrchestrator {
           toolKind: kind,
           remoteIdentifier,
           fatal: false,
-          message: warnMessage,
-          details: warnDetails,
-        };
-        this.log(warnLog, { opId });
-      } else {
-        result = '(tool failed: response exceeded max size)';
-        const finalBytes = Buffer.byteLength(result, 'utf8');
-        const truncatedPct = computeTruncationPercent(sizeBytes, finalBytes);
-        const warnDetails: Record<string, LogDetailValue> = {
-          tool: composedToolName,
-          tool_namespace: toolIdentity.namespace,
-          provider: providerField,
-          tool_kind: kind,
-          actual_bytes: sizeBytes,
-          original_bytes: sizeBytes,
-          final_bytes: finalBytes,
-          truncated_pct: truncatedPct,
-          limit_bytes: limit,
-          truncated: false,
-          dropped: true,
-          reason: 'size_cap_truncation_failed',
-        };
-        if (batchToolSummary !== undefined) {
-          warnDetails.batch_tools = batchToolSummary;
-        }
-        const sizeDescriptor = `actual ${String(sizeBytes)} B > limit ${String(limit)} B`;
-        const warnMessage = batchToolSummary !== undefined
-          ? `Tool '${composedToolName}' output dropped: response exceeded max size and truncation failed (${sizeDescriptor}; calls: ${batchToolSummary}).`
-          : `Tool '${composedToolName}' output dropped: response exceeded max size and truncation failed (${sizeDescriptor}).`;
-        const warnLog: LogEntry = {
-          timestamp: Date.now(),
-          severity: 'WRN',
-          turn: ctx.turn,
-          subturn: ctx.subturn,
-          direction: 'response',
-          type: 'tool',
-          toolKind: kind,
-          remoteIdentifier,
-          fatal: false,
-          message: warnMessage,
+          message: `Tool '${composedToolName}' output truncated to toolResponseMaxBytes (${String(limit)} bytes).`,
           details: warnDetails,
         };
         this.log(warnLog, { opId });
@@ -975,70 +1008,40 @@ export class ToolsOrchestrator {
     // Ensure non-empty result for downstream providers that expect a non-empty tool output
     if (result.length === 0) result = ' ';
     let resultBytes = Buffer.byteLength(result, 'utf8');
-    let truncatedForBudget = false;
-
     let reservation: ToolBudgetReservation = (!isInternalAgentTool && budgetCallbacks !== undefined)
       ? await budgetCallbacks.reserveToolOutput(result)
       : { ok: true };
 
-    // If reservation fails but we have available budget, try truncating to fit
-    if (!reservation.ok && budgetCallbacks !== undefined && reservation.availableTokens !== undefined && reservation.availableTokens > 0 && !truncatedForSize) {
-      const prefixTokensBudget = getTruncationPrefixTokensBudget('tokens', budgetCallbacks.countTokens);
-      const contentTokenBudget = reservation.availableTokens - prefixTokensBudget;
-      if (contentTokenBudget > 0) {
-        const originalBytesForBudget = Buffer.byteLength(result, 'utf8');
-        const truncatedInfo = truncateToTokensWithInfo(result, contentTokenBudget, budgetCallbacks.countTokens);
-        if (truncatedInfo?.truncated === true) {
-          const prefix = buildTruncationPrefixWithSeparator(truncatedInfo.omitted, 'tokens');
-          result = `${prefix}${truncatedInfo.value}`;
+    if (!reservation.ok && canHandleToolOutput && storedHandle === undefined && budgetCallbacks !== undefined) {
+      try {
+        const forcedHandle = await toolOutputHandler.maybeStore({
+          toolName: effective,
+          toolArgsJson,
+          output: raw,
+          sizeLimitBytes: limit,
+          budgetCallbacks,
+          sourceTarget: opts?.sourceTarget,
+          forceReason: 'reserve_failed',
+        });
+        if (forcedHandle !== undefined) {
+          storedHandle = forcedHandle;
+          result = forcedHandle.message;
+          if (result.length === 0) result = ' ';
           resultBytes = Buffer.byteLength(result, 'utf8');
-          truncatedForBudget = true;
-          const truncatedPct = computeTruncationPercent(originalBytesForBudget, resultBytes);
-          const warnDetails: Record<string, LogDetailValue> = {
-            tool: composedToolName,
-            tool_namespace: toolIdentity.namespace,
-            provider: providerField,
-            tool_kind: kind,
-            actual_bytes: originalBytesForBudget,
-            original_bytes: originalBytesForBudget,
-            final_bytes: resultBytes,
-            truncated_pct: truncatedPct,
-            tokens_available: reservation.availableTokens,
-            truncated: true,
-            dropped: false,
-            reason: 'token_budget_enforced',
-          };
-          if (batchToolSummary !== undefined) {
-            warnDetails.batch_tools = batchToolSummary;
-          }
-          const warnMessage = batchToolSummary !== undefined
-            ? `Tool '${composedToolName}' output truncated: token budget enforced (calls: ${batchToolSummary}).`
-            : `Tool '${composedToolName}' output truncated: token budget enforced.`;
-          const warnLog: LogEntry = {
-            timestamp: Date.now(),
-            severity: 'WRN',
-            turn: ctx.turn,
-            subturn: ctx.subturn,
-            direction: 'response',
-            type: 'tool',
-            toolKind: kind,
-            remoteIdentifier,
-            fatal: false,
-            message: warnMessage,
-            details: warnDetails,
-          };
-          this.log(warnLog, { opId });
-          // Retry reservation with truncated output
+          logToolOutputHandle(forcedHandle);
           reservation = await budgetCallbacks.reserveToolOutput(result);
         }
+      } catch (e) {
+        warn(`tool_output reserve fallback failed: ${toErrorMessage(e)}`);
       }
     }
 
     if (!reservation.ok) {
       const failureReason = reservation.reason ?? 'token_budget_exceeded';
       const failureStub = '(tool failed: context window budget exceeded)';
+      const dropResult = storedHandle !== undefined ? result : failureStub;
       const originalBytesForDrop = resultBytes;
-      const finalBytesForDrop = Buffer.byteLength(failureStub, 'utf8');
+      const finalBytesForDrop = Buffer.byteLength(dropResult, 'utf8');
       const truncatedPct = computeTruncationPercent(originalBytesForDrop, finalBytesForDrop);
       const dropDetails: Record<string, LogDetailValue> = {
         tool: composedToolName,
@@ -1048,11 +1051,10 @@ export class ToolsOrchestrator {
         original_bytes: originalBytesForDrop,
         final_bytes: finalBytesForDrop,
         truncated_pct: truncatedPct,
-        raw_bytes: sizeBytes,
+        raw_bytes: rawBytes,
         tokens_estimated: reservation.tokens ?? 0,
         reason: failureReason,
         truncated: result !== raw,
-        truncated_for_budget: truncatedForBudget,
         dropped: true,
         latency_ms: latency,
       };
@@ -1075,7 +1077,7 @@ export class ToolsOrchestrator {
         const failureMetrics: ProgressMetrics = {
           latencyMs: latency,
           charactersIn,
-          charactersOut: failureStub.length,
+          charactersOut: dropResult.length,
         };
         this.progress?.toolFinished({
           callPath: callPathLabel,
@@ -1095,7 +1097,7 @@ export class ToolsOrchestrator {
         mcpServer: providerLabel,
         command: name,
         charactersIn,
-        charactersOut: failureStub.length,
+        charactersOut: dropResult.length,
         error: failureReason,
       };
       try { if (opId !== undefined) this.opTree.appendAccounting(opId, accDrop); } catch (e) { warn(`tools accounting append failed: ${toErrorMessage(e)}`); }
@@ -1110,7 +1112,7 @@ export class ToolsOrchestrator {
         errorType: failureReason,
         latencyMs: latency,
         inputBytes,
-        outputBytes: Buffer.byteLength(failureStub, 'utf8'),
+        outputBytes: Buffer.byteLength(dropResult, 'utf8'),
         ...(sessionTelemetryLabels !== undefined ? { customLabels: sessionTelemetryLabels } : {}),
       } satisfies ToolMetricsRecord;
       recordToolMetrics(errorMetricsDrop);
@@ -1124,11 +1126,11 @@ export class ToolsOrchestrator {
       } catch (e) { warn(`tools endOp failed: ${toErrorMessage(e)}`); }
       return {
         ok: false,
-        result: failureStub,
+        result: dropResult,
         providerLabel,
         latency,
         charactersIn,
-        charactersOut: failureStub.length,
+        charactersOut: dropResult.length,
         tokens: reservation.tokens,
         dropped: true,
         reason: failureReason,
@@ -1151,7 +1153,11 @@ export class ToolsOrchestrator {
       responseDetails.tokens_estimated = reservation.tokens;
     }
     responseDetails.dropped = false;
-    responseDetails.truncated = truncatedForSize || truncatedForBudget;
+    responseDetails.truncated = storedHandle !== undefined;
+    if (storedHandle !== undefined) {
+      responseDetails.tool_output_handle = storedHandle.handle;
+      responseDetails.tool_output_reason = storedHandle.reason;
+    }
     const resPreview = (() => {
       try {
         const jsonified = JSON.stringify(raw);
@@ -1196,7 +1202,7 @@ export class ToolsOrchestrator {
     }
     try {
       if (opId !== undefined) {
-        this.opTree.setResponse(opId, { payload: result, size: resultBytes, truncated: truncatedForSize || truncatedForBudget });
+        this.opTree.setResponse(opId, { payload: result, size: resultBytes, truncated: storedHandle !== undefined || resultTruncated });
       }
     } catch (e) { warn(`tools setResponse failed: ${toErrorMessage(e)}`); }
 
@@ -1257,7 +1263,15 @@ export class ToolsOrchestrator {
       'ai.tool.output_bytes': result.length,
       'ai.tool.provider_label': providerLabel,
     });
-    if (cache !== undefined && cacheKeyPayload !== undefined && cacheHitEntry === undefined && typeof cacheTtlMs === 'number' && cacheTtlMs > 0) {
+    if (
+      cache !== undefined
+      && cacheKeyPayload !== undefined
+      && cacheHitEntry === undefined
+      && typeof cacheTtlMs === 'number'
+      && cacheTtlMs > 0
+      && storedHandle === undefined
+      && !isToolOutputTool
+    ) {
       const metadata: CacheEntryMetadata = {
         kind: 'tool',
         agentName: agentIdLabel,
@@ -1296,7 +1310,7 @@ export class ToolsOrchestrator {
   // Order: internal (final report + internal tools) first, then external tool providers
   getCombinedInstructions(): string {
     const external: string[] = [];
-    let internal: string | undefined;
+    const internal: string[] = [];
     // eslint-disable-next-line functional/no-loop-statements
     for (const provider of this.providers) {
       try {
@@ -1305,19 +1319,19 @@ export class ToolsOrchestrator {
         const trimmed = instr.trim();
         if (trimmed.length === 0) continue;
         if (provider.kind === 'agent') {
-          internal = trimmed;
+          internal.push(trimmed);
         } else {
           external.push(trimmed);
         }
       } catch (e) { warn(`getCombinedInstructions failed: ${toErrorMessage(e)}`); }
     }
-    if (external.length === 0 && internal === undefined) {
+    if (external.length === 0 && internal.length === 0) {
       return '';
     }
     const sections: string[] = [];
     // Internal instructions first (final report format + internal tools like task_status)
-    if (internal !== undefined) {
-      sections.push(internal);
+    if (internal.length > 0) {
+      sections.push(internal.join('\n\n'));
     }
     // External tool providers last
     if (external.length > 0) {

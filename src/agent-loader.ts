@@ -750,6 +750,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       reasoningValue: eff.reasoningValue,
       caching: eff.caching,
       contextWindow: options?.globalOverrides?.contextWindow,
+      toolOutput: fm?.options?.toolOutput,
     },
   };
   const agentHash = sha256Hex(stableStringify(agentHashPayload));
@@ -813,6 +814,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       traceSdk: eff.traceSdk,
       verbose: eff.verbose,
       toolResponseMaxBytes: eff.toolResponseMaxBytes,
+      toolOutput: fm?.options?.toolOutput,
       mcpInitConcurrency: eff.mcpInitConcurrency,
       reasoning: eff.reasoning,
       reasoningValue: eff.reasoningValue,

@@ -10,6 +10,8 @@ export interface ToolExecuteOptions {
   disableGlobalTimeout?: boolean;
   // When true, provider should emit detailed trace logs
   trace?: boolean;
+  // Source LLM target for tool execution (used for tool_output defaults)
+  sourceTarget?: { provider: string; model: string };
   // For sub-agents: stream live child opTree snapshots during execution
   onChildOpTree?: (tree: SessionNode) => void;
   // Parent op path label (e.g., 1.2). Used to prefix child log entry.path for hierarchical greppability

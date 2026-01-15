@@ -78,6 +78,8 @@ export class InternalToolProvider extends ToolProvider {
   private readonly maxToolCallsPerTurn: number;
   private instructions: string;
   private cachedBatchSchemas?: { schemas: Record<string, unknown>[]; summaries: { name: string; required: string[] }[] };
+  private cachedBatchSchemasKey?: string;
+  private listingTools = false;
   private readonly disableProgressTool: boolean;
   private readonly xmlSessionNonce: string;
 
@@ -105,84 +107,89 @@ export class InternalToolProvider extends ToolProvider {
   }
 
   listTools(): MCPTool[] {
+    this.listingTools = true;
     const tools: MCPTool[] = [];
-    if (!this.disableProgressTool) {
-      tools.push({
-        name: TASK_STATUS_TOOL,
-        description: 'Provides live feedback to the user about your accomplishments, pending items and goals. This tool is only updating the user. It does not perform any other actions.',
-        inputSchema: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['status', 'done', 'pending', 'now', 'ready_for_final_report', 'need_to_run_more_tools'],
-          properties: {
-            status: {
-              type: 'string',
-              enum: [...VALID_TASK_STATUSES],
-              description: 'The current status of the task assigned to you (pick one of the values)'
-            },
-            done: {
-              type: 'string',
-              description: 'What has been completed so far (up to 15 words)'
-            },
-            pending: {
-              type: 'string',
-              description: 'What remains to be done (up to 15 words)'
-            },
-            now: {
-              type: 'string',
-              description: 'Your immediate step - what you want to achieve with the tools you call now? (up to 15 words)'
-            },
-            ready_for_final_report: {
-              type: 'boolean',
-              description: 'Set to true when you have enough information to provide your final report/answer, false otherwise'
-            },
-            need_to_run_more_tools: {
-              type: 'boolean',
-              description: 'Set to true when you need to run more tools, false if you are done with tools'
-            }
-          }
-        }
-      });
-    }
-    // Final report: included for internal filtering (final-turn enforcement).
-    // The LLM uses XML wrapper to deliver reports, but the tool must be in the list
-    // so session-turn-runner can filter to it on final turn.
-    tools.push(this.buildFinalReportTool());
-    if (this.opts.enableBatch) {
-      const { schemas } = this.ensureBatchSchemas();
-      const fallbackItemSchema: Record<string, unknown> = {
-        type: 'object',
-        additionalProperties: true,
-        required: ['id', 'tool', 'parameters'],
-        properties: {
-          id: { oneOf: [ { type: 'string', minLength: 1 }, { type: 'number' } ] },
-          tool: { type: 'string', minLength: 1 },
-          parameters: {
+    try {
+      if (!this.disableProgressTool) {
+        tools.push({
+          name: TASK_STATUS_TOOL,
+          description: 'Provides live feedback to the user about your accomplishments, pending items and goals. This tool is only updating the user. It does not perform any other actions.',
+          inputSchema: {
             type: 'object',
-            additionalProperties: true,
-            description: DEFAULT_PARAMETERS_DESCRIPTION
-          }
-        }
-      };
-      const itemsSchema = schemas.length > 0 ? { anyOf: schemas } : fallbackItemSchema;
-      tools.push({
-        name: BATCH_TOOL,
-        description: 'Execute multiple tools in one call, reusing the schemas of all available tools.',
-        inputSchema: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['calls'],
-          properties: {
-            calls: {
-              type: 'array',
-              minItems: 1,
-              items: itemsSchema
+            additionalProperties: false,
+            required: ['status', 'done', 'pending', 'now', 'ready_for_final_report', 'need_to_run_more_tools'],
+            properties: {
+              status: {
+                type: 'string',
+                enum: [...VALID_TASK_STATUSES],
+                description: 'The current status of the task assigned to you (pick one of the values)'
+              },
+              done: {
+                type: 'string',
+                description: 'What has been completed so far (up to 15 words)'
+              },
+              pending: {
+                type: 'string',
+                description: 'What remains to be done (up to 15 words)'
+              },
+              now: {
+                type: 'string',
+                description: 'Your immediate step - what you want to achieve with the tools you call now? (up to 15 words)'
+              },
+              ready_for_final_report: {
+                type: 'boolean',
+                description: 'Set to true when you have enough information to provide your final report/answer, false otherwise'
+              },
+              need_to_run_more_tools: {
+                type: 'boolean',
+                description: 'Set to true when you need to run more tools, false if you are done with tools'
+              }
             }
           }
-        }
-      });
+        });
+      }
+      // Final report: included for internal filtering (final-turn enforcement).
+      // The LLM uses XML wrapper to deliver reports, but the tool must be in the list
+      // so session-turn-runner can filter to it on final turn.
+      tools.push(this.buildFinalReportTool());
+      if (this.opts.enableBatch) {
+        const { schemas } = this.ensureBatchSchemas();
+        const fallbackItemSchema: Record<string, unknown> = {
+          type: 'object',
+          additionalProperties: true,
+          required: ['id', 'tool', 'parameters'],
+          properties: {
+            id: { oneOf: [ { type: 'string', minLength: 1 }, { type: 'number' } ] },
+            tool: { type: 'string', minLength: 1 },
+            parameters: {
+              type: 'object',
+              additionalProperties: true,
+              description: DEFAULT_PARAMETERS_DESCRIPTION
+            }
+          }
+        };
+        const itemsSchema = schemas.length > 0 ? { anyOf: schemas } : fallbackItemSchema;
+        tools.push({
+          name: BATCH_TOOL,
+          description: 'Execute multiple tools in one call, reusing the schemas of all available tools.',
+          inputSchema: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['calls'],
+            properties: {
+              calls: {
+                type: 'array',
+                minItems: 1,
+                items: itemsSchema
+              }
+            }
+          }
+        });
+      }
+      return tools;
+    } finally {
+      this.listingTools = false;
     }
-    return tools;
   }
 
   hasTool(name: string): boolean {
@@ -930,7 +937,20 @@ export class InternalToolProvider extends ToolProvider {
   }
 
   private ensureBatchSchemas(): { schemas: Record<string, unknown>[]; summaries: { name: string; required: string[] }[] } {
-    if (this.cachedBatchSchemas !== undefined) return this.cachedBatchSchemas;
+    if (this.listingTools) {
+      return this.cachedBatchSchemas ?? { schemas: [], summaries: [] };
+    }
+    let available: MCPTool[] | undefined;
+    let toolKey: string | undefined;
+    try {
+      available = this.opts.orchestrator.listTools();
+      toolKey = available.map((tool) => tool.name).sort((a, b) => a.localeCompare(b)).join('|');
+      if (this.cachedBatchSchemas !== undefined && toolKey === this.cachedBatchSchemasKey) {
+        return this.cachedBatchSchemas;
+      }
+    } catch {
+      if (this.cachedBatchSchemas !== undefined) return this.cachedBatchSchemas;
+    }
     const schemas: Record<string, unknown>[] = [];
     const summaries: { name: string; required: string[] }[] = [];
     const idSchema: Record<string, unknown> = { oneOf: [ { type: 'string', minLength: 1 }, { type: 'number' } ] };
@@ -958,8 +978,8 @@ export class InternalToolProvider extends ToolProvider {
     };
 
     try {
-      const available = this.opts.orchestrator.listTools();
-      available.forEach((tool) => {
+      const tools = available ?? this.opts.orchestrator.listTools();
+      tools.forEach((tool) => {
         const name = tool.name;
         if (!name || name === FINAL_REPORT_TOOL || name === BATCH_TOOL) return;
         pushSchema(name, tool.inputSchema);
@@ -985,6 +1005,7 @@ export class InternalToolProvider extends ToolProvider {
     }
 
     this.cachedBatchSchemas = { schemas, summaries };
+    this.cachedBatchSchemasKey = toolKey;
     return this.cachedBatchSchemas;
   }
 

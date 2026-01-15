@@ -9,6 +9,17 @@
 - **Blind truncation happens in the main session**:
   - `applyToolResponseCap` truncates tool output in `src/ai-agent.ts` and logs warnings. (Evidence: `src/ai-agent.ts:1147-1215`)
   - Context guard drops tool output entirely with `(tool failed: context window budget exceeded)` in `src/session-tool-executor.ts`. (Evidence: `src/session-tool-executor.ts:457-617`)
+- **Tool outputs are already truncated/dropped inside ToolsOrchestrator**:
+  - Size cap + truncation happens before session-tool-executor sees the result. (Evidence: `src/tools/tools.ts:876-973`)
+  - Token-budget enforcement can truncate or drop after execution. (Evidence: `src/tools/tools.ts:980-1033`)
+- **Context guard enforces final turn on tool preflight**:
+  - Tool budget reservation enforces final turn when exceeded. (Evidence: `src/context-guard.ts:391-409`)
+  - ToolsOrchestrator uses those callbacks for external tool results. (Evidence: `src/ai-agent.ts:586-607`)
+- **Batch tool schema is cached and based on current tool list**:
+  - `cachedBatchSchemas` is built once from `orchestrator.listTools()` and reused. (Evidence: `src/tools/internal-provider.ts:932-988`)
+  - Cache is only refreshed via `warmupWithOrchestrator()` (not called today). (Evidence: `src/tools/internal-provider.ts:1014-1017`)
+- **Tool output is sanitized after execution**:
+  - Tool output is sanitized for Unicode surrogate safety before any extra capping. (Evidence: `src/session-tool-executor.ts:457-467`)
 - **No tool-output store exists**:
   - Tool results are appended directly to conversation/opTree; no handle, no retrieval path. (Evidence: `src/ai-agent.ts`, `src/session-tool-executor.ts`)
 - **Internal tools are fixed**:
@@ -21,6 +32,91 @@
 - Large tool outputs are truncated or dropped, losing critical information.
 - The model cannot control what is preserved.
 - We need a consistent, single internal tool to extract from large outputs, using a dedicated extraction module.
+
+## Non‑Negotiable Constraints (Costa)
+- **All features must be tested across main components and their features.**
+- **All truncation‑dependent tests must be adapted** because truncation moves into `tool_output`.
+- **`tool_output` must remain isolated** (no spreading into core).
+- **Core loops must not grow**; they must **shrink** (move logic out).
+- **`tool_output` accounting must be aggregated at the session level**, similar to sub‑agents.
+- **opTree + snapshots must include tool_output sub‑agent and extraction LLM calls.**
+
+## Pre‑Change Test Baseline (2026-01-15T01:46:04+02:00)
+- `npm run lint` — **PASS**
+- `npm run build` — **PASS**
+- `npm run test:phase1` — **PASS**
+- `npm run test:phase2` — **PASS** (268/268)
+- Observed warnings during Phase 2 (suite still passed):
+  - MODEL_ERROR_DIAGNOSTIC (expected simulated errors in fixtures)
+  - traced fetch clone warnings
+  - unreadable env file warning (fixture)
+  - lingering handles warning (fixture teardown)
+  - persistence EEXIST warnings (fixture)
+
+## Implementation Status (2026-01-15)
+- **Module scaffold created** under `src/tool-output/`:
+  - `types.ts`, `config.ts`, `store.ts`, `formatter.ts`, `stats.ts`, `chunking.ts`, `handler.ts`, `extractor.ts`, `provider.ts`.
+- **Context guard budget preview added**:
+  - `previewToolOutput` in `src/context-guard.ts` (used to evaluate handle text without forcing final turn).
+- **ToolsOrchestrator types extended**:
+  - `ToolOutputHandler` + handle request/response types in `src/tools/tools.ts`.
+- **Core truncation paths still active** (not yet replaced):
+  - size cap + token budget truncation still in `src/tools/tools.ts`.
+  - `applyToolResponseCap` still in `src/ai-agent.ts` / `src/session-tool-executor.ts`.
+- **Internal tool registration not done yet**:
+  - `tool_output` not yet wired in `src/tools/internal-provider.ts` or `src/ai-agent.ts`.
+
+## Implementation Status Update (2026-01-15)
+- **tool_output is wired end-to-end**:
+  - ToolOutputStore + handler + provider + extractor integrated and registered. (Evidence: `src/ai-agent.ts`, `src/tool-output/*`)
+  - Oversized outputs are stored and replaced with handle messages; context guard previews handle text. (Evidence: `src/tools/tools.ts`, `src/context-guard.ts`, `src/tool-output/handler.ts`)
+  - When budget reservation fails after storing a handle, the handle is returned instead of the failure stub to preserve the handle for the model. (Evidence: `src/tools/tools.ts`)
+- **Test fixture update**:
+  - Added `context-guard-budget` payload (10,000 bytes) to reliably trigger token-budget storage without size-cap. (Evidence: `src/tests/mcp/test-stdio-server.ts`, `src/tests/fixtures/test-llm-scenarios.ts`)
+- **opTree payload sizing updated**:
+  - tool_output extraction LLM ops now store message count + byte size and cap response previews to `TRUNCATE_PREVIEW_BYTES` to avoid memory blowups. (Evidence: `src/tool-output/extractor.ts`)
+- **Legacy size cap fallback restored when tool_output disabled**:
+  - toolResponseMaxBytes truncation re-applied when tool_output handler is absent. (Evidence: `src/tools/tools.ts`)
+- **Phase 2 OOM resolved**:
+  - Guarded InternalToolProvider batch schema rebuild to avoid recursive listTools during listTools. (Evidence: `src/tools/internal-provider.ts`)
+- **Harness stability + handle detection updates**:
+  - Batch tool_output handle detection now parses JSON payloads. (Evidence: `src/tests/phase2-harness-scenarios/phase2-runner.ts`)
+  - context-token-double-count selects post-tool request log by turn/subturn instead of log order. (Evidence: `src/tests/phase2-harness-scenarios/phase2-runner.ts`)
+  - run-test-budget-truncation-preserves-output moved to sequential to avoid shared MCP restart contention. (Evidence: `src/tests/phase2-harness-scenarios/phase2-runner.ts`)
+
+## Post-Change Test Runs (2026-01-15)
+- `npm run lint` — **PASS**
+- `npm run build` — **PASS**
+- `npm run test:phase1` — **PASS** (240 tests)
+- `npm run test:phase2` / `PHASE2_MODE=sequential node dist/tests/phase2-harness.js` — **FAIL (OOM)**  
+  - Node hits heap limit after ~5 sequential scenarios.  
+  - Evidence: `/tmp/phase2-seq.log` (OOM stack trace, heap ~4GB).
+
+## Post-Change Test Runs (2026-01-15, latest)
+- `npm run lint` — **PASS**
+- `npm run build` — **PASS**
+- `npm run test:phase1` — **PASS** (240 tests, Vitest poolOptions deprecation warning)
+- `npm run test:phase2` — **PASS** (268/268; 158 parallel, 110 sequential)
+  - Expected warnings during Phase 2:
+    - MODEL_ERROR_DIAGNOSTIC (fixture coverage)
+    - traced fetch clone warnings (fixtures)
+    - unreadable env file warning (fixture)
+    - lingering handles warning (fixture teardown)
+
+## Feasibility Study (2026-01-14)
+### Facts (with evidence)
+- Tool outputs are truncated in **two** places today (ToolsOrchestrator + `applyToolResponseCap`), so replacing truncation requires changing multiple layers. (Evidence: `src/tools/tools.ts:876-973`, `src/ai-agent.ts:1147-1215`, `src/session-tool-executor.ts:465-467`)
+- Context-guard enforcement happens **before** the session can see the oversized content, so a handle-based approach must integrate at or before the tool budget reservation step. (Evidence: `src/context-guard.ts:391-409`, `src/tools/tools.ts:980-1033`)
+- `agent__batch` uses a cached tool schema built from the tool list; dynamic tools (like `tool_output`) will not be reflected unless we refresh that cache. (Evidence: `src/tools/internal-provider.ts:932-1017`)
+
+### Stress points already covered by existing decisions
+- Store outputs on disk with a handle and only for oversized cases → avoids memory blowups and keeps the main loop clean. (Decisions 1, 10, 11)
+- Use a dedicated `tool_output` tool with explicit handle + extract instructions → gives the model control and preserves context budget. (Decisions 2, 2a, 2b)
+- Route extraction strategies in a separate module and fall back to truncation only inside the module → isolates risk to the new module. (Decisions 3, 4, 5)
+- Limit the read/grep sub-agent to Read + Grep only → keeps blast radius small. (Decision 8)
+
+### Speculation (clearly labeled)
+- **Speculation**: The design is feasible but will require a refactor in `src/tools/tools.ts`, `src/session-tool-executor.ts`, and `src/context-guard.ts`, plus updates to batch tool schema caching and tests. This is medium-to-high risk because these are core flow paths.
 
 ## Proposed Design (brainstorming, not final)
 ### 1) ToolOutputStore (per session)
@@ -281,15 +377,113 @@ OUTPUT FORMAT (required)
    - Decision: **A** (include tool name + arguments; low complexity).
    - Tool arguments format: **A** (verbatim JSON string).
 
-## Plan (implementation, not started)
-1) Create `src/tool-output/` module (policy + chunked extraction + read/grep adapter).
-2) Add ToolOutputStore (session scoped) + write large tool outputs to configurable `/tmp/ai-agent-{session-trxid}/`.
-3) Add internal tool `tool_output` in `internal-provider.ts`.
-4) Remove or disable `applyToolResponseCap` in main session; replace with handle creation.
-5) Add dynamic sub-agent spawn logic for `Read/Grep` only, pinned to session tmp dir.
-6) Wire accounting + logs for: handle creation, extraction mode, failures, truncation fallback.
-7) Update Phase 1 + Phase 2 tests.
-8) Update documentation.
+18) **Interception point for ToolOutputStore + handle replacement**
+   - Context: tool outputs are currently size‑capped and budget‑checked in ToolsOrchestrator **before** SessionToolExecutor sees them. (Evidence: `src/tools/tools.ts:876-1033`)
+   - A) Intercept in `ToolsOrchestrator.executeWithManagement` right after raw tool output, before size cap/budget/cache
+     - Pros: preserves raw output; avoids double caps; lets context guard evaluate the handle message.
+     - Cons: deepest core change; touches cache + budget flow.
+   - B) Intercept in `SessionToolExecutor` after managed result
+     - Pros: smaller surface change.
+     - Cons: only sees already‑truncated output; context guard already fired; defeats goal.
+   - C) Intercept inside provider (MCP/REST) before ToolsOrchestrator
+     - Pros: preserves raw output.
+     - Cons: duplicated logic per provider; misses internal/sub‑agent tools.
+   - Recommendation: **A** (single authoritative place; preserves full output).
+   - Decision: **A** (best maintainability: one authoritative path in ToolsOrchestrator).
+
+19) **Context‑guard behavior when returning a handle**
+   - Context: tool budget reservation currently enforces a forced final turn on overflow. (Evidence: `src/context-guard.ts:391-409`)
+   - A) Evaluate budget on the handle message and **do not** force final turn unless the handle itself overflows
+     - Pros: preserves normal flow; handle stays small; aligns with goal.
+     - Cons: requires new guard path and tests.
+   - B) Keep forced final turn even when returning a handle
+     - Pros: minimal guard changes.
+     - Cons: negates benefit (model can’t use tool_output if final turn disables tools).
+   - Recommendation: **A**.
+   - Decision: **A**.
+
+20) **Extraction model selection (full‑chunked path)**
+   - A) Use the **current** provider/model pair for the active turn (default)
+     - Pros: minimal config; consistent behavior.
+     - Cons: might be expensive; retries tied to current provider health.
+   - B) Use the session’s full `targets` list (in order)
+     - Pros: resiliency across providers.
+     - Cons: more variability; may change output quality.
+   - C) Add a dedicated config override for extraction targets
+     - Pros: explicit control; can choose cheaper model.
+     - Cons: new config surface + docs.
+   - Recommendation: **C** with default fallback to **A** when not configured.
+   - Decision: **Configurable**; if absent, default to current session provider/model.
+
+21) **Tool cache interaction for oversized outputs**
+   - Context: cache stores the **post‑processed** tool result. (Evidence: `src/tools/tools.ts:1248-1273`)
+   - A) Skip caching when output is stored in ToolOutputStore
+     - Pros: avoids caching handles/truncated results; simpler behavior.
+     - Cons: less cache reuse for large outputs.
+   - B) Cache the handle message only
+     - Pros: consistent caching layer; avoids storing large payloads.
+     - Cons: handle may expire or be session‑scoped; stale reuse risk.
+   - C) Cache raw output separately (metadata + content) and re‑emit handle on hit
+     - Pros: preserves large outputs across cache hits.
+     - Cons: more complexity; potential storage bloat.
+   - Recommendation: **A** (simple + safe for session‑scoped handles).
+   - Decision: Cache behavior is unchanged for normal tools; if a cached or live tool output is oversized we still store it in ToolOutputStore and return the handle message; **tool_output results are never cached**.
+
+22) **Stored content fidelity (raw vs sanitized)**
+   - Context: tool output is sanitized before LLM use. (Evidence: `src/session-tool-executor.ts:457-467`)
+   - A) Store **raw** tool output
+     - Pros: maximum fidelity.
+     - Cons: may contain invalid surrogates; file write or downstream parsing risk.
+   - B) Store **sanitized** output only
+     - Pros: safer for file I/O and LLM extraction.
+     - Cons: tiny fidelity loss for invalid codepoints.
+   - C) Store both (raw + sanitized)
+     - Pros: fidelity + safety.
+     - Cons: extra storage + complexity.
+   - Recommendation: **B** unless you need exact raw fidelity.
+   - Decision: **B** (store sanitized output).
+
+23) **Metadata storage format**
+   - A) In‑memory map keyed by handle + output file only
+     - Pros: simplest; no extra files.
+     - Cons: lost on crash; can’t inspect later.
+   - B) Sidecar JSON file per handle
+     - Pros: debuggable; survives crashes during session.
+     - Cons: more files; cleanup complexity.
+   - C) Both in‑memory + sidecar
+     - Pros: fastest lookups + persistence.
+     - Cons: most complex.
+   - Recommendation: **A** (session‑scoped storage).
+   - Decision: **A**.
+
+24) **tool_output opTree payload sizing**
+   - Context: tool_output extraction LLM calls can include very large chunk text in opTree.
+   - Decision: **Store summary-only requests** (message count + byte size) and **truncate response previews** using `TRUNCATE_PREVIEW_BYTES`.
+   - Rationale: avoids memory blowups while still including extraction LLM calls in opTree/snapshots.
+
+25) **Size cap when tool_output is disabled**
+   - Context: without tool_output handler, toolResponseMaxBytes is no longer enforced.
+   - Decision: **Restore legacy truncation when tool_output is disabled** (preserve size cap only in that path).
+   - Rationale: maintain backward compatibility and prevent unbounded tool outputs (e.g., read/grep sub-agent).
+
+## Plan (implementation in progress)
+1) Decisions finalized (18–23 complete). ✅
+2) Create `src/tool-output/` module (store + policy + extraction strategies). ✅ (scaffolded)
+3) Add ToolOutputStore (session scoped) + write oversized tool outputs to configurable `/tmp/ai-agent-{session-trxid}/`. ✅
+4) Refactor tool-output pipeline:
+   - Intercept raw tool outputs at the chosen layer. ✅
+   - Replace truncation with handle message (per 2a) when oversized. ✅
+   - Ensure context guard reserves tokens for handle text, not full output. ✅
+   - Remove/disable redundant `applyToolResponseCap` path. ✅
+5) Add internal tool `tool_output` in `internal-provider.ts` and wire to module. ✅
+6) Implement extraction strategies:
+   - full‑chunked (map/reduce) using selected extraction model targets. ✅
+   - read/grep via dynamic sub‑agent with filesystem MCP pinned to tmp dir. ✅
+7) Fix batch schema caching so `tool_output` is included when enabled. ✅
+8) Wire accounting + logs for: handle creation, extraction mode, failures, truncation fallback. ✅
+9) Update Phase 1 + Phase 2 tests (size cap + context‑guard scenarios), plus any truncation‑dependent fixtures. ✅
+10) Run full lint/build and test suites per project rules. ✅ (lint/build/phase1/phase2 pass)
+11) Update documentation (specs + guide + internal API + README). ✅
 
 ## Implied Decisions
 - Truncation is now an **extraction fallback**, not a main-session default.
@@ -306,6 +500,7 @@ OUTPUT FORMAT (required)
   - Large tool output → handle → tool_output extract
   - Huge single-line JSON → forces full-chunked
   - Standard multi-line text → read/grep path
+  - Update all existing truncation scenarios to validate handle + tool_output behavior
 
 ## Documentation Updates
 - `docs/SPECS.md`: new tool_output behavior, routing, and storage.

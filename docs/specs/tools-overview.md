@@ -322,7 +322,7 @@ interface MCPTool {
 | Setting | Effect |
 |---------|--------|
 | `toolTimeout` | Global timeout per tool execution |
-| `toolResponseMaxBytes` | Max response size cap |
+| `toolResponseMaxBytes` | Oversize tool outputs stored + tool_output handle inserted |
 | `traceMCP` | Enable MCP tracing logs |
 | `mcpInitConcurrency` | Parallel MCP server initialization |
 | `tools` (frontmatter) | Enabled tool list filter |
@@ -420,7 +420,8 @@ interface MCPTool {
 - **Tool filtering**: MCP servers and providers respect `toolsAllowed` / `toolsDenied` lists so administrators can expose only safe operations (`src/tools/mcp-provider.ts:120-220`). Internal helper `sanitizeToolName` ensures comparisons ignore `<|prefix|>` wrappers (`src/utils.ts`).
 - **Process tree killing**: Stdio MCP provider tracks child PIDs and uses `killProcessTree` to terminate servers on shutdown/restart, preventing orphaned processes (`src/tools/mcp-provider.ts:460-520`).
 - **Shared MCP registry**: Shared servers (`shared !== false`) keep a reference count so multiple sessions reuse the same transport and automatically restart if `onclose` fires (`src/tools/mcp-provider.ts:540-680`).
-- **Tool budget + truncation**: Orchestrator enforces `toolResponseMaxBytes` before committing outputs, truncates with a prefix + mid-marker, and logs warnings including `original_bytes`, `final_bytes`, `truncated_pct`, and size/token limits (`src/tools/tools.ts`).
+- **Tool budget + tool_output**: Orchestrator stores oversize outputs (size cap or token budget) and replaces them with a `tool_output` handle message. Warnings include `handle`, `reason`, `bytes`, `lines`, and `tokens` (`src/tools/tools.ts`).
+- **Legacy size cap fallback**: When tool_output is disabled, `toolResponseMaxBytes` is still enforced by truncating tool outputs in the orchestrator to avoid unbounded payloads (`src/tools/tools.ts`).
 
 ### OpenAPI Importer
 11. **Automatic REST tool generation**:
@@ -437,7 +438,7 @@ interface MCPTool {
 - Tool discovery
 - Execution routing
 - Timeout enforcement
-- Size cap application
+- Size cap + tool_output handle insertion
 - Error handling
 - Queue management
 
@@ -460,11 +461,9 @@ interface MCPTool {
 - Check requestTimeoutMs per server
 - Check network latency
 
-### Large response truncated
+### Large response stored for tool_output
 - Check toolResponseMaxBytes setting
-- Response uses 50/50 split with **two markers**:
-  - Prefix: `[TRUNCATED IN THE MIDDLE BY ~X BYTES/TOKENS]`
-  - Mid-marker: `[···TRUNCATED N bytes/tokens···]`
+- Confirm tool_output handle message is returned and warning log includes `handle` + `reason`
 
 ### MCP connection failed
 - Check command/args for stdio

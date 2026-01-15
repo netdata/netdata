@@ -234,5 +234,5 @@ No direct logging in provider. Child session logs independently with inherited t
 
 ### Result too large
 - Check child final report size
-- Verify result not truncated
+- Verify tool_output handle is inserted for oversize results
 - Review accounting entry count

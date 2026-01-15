@@ -3,7 +3,8 @@ import path from "node:path";
 
 import * as yaml from "js-yaml";
 
-import type { ReasoningLevel, CachingMode } from "./types.js";
+import type { ToolOutputConfigInput } from "./tool-output/types.js";
+import type { CachingMode, ReasoningLevel } from "./types.js";
 
 import {
   getFrontmatterAllowedKeys,
@@ -31,6 +32,7 @@ export interface FrontmatterOptions {
   maxOutputTokens?: number;
   repeatPenalty?: number | null;
   toolResponseMaxBytes?: number;
+  toolOutput?: ToolOutputConfigInput;
   reasoning?: ReasoningLevel | "none";
   reasoningTokens?: number | string;
   caching?: CachingMode;
@@ -115,6 +117,7 @@ export function parseFrontmatter(
         "input",
         "toolName",
         "router",
+        "toolOutput",
         ...fmAllowed,
       ]);
       const unknownKeys = Object.keys(raw).filter(
@@ -217,6 +220,35 @@ export function parseFrontmatter(
       options.cache = raw.cache;
     if (typeof raw.toolResponseMaxBytes === "number")
       options.toolResponseMaxBytes = raw.toolResponseMaxBytes;
+    if (raw.toolOutput !== undefined) {
+      const rawToolOutput = raw.toolOutput;
+      if (
+        rawToolOutput !== null &&
+        typeof rawToolOutput === "object" &&
+        !Array.isArray(rawToolOutput)
+      ) {
+        const toolOutputRecord = rawToolOutput as Record<string, unknown>;
+        const parsed: ToolOutputConfigInput = {};
+        if (typeof toolOutputRecord.enabled === "boolean")
+          parsed.enabled = toolOutputRecord.enabled;
+        if (typeof toolOutputRecord.storeDir === "string")
+          parsed.storeDir = toolOutputRecord.storeDir;
+        if (typeof toolOutputRecord.maxChunks === "number")
+          parsed.maxChunks = toolOutputRecord.maxChunks;
+        if (typeof toolOutputRecord.overlapPercent === "number")
+          parsed.overlapPercent = toolOutputRecord.overlapPercent;
+        if (typeof toolOutputRecord.avgLineBytesThreshold === "number")
+          parsed.avgLineBytesThreshold = toolOutputRecord.avgLineBytesThreshold;
+        if (
+          typeof toolOutputRecord.models === "string" ||
+          Array.isArray(toolOutputRecord.models)
+        )
+          parsed.models = toolOutputRecord.models as string | string[];
+        options.toolOutput = parsed;
+      } else {
+        throw new Error("toolOutput must be an object in frontmatter");
+      }
+    }
     if (typeof raw.maxOutputTokens === "number")
       options.maxOutputTokens = raw.maxOutputTokens;
     // Parse nullable numeric params (accept special strings like 'none', 'off', 'unset', 'default', 'null')

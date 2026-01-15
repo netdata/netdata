@@ -298,7 +298,7 @@ interface SessionTotals {
 - **Cache-aware totals**: LLM entries normalize `totalTokens` by adding cache read/write tokens when providers omit them, ensuring downstream dashboards match actual billing (`src/ai-agent.ts:1777-1797`).
 - **Cost resolution order**: Router metadata (e.g., OpenRouter `actualProvider`/`actualModel`, upstream and downstream costs) always overrides pricing-table estimates; only when metadata lacks cost do we evaluate `config.pricing` entries (`src/ai-agent.ts:1798-1844`).
 - **Ledger persistence**: `flushAccounting` emits `onEvent(type='accounting_flush')`; when `persistence.billingFile` is configured, `createPersistenceCallbacks` hooks that event and appends each batch as JSONL lines on disk (`src/ai-agent.ts:388-408`, `src/persistence.ts:1-75`).
-- **Tool character counts**: Tool entries store the serialized parameter/result `.length` (approximate character count) for in/out payloads, so even truncated responses show the number of characters originally returned (`src/tools/tools.ts:330-520`).
+- **Tool character counts**: Tool entries store the serialized parameter/result `.length` (approximate character count) for in/out payloads **after** any tool_output handle replacement (`src/tools/tools.ts:330-520`). Original sizes for oversized outputs are recorded in warning logs (`bytes`, `lines`, `tokens`).
 - **Trace propagation**: Entries capture `txnId`, `parentTxnId`, `originTxnId`, and `callPath` so multi-agent billing can be correlated through the session tree (`src/ai-agent.ts:1765-1868`, `src/types.ts:636-680`).
 
 ## Troubleshooting

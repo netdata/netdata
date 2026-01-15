@@ -410,6 +410,19 @@ export class ContextGuard {
           return { ok: true as const, tokens };
         });
       },
+      previewToolOutput: async (output: string): Promise<ToolBudgetReservation> => {
+        return await this.mutex.runExclusive(() => {
+          const tokens = this.estimateTokens([{ role: 'tool', content: output }]);
+          const guard = this.evaluate(tokens);
+          if (guard.blocked.length > 0) {
+            const baseProjected = this.currentCtxTokens + this.pendingCtxTokens + this.newCtxTokens;
+            const minLimit = Math.min(...guard.blocked.map((entry) => entry.limit));
+            const availableTokens = Math.max(0, minLimit - baseProjected);
+            return { ok: false as const, tokens, reason: 'token_budget_exceeded', availableTokens };
+          }
+          return { ok: true as const, tokens };
+        });
+      },
       canExecuteTool: () => !this.toolBudgetExceeded,
       countTokens: (text: string): number => {
         // Use the same tokenizer logic as estimateTokens for consistency

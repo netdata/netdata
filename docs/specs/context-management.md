@@ -210,7 +210,7 @@ When forced final turn but still over limit:
 
 - **Per-provider outcomes**: `evaluateContextForProvider` returns `ok`, `skip`, or `final` so large-context providers can be skipped without forcing the entire session into final-turn mode (`src/ai-agent.ts:1386-1516`).
 - **Context telemetry**: Every enforcement emits `recordContextGuardMetrics` with `{provider, model, trigger, outcome, remaining_tokens}` so dashboards can alert on chronic guard hits (`src/ai-agent.ts:2323-2368`).
-- **Tool budget mutex**: Tool output reservations run inside a mutex so overlapping tool calls cannot simultaneously exceed the byte cap or race on `toolBudgetExceeded` (`src/ai-agent.ts:516-562`).
+- **Tool budget mutex**: Tool output reservations and tool_output handle checks run inside a mutex so overlapping tool calls cannot race on `toolResponseMaxBytes` or `toolBudgetExceeded` (`src/ai-agent.ts:516-562`).
 - **Schema shrink logic**: When the guard fires, the session recomputes schema tokens for the remaining tools (usually just `agent__final_report`) and logs explicit WARN entries if still over limit before proceeding (`src/ai-agent.ts:2345-2405`).
 - **Forced-final messaging**: Guard activations push a deterministic system message plus `forcedFinalTurnReason='context'`, which later controls exit code selection and FIN summaries (`src/ai-agent.ts:2370-2650`).
 
@@ -222,7 +222,7 @@ When forced final turn but still over limit:
 | `contextWindowBufferTokens` | Safety margin |
 | `maxOutputTokens` | Reserved for response |
 | `tokenizer` | Estimation accuracy |
-| `toolResponseMaxBytes` | Indirect token impact |
+| `toolResponseMaxBytes` | Triggers tool_output handle storage; handle text is what the guard budgets against |
 
 ## Telemetry
 
@@ -300,7 +300,7 @@ When forced final turn but still over limit:
 
 ### Tool budget exceeded
 - Check tool output sizes
-- Verify toolResponseMaxBytes
+- Verify toolResponseMaxBytes and tool_output storage warnings
 - Review accumulated context
 
 ### Provider skipped

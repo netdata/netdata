@@ -76,7 +76,7 @@ SessionNode
                 ├── reasoning   // { chunks: [{text, ts}], final?: string }
                 ├── request      // {kind, payload, size}
                 ├── response     // {payload, size, truncated}
-                └── childSession // Nested SessionNode (for sub-agents)
+                └── childSession // Nested SessionNode (for sub-agents and tool_output)
 ```
 
 ### LogEntry Structure
@@ -615,10 +615,10 @@ zcat "$SNAPSHOT" | jq '.opTree.attributes'
 zcat "$SNAPSHOT" | jq '.opTree.attributes.ingress // "No ingress metadata"'
 ```
 
-### Extract Truncated Responses
+### Extract Shortened/Handle Responses
 
 ```bash
-# Find operations where responses were truncated
+# Find operations where responses were shortened or replaced (tool_output handle or upstream truncation)
 zcat "$SNAPSHOT" | jq '[.opTree.turns[].ops[] | select(.response.truncated == true) | {opId:.opId, kind:.kind, name:.attributes.name, truncated:.response.truncated}]'
 ```
 

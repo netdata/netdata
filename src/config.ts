@@ -308,6 +308,17 @@ const TelemetryLoggingOtlpSchema = z.object({
   timeoutMs: durationMsParam('telemetry.logging.otlp.timeoutMs').optional(),
 }).optional();
 
+const ToolOutputConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    storeDir: z.string().optional(),
+    maxChunks: z.number().int().positive().optional(),
+    overlapPercent: z.number().int().min(0).max(50).optional(),
+    avgLineBytesThreshold: z.number().int().positive().optional(),
+    models: z.union([z.string(), z.array(z.string())]).optional(),
+  })
+  .optional();
+
 const TelemetryLoggingSchema = z.object({
   formats: z.array(TelemetryLogFormatSchema).nonempty().optional(),
   extra: z.array(TelemetryLogExtraSchema).optional(),
@@ -328,6 +339,7 @@ const ConfigurationSchema = z.object({
   mcpServers: z.record(z.string(), MCPServerConfigSchema),
   queues: z.record(z.string(), z.object({ concurrent: z.number().int().positive() })),
   cache: CacheConfigSchema,
+  toolOutput: ToolOutputConfigSchema,
   accounting: z.object({ file: z.string() }).optional(),
   pricing: z
     .record(

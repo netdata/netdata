@@ -332,16 +332,19 @@ Notes:
 <!-- Tool limits are now handled by the provider/SDK; no app-level limit option. -->
 
 #### Tool Response Size Cap
-- A configurable maximum size (bytes) is enforced for MCP tool responses.
-- If a tool returns content larger than the limit, the agent truncates using 50/50 split with **two markers**:
-  - Prefix: `[TRUNCATED IN THE MIDDLE BY ~X BYTES/TOKENS]`
-  - Mid-marker: `[···TRUNCATED {omitted} bytes/tokens···]`
-  - Both beginning and end are preserved for better context.
-- A warning is logged with request details plus `original_bytes`, `final_bytes`, `truncated_pct` (bytes), and the size/token limit.
+- A configurable maximum size (bytes) determines when a tool result is **stored** and replaced with a `tool_output` handle message.
+- If a tool returns content larger than the limit **or** would overflow the context budget, the agent:
+  - Stores the sanitized output in the per-session `tool_output` store.
+  - Replaces the tool result with a handle message instructing the model to call `tool_output(handle=..., extract=...)`.
+  - Logs a warning that includes `handle`, `reason` (`size_cap|token_budget|reserve_failed`), `bytes`, `lines`, and `tokens`.
+- Truncation happens **only inside the `tool_output` module** as a fallback when extraction fails.
 - Configuration surfaces (highest precedence first):
   - CLI: `--tool-response-max-bytes <n>`
   - Frontmatter: `toolResponseMaxBytes: <number>`
   - Config defaults: `.ai-agent.json` → `defaults.toolResponseMaxBytes`
+- Tool output module overrides (optional):
+  - Frontmatter: `toolOutput: { enabled, storeDir, maxChunks, overlapPercent, avgLineBytesThreshold, models }`
+  - Config: `.ai-agent.json` → `toolOutput`
 - Default when unspecified: `12288` (12 KB).
 
 ### Provider Fallback

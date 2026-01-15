@@ -31,17 +31,17 @@ import { SessionTreeBuilder } from './session-tree.js';
 import { TurnRunner, type TurnRunnerCallbacks, type TurnRunnerContext } from './session-turn-runner.js';
 import { SubAgentRegistry } from './subagent-registry.js';
 import { addSpanEvent, recordContextGuardMetrics, runWithSpan } from './telemetry/index.js';
+import { resolveToolOutputConfig } from './tool-output/config.js';
+import { ToolOutputExtractor } from './tool-output/extractor.js';
+import { buildToolOutputFsServerConfig } from './tool-output/fs-server.js';
+import { ToolOutputHandler } from './tool-output/handler.js';
+import { ToolOutputProvider } from './tool-output/provider.js';
+import { ToolOutputStore } from './tool-output/store.js';
 import { AgentProvider } from './tools/agent-provider.js';
 import { InternalToolProvider } from './tools/internal-provider.js';
 import { MCPProvider } from './tools/mcp-provider.js';
 import { RestProvider } from './tools/rest-provider.js';
 import { ToolsOrchestrator } from './tools/tools.js';
-import {
-  buildTruncationPrefix,
-  buildTruncationPrefixPlaceholder,
-  truncateJsonStringsWithInfo,
-  truncateToBytesWithInfo,
-} from './truncation.js';
 import { appendCallPathSegment, isPlainObject, normalizeCallPath, sanitizeToolName, warn } from './utils.js';
 import { XmlToolTransport } from './xml-transport.js';
 
@@ -186,7 +186,6 @@ export class AIAgentSession {
   // Counters for summary
   private llmAttempts = 0;
   private llmSyntheticFailures = 0;
-  private centralSizeCapHits = 0;
 
   private readonly sessionExecutor: SessionToolExecutor;
 
@@ -584,7 +583,53 @@ export class AIAgentSession {
         this.emitEvent({ type: 'status', event });
       }
     });
+    this.xmlTransport = new XmlToolTransport();
     const toolBudgetCallbacks = this.contextGuard.createToolBudgetCallbacks();
+    const toolOutputConfig = resolveToolOutputConfig({
+      config: sessionConfig.config.toolOutput,
+      overrides: sessionConfig.toolOutput,
+      baseDir: process.cwd(),
+    });
+    const toolOutputStore = toolOutputConfig.enabled ? new ToolOutputStore(toolOutputConfig.storeDir, this.txnId) : undefined;
+    const toolOutputHandler = toolOutputStore !== undefined
+      ? new ToolOutputHandler(toolOutputStore, toolOutputConfig)
+      : undefined;
+    const toolOutputTargets = sessionConfig.targets.map((target) => ({ provider: target.provider, model: target.model }));
+    const toolOutputExtractor = toolOutputStore !== undefined
+      ? new ToolOutputExtractor({
+        config: toolOutputConfig,
+        llmClient: this.llmClient,
+        targets: this.contextGuard.getTargets(),
+        computeMaxOutputTokens: (contextWindow) => this.contextGuard.computeMaxOutputTokens(contextWindow),
+        sessionTargets: toolOutputTargets,
+        sessionNonce: this.xmlTransport.getSessionNonce(),
+        sessionId: this.txnId,
+        agentId: this.sessionConfig.agentId,
+        callPath: this.callPath,
+        toolResponseMaxBytes: sessionConfig.toolResponseMaxBytes,
+        temperature: sessionConfig.temperature,
+        topP: sessionConfig.topP,
+        topK: sessionConfig.topK,
+        repeatPenalty: sessionConfig.repeatPenalty,
+        maxOutputTokens: sessionConfig.maxOutputTokens,
+        reasoning: sessionConfig.reasoning,
+        reasoningValue: sessionConfig.reasoningValue,
+        llmTimeout: sessionConfig.llmTimeout,
+        toolTimeout: sessionConfig.toolTimeout,
+        caching: sessionConfig.caching,
+        traceLLM: sessionConfig.traceLLM,
+        traceMCP: sessionConfig.traceMCP,
+        traceSdk: sessionConfig.traceSdk,
+        pricing: sessionConfig.config.pricing,
+        countTokens: toolBudgetCallbacks.countTokens,
+        recordAccounting: (entry) => { this.recordAccounting(entry); },
+        fsRootDir: toolOutputStore.getRootDir(),
+        buildFsServerConfig: (rootDir: string) => buildToolOutputFsServerConfig(sessionConfig.config, rootDir),
+      })
+      : undefined;
+    const toolOutputProvider = toolOutputStore !== undefined && toolOutputExtractor !== undefined
+      ? new ToolOutputProvider(toolOutputStore, toolOutputConfig, toolOutputExtractor, toolOutputTargets, sessionConfig.toolResponseMaxBytes)
+      : undefined;
     // Begin system preflight turn (turn 0) and log init
     try {
       if (!this.systemTurnBegan) {
@@ -621,6 +666,7 @@ export class AIAgentSession {
     },
     this.progressReporter,
     toolBudgetCallbacks,
+    toolOutputHandler,
     cacheContext);
     const providerRequestTimeout = (() => {
       const raw = sessionConfig.toolTimeout;
@@ -661,7 +707,6 @@ export class AIAgentSession {
       const wantsProgressUpdates = this.sessionConfig.headendWantsProgressUpdates !== false;
     const enableProgressTool = wantsProgressUpdates && (hasNonInternalDeclaredTools || hasSubAgentsConfigured);
     this.taskStatusToolEnabled = enableProgressTool;
-    this.xmlTransport = new XmlToolTransport();
       const enableBatch = declaredTools.includes('batch');
       const eo = this.sessionConfig.expectedOutput;
       const expectedJsonSchema = (eo?.format === 'json') ? eo.schema : undefined;
@@ -763,6 +808,9 @@ export class AIAgentSession {
       );
       orch.register(internalProvider);
     }
+    if (toolOutputProvider !== undefined) {
+      orch.register(toolOutputProvider);
+    }
     // Router tool provider (orchestration)
     {
       const routerConfig = this.sessionConfig.orchestration?.router;
@@ -847,7 +895,6 @@ export class AIAgentSession {
       this.xmlTransport,
       (entry) => { this.log(entry); },
       (entry) => { this.recordAccounting(entry); },
-      (result, context) => this.applyToolResponseCap(result, this.sessionConfig.toolResponseMaxBytes, this.logs, context),
       sessionContext,
       this.subAgents !== undefined ? {
         hasTool: (name) => this.subAgents?.hasTool(name) ?? false,
@@ -1142,92 +1189,6 @@ export class AIAgentSession {
     } finally {
       try { if (timer !== undefined) clearTimeout(timer); } catch { /* noop */ }
     }
-  }
-
-  // Apply centralized response size cap (in bytes) to any tool result
-  private applyToolResponseCap(
-    result: string,
-    limitBytes: number | undefined,
-    logs: LogEntry[],
-    context?: { server?: string; tool?: string; turn?: number; subturn?: number }
-  ): string {
-    if (typeof limitBytes !== 'number' || limitBytes <= 0) return result;
-    const sizeBytes = Buffer.byteLength(result, 'utf8');
-    if (sizeBytes <= limitBytes) return result;
-    if (result.startsWith('[TRUNCATED IN THE MIDDLE BY ~')) return result;
-    const computeTruncationPercent = (originalBytes: number, finalBytes: number): number => {
-      if (originalBytes <= 0) return 0;
-      const pct = ((originalBytes - finalBytes) / originalBytes) * 100;
-      return Number(Math.max(0, pct).toFixed(1));
-    };
-    try {
-      const srv = context?.server;
-      const tl = context?.tool;
-      const rid = (srv !== undefined && tl !== undefined)
-        ? `${srv}:${tl}`
-        : 'agent:tool';
-      const prefixBudgetBytes = Buffer.byteLength(`${buildTruncationPrefixPlaceholder('bytes')}\n`, 'utf8');
-      const contentBudget = limitBytes - prefixBudgetBytes;
-      const truncatedPayload = contentBudget > 0
-        ? (truncateJsonStringsWithInfo(result, contentBudget) ?? truncateToBytesWithInfo(result, contentBudget))
-        : undefined;
-      if (truncatedPayload?.truncated === true) {
-        const prefix = `${buildTruncationPrefix(truncatedPayload.omitted, 'bytes')}\n`;
-        const truncatedResult = `${prefix}${truncatedPayload.value}`;
-        const finalBytes = Buffer.byteLength(truncatedResult, 'utf8');
-        const truncatedPct = computeTruncationPercent(sizeBytes, finalBytes);
-        const warn: LogEntry = {
-          timestamp: Date.now(),
-          severity: 'WRN',
-          turn: context?.turn ?? this.currentTurn,
-          subturn: context?.subturn ?? 0,
-          direction: 'response',
-          type: 'tool',
-          remoteIdentifier: rid,
-          fatal: false,
-          message: `Tool '${context?.tool ?? 'unknown'}' output truncated: response exceeded max size (actual ${String(sizeBytes)} B > limit ${String(limitBytes)} B).`,
-          details: {
-            original_bytes: sizeBytes,
-            final_bytes: finalBytes,
-            truncated_pct: truncatedPct,
-            limit_bytes: limitBytes,
-            truncated: true,
-            dropped: false,
-            reason: 'size_cap_exceeded',
-          },
-        };
-        this.log(warn);
-        this.centralSizeCapHits += 1;
-        return truncatedResult;
-      }
-      const failureStub = '(tool failed: response exceeded max size)';
-      const finalBytes = Buffer.byteLength(failureStub, 'utf8');
-      const truncatedPct = computeTruncationPercent(sizeBytes, finalBytes);
-      const warn: LogEntry = {
-        timestamp: Date.now(),
-        severity: 'WRN',
-        turn: context?.turn ?? this.currentTurn,
-        subturn: context?.subturn ?? 0,
-        direction: 'response',
-        type: 'tool',
-        remoteIdentifier: rid,
-        fatal: false,
-        message: `Tool '${context?.tool ?? 'unknown'}' output dropped: response exceeded max size and truncation failed (actual ${String(sizeBytes)} B > limit ${String(limitBytes)} B).`,
-        details: {
-          original_bytes: sizeBytes,
-          final_bytes: finalBytes,
-          truncated_pct: truncatedPct,
-          limit_bytes: limitBytes,
-          truncated: false,
-          dropped: true,
-          reason: 'size_cap_truncation_failed',
-        },
-      };
-      this.log(warn);
-      this.centralSizeCapHits += 1;
-      return failureStub;
-    } catch { /* ignore logging errors */ }
-    return result;
   }
 
   private applyLogPayloadToOp(opId: string, log: LogEntry): boolean {
@@ -1668,7 +1629,6 @@ export class AIAgentSession {
         isSystemTurnBegan: () => this.systemTurnBegan,
         setCurrentLlmOpId: (opId) => { this.currentLlmOpId = opId; },
         getCurrentLlmOpId: () => this.currentLlmOpId,
-        applyToolResponseCap: (result, limitBytes, logs, context) => this.applyToolResponseCap(result, limitBytes, logs, context),
       };
 
       const turnRunner = new TurnRunner(turnRunnerContext, turnRunnerCallbacks);
@@ -2000,7 +1960,6 @@ export class AIAgentSession {
       const toolPairsStr = [...byToolStats.entries()]
         .map(([k, s]) => `${String(s.total)}x [${String(s.ok)}+${String(s.failed)}] ${k}`)
         .join(', ');
-      const sizeCaps = this.centralSizeCapHits;
       const finMcp: LogEntry = {
         timestamp: Date.now(),
         severity: 'FIN',
@@ -2010,7 +1969,7 @@ export class AIAgentSession {
         type: 'tool',
         remoteIdentifier: 'summary',
         fatal: false,
-        message: `requests=${String(mcpRequests)}, failed=${String(mcpFailures)}, capped=${String(sizeCaps)}, bytes in=${String(totalToolCharsIn)} out=${String(totalToolCharsOut)}, providers/tools: ${toolPairsStr.length > 0 ? toolPairsStr : 'none'}`,
+        message: `requests=${String(mcpRequests)}, failed=${String(mcpFailures)}, bytes in=${String(totalToolCharsIn)} out=${String(totalToolCharsOut)}, providers/tools: ${toolPairsStr.length > 0 ? toolPairsStr : 'none'}`,
       };
       this.log(finMcp);
     } catch { /* swallow summary errors */ }

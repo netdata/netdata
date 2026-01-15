@@ -180,7 +180,7 @@ Defined in `src/ai-agent.ts:16-44`:
 - **Context guard + forced final turn**: Each provider/model pair carries a `TargetContextConfig`; when `evaluateContextForProvider` projects an overflow, tools are disabled, the forced-final message is injected, and exit bookkeeping switches to `EXIT-TOKEN-LIMIT` (`src/ai-agent.ts:1490-1660`, `src/ai-agent.ts:3102-3268`).
 - **Pending retry deduplication**: System retry messages are de-duped and appended exactly once per turn using `pendingRetryMessages` so models do not see duplicate warnings when multiple providers are tried (`src/ai-agent.ts:2959-3042`).
 - **Rate-limit cycle gating**: The session counts rate-limit responses per provider/model cycle and only sleeps when *all* targets rate-limit simultaneously, honoring provider-specific `retryAfter` bounds before retrying (`src/ai-agent.ts:1456-2560`).
-- **Tool-budget mutex**: Tool output truncation and the `(tool failed: response exceeded max bytes)` guard run under a mutex so concurrent tool executions cannot race on `toolResponseMaxBytes` (`src/ai-agent.ts:516-562`).
+- **Tool-budget mutex**: Tool output reservations and budget checks run under a mutex so concurrent tool executions cannot race on `toolResponseMaxBytes` or the context guard (`src/ai-agent.ts:516-562`).
 - **Progress + opTree sync**: `SessionProgressReporter` drives structured `[PROGRESS UPDATE]` logs, emits opTree snapshots via `onEvent(type='op_tree')`, and is wired to Slack/CLI renderers in headends (`src/ai-agent.ts:600-720`).
 - **Stop handling & sleepWithAbort**: Every wait (rate-limit backoffs, queue delays) invokes `sleepWithAbort` so `stopRef`/`AbortSignal` cancellations short-circuit loops and emit `EXIT-USER-STOP` when requested (`src/ai-agent.ts:2487-2510`, `src/ai-agent.ts:2757-2804`).
 - **Sub-agent isolation**: `SubAgentRegistry` spawns children with independent trace context (`originTxnId`, `parentTxnId`, `agentPath`) and aggregates child conversations for auditing (`src/ai-agent.ts:700-838`).
@@ -204,7 +204,8 @@ Defined in `src/ai-agent.ts:16-44`:
 - `stream?: boolean` - Enable streaming
 - `llmTimeout?: number` - LLM request timeout (ms)
 - `toolTimeout?: number` - Tool execution timeout (ms)
-- `toolResponseMaxBytes?: number` - Max tool response size
+- `toolResponseMaxBytes?: number` - Max tool response size (oversize stored + tool_output handle)
+- `toolOutput?: ToolOutputConfigInput` - tool_output module overrides
 - `abortSignal?: AbortSignal` - Cancellation signal
 - `stopRef?: { stopping: boolean }` - Graceful stop reference
 - `callbacks?: AIAgentEventCallbacks` - Event callbacks

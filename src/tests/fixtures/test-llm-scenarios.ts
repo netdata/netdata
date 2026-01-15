@@ -93,6 +93,7 @@ const TOOL_REQUEST_TEXT = 'Requesting test to gather information.';
 const TOOL_ARGUMENT_SUCCESS = 'phase-1-tool-success';
 const TOOL_ARGUMENT_LONG_OUTPUT = 'long-output';
 const TOOL_ARGUMENT_CONTEXT_OVERFLOW = 'context-guard-600';
+const TOOL_ARGUMENT_CONTEXT_BUDGET = 'context-guard-budget';
 const CONCURRENCY_TIMEOUT_ARGUMENT = 'trigger-timeout';
 const CONCURRENCY_SECOND_ARGUMENT = 'concurrency-second';
 const BATCH_INVALID_INPUT_ARGUMENT = 'batch-missing-id';
@@ -564,7 +565,7 @@ const SCENARIOS: ScenarioDefinition[] = [
   },
   {
     id: 'run-test-8',
-    description: 'MCP tool truncation path.',
+    description: 'MCP tool oversized output stored for tool_output.',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
     turns: [
       {
@@ -591,8 +592,8 @@ const SCENARIOS: ScenarioDefinition[] = [
         turn: 2,
         response: {
           kind: FINAL_RESPONSE_KIND,
-          assistantText: 'Report after truncation.',
-          reportContent: `${RESULT_HEADING}Truncated payload processed.`,
+          assistantText: 'Report after tool_output handle.',
+          reportContent: `${RESULT_HEADING}Oversized payload stored; handle returned.`,
           reportFormat: MARKDOWN_FORMAT,
           status: STATUS_SUCCESS,
           tokenUsage: {
@@ -2775,7 +2776,7 @@ const SCENARIOS: ScenarioDefinition[] = [
   },
   {
     id: 'run-test-59',
-    description: 'Tool response size cap and truncation.',
+    description: 'Tool response size cap triggers tool_output handle.',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
     turns: [
       {
@@ -2805,8 +2806,8 @@ const SCENARIOS: ScenarioDefinition[] = [
         turn: 2,
         response: {
           kind: FINAL_RESPONSE_KIND,
-          assistantText: 'Large tool output processed with size cap.',
-          reportContent: `${RESULT_HEADING}Tool response was truncated to respect size limits.`,
+          assistantText: 'Large tool output stored with handle.',
+          reportContent: `${RESULT_HEADING}Tool response stored for tool_output extraction.`,
           reportFormat: MARKDOWN_FORMAT,
           status: STATUS_SUCCESS,
           tokenUsage: DEFAULT_TOKEN_USAGE,
@@ -4306,7 +4307,7 @@ const SCENARIOS: ScenarioDefinition[] = [
   },
   {
     id: 'context_guard__tool_drop_after_success',
-    description: 'Second heavy tool output must be dropped once the first reservation consumes the budget.',
+    description: 'Second heavy tool output stored for tool_output once the first reservation consumes the budget.',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
     turns: [
       {
@@ -4328,7 +4329,7 @@ const SCENARIOS: ScenarioDefinition[] = [
               callId: 'call-guard-drop-second',
               assistantText: 'Issuing second heavy payload.',
               arguments: {
-                text: TOOL_ARGUMENT_LONG_OUTPUT,
+                text: TOOL_ARGUMENT_CONTEXT_BUDGET,
               },
             },
           ],
@@ -4341,8 +4342,8 @@ const SCENARIOS: ScenarioDefinition[] = [
         expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
-          assistantText: 'Final report after context guard drop enforcement.',
-          reportContent: `${RESULT_HEADING}Second heavy tool output dropped after guard enforcement.`,
+          assistantText: 'Final report after tool_output handle.',
+          reportContent: `${RESULT_HEADING}Second heavy tool output stored for tool_output extraction.`,
           reportFormat: MARKDOWN_FORMAT,
           status: STATUS_SUCCESS,
           tokenUsage: {
@@ -4807,14 +4808,14 @@ const SCENARIOS: ScenarioDefinition[] = [
   // =====================================================================
   {
     id: 'run-test-size-cap-truncation',
-    description: 'Tool response exceeding toolResponseMaxBytes is truncated with marker.',
+    description: 'Tool response exceeding toolResponseMaxBytes is stored for tool_output.',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
     turns: [
       {
         turn: 1,
         response: {
           kind: 'tool-call',
-          assistantText: 'Fetching large payload that will be truncated by size cap.',
+          assistantText: 'Fetching large payload that will be stored for tool_output.',
           toolCalls: [
             {
               toolName: TOOL_NAME,
@@ -4833,8 +4834,8 @@ const SCENARIOS: ScenarioDefinition[] = [
         expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
-          assistantText: 'Received truncated tool output.',
-          reportContent: `${RESULT_HEADING}Tool output was truncated to fit size cap.`,
+          assistantText: 'Received tool_output handle for oversized output.',
+          reportContent: `${RESULT_HEADING}Tool output stored for tool_output extraction.`,
           reportFormat: MARKDOWN_FORMAT,
           status: STATUS_SUCCESS,
           tokenUsage: DEFAULT_TOKEN_USAGE,
@@ -4881,14 +4882,14 @@ const SCENARIOS: ScenarioDefinition[] = [
   },
   {
     id: 'run-test-size-cap-small-over-limit-fails',
-    description: 'Payload between cap and 512B minimum returns failure stub.',
+    description: 'Payload between cap and 512B minimum is stored for tool_output.',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
     turns: [
       {
         turn: 1,
         response: {
           kind: 'tool-call',
-          assistantText: 'Fetching payload that exceeds cap but is too small to truncate.',
+          assistantText: 'Fetching payload that exceeds cap and should be stored for tool_output.',
           toolCalls: [
             {
               toolName: TOOL_NAME,
@@ -4907,10 +4908,10 @@ const SCENARIOS: ScenarioDefinition[] = [
         expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
-          assistantText: 'Tool output was replaced with failure stub.',
-          reportContent: `${RESULT_HEADING}Tool response exceeded max size and could not be truncated.`,
+          assistantText: 'Received tool_output handle for over-limit payload.',
+          reportContent: `${RESULT_HEADING}Tool response stored for tool_output extraction.`,
           reportFormat: MARKDOWN_FORMAT,
-          status: STATUS_FAILURE,
+          status: STATUS_SUCCESS,
           tokenUsage: DEFAULT_TOKEN_USAGE,
         },
       },
@@ -4918,14 +4919,14 @@ const SCENARIOS: ScenarioDefinition[] = [
   },
   {
     id: 'run-test-budget-truncation-preserves-output',
-    description: 'Tool output truncated (not dropped) when exceeds token budget but truncation fits.',
+    description: 'Tool output stored for tool_output when token budget is exceeded.',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
     turns: [
       {
         turn: 1,
         response: {
           kind: 'tool-call',
-          assistantText: 'Fetching large payload that exceeds token budget.',
+          assistantText: 'Fetching large payload that exceeds token budget and should be stored.',
           toolCalls: [
             {
               toolName: TOOL_NAME,
@@ -4948,8 +4949,8 @@ const SCENARIOS: ScenarioDefinition[] = [
         expectedTools: [],
         response: {
           kind: FINAL_RESPONSE_KIND,
-          assistantText: 'Received budget-truncated tool output with marker.',
-          reportContent: `${RESULT_HEADING}Tool output was truncated to fit token budget.`,
+          assistantText: 'Received tool_output handle after budget overflow.',
+          reportContent: `${RESULT_HEADING}Tool output stored for tool_output extraction.`,
           reportFormat: MARKDOWN_FORMAT,
           status: STATUS_SUCCESS,
           tokenUsage: DEFAULT_TOKEN_USAGE,

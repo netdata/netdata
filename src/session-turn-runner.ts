@@ -104,7 +104,6 @@ export interface TurnRunnerCallbacks {
   isSystemTurnBegan: () => boolean;
   setCurrentLlmOpId: (opId: string | undefined) => void;
   getCurrentLlmOpId: () => string | undefined;
-  applyToolResponseCap: (result: string, limitBytes: number | undefined, logs: LogEntry[], context?: { server?: string; tool?: string; turn?: number; subturn?: number }) => string;
 }
 
 /**
@@ -1040,7 +1039,7 @@ export class TurnRunner {
                         // FALLBACK: Extract and execute tool calls from leaked XML-like patterns
                         // Handles models that emit <tools>, <tool_call>, etc. instead of native tool calls
                         if (!sanitizedHasToolCalls && sanitizedHasText && assistantForAdoption !== undefined && textContent !== undefined) {
-                            const fallbackResult = await this.processLeakedToolCallsFallback(textContent, currentTurn, provider);
+                            const fallbackResult = await this.processLeakedToolCallsFallback(textContent, currentTurn, provider, model);
                             if (fallbackResult !== undefined) {
                                 assistantForAdoption.toolCalls = fallbackResult.toolCalls;
                                 assistantForAdoption.content = fallbackResult.cleanedContent ?? '';
@@ -2840,7 +2839,8 @@ export class TurnRunner {
     private async processLeakedToolCallsFallback(
         textContent: string,
         turn: number,
-        provider: string
+        provider: string,
+        model: string
     ): Promise<LeakedToolFallbackResult | undefined> {
         // Create execution state for the fallback executor
         const executionState: ToolExecutionState = {
@@ -2867,7 +2867,7 @@ export class TurnRunner {
         };
 
         // Create tool executor for fallback execution
-        const executor = this.ctx.sessionExecutor.createExecutor(turn, provider, executionState);
+        const executor = this.ctx.sessionExecutor.createExecutor(turn, provider, model, executionState);
 
         // Delegate to the module, passing executionState as stats reference
         const fallback = await processLeakedToolCalls({
@@ -3298,7 +3298,7 @@ export class TurnRunner {
                 this.ctx.contextGuard.setTaskCompletionReason();
             },
         };
-        const baseExecutor = this.ctx.sessionExecutor.createExecutor(currentTurn, provider, executionState, allowedToolNames);
+        const baseExecutor = this.ctx.sessionExecutor.createExecutor(currentTurn, provider, model, executionState, allowedToolNames);
         let incompleteFinalReportDetected = false;
         const toolExecutor = async (toolName: string, parameters: Record<string, unknown>, options?: { toolCallId?: string }): Promise<string> => {
             try {

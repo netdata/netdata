@@ -145,11 +145,12 @@ interface OperationNode {
 7. LLM request/response payloads under `opTree.turns[].ops[].request.payload` and `opTree.turns[].ops[].response.payload`:
    - `payload.raw` = base64 of the full HTTP/SSE body capture (no placeholders; `[unavailable]` indicates a capture bug)
    - `payload.sdk` = base64 of serialized SDK request/response (verification copy)
+8. Child sessions for sub-agents **and** tool_output extraction (attached under `opTree.turns[].ops[].childSession` when `kind == "session"`).
 
 ### Excluded Data
 1. Raw conversation (summarized in ops)
 2. Tool parameters remain attached to opTree requests (not truncated at snapshot time)
-3. Response bodies are preserved in opTree responses via `payload.raw` (full HTTP/SSE capture) and `payload.sdk` (SDK snapshot); any shortening reflects upstream limits (e.g., toolResponseMaxBytes or token-budget truncation), not snapshot truncation.
+3. Response bodies are preserved in opTree responses via `payload.raw` (full HTTP/SSE capture) and `payload.sdk` (SDK snapshot); any shortening reflects upstream limits or tool_output handle replacement, not snapshot truncation.
 
 ## Persistence Patterns
 
@@ -302,7 +303,7 @@ User-provided `persistence` config values override defaults. Custom callbacks (`
 - Confirm payload capture completed (LLM responses are recorded in full, even for streaming).
 
 ### Large snapshot size
-- Check upstream truncation settings (toolResponseMaxBytes, token-budget truncation)
+- Check toolResponseMaxBytes and tool_output storage behavior
 - Verify log pruning
 - Consider selective snapshots
 

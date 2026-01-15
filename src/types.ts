@@ -2,6 +2,7 @@ import type { CacheConfig } from './cache/types.js';
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
 import type { PreloadedSubAgent } from './subagent-registry.js';
+import type { ToolOutputConfigInput } from './tool-output/types.js';
 import type { ReasoningOutput } from 'ai';
 // Core status interfaces for clear decision making
 export type TurnStatus = 
@@ -449,6 +450,7 @@ export interface Configuration {
   mcpServers: Record<string, MCPServerConfig>;
   queues: Record<string, QueueConfig>;
   cache?: CacheConfig;
+  toolOutput?: ToolOutputConfigInput;
   // Optional REST tools registry (manifest-driven)
   restTools?: Record<string, RestToolConfig>;
   // Optional OpenAPI specs to auto-generate REST tools
@@ -482,7 +484,7 @@ export interface Configuration {
     maxToolCallsPerTurn?: number;
     stream?: boolean;
     maxRetries?: number;
-    // Maximum allowed MCP tool response size in bytes. If exceeded, a tool error is injected.
+    // Maximum allowed tool response size in bytes. If exceeded, output is stored and replaced with tool_output handle.
     toolResponseMaxBytes?: number;
     mcpInitConcurrency?: number;
     outputFormat?: 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'json' | 'sub-agent';
@@ -756,8 +758,9 @@ export interface AIAgentSessionConfig {
   caching?: CachingMode;
   // Optional pre-set session title (does not consume a tool turn)
   initialTitle?: string;
-  // Enforced cap for MCP tool response size (bytes)
+  // Enforced tool response size cap (bytes); oversized outputs are stored and replaced with tool_output handle
   toolResponseMaxBytes?: number;
+  toolOutput?: ToolOutputConfigInput;
   // Preferred MCP init concurrency override for this session
   mcpInitConcurrency?: number;
   // Trace context propagation

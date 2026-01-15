@@ -15,7 +15,7 @@ Unit tests live under `src/tests/unit/*.spec.ts` and run in parallel via Vitest.
 - Execute with `npm run test:phase1`
 - Tests are isolated with no shared state
 - Fast execution (~300ms for ~200 tests)
-- Covers: JSON repair, truncation, XML tools, Slack formatting, LLM messages, etc.
+- Covers: JSON repair, tool_output handling, XML tools, Slack formatting, LLM messages, etc.
 
 ## Phase 2: Deterministic Harness
 
@@ -119,5 +119,5 @@ Test agents for the scenarios are located under `src/tests/phase3/test-agents/`:
 
 ## Test MCP Notes
 - The test MCP server exposes `test` and `test-summary` tools; sanitized tool names appear as `test__test` in accounting/logs.
-- Tool behaviors include success, explicit error responses, long-payload truncation, and simulated timeouts; reuse these payloads before introducing new helpers.
+- Tool behaviors include success, explicit error responses, long-payload tool_output storage (handle), and simulated timeouts; reuse these payloads before introducing new helpers.
 - Update scenario metadata and harness expectations whenever new MCP behaviors are added to keep the suite coherent.

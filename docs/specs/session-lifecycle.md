@@ -249,7 +249,8 @@ The flow is **procedural**, not state-machine driven. Error handling is inline v
 | `stopRef` | Graceful stop trigger |
 | `conversationHistory` | Initial conversation state |
 | `toolTimeout` | Per-tool execution timeout |
-| `toolResponseMaxBytes` | Response size cap |
+| `toolResponseMaxBytes` | Oversize tool outputs stored + tool_output handle inserted |
+| `toolOutput` | Overrides tool_output extraction/storage behavior |
 
 ## Telemetry
 

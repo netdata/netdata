@@ -37,13 +37,11 @@ See Section 2 “Context Management Contract” for the complete definition of c
 ### Tool Response Handling
 
 **`toolResponseMaxBytes`**
-- Tool responses exceeding this size are truncated
-- Truncated responses use 50/50 split (first half + last half) with **two markers**:
-  - Prefix: `[TRUNCATED IN THE MIDDLE BY ~X BYTES/TOKENS]`
-  - Mid-marker: `[···TRUNCATED N bytes/tokens···]`
-- Warning logged with metadata: tool name plus `original_bytes`, `final_bytes`, `truncated_pct` (bytes), and limit bytes/tokens as applicable
-- Original response only preserved in logs when `traceTools` mode enabled
-- **Exception:** `agent__batch` meta-tool output NOT truncated as a whole; individual tools within the batch ARE subject to truncation
+- Tool responses exceeding this size are **stored** and replaced with a `tool_output` handle message.
+- Handle warnings include `handle`, `reason` (`size_cap|token_budget|reserve_failed`), `bytes`, `lines`, and `tokens`.
+- Original response is preserved in the per-session `tool_output` store; it is **not** embedded in conversation history.
+- `tool_output` results are never cached; they are extracted on demand by handle.
+- **Exception:** `agent__batch` meta-tool output is not size-capped as a whole; individual tools within the batch can still trigger `tool_output` storage.
 
 **`toolTimeout`**
 - Tool execution aborted after this duration (milliseconds)
@@ -430,7 +428,7 @@ Any deviation from the guarantees above is a **contract violation** and must be 
 - `temperature: 0.5` configured but provider receives `temperature: 1.0`
 
 ❌ **Tool response overflow without handling**
-- Tool returns 10KB when `toolResponseMaxBytes: 1024`, no truncation or notice in conversation
+- Tool returns 10KB when `toolResponseMaxBytes: 1024`, but no `tool_output` handle is inserted and no warning is logged
 
 ### Non-Violations (Implementation Details)
 
@@ -517,7 +515,7 @@ Any deviation from the guarantees above is a **contract violation** and must be 
 - Streaming output is buffered once an opening-tag fragment for the current nonce appears and stops at the matching closing tag. Content outside matched tags is ignored.
 
 **Unchanged**
-- Context guard logic and limits are unchanged. Tool truncation rules remain; no size guard is applied to final outputs.
+- Context guard logic and limits are unchanged. Tool output handling uses tool_output handle storage; no size guard is applied to final outputs.
 
 ---
 

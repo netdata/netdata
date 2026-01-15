@@ -51,6 +51,7 @@ server.registerTool(
 
 const longPayload = '#'.repeat(3200);
 const guardOverflowPayload = '@'.repeat(1200);
+const guardBudgetPayload = '%'.repeat(10000);
 // Payloads for budget truncation tests
 const budgetTruncatablePayload = 'X'.repeat(2000);  // Large enough to truncate (>512 bytes)
 const smallFitsPayload = 'Y'.repeat(100);           // Small, fits any reasonable limit
@@ -204,6 +205,13 @@ server.server.setRequestHandler(CallToolRequestSchema, async (request, extra) =>
       return {
         content: [
           { type: 'text', text: guardOverflowPayload },
+        ],
+      };
+    }
+    if (payload === 'context-guard-budget') {
+      return {
+        content: [
+          { type: 'text', text: guardBudgetPayload },
         ],
       };
     }

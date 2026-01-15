@@ -105,8 +105,6 @@ export interface SessionContext {
   routerToolName?: string;
 }
 
-export type ToolResponseCapper = (result: string, context?: { server?: string; tool?: string; turn?: number; subturn?: number }) => string;
-
 export type ToolExecutor = (
   toolName: string,
   parameters: Record<string, unknown>,
@@ -126,7 +124,6 @@ export class SessionToolExecutor {
     private readonly xmlTransport: XmlToolTransport | undefined,
     private readonly log: (entry: LogEntry) => void,
     private readonly recordAccounting: (entry: AccountingEntry) => void,
-    private readonly applyToolResponseCap: ToolResponseCapper | undefined,
     private readonly sessionContext: SessionContext,
     private readonly subAgents?: { hasTool: (name: string) => boolean; addInvoked: (name: string) => void }
   ) {}
@@ -182,7 +179,7 @@ export class SessionToolExecutor {
     return candidate?.name;
   }
 
-  public createExecutor(turn: number, provider: string, state: ToolExecutionState, allowedToolNames?: Set<string>): ToolExecutor {
+  public createExecutor(turn: number, provider: string, model: string, state: ToolExecutionState, allowedToolNames?: Set<string>): ToolExecutor {
     let subturnCounter = 0;
     const maxToolCallsPerTurn = Math.max(
       1,
@@ -396,6 +393,7 @@ export class SessionToolExecutor {
               timeoutMs: this.sessionContext.toolTimeout,
               bypassConcurrency: isBatchTool,
               disableGlobalTimeout: isBatchTool,
+              sourceTarget: { provider, model },
             }
           );
 
@@ -461,10 +459,7 @@ export class SessionToolExecutor {
             sanitizedResult.length > 0
               ? sanitizedResult
               : TOOL_NO_OUTPUT;
-          // Batch tool is a container - inner tools already get capped individually, don't cap the container
-          const toolOutput = (this.applyToolResponseCap !== undefined && !isBatchTool)
-            ? this.applyToolResponseCap(uncappedToolOutput, { server: providerLabel, tool: effectiveToolName, turn, subturn: subturnCounter })
-            : uncappedToolOutput;
+          const toolOutput = uncappedToolOutput;
           if (managed.dropped === true) {
             const failureReason = managed.reason ?? 'context_budget_exceeded';
             const failureTokens = this.estimateTokensForCounters([
@@ -526,7 +521,10 @@ export class SessionToolExecutor {
               { role: 'tool', content: toolOutput },
             ]);
 
-          if (!isInternalProvider) {
+          const shouldEvaluateGuard =
+            !isInternalProvider && managedTokens === undefined;
+
+          if (shouldEvaluateGuard) {
             const guardEvaluation = this.contextGuard.evaluate(toolTokens);
 
             if (process.env.CONTEXT_DEBUG === 'true') {
@@ -657,7 +655,7 @@ export class SessionToolExecutor {
               );
               return renderedFailure;
             }
-          } else if (process.env.CONTEXT_DEBUG === 'true') {
+          } else if (process.env.CONTEXT_DEBUG === 'true' && managedTokens === undefined) {
             const approxTokens = Math.ceil(
               estimateMessagesBytes([{ role: 'tool', content: toolOutput }]) / 4
             );
@@ -677,7 +675,9 @@ export class SessionToolExecutor {
             });
           }
 
-          this.contextGuard.addNewTokens(toolTokens);
+          if (managedTokens === undefined) {
+            this.contextGuard.addNewTokens(toolTokens);
+          }
           const successEntry: AccountingEntry = {
             type: 'tool',
             timestamp: startTime,

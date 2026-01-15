@@ -159,7 +159,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
     key: "toolResponseMaxBytes",
     default: 12288,
     description:
-      "Maximum size of tool output to keep; longer outputs get truncated to avoid overwhelming the LLM context",
+      "Maximum tool output size kept in conversation; larger outputs are stored and replaced with a tool_output handle",
     cli: {
       names: ["--tool-response-max-bytes", "--toolResponseMaxBytes"],
       showInHelp: true,

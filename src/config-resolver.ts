@@ -438,6 +438,27 @@ function resolveEmbed(layers: ResolvedConfigLayer[]): Configuration['embed'] {
   return expanded;
 }
 
+function resolveToolOutput(layers: ResolvedConfigLayer[]): Configuration['toolOutput'] {
+  const found = layers.find((layer) => {
+    const j = layer.json as { toolOutput?: Record<string, unknown> } | undefined;
+    return j?.toolOutput !== undefined;
+  });
+  if (found === undefined) return undefined;
+  const source = found.json as { toolOutput?: Record<string, unknown> } | undefined;
+  const toolOutputRaw = source?.toolOutput;
+  if (toolOutputRaw === undefined) return undefined;
+  const env = found.env ?? {};
+  const expanded = expandPlaceholders(toolOutputRaw, (name: string) => {
+    const envVal = Object.prototype.hasOwnProperty.call(env, name) ? env[name] : undefined;
+    const v = envVal ?? process.env[name];
+    return v ?? '';
+  });
+  if (expanded === null || typeof expanded !== 'object' || Array.isArray(expanded)) {
+    throw new Error('toolOutput must be an object');
+  }
+  return expanded as Configuration['toolOutput'];
+}
+
 const parseOptionalString = (value: unknown, context: string): string | undefined => {
   if (value === undefined) return undefined;
   if (typeof value === 'string') return value;
@@ -581,6 +602,7 @@ export function buildUnifiedConfiguration(
   const queues = resolveQueues(layers);
   const cache = resolveCache(layers);
   const embed = resolveEmbed(layers);
+  const toolOutput = resolveToolOutput(layers);
 
-  return { providers, mcpServers, restTools, openapiSpecs, queues, defaults, accounting, pricing, telemetry, cache, embed } as Configuration;
+  return { providers, mcpServers, restTools, openapiSpecs, queues, defaults, accounting, pricing, telemetry, cache, embed, toolOutput } as Configuration;
 }

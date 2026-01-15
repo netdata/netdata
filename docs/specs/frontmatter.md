@@ -50,6 +50,13 @@ topP: 0.9
 maxOutputTokens: 16384
 repeatPenalty: 1.0
 toolResponseMaxBytes: 100000
+toolOutput:
+  enabled: true
+  storeDir: /tmp
+  maxChunks: 1
+  overlapPercent: 10
+  avgLineBytesThreshold: 1000
+  models: openai/gpt-4o-mini
 reasoning: medium
 reasoningTokens: 16000
 caching: full
@@ -141,6 +148,7 @@ interface FrontmatterOptions {
   maxOutputTokens?: number;
   repeatPenalty?: number;
   toolResponseMaxBytes?: number;
+  toolOutput?: ToolOutputConfigInput;
   reasoning?: ReasoningLevel | 'none';
   reasoningTokens?: number | string;
   caching?: CachingMode;
@@ -325,6 +333,7 @@ function buildFrontmatterTemplate(args): Record<string, unknown> {
 - `output`: Output specification
 - `input`: Input specification (sub-agent tools)
 - `toolName`: Custom tool name
+- `toolOutput`: tool_output module overrides (object)
 
 ### Option Keys (from OPTIONS_REGISTRY)
 - `models`: LLM providers and models
@@ -340,7 +349,7 @@ function buildFrontmatterTemplate(args): Record<string, unknown> {
 - `topK`: Top-k sampling
 - `maxOutputTokens`: Max output tokens
 - `repeatPenalty`: Frequency penalty
-- `toolResponseMaxBytes`: Max tool response size
+- `toolResponseMaxBytes`: Max tool response size before tool_output handle storage
 - `reasoning`: Reasoning level
 - `reasoningTokens`: Reasoning budget
 - `caching`: Cache control mode

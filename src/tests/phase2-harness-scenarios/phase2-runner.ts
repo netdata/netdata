@@ -216,6 +216,7 @@ const SEQUENTIAL_TEST_IDS = new Set([
   'run-test-114',
   'run-test-44',
   'reasoning-interleaved-sdk-payload',
+  'run-test-budget-truncation-preserves-output',
   'run-test-size-cap-truncation',
   'run-test-size-cap-small-payload-passes',
   'run-test-size-cap-small-over-limit-fails',
@@ -238,8 +239,9 @@ const isSequentialTest = (test: HarnessTest): boolean => {
   if (test.id.startsWith('reasoning-matrix-')) return true;
   return false;
 };
-const TOOL_DROP_STUB = `(tool failed: ${CONTEXT_OVERFLOW_FRAGMENT})`;
-const TOOL_SIZE_CAP_STUB = '(tool failed: response exceeded max size)';
+const TOOL_OUTPUT_HANDLE_PREFIX = 'Tool output is too large (';
+const TOOL_OUTPUT_HANDLE_PATTERN = /tool_output\(handle = "[^"]+"/;
+const TOOL_OUTPUT_STORE_LOG_FRAGMENT = 'output stored for tool_output';
 const SNAPSHOT_FULL_MARKER = 'SNAPSHOT-FULL-PAYLOAD-END';
 const SHARED_REGISTRY_RESULT = 'shared-response';
 const SECOND_TURN_FINAL_ANSWER = 'Second turn final answer.';
@@ -277,6 +279,7 @@ const updateRestartFixtureState = (file: string, updater: (prev: RestartFixtureS
 
 const toError = (value: unknown): Error => (value instanceof Error ? value : new Error(String(value)));
 const toErrorMessage = (value: unknown): string => (value instanceof Error ? value.message : String(value));
+const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 
 const defaultHarnessWarningSink = (message: string): void => {
   const prefix = '[warn] ';
@@ -437,7 +440,6 @@ const sessionConfigObservers: ((config: AIAgentSessionConfig) => void)[] = [];
 
 const COVERAGE_ALIAS_BASENAME = 'parent.ai';
 const TRUNCATION_MARKER_PATTERN = /\[···TRUNCATED \d+ (?:bytes|chars|tokens)···\]/;
-const TRUNCATION_PREFIX_PATTERN = /\[TRUNCATED IN THE MIDDLE BY ~\d+ (?:BYTES|TOKENS|CHARS)\]/;
 const CONFIG_FILE_NAME = 'config.json';
 const INCLUDE_DIRECTIVE_TOKEN = '${include:';
 const FINAL_REPORT_CALL_ID = 'agent-final-report';
@@ -485,10 +487,10 @@ const SESSIONS_SUBDIR = 'sessions';
 const BILLING_FILENAME = 'billing.jsonl';
 const THRESHOLD_BUFFER_TOKENS = 8;
 const THRESHOLD_MAX_OUTPUT_TOKENS = 32;
-// Prompt + instructions currently estimate to ~1009-1010 tokens (ctx + new, schema excluded from projection).
-const THRESHOLD_CONTEXT_WINDOW_BELOW = 1089; // limit = 1089 - 8 - 32 = 1049 (> projected ~1009)
-const THRESHOLD_CONTEXT_WINDOW_EQUAL = 1049; // limit = 1049 - 8 - 32 = 1009 (matches projected)
-const THRESHOLD_CONTEXT_WINDOW_ABOVE = 1029; // limit = 1029 - 8 - 32 = 989 (< projected ~1010)
+// Prompt + instructions currently estimate to ~1099 tokens (ctx + new, schema excluded from projection).
+const THRESHOLD_CONTEXT_WINDOW_BELOW = 1179; // limit = 1179 - 8 - 32 = 1139 (> projected ~1099)
+const THRESHOLD_CONTEXT_WINDOW_EQUAL = 1139; // limit = 1139 - 8 - 32 = 1099 (matches projected)
+const THRESHOLD_CONTEXT_WINDOW_ABOVE = 1119; // limit = 1119 - 8 - 32 = 1079 (< projected ~1099)
 const PREFLIGHT_CONTEXT_WINDOW = 80;
 const PREFLIGHT_BUFFER_TOKENS = 8;
 const PREFLIGHT_MAX_OUTPUT_TOKENS = 16;
@@ -1551,8 +1553,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-8 expected success.');
       const toolMessages = result.conversation.filter((message) => message.role === 'tool');
-      invariant(toolMessages.some((message) => TRUNCATION_MARKER_PATTERN.test(message.content)), 'Truncation marker expected in run-test-8.');
-      invariant(toolMessages.some((message) => TRUNCATION_PREFIX_PATTERN.test(message.content)), 'Truncation prefix expected in run-test-8.');
+      const hasHandle = toolMessages.some((message) => {
+        if (typeof message.content !== 'string') return false;
+        return message.content.includes(TOOL_OUTPUT_HANDLE_PREFIX) && TOOL_OUTPUT_HANDLE_PATTERN.test(message.content);
+      });
+      invariant(hasHandle, 'tool_output handle message expected in run-test-8.');
     },
   },
   {
@@ -2324,34 +2329,30 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const secondTool = result.conversation.find((message) => message.role === 'tool' && (message as { toolCallId?: string }).toolCallId === 'call-guard-drop-second');
       invariant(secondTool !== undefined, 'Second tool result missing for context_guard__tool_drop_after_success.');
       invariant(typeof secondTool.content === 'string', 'Second tool content should be a string.');
-      invariant(secondTool.content === TOOL_DROP_STUB, 'Second tool output should be replaced with the drop stub for context_guard__tool_drop_after_success.');
+      invariant(
+        secondTool.content.includes(TOOL_OUTPUT_HANDLE_PREFIX) && TOOL_OUTPUT_HANDLE_PATTERN.test(secondTool.content),
+        'Second tool output should be stored with a tool_output handle for context_guard__tool_drop_after_success.'
+      );
 
       if (!result.success && process.env.CONTEXT_DEBUG === 'true') {
         console.log('context_guard__tool_drop_after_success final status', result.success, 'error', result.error);
       }
 
-      const dropLog = result.logs.find((entry) =>
+      const storeLog = result.logs.find((entry) =>
         entry.type === 'tool'
         && entry.direction === 'response'
         && entry.severity === 'WRN'
         && typeof entry.message === 'string'
-        && entry.message.includes('output dropped')
+        && entry.message.includes(TOOL_OUTPUT_STORE_LOG_FRAGMENT)
         && getLogDetail(entry, 'tool') === 'test__test'
       );
-      invariant(dropLog !== undefined, 'Drop warning log expected for context_guard__tool_drop_after_success.');
-      const dropReason = getLogDetail(dropLog, 'reason');
-      invariant(dropReason === 'token_budget_exceeded', 'Drop reason should be token_budget_exceeded for context_guard__tool_drop_after_success.');
-      invariant(logHasDetail(dropLog, 'final_bytes'), 'Drop warning should report final_bytes for context_guard__tool_drop_after_success.');
-      const dropPct = expectLogDetailNumber(dropLog, 'truncated_pct', 'Drop warning should report truncated_pct for context_guard__tool_drop_after_success.');
-      invariant(dropPct >= 0, 'Drop truncated_pct should be non-negative for context_guard__tool_drop_after_success.');
+      invariant(storeLog !== undefined, 'tool_output storage warning expected for context_guard__tool_drop_after_success.');
+      const storeReason = getLogDetail(storeLog, 'reason');
+      invariant(storeReason === 'token_budget', 'tool_output reason should be token_budget for context_guard__tool_drop_after_success.');
 
       const accountingEntries = result.accounting.filter(isToolAccounting);
-      const failedEntry = accountingEntries.find((entry) => entry.command === 'test__test' && entry.status === 'failed');
-      invariant(failedEntry !== undefined, 'Failed tool accounting entry expected for context_guard__tool_drop_after_success.');
-      if (process.env.CONTEXT_DEBUG === 'true') {
-        console.log('context_guard__tool_drop_after_success failed accounting entry', failedEntry);
-      }
-      invariant(failedEntry.error === 'token_budget_exceeded', 'Failed tool accounting entry should indicate token_budget_exceeded.');
+      const okEntry = accountingEntries.find((entry) => entry.command === 'test__test' && entry.status === 'ok');
+      invariant(okEntry !== undefined, 'Successful tool accounting entry expected for context_guard__tool_drop_after_success.');
 
       const finalReportAccounting = accountingEntries.find((entry) => entry.command === 'agent__final_report');
       invariant(finalReportAccounting?.status === 'ok', 'Final report accounting must succeed after guard drop.');
@@ -2838,11 +2839,27 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         }
       });
       invariant(responseLogBefore !== undefined || requestLogBeforeFallback !== undefined, 'LLM response/request log before tool expected for run-test-context-token-double-count.');
-      const requestLogAfter = result.logs.slice(toolIndex).find((entry) =>
-        entry.type === 'llm'
-        && entry.direction === 'request'
-        && entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`
-      );
+      const requestLogAfter = result.logs
+        .filter((entry) =>
+          entry.type === 'llm'
+          && entry.direction === 'request'
+          && entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`
+        )
+        .filter((entry) => {
+          const entryTurn = typeof entry.turn === 'number' ? entry.turn : Number.POSITIVE_INFINITY;
+          const entrySubturn = typeof entry.subturn === 'number' ? entry.subturn : Number.POSITIVE_INFINITY;
+          return entryTurn > toolTurn || (entryTurn === toolTurn && entrySubturn > toolSubturn);
+        })
+        .reduce<LogEntry | undefined>((best, entry) => {
+          if (best === undefined) return entry;
+          const bestTurn = typeof best.turn === 'number' ? best.turn : Number.POSITIVE_INFINITY;
+          const bestSubturn = typeof best.subturn === 'number' ? best.subturn : Number.POSITIVE_INFINITY;
+          const entryTurn = typeof entry.turn === 'number' ? entry.turn : Number.POSITIVE_INFINITY;
+          const entrySubturn = typeof entry.subturn === 'number' ? entry.subturn : Number.POSITIVE_INFINITY;
+          if (entryTurn < bestTurn) return entry;
+          if (entryTurn > bestTurn) return best;
+          return entrySubturn < bestSubturn ? entry : best;
+        }, undefined);
       invariant(requestLogAfter !== undefined, 'LLM request log after tool expected for run-test-context-token-double-count.');
       const baselineLog = requestLogBeforeFallback ?? responseLogBefore;
       if (baselineLog === undefined) {
@@ -4714,19 +4731,39 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-59 expected success.');
-      const truncLogs = result.logs.filter((entry) => entry.severity === 'WRN' && typeof entry.message === 'string' && entry.message.includes('response exceeded max size'));
-      invariant(truncLogs.length > 0, 'Truncation warning expected for run-test-59.');
-      const mcpTrunc = truncLogs.find((entry) => logHasDetail(entry, 'tool') && getLogDetail(entry, 'tool') === 'test__test');
-      invariant(mcpTrunc !== undefined, 'MCP truncation warning missing for run-test-59.');
-      invariant(logHasDetail(mcpTrunc, 'provider') && getLogDetail(mcpTrunc, 'provider') === 'mcp:test', 'Truncation warning must carry provider field for run-test-59.');
-      invariant(logHasDetail(mcpTrunc, 'tool_kind') && getLogDetail(mcpTrunc, 'tool_kind') === 'mcp', 'Truncation warning must carry tool_kind field for run-test-59.');
-      invariant(logHasDetail(mcpTrunc, 'actual_bytes') && getLogDetail(mcpTrunc, 'actual_bytes') === 5000, 'Truncation warning must report actual_bytes for run-test-59.');
-      invariant(logHasDetail(mcpTrunc, 'limit_bytes') && getLogDetail(mcpTrunc, 'limit_bytes') === 120, 'Truncation warning must report limit_bytes for run-test-59.');
-      invariant(logHasDetail(mcpTrunc, 'final_bytes'), 'Truncation warning must report final_bytes for run-test-59.');
-      const truncPct = expectLogDetailNumber(mcpTrunc, 'truncated_pct', 'Truncation warning must report truncated_pct for run-test-59.');
-      invariant(truncPct > 0, 'truncated_pct should be positive for run-test-59.');
-      const batchTool = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && TRUNCATION_MARKER_PATTERN.test(message.content));
-      invariant(batchTool !== undefined, 'Truncated tool response expected for run-test-59.');
+      const storeLogs = result.logs.filter((entry) => entry.severity === 'WRN' && typeof entry.message === 'string' && entry.message.includes(TOOL_OUTPUT_STORE_LOG_FRAGMENT));
+      invariant(storeLogs.length > 0, 'tool_output storage warning expected for run-test-59.');
+      const mcpStore = storeLogs.find((entry) => logHasDetail(entry, 'tool') && getLogDetail(entry, 'tool') === 'test__test');
+      invariant(mcpStore !== undefined, 'MCP tool_output storage warning missing for run-test-59.');
+      invariant(logHasDetail(mcpStore, 'provider') && getLogDetail(mcpStore, 'provider') === 'mcp:test', 'tool_output log must carry provider field for run-test-59.');
+      invariant(logHasDetail(mcpStore, 'tool_kind') && getLogDetail(mcpStore, 'tool_kind') === 'mcp', 'tool_output log must carry tool_kind field for run-test-59.');
+      invariant(logHasDetail(mcpStore, 'bytes') && getLogDetail(mcpStore, 'bytes') === 5000, 'tool_output log must report bytes for run-test-59.');
+      invariant(logHasDetail(mcpStore, 'reason') && getLogDetail(mcpStore, 'reason') === 'size_cap', 'tool_output log must report reason=size_cap for run-test-59.');
+      invariant(logHasDetail(mcpStore, 'tool_output') && getLogDetail(mcpStore, 'tool_output') === true, 'tool_output log must include tool_output=true for run-test-59.');
+      const hasHandleInBatch = result.conversation.some((message) => {
+        if (message.role !== 'tool' || typeof message.content !== 'string') return false;
+        if (message.content.includes(TOOL_OUTPUT_HANDLE_PREFIX) && TOOL_OUTPUT_HANDLE_PATTERN.test(message.content)) {
+          return true;
+        }
+        const parsed = (() => {
+          try {
+            return JSON.parse(message.content) as unknown;
+          } catch {
+            return undefined;
+          }
+        })();
+        if (!isRecord(parsed)) return false;
+        const results = parsed.results;
+        if (!Array.isArray(results)) return false;
+        return results.some((entry) => {
+          if (!isRecord(entry)) return false;
+          const output = entry.output;
+          return typeof output === 'string'
+            && output.includes(TOOL_OUTPUT_HANDLE_PREFIX)
+            && TOOL_OUTPUT_HANDLE_PATTERN.test(output);
+        });
+      });
+      invariant(hasHandleInBatch, 'tool_output handle message expected in batch tool response for run-test-59.');
     },
   },
 
@@ -9959,14 +9996,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success, 'Scenario run-test-size-cap-truncation expected success.');
       const toolMessages = result.conversation.filter((message) => message.role === 'tool');
       invariant(toolMessages.length > 0, 'Expected tool messages in run-test-size-cap-truncation.');
-      // Tool output should be truncated with marker, not the failure stub
-      const hasTruncationMarker = toolMessages.some((message) => typeof message.content === 'string' && TRUNCATION_MARKER_PATTERN.test(message.content));
-      invariant(hasTruncationMarker, 'Truncation marker expected in run-test-size-cap-truncation.');
-      const hasTruncationPrefix = toolMessages.some((message) => typeof message.content === 'string' && TRUNCATION_PREFIX_PATTERN.test(message.content));
-      invariant(hasTruncationPrefix, 'Truncation prefix expected in run-test-size-cap-truncation.');
-      // Should NOT have the failure stub
-      const hasFailureStub = toolMessages.some((message) => typeof message.content === 'string' && message.content === TOOL_SIZE_CAP_STUB);
-      invariant(!hasFailureStub, 'Failure stub should NOT appear when truncation succeeds in run-test-size-cap-truncation.');
+      const hasHandle = toolMessages.some((message) => {
+        if (typeof message.content !== 'string') return false;
+        return message.content.includes(TOOL_OUTPUT_HANDLE_PREFIX) && TOOL_OUTPUT_HANDLE_PATTERN.test(message.content);
+      });
+      invariant(hasHandle, 'tool_output handle message expected in run-test-size-cap-truncation.');
     },
   },
   {
@@ -9983,6 +10017,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       // Payload should pass through unchanged - no truncation marker
       const hasTruncationMarker = toolMessages.some((message) => typeof message.content === 'string' && TRUNCATION_MARKER_PATTERN.test(message.content));
       invariant(!hasTruncationMarker, 'Truncation marker should NOT appear when payload fits in run-test-size-cap-small-payload-passes.');
+      const hasHandle = toolMessages.some((message) => {
+        if (typeof message.content !== 'string') return false;
+        return message.content.includes(TOOL_OUTPUT_HANDLE_PREFIX) && TOOL_OUTPUT_HANDLE_PATTERN.test(message.content);
+      });
+      invariant(!hasHandle, 'tool_output handle message should NOT appear when payload fits in run-test-size-cap-small-payload-passes.');
       // Should contain the actual payload (100 Y's)
       const hasExpectedContent = toolMessages.some((message) => typeof message.content === 'string' && message.content.includes('YYYYYY'));
       invariant(hasExpectedContent, 'Expected original payload content in run-test-size-cap-small-payload-passes.');
@@ -9999,9 +10038,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success, 'Scenario run-test-size-cap-small-over-limit-fails expected success.');
       const toolMessages = result.conversation.filter((message) => message.role === 'tool');
       invariant(toolMessages.length > 0, 'Expected tool messages in run-test-size-cap-small-over-limit-fails.');
-      // Should have the failure stub (payload too small to truncate but exceeds limit)
-      const hasFailureStub = toolMessages.some((message) => typeof message.content === 'string' && message.content === TOOL_SIZE_CAP_STUB);
-      invariant(hasFailureStub, 'Failure stub expected in run-test-size-cap-small-over-limit-fails.');
+      const hasHandle = toolMessages.some((message) => {
+        if (typeof message.content !== 'string') return false;
+        return message.content.includes(TOOL_OUTPUT_HANDLE_PREFIX) && TOOL_OUTPUT_HANDLE_PATTERN.test(message.content);
+      });
+      invariant(hasHandle, 'tool_output handle message expected in run-test-size-cap-small-over-limit-fails.');
     },
   },
   {
@@ -10013,7 +10054,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           type: 'test-llm',
           models: {
             [MODEL_NAME]: {
-              contextWindow: 1500,
+              contextWindow: 2500,
               tokenizer: 'approximate',
             },
           },
@@ -10029,20 +10070,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-budget-truncation-preserves-output expected success.');
       const toolMessages = result.conversation.filter((message) => message.role === 'tool');
-      // Either truncated with marker OR dropped entirely (depends on timing)
-      // The key assertion: if there's tool output, it should be truncated, not raw oversized
       if (toolMessages.length > 0) {
-        const hasTruncationOrDrop = toolMessages.some((message) => {
+        const hasHandle = toolMessages.some((message) => {
           if (typeof message.content !== 'string') return false;
-          // Could be truncated with marker
-          if (TRUNCATION_MARKER_PATTERN.test(message.content)) return true;
-          // Could be dropped entirely due to no budget
-          if (message.content === TOOL_DROP_STUB) return true;
-          // Small enough to fit (unlikely with 2000-byte payload)
-          if (message.content.length < 500) return true;
-          return false;
+          return message.content.includes(TOOL_OUTPUT_HANDLE_PREFIX) && TOOL_OUTPUT_HANDLE_PATTERN.test(message.content);
         });
-        invariant(hasTruncationOrDrop, 'Tool output should be truncated or dropped, not oversized in run-test-budget-truncation-preserves-output.');
+        invariant(hasHandle, 'tool_output handle message expected in run-test-budget-truncation-preserves-output.');
       }
     },
   },
@@ -10141,7 +10174,10 @@ async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
     }
   };
 
-  return await runWithTimeout(runner(), effectiveTimeout, prompt, abortOnTimeout);
+  try {
+    return await runWithTimeout(runner(), effectiveTimeout, prompt, abortOnTimeout);
+  } finally {
+  }
 }
 
 function formatFailureHint(result: AIAgentResult): string {
@@ -12648,13 +12684,14 @@ interface TestRunResult {
 
 async function runSingleScenario(scenario: HarnessTest): Promise<TestRunResult> {
   const startMs = Date.now();
+  let result: AIAgentResult | undefined;
   try {
-    const result = await runScenario(scenario);
+    result = await runScenario(scenario);
     dumpScenarioResultIfNeeded(scenario.id, result);
     scenario.expect(result);
-    return { scenario, result, durationMs: Date.now() - startMs };
+    return { scenario, durationMs: Date.now() - startMs };
   } catch (error: unknown) {
-    return { scenario, error: toError(error), durationMs: Date.now() - startMs };
+    return { scenario, result, error: toError(error), durationMs: Date.now() - startMs };
   }
 }
 
@@ -12778,6 +12815,10 @@ export async function runPhaseOneSuite(options?: PhaseOneRunOptions): Promise<vo
 
       console.log(`${header} [PASS] ${duration}`);
       passCount += 1;
+      await cleanupActiveHandles();
+      queueManager.reset();
+      await shutdownSharedRegistry();
+      await delay(50);
     } catch (error: unknown) {
       const duration = formatDurationMs(startMs, Date.now());
       const message = toErrorMessage(error);

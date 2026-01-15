@@ -32,7 +32,8 @@ The library performs no direct I/O (no stdout/stderr/file writes). All output, l
   - Output contract: `expectedOutput?: { format: 'json' | 'markdown' | 'text'; schema?: Record<string, unknown> }`
   - Execution controls (optional): `temperature`, `topP`, `topK`, `repeatPenalty`, `maxRetries`, `maxTurns`, `llmTimeout`, `toolTimeout`, `stream`
   - UX flags (optional): `traceLLM`, `traceMCP`, `verbose`
-  - Tool response cap (optional): `toolResponseMaxBytes` (bytes)
+  - Tool response cap (optional): `toolResponseMaxBytes` (bytes) — oversized outputs are stored and replaced with a `tool_output` handle
+  - Tool output module config (optional): `toolOutput` (object with `enabled`, `storeDir`, `maxChunks`, `overlapPercent`, `avgLineBytesThreshold`, `models`)
   - `callbacks?: AIAgentEventCallbacks`
 - `Configuration`
   - `cache?: CacheConfig` – global response cache backend (SQLite/Redis); when absent, cache uses defaults only if a TTL is enabled
@@ -112,14 +113,14 @@ Type `tool` (MCP tool calls and internal tools):
 - `mcpServer: string` – the MCP server identifier; `'agent'` for internal tools; `'unknown'` when a failure occurs before server resolution
 - `command: string` – tool name (namespaced for internal tools: `agent_*`)
 - `charactersIn: number` – length of JSON-serialized input parameters
-- `charactersOut: number` – length of returned text (after any truncation)
+- `charactersOut: number` – length of returned text (after handle replacement or tool_output response cap)
 - `error?: string` – only when `status: 'failed'`
 - `details?: Record<string, string | number | boolean>` – optional structured metadata (e.g., `projected_tokens`, `limit_tokens`, `remaining_tokens` for context guard failures)
 
 Emission timing (tool): Immediately after each tool execution completes or fails:
 - Internal tools `agent__task_status`: `status: 'ok'`, `mcpServer: 'agent'`, variable `charactersOut` (based on done/pending/now fields), `agent__final_report`: `status: 'ok'`, `mcpServer: 'agent'`, fixed `charactersOut` (12), `charactersIn` reflects parameter size.
 - External MCP tools: `status: 'ok'` with the resolved `mcpServer` on success; `status: 'failed'`, `mcpServer: 'unknown'`, and `charactersOut: 0` on error.
-- Truncation: If the tool response exceeds `toolResponseMaxBytes`, the library prefixes a truncation notice and trims the content to the limit; `charactersOut` reflects the returned (prefixed + truncated) content length. Truncated outputs include both the prefix `[TRUNCATED IN THE MIDDLE BY ~X BYTES/TOKENS]` and the mid-marker `[···TRUNCATED N bytes/tokens···]`. The emitted warning includes `original_bytes`, `final_bytes`, `truncated_pct` (bytes), and the configured size/token limit.
+- Oversized outputs: If a tool response exceeds `toolResponseMaxBytes` **or** would overflow the context budget, the output is stored in the per-session `tool_output` store and replaced with a handle message instructing the model to call `tool_output(handle=..., extract=...)`. `charactersOut` reflects the handle message length. Warnings include `handle`, `reason` (`size_cap|token_budget|reserve_failed`), `bytes`, `lines`, and `tokens`.
 - Context overflow: If projecting a tool result would overflow the configured `contextWindow`, the agent injects `(tool failed: context window budget exceeded)`, records an accounting entry with `error: 'context_budget_exceeded'`, and populates `details` with `projected_tokens`, `limit_tokens`, and `remaining_tokens`.
 - Telemetry: every guard activation increments `ai_agent_context_guard_events_total{provider,model,trigger,outcome}` and updates the observable gauge `ai_agent_context_guard_remaining_tokens{provider,model,trigger,outcome}` so integrators can monitor how close sessions are to exhausting their budgets.
 
@@ -223,16 +224,15 @@ Recommendation for JSON output: include an explicit error structure in the schem
   - `result.logs` including `agent:EXIT-...` and `FIN` lines,
   - `result.accounting` for a full activity record.
 
-## MCP Tool Response Size Cap (Truncation)
+## Tool Response Size Cap (tool_output)
 
 - Configurable via `sessionConfig.toolResponseMaxBytes`.
-- When an MCP tool response exceeds the cap:
-  - Emits a `WRN` log (response, mcp) that states whether the output was **truncated** or **dropped**, and includes:
-    - `original_bytes`, `final_bytes`, `truncated_pct` (bytes), plus `limit_bytes` when size-capped.
-  - Returns truncated content with **two markers**:
-    - Prefix at start: `[TRUNCATED IN THE MIDDLE BY ~X BYTES/TOKENS]`
-    - Existing mid-marker: `[···TRUNCATED {omitted} bytes/tokens···]` (appears in the middle of content)
-  - Counts occurrences; `FIN` MCP summary includes `capped=<count>`.
+- Tool output module overrides via `sessionConfig.toolOutput`.
+- When an MCP tool response exceeds the cap (or would overflow the context budget):
+  - Stores the sanitized output in the per-session `tool_output` store.
+  - Returns a handle message instructing the model to call `tool_output(handle=..., extract=...)`.
+  - Emits a `WRN` log (response, mcp) with `handle`, `reason` (`size_cap|token_budget|reserve_failed`), `bytes`, `lines`, and `tokens`.
+  - Any truncation happens **only** inside the `tool_output` module as a fallback when extraction fails.
 - Headend surfaces (REST/MCP/OpenAI/Anthropic) apply the same cap via their session configuration and surface errors through HTTP/SSE/WebSocket semantics. Their incoming request payloads must include `format`, and when `format` is `json`, a `schema` object is required so the library can validate structured content.
 
 ## Using the Library (minimal example)
