@@ -332,7 +332,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
             let data_iter = journal_file.entry_data_objects(entry_offset)?;
             for data_result in data_iter {
                 let data_guard = data_result?;
-                let payload = data_guard.get_payload();
+                let payload = data_guard.raw_payload();
                 payloads.push(payload.to_vec());
             }
         }

@@ -11,7 +11,7 @@ pub trait HashableObject {
     fn hash(&self) -> u64;
 
     /// Get the payload data for matching
-    fn get_payload(&self) -> &[u8];
+    fn raw_payload(&self) -> &[u8];
 
     /// Get the offset to the next object in the hash chain
     fn next_hash_offset(&self) -> Option<NonZeroU64>;
@@ -158,7 +158,7 @@ impl<B: ByteSlice> HashableObject for FieldObject<B> {
         self.header.hash
     }
 
-    fn get_payload(&self) -> &[u8] {
+    fn raw_payload(&self) -> &[u8] {
         &self.payload
     }
 
@@ -186,7 +186,7 @@ impl<B: ByteSlice> HashableObject for DataObject<B> {
         self.header.hash
     }
 
-    fn get_payload(&self) -> &[u8] {
+    fn raw_payload(&self) -> &[u8] {
         self.payload_bytes()
     }
 
