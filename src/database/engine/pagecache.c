@@ -485,8 +485,15 @@ static ALWAYS_INLINE_HOT size_t list_has_time_gaps(
 // ----------------------------------------------------------------------------
 
 typedef void (*page_found_callback_t)(PGC_PAGE *page, void *data);
-static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, page_found_callback_t callback, void *callback_data) {
+
+static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *metric,
+                                                           usec_t start_time_ut, usec_t end_time_ut,
+                                                           page_found_callback_t callback, void *callback_data)
+{
     nd_uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
+    if (unlikely(!uuid))
+        return 0;
+
     Word_t metric_id = mrg_metric_id(main_mrg, metric);
 
     time_t wanted_start_time_s = (time_t)(start_time_ut / USEC_PER_SEC);
@@ -523,11 +530,13 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
             struct journal_metric_list *uuid_list =
                 (struct journal_metric_list *)((uint8_t *)j2_header + j2_header->metric_offset);
             size_t metric_offset = (uint8_t *)uuid_list - (uint8_t *)j2_header;
-            if (metric_offset >= journal_v2_file_size) {
+
+            size_t metric_list_size = journal_metric_count * sizeof(*uuid_list);
+            if (metric_offset + metric_list_size > journal_v2_file_size) {
                 nd_log_limit_static_thread_var(erl, 60, 0);
                 nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                             "DBENGINE: Invalid metric list header in journalfile %u of tier %u",
-                             datafile->fileno, datafile->tier);
+                             "DBENGINE: Metric list exceeds journal file size in journalfile %u of tier %u (metric_offset=%zu, list_size=%zu, file_size=%zu)",
+                             datafile->fileno, datafile->tier, metric_offset, metric_list_size, journal_v2_file_size);
                 journalfile_v2_data_release(datafile->journalfile);
                 continue;
             }
