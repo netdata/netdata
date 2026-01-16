@@ -238,6 +238,97 @@ const fallbackWait = Math.min(Math.max(attempts * 1_000, RATE_LIMIT_MIN_WAIT_MS)
 - Retry guidance is persisted via TURN-FAILED user messages in the conversation history (except malformed tool payloads, which surface as tool failure responses instead).
 - Provider throttling and transport errors are **not** surfaced to the model; they are logged and handled by provider cycling/backoff.
 
+## Model Feedback Messages
+
+### TURN-FAILED (Permanent)
+**Location**: `src/llm-messages-turn-failed.ts`, `src/session-turn-runner.ts:553`
+
+- **Persistence**: Added to permanent conversation history
+- **Purpose**: Error feedback requiring model correction on retry
+- **Format**: `TURN-FAILED: <reason1> | <reason2>`
+- **When used**: Validation errors, empty responses, malformed output, schema failures
+- **Caching**: NOT excluded from Anthropic prompt caching (uses `TURN-FAILED:` prefix)
+
+**Example**:
+```
+TURN-FAILED: Empty response detected: no tool calls and no final report/answer were received.
+```
+
+### XML-NEXT (Ephemeral)
+**Location**: `src/llm-messages-xml-next.ts`, `src/xml-transport.ts`
+
+- **Persistence**: Per-attempt only (added to `attemptConversation` copy, not permanent history)
+- **Purpose**: Turn status, warnings, and next-move instructions
+- **Format**: `# System Notice\n\n<header>\n\n<warnings>\n\n<footer>`
+- **Caching**: Excluded from Anthropic prompt caching (starts with `# System Notice`)
+
+### XML-NEXT 3-Part Structure
+
+The XML-NEXT message uses a clean 3-part structure:
+
+**Part 1: Header (always present)**
+```
+This is turn/step X of Y[, attempt A of B]. Your context window is Z% full.
+```
+
+Rules:
+- `X` = current turn number
+- `Y` = max turns (if defined)
+- `, attempt A of B` = only shown on retry (attempt > 1)
+- `Z` = context window percentage
+
+**Part 2: Warnings (optional)**
+
+Shown when there are issues from the previous attempt or informational warnings:
+
+| Warning Type | Message |
+|--------------|---------|
+| Wasted turn (task_status only) | Turn wasted: you called task-status without any other tools and without providing a final report/answer, so a turn has been wasted without any progress on your task. (This is occurrence X of 5 before forced finalization) |
+| Context limit | You run out of context window. You MUST now provide your final report/answer, even if incomplete. If you have not finished the task, state this limitation in your final report/answer. |
+| Max turns | You are not allowed to run more turns. You MUST now provide your final report/answer, even if incomplete. If you have not finished the task, state this limitation in your final report/answer. |
+| Task completed | You marked the task-status as completed. You MUST now provide your final report/answer. |
+| Task status loop | You are repeatedly calling task-status without any other tools or a final report/answer and the system stopped you to prevent infinite loops. You MUST now provide your final report/answer, even if incomplete. |
+| Retry exhaustion | All retry attempts have been exhausted. You MUST now provide your final report/answer, even if incomplete. If you have not finished the task, state this limitation in your final report/answer. |
+
+**Part 3: Footer (always present)**
+
+Non-final turn (with task_status enabled):
+```
+You now need to decide your next move:
+EITHER
+- Call tools to advance your task following the main prompt instructions (pay attention to tool formatting and schema requirements).
+- Together with these tool calls, also call `agent__task_status` to inform your user about what you are doing and why you are calling these tools.
+OR
+- Provide your final report/answer in the expected format (format) using the XML wrapper: <ai-agent-NONCE-FINAL format="format">...
+```
+
+Final turn:
+```
+You must now provide your final report/answer in the expected format (format) using the XML wrapper: <ai-agent-NONCE-FINAL format="format">...
+
+Allowed tools for this final turn: tool1, tool2
+```
+
+## Wasted Turn Detection
+
+### Consecutive Standalone task_status Calls
+**Location**: `src/session-turn-runner.ts:1542-1558`, `src/session-tool-executor.ts:293-371`
+
+| Condition | Behavior |
+|-----------|----------|
+| task_status called alone (no other tools, no final report) | Turn succeeds, counter increments |
+| Warning shown | Ephemeral warning in XML-NEXT on each occurrence |
+| Counter reaches 5 | Force final turn (`task_status_only` reason) |
+
+**Warning Message** (ephemeral, in XML-NEXT):
+```
+Turn wasted: you called task-status without any other tools and without providing
+a final report/answer, so a turn has been wasted without any progress on your task.
+(This is occurrence X of 5 before forced finalization)
+```
+
+**Rationale**: Model may loop calling only task_status without making progress. Warning on each occurrence helps model self-correct before forced finalization.
+
 ## Business Logic Coverage (Verified 2025-12-23)
 
 - **Cycle-scoped rate-limit waits**: `rateLimitedInCycle` counts per-target failures and waits only after *every* provider in the rotation returns `rate_limit`, preventing unnecessary sleeps when at least one path remains (`src/session-turn-runner.ts`).

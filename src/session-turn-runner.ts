@@ -23,7 +23,7 @@ import { ContextGuard, type ContextGuardBlockedEntry, type ContextGuardEvaluatio
 import { FINAL_REPORT_FORMAT_VALUES, type FinalReportManager, type FinalReportSource, type PendingFinalReportPayload } from './final-report-manager.js';
 import { FINAL_REPORT_TOOL, FINAL_REPORT_TOOL_ALIASES } from './internal-tools.js';
 import { buildTurnFailedNotice, type TurnFailedNoticeEvent, type TurnFailedSlug } from './llm-messages-turn-failed.js';
-import { buildXmlNextEvents, buildXmlNextNotice, type XmlNextNoticeEvent } from './llm-messages-xml-next.js';
+import { buildXmlNextNotice } from './llm-messages-xml-next.js';
 import {
   FINAL_REPORT_JSON_REQUIRED,
   FINAL_REPORT_SLACK_MESSAGES_MISSING,
@@ -118,8 +118,6 @@ interface TurnRunnerState {
   accounting: AccountingEntry[];
   turnFailedEvents: TurnFailedNoticeEvent[];
   turnFailedCounter: number;
-  xmlNextEvents: XmlNextNoticeEvent[];
-  xmlNextCounter: number;
   toolFailureMessages: Map<string, string>;
   toolFailureFallbacks: string[];
   toolNameCorrections: Map<string, string>;
@@ -199,8 +197,6 @@ export class TurnRunner {
             accounting: [],
             turnFailedEvents: [],
             turnFailedCounter: 0,
-            xmlNextEvents: [],
-            xmlNextCounter: 0,
             toolFailureMessages: new Map<string, string>(),
             toolFailureFallbacks: [],
             toolNameCorrections: new Map<string, string>(),
@@ -319,8 +315,6 @@ export class TurnRunner {
             this.ctx.xmlTransport.beginTurn();
             this.state.turnFailedEvents = [];
             this.state.turnFailedCounter = 0;
-            this.state.xmlNextEvents = [];
-            this.state.xmlNextCounter = 0;
             this.state.currentTurn = currentTurn;
             this.callbacks.setCurrentTurn(currentTurn);
             this.logTurnStart(currentTurn);
@@ -564,7 +558,8 @@ export class TurnRunner {
                     const xmlNextForcedReason = isFinalTurn
                         ? (this.forcedFinalTurnReason ?? 'max_turns')
                         : undefined;
-                    const { events: xmlNextEvents, nextOrder } = buildXmlNextEvents({
+                    // Build XML-NEXT notice using 3-part structure directly
+                    const xmlNextContent = buildXmlNextNotice({
                         nonce: this.ctx.xmlTransport.getSessionNonce(),
                         turn: currentTurn,
                         maxTurns,
@@ -578,10 +573,8 @@ export class TurnRunner {
                         finalTurnTools: this.ctx.finalTurnAllowedTools !== undefined
                             ? Array.from(this.ctx.finalTurnAllowedTools.values())
                             : undefined,
-                    }, this.state.xmlNextCounter);
-                    this.state.xmlNextEvents = xmlNextEvents;
-                    this.state.xmlNextCounter = nextOrder;
-                    const xmlNextContent = buildXmlNextNotice(xmlNextEvents);
+                        consecutiveProgressOnlyTurns: this.state.consecutiveProgressOnlyTurns ?? 0,
+                    });
                     const xmlResult = this.ctx.xmlTransport.buildMessages({
                         turn: currentTurn,
                         maxTurns,

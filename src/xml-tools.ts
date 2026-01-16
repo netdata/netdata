@@ -1,7 +1,7 @@
 import type { OutputFormatId } from './formats.js';
 import type { ToolCall } from './types.js';
 
-import { buildXmlNextEvents, buildXmlNextNotice } from './llm-messages-xml-next.js';
+import { buildXmlNextNotice } from './llm-messages-xml-next.js';
 import { renderXmlPastTemplate } from './llm-messages.js';
 import { stripLeadingThinkBlock } from './think-tag-filter.js';
 import { TRUNCATE_PREVIEW_BYTES, truncateToBytes } from './truncation.js';
@@ -29,6 +29,8 @@ export interface XmlNextPayload {
   hasExternalTools: boolean;
   forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion';
   finalTurnTools?: string[];
+  // Wasted turn tracking - consecutive task_status-only turns
+  consecutiveProgressOnlyTurns?: number;
 }
 
 export interface XmlPastEntry {
@@ -141,7 +143,7 @@ export function buildToolCallFromParsed(slot: ParsedXmlSlot, toolCallId: string)
 }
 
 export function renderXmlNext(payload: XmlNextPayload): string {
-  const { events } = buildXmlNextEvents({
+  return buildXmlNextNotice({
     nonce: payload.nonce,
     turn: payload.turn,
     maxTurns: payload.maxTurns,
@@ -153,8 +155,8 @@ export function renderXmlNext(payload: XmlNextPayload): string {
     taskStatusToolEnabled: payload.taskStatusToolEnabled,
     forcedFinalTurnReason: payload.forcedFinalTurnReason,
     finalTurnTools: payload.finalTurnTools,
-  }, 0);
-  return buildXmlNextNotice(events);
+    consecutiveProgressOnlyTurns: payload.consecutiveProgressOnlyTurns,
+  });
 }
 
 export function renderXmlPast(past: XmlPastPayload): string {

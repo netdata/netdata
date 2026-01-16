@@ -66,6 +66,8 @@ export interface XmlBuildMessagesConfig {
   forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion';
   finalTurnTools?: string[];
   noticeContent?: string;
+  // Wasted turn tracking - consecutive task_status-only turns
+  consecutiveProgressOnlyTurns?: number;
 }
 
 // Result from building messages
@@ -188,6 +190,7 @@ export class XmlToolTransport {
       hasExternalTools,
       forcedFinalTurnReason: config.forcedFinalTurnReason,
       finalTurnTools: config.finalTurnTools,
+      consecutiveProgressOnlyTurns: config.consecutiveProgressOnlyTurns,
     });
 
     const nextMessage: ConversationMessage = {
