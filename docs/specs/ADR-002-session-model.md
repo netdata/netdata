@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2025-09-04
 - Owners: Core maintainers
-- Related: docs/DESIGN.md, docs/ADR-001-sub-agent-as-tool.md
+- Related: DESIGN.md, ADR-001-sub-agent-as-tool.md
 
 ## Context
 

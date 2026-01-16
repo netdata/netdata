@@ -17,5 +17,5 @@ Compact, no prose. All behaviors enumerated with conditions.
 ## Maintenance (Verified 2025-11-16)
 
 - Every behavior-changing PR must update the relevant spec(s) **and** `docs/specs/index.md`.
-- Specs referencing runtime behavior must also update `docs/AI-AGENT-GUIDE.md` to keep AI-facing docs aligned.
+- Specs referencing runtime behavior must also update `docs/skills/ai-agent-configuration.md` to keep AI-facing docs aligned.
 - Run Codex + Gemini second-opinion reviews on spec changes and incorporate their findings before merging (per TODO-INTERNAL-DOCUMENTATION.md).

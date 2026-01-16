@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2025-09-04
 - Owners: Core maintainers
-- Related: docs/DESIGN.md, docs/MULTI-AGENT.md
+- Related: DESIGN.md, MULTI-AGENT.md
 
 ## Context
 

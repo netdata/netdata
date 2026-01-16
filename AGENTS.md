@@ -1,14 +1,13 @@
 ## YOU MUST READ
 
-- docs/SPECS.md for specifications.
-- docs/IMPLEMENTATION.md for AI SDK/ModelContextProtocol implementation.
-- docs/DESIGN.md for the design of the application.
-- docs/MULTI-AGENT.md for the recursive multi-agent design.
-- docs/TESTING.md for deterministic harness usage and coverage guidance.
-- docs/docs/AI-AGENT-INTERNAL-API.md current status of the ai-agent internal agent API.
+- docs/specs/IMPLEMENTATION.md for AI SDK/ModelContextProtocol implementation.
+- docs/specs/DESIGN.md for the design of the application.
+- docs/specs/MULTI-AGENT.md for the recursive multi-agent design.
+- docs/Contributing-Testing.md for deterministic harness usage and coverage guidance.
+- docs/specs/AI-AGENT-INTERNAL-API.md current status of the ai-agent internal agent API.
 - README.md for end-user documentation of the application.
-- docs/AI-AGENT-GUIDE.md for the AI-facing source of truth covering prompts, configs, headends, snapshots, and operational defaults.
-- **docs/SESSION-SNAPSHOTS.md** for session snapshot extraction commands and structure. YOU MUST READ this document when working with session snapshots (debugging issues, extracting LLM payloads, tool requests/responses, logs, WRN/ERR entries, sub-agent data).
+- docs/skills/ai-agent-configuration.md for the AI-facing source of truth covering prompts, configs, headends, snapshots, and operational defaults.
+- **docs/skills/ai-agent-session-snapshots.md** for session snapshot extraction commands and structure. YOU MUST READ this document when working with session snapshots (debugging issues, extracting LLM payloads, tool requests/responses, logs, WRN/ERR entries, sub-agent data).
 
 The code has extensive tests and its business logic is described in detail in the documents under `docs/specs/*.md`. These documents have been SYNCHORIZED with the codebase and they act as a reference during code refactorings, new features and improvements (they are organized by feature, module and business logic).
 
@@ -28,7 +27,7 @@ The application source code is in the root directory (src/, package.json, etc).
 
 When debugging session issues, extracting LLM payloads, examining tool calls, or analyzing errors:
 
-1. **YOU MUST READ** `docs/SESSION-SNAPSHOTS.md` before working with snapshots
+1. **YOU MUST READ** `docs/skills/ai-agent-session-snapshots.md` before working with snapshots
 2. Use `zcat` to decompress and `jq` to extract specific data
 3. Common extractions:
    - LLM request/response payloads: `.opTree.turns[].ops[] | select(.kind == "llm")`
@@ -38,7 +37,7 @@ When debugging session issues, extracting LLM payloads, examining tool calls, or
 
 ### Documentation
 
-- `docs/SESSION-SNAPSHOTS.md` contains comprehensive extraction commands
+- `docs/skills/ai-agent-session-snapshots.md` contains comprehensive extraction commands
 - `docs/specs/snapshots.md` contains technical specifications
 - `src/session-tree.ts` contains the opTree implementation
 - `src/persistence.ts` contains file persistence logic
@@ -181,7 +180,7 @@ These rules help generate code that passes `npm run lint` and `npm run build` on
 
 - Lint must pass with zero warnings/errors
 - Build must succeed before commits
-- Read docs/SPECS.md, docs/IMPLEMENTATION.md, docs/DESIGN.md for context
+- Read docs/specs/IMPLEMENTATION.md, docs/specs/DESIGN.md for context
 
 # PRINCIPLES
 

@@ -201,7 +201,7 @@ Caches:
 ## Business Logic Coverage (Verified 2025-11-16)
 
 - **Routing matrix**: `compileRouting` supports `default`, `rules`, and `deny` blocks with glob-style channel IDs/names plus `engage` filters (`mentions`, `channel-posts`, `dms`); deny rules short-circuit resolution so sensitive channels can block the bot entirely (`src/headends/slack-headend.ts:538-670`).
-- **Prompt templating**: Route entries can specify `promptTemplates` per channel engagement type so mentions/DMs can inject extra context before the agent run, matching the behavior described in `docs/SPECS.md` (`src/headends/slack-headend.ts:570-612`).
+- **Prompt templating**: Route entries can specify `promptTemplates` per channel engagement type so mentions/DMs can inject extra context before the agent run (`src/headends/slack-headend.ts:570-612`).
 - **Opener tones**: `parseOpenerTone` supports `random`, `cheerful`, `formal`, and `busy` preset openers, ensuring multi-channel deployments have consistent “starting…” cues (`src/headends/slack-headend.ts:182-210, 373-390`).
 - **Slash command fallback**: The headend registers an extra route (REST headend if present, or ad-hoc HTTP server) for `/ai-agent` slash commands with signature verification and slack signing secret enforcement (`src/headends/slack-headend.ts:98-305`).
 - **Run-slot cleanup**: Each run stores a release callback keyed by Slack `runId`; aborts or completion events call `release` so the `ConcurrencyLimiter` never leaks slots even if Slack closes Socket Mode connections abruptly (`src/headends/slack-headend.ts:210-270`).

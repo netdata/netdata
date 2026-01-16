@@ -163,7 +163,7 @@ Each headend flag is repeatable. All headends share the same agent registry and 
 
 ## Documentation for AI Assistants
 
-**See [`docs/AI-AGENT-GUIDE.md`](docs/AI-AGENT-GUIDE.md)**: Single-page reference for LLM agents designing ai-agents. Covers:
+**See [`docs/skills/ai-agent-configuration.md`](docs/skills/ai-agent-configuration.md)**: Single-page reference for LLM agents designing ai-agents. Covers:
 
 - Frontmatter schema and all available keys
 - Tool composition patterns
