@@ -55,6 +55,11 @@ Classification Logic:
 
 Always fetch the company record via view_company to check these fields.
 
+Freshdesk UI to API Field Mapping:
+- "Support Tier" in UI = company.account_tier in API
+- "Support Group" in UI = ticket.group_id in API (determines routing)
+- Premium customers are typically routed to dedicated support groups
+
 Key Tools (read-only)
 - freshdesk__get_tickets: Primary tool for filtering tickets by company_id, requester_id, or email (parameters must be integers or strings as appropriate).
 - freshdesk__search_tickets: Find tickets by query/filters. See "search_tickets API Reference" below for EXACT supported fields.
