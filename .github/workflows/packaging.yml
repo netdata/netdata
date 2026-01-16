@@ -203,7 +203,7 @@ jobs:
       # build failure for one version doesn't prevent us from publishing
       # successfully built and tested packages for another version.
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 16
     steps:
       - name: Skip Check
         id: skip
