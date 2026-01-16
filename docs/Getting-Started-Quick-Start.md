@@ -266,9 +266,6 @@ Create `/etc/ai-agent/ai-agent.json` (or use `~/.ai-agent/ai-agent.json`):
       "command": "npx",
       "args": ["-y", "@context7/mcp-server"]
     }
-  },
-  "api": {
-    "port": 3000
   }
 }
 ```
@@ -287,7 +284,7 @@ Type=simple
 User=ai-agent
 Group=ai-agent
 WorkingDirectory=/opt/ai-agent
-ExecStart=/opt/ai-agent/bin/ai-agent --headend openai --agent /opt/ai-agent/agents/docs-helper.ai
+ExecStart=/opt/ai-agent/bin/ai-agent --openai-completions 3000 --agent /opt/ai-agent/agents/docs-helper.ai
 Restart=always
 RestartSec=5
 EnvironmentFile=/etc/ai-agent/ai-agent.env
@@ -307,18 +304,19 @@ sudo systemctl status ai-agent
 
 ### Step 4.4: Available Headends
 
-| Headend | Flag | Port | Use Case |
-|---------|------|------|----------|
-| OpenAI-compatible | `--headend openai` | 3000 | Open-WebUI, any OpenAI client |
-| Anthropic-compatible | `--headend anthropic` | 3000 | Claude-compatible clients |
-| MCP | `--headend mcp` | stdio | Claude Code, VS Code |
-| REST | `--headend rest` | 3000 | Custom integrations |
-| Slack | `--headend slack` | 3000 | Slack bot |
+| Headend | Flag | Use Case |
+|---------|------|----------|
+| OpenAI-compatible | `--openai-completions <port>` | Open-WebUI, any OpenAI client |
+| Anthropic-compatible | `--anthropic-completions <port>` | Claude-compatible clients |
+| MCP | `--mcp stdio` | Claude Code, VS Code (stdio) |
+| MCP HTTP | `--mcp http:<port>` | HTTP-based MCP clients |
+| REST | `--api <port>` | Custom integrations |
+| Slack | `--slack` | Slack bot (Socket Mode, no port) |
 
-Multiple headends can run simultaneously:
+Multiple headends can run simultaneously on different ports:
 
 ```bash
-ai-agent --headend openai --headend mcp --agent docs-helper.ai
+ai-agent --openai-completions 3000 --api 3001 --mcp stdio --agent docs-helper.ai
 ```
 
 ---
@@ -327,9 +325,9 @@ ai-agent --headend openai --headend mcp --agent docs-helper.ai
 
 ### Open-WebUI (LLM Headend)
 
-1. Start ai-agent with OpenAI headend:
+1. Start ai-agent with OpenAI-compatible headend:
    ```bash
-   ai-agent --headend openai --agent docs-helper.ai
+   ai-agent --openai-completions 3000 --agent docs-helper.ai
    ```
 
 2. In Open-WebUI settings, add connection:
@@ -346,7 +344,7 @@ ai-agent --headend openai --headend mcp --agent docs-helper.ai
      "mcpServers": {
        "ai-agent": {
          "command": "ai-agent",
-         "args": ["--headend", "mcp", "--agent", "/path/to/docs-helper.ai"]
+         "args": ["--mcp", "stdio", "--agent", "/path/to/docs-helper.ai"]
        }
      }
    }
@@ -360,7 +358,7 @@ ai-agent --headend openai --headend mcp --agent docs-helper.ai
 
 2. Configure the extension to use:
    ```bash
-   ai-agent --headend mcp --agent /path/to/docs-helper.ai
+   ai-agent --mcp stdio --agent /path/to/docs-helper.ai
    ```
 
 3. Agent tools become available in VS Code
