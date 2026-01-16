@@ -876,6 +876,15 @@ helm install netdata netdata/netdata
 - User consent management
 - Audit logs for compliance monitoring
 
+**Netdata's own Logs:**
+Netdata itself logs to various destinations depending on how and where it is run:
+
+- When running under systemd, Netdata logs structured events to systemd journals, using the `netdata` journal namespace (append `--namespace netdata` to journalctl)
+- When running on MacOS/FreeBSD or Linux without systemd, it logs to `/var/log/netdata/{daemon,collector,health}.log` (or `/opt/netdata/var/log/netdata/{daemon,collector,health}.log` for static installations), in logfmt format (json supported too)
+- When running on MS Windows, it logs to ETW (Event Tracing for Windows - preferred) or WEL (Windows Event Log - fallback), both of which are available using Netdata's Logs dashboard tab and Windows Event Viewer
+
+Netdata logs are structured in all cases, and are SIEM friendly.
+
 ### 11.3 Access Control
 
 **Role-Based Access Control (RBAC):**
@@ -1064,10 +1073,10 @@ Regardless of tier, all users benefit from:
 - Forum: https://community.netdata.cloud
 - GitHub Discussions: https://github.com/netdata/netdata/discussions
 - Discord: https://discord.com/invite/2mEmfW735j
-- GitHub Issues: Bug reports and feature requests
+- GitHub Issues: Bug reports and feature requests (https://github.com/netdata/netdata/issues)
 
 **Community Stats:**
-- 76,300+ GitHub stars
+- 77,400+ GitHub stars
 - 615+ contributors
 - 1.5 million downloads per day
 - Active community engagement

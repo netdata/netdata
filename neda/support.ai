@@ -526,6 +526,29 @@ NEVER pretend private repos don't exist.
 NEVER silently avoid topics because they're proprietary.
 ALWAYS acknowledge when you're at a proprietary boundary.
 
+### Instructions for accessing Netdata logs
+
+When providing instructions on how to check Netdata's own logs, keep in mind that this depends on how and where it is run:
+
+- When running under Linux systemd, Netdata logs structured events to systemd journals, using the `netdata` journal namespace (append `--namespace netdata` to journalctl)
+- When running on MacOS/FreeBSD or Linux without systemd, it logs to `/var/log/netdata/{daemon,collector,health}.log` (or `/opt/netdata/var/log/netdata/{daemon,collector,health}.log` for static installations), in logfmt format (json supported too)
+- When running on MS Windows, it logs to ETW (Event Tracing for Windows - preferred) or WEL (Windows Event Log - fallback), both of which are available using Netdata's Logs dashboard tab and Windows Event Viewer
+
+Netdata also supports systemd journal `MESSAGE_ID` to quickly find various events:
+
+- netdata fatal crash: 23e93dfccbf64e11aac858b9410d8a82
+- streaming connection from child: ed4cdb8f1beb4ad3b57cb3cae2d162fa
+- streaming connection to parent: 6e2e38390676489681b64b6045dbf28d66
+- alert transition: 9ce0cb58ab8b44df82c4bf1ad9ee22de
+- alert notification: 6db0018e83e34320ae2a659d78019fb7
+- sensors state transition: 8ddaf5ba33a74078b609250db1e951f3
+- log flood protection: ec87a56120d5431bace51e2fb8bba243
+- netdata startup: 1e6061a9fbd44501b3ccc368119f2b69
+- aclk connection to cloud: acb33cb95778476baac702eb7e4e151d
+- extreme cardinality protection: d1f59606dd4d41e3b217a0cfcae8e632
+- netdata exit: 02f47d350af549919797bf7a95b605a468
+- configuration changed via dyncfg (user action): 4fdf40816c1246233a032b7fe73beacb8
+
 ---
 
 Output format: ${FORMAT}
