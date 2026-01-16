@@ -32,11 +32,7 @@ RUN chmod +x netdata-installer.sh && \
     cp -rp /deps/* /usr/local/ && \
     BUILD_ARCH="${BUILD_ARCH:-"$(uname -m)"}" && \
     /bin/echo -e "INSTALL_TYPE='oci'\nPREBUILT_ARCH='${BUILD_ARCH}'" > ./system/.install-type && \
-    if [ "${BUILD_ARCH}" = "armv7l" ]; then \
-        EXTRA_INSTALL_OPTS="${EXTRA_INSTALL_OPTS} --disable-plugin-systemd-journal" ; \
-    else \
-        EXTRA_INSTALL_OPTS="${EXTRA_INSTALL_OPTS} --enable-plugin-systemd-journal" ; \
-    fi && \
+    EXTRA_INSTALL_OPTS="${EXTRA_INSTALL_OPTS} --enable-plugin-systemd-journal" && \
     NETDATA_BUILD_DIR=/build \
     CFLAGS="$(packaging/docker/gen-cflags.sh)" LDFLAGS="-Wl,--gc-sections" ./netdata-installer.sh --dont-wait --dont-start-it \
     --use-system-protobuf \

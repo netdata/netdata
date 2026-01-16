@@ -330,7 +330,7 @@ prepare_cmake_options() {
   fi
 
   if [ -z "${ENABLE_SYSTEMD_JOURNAL}" ]; then
-    if command -v rustc > /dev/null 2>&1 && [ "$(uname -m)" != 'armv7l' ] && [ "$(uname -m)" != 'armv6l' ]; then
+    if command -v rustc > /dev/null 2>&1; then
       ENABLE_SYSTEMD_JOURNAL=1
     else
       ENABLE_SYSTEMD_JOURNAL=0
