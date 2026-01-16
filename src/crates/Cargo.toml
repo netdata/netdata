@@ -47,12 +47,12 @@ uuid = { version = "1.0"}
 nix = { version = "0.30" }
 
 ruzstd = "0.8"
-zstd = "0.13"
 siphasher = "1.0"
 hashers = "1.0"
 twox-hash = { version = "2.1", default-features = false }
 rand = "0.9"
-lz4 = "1.25"
+lz4_flex = { version = "0.12", default-features = false, features = ["std", "safe-decode", "checked-decode"] }
+lzma-rust2 = { version = "0.15", default-features = false, features = ["std", "xz"] }
 md5 = "0.7"
 
 roaring = { git = "https://github.com/netdata/roaring-rs.git", branch="allocative" }

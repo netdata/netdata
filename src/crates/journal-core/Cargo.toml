@@ -25,7 +25,6 @@ nix = { workspace = true }
 
 # File format dependencies
 ruzstd = { workspace = true }
-zstd = { workspace = true }
 siphasher = { workspace = true }
 md5 = { workspace = true }
 hashers = { workspace = true }
@@ -33,7 +32,8 @@ hashers = { workspace = true }
 twox-hash = { workspace = true, features = ["std"] }
 rand = { workspace = true }
 
-lz4 = { workspace = true }
+lz4_flex = { workspace = true }
+lzma-rust2 = { workspace = true }
 
 serde = { workspace =  true, features = ["derive"] }
 
