@@ -1,0 +1,49 @@
+name: Sync docs to Wiki
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'docs/**'
+  workflow_dispatch:
+
+jobs:
+  sync-wiki:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main repo
+        uses: actions/checkout@v4
+
+      - name: Checkout wiki repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}.wiki
+          path: wiki
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sync docs to wiki
+        run: |
+          # Remove old wiki content (except .git)
+          find wiki -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+
+          # Copy docs content to wiki root
+          # Wiki pages go to root, specs/ and skills/ as subdirectories
+          cp -r docs/* wiki/
+
+          # GitHub wiki uses Home.md as the landing page (already named correctly)
+
+      - name: Commit and push to wiki
+        run: |
+          cd wiki
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Sync wiki from docs/ ($(date -u +%Y-%m-%d))"
+            git push
+          fi
