@@ -1,246 +1,408 @@
 # Context Management
 
-Token budget tracking and context guard enforcement.
+Token budget tracking, context guard enforcement, and overflow handling to prevent LLM context window overflow.
+
+---
+
+## Table of Contents
+
+- [TL;DR](#tldr) - Quick summary of context management
+- [Why This Matters](#why-this-matters) - When context management affects you
+- [Core Concepts](#core-concepts) - Key terms and counters
+- [Context Guard Algorithm](#context-guard-algorithm) - How limits are enforced
+- [Limit Calculation](#limit-calculation) - How budgets are computed
+- [Token Estimation](#token-estimation) - How tokens are counted
+- [Tool Budget Management](#tool-budget-management) - Tool output handling
+- [Configuration Options](#configuration-options) - Settings that affect context
+- [Debug Mode](#debug-mode) - Troubleshooting context issues
+- [Troubleshooting](#troubleshooting) - Common problems and solutions
+- [See Also](#see-also) - Related documentation
 
 ---
 
 ## TL;DR
 
-Projects token usage, enforces limits per model, forces final turn when approaching limit, manages tool output sizes.
+ai-agent tracks token usage across the conversation and enforces limits before they cause LLM API errors. When approaching the context window limit, the guard forces a final turn (tools restricted to `final_report` only). Tool outputs that exceed size limits are stored on disk and replaced with handles.
 
 ---
 
-## Token Counters
+## Why This Matters
 
-### Session State
+Context management affects you when:
 
-| Counter | Description |
-|---------|-------------|
-| `currentCtxTokens` | Tokens in committed conversation |
-| `pendingCtxTokens` | Tokens pending commit |
-| `newCtxTokens` | New tokens this turn |
-| `schemaCtxTokens` | Tool schema token estimate |
+- **Session ends unexpectedly**: Context guard forced a final turn
+- **Tools stop executing**: Tool budget exceeded
+- **Large responses stored**: Tool output exceeded size limit
+- **Provider errors**: Context window overflow at the API level
+
+Understanding these mechanisms helps you:
+- Configure appropriate limits for your use case
+- Debug "unexpected final turn" scenarios
+- Optimize token usage for longer conversations
+- Handle large tool outputs gracefully
 
 ---
 
-## Context Guard Flow
+## Core Concepts
 
-### 1. Initialization
+### Token Counters
 
-At session start:
-```typescript
-targetContextConfigs = sessionTargets.map((target) => {
-  return {
-    provider, model,
-    contextWindow,      // Model capacity
-    bufferTokens,       // Safety margin
-    tokenizerId
-  };
-});
-currentCtxTokens = estimateTokensForCounters(conversation);
+The session tracks multiple token counters to project usage.
+
+```mermaid
+graph LR
+    subgraph "Current State"
+        Current[currentCtxTokens<br/>Committed conversation]
+    end
+
+    subgraph "Pending"
+        Pending[pendingCtxTokens<br/>Uncommitted outputs]
+        New[newCtxTokens<br/>New this turn]
+    end
+
+    subgraph "Overhead"
+        Schema[schemaCtxTokens<br/>Tool schemas]
+    end
+
+    subgraph "Projection"
+        Projected[projected tokens<br/>Sum of all]
+    end
+
+    Current --> Projected
+    Pending --> Projected
+    New --> Projected
+    Schema --> Projected
 ```
 
-### 2. Pre-Turn Evaluation
+| Counter | Description | Updated When |
+|---------|-------------|--------------|
+| `currentCtxTokens` | Tokens in committed conversation | After turn completes |
+| `pendingCtxTokens` | Tokens pending commit (tool outputs, retry notices) | During turn |
+| `newCtxTokens` | New tokens added this turn | During turn |
+| `schemaCtxTokens` | Tool schema token estimate | When tools change |
 
-Before each LLM request:
-```typescript
-const status = evaluateContextForProvider(provider, model);
-// Returns: 'ok' | 'skip' | 'final'
+### Guard Triggers
 
-if (status === 'final') {
-  enforceContextFinalTurn();
-}
-if (status === 'skip') {
-  // Log warning, provider cannot fit context
-}
+| Trigger | When Checked | Action if Exceeded |
+|---------|--------------|-------------------|
+| `turn_preflight` | Before each LLM request | Force final turn |
+| `tool_preflight` | Before committing tool output | Block tool output |
+
+---
+
+## Context Guard Algorithm
+
+### Pre-Turn Evaluation
+
+Before each LLM request, the guard evaluates whether the context fits.
+
+```mermaid
+flowchart TD
+    Start[Turn Start] --> Evaluate[Evaluate Context for Provider]
+    Evaluate --> Status{Guard Status?}
+
+    Status -->|ok| Proceed[Proceed with Turn]
+    Status -->|skip| Skip[Skip Provider<br/>Try Next]
+    Status -->|final| Force[Force Final Turn]
+
+    Force --> Restrict[Restrict Tools to final_report]
+    Restrict --> Inject[Inject Instruction Message]
+    Inject --> Proceed
 ```
 
-### 3. Guard Projection
+### Projection Formula
 
-```typescript
-projected = currentCtxTokens + pendingCtxTokens + newCtxTokens + schemaCtxTokens;
-limit = contextWindow - bufferTokens - maxOutputTokens;
+```
+projected = currentCtxTokens + pendingCtxTokens + newCtxTokens + schemaCtxTokens
+limit = contextWindow - bufferTokens - maxOutputTokens
 
-if (projected > limit) {
-  blocked.push({ provider, model, limit, projected });
-}
+if projected > limit:
+    trigger guard enforcement
 ```
 
-### 4. Enforcement
+### Enforcement Actions
 
-When guard triggers:
-1. Set `forcedFinalTurnReason = 'context'`
-2. Log context guard enforcement
-3. Restrict tools to `final_report` only
-4. Emit telemetry event
+When the guard triggers:
+
+| Step | Action |
+|------|--------|
+| 1 | Set `forcedFinalTurnReason = 'context'` |
+| 2 | Log context guard enforcement |
+| 3 | Restrict tools to `agent__final_report` only |
+| 4 | Emit telemetry event |
+| 5 | Recompute schema tokens (only final_report) |
 
 ---
 
 ## Limit Calculation
 
-```typescript
-effectiveLimit = contextWindow - bufferTokens - maxOutputTokens;
+### Effective Limit Formula
+
+```
+effectiveLimit = contextWindow - bufferTokens - maxOutputTokens
 ```
 
-**Example**:
-- contextWindow: 128,000
-- bufferTokens: 256
-- maxOutputTokens: 16,384
-- **effectiveLimit**: 111,360
+**Example Calculation**:
 
----
+| Setting | Value |
+|---------|-------|
+| contextWindow | 128,000 |
+| bufferTokens | 256 |
+| maxOutputTokens | 16,384 |
+| **effectiveLimit** | **111,360** |
 
-## Guard Triggers
+### Context Window Resolution
 
-### turn_preflight
+The context window value is resolved from multiple sources (first defined wins):
 
-Before each LLM request:
-- Evaluate projected tokens
-- Force final turn if exceeded
-- Skip provider if cannot fit
+| Priority | Source | Example |
+|----------|--------|---------|
+| 1 | `modelConfig.contextWindow` | Per-model override |
+| 2 | `providerConfig.contextWindow` | Provider default |
+| 3 | `DEFAULT_CONTEXT_WINDOW_TOKENS` | 131,072 (fallback) |
 
-### tool_preflight
+### Buffer Resolution
 
-Before committing tool output:
-- Estimate output tokens
-- Block if budget exceeded
-- Set toolBudgetExceeded flag
-
----
-
-## Tool Budget Callback
-
-```typescript
-toolBudgetCallbacks = {
-  reserveToolOutput: async (output) => {
-    const tokens = estimateTokens(output);
-    const guard = evaluateContextGuard(tokens);
-    if (guard.blocked.length > 0) {
-      this.toolBudgetExceeded = true;
-      enforceContextFinalTurn();
-      return { ok: false, reason: 'token_budget_exceeded' };
-    }
-    return { ok: true, tokens };
-  },
-  canExecuteTool: () => !this.toolBudgetExceeded,
-};
-```
-
-Once a tool response is rejected, `canExecuteTool()` returns `false`, so the orchestrator skips additional tools.
-
----
-
-## Context Window Hierarchy
-
-**Resolution Order** (first defined wins):
-
-1. `modelConfig.contextWindow` (model-specific)
-2. `providerConfig.contextWindow` (provider default)
-3. `DEFAULT_CONTEXT_WINDOW_TOKENS` (131,072)
-
-**Buffer Resolution**:
-
-1. `modelConfig.contextWindowBufferTokens`
-2. `providerConfig.contextWindowBufferTokens`
-3. `defaults.contextWindowBufferTokens`
-4. `DEFAULT_CONTEXT_BUFFER_TOKENS` (256)
+| Priority | Source | Default |
+|----------|--------|---------|
+| 1 | `modelConfig.contextWindowBufferTokens` | - |
+| 2 | `providerConfig.contextWindowBufferTokens` | - |
+| 3 | `defaults.contextWindowBufferTokens` | - |
+| 4 | `DEFAULT_CONTEXT_BUFFER_TOKENS` | 256 |
 
 ---
 
 ## Token Estimation
 
-### Methods
+### Estimation Methods
 
-- `estimateMessagesTokens(messages, tokenizerId)`
-- `resolveTokenizer(tokenizerId)`
+| Method | Accuracy | Speed | Used When |
+|--------|----------|-------|-----------|
+| Tokenizer-based | High | Slower | Tokenizer configured |
+| Character-based | Low | Fast | No tokenizer (fallback) |
 
-### Fallback
+**Character-based fallback**: `tokens ≈ characters / 4`
 
-- Default estimation: characters / 4
-- Per-model tokenizers when available
+### Tokenizer Configuration
+
+```yaml
+providers:
+  openai:
+    models:
+      gpt-4:
+        tokenizer: "cl100k_base"
+```
+
+### What Gets Estimated
+
+| Content | Estimation |
+|---------|------------|
+| System prompt | At session start |
+| User message | At session start |
+| Assistant messages | After LLM response |
+| Tool results | Before commit |
+| Tool schemas | When tools change |
 
 ---
 
-## Post-Shrink Behavior
+## Tool Budget Management
 
-When forced final but still over limit:
-1. Recompute schema tokens (final_report only)
-2. Re-evaluate guard
-3. If still blocked → log warning
-4. Proceed anyway (best effort)
+### Tool Output Size Handling
+
+```mermaid
+flowchart TD
+    Output[Tool Output] --> SizeCheck{Exceeds<br/>toolResponseMaxBytes?}
+
+    SizeCheck -->|No| BudgetCheck{Exceeds<br/>Token Budget?}
+    SizeCheck -->|Yes| Store[Store to Disk]
+
+    Store --> Handle[Replace with Handle]
+    Handle --> Commit[Commit to Conversation]
+
+    BudgetCheck -->|No| Commit
+    BudgetCheck -->|Yes| Drop[Drop Output]
+
+    Drop --> Fail[Return Failure Message]
+    Fail --> SetFlag[Set toolBudgetExceeded]
+```
+
+### Size Cap Behavior
+
+When output exceeds `toolResponseMaxBytes`:
+
+| Step | Action |
+|------|--------|
+| 1 | Write output to disk |
+| 2 | Generate unique handle |
+| 3 | Replace output with handle message |
+| 4 | Log warning with bytes/lines/tokens |
+
+**Handle Format**: `session-<uuid>/<file-uuid>`
+
+**Storage Location**: `/tmp/ai-agent-<run-hash>/`
+
+### Budget Callback Interface
+
+```typescript
+toolBudgetCallbacks = {
+    reserveToolOutput: async (output) => {
+        const tokens = estimateTokens(output);
+        const guard = evaluateContextGuard(tokens);
+
+        if (guard.blocked.length > 0) {
+            this.toolBudgetExceeded = true;
+            enforceContextFinalTurn();
+            return { ok: false, reason: 'token_budget_exceeded' };
+        }
+
+        return { ok: true, tokens };
+    },
+
+    canExecuteTool: () => !this.toolBudgetExceeded
+};
+```
+
+Once `toolBudgetExceeded` is set, `canExecuteTool()` returns `false` and the orchestrator skips remaining tool calls.
+
+---
+
+## Configuration Options
+
+| Setting | Type | Default | Effect |
+|---------|------|---------|--------|
+| `contextWindow` | number | 131,072 | Total token capacity |
+| `contextWindowBufferTokens` | number | 256 | Safety margin |
+| `maxOutputTokens` | number | varies | Reserved for LLM response |
+| `tokenizer` | string | - | Estimation accuracy |
+| `toolResponseMaxBytes` | number | varies | Triggers disk storage |
+
+### Example Configuration
+
+```yaml
+providers:
+  openai:
+    contextWindow: 128000
+    contextWindowBufferTokens: 512
+    models:
+      gpt-4-turbo:
+        maxOutputTokens: 4096
+        contextWindow: 128000
+
+defaults:
+  toolResponseMaxBytes: 100000
+```
 
 ---
 
 ## Debug Mode
 
-**Environment**: `CONTEXT_DEBUG=true`
+Enable detailed context guard logging with environment variable.
 
-**Console topics**:
-- `context-guard/init-counters`
-- `context-guard/loop-init`
-- `context-guard/schema-estimate`
-- `context-guard/provider-eval`
-- `context-guard/enforce`
-- `context-guard/tool-eval`
-- `context-guard/request-metrics`
+**Enable**: `CONTEXT_DEBUG=true`
 
----
+### Debug Topics
 
-## Configuration Effects
+| Topic | Information |
+|-------|-------------|
+| `context-guard/init-counters` | Initial token counts |
+| `context-guard/loop-init` | Per-turn initialization |
+| `context-guard/schema-estimate` | Tool schema token estimate |
+| `context-guard/provider-eval` | Per-provider evaluation |
+| `context-guard/enforce` | Guard enforcement events |
+| `context-guard/tool-eval` | Tool output evaluation |
+| `context-guard/request-metrics` | LLM request token metrics |
 
-| Setting | Effect |
-|---------|--------|
-| `contextWindow` | Total token capacity |
-| `contextWindowBufferTokens` | Safety margin |
-| `maxOutputTokens` | Reserved for response |
-| `tokenizer` | Estimation accuracy |
-| `toolResponseMaxBytes` | Triggers tool_output storage |
+### Example Debug Output
 
----
-
-## Telemetry
-
-**Context Guard Events**:
-- `trigger`: turn_preflight / tool_preflight
-- `outcome`: forced_final / skipped_provider
-- `limitTokens`: Computed limit
-- `projectedTokens`: Estimated usage
-- `remainingTokens`: Available headroom
-
----
-
-## Invariants
-
-1. **Guarded overflow**: When projections exceed limit, guard forces final turn
-2. **Buffer preserved**: bufferTokens always subtracted
-3. **Output space reserved**: maxOutputTokens always carved out
-4. **Monotonic growth**: Counters only increase until turn commits
-5. **Final turn enforcement**: Triggered before next LLM/tool execution
+```
+[context-guard/provider-eval] openai/gpt-4
+  currentCtxTokens: 45000
+  pendingCtxTokens: 2000
+  schemaCtxTokens: 3000
+  projected: 50000
+  limit: 111360
+  status: ok
+```
 
 ---
 
 ## Troubleshooting
 
-### Unexpected final turn
-- Check context window settings
-- Verify buffer tokens configuration
-- Check tool schema size
-- Review maxOutputTokens
+### Unexpected Final Turn
 
-### Token count mismatch
-- Check tokenizer configuration
-- Verify estimation algorithm
-- Compare with actual provider counts
+**Symptom**: Session ends with "context guard enforced" message.
 
-### Tool budget exceeded
-- Check tool output sizes
-- Verify toolResponseMaxBytes
-- Review accumulated context
+**Causes**:
+- Context window setting too low
+- Buffer tokens too large
+- Tool schemas consuming budget
+- Large tool outputs accumulated
+
+**Solutions**:
+1. Check `contextWindow` matches your model's actual limit
+2. Reduce `contextWindowBufferTokens` (carefully)
+3. Use `toolsAllowed`/`toolsDenied` to limit tools
+4. Configure `toolResponseMaxBytes` to store large outputs
+
+### Token Count Mismatch
+
+**Symptom**: Estimated tokens differ significantly from provider-reported.
+
+**Causes**:
+- No tokenizer configured (using character fallback)
+- Wrong tokenizer for model
+- Provider counts differently
+
+**Solutions**:
+1. Configure correct tokenizer for your model
+2. Compare with actual provider token counts
+3. Adjust buffer tokens to account for variance
+
+### Tool Budget Exceeded
+
+**Symptom**: Tools stop executing mid-turn.
+
+**Causes**:
+- Large tool outputs consuming context
+- Many tool calls in single turn
+- Accumulated conversation history
+
+**Solutions**:
+1. Lower `toolResponseMaxBytes` to store large outputs
+2. Increase `contextWindow` if model supports it
+3. Review tool output sizes
+4. Consider breaking into multiple sessions
+
+### Post-Shrink Still Over Limit
+
+**Symptom**: "Still over limit after shrink" warning.
+
+**Cause**: Even with only `final_report` tool, context exceeds limit.
+
+**Behavior**: Session proceeds best-effort (may fail at API level).
+
+**Solutions**:
+1. Increase context window
+2. Review conversation history size
+3. Use more aggressive context management earlier
+
+---
+
+## Invariants
+
+These rules MUST hold:
+
+1. **Guarded overflow**: When projections exceed limit, guard forces final turn
+2. **Buffer preserved**: `bufferTokens` always subtracted from capacity
+3. **Output space reserved**: `maxOutputTokens` always carved out
+4. **Monotonic growth**: Counters only increase until turn commits
+5. **Final turn enforcement**: Triggered BEFORE next LLM/tool execution
 
 ---
 
 ## See Also
 
-- [Configuration-Context-Window](Configuration-Context-Window) - Configuration guide
-- [docs/specs/context-management.md](../docs/specs/context-management.md) - Full spec
-
+- [Session Lifecycle](Technical-Specs-Session-Lifecycle) - When context is checked
+- [Tool System](Technical-Specs-Tool-System) - Tool output handling
+- [Agent-Files-Behavior](Agent-Files-Behavior) - Configuration options
+- [specs/context-management.md](specs/context-management.md) - Full specification

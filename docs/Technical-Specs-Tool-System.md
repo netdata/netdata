@@ -1,74 +1,110 @@
 # Tool System
 
-Tool providers, execution, and orchestration.
+Tool providers, execution routing, queue management, and the unified tool abstraction that powers agent capabilities.
+
+---
+
+## Table of Contents
+
+- [TL;DR](#tldr) - Quick summary of the tool system
+- [Why This Matters](#why-this-matters) - When tool architecture affects you
+- [Tool Provider Architecture](#tool-provider-architecture) - Provider abstraction
+- [Concrete Providers](#concrete-providers) - MCP, REST, Internal, Agent providers
+- [Tool Namespacing](#tool-namespacing) - How tools are named and resolved
+- [Tools Orchestrator](#tools-orchestrator) - Routing and management
+- [Queue Management](#queue-management) - Concurrency control
+- [Tool Output Handling](#tool-output-handling) - Size limits and storage
+- [Configuration](#configuration) - Settings that affect tools
+- [Telemetry and Logging](#telemetry-and-logging) - Observability
+- [Troubleshooting](#troubleshooting) - Common problems and solutions
+- [See Also](#see-also) - Related documentation
 
 ---
 
 ## TL;DR
 
-Abstract ToolProvider interface with four implementations: MCP, REST, Internal, Agent. ToolsOrchestrator routes calls, manages queues, applies timeouts and size caps.
+ai-agent uses a unified tool abstraction where all capabilities (MCP servers, REST APIs, sub-agents, internal tools) implement the same `ToolProvider` interface. The `ToolsOrchestrator` routes calls, manages queues, applies timeouts, and enforces size limits. Tools are namespaced as `{provider}__{toolname}`.
+
+---
+
+## Why This Matters
+
+Understanding the tool system helps you:
+
+- **Configure tools correctly**: Know which provider settings to use
+- **Debug tool issues**: Understand execution flow and failure points
+- **Optimize performance**: Use queues and timeouts effectively
+- **Add new tools**: Implement the provider interface correctly
+- **Understand failures**: Know why tools fail and how to fix them
 
 ---
 
 ## Tool Provider Architecture
 
-### ToolProvider (Abstract Base)
+### ToolProvider Interface
 
-```typescript
-abstract class ToolProvider {
-  abstract readonly kind: ToolKind;  // 'mcp' | 'rest' | 'agent'
-  abstract readonly namespace: string;
-  abstract listTools(): MCPTool[];
-  abstract hasTool(name: string): boolean;
-  abstract execute(name, parameters, opts?): Promise<ToolExecuteResult>;
-  async warmup(): Promise<void>;
-  getInstructions(): string;
-}
+All tool providers implement this abstract interface.
+
+```mermaid
+classDiagram
+    class ToolProvider {
+        <<abstract>>
+        +kind: ToolKind
+        +namespace: string
+        +listTools() MCPTool[]
+        +hasTool(name) boolean
+        +execute(name, parameters, opts) ToolExecuteResult
+        +warmup() void
+        +getInstructions() string
+    }
+
+    class MCPProvider {
+        +kind: "mcp"
+        +protocol: stdio|websocket|http|sse
+    }
+
+    class RestProvider {
+        +kind: "rest"
+        +namespace: "rest"
+    }
+
+    class InternalToolProvider {
+        +kind: varies
+        +namespace: "agent"
+    }
+
+    class AgentProvider {
+        +kind: "agent"
+        +namespace: "subagent"
+    }
+
+    class RouterToolProvider {
+        +kind: "agent"
+        +tool: "router__handoff-to"
+    }
+
+    ToolProvider <|-- MCPProvider
+    ToolProvider <|-- RestProvider
+    ToolProvider <|-- InternalToolProvider
+    ToolProvider <|-- AgentProvider
+    ToolProvider <|-- RouterToolProvider
 ```
 
 ### ToolExecuteResult
 
+Every tool execution returns this structure.
+
 ```typescript
 interface ToolExecuteResult {
-  ok: boolean;
-  result?: string;
-  error?: string;
-  latencyMs: number;
-  kind: ToolKind;
-  namespace: string;
-  extras?: Record<string, unknown>;
+    ok: boolean;           // Success flag
+    result?: string;       // Output content (if success)
+    error?: string;        // Error message (if failure)
+    latencyMs: number;     // Execution time
+    kind: ToolKind;        // Provider type
+    namespace: string;     // Provider namespace
+    extras?: Record<string, unknown>; // Additional metadata
 }
 ```
-
----
-
-## ToolsOrchestrator
-
-**State**:
-- `providers` - Registered providers
-- `mapping` - Tool → provider mapping
-- `aliases` - Tool name aliases
-- `canceled` - Cancellation flag
-- `pendingQueueControllers` - Active queue controllers
-
-**Key Methods**:
-- `register(provider)` - Add provider
-- `listTools()` - Get all available tools
-- `warmup()` - Initialize providers
-- `executeWithManagement()` - Execute with queueing/budgeting
-- `cancel()` - Cancel all pending
-- `cleanup()` - Release resources
-
-**Execution Flow**:
-1. Validate tool exists
-2. Check tool response cache
-3. Acquire queue slot
-4. Begin opTree operation
-5. Run timeout wrapper
-6. Call `provider.execute()`
-7. Apply response size cap
-8. Record accounting
-9. End opTree operation
 
 ---
 
@@ -76,98 +112,162 @@ interface ToolExecuteResult {
 
 ### MCPProvider
 
+Model Context Protocol tools from external servers.
+
 **Kind**: `mcp`
 
-**Features**:
-- Protocol support: stdio, websocket, http, sse
-- Connection management with reconnection
-- Tool discovery via `tools/list`
-- Tool execution via `tools/call`
-- Parameter validation via AJV
-- Server instructions
-- Concurrency queues
+**Protocols Supported**:
+
+| Protocol | Description | Use Case |
+|----------|-------------|----------|
+| `stdio` | Spawned process with stdin/stdout | Local executables |
+| `websocket` | WebSocket connection | Remote servers |
+| `http` | HTTP POST requests | REST-style MCP |
+| `sse` | Server-Sent Events | Streaming responses |
 
 **Tool Naming**: `{namespace}__{toolname}`
 
-**Configuration**:
+Example: `github__search_code`, `slack__send_message`
+
+**Configuration Example**:
 ```json
 {
-  "type": "stdio",
-  "command": "npx",
-  "args": ["-y", "@mcp/server"],
-  "env": { "API_KEY": "${API_KEY}" },
-  "toolsAllowed": ["search", "get"],
-  "cache": 300000,
-  "queue": "mcp-queue"
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@mcp/github"],
+    "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" },
+    "toolsAllowed": ["search_code", "get_file"],
+    "toolsDenied": ["delete_repo"],
+    "cache": 300000,
+    "queue": "github-queue"
 }
 ```
+
+**Features**:
+- Connection management with auto-reconnection
+- Tool discovery via `tools/list`
+- Parameter validation via AJV
+- Server instructions injection
+- Concurrency queues
 
 ---
 
 ### RestProvider
 
+REST API tools defined inline or via OpenAPI specs.
+
 **Kind**: `rest`
 **Namespace**: `rest`
 
+**Tool Naming**: `rest__{toolname}`
+
+**Configuration Example**:
+```json
+{
+    "description": "Get weather data for a city",
+    "method": "GET",
+    "url": "https://api.weather.com/v1/${parameters.city}",
+    "headers": {
+        "Authorization": "Bearer ${WEATHER_API_KEY}"
+    },
+    "parametersSchema": {
+        "type": "object",
+        "properties": {
+            "city": { "type": "string", "description": "City name" }
+        },
+        "required": ["city"]
+    }
+}
+```
+
 **Features**:
-- REST API tool invocation
-- OpenAPI schema import
-- URL template expansion
+- URL template expansion with `${parameters.x}`
 - Query parameter handling
 - Request body construction
 - JSON streaming support
-
-**Tool Naming**: `rest__{toolname}`
-
-**Configuration**:
-```json
-{
-  "description": "Get weather data",
-  "method": "GET",
-  "url": "https://api.weather.com/v1/${parameters.city}",
-  "headers": { "Authorization": "Bearer ${API_KEY}" },
-  "parametersSchema": {
-    "type": "object",
-    "properties": {
-      "city": { "type": "string" }
-    }
-  }
-}
-```
+- OpenAPI schema import
 
 ---
 
 ### InternalToolProvider
 
+Built-in tools provided by ai-agent itself.
+
 **Kind**: (tool-specific)
 **Namespace**: `agent`
 
-**Tools**:
+**Available Tools**:
 
-| Tool | Purpose |
-|------|---------|
-| `agent__final_report` | Deliver final answer |
-| `agent__task_status` | Track task progress (optional) |
-| `agent__batch` | Batch tool execution (optional) |
+| Tool | Purpose | Always Available |
+|------|---------|------------------|
+| `agent__final_report` | Deliver final answer | Yes |
+| `agent__task_status` | Track task progress | Optional |
+| `agent__batch` | Batch tool execution | Optional |
 
 **final_report Parameters**:
-- `status`: `'success' | 'failure' | 'partial'`
-- `format`: Output format identifier
-- `content_json`: For JSON format (validated)
-- `content`: For text/markdown formats
-- `metadata`: Optional metadata
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `status` | `'success'` \| `'failure'` \| `'partial'` | Completion status |
+| `format` | string | Output format identifier |
+| `content_json` | object | JSON content (for JSON formats) |
+| `content` | string | Text content (for text formats) |
+| `metadata` | object | Optional metadata |
 
 **task_status Parameters**:
-- `status`: `'starting' | 'in-progress' | 'completed'`
-- `done`: What has been completed
-- `pending`: What remains
-- `now`: Current immediate step
-- `ready_for_final_report`: Boolean
-- `need_to_run_more_tools`: Boolean
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `status` | `'starting'` \| `'in-progress'` \| `'completed'` | Current status |
+| `done` | string | What has been completed |
+| `pending` | string | What remains |
+| `now` | string | Current immediate step |
+| `ready_for_final_report` | boolean | Can finalize now |
+| `need_to_run_more_tools` | boolean | More tools needed |
+
+---
+
+### AgentProvider
+
+Sub-agent invocation as tools.
+
+**Kind**: `agent`
+**Namespace**: `subagent`
+
+**Tool Naming**: `agent__{agentname}`
+
+Example: `agent__researcher`, `agent__code_reviewer`
+
+**Execution Flow**:
+
+```mermaid
+sequenceDiagram
+    participant Parent as Parent Session
+    participant Provider as AgentProvider
+    participant Registry as SubAgentRegistry
+    participant Child as Child Session
+
+    Parent->>Provider: execute("agent__researcher", params)
+    Provider->>Registry: resolve("researcher")
+    Registry-->>Provider: agent definition
+    Provider->>Child: create session with inherited config
+    Provider->>Child: run(prompt)
+    Child-->>Provider: AIAgentResult
+    Provider->>Parent: Tool result (final_report content)
+```
+
+**Features**:
+- Recursive composition
+- Trace context propagation
+- OpTree hierarchy (child sessions nested)
+- Accounting aggregation
+- Inherited configuration
 
 ---
 
 ### RouterToolProvider
+
+Dynamic agent routing.
 
 **Kind**: `agent`
 **Tool**: `router__handoff-to`
@@ -175,176 +275,388 @@ interface ToolExecuteResult {
 **Parameters**:
 ```typescript
 {
-  agent: string;     // Must be in router.destinations
-  message?: string;  // Optional advisory text
+    agent: string;      // Must be in router.destinations
+    message?: string;   // Optional advisory text
 }
 ```
 
-Registered only when `router.destinations` is configured.
-
----
-
-### AgentProvider
-
-**Kind**: `agent`
-**Namespace**: `subagent`
-
-**Features**:
-- Sub-agent invocation
-- Recursive composition
-- Trace context propagation
-- OpTree hierarchy
-- Accounting aggregation
-
-**Tool Naming**: `agent__{agentname}`
-
-**Execution**:
-1. Resolve sub-agent definition
-2. Create child session with inherited config
-3. Propagate trace context
-4. Execute child session
-5. Capture child opTree and accounting
-6. Return final_report content
+**Registered When**: `router.destinations` is configured.
 
 ---
 
 ## Tool Namespacing
 
-**Format**: `{provider}__{toolname}`
+### Naming Convention
 
-**Examples**:
-- `github__search_code` - MCP server 'github'
-- `rest__weather_api` - REST tool
-- `agent__researcher` - Sub-agent
-- `agent__final_report` - Internal tool
-- `router__handoff-to` - Router tool
+All tools follow the pattern: `{provider}__{toolname}`
 
-**Sanitization**:
-- Replace invalid characters with underscores
-- Truncate to max length
-- Normalize casing
+| Provider Type | Namespace | Example |
+|---------------|-----------|---------|
+| MCP Server | Server name | `github__search_code` |
+| REST | `rest` | `rest__weather_api` |
+| Sub-Agent | `agent` | `agent__researcher` |
+| Internal | `agent` | `agent__final_report` |
+| Router | `router` | `router__handoff-to` |
+
+### Sanitization Rules
+
+Tool names are sanitized for safe usage:
+
+| Rule | Example |
+|------|---------|
+| Replace invalid characters with `_` | `my-tool` → `my_tool` |
+| Truncate to max length | Long names shortened |
+| Normalize casing | Case preserved (provider-specific) |
+
+### Resolution
+
+```mermaid
+flowchart TD
+    Call[Tool Call: github__search_code] --> Parse[Parse namespace: github]
+    Parse --> Lookup[Lookup provider by namespace]
+    Lookup --> Found{Provider Found?}
+
+    Found -->|Yes| Route[Route to provider.execute]
+    Found -->|No| Error[Return: tool not found]
+
+    Route --> Result[Return ToolExecuteResult]
+```
+
+---
+
+## Tools Orchestrator
+
+### State
+
+```typescript
+class ToolsOrchestrator {
+    providers: Map<string, ToolProvider>;
+    mapping: Map<string, ToolProvider>;     // tool → provider
+    aliases: Map<string, string>;           // alias → canonical name
+    canceled: boolean;
+    pendingQueueControllers: Set<AbortController>;
+}
+```
+
+### Key Methods
+
+| Method | Purpose |
+|--------|---------|
+| `register(provider)` | Add provider to orchestrator |
+| `listTools()` | Get all available tools |
+| `warmup()` | Initialize all providers |
+| `executeWithManagement()` | Execute with queue/budget/timeout |
+| `cancel()` | Cancel all pending operations |
+| `cleanup()` | Release resources (close connections) |
+
+### Execution Flow
+
+```mermaid
+flowchart TD
+    Call[executeWithManagement] --> Validate{Tool Exists?}
+    Validate -->|No| NotFound[Return: tool not found]
+    Validate -->|Yes| Cache{In Response Cache?}
+
+    Cache -->|Yes| Cached[Return cached result]
+    Cache -->|No| Queue[Acquire queue slot]
+
+    Queue --> Begin[Begin opTree operation]
+    Begin --> Timeout[Apply timeout wrapper]
+    Timeout --> Execute[provider.execute]
+    Execute --> Size[Apply response size cap]
+    Size --> Budget[Check context budget]
+
+    Budget -->|OK| Record[Record accounting]
+    Budget -->|Exceeded| Drop[Drop result + flag]
+
+    Record --> End[End opTree operation]
+    Drop --> End
+    End --> Return[Return result]
+```
 
 ---
 
 ## Queue Management
 
-**Features**:
-- Per-queue concurrency limits
-- Priority queueing
-- Abort signal propagation
-- Timeout enforcement
+### Purpose
 
-**Queue Assignment**:
-- Per-server queue: All tools share queue
-- Per-tool queue: Individual tool queue
-- Default: No queue (immediate)
+Queues control concurrency to:
+- Respect rate limits
+- Prevent overload
+- Prioritize requests
 
-**Configuration**:
+### Queue Types
+
+| Type | Scope | Use Case |
+|------|-------|----------|
+| Per-server queue | All tools from one MCP server | Server rate limits |
+| Per-tool queue | Individual tool | Tool-specific limits |
+| No queue | Immediate execution | Low-traffic tools |
+
+### Configuration
+
 ```json
 {
-  "queues": {
-    "github": { "concurrent": 3 }
-  },
-  "mcpServers": {
-    "github": { "queue": "github" }
-  }
+    "queues": {
+        "github": { "concurrent": 3 },
+        "slow-api": { "concurrent": 1 }
+    },
+    "mcpServers": {
+        "github": { "queue": "github" },
+        "slow-service": { "queue": "slow-api" }
+    }
 }
+```
+
+### Queue Behavior
+
+```mermaid
+sequenceDiagram
+    participant Tool1
+    participant Tool2
+    participant Tool3
+    participant Queue
+    participant Server
+
+    Tool1->>Queue: Request slot
+    Queue->>Tool1: Granted (1/3)
+    Tool1->>Server: Execute
+
+    Tool2->>Queue: Request slot
+    Queue->>Tool2: Granted (2/3)
+    Tool2->>Server: Execute
+
+    Tool3->>Queue: Request slot
+    Queue->>Tool3: Granted (3/3)
+    Tool3->>Server: Execute
+
+    Note over Queue: Queue full (3/3)
+
+    Tool1->>Queue: Release slot
+    Queue-->>Tool1: Released (2/3)
 ```
 
 ---
 
 ## Tool Output Handling
 
-When tool outputs exceed limits:
+### Size Limit Flow
 
-1. **Size cap** (`toolResponseMaxBytes`):
-   - Output stored to disk
-   - Handle message inserted
-   - Warning logged with bytes/lines/tokens
+```mermaid
+flowchart TD
+    Output[Tool Output] --> SizeCheck{Exceeds<br/>toolResponseMaxBytes?}
 
-2. **Token budget** (context guard):
-   - Output dropped
-   - Failure stub inserted
-   - `toolBudgetExceeded` flag set
+    SizeCheck -->|No| TokenCheck{Exceeds<br/>Token Budget?}
+    SizeCheck -->|Yes| Store[Store to Disk]
 
-**Handle Format**: `session-<uuid>/<file-uuid>`
-**Storage Root**: `/tmp/ai-agent-<run-hash>/`
+    Store --> Handle[Generate Handle]
+    Handle --> Replace[Replace output with handle message]
+    Replace --> Commit[Commit to conversation]
+
+    TokenCheck -->|No| Commit
+    TokenCheck -->|Yes| Fail[Return failure message]
+
+    Fail --> Flag[Set toolBudgetExceeded]
+```
+
+### Stored Output Format
+
+When output exceeds `toolResponseMaxBytes`:
+
+**Handle Message**:
+```json
+{
+    "tool_output": {
+        "handle": "session-abc123/file-xyz789",
+        "reason": "size_limit_exceeded",
+        "bytes": 1048576,
+        "lines": 25000,
+        "tokens": 250000
+    }
+}
+```
+
+**Storage Location**: `/tmp/ai-agent-<run-hash>/session-<uuid>/<file-uuid>`
+
+### Output Outcomes
+
+| Outcome | Conversation Message |
+|---------|---------------------|
+| Success | Tool result content |
+| Timeout | `(tool failed: timeout)` |
+| Error | `(tool failed: <error message>)` |
+| Size exceeded | `tool_output` handle reference |
+| Budget exceeded | `(tool failed: context window budget exceeded)` |
 
 ---
 
-## Configuration Effects
+## Configuration
 
-| Setting | Effect |
-|---------|--------|
-| `toolTimeout` | Global timeout per tool |
-| `toolResponseMaxBytes` | Triggers tool_output storage |
-| `traceMCP` | Enable MCP tracing logs |
-| `mcpInitConcurrency` | Parallel MCP init |
-| `toolsAllowed` | Per-server allow list |
-| `toolsDenied` | Per-server deny list |
+### Global Settings
+
+| Setting | Type | Default | Effect |
+|---------|------|---------|--------|
+| `toolTimeout` | number | varies | Global timeout per tool |
+| `toolResponseMaxBytes` | number | varies | Triggers disk storage |
+| `traceMCP` | boolean | false | Enable MCP tracing logs |
+| `mcpInitConcurrency` | number | varies | Parallel MCP initialization |
+
+### Per-Server Settings
+
+| Setting | Type | Description |
+|---------|------|-------------|
+| `toolsAllowed` | array | Whitelist of tool names |
+| `toolsDenied` | array | Blacklist of tool names |
+| `queue` | string | Queue name to use |
+| `cache` | number | Cache duration in ms |
+| `requestTimeoutMs` | number | Server-specific timeout |
+
+### Example Configuration
+
+```yaml
+defaults:
+  toolTimeout: 30000
+  toolResponseMaxBytes: 100000
+
+mcpServers:
+  github:
+    type: stdio
+    command: npx
+    args: ["-y", "@mcp/github"]
+    toolsAllowed: ["search_code", "get_file_contents"]
+    queue: github-queue
+
+queues:
+  github-queue:
+    concurrent: 5
+```
 
 ---
 
-## Telemetry
+## Telemetry and Logging
 
-**Per Tool Execution**:
-- Latency (ms)
-- Characters in/out
-- Success/failure status
-- Provider namespace
+### Metrics Per Tool Execution
 
----
+| Metric | Description |
+|--------|-------------|
+| `latencyMs` | Execution duration |
+| `charactersIn` | Input parameter size |
+| `charactersOut` | Output size |
+| `status` | `ok` or `failed` |
+| `namespace` | Provider namespace |
 
-## Logging
+### Log Events
 
-**Request Logs**:
-- Severity: VRB
-- Direction: request
-- Type: tool
-- Remote: `namespace:toolname`
+**Request Logs** (VRB severity):
+```
+[VRB] tool request → github__search_code
+    parameters: { query: "foo", limit: 10 }
+```
 
 **Response Logs**:
-- Severity: VRB (success), WRN/ERR (failure)
-- Direction: response
-- Details: latency, output size, error
+```
+[VRB] tool response ← github__search_code
+    latency: 234ms, output: 4521 chars, status: ok
 
----
+[WRN] tool response ← github__search_code
+    latency: 5000ms, status: failed, error: timeout
+```
 
-## Events
+### Events
 
-- `tool_started` - Execution began
-- `tool_finished` - Execution completed
+| Event | Description |
+|-------|-------------|
+| `tool_started` | Execution began |
+| `tool_finished` | Execution completed |
 
 ---
 
 ## Troubleshooting
 
-### Tool not found
-- Check tool name matches registered name
-- Check server enabled flag
-- Check toolsAllowed/toolsDenied lists
+### Tool Not Found
 
-### Tool timeout
-- Check toolTimeout setting
-- Check requestTimeoutMs per server
-- Check network latency
+**Symptom**: "Tool not found" error.
 
-### Large response stored
-- Check toolResponseMaxBytes
-- Confirm tool_output handle in response
-- Review warning log details
+**Causes**:
+- Tool name misspelled
+- MCP server not started
+- Tool in `toolsDenied` list
+- Server `enabled: false`
 
-### MCP connection failed
-- Check command/args for stdio
-- Check url for websocket/http/sse
-- Check env variables
-- Check spawn permissions
+**Solutions**:
+1. Check exact tool name in logs
+2. Verify MCP server initialization
+3. Review `toolsAllowed`/`toolsDenied` configuration
+4. Check server enabled status
+
+### Tool Timeout
+
+**Symptom**: `(tool failed: timeout)` in conversation.
+
+**Causes**:
+- `toolTimeout` too low
+- Server slow to respond
+- Network latency
+- Tool execution genuinely slow
+
+**Solutions**:
+1. Increase `toolTimeout`
+2. Check `requestTimeoutMs` per server
+3. Review server performance
+4. Consider async patterns for slow tools
+
+### Large Response Stored
+
+**Symptom**: `tool_output` handle instead of content.
+
+**Causes**:
+- Output exceeded `toolResponseMaxBytes`
+
+**Behavior**:
+- Normal operation (size limit working correctly)
+- LLM receives handle reference instead of content
+- Original content preserved on disk
+
+**Solutions**:
+1. Increase `toolResponseMaxBytes` if needed
+2. Review tool output (may need filtering at source)
+
+### MCP Connection Failed
+
+**Symptom**: MCP server fails to initialize.
+
+**Causes**:
+- Command not found
+- Missing environment variables
+- Port already in use
+- Spawn permissions
+
+**Solutions**:
+1. Verify `command` exists and is executable
+2. Check `env` variables are set
+3. For websocket/http, check URL accessibility
+4. Review file permissions
+
+### Queue Deadlock
+
+**Symptom**: Tools hang waiting for queue.
+
+**Causes**:
+- Concurrent limit too low
+- Tools not releasing slots
+- Circular dependencies
+
+**Solutions**:
+1. Increase `concurrent` limit
+2. Review timeout settings
+3. Check for hanging tool executions
 
 ---
 
 ## See Also
 
-- [Configuration-MCP-Tools](Configuration-MCP-Tools) - MCP configuration
+- [Configuration-MCP-Servers](Configuration-MCP-Servers) - MCP configuration
 - [Configuration-REST-Tools](Configuration-REST-Tools) - REST configuration
-- [docs/specs/tools-overview.md](../docs/specs/tools-overview.md) - Full spec
-
+- [Agent-Files-Tools](Agent-Files-Tools) - Tool configuration in agent files
+- [Context Management](Technical-Specs-Context-Management) - Tool budget handling
+- [specs/tools-overview.md](specs/tools-overview.md) - Full specification

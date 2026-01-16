@@ -4,18 +4,55 @@ Configure token budgets and context guards.
 
 ---
 
-## Overview
+## Table of Contents
 
-The context guard prevents token overflow by:
-1. Tracking token usage per turn
-2. Rejecting tool calls that would exceed the budget
-3. Forcing early completion when limits approach
+- [Overview](#overview) - Context management purpose
+- [Context Window Configuration](#context-window-configuration) - Setting token limits
+- [Tokenizers](#tokenizers) - Token counting configuration
+- [Context Buffer](#context-buffer) - Safety margin for final messages
+- [Context Guard Behavior](#context-guard-behavior) - Overflow protection
+- [Tool Output Storage](#tool-output-storage) - Handling large responses
+- [Configuration Reference](#configuration-reference) - All context options
+- [Debugging](#debugging) - Token tracking and troubleshooting
+- [Best Practices](#best-practices) - Optimization guidelines
+- [See Also](#see-also) - Related documentation
 
 ---
 
-## Configuration
+## Overview
 
-### Provider-Level
+The context guard prevents token overflow by:
+
+1. **Tracking tokens**: Counting usage per turn
+2. **Projecting overflow**: Estimating if next action exceeds budget
+3. **Forcing completion**: Triggering final response when limits approach
+4. **Rejecting tools**: Blocking tool calls that would overflow
+
+Without context management, sessions fail when the context window is exceeded.
+
+---
+
+## Context Window Configuration
+
+### Provider-Level Default
+
+Set context window for all models from a provider:
+
+```json
+{
+  "providers": {
+    "openai": {
+      "type": "openai",
+      "apiKey": "${OPENAI_API_KEY}",
+      "contextWindow": 128000
+    }
+  }
+}
+```
+
+### Model-Level Override
+
+Override for specific models:
 
 ```json
 {
@@ -24,27 +61,15 @@ The context guard prevents token overflow by:
       "type": "openai",
       "apiKey": "${OPENAI_API_KEY}",
       "contextWindow": 128000,
-      "tokenizer": "tiktoken:gpt-4o"
-    }
-  }
-}
-```
-
-### Model-Level
-
-```json
-{
-  "providers": {
-    "openai": {
-      "type": "openai",
       "models": {
         "gpt-4o": {
-          "contextWindow": 128000,
-          "tokenizer": "tiktoken:gpt-4o"
+          "contextWindow": 128000
         },
         "gpt-4o-mini": {
-          "contextWindow": 128000,
-          "tokenizer": "tiktoken:gpt-4o"
+          "contextWindow": 128000
+        },
+        "o1": {
+          "contextWindow": 200000
         }
       }
     }
@@ -52,84 +77,9 @@ The context guard prevents token overflow by:
 }
 ```
 
-### Default
+### Agent-Level Override
 
-If no context window is specified, the agent uses a fallback of **131,072 tokens**.
-
----
-
-## Context Buffer
-
-Safety margin for final messages:
-
-```json
-{
-  "defaults": {
-    "contextWindowBufferTokens": 256
-  }
-}
-```
-
-This ensures forced-final-turn messages fit within the remaining budget.
-
----
-
-## Tokenizers
-
-Supported tokenizer identifiers:
-
-| Tokenizer | Models |
-|-----------|--------|
-| `tiktoken:gpt-4o` | OpenAI GPT-4o, GPT-4o-mini |
-| `tiktoken:gpt-4` | OpenAI GPT-4 |
-| `anthropic` | Anthropic Claude models |
-| `gemini:google` | Google Gemini models |
-
-Example:
-
-```json
-{
-  "providers": {
-    "openai": {
-      "models": {
-        "gpt-4o": {
-          "tokenizer": "tiktoken:gpt-4o"
-        }
-      }
-    }
-  }
-}
-```
-
----
-
-## Context Guard Behavior
-
-### Before Each Turn
-
-1. Estimate token footprint of conversation + pending tool results
-2. Calculate remaining budget: `contextWindow - maxOutputTokens - buffer`
-3. If projected usage exceeds budget, enter forced-final-turn
-
-### Tool Response Handling
-
-When a tool response would overflow:
-
-1. Tool call rejected with: `(tool failed: context window budget exceeded)`
-2. Session enters forced-final-turn flow
-3. Agent produces final answer with available context
-
----
-
-## Override via CLI
-
-```bash
-ai-agent --agent test.ai --override contextWindow=32000 "query"
-```
-
----
-
-## Override via Frontmatter
+Override in agent frontmatter:
 
 ```yaml
 ---
@@ -140,28 +90,143 @@ maxOutputTokens: 4096
 ---
 ```
 
+### CLI Override
+
+Override at runtime:
+
+```bash
+ai-agent --agent test.ai --override contextWindow=32000 "query"
+```
+
+### Default Value
+
+If no context window is specified, the agent uses a fallback of **131,072 tokens**.
+
 ---
 
-## Telemetry
+## Tokenizers
 
-Context guard activations are exported as metrics:
+Configure how tokens are counted for each provider/model.
 
-| Metric | Description |
-|--------|-------------|
-| `ai_agent_context_guard_events_total` | Activation count by trigger/outcome |
-| `ai_agent_context_guard_remaining_tokens` | Remaining budget at activation |
+### Tokenizer Configuration
 
-Labels:
-- `provider`: LLM provider
-- `model`: Model name
-- `trigger`: What triggered the guard
-- `outcome`: Result (forced_final, tool_rejected, etc.)
+```json
+{
+  "providers": {
+    "openai": {
+      "type": "openai",
+      "tokenizer": "tiktoken:gpt-4o",
+      "models": {
+        "gpt-4o": {
+          "tokenizer": "tiktoken:gpt-4o"
+        },
+        "gpt-4": {
+          "tokenizer": "tiktoken:gpt-4"
+        }
+      }
+    },
+    "anthropic": {
+      "type": "anthropic",
+      "tokenizer": "anthropic"
+    },
+    "google": {
+      "type": "google",
+      "tokenizer": "gemini:google"
+    }
+  }
+}
+```
+
+### Supported Tokenizers
+
+| Tokenizer | Provider | Models |
+|-----------|----------|--------|
+| `tiktoken:gpt-4o` | OpenAI | GPT-4o, GPT-4o-mini |
+| `tiktoken:gpt-4` | OpenAI | GPT-4, GPT-4-turbo |
+| `anthropic` | Anthropic | All Claude models |
+| `gemini:google` | Google | All Gemini models |
+
+### Tokenizer Selection
+
+- Use provider-specific tokenizers for accurate counts
+- Mismatched tokenizers cause under/over-estimation
+- Default tokenizer may be inaccurate for some models
+
+---
+
+## Context Buffer
+
+Safety margin reserved for final messages.
+
+```json
+{
+  "defaults": {
+    "contextWindowBufferTokens": 256
+  }
+}
+```
+
+### Purpose
+
+The buffer ensures:
+- Forced-final-turn messages fit within budget
+- System messages for error handling have space
+- Small variations in token counting don't cause failures
+
+### How It Works
+
+```
+available_budget = contextWindow - maxOutputTokens - buffer
+```
+
+### Buffer Reference
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `contextWindowBufferTokens` | `number` | `256` | Reserved token buffer |
+
+---
+
+## Context Guard Behavior
+
+### Before Each Turn
+
+1. **Estimate footprint**: Count conversation tokens + pending tool results
+2. **Calculate budget**: `contextWindow - maxOutputTokens - buffer`
+3. **Check projection**: If projected usage exceeds budget, trigger guard
+
+### Guard Triggers
+
+| Trigger | Action |
+|---------|--------|
+| Projected overflow | Enter forced-final-turn mode |
+| Tool result overflow | Reject tool call with error |
+| Max turns reached | Force final response |
+
+### Forced-Final-Turn Flow
+
+When the guard activates:
+
+1. Agent receives notification that context is nearly exhausted
+2. Agent must produce a final response with available context
+3. No further tool calls are allowed
+4. Session completes gracefully
+
+### Tool Response Handling
+
+When a tool response would overflow:
+
+```
+(tool failed: context window budget exceeded)
+```
+
+The tool call is rejected, and the session enters forced-final-turn.
 
 ---
 
 ## Tool Output Storage
 
-When tool responses are too large:
+Handle large tool responses that would overflow context.
 
 ### Size-Based Storage
 
@@ -171,25 +236,106 @@ toolResponseMaxBytes: 12288  # 12 KB default
 ---
 ```
 
-Responses exceeding this are stored and replaced with handles.
+Responses exceeding this size are stored and replaced with handles.
 
-### Token-Based Guard
+### Configuration
 
-Even if under byte limit, responses that would overflow tokens are stored.
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `toolResponseMaxBytes` | `number` | `12288` | Max response size in bytes |
 
-### Handle System
+### How Storage Works
 
-Stored responses can be retrieved:
+1. Tool returns large response
+2. Response stored in session storage
+3. Handle returned to LLM instead:
+
+```json
+{
+  "stored": true,
+  "handle": "session-abc123/tool-xyz",
+  "size": 45678,
+  "preview": "First 500 characters..."
+}
+```
+
+### Retrieving Stored Output
+
+Use the `tool_output` tool to retrieve stored responses:
 
 ```json
 {
   "tool": "tool_output",
   "arguments": {
-    "handle": "session-abc123/file-xyz",
+    "handle": "session-abc123/tool-xyz",
     "extract": "lines 1-100"
   }
 }
 ```
+
+### Token-Based Guard
+
+Even if under byte limit, responses that would overflow tokens are stored.
+
+---
+
+## Configuration Reference
+
+### Provider Context Options
+
+```json
+{
+  "providers": {
+    "<name>": {
+      "contextWindow": "number",
+      "tokenizer": "string",
+      "models": {
+        "<model>": {
+          "contextWindow": "number",
+          "tokenizer": "string"
+        }
+      }
+    }
+  }
+}
+```
+
+### Default Context Options
+
+```json
+{
+  "defaults": {
+    "contextWindowBufferTokens": "number",
+    "maxOutputTokens": "number",
+    "toolResponseMaxBytes": "number"
+  }
+}
+```
+
+### Frontmatter Context Options
+
+```yaml
+---
+contextWindow: "number"
+maxOutputTokens: "number"
+toolResponseMaxBytes: "number"
+---
+```
+
+### All Context Properties
+
+| Location | Property | Type | Default | Description |
+|----------|----------|------|---------|-------------|
+| Provider | `contextWindow` | `number` | `131072` | Provider-wide context limit |
+| Provider | `tokenizer` | `string` | Auto-detect | Token counting method |
+| Model | `contextWindow` | `number` | Provider value | Model-specific limit |
+| Model | `tokenizer` | `string` | Provider value | Model-specific tokenizer |
+| Defaults | `contextWindowBufferTokens` | `number` | `256` | Safety buffer |
+| Defaults | `maxOutputTokens` | `number` | Model default | Max output tokens |
+| Defaults | `toolResponseMaxBytes` | `number` | `12288` | Max tool response size |
+| Frontmatter | `contextWindow` | `number` | Provider value | Agent-specific limit |
+| Frontmatter | `maxOutputTokens` | `number` | Defaults value | Agent output limit |
+| Frontmatter | `toolResponseMaxBytes` | `number` | Defaults value | Agent tool response limit |
 
 ---
 
@@ -206,12 +352,56 @@ Shows:
 - Budget calculations
 - Guard activation decisions
 
+### Verbose Mode
+
+```bash
+ai-agent --agent test.ai --verbose "query"
+```
+
+Logs context-related decisions.
+
 ### Check Accounting
 
-Tool accounting entries include:
-- `projected_tokens`: Estimated tokens
-- `limit_tokens`: Context limit
-- `remaining_tokens`: Remaining budget
+Accounting entries include context metrics:
+
+```json
+{
+  "type": "llm",
+  "inputTokens": 15230,
+  "outputTokens": 1456,
+  "contextWindow": 128000,
+  "remainingTokens": 111314
+}
+```
+
+### Telemetry Metrics
+
+| Metric | Description |
+|--------|-------------|
+| `ai_agent_context_guard_events_total` | Guard activation count |
+| `ai_agent_context_guard_remaining_tokens` | Remaining budget at activation |
+
+Labels:
+- `provider`: LLM provider
+- `model`: Model name
+- `trigger`: What triggered the guard
+- `outcome`: Result (forced_final, tool_rejected)
+
+### Common Issues
+
+**Session ends abruptly:**
+- Check if context guard triggered
+- Review token usage in accounting
+- Consider increasing `contextWindow` or reducing tool responses
+
+**Tool calls rejected:**
+- Tool response would overflow context
+- Use `toolResponseMaxBytes` to store large responses
+- Consider chunked/paginated tool responses
+
+**Inaccurate token counts:**
+- Verify tokenizer matches model
+- Different tokenizers produce different counts
 
 ---
 
@@ -223,17 +413,23 @@ Tool accounting entries include:
 ---
 models:
   - openai/gpt-4o
-maxOutputTokens: 4096      # Reserve for output
-contextWindow: 100000      # Leave headroom
+contextWindow: 100000     # Leave 28K headroom from 128K
+maxOutputTokens: 4096     # Reserve for response
+toolResponseMaxBytes: 25000  # Allow larger tool responses
 ---
 ```
 
 ### Plan for Large Responses
 
+For research agents that process large documents:
+
 ```yaml
 ---
-toolResponseMaxBytes: 25000  # Higher limit for research agents
+models:
+  - anthropic/claude-sonnet-4-20250514
+toolResponseMaxBytes: 50000
 maxTurns: 20
+contextWindow: 180000
 ---
 ```
 
@@ -244,10 +440,27 @@ Use telemetry to track:
 - Which tools trigger guards
 - Remaining budget patterns
 
+### Optimize for Long Sessions
+
+1. **Reduce system prompt size**: Concise prompts leave more room
+2. **Use tool output storage**: Store large responses externally
+3. **Paginate tool results**: Request data in chunks
+4. **Monitor turn count**: More turns = more context consumed
+
+### Model Selection by Context Need
+
+| Use Case | Recommended Model | Context Window |
+|----------|-------------------|----------------|
+| Simple queries | gpt-4o-mini | 128K |
+| Code analysis | claude-sonnet-4 | 200K |
+| Large document | claude-sonnet-4 | 200K |
+| Multi-turn research | gpt-4o | 128K |
+
 ---
 
 ## See Also
 
-- [Configuration](Configuration) - Overview
-- [Operations - Tool Output Handles](Operations-Tool-Output) - Handle system
-- [docs/specs/context-management.md](../docs/specs/context-management.md) - Technical spec
+- [Configuration](Configuration) - Configuration overview
+- [Providers](Configuration-Providers) - Provider configuration
+- [Parameters](Configuration-Parameters) - All parameters reference
+- [Operations - Tool Output](Operations-Tool-Output) - Handle system documentation

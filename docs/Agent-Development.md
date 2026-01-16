@@ -1,10 +1,19 @@
 # Agent Development
 
-This section has been reorganized into focused chapters. Please see:
+This section covers everything you need to build and configure ai-agents. Start with the core chapters, then explore specialized topics.
 
 ---
 
-## Agent Files ⭐
+## Table of Contents
+
+- [Agent Files](#agent-files) - Configure `.ai` files (models, tools, orchestration)
+- [System Prompts](#system-prompts) - Write effective prompts
+- [Related Topics](#related-topics) - Safety patterns, multi-agent orchestration
+- [See Also](#see-also) - CLI, configuration, deployment
+
+---
+
+## Agent Files
 
 The most important chapter for building agents. Covers all `.ai` file configuration.
 
@@ -21,7 +30,7 @@ The most important chapter for building agents. Covers all `.ai` file configurat
 
 ---
 
-## System Prompts ⭐
+## System Prompts
 
 Writing effective prompts for your agents.
 
@@ -34,14 +43,17 @@ Writing effective prompts for your agents.
 
 ---
 
-## Related Sections
+## Related Topics
 
-- [Safety Gates](Agent-Development-Safety) - Prompt patterns for safe agents
-- [Multi-Agent Orchestration](Agent-Development-Multi-Agent) - High-level orchestration concepts
+| Page | Description |
+|------|-------------|
+| [Safety Gates](Agent-Development-Safety) | Prompt patterns for safe, reliable agents |
+| [Multi-Agent Orchestration](Agent-Development-Multi-Agent) | Advisors, routers, handoffs, sub-agents |
 
 ---
 
 ## See Also
 
 - [CLI Reference](CLI) - Running agents from command line
-- [Configuration](Configuration) - Providers and tools setup
+- [Configuration](Configuration) - Providers and MCP servers setup
+- [Headends](Headends) - Deploy agents via REST, Slack, MCP, etc.

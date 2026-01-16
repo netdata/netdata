@@ -4,28 +4,61 @@ Control concurrency with tool queues.
 
 ---
 
+## Table of Contents
+
+- [Overview](#overview) - Purpose of concurrency queues
+- [Defining Queues](#defining-queues) - Queue configuration syntax
+- [Default Queue](#default-queue) - Automatic default queue
+- [Assigning Tools to Queues](#assigning-tools-to-queues) - MCP and REST tool assignment
+- [Queue Behavior](#queue-behavior) - Slot acquisition and waiting
+- [Configuration Reference](#configuration-reference) - All queue options
+- [Common Patterns](#common-patterns) - Production queue setups
+- [Sizing Recommendations](#sizing-recommendations) - Concurrency guidelines
+- [Telemetry](#telemetry) - Queue metrics
+- [Debugging](#debugging) - Troubleshooting queue issues
+- [See Also](#see-also) - Related documentation
+
+---
+
 ## Overview
 
 Queues limit concurrent tool executions:
-- Prevent overwhelming external APIs
-- Control resource usage
-- Ensure fair access across sessions
+
+| Purpose | Benefit |
+|---------|---------|
+| API rate limiting | Prevent overwhelming external services |
+| Resource control | Limit CPU/memory usage |
+| Fair access | Ensure equitable resource sharing |
+| Cost control | Throttle expensive operations |
+
+Without queues, parallel tool calls may exceed API rate limits or exhaust system resources.
 
 ---
 
 ## Defining Queues
+
+Configure queues in `.ai-agent.json`:
 
 ```json
 {
   "queues": {
     "default": { "concurrent": 32 },
     "heavy": { "concurrent": 2 },
-    "api": { "concurrent": 4 }
+    "api": { "concurrent": 4 },
+    "rate-limited": { "concurrent": 1 }
   }
 }
 ```
 
-### Default Queue
+### Queue Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `concurrent` | `number` | Required | Maximum simultaneous executions |
+
+---
+
+## Default Queue
 
 If no `default` queue is defined, one is injected automatically:
 
@@ -37,11 +70,19 @@ If no `default` queue is defined, one is injected automatically:
 }
 ```
 
+### Default Queue Behavior
+
+- All tools without explicit queue assignment use `default`
+- Provides baseline concurrency control
+- Override with custom `default` configuration
+
 ---
 
 ## Assigning Tools to Queues
 
 ### MCP Servers
+
+Assign a queue to all tools from an MCP server:
 
 ```json
 {
@@ -55,6 +96,11 @@ If no `default` queue is defined, one is injected automatically:
       "type": "http",
       "url": "https://slow.api.com/mcp",
       "queue": "heavy"
+    },
+    "rate-limited-api": {
+      "type": "stdio",
+      "command": "./api-mcp",
+      "queue": "rate-limited"
     }
   }
 }
@@ -62,22 +108,34 @@ If no `default` queue is defined, one is injected automatically:
 
 ### REST Tools
 
+Assign a queue to a REST tool:
+
 ```json
 {
   "restTools": {
     "expensive-api": {
-      "description": "Rate-limited API",
+      "description": "Rate-limited external API",
       "method": "GET",
       "url": "https://api.example.com/data",
-      "queue": "api"
+      "queue": "api",
+      "parametersSchema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" }
+        }
+      }
     }
   }
 }
 ```
 
-### Default Assignment
+### Assignment Reference
 
-Tools without explicit queue assignment use the `default` queue.
+| Tool Source | Configuration |
+|-------------|---------------|
+| MCP Server | `mcpServers.<name>.queue` |
+| REST Tool | `restTools.<name>.queue` |
+| Default | `"default"` if not specified |
 
 ---
 
@@ -85,44 +143,89 @@ Tools without explicit queue assignment use the `default` queue.
 
 ### Slot Acquisition
 
-1. Tool execution requests a slot from its queue
-2. If slot available → execute immediately
-3. If no slot → wait until one is available
+1. Tool execution requests a slot from its assigned queue
+2. If slot available: execute immediately
+3. If no slot: wait until one becomes available
+4. After completion: release slot
 
-### Logging
+### Waiting
 
-When a tool waits for a slot:
+When all slots are in use, new requests wait:
 
 ```
 [tool] queued: mcp__slow-server__query (queue: heavy, waiting: 2)
+[tool] acquired: mcp__slow-server__query (queue: heavy, wait: 1523ms)
 ```
 
-### Bypass
+### FIFO Order
 
-Internal tools bypass queues (never deadlock):
-- `agent__final_report`
-- `agent__task_status`
-- `agent__batch`
+Waiting requests are processed in order (first-in, first-out).
 
----
+### Queue Bypass
 
-## Telemetry
+Internal tools bypass queues to prevent deadlocks:
 
-Queue metrics:
-
-| Metric | Description |
-|--------|-------------|
-| `ai_agent_queue_depth` | Current in-use + waiting slots |
-| `ai_agent_queue_wait_duration_ms` | Time spent waiting for slot |
-
-Labels:
-- `queue`: Queue name
+| Tool | Purpose |
+|------|---------|
+| `agent__final_report` | Session completion |
+| `agent__task_status` | Status reporting |
+| `agent__batch` | Batch tool execution |
 
 ---
 
-## Queue Isolation Patterns
+## Configuration Reference
+
+### Queue Schema
+
+```json
+{
+  "queues": {
+    "<name>": {
+      "concurrent": "number"
+    }
+  }
+}
+```
+
+### MCP Server Queue Assignment
+
+```json
+{
+  "mcpServers": {
+    "<name>": {
+      "queue": "string"
+    }
+  }
+}
+```
+
+### REST Tool Queue Assignment
+
+```json
+{
+  "restTools": {
+    "<name>": {
+      "queue": "string"
+    }
+  }
+}
+```
+
+### All Queue Properties
+
+| Location | Property | Type | Default | Description |
+|----------|----------|------|---------|-------------|
+| Queue | `concurrent` | `number` | Required | Max simultaneous executions |
+| MCP Server | `queue` | `string` | `"default"` | Queue assignment |
+| REST Tool | `queue` | `string` | `"default"` | Queue assignment |
+
+---
+
+## Common Patterns
 
 ### Per-Integration Queues
+
+Isolate different integrations:
 
 ```json
 {
@@ -154,6 +257,8 @@ Labels:
 
 ### Rate-Limited APIs
 
+For APIs with strict rate limits:
+
 ```json
 {
   "queues": {
@@ -164,46 +269,27 @@ Labels:
       "description": "1 req/sec API",
       "method": "GET",
       "url": "https://limited.api.com/data",
-      "queue": "rate-limited"
+      "queue": "rate-limited",
+      "parametersSchema": { "type": "object" }
     }
   }
 }
 ```
 
----
+### Sub-Agent Control
 
-## Sizing Recommendations
+Limit concurrent sub-agent invocations:
 
-| Use Case | Concurrent |
-|----------|------------|
-| Local filesystem | 32+ |
-| Database queries | 10-20 |
-| Public APIs | 2-5 |
-| Rate-limited APIs | 1 |
-| Heavy computation | 2-4 |
-
----
-
-## Debugging
-
-### Check Queue Status
-
-With `--verbose`:
-
-```
-[tool] queued: mcp__api__query (queue: heavy, waiting: 2)
-[tool] acquired: mcp__api__query (queue: heavy, wait: 1523ms)
+```json
+{
+  "queues": {
+    "default": { "concurrent": 32 },
+    "llm-sub-agents": { "concurrent": 4 }
+  }
+}
 ```
 
-### Monitor Metrics
-
-```bash
-curl localhost:9090/metrics | grep ai_agent_queue
-```
-
----
-
-## Example: Production Setup
+### Production Setup
 
 ```json
 {
@@ -240,7 +326,110 @@ curl localhost:9090/metrics | grep ai_agent_queue
 
 ---
 
+## Sizing Recommendations
+
+| Use Case | Concurrent | Rationale |
+|----------|------------|-----------|
+| Local filesystem | 32+ | Fast, no external limits |
+| Database queries | 10-20 | Connection pool limits |
+| Public APIs | 2-5 | Rate limit compliance |
+| Rate-limited APIs | 1 | Strict rate limits |
+| Heavy computation | 2-4 | CPU/memory constraints |
+| Sub-agents | 2-4 | LLM API limits |
+
+### Factors to Consider
+
+| Factor | Lower Concurrency | Higher Concurrency |
+|--------|-------------------|-------------------|
+| API rate limits | Yes | No |
+| Expensive operations | Yes | No |
+| Shared resources | Yes | No |
+| Fast local operations | No | Yes |
+| Independent operations | No | Yes |
+
+---
+
+## Telemetry
+
+Queue metrics are exported for monitoring:
+
+| Metric | Description |
+|--------|-------------|
+| `ai_agent_queue_depth` | Current in-use + waiting slots |
+| `ai_agent_queue_wait_duration_ms` | Time spent waiting for slot |
+
+### Labels
+
+| Label | Description |
+|-------|-------------|
+| `queue` | Queue name |
+
+### Example Query
+
+```promql
+# Average wait time per queue
+avg(ai_agent_queue_wait_duration_ms) by (queue)
+
+# Queue utilization
+ai_agent_queue_depth / on(queue) ai_agent_queue_concurrent
+```
+
+---
+
+## Debugging
+
+### Check Queue Status
+
+With `--verbose`:
+
+```bash
+ai-agent --agent test.ai --verbose "query"
+```
+
+Output:
+
+```
+[tool] queued: mcp__api__query (queue: heavy, waiting: 2)
+[tool] acquired: mcp__api__query (queue: heavy, wait: 1523ms)
+[tool] completed: mcp__api__query (queue: heavy, duration: 3241ms)
+```
+
+### Monitor Metrics
+
+```bash
+curl localhost:9090/metrics | grep ai_agent_queue
+```
+
+### Common Issues
+
+**Tools waiting too long:**
+- Increase `concurrent` for the queue
+- Check if one tool is blocking others
+- Consider separate queues for slow tools
+
+**Rate limit errors despite queue:**
+- `concurrent` may still be too high
+- API may have burst limits
+- Consider adding delays between calls
+
+**Deadlock symptoms:**
+- Internal tools should bypass queues
+- Check for circular dependencies
+- Verify queue assignments
+
+### Trace Queue Operations
+
+```bash
+DEBUG=queue ai-agent --agent test.ai "query"
+```
+
+Shows detailed queue acquisition/release operations.
+
+---
+
 ## See Also
 
-- [Configuration](Configuration) - Overview
-- [MCP Tools](Configuration-MCP-Tools) - Tool configuration
+- [Configuration](Configuration) - Configuration overview
+- [MCP Servers](Configuration-MCP-Servers) - MCP server configuration
+- [REST Tools](Configuration-REST-Tools) - REST tool configuration
+- [Parameters](Configuration-Parameters) - All parameters reference

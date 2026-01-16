@@ -1,235 +1,476 @@
 # Session Lifecycle
 
-Session creation, execution, and finalization flow.
+Complete flow from session creation through execution to finalization, including all intermediate states and transitions.
+
+---
+
+## Table of Contents
+
+- [TL;DR](#tldr) - Quick summary of session lifecycle
+- [Why This Matters](#why-this-matters) - When you need to understand lifecycle
+- [Lifecycle Overview](#lifecycle-overview) - Visual state machine
+- [Phase 1: Creation](#phase-1-creation) - Session instantiation
+- [Phase 2: Initialization](#phase-2-initialization) - Constructor setup
+- [Phase 3: Orchestration](#phase-3-orchestration) - AIAgent wrapper
+- [Phase 4: Execution](#phase-4-execution) - Main run loop
+- [Phase 5: Agent Loop](#phase-5-agent-loop) - Turn iteration
+- [Phase 6: Turn Execution](#phase-6-turn-execution) - Single turn flow
+- [Phase 7: Tool Execution](#phase-7-tool-execution) - Tool call handling
+- [Phase 8: Finalization](#phase-8-finalization) - Session completion
+- [Cancellation Paths](#cancellation-paths) - Abort and graceful stop
+- [Events and Logging](#events-and-logging) - Observable lifecycle events
+- [See Also](#see-also) - Related documentation
 
 ---
 
 ## TL;DR
 
-Session created via static factory; `AIAgent.run()` wraps orchestration around the inner `AIAgentSession.run()` loop.
+Sessions are created via a static factory method, initialized with configuration, and executed through a multi-turn loop. Each turn: select provider → check context → LLM request → process tools → repeat or finalize. The `AIAgent.run()` wrapper adds orchestration (advisors, router, handoff) around the inner `AIAgentSession.run()` loop.
 
 ---
 
-## Lifecycle Phases
+## Why This Matters
 
-### 1. Creation
+Understanding the session lifecycle helps you:
 
-**Method**: `AIAgentSession.create(config)`
+- **Debug stuck sessions**: Identify which phase is blocking
+- **Optimize performance**: Know where time is spent
+- **Handle errors correctly**: Understand error propagation
+- **Implement callbacks**: Know when events fire
+- **Build integrations**: Understand the execution contract
+
+---
+
+## Lifecycle Overview
+
+```mermaid
+stateDiagram-v2
+    [*] --> Creating: create()
+    Creating --> Initializing: constructor
+    Initializing --> Ready: init complete
+
+    Ready --> Orchestrating: AIAgent.run()
+    Orchestrating --> Running: run advisors, start session
+
+    Running --> Executing: executeAgentLoop()
+    Executing --> Turn: begin turn
+
+    Turn --> LLMRequest: select provider
+    LLMRequest --> ToolExec: has tool calls
+    LLMRequest --> Finalizing: has final_report
+    LLMRequest --> Turn: retry/continue
+
+    ToolExec --> Turn: tools complete
+    ToolExec --> Finalizing: final_report called
+
+    Turn --> Finalizing: max turns reached
+    Turn --> Canceled: abort signal
+
+    Finalizing --> Cleanup: finalize complete
+    Canceled --> Cleanup: cancel complete
+    Cleanup --> [*]: return result
+```
+
+---
+
+## Phase 1: Creation
+
+**Entry Point**: `AIAgentSession.create(config)`
+
+The static factory method validates configuration and creates the session instance.
 
 **Steps**:
-1. Validate config (providers, MCP servers, prompts)
-2. Generate session transaction ID
-3. Infer agent path from config
-4. Enrich config with trace fields
-5. Create LLMClient with provider configs
-6. Instantiate AIAgentSession
-7. Bind external log relay
+
+| Step | Description |
+|------|-------------|
+| 1 | Validate config (providers, MCP servers, prompts) |
+| 2 | Generate unique session transaction ID |
+| 3 | Infer agent path from config |
+| 4 | Enrich config with trace fields |
+| 5 | Create LLMClient with provider configurations |
+| 6 | Instantiate AIAgentSession |
+| 7 | Bind external log relay |
 
 **Invariants**:
-- Config validation throws on invalid input
-- Session always has unique txnId
-- originTxnId defaults to selfId for root agents
+- Config validation throws on invalid input (fail fast)
+- Session always receives a unique `txnId`
+- `originTxnId` defaults to `selfId` for root agents
+
+**Example Transaction IDs**:
+```
+Root agent:    txnId=abc123, originTxnId=abc123
+Sub-agent:     txnId=def456, originTxnId=abc123
+```
 
 ---
 
-### 2. Initialization (Constructor)
+## Phase 2: Initialization
+
+**Entry Point**: Constructor (`new AIAgentSession()`)
+
+Sets up all session state before execution begins.
 
 **Steps**:
-1. Store config references
-2. Set up abort signal listener
-3. Initialize target context configs
-4. Compute initial context token count
-5. Initialize SubAgentRegistry if subAgents provided
-6. Set trace IDs
-7. Initialize opTree (SessionTreeBuilder)
-8. Initialize progressReporter
-9. Begin system turn (turn 0)
-10. Initialize ToolsOrchestrator
-11. Apply initial session title
+
+| Step | Action |
+|------|--------|
+| 1 | Store config references |
+| 2 | Set up abort signal listener |
+| 3 | Initialize target context configs |
+| 4 | Compute initial context token count |
+| 5 | Initialize SubAgentRegistry (if configured) |
+| 6 | Set trace IDs |
+| 7 | Initialize opTree (SessionTreeBuilder) |
+| 8 | Initialize progressReporter |
+| 9 | Begin system turn (turn 0) |
+| 10 | Initialize ToolsOrchestrator |
+| 11 | Apply initial session title |
+
+**Key Initializations**:
+```typescript
+conversation = []           // Empty message array
+currentTurn = 0            // System turn (action turns start at 1)
+currentCtxTokens = 0       // Will be computed
+accounting = []            // Empty entries array
+```
 
 ---
 
-### 3. Orchestration Wrapper
+## Phase 3: Orchestration
 
-**Method**: `AIAgent.run(session)`
+**Entry Point**: `AIAgent.run(session)`
+
+Wraps the inner session with higher-level orchestration patterns.
+
+```mermaid
+flowchart TD
+    Start[AIAgent.run] --> HasOrch{Has Orchestration?}
+    HasOrch -->|No| Direct[Direct session.run]
+    HasOrch -->|Yes| Advisors[Run Advisors in Parallel]
+
+    Advisors --> Enrich[Build Enriched Prompt]
+    Enrich --> MainSession[Run Main Session]
+    MainSession --> HasRouter{Router Selected?}
+
+    HasRouter -->|Yes| RunRouter[Run Router Target]
+    HasRouter -->|No| HasHandoff{Has Handoff?}
+
+    RunRouter --> HasHandoff
+    HasHandoff -->|Yes| RunHandoff[Run Handoff Target]
+    HasHandoff -->|No| Merge[Merge Results]
+
+    RunHandoff --> Merge
+    Direct --> Merge
+    Merge --> Return[Return AIAgentResult]
+```
+
+**Orchestration Features**:
+
+| Feature | Trigger | Behavior |
+|---------|---------|----------|
+| **Advisors** | `advisors` configured | Run in parallel, inject advice into prompt |
+| **Router** | `router.destinations` configured | Route to selected agent |
+| **Handoff** | `handoff` configured | Post-session delegation |
+
+---
+
+## Phase 4: Execution
+
+**Entry Point**: `AIAgentSession.run()`
+
+Main entry point for session execution.
 
 **Steps**:
-1. If no orchestration → call `AIAgentSession.run()` directly
-2. **Advisors**: run advisor sessions in parallel
-3. Build enriched prompt with advisory blocks
-4. Run main session with enriched prompt
-5. If router selection → run router target
-6. If `handoff` configured → run handoff target
-7. Merge results
+
+| Step | Action |
+|------|--------|
+| 1 | Create OpenTelemetry span |
+| 2 | Emit `agent_started` event |
+| 3 | Warm up tools orchestrator |
+| 4 | Log settings summary (if verbose) |
+| 5 | Log tools banner |
+| 6 | Check pricing coverage |
+| 7 | Expand system and user prompts |
+| 8 | Build enhanced system prompt |
+| 9 | Initialize conversation with messages |
+| 10 | **Execute agent loop** |
+| 11 | Flatten opTree |
+| 12 | End system turn |
+| 13 | End session in opTree |
+| 14 | Emit completion event |
+| 15 | Persist final snapshot |
+| 16 | Flush accounting |
+| 17 | Return AIAgentResult |
 
 ---
 
-### 4. Execution
+## Phase 5: Agent Loop
 
-**Method**: `AIAgentSession.run()`
+**Entry Point**: `executeAgentLoop()`
 
-**Steps**:
-1. Create OpenTelemetry span
-2. Emit `agent_started` event
-3. Warm up tools orchestrator
-4. Log settings summary (if verbose)
-5. Log tools banner
-6. Check pricing coverage
-7. Expand system and user prompts
-8. Build enhanced system prompt
-9. Initialize conversation
-10. Execute agent loop
-11. Flatten opTree
-12. End system turn
-13. End session in opTree
-14. Emit completion event
-15. Persist final snapshot
-16. Flush accounting
-17. Return AIAgentResult
-
----
-
-### 5. Agent Loop
-
-**Method**: `executeAgentLoop()`
+The core multi-turn execution loop.
 
 ```
 for turn = 1 to maxTurns:
-  check cancellation/stop
-  begin turn in opTree
+    check cancellation/stop signals
+    begin turn in opTree
 
-  attempts = 0
-  while attempts < maxRetries and not successful:
-    select provider/model (round-robin)
-    check context guard
-    execute single turn (LLM request)
-    sanitize messages
-    process tool calls
+    attempts = 0
+    while attempts < maxRetries and not successful:
+        select provider/model (round-robin)
+        check context guard
+        execute single turn (LLM request)
+        sanitize messages
+        process tool calls
 
-    handle status:
-      - success with tools: execute tools
-      - success with final_report: finalize
-      - success without tools: retry
-      - rate_limit: backoff and retry
-      - auth_error: abort
-      - model_error: retry or skip
+        handle status:
+            success with tools     → execute tools
+            success with final     → finalize
+            success without tools  → synthetic retry
+            rate_limit            → backoff and retry
+            auth_error            → abort
+            model_error           → retry or skip
 
-    record accounting
-    update opTree
+        record accounting
+        update opTree
 
-  end turn in opTree
-  if final_report captured: break
+    end turn in opTree
+    if final_report captured: break
+```
+
+**Key State During Loop**:
+
+| State | Purpose |
+|-------|---------|
+| `currentTurn` | Current turn number (1-based) |
+| `pairCursor` | Provider cycling index |
+| `attempts` | Retry counter for current turn |
+| `forcedFinalTurnReason` | Why tools are restricted |
+
+---
+
+## Phase 6: Turn Execution
+
+**Entry Point**: `executeSingleTurn()`
+
+Executes a single LLM request/response cycle.
+
+```mermaid
+sequenceDiagram
+    participant Session
+    participant OpTree
+    participant LLMClient
+    participant Provider
+    participant LLM
+
+    Session->>OpTree: beginLLMOp()
+    Session->>Session: resolveReasoningValue()
+    Session->>Session: buildTurnRequest()
+    Session->>LLMClient: executeTurn(request)
+    LLMClient->>Provider: executeTurn(request)
+    Provider->>LLM: HTTP POST
+    LLM-->>Provider: Response (streaming or full)
+    Provider-->>LLMClient: TurnResult
+    LLMClient-->>Session: TurnResult
+    Session->>OpTree: endLLMOp(result)
+```
+
+**TurnRequest Structure**:
+```typescript
+{
+    messages: CoreMessage[],
+    tools: ToolDefinition[],
+    model: string,
+    temperature?: number,
+    maxOutputTokens?: number,
+    reasoning?: ReasoningConfig,
+    // ... provider-specific options
+}
+```
+
+**TurnResult Structure**:
+```typescript
+{
+    status: 'success' | 'rate_limit' | 'auth_error' | ...,
+    messages: CoreMessage[],
+    toolCalls: ToolCall[],
+    tokens: TokenUsage,
+    metadata: ResponseMetadata,
+    retry?: RetryDirective
+}
 ```
 
 ---
 
-### 6. Turn Execution
+## Phase 7: Tool Execution
 
-**Method**: `executeSingleTurn()`
+**Entry Point**: `ToolsOrchestrator.executeWithManagement()`
 
-**Steps**:
-1. Begin LLM operation in opTree
-2. Resolve reasoning value for provider
-3. Build turn request (messages, tools, params)
-4. Call `llmClient.executeTurn()`
-5. Process streaming response (if enabled)
-6. Return turn result
+Executes tool calls after a successful LLM turn.
+
+```mermaid
+flowchart TD
+    Start[Tool Calls Received] --> Log[Log Assistant Message]
+    Log --> Loop[For Each Tool Call]
+
+    Loop --> Begin[Begin Tool Op in OpTree]
+    Begin --> Route[Route to Provider]
+    Route --> Timeout[Apply Timeout Wrapper]
+    Timeout --> Execute[Execute Tool]
+    Execute --> Size[Apply Size Cap]
+    Size --> Budget[Check Context Budget]
+
+    Budget -->|OK| Capture[Capture Result]
+    Budget -->|Exceeded| Drop[Drop Result]
+
+    Capture --> End[End Tool Op]
+    Drop --> End
+    End --> More{More Tools?}
+
+    More -->|Yes| Loop
+    More -->|No| Add[Add Results to Conversation]
+    Add --> Continue[Continue to Next Turn]
+```
+
+**Tool Result Outcomes**:
+
+| Outcome | Conversation Message |
+|---------|---------------------|
+| Success | Tool result content |
+| Timeout | `(tool failed: timeout)` |
+| Error | `(tool failed: <error>)` |
+| Size exceeded | `tool_output` handle reference |
+| Budget exceeded | `(tool failed: context window budget exceeded)` |
 
 ---
 
-### 7. Tool Execution
-
-**After successful LLM turn with tool calls**:
-
-1. Log assistant message with tool calls
-2. For each tool call:
-   - Begin tool operation in opTree
-   - Route to appropriate provider
-   - Apply timeout wrapper
-   - Apply response size cap
-   - Reserve context budget
-   - Capture result
-   - End tool operation
-3. Add tool result messages to conversation
-4. Continue to next turn
-
----
-
-### 8. Finalization
+## Phase 8: Finalization
 
 **Triggers**:
-- `agent__final_report` tool called
+- `agent__final_report` tool called successfully
 - Max turns reached
-- Context guard enforced
-- Error conditions
+- Context guard enforced (forced final turn)
+- Error conditions (auth failure, quota exceeded)
+- Cancellation (abort signal, graceful stop)
 
 **Steps**:
-1. Capture final report (status, format, content)
-2. Validate JSON schema if applicable
-3. Log finalization
-4. End all open operations in opTree
-5. Return AIAgentResult
 
----
+| Step | Action |
+|------|--------|
+| 1 | Capture final report (status, format, content) |
+| 2 | Validate JSON schema (if applicable) |
+| 3 | Log finalization event |
+| 4 | End all open operations in opTree |
+| 5 | Build AIAgentResult |
 
-### 9. Cleanup
-
-**Finally block**:
-- `toolsOrchestrator.cleanup()` - closes MCP connections
+**AIAgentResult Structure**:
+```typescript
+{
+    success: boolean,
+    exitCode: ExitCode,
+    finalReport?: FinalReport,
+    conversation: CoreMessage[],
+    accounting: AccountingEntry[],
+    logs: LogEntry[],
+    opTree: FlattenedOpTree,
+    metadata: SessionMetadata
+}
+```
 
 ---
 
 ## Cancellation Paths
 
-### Abort Signal
+### Abort Signal (Immediate)
+
+**Trigger**: External `AbortSignal` fires
+
+**Behavior**:
 - Checked at turn start
 - Propagated to child operations
-- Returns `finalizeCanceledSession()`
+- Current operation may complete
+- Returns `finalizeCanceledSession()` result
 
-### Graceful Stop
-- Checked via `stopRef.stopping`
-- Allows current turn to complete
-- Returns `finalizeGracefulStopSession()`
-
----
-
-## State Transitions
-
+**Propagation**:
 ```
-Constructor → run() entry → executeAgentLoop() → finalization → cleanup
-                                  ↓
-                            error handling
+AbortSignal → Session → LLMClient → Provider
+                    ↘→ ToolsOrchestrator → Tool Providers
 ```
 
-**Note**: The session does NOT track an explicit state field. Lifecycle phases are implicit in execution flow.
+### Graceful Stop (Soft)
+
+**Trigger**: `stopRef.stopping` set to `true`
+
+**Behavior**:
+- Checked at turn start
+- Current turn allowed to complete
+- No new turns started
+- Returns `finalizeGracefulStopSession()` result
 
 ---
 
-## Events
+## Events and Logging
 
-- `agent_started` - Session began
-- `agent_update` - Progress update
-- `agent_finished` - Success completion
-- `agent_failed` - Error completion
+### Lifecycle Events
+
+| Event | When | Payload |
+|-------|------|---------|
+| `agent_started` | Session begins | Session config summary |
+| `agent_update` | Progress update | Turn number, status |
+| `agent_finished` | Success completion | Final report |
+| `agent_failed` | Error completion | Error details |
+
+### Key Log Events
+
+| Event | Severity | Description |
+|-------|----------|-------------|
+| `agent:init` | INF | Session initialized |
+| `agent:settings` | VRB | Configuration summary |
+| `agent:tools` | INF | Tool banner (available tools) |
+| `agent:turn-start` | INF | Turn begins |
+| `agent:final-turn` | WRN | Final turn detected |
+| `agent:context` | WRN | Context guard events |
+| `agent:final-report-accepted` | INF | Final report committed |
+| `agent:fin` | INF | Session finalized |
 
 ---
 
-## Key Log Events
+## State Transitions Summary
 
-- `agent:init` - Session initialized
-- `agent:settings` - Configuration summary
-- `agent:tools` - Tool banner
-- `agent:turn-start` - Turn begins
-- `agent:final-turn` - Final turn detected
-- `agent:context` - Context guard events
-- `agent:final-report-accepted` - Final report committed
-- `agent:fin` - Session finalized
+```
+                     ┌──────────────┐
+                     │   CREATED    │
+                     └──────┬───────┘
+                            │ constructor
+                     ┌──────▼───────┐
+                     │ INITIALIZED  │
+                     └──────┬───────┘
+                            │ run()
+                     ┌──────▼───────┐
+                     │   RUNNING    │◄────────┐
+                     └──────┬───────┘         │
+                            │                 │ next turn
+                     ┌──────▼───────┐         │
+                     │  TURN ACTIVE │─────────┘
+                     └──────┬───────┘
+                            │ final/max/error
+                     ┌──────▼───────┐
+                     │  FINALIZING  │
+                     └──────┬───────┘
+                            │
+                     ┌──────▼───────┐
+                     │   COMPLETE   │
+                     └──────────────┘
+```
+
+> **Note**: The session does NOT track an explicit state field. These states are implicit in the execution flow.
 
 ---
 
 ## See Also
 
 - [Architecture](Technical-Specs-Architecture) - Component overview
-- [Context Management](Technical-Specs-Context-Management) - Token budgets
-- [docs/specs/session-lifecycle.md](../docs/specs/session-lifecycle.md) - Full spec
-
+- [Context Management](Technical-Specs-Context-Management) - Token budgets and guard
+- [Retry Strategy](Technical-Specs-Retry-Strategy) - Error handling and recovery
+- [Tool System](Technical-Specs-Tool-System) - Tool execution details
+- [specs/session-lifecycle.md](specs/session-lifecycle.md) - Full specification

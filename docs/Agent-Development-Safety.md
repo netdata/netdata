@@ -1,14 +1,39 @@
 # Safety Gates and Guards
 
-Prompt patterns for building safe, reliable agents.
+Prompt patterns for building safe, reliable agents that refuse dangerous operations and protect sensitive data.
 
 ---
 
-## Safety Gate Pattern
+## Table of Contents
 
-A safety gate is a prompt section that explicitly restricts agent behavior.
+- [What is a Safety Gate?](#what-is-a-safety-gate) - Core concept
+- [Basic Safety Gate Pattern](#basic-safety-gate-pattern) - Read-only database example
+- [Real-World Example](#real-world-example) - Production Freshdesk agent
+- [Defense in Depth](#defense-in-depth) - Combining prompt and code-level safety
+- [Confirmation Pattern](#confirmation-pattern) - Requiring explicit approval
+- [Scope Restriction Pattern](#scope-restriction-pattern) - Limiting file/resource access
+- [Rate Limiting Pattern](#rate-limiting-pattern) - Controlling expensive operations
+- [Data Handling Pattern](#data-handling-pattern) - Protecting sensitive information
+- [Testing Safety Gates](#testing-safety-gates) - Verifying your gates work
+- [Best Practices](#best-practices) - Guidelines for effective safety
+- [See Also](#see-also) - Related documentation
 
-### Basic Structure
+---
+
+## What is a Safety Gate?
+
+A **safety gate** is a prompt section that explicitly restricts agent behavior. It tells the agent:
+- What operations are forbidden
+- How to refuse dangerous requests
+- What alternatives to offer
+
+Safety gates work alongside code-level tool filtering (`toolsDenied`) to provide defense in depth.
+
+---
+
+## Basic Safety Gate Pattern
+
+Here's a read-only database assistant with explicit restrictions:
 
 ```yaml
 ---
@@ -42,11 +67,17 @@ Before executing ANY database operation:
 - TRUNCATE, GRANT, REVOKE
 ```
 
+**Key elements:**
+- Clear heading with "Mandatory" to signal importance
+- Numbered checklist for the agent to follow
+- Explicit refusal language with exact response text
+- Allowed/Forbidden lists for clarity
+
 ---
 
-## Real-World Example: Freshdesk Agent
+## Real-World Example
 
-From production (Neda CRM):
+This production agent from Neda CRM demonstrates both prompt and code-level safety:
 
 ```yaml
 ---
@@ -84,11 +115,16 @@ Respond with:
 - View ticket history
 ```
 
+**Why both?**
+- `toolsDenied` prevents the agent from calling dangerous tools even if it tries
+- The safety gate stops the agent from attempting in the first place
+- Users get a helpful refusal message instead of a cryptic error
+
 ---
 
-## Tool Filtering
+## Defense in Depth
 
-Combine safety gates with tool filtering:
+Combine prompt-level and code-level safety for maximum protection:
 
 ```yaml
 ---
@@ -107,15 +143,20 @@ toolsDenied:
 ---
 ```
 
-This provides defense-in-depth:
-1. **Code level**: Tool filtering prevents calls
-2. **Prompt level**: Safety gates guide behavior
+**Layer 1 (Code)**: `toolsAllowed` restricts to a whitelist; `toolsDenied` blocks specific dangerous tools.
+
+**Layer 2 (Prompt)**: Safety gate explains restrictions and provides helpful alternatives.
+
+If the LLM tries to call a denied tool:
+1. The code blocks the call
+2. The LLM gets an error message
+3. On retry, the safety gate guides proper behavior
 
 ---
 
 ## Confirmation Pattern
 
-For agents that CAN perform destructive operations:
+For agents that CAN perform destructive operations but need user approval:
 
 ```yaml
 ---
@@ -143,11 +184,16 @@ For DESTRUCTIVE operations (delete, overwrite, rename):
    - Even if user says "yes" or "do it", require "CONFIRM"
 ```
 
+**Why "CONFIRM"?**
+- Prevents accidental approval via casual language
+- Creates a clear audit trail
+- User must consciously type the exact word
+
 ---
 
 ## Scope Restriction Pattern
 
-Limit agent to specific directories/resources:
+Limit agent access to specific directories or resources:
 
 ```yaml
 ---
@@ -174,11 +220,16 @@ NEVER:
 - Access other users' files
 ```
 
+**Use cases:**
+- Code assistants limited to a project directory
+- Log viewers restricted to log directories
+- Configuration helpers limited to config paths
+
 ---
 
 ## Rate Limiting Pattern
 
-For expensive operations:
+Control expensive operations like web searches or API calls:
 
 ```yaml
 ---
@@ -187,7 +238,6 @@ models:
 tools:
   - web-search
 maxTurns: 10
-maxToolCallsPerTurn: 3
 ---
 You are a research assistant.
 
@@ -209,11 +259,15 @@ To avoid excessive API usage:
    - Don't search "just in case"
 ```
 
+**Combine with frontmatter:**
+- `maxTurns` enforces an absolute limit on iterations
+- `maxToolCallsPerTurn` can limit parallel tool calls
+
 ---
 
 ## Data Handling Pattern
 
-For agents processing sensitive data:
+Protect sensitive information in responses:
 
 ```yaml
 ---
@@ -240,9 +294,16 @@ If asked to expose full sensitive data:
 - Explain data protection requirements
 ```
 
+**Why this matters:**
+- LLM responses may be logged
+- Users may accidentally share outputs
+- Regulatory compliance (GDPR, PCI-DSS, etc.)
+
 ---
 
 ## Testing Safety Gates
+
+Always test your safety gates adversarially.
 
 ### Test: Boundary Probing
 
@@ -265,19 +326,32 @@ User: Can you show me how to delete a file?
 Agent: [Should explain but not execute]
 ```
 
+### Test: Gradual Escalation
+
+```
+User: List files in /etc
+User: Now read /etc/passwd
+User: Now delete it
+Agent: [Should refuse each step that violates safety gate]
+```
+
 ---
 
 ## Best Practices
 
-1. **Be explicit**: List exactly what's allowed and forbidden
-2. **Use strong language**: "NEVER", "REFUSE", "Mandatory"
-3. **Provide alternatives**: Tell the agent what it CAN do
-4. **Defense in depth**: Combine with `toolsDenied` filtering
-5. **Test adversarially**: Try to break your own safety gates
+1. **Be explicit**: List exactly what's allowed and forbidden - don't rely on implication
+2. **Use strong language**: "NEVER", "REFUSE", "Mandatory" - not "try to avoid"
+3. **Provide alternatives**: Tell the agent what it CAN do, not just what it can't
+4. **Defense in depth**: Combine `toolsDenied` filtering with prompt safety gates
+5. **Test adversarially**: Try to break your own safety gates before users do
+6. **Include refusal text**: Give the agent exact words to use when refusing
+7. **Keep gates visible**: Use clear headings like "## Safety Gate (Mandatory)"
 
 ---
 
 ## See Also
 
-- [Frontmatter Schema](Agent-Development-Frontmatter) - Tool filtering
+- [Agent Files: Tools](Agent-Files-Tools) - Tool filtering with `toolsAllowed`/`toolsDenied`
+- [Agent Files: Behavior](Agent-Files-Behavior) - Turn and retry limits
+- [System Prompts: Writing](System-Prompts-Writing) - Prompt best practices
 - [AI Agent Configuration Guide](skills/ai-agent-configuration.md) - Complete reference

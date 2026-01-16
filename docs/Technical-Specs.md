@@ -1,79 +1,163 @@
 # Technical Specifications
 
-Deep-dive technical documentation for contributors and maintainers.
+Deep-dive technical documentation for contributors, maintainers, and advanced users who need to understand ai-agent internals.
+
+---
+
+## Table of Contents
+
+- [Overview](#overview) - What these specifications cover and who they're for
+- [Quick Navigation](#quick-navigation) - Find the right spec document fast
+- [Core Architecture](#core-architecture) - System design documents
+- [Runtime Behavior](#runtime-behavior) - How sessions execute
+- [Contracts and Guarantees](#contracts-and-guarantees) - User-facing promises
+- [Source Code Reference](#source-code-reference) - Key implementation files
+- [Core Invariants](#core-invariants) - Rules that MUST always hold
+- [See Also](#see-also) - Related documentation
 
 ---
 
 ## Overview
 
-Technical specifications provide:
-- Detailed architecture documentation
-- Session lifecycle and state management
-- Context window management algorithms
-- Retry and recovery strategies
-- Tool system internals
-- User-facing contracts (SLAs)
+**TL;DR**: Technical specifications document the internal design, algorithms, and guarantees of ai-agent. Use these when building integrations, debugging complex issues, or contributing to the codebase.
+
+### Why These Specifications Exist
+
+1. **Contributors**: Understand implementation decisions before modifying code
+2. **Advanced Users**: Debug complex issues with knowledge of internals
+3. **Integrators**: Build robust integrations using documented guarantees
+4. **Maintainers**: Ensure changes respect established contracts
+
+### What You'll Find
+
+| Spec Type | Purpose | Example |
+|-----------|---------|---------|
+| **Architecture** | How components fit together | Session → LLM Client → Provider |
+| **Lifecycle** | Sequence of operations | Turn execution order |
+| **Algorithms** | Decision logic | Context guard projection |
+| **Contracts** | Guaranteed behaviors | "Never exceed maxTurns" |
+| **ADRs** | Why decisions were made | "Sub-agent as tool" rationale |
 
 ---
 
-## Specification Documents
+## Quick Navigation
 
-### Core Architecture
+**Most Common Questions**:
 
-| Document | Description |
-|----------|-------------|
-| [Architecture](Technical-Specs-Architecture) | Layered component architecture |
-| [Session Lifecycle](Technical-Specs-Session-Lifecycle) | Session creation to completion |
-| [Design History](Technical-Specs-Design-History) | Architectural decisions (ADRs) |
-
-### Runtime Behavior
-
-| Document | Description |
-|----------|-------------|
-| [Context Management](Technical-Specs-Context-Management) | Token budgets and context guard |
-| [Retry Strategy](Technical-Specs-Retry-Strategy) | Error handling and provider cycling |
-| [Tool System](Technical-Specs-Tool-System) | Tool providers and execution |
-
-### Contracts
-
-| Document | Description |
-|----------|-------------|
-| [User Contract](Technical-Specs-User-Contract) | End-user guarantees and SLAs |
-| [Specifications Index](Technical-Specs-Index) | Full spec document index |
+| Question | Document |
+|----------|----------|
+| "How does a session work?" | [Session Lifecycle](Technical-Specs-Session-Lifecycle) |
+| "Why did my session stop early?" | [Context Management](Technical-Specs-Context-Management) |
+| "What happens when an LLM fails?" | [Retry Strategy](Technical-Specs-Retry-Strategy) |
+| "How are tools executed?" | [Tool System](Technical-Specs-Tool-System) |
+| "What guarantees can I rely on?" | [User Contract](Technical-Specs-User-Contract) |
+| "Why is it designed this way?" | [Design History](Technical-Specs-Design-History) |
 
 ---
 
-## Source Files
+## Core Architecture
 
-Key implementation files:
+System design and component structure.
+
+| Document | Description |
+|----------|-------------|
+| [Architecture](Technical-Specs-Architecture) | Layered component design: CLI → Session → LLM Client → Providers |
+| [Session Lifecycle](Technical-Specs-Session-Lifecycle) | Creation → Execution → Finalization flow |
+| [Design History](Technical-Specs-Design-History) | Architectural Decision Records (ADRs) |
+
+```mermaid
+graph LR
+    CLI[CLI / Headend] --> Session[AIAgentSession]
+    Session --> LLMClient[LLM Client]
+    Session --> Tools[Tools Orchestrator]
+    LLMClient --> Providers[Providers]
+    Tools --> MCP[MCP Servers]
+    Tools --> REST[REST APIs]
+    Tools --> SubAgents[Sub-Agents]
+```
+
+---
+
+## Runtime Behavior
+
+How sessions execute at runtime.
+
+| Document | Description |
+|----------|-------------|
+| [Context Management](Technical-Specs-Context-Management) | Token budgets, context guard, overflow handling |
+| [Retry Strategy](Technical-Specs-Retry-Strategy) | Error classification, provider cycling, backoff |
+| [Tool System](Technical-Specs-Tool-System) | Tool providers, execution routing, queue management |
+
+---
+
+## Contracts and Guarantees
+
+User-facing promises that implementations MUST honor.
+
+| Document | Description |
+|----------|-------------|
+| [User Contract](Technical-Specs-User-Contract) | End-user guarantees (limits, error handling, output) |
+| [Specifications Index](Technical-Specs-Index) | Complete index of all spec documents |
+
+---
+
+## Source Code Reference
+
+Key implementation files for each subsystem.
 
 | Component | File | Description |
 |-----------|------|-------------|
-| Session | `src/ai-agent.ts` | Main orchestration |
-| LLM Client | `src/llm-client.ts` | Provider interface |
-| Tools | `src/tools/tools.ts` | Tool orchestration |
-| Context | `src/ai-agent.ts` | Context guard |
+| Session Orchestration | `src/ai-agent.ts` | Main session loop and orchestration |
+| LLM Client | `src/llm-client.ts` | Provider interface and request execution |
+| Tool System | `src/tools/tools.ts` | Tool orchestration and routing |
+| MCP Provider | `src/tools/mcp-provider.ts` | MCP protocol implementation |
+| Context Guard | `src/ai-agent.ts` | Token budget enforcement |
 | Types | `src/types.ts` | Core type definitions |
+| OpTree | `src/session-tree.ts` | Hierarchical operation tracking |
 
 ---
 
-## Invariants
+## Core Invariants
 
-Core invariants that MUST hold:
+These rules MUST hold under all conditions. Violations are critical bugs.
 
-1. **Session Immutability**: Config immutable after creation
-2. **Turn Ordering**: Turn 0 = system, action turns are 1-based
-3. **Provider Isolation**: Each provider handles own auth/protocol
-4. **Context Guard**: Token budget checked before each LLM request
-5. **Tool Budget**: Tool output size checked before commit
-6. **Abort Propagation**: Cancellations propagate to all wait loops
-7. **OpTree Consistency**: Every operation has begin/end lifecycle
+### Session Invariants
+
+1. **Configuration Immutable**: Config cannot change after session creation
+2. **Turn Ordering**: Turn 0 = system setup, action turns are 1-based
+3. **Max Turns Honored**: Session NEVER exceeds configured `maxTurns`
+
+### Provider Invariants
+
+4. **Provider Isolation**: Each provider handles its own auth and protocol
+5. **No Cross-Provider State**: Providers share nothing except explicit config
+
+### Context Invariants
+
+6. **Context Guard Active**: Token budget checked before every LLM request
+7. **Tool Budget Enforced**: Tool output size checked before commit
+
+### Operational Invariants
+
+8. **Abort Propagation**: Cancellations propagate to all wait loops
+9. **OpTree Consistency**: Every operation has begin/end lifecycle
+10. **Always Returns Result**: Session NEVER crashes without returning `AIAgentResult`
+
+---
+
+## Reading Order for New Contributors
+
+1. **Start**: [Architecture](Technical-Specs-Architecture) - Understand the layers
+2. **Then**: [Session Lifecycle](Technical-Specs-Session-Lifecycle) - Follow a request through
+3. **Deep Dive**: [Context Management](Technical-Specs-Context-Management) or [Tool System](Technical-Specs-Tool-System)
+4. **Why**: [Design History](Technical-Specs-Design-History) - Understand decisions
+5. **Reference**: [Specifications Index](Technical-Specs-Index) - Find detailed specs
 
 ---
 
 ## See Also
 
-- [Agent Development](Agent-Development) - Building agents
-- [Configuration](Configuration) - System configuration
+- [Configuration](Configuration) - System configuration reference
+- [Agent-Files](Agent-Files) - Agent file configuration
 - [Operations](Operations) - Debugging and monitoring
-
+- [Contributing](Contributing) - How to contribute

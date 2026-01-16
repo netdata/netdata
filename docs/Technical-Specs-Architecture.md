@@ -1,205 +1,364 @@
 # Architecture
 
-Layered architecture with strict separation of concerns.
+Layered architecture with strict separation of concerns between orchestration, LLM communication, and tool execution.
+
+---
+
+## Table of Contents
+
+- [TL;DR](#tldr) - Quick summary of the architecture
+- [Why This Matters](#why-this-matters) - When you need to understand architecture
+- [Component Overview](#component-overview) - High-level system diagram
+- [Core Components](#core-components) - Detailed component descriptions
+- [Data Flow](#data-flow) - Request and response paths
+- [Exit Codes](#exit-codes) - Session termination states
+- [Session Configuration](#session-configuration) - Key configuration options
+- [See Also](#see-also) - Related documentation
 
 ---
 
 ## TL;DR
 
-CLI → Session → LLM Client → Providers. Session orchestrates turns, LLM Client executes single requests, Providers handle protocol.
+ai-agent uses a layered architecture: **CLI/Headend** → **AIAgent** → **AIAgentSession** → **LLMClient** → **Providers**. The session orchestrates multi-turn conversations, the LLM client executes single requests, and providers handle protocol-specific communication. Tools are abstracted through the **ToolsOrchestrator** with multiple provider types (MCP, REST, internal, sub-agent).
+
+---
+
+## Why This Matters
+
+Understanding the architecture helps you:
+
+- **Debug issues**: Know which component to investigate based on symptoms
+- **Add features**: Understand where new functionality belongs
+- **Configure correctly**: Know what each layer controls
+- **Optimize performance**: Identify bottlenecks in the right layer
+
+---
+
+## Component Overview
+
+```mermaid
+graph TB
+    subgraph "Entry Points"
+        CLI[CLI]
+        REST[REST Headend]
+        MCP[MCP Headend]
+        Slack[Slack Headend]
+    end
+
+    subgraph "Orchestration Layer"
+        AIAgent[AIAgent<br/>Advisors/Router/Handoff]
+        Session[AIAgentSession<br/>Multi-turn Loop]
+    end
+
+    subgraph "LLM Layer"
+        LLMClient[LLMClient<br/>Request Execution]
+        OpenAI[OpenAI Provider]
+        Anthropic[Anthropic Provider]
+        Google[Google Provider]
+        Ollama[Ollama Provider]
+        OpenRouter[OpenRouter Provider]
+    end
+
+    subgraph "Tool Layer"
+        ToolsOrch[ToolsOrchestrator<br/>Routing & Queues]
+        MCPProv[MCP Provider]
+        RESTProv[REST Provider]
+        InternalProv[Internal Tools]
+        AgentProv[Agent Provider]
+    end
+
+    CLI --> AIAgent
+    REST --> AIAgent
+    MCP --> AIAgent
+    Slack --> AIAgent
+
+    AIAgent --> Session
+    Session --> LLMClient
+    Session --> ToolsOrch
+
+    LLMClient --> OpenAI
+    LLMClient --> Anthropic
+    LLMClient --> Google
+    LLMClient --> Ollama
+    LLMClient --> OpenRouter
+
+    ToolsOrch --> MCPProv
+    ToolsOrch --> RESTProv
+    ToolsOrch --> InternalProv
+    ToolsOrch --> AgentProv
+```
 
 ---
 
 ## Core Components
 
-### 0. AIAgent (Orchestration Wrapper)
-
-**Responsibility**: Runs advisors/router/handoff around the inner session loop.
+### 1. AIAgent (Orchestration Wrapper)
 
 **File**: `src/ai-agent.ts`
+
+**Responsibility**: Wraps the inner session loop with higher-level orchestration patterns.
+
+| Feature | Description |
+|---------|-------------|
+| **Advisors** | Parallel pre-consultation with specialist agents |
+| **Router** | Dynamic agent selection based on task |
+| **Handoff** | Post-session delegation to another agent |
 
 **Lifecycle**:
-1. `AIAgent.run(session)` executes orchestration if configured
-2. Calls `AIAgentSession.run()` for the main loop
-3. Applies router delegation and handoff after the main session
+1. Run advisor sessions in parallel (if configured)
+2. Build enriched prompt with advisory context
+3. Execute main `AIAgentSession.run()`
+4. Apply router delegation (if selected)
+5. Run handoff target (if configured)
+6. Merge and return results
 
 ---
 
-### 1. AIAgentSession
-
-**Responsibility**: Multi-turn orchestration, retry logic, context management
+### 2. AIAgentSession
 
 **File**: `src/ai-agent.ts`
 
+**Responsibility**: Multi-turn orchestration, retry logic, context management, and tool execution.
+
 **Key State**:
-- `conversation` - Full conversation history
-- `logs` - Structured log entries
-- `accounting` - Token/cost tracking
-- `currentTurn` - Current turn index (1-based for action turns)
-- `opTree` - Hierarchical operation tracking
-- `toolsOrchestrator` - Tool execution engine
-- `llmClient` - LLM request executor
-- `finalReport` - Captured final_report tool result
+
+| Property | Purpose |
+|----------|---------|
+| `conversation` | Full conversation history (messages array) |
+| `logs` | Structured log entries for debugging |
+| `accounting` | Token and cost tracking |
+| `currentTurn` | Current turn index (1-based for action turns) |
+| `opTree` | Hierarchical operation tracking for snapshots |
+| `toolsOrchestrator` | Tool execution engine |
+| `llmClient` | LLM request executor |
+| `finalReport` | Captured `final_report` tool result |
+
+**Core Loop**:
+```
+for turn = 1 to maxTurns:
+    select provider/model
+    check context guard
+    execute LLM request
+    if tool calls: execute tools
+    if final_report: finalize
+    record accounting
+```
 
 ---
 
-### 2. LLMClient
-
-**Responsibility**: Single LLM request execution, response parsing, tracing
+### 3. LLMClient
 
 **File**: `src/llm-client.ts`
 
+**Responsibility**: Single LLM request execution, response parsing, and metadata collection.
+
 **Key Operations**:
-- `executeTurn(TurnRequest)` → `TurnResult`
-- Provider selection by name
-- HTTP fetch tracing
-- Metadata collection (cost, routing, cache stats)
-- Pricing computation
+
+| Method | Purpose |
+|--------|---------|
+| `executeTurn(TurnRequest)` | Execute one LLM request/response cycle |
+| Provider selection | Route to correct provider by name |
+| Metadata collection | Gather cost, routing, cache statistics |
+| Pricing computation | Calculate token costs |
 
 **Registered Providers**:
-- `openai` → OpenAIProvider
-- `anthropic` → AnthropicProvider
-- `google` → GoogleProvider
-- `openrouter` → OpenRouterProvider
-- `ollama` → OllamaProvider
+
+| Name | Class | Protocol |
+|------|-------|----------|
+| `openai` | OpenAIProvider | OpenAI API |
+| `anthropic` | AnthropicProvider | Anthropic API |
+| `google` | GoogleProvider | Google AI API |
+| `openrouter` | OpenRouterProvider | OpenRouter API |
+| `ollama` | OllamaProvider | Ollama local API |
 
 ---
 
-### 3. ToolsOrchestrator
-
-**Responsibility**: Tool discovery, schema management, execution routing
+### 4. ToolsOrchestrator
 
 **File**: `src/tools/tools.ts`
 
-**Providers**:
-- MCPProvider - MCP protocol tools
-- RestProvider - REST/OpenAPI tools
-- InternalToolProvider - Built-in tools
-- AgentProvider - Sub-agent invocation
-- RouterToolProvider - Router delegation
+**Responsibility**: Tool discovery, schema management, execution routing, and queue management.
+
+**Provider Types**:
+
+| Provider | Kind | Description |
+|----------|------|-------------|
+| MCPProvider | `mcp` | Model Context Protocol tools |
+| RestProvider | `rest` | REST/OpenAPI tools |
+| InternalToolProvider | `agent` | Built-in tools (final_report, task_status) |
+| AgentProvider | `agent` | Sub-agent invocation |
+| RouterToolProvider | `agent` | Router delegation tool |
+
+**Execution Flow**:
+1. Validate tool exists in registry
+2. Check tool response cache
+3. Acquire queue slot (if queued)
+4. Begin opTree operation
+5. Apply timeout wrapper
+6. Call `provider.execute()`
+7. Apply response size cap
+8. Record accounting
+9. End opTree operation
 
 ---
 
-### 4. SessionTreeBuilder
-
-**Responsibility**: Hierarchical operation tracking (opTree)
+### 5. SessionTreeBuilder (OpTree)
 
 **File**: `src/session-tree.ts`
+
+**Responsibility**: Hierarchical operation tracking for debugging and snapshots.
 
 **Structure**:
 ```
 Session
-├─ Turn 0 (system)
-│  ├─ Op: init
-│  └─ Op: fin
-├─ Turn 1
-│  ├─ Op: llm (attempt 1)
-│  ├─ Op: tool (call 1)
-│  └─ Op: tool (call 2)
-└─ Turn N
+├── Turn 0 (system setup)
+│   ├── Op: init
+│   └── Op: fin
+├── Turn 1
+│   ├── Op: llm (attempt 1)
+│   │   └── latency, tokens, status
+│   ├── Op: tool (call 1)
+│   │   └── latency, result
+│   └── Op: tool (call 2)
+├── Turn 2
+│   └── ...
+└── Turn N
+    └── Op: llm (final)
 ```
 
 ---
 
 ## Data Flow
 
-### Request Flow
+### Request Flow (User → LLM)
 
-```
-User Prompt
-    ↓
-AIAgent.run()
-    ↓
-(advisors pre-run, if configured)
-    ↓
-AIAgentSession.run()
-    ↓
-executeAgentLoop()
-    ↓
-[Per Turn]
-    ↓
-LLMClient.executeTurn()
-    ↓
-Provider.executeTurn()
-    ↓
-HTTP Request to LLM API
+```mermaid
+sequenceDiagram
+    participant User
+    participant AIAgent
+    participant Session as AIAgentSession
+    participant LLMClient
+    participant Provider
+    participant LLM as LLM API
+
+    User->>AIAgent: run(prompt)
+    AIAgent->>Session: run()
+    Session->>Session: executeAgentLoop()
+    loop Each Turn
+        Session->>LLMClient: executeTurn(request)
+        LLMClient->>Provider: executeTurn(request)
+        Provider->>LLM: HTTP Request
+        LLM-->>Provider: HTTP Response
+        Provider-->>LLMClient: TurnResult
+        LLMClient-->>Session: TurnResult
+    end
+    Session-->>AIAgent: AIAgentResult
+    AIAgent-->>User: AIAgentResult
 ```
 
-### Response Flow
+### Response Processing
 
-```
-LLM API Response
-    ↓
-Provider parses response
-    ↓
-TurnResult (status, messages, toolCalls, tokens)
-    ↓
-AIAgentSession processes result
-    ↓
-[If toolCalls]
-    ↓
-ToolsOrchestrator.executeWithManagement()
-    ↓
-Tool results added to conversation
-    ↓
-[Next turn or finalize]
+```mermaid
+flowchart TD
+    Response[LLM Response] --> Parse[Provider Parses]
+    Parse --> Result[TurnResult]
+    Result --> Check{Has Tool Calls?}
+
+    Check -->|Yes| Execute[Execute Tools]
+    Execute --> AddResults[Add Tool Results]
+    AddResults --> NextTurn[Continue to Next Turn]
+
+    Check -->|No| Final{Has Final Report?}
+    Final -->|Yes| Finalize[Finalize Session]
+    Final -->|No| Retry[Synthetic Retry]
+
+    Retry --> NextTurn
+    NextTurn --> Response
 ```
 
 ---
 
 ## Exit Codes
 
-### Success
-- `EXIT-FINAL-ANSWER` - Agent called final_report
-- `EXIT-MAX-TURNS-WITH-RESPONSE` - Max turns reached with response
-- `EXIT-USER-STOP` - User-initiated graceful stop
+Session termination states returned in `AIAgentResult.exitCode`.
 
-### LLM Failures
-- `EXIT-NO-LLM-RESPONSE` - No response from LLM
-- `EXIT-EMPTY-RESPONSE` - Empty response
-- `EXIT-AUTH-FAILURE` - Authentication failed
-- `EXIT-QUOTA-EXCEEDED` - Quota exceeded
-- `EXIT-MODEL-ERROR` - Model error
+### Success States
 
-### Tool Failures
-- `EXIT-TOOL-FAILURE` - Tool execution failed
-- `EXIT-MCP-CONNECTION-LOST` - MCP server disconnected
-- `EXIT-TOOL-NOT-AVAILABLE` - Requested tool not found
-- `EXIT-TOOL-TIMEOUT` - Tool execution timeout
+| Exit Code | Description |
+|-----------|-------------|
+| `EXIT-FINAL-ANSWER` | Agent called `final_report` tool successfully |
+| `EXIT-MAX-TURNS-WITH-RESPONSE` | Max turns reached with valid response |
+| `EXIT-USER-STOP` | User-initiated graceful stop |
 
-### Configuration
-- `EXIT-NO-PROVIDERS` - No providers configured
-- `EXIT-INVALID-MODEL` - Invalid model specified
-- `EXIT-MCP-INIT-FAILED` - MCP initialization failed
+### LLM Failure States
 
-### Timeout/Limits
-- `EXIT-INACTIVITY-TIMEOUT` - Inactivity timeout
-- `EXIT-MAX-RETRIES` - Max retries exhausted
-- `EXIT-TOKEN-LIMIT` - Token limit exceeded
-- `EXIT-MAX-TURNS-NO-RESPONSE` - Max turns without response
+| Exit Code | Description |
+|-----------|-------------|
+| `EXIT-NO-LLM-RESPONSE` | No response received from any provider |
+| `EXIT-EMPTY-RESPONSE` | Empty response after all retries |
+| `EXIT-AUTH-FAILURE` | Authentication failed (API key invalid) |
+| `EXIT-QUOTA-EXCEEDED` | Account quota exceeded |
+| `EXIT-MODEL-ERROR` | Model returned an error |
+
+### Tool Failure States
+
+| Exit Code | Description |
+|-----------|-------------|
+| `EXIT-TOOL-FAILURE` | Critical tool execution failed |
+| `EXIT-MCP-CONNECTION-LOST` | MCP server disconnected |
+| `EXIT-TOOL-NOT-AVAILABLE` | Requested tool not in registry |
+| `EXIT-TOOL-TIMEOUT` | Tool execution exceeded timeout |
+
+### Configuration States
+
+| Exit Code | Description |
+|-----------|-------------|
+| `EXIT-NO-PROVIDERS` | No LLM providers configured |
+| `EXIT-INVALID-MODEL` | Specified model not available |
+| `EXIT-MCP-INIT-FAILED` | MCP server initialization failed |
+
+### Limit States
+
+| Exit Code | Description |
+|-----------|-------------|
+| `EXIT-INACTIVITY-TIMEOUT` | Session inactive too long |
+| `EXIT-MAX-RETRIES` | Max retries exhausted without success |
+| `EXIT-TOKEN-LIMIT` | Token limit exceeded |
+| `EXIT-MAX-TURNS-NO-RESPONSE` | Max turns without valid response |
 
 ---
 
 ## Session Configuration
 
-Key configuration options:
+Key configuration options that affect architecture behavior.
 
-| Setting | Description |
-|---------|-------------|
-| `targets` | Model fallback chain |
-| `systemPrompt` | System prompt template |
-| `maxTurns` | Maximum action turns |
-| `maxRetries` | Max retries per turn |
-| `toolTimeout` | Tool execution timeout |
-| `toolResponseMaxBytes` | Max tool response size |
-| `abortSignal` | Cancellation signal |
-| `callbacks` | Event callbacks |
+| Setting | Type | Description |
+|---------|------|-------------|
+| `targets` | Array | Model fallback chain (provider/model pairs) |
+| `systemPrompt` | String | System prompt template |
+| `maxTurns` | Number | Maximum action turns (default: 25) |
+| `maxRetries` | Number | Max retries per turn (default: 3) |
+| `toolTimeout` | Number | Tool execution timeout in ms |
+| `toolResponseMaxBytes` | Number | Max tool response size before storage |
+| `abortSignal` | AbortSignal | Cancellation signal |
+| `callbacks` | Object | Event callbacks for streaming |
+
+---
+
+## Key Design Decisions
+
+1. **Layered Isolation**: Each layer only knows about its immediate dependencies
+2. **Provider Abstraction**: LLM providers share a common interface
+3. **Tool Abstraction**: All tools (MCP, REST, sub-agent) share a common interface
+4. **Stateless Providers**: Providers hold no session state
+5. **Session Owns State**: All session state lives in `AIAgentSession`
 
 ---
 
 ## See Also
 
-- [Session Lifecycle](Technical-Specs-Session-Lifecycle) - Detailed session flow
-- [Tool System](Technical-Specs-Tool-System) - Tool internals
-- [docs/specs/architecture.md](../docs/specs/architecture.md) - Full spec
-
+- [Session Lifecycle](Technical-Specs-Session-Lifecycle) - Detailed session execution flow
+- [Tool System](Technical-Specs-Tool-System) - Tool provider internals
+- [Context Management](Technical-Specs-Context-Management) - Token budget management
+- [Design History](Technical-Specs-Design-History) - Why these decisions were made
+- [specs/architecture.md](specs/architecture.md) - Full specification

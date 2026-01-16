@@ -1,77 +1,87 @@
 # AI Agent Wiki
 
-**Build powerful AI agents in minutes, not months. Write a prompt, add tools, run it.**
+Welcome to **ai-agent** - a framework for building autonomous AI agents. Write a prompt, add tools, and run it.
 
 ---
 
-## Quick Navigation
+## What is ai-agent?
 
-| Section | Description |
-|---------|-------------|
-| [Getting Started](Getting-Started) | Installation, first agent, CLI basics |
-| [Agent Development](Agent-Development) | `.ai` files, frontmatter, multi-agent patterns |
-| [Configuration](Configuration) | Providers, tools, caching, context windows |
-| [Headends](Headends) | Deployment modes (CLI, REST, MCP, Slack, etc.) |
-| [Operations](Operations) | Debugging, logging, snapshots, telemetry |
-| [Technical Specs](Technical-Specs) | Architecture, design, behavior contracts |
-| [Advanced](Advanced) | Hidden options, overrides, internal API |
-| [Contributing](Contributing) | Testing, code style, documentation |
+ai-agent is a TypeScript framework that turns simple text files (`.ai` files) into powerful autonomous agents. Each agent gets:
+- A system prompt that defines its behavior
+- Access to tools (MCP servers, REST APIs, other agents)
+- Automatic orchestration with retries, context management, and error recovery
+
+**No orchestration code required** - just configuration and prompts.
 
 ---
 
-## Core Architecture
+## Quick Start
 
-- **Recursive Autonomous Agents**: Every agent continuously plans, executes, observes, and adapts
-- **100% Session Isolation**: Each agent run is a completely independent universe with ZERO shared state
-- **TypeScript + Vercel AI SDK 5**: Full type safety with unified provider interface
-- **Library-First Design**: Core functionality as embeddable library; CLI is thin wrapper
+1. **Install**: `npm install -g @anthropic/ai-agent`
+2. **Configure**: Create `~/.ai-agent/config.toml` with your API keys
+3. **Run**: `ai-agent --agent my-agent.ai "Hello, world!"`
 
----
-
-## Key Capabilities
-
-### LLM Provider Support
-- **Commercial**: OpenAI, Anthropic, Google
-- **Open-Source**: OpenRouter, Ollama, self-hosted (vLLM, llama.cpp)
-- Provider/model fallback chains
-- Per-model context window and tokenizer configuration
-
-### Multi-Agent Orchestration
-- **Advisors**: Parallel pre-run agents
-- **Router**: Delegation via `router__handoff-to` tool
-- **Handoff**: Post-run execution chains
-- **Agent-as-Tool**: Any `.ai` file becomes callable
-
-### Tool System
-- MCP tools auto-converted to SDK tools
-- REST/OpenAPI tool support
-- Queue-based concurrency control
-- Tool output storage for oversized responses
+See [Getting Started](Getting-Started) for the complete walkthrough.
 
 ---
 
-## Headend Modes
+## Key Sections
 
-| Headend | Purpose |
-|---------|---------|
-| `--cli` | Direct agent execution |
-| `--api <port>` | REST API |
-| `--mcp <transport>` | MCP server |
-| `--openai-completions <port>` | OpenAI-compatible API |
-| `--anthropic-completions <port>` | Anthropic-compatible API |
-| `--embed <port>` | Public embeddable chat |
-| `--slack` | Slack Socket Mode app |
+### For Building Agents
+
+| Section | What You'll Find |
+|---------|------------------|
+| [Agent Files](Agent-Files) | Configure `.ai` files - models, tools, sub-agents, schemas |
+| [System Prompts](System-Prompts) | Write effective prompts with includes and variables |
+| [CLI Reference](CLI) | Run agents, debug, override settings, script automation |
+
+### For Configuration
+
+| Section | What You'll Find |
+|---------|------------------|
+| [Configuration](Configuration) | Providers, MCP servers, REST tools, caching |
+| [Headends](Headends) | Deploy as REST API, MCP server, Slack bot, embedded widget |
+
+### For Operations
+
+| Section | What You'll Find |
+|---------|------------------|
+| [Operations](Operations) | Logging, debugging, snapshots, telemetry |
+| [Technical Specs](Technical-Specs) | Architecture, session lifecycle, tool system |
+
+---
+
+## Common Tasks
+
+**I want to...**
+
+- **Create my first agent** - [Quick Start](Getting-Started-Quick-Start)
+- **Add tools to my agent** - [Agent Files: Tools](Agent-Files-Tools)
+- **Use a different model** - [Agent Files: Models](Agent-Files-Models)
+- **Debug why my agent isn't working** - [CLI: Debugging](CLI-Debugging)
+- **Deploy as a REST API** - [Headends: REST](Headends-REST)
+- **Run agents in Slack** - [Headends: Slack](Headends-Slack)
+- **Understand session snapshots** - [Operations: Snapshots](Operations-Snapshots)
+
+---
+
+## Architecture at a Glance
+
+- **Recursive Autonomous Agents**: Each agent plans, executes, observes, and adapts
+- **100% Session Isolation**: Every agent run is independent with zero shared state
+- **TypeScript + Vercel AI SDK 5**: Type safety with unified provider interface
+- **Library-First Design**: Core is an embeddable library; CLI is a thin wrapper
 
 ---
 
 ## For AI Assistants
 
-**[AI Agent Configuration Guide](skills/ai-agent-configuration.md)** - Single-page reference for LLM agents building ai-agents. Covers frontmatter schema, tool composition, patterns, and output contracts.
+Building ai-agents programmatically? See the [AI Agent Configuration Guide](skills/ai-agent-configuration.md) - a single-page reference covering frontmatter schema, tool composition, patterns, and output contracts.
 
 ---
 
-## Real Impact
+## See Also
 
-- **Neda CRM**: 22 specialized agents, ~2,000 lines of prompts
-- **Traditional equivalent**: 20,000+ lines of orchestration code
-- **Development time**: weeks vs months
+- [Getting Started](Getting-Started) - Installation and first steps
+- [Contributing](Contributing) - Help improve ai-agent
+- [Advanced](Advanced) - Hidden options and internal API

@@ -4,21 +4,42 @@ Configure response caching for agents and tools.
 
 ---
 
+## Table of Contents
+
+- [Overview](#overview) - Caching layers and purposes
+- [Cache Backend](#cache-backend) - SQLite and Redis configuration
+- [Agent Response Caching](#agent-response-caching) - Cache complete agent responses
+- [Tool Response Caching](#tool-response-caching) - Cache MCP and REST tool responses
+- [Anthropic Cache Control](#anthropic-cache-control) - Provider-side prompt caching
+- [TTL Formats](#ttl-formats) - Duration syntax reference
+- [Cache Keys](#cache-keys) - How cache keys are computed
+- [Cache Behavior](#cache-behavior) - Hits, misses, and invalidation
+- [Configuration Reference](#configuration-reference) - All caching options
+- [Debugging](#debugging) - Inspect and manage cache
+- [Best Practices](#best-practices) - When to cache and TTL guidelines
+- [See Also](#see-also) - Related documentation
+
+---
+
 ## Overview
 
 AI Agent supports caching at multiple levels:
 
 | Level | Purpose | Configuration |
 |-------|---------|---------------|
-| Agent | Cache agent responses | Frontmatter `cache:` |
-| Tool | Cache tool responses | Config `cache:` per server/tool |
-| LLM | Provider-side caching | Anthropic `cacheStrategy` |
+| Agent | Cache complete agent responses | Frontmatter `cache:` |
+| Tool | Cache individual tool responses | Config `cache:` per server/tool |
+| LLM | Provider-side prompt caching | Provider `cacheStrategy` |
+
+Caching reduces costs, improves latency, and prevents redundant API calls.
 
 ---
 
 ## Cache Backend
 
-Configure the cache backend:
+Configure where cached data is stored.
+
+### SQLite Backend (Default)
 
 ```json
 {
@@ -32,14 +53,7 @@ Configure the cache backend:
 }
 ```
 
-### Options
-
-| Backend | Description |
-|---------|-------------|
-| `sqlite` | SQLite database (default) |
-| `redis` | Redis server |
-
-### Redis Configuration
+### Redis Backend
 
 ```json
 {
@@ -47,16 +61,28 @@ Configure the cache backend:
     "backend": "redis",
     "redis": {
       "url": "redis://localhost:6379"
-    }
+    },
+    "maxEntries": 10000
   }
 }
 ```
+
+### Backend Configuration Reference
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `backend` | `string` | `"sqlite"` | Cache backend: `sqlite` or `redis` |
+| `sqlite.path` | `string` | `"${HOME}/.ai-agent/cache.db"` | SQLite database path |
+| `redis.url` | `string` | - | Redis connection URL |
+| `maxEntries` | `number` | `5000` | Maximum cache entries (LRU eviction) |
 
 ---
 
 ## Agent Response Caching
 
-Cache complete agent responses:
+Cache complete agent responses to avoid redundant LLM calls.
+
+### Basic Usage
 
 ```yaml
 ---
@@ -64,31 +90,41 @@ models:
   - openai/gpt-4o
 cache: 1h
 ---
+Answer questions about our documentation.
 ```
 
-### TTL Formats
+### Cache Key Components
 
-| Format | Example | Description |
-|--------|---------|-------------|
-| `off` | `cache: off` | Disable caching |
-| Milliseconds | `cache: 60000` | 60 seconds |
-| Duration | `cache: 5m` | 5 minutes |
-| Duration | `cache: 1h` | 1 hour |
-| Duration | `cache: 1d` | 1 day |
-| Duration | `cache: 1w` | 1 week |
+Agent cache keys are computed from:
+- **Agent hash**: Expanded system prompt + configuration
+- **User prompt**: The input query
+- **Output format**: Expected format and schema (if any)
 
-### Cache Key
+Same inputs produce the same cache key.
 
-Agent cache key is computed from:
-- Agent hash (expanded prompt + config)
-- User prompt
-- Expected output format/schema
+### When Agent Caching Helps
+
+- FAQ-style agents with common questions
+- Documentation lookup agents
+- Reference data queries
+- Repeated identical requests
+
+### When to Avoid Agent Caching
+
+- Agents with external tool calls (results may change)
+- Time-sensitive queries
+- User-specific responses
+- Agents that modify state
 
 ---
 
 ## Tool Response Caching
 
+Cache responses from MCP servers and REST tools.
+
 ### Server-Wide Cache
+
+Apply cache TTL to all tools from a server:
 
 ```json
 {
@@ -103,6 +139,8 @@ Agent cache key is computed from:
 ```
 
 ### Per-Tool Cache
+
+Override cache TTL for specific tools:
 
 ```json
 {
@@ -127,26 +165,35 @@ Agent cache key is computed from:
 {
   "restTools": {
     "weather": {
-      "description": "Get weather",
+      "description": "Get current weather",
       "method": "GET",
-      "url": "https://api.weather.com/current",
-      "cache": "15m"
+      "url": "https://api.weather.com/current?location=${parameters.location}",
+      "cache": "15m",
+      "parametersSchema": {
+        "type": "object",
+        "properties": {
+          "location": { "type": "string" }
+        },
+        "required": ["location"]
+      }
     }
   }
 }
 ```
 
-### Tool Cache Key
+### Tool Cache Key Components
 
-Tool cache key is computed from:
-- Tool identity (namespace + name)
-- Request payload
+Tool cache keys are computed from:
+- **Tool identity**: Namespace + tool name
+- **Request payload**: All parameters serialized
 
 ---
 
 ## Anthropic Cache Control
 
-Special caching for Anthropic models:
+Anthropic models support server-side prompt caching for cost savings.
+
+### Enable Cache Strategy
 
 ```json
 {
@@ -160,28 +207,100 @@ Special caching for Anthropic models:
 }
 ```
 
-### Strategies
+### Cache Strategies
 
 | Strategy | Description |
 |----------|-------------|
-| `full` (default) | Apply ephemeral cache control to messages |
+| `full` | Apply ephemeral cache control to messages (default) |
 | `none` | Disable cache control |
 
 ### How It Works
 
 When `cacheStrategy: "full"`:
-- Applies `cacheControl: { type: 'ephemeral' }` to the last valid user message per turn
-- Enables significant cost savings on repeated context patterns
+1. Applies `cacheControl: { type: 'ephemeral' }` to the last valid user message per turn
+2. Anthropic caches the prompt prefix server-side
+3. Subsequent requests with the same prefix use cached tokens
 
-### Cache Accounting
+### Cost Implications
 
-Cache tokens are tracked in accounting:
-- `cacheReadInputTokens`: Tokens read from cache
-- `cacheWriteInputTokens`: Tokens written to cache
+| Token Type | Price Impact |
+|------------|--------------|
+| Cache write | Slightly higher than normal input |
+| Cache read | Significantly lower than normal input |
+| Cache hit | Major cost savings on long prompts |
 
-Telemetry counters:
+### Cache Token Accounting
+
+```json
+{
+  "type": "llm",
+  "inputTokens": 1523,
+  "outputTokens": 456,
+  "cacheReadTokens": 1200,
+  "cacheWriteTokens": 323
+}
+```
+
+Telemetry metrics:
 - `ai_agent_llm_cache_read_tokens_total`
 - `ai_agent_llm_cache_write_tokens_total`
+
+---
+
+## TTL Formats
+
+Cache TTL (Time To Live) can be specified in multiple formats.
+
+| Format | Example | Duration |
+|--------|---------|----------|
+| Disabled | `off` | No caching |
+| Milliseconds | `60000` | 60 seconds |
+| Seconds | `30s` | 30 seconds |
+| Minutes | `5m` | 5 minutes |
+| Hours | `1h` | 1 hour |
+| Days | `1d` | 1 day |
+| Weeks | `1w` | 1 week |
+
+### Examples
+
+```yaml
+cache: off      # Disabled
+cache: 30s      # 30 seconds
+cache: 5m       # 5 minutes
+cache: 1h       # 1 hour
+cache: 1d       # 1 day
+cache: 60000    # 60 seconds (milliseconds)
+```
+
+---
+
+## Cache Keys
+
+### Agent Cache Key
+
+```
+hash(agent_hash + user_prompt + output_format)
+```
+
+Where `agent_hash` is computed from:
+- Expanded system prompt (after variable substitution)
+- All frontmatter configuration
+- Model selection
+
+### Tool Cache Key
+
+```
+hash(tool_namespace + tool_name + serialized_parameters)
+```
+
+All parameters are included, so different parameter values produce different keys.
+
+### Key Implications
+
+- Same query to same agent = cache hit
+- Modified agent prompt = cache miss (new hash)
+- Same tool call with same parameters = cache hit
+- Tool call with different parameters = cache miss
 
 ---
 
@@ -189,33 +308,130 @@ Telemetry counters:
 
 ### Cache Hits
 
-- Logged at verbose level
+When a cache hit occurs:
 - Response returned immediately
-- No LLM/tool calls made
+- No LLM or tool calls made
+- Logged at verbose level: `[cache] hit: <key>`
 
 ### Cache Misses
 
-- Silent (no log)
+When a cache miss occurs:
 - Normal execution proceeds
-- Result stored in cache
+- Result stored in cache with TTL
+- Silent (no log by default)
 
 ### Cache Invalidation
 
 Caches are invalidated when:
-- TTL expires
-- Agent hash changes (prompt modified)
-- `maxEntries` exceeded (LRU eviction)
+- **TTL expires**: Entry removed on next access
+- **Agent modified**: New agent hash = new cache key
+- **Max entries exceeded**: LRU eviction removes oldest entries
+- **Manual clear**: Database deleted or entry removed
+
+### Stale Data
+
+Cached responses may become stale:
+- External data changes after caching
+- Tool responses reflect old state
+- Use appropriate TTLs for data volatility
 
 ---
 
-## Debugging Cache
+## Configuration Reference
 
-### Check Cache Status
+### Cache Backend Schema
+
+```json
+{
+  "cache": {
+    "backend": "sqlite | redis",
+    "sqlite": {
+      "path": "string"
+    },
+    "redis": {
+      "url": "string"
+    },
+    "maxEntries": "number"
+  }
+}
+```
+
+### Provider Cache Options
+
+```json
+{
+  "providers": {
+    "<name>": {
+      "cacheStrategy": "full | none"
+    }
+  }
+}
+```
+
+### MCP Server Cache Options
+
+```json
+{
+  "mcpServers": {
+    "<name>": {
+      "cache": "string | number",
+      "toolsCache": {
+        "<tool>": "string | number"
+      }
+    }
+  }
+}
+```
+
+### REST Tool Cache Options
+
+```json
+{
+  "restTools": {
+    "<name>": {
+      "cache": "string | number"
+    }
+  }
+}
+```
+
+### Frontmatter Cache Option
+
+```yaml
+---
+cache: "string | number"
+---
+```
+
+### All Cache Properties
+
+| Location | Property | Type | Default | Description |
+|----------|----------|------|---------|-------------|
+| Global | `cache.backend` | `string` | `"sqlite"` | Backend type |
+| Global | `cache.sqlite.path` | `string` | `"~/.ai-agent/cache.db"` | SQLite path |
+| Global | `cache.redis.url` | `string` | - | Redis URL |
+| Global | `cache.maxEntries` | `number` | `5000` | Max entries |
+| Provider | `cacheStrategy` | `string` | `"full"` | Anthropic cache strategy |
+| MCP Server | `cache` | `string/number` | `"off"` | Server-wide TTL |
+| MCP Server | `toolsCache.<tool>` | `string/number` | Server default | Per-tool TTL |
+| REST Tool | `cache` | `string/number` | `"off"` | Tool TTL |
+| Frontmatter | `cache` | `string/number` | `"off"` | Agent response TTL |
+
+---
+
+## Debugging
+
+### Check Cache Database
 
 ```bash
-# View cache file
+# View tables
 sqlite3 ~/.ai-agent/cache.db ".tables"
+
+# Count entries
 sqlite3 ~/.ai-agent/cache.db "SELECT COUNT(*) FROM cache"
+
+# View recent entries
+sqlite3 ~/.ai-agent/cache.db "SELECT key, created_at FROM cache ORDER BY created_at DESC LIMIT 10"
 ```
 
 ### Disable Cache Temporarily
@@ -226,10 +442,30 @@ cache: off
 ---
 ```
 
-### Clear Cache
+Or clear environment:
 
 ```bash
 rm ~/.ai-agent/cache.db
+```
+
+### Verbose Cache Logging
+
+```bash
+ai-agent --agent test.ai --verbose "query"
+```
+
+Shows cache hit/miss decisions.
+
+### Force Cache Miss
+
+Modify the query slightly to generate a new cache key:
+
+```bash
+# Original
+ai-agent --agent test.ai "What is the weather?"
+
+# Force miss
+ai-agent --agent test.ai "What is the weather? (fresh)"
 ```
 
 ---
@@ -238,28 +474,46 @@ rm ~/.ai-agent/cache.db
 
 ### Do Cache
 
-- Static or slow-changing data (reference docs, config)
-- Expensive API calls (web search results)
-- Idempotent operations
+| Use Case | Suggested TTL |
+|----------|---------------|
+| Static reference data | `1d` - `1w` |
+| Documentation lookups | `1h` - `4h` |
+| API responses (stable) | `15m` - `1h` |
+| Search results | `1h` - `4h` |
+| Expensive computations | `1h` |
 
 ### Don't Cache
 
-- Real-time data (stock prices, live metrics)
-- User-specific responses
-- Operations with side effects
+| Use Case | Reason |
+|----------|--------|
+| Real-time data | Stale immediately |
+| User-specific responses | Wrong data for other users |
+| Operations with side effects | Cached response != action taken |
+| Security-sensitive queries | Cache may leak data |
 
 ### TTL Guidelines
 
-| Data Type | Suggested TTL |
-|-----------|---------------|
-| Static reference | 1d - 1w |
-| API responses | 15m - 1h |
-| Search results | 1h - 4h |
-| Real-time data | off |
+| Data Volatility | TTL |
+|-----------------|-----|
+| Static/immutable | `1w` or longer |
+| Daily updates | `1h` - `4h` |
+| Hourly updates | `15m` - `30m` |
+| Real-time | `off` |
+
+### Production Recommendations
+
+1. **Start conservative**: Use shorter TTLs initially
+2. **Monitor cache hit rates**: Increase TTLs for frequently hit entries
+3. **Set appropriate maxEntries**: Based on memory/disk constraints
+4. **Use Redis for multi-instance**: SQLite is single-process only
+5. **Clear cache on deployments**: Prevents stale responses after updates
 
 ---
 
 ## See Also
 
-- [Configuration](Configuration) - Overview
+- [Configuration](Configuration) - Configuration overview
 - [Pricing](Configuration-Pricing) - Cache cost implications
+- [Providers](Configuration-Providers) - Provider cache strategies
+- [MCP Servers](Configuration-MCP-Servers) - Server cache configuration
+- [REST Tools](Configuration-REST-Tools) - REST tool cache configuration

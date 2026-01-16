@@ -1,18 +1,40 @@
 # Code Style
 
-TypeScript and ESLint guidelines.
+TypeScript guidelines, naming conventions, and ESLint rules for AI Agent.
+
+---
+
+## Table of Contents
+
+- [Build Requirements](#build-requirements) - Commands that must pass before commit
+- [TypeScript Guidelines](#typescript-guidelines) - Strict mode, type preferences, type guards
+- [Naming Conventions](#naming-conventions) - Files, variables, types, constants
+- [Import Order](#import-order) - Required import organization
+- [ESLint Rules](#eslint-rules) - Key rules and how to disable when necessary
+- [Error Handling](#error-handling) - Mapping errors and applying defaults
+- [Functional Style](#functional-style) - Prefer functional, when loops are acceptable
+- [File Organization](#file-organization) - Keep files and functions small
+- [Comments](#comments) - Explain why, not what
+- [Before Commit Checklist](#before-commit-checklist) - Final verification steps
+- [See Also](#see-also) - Related documentation
 
 ---
 
 ## Build Requirements
 
+These commands must pass before every commit:
+
 ```bash
-# Build (required before commit)
+# Build (required)
 npm run build
 
 # Lint (zero warnings required)
 npm run lint
 ```
+
+**Build output**: TypeScript compiles to `dist/` with no errors.
+
+**Lint output**: Zero warnings, zero errors. Any warning fails the check.
 
 ---
 
@@ -21,27 +43,54 @@ npm run lint
 ### Strict Mode
 
 TypeScript strict mode is enabled. All code must:
-- Pass type checking
-- Have explicit types where needed
-- Avoid `any`
+- Pass type checking without errors
+- Have explicit types where inference is insufficient
+- Avoid `any` entirely
 
 ### Type Preferences
 
-| Prefer | Over |
-|--------|------|
-| `Record<string, unknown>` | `any` or index signatures |
-| `unknown` with type guards | `any` |
-| Precise types | Generic types |
-| Dot notation | Bracket notation |
+| Prefer | Over | Why |
+|--------|------|-----|
+| `Record<string, unknown>` | `any` or `{ [k: string]: unknown }` | Explicit generic object type |
+| `unknown` with type guards | `any` | Forces safe narrowing |
+| Precise types | Generic types | Better documentation and checking |
+| Dot notation | Bracket notation | Cleaner, lint-enforced |
 
 ### Type Guards
 
-Add small, reusable type guards:
+Add small, reusable type guards for narrowing `unknown` values:
 
 ```typescript
 private isPlainObject(val: unknown): val is Record<string, unknown> {
   return val !== null && typeof val === 'object' && !Array.isArray(val);
 }
+
+private isStringArray(val: unknown): val is string[] {
+  return Array.isArray(val) && val.every(item => typeof item === 'string');
+}
+```
+
+**Usage**:
+
+```typescript
+function processConfig(input: unknown): Config {
+  if (!isPlainObject(input)) {
+    throw new Error('Config must be an object');
+  }
+  // Now input is typed as Record<string, unknown>
+  const maxTurns = typeof input.maxTurns === 'number' ? input.maxTurns : 10;
+  return { maxTurns };
+}
+```
+
+### Avoid Unnecessary Assertions
+
+```typescript
+// Bad: Unnecessary assertion
+const value = result as string;  // ESLint: unnecessary type assertion
+
+// Good: Let TypeScript infer
+const value = result;  // If result is already string
 ```
 
 ---
@@ -52,12 +101,38 @@ private isPlainObject(val: unknown): val is Record<string, unknown> {
 |--------|------------|---------|
 | Files | kebab-case | `session-runner.ts` |
 | Variables | camelCase | `sessionConfig` |
+| Functions | camelCase | `processToolCall` |
 | Types/Interfaces | PascalCase | `AIAgentResult` |
-| Constants | SCREAMING_SNAKE | `MAX_RETRIES` |
+| Classes | PascalCase | `SessionRunner` |
+| Constants | SCREAMING_SNAKE_CASE | `MAX_RETRIES` |
+| Private members | camelCase (no underscore prefix) | `private config` |
+
+### Examples
+
+```typescript
+// File: tool-executor.ts
+
+const MAX_TOOL_TIMEOUT = 30000;
+
+interface ToolExecutorConfig {
+  timeout: number;
+  retries: number;
+}
+
+class ToolExecutor {
+  private config: ToolExecutorConfig;
+
+  executeToolCall(toolName: string): ToolResult {
+    // ...
+  }
+}
+```
 
 ---
 
 ## Import Order
+
+Imports must follow this order, with blank lines between groups:
 
 1. Node builtins
 2. External packages
@@ -67,16 +142,25 @@ private isPlainObject(val: unknown): val is Record<string, unknown> {
 6. Sibling imports
 7. Index imports
 
+### Example
+
 ```typescript
 import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
 import Ajv from 'ajv';
+import { z } from 'zod';
 
-import type { Configuration } from './types.js';
+import type { Configuration, ToolDefinition } from './types.js';
 
 import { Logger } from '../utils/logger.js';
+import { formatError } from '../utils/errors.js';
+
 import { parseConfig } from './config.js';
+import { validateSchema } from './validation.js';
 ```
+
+The linter enforces this order automatically.
 
 ---
 
@@ -84,22 +168,38 @@ import { parseConfig } from './config.js';
 
 ### Key Rules
 
-| Rule | Requirement |
-|------|-------------|
-| No unused vars | Remove or prefix with `_` |
-| No unused imports | Remove |
-| No `any` | Use precise types |
-| No loops (functional) | Prefer map/reduce/filter |
-| No duplicate strings | Extract constants |
+| Rule | Requirement | Fix |
+|------|-------------|-----|
+| No unused vars | Remove unused variables | Delete or prefix with `_` |
+| No unused imports | Remove unused imports | Delete the import |
+| No `any` | Use precise types | Use `unknown` with guards |
+| No loops (functional) | Prefer map/reduce/filter | Refactor or add disable comment |
+| No duplicate strings | Extract to constants | Create named constant |
+| Dot notation | Use `obj.key` not `obj['key']` | Use dot notation |
 
 ### Disabling Rules
 
-When necessary, disable narrowly:
+When a rule must be disabled, do it narrowly with a reason:
 
 ```typescript
-// eslint-disable-next-line functional/no-loop-statements
-for (const item of items) {
-  // Streaming logic where loop is clearer
+// Single line disable with reason
+// eslint-disable-next-line functional/no-loop-statements -- streaming requires iteration
+for await (const chunk of stream) {
+  yield chunk;
+}
+```
+
+**Never disable globally**. Target the specific line or block.
+
+### Unused Parameters
+
+If a parameter is required by an interface but unused, prefix with underscore:
+
+```typescript
+// Interface requires both parameters
+function handleEvent(event: Event, _context: Context): void {
+  // Only using event, context required by interface
+  console.log(event.type);
 }
 ```
 
@@ -109,61 +209,100 @@ for (const item of items) {
 
 ### Mapping External Errors
 
-```typescript
-// Good: Map to internal type
-const error: AgentError = {
-  code: 'PROVIDER_ERROR',
-  message: providerError.message,
-  details: { provider, model }
-};
+Map external errors to internal types without using `any`:
 
-// Bad: Pass any
-return { error: providerError as any };
+```typescript
+// Good: Map to internal type with explicit fields
+try {
+  await provider.complete(messages);
+} catch (err) {
+  const error: AgentError = {
+    code: 'PROVIDER_ERROR',
+    message: err instanceof Error ? err.message : 'Unknown error',
+    details: { provider: 'openai', model: 'gpt-4' }
+  };
+  throw error;
+}
+
+// Bad: Pass error as any
+catch (err) {
+  return { error: err as any };  // Never do this
+}
 ```
 
-### Defaults
+### Applying Defaults
 
-Apply defaults once when parsing:
+Apply defaults once during parsing, then treat as definite:
 
 ```typescript
 // Good: Default during parse, then definite
-const config: ResolvedConfig = {
-  maxTurns: input.maxTurns ?? 10,
-  maxRetries: input.maxRetries ?? 3
-};
+interface ResolvedConfig {
+  maxTurns: number;    // Not optional
+  maxRetries: number;  // Not optional
+}
+
+function resolveConfig(input: Partial<Config>): ResolvedConfig {
+  return {
+    maxTurns: input.maxTurns ?? 10,
+    maxRetries: input.maxRetries ?? 3
+  };
+}
+
+// Then use without checking
+const config = resolveConfig(userInput);
+if (turn > config.maxTurns) { ... }  // No ?? needed
 
 // Bad: Check everywhere
-if (config.maxTurns ?? 10 > ...
+if ((config.maxTurns ?? 10) > ...) { ... }  // Repetitive, error-prone
 ```
 
 ---
 
 ## Functional Style
 
-### Prefer Functional
+### Prefer Functional Methods
+
+Use `map`, `filter`, `reduce` instead of loops when natural:
 
 ```typescript
-// Good
-const results = items.map(process).filter(Boolean);
+// Good: Functional
+const results = items
+  .map(item => processItem(item))
+  .filter(result => result.valid);
 
-// Avoid unless clearer
+const total = values.reduce((sum, val) => sum + val, 0);
+
+// Avoid: Imperative
+const results = [];
 for (const item of items) {
-  results.push(process(item));
+  const result = processItem(item);
+  if (result.valid) {
+    results.push(result);
+  }
 }
 ```
 
-### When Loops Are OK
+### When Loops Are Acceptable
 
+Loops are acceptable for:
 - Streaming/iterative processing
 - Performance-critical paths
-- Complex control flow
+- Complex control flow (early exit, multiple conditions)
 
-Add disable comment with reason:
+Add a disable comment with reason:
 
 ```typescript
 // eslint-disable-next-line functional/no-loop-statements -- streaming requires iteration
 for await (const chunk of stream) {
   yield chunk;
+}
+
+// eslint-disable-next-line functional/no-loop-statements -- early exit on match
+for (const provider of providers) {
+  const result = await provider.tryConnect();
+  if (result.success) {
+    return result;
+  }
 }
 ```
 
@@ -173,47 +312,99 @@ for await (const chunk of stream) {
 
 ### Keep Files Small
 
-- One concern per file
-- Split large files into modules
-- Group related functionality
+- **One concern per file**: A file should have one primary purpose
+- **Target size**: 100-300 lines per file
+- **Split large files**: Extract modules when a file grows beyond 400 lines
 
 ### Keep Functions Small
 
-- One purpose per function
-- Extract complex logic
-- Name functions descriptively
+- **One purpose per function**: Each function does one thing
+- **Target size**: 20-50 lines per function
+- **Extract complex logic**: Named helper functions improve readability
+
+### Example Structure
+
+```
+src/
+  session/
+    session-runner.ts      # Main session loop
+    session-config.ts      # Configuration handling
+    session-state.ts       # State management
+  tools/
+    tool-executor.ts       # Tool execution
+    tool-validator.ts      # Tool validation
+    tool-types.ts          # Type definitions
+```
 
 ---
 
 ## Comments
 
-- Explain "why", not "what"
-- Keep professional and short
-- Don't add to unchanged code
+### Explain Why, Not What
 
 ```typescript
 // Good: Explains why
 // Skip validation for internal tools (already validated at registration)
+if (tool.internal) {
+  return tool;
+}
 
-// Bad: Explains what
+// Bad: Explains what (obvious from code)
 // Check if tool is internal
+if (tool.internal) {
+  return tool;
+}
+```
+
+### Comment Guidelines
+
+| Do | Do Not |
+|----|--------|
+| Explain non-obvious decisions | State what the code does |
+| Document edge cases | Add comments to unchanged code |
+| Note performance considerations | Use comments as code deodorant |
+| Reference related issues/specs | Write novels |
+
+### Examples
+
+```typescript
+// Good: Context for future readers
+// Retry with exponential backoff; max 3 attempts per provider rate limits
+await retry(operation, { maxAttempts: 3, backoff: 'exponential' });
+
+// Good: Warning about non-obvious behavior
+// Order matters: tools must be registered before agents to resolve references
+registerTools(config);
+registerAgents(config);
 ```
 
 ---
 
 ## Before Commit Checklist
 
-1. `npm run build` passes
-2. `npm run lint` passes with zero warnings
-3. No `any` types added
-4. Imports ordered correctly
-5. Unused code removed
-6. Comments explain "why"
+| Step | Check | Command |
+|------|-------|---------|
+| 1 | Build passes | `npm run build` |
+| 2 | Lint passes with zero warnings | `npm run lint` |
+| 3 | No `any` types added | Manual review |
+| 4 | Imports ordered correctly | Linter catches this |
+| 5 | Unused code removed | Linter catches this |
+| 6 | Comments explain "why" | Manual review |
+| 7 | Tests pass | `npm test` |
+
+### Quick Verification
+
+```bash
+npm run build && npm run lint && npm test
+```
+
+All three must pass before committing.
 
 ---
 
 ## See Also
 
-- [Contributing](Contributing) - Overview
-- [CLAUDE.md](../CLAUDE.md) - Full development instructions
-
+- [Contributing](Contributing) - Contribution overview and setup
+- [Testing Guide](Contributing-Testing) - Test phases and coverage
+- [Documentation Standards](Contributing-Documentation) - Documentation guidelines
+- [CLAUDE.md](https://github.com/netdata/ai-agent/blob/master/CLAUDE.md) - Full development instructions

@@ -1,51 +1,101 @@
 # User Contract
 
-End-user guarantees that MUST hold regardless of implementation.
+End-user guarantees that MUST hold regardless of implementation details. These are the promises ai-agent makes to its users.
 
 ---
 
-## Overview
+## Table of Contents
 
-This document defines the **end-user contract** for ai-agent: guarantees that MUST hold under ALL conditions. Every condition in specs maps to a contract-level guarantee here.
-
----
-
-## 1. Turn and Tool Limits
-
-### maxTurns
-
-- Application will **NEVER** exceed this number of turns
-- 1 turn = 1 LLM request/response + tool execution phase
-- Retries within same turn do NOT count toward limit
-- When limit reached without final_report → synthetic failure generated
-
-### maxToolCallsPerTurn
-
-- LLM cannot request more tools than this limit per turn
-- Excess tool calls are dropped (NOT executed)
-- LLM receives error message about excess
-
-### maxRetries
-
-- Maximum total LLM attempts per turn (initial + retries)
-- `maxRetries: 1` = 1 attempt (no retries)
-- `maxRetries: 3` = 3 attempts (initial + 2 retries)
-- Attempts cycle through all provider/model targets round-robin
+- [TL;DR](#tldr) - Quick summary of guaranteed behaviors
+- [Why This Matters](#why-this-matters) - What the contract means for you
+- [Turn and Tool Limits](#turn-and-tool-limits) - Guaranteed limit enforcement
+- [Context Window Management](#context-window-management) - Token handling guarantees
+- [Tool Response Handling](#tool-response-handling) - Tool output guarantees
+- [Output Guarantees](#output-guarantees) - Session always produces output
+- [Error Handling Contract](#error-handling-contract) - Error behavior guarantees
+- [Final Report Contract](#final-report-contract) - Completion guarantees
+- [Accounting Contract](#accounting-contract) - Cost tracking guarantees
+- [Conversation Contract](#conversation-contract) - Message ordering guarantees
+- [Configuration Contract](#configuration-contract) - Config loading guarantees
+- [Contract Violations](#contract-violations) - What counts as a bug
+- [See Also](#see-also) - Related documentation
 
 ---
 
-## 2. Context Window Management
+## TL;DR
 
-### Token Counters
+ai-agent guarantees: sessions never exceed `maxTurns`, context overflow is prevented before API errors, every session produces output (success or synthesized failure), and tool responses are handled consistently. These guarantees hold regardless of implementation changes.
 
-- `currentCtxTokens`: Committed to conversation
-- `pendingCtxTokens`: Pending commit (tool outputs, retry notices)
-- `schemaCtxTokens`: Tool schema overhead
-- `contextWindow`: Provider/model capacity
+---
+
+## Why This Matters
+
+The user contract defines what you can **rely on**:
+
+- **Building integrations**: Know exactly what outputs to expect
+- **Setting limits**: Trust that limits are enforced
+- **Error handling**: Understand error behavior patterns
+- **Cost control**: Rely on accounting records
+- **Debugging**: Know what's guaranteed vs. implementation detail
+
+**Contract vs. Implementation**:
+- **Contract**: "Session never exceeds maxTurns" - guaranteed
+- **Implementation**: "Retries use round-robin" - may change
+
+---
+
+## Turn and Tool Limits
+
+### maxTurns Contract
+
+| Guarantee | Details |
+|-----------|---------|
+| Session NEVER exceeds `maxTurns` | Absolute limit on LLM turns |
+| 1 turn = 1 LLM request/response + tool phase | Definition of a turn |
+| Retries don't count toward limit | Retries happen within a turn |
+| Max turns without final_report → synthetic failure | Always produces output |
+
+**Behavior**:
+```
+Turn 1: LLM → Tools → (retry if needed)
+Turn 2: LLM → Tools
+...
+Turn N (maxTurns): LLM → final_report ONLY
+```
+
+### maxToolCallsPerTurn Contract
+
+| Guarantee | Details |
+|-----------|---------|
+| Excess tool calls are dropped | Never executed |
+| LLM receives error about excess | Informed of limit |
+| Valid calls still executed | Up to limit |
+
+### maxRetries Contract
+
+| Guarantee | Details |
+|-----------|---------|
+| `maxRetries` = total attempts per turn | Initial + retries |
+| `maxRetries: 1` = 1 attempt | No retries |
+| `maxRetries: 3` = 3 attempts | 2 retries |
+| Attempts cycle through targets | Round-robin |
+
+---
+
+## Context Window Management
+
+### Token Counter Guarantees
+
+| Counter | Guarantee |
+|---------|-----------|
+| `currentCtxTokens` | Committed conversation tokens |
+| `pendingCtxTokens` | Uncommitted tokens (tool outputs, notices) |
+| `schemaCtxTokens` | Tool schema overhead |
+| `contextWindow` | Model capacity |
 
 ### LLM Request Metrics
 
-Every `LLM request prepared` log MUST satisfy:
+Every `LLM request prepared` log satisfies:
 ```
 expectedTokens = ctxTokens + pendingCtxTokens + schemaCtxTokens
 ```
@@ -57,78 +107,92 @@ projected = currentCtxTokens + pendingCtxTokens + newCtxTokens + schemaCtxTokens
 limit = contextWindow - contextWindowBufferTokens - maxOutputTokens
 ```
 
-### Enforcement
+### Enforcement Guarantees
 
-- When `projected > limit` → forced final turn
-- Tools restricted to `final_report` only
-- Session proceeds best-effort if still over after shrink
-
----
-
-## 3. Tool Response Handling
-
-### toolResponseMaxBytes
-
-- Responses exceeding size are **stored** on disk
-- Replaced with `tool_output` handle message
-- Handle includes: `handle`, `reason`, `bytes`, `lines`, `tokens`
-- Original preserved under `/tmp/ai-agent-<run-hash>/`
-
-### toolTimeout
-
-- Tool execution aborted after this duration
-- Timed-out tools marked `status: 'failed'`
-- LLM receives: `(tool failed: timeout)`
+| Condition | Guarantee |
+|-----------|-----------|
+| `projected > limit` | Forced final turn |
+| Forced final turn | Tools restricted to `final_report` |
+| Still over after shrink | Proceed best-effort (may fail at API) |
 
 ---
 
-## 4. Core Invariants
+## Tool Response Handling
+
+### toolResponseMaxBytes Contract
+
+| Guarantee | Details |
+|-----------|---------|
+| Responses exceeding size are stored | Written to disk |
+| Replaced with `tool_output` handle | LLM receives handle |
+| Handle includes metadata | `handle`, `reason`, `bytes`, `lines`, `tokens` |
+| Original preserved | Under `/tmp/ai-agent-<run-hash>/` |
+
+### toolTimeout Contract
+
+| Guarantee | Details |
+|-----------|---------|
+| Tool aborted after timeout | Execution stops |
+| Timed-out tools marked `failed` | Status recorded |
+| LLM receives failure message | `(tool failed: timeout)` |
+
+---
+
+## Output Guarantees
 
 ### Always Return Output
 
-**Application NEVER crashes without returning `AIAgentResult`**:
+**Guarantee**: ai-agent NEVER crashes without returning `AIAgentResult`.
 
-- Model-provided report: `success: true`, `finalReport` populated
-- Synthetic failure: `success: false`, `finalReport` with failure content
-- Fatal errors: `success: false`, `error` field populated
+| Scenario | Result |
+|----------|--------|
+| Model provides final_report | `success: true`, `finalReport` populated |
+| Max turns without final_report | `success: false`, synthetic failure report |
+| Fatal error | `success: false`, `error` field populated |
 
 ### CLI Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success or informational output |
-| 1 | Generic session failure |
-| 3 | Missing/failed MCP servers |
-| 4 | Invalid arguments or config |
-| 5 | Schema validation failures |
+| Code | Meaning | When |
+|------|---------|------|
+| 0 | Success | Session completed successfully |
+| 1 | Generic failure | Session failed |
+| 3 | MCP failure | Missing/failed MCP servers |
+| 4 | Invalid config | Invalid arguments or configuration |
+| 5 | Schema error | Schema validation failures |
 
-### Empty or Invalid Responses
+### Empty/Invalid Response Handling
 
 **Empty content without tool calls**:
-- If only reasoning → preserve reasoning, retry with guidance
-- If nothing → NOT added to conversation, synthetic retry
-- Counts as one attempt toward `maxRetries`
+
+| Condition | Behavior |
+|-----------|----------|
+| Only reasoning present | Preserve reasoning, retry with guidance |
+| Nothing present | NOT added to conversation, synthetic retry |
+| Counts as attempt | Toward `maxRetries` |
 
 **Invalid tool parameters**:
-- Malformed calls dropped
-- LLM receives validation error
-- Valid calls still executed
+
+| Condition | Behavior |
+|-----------|----------|
+| Malformed JSON | Call dropped |
+| Valid calls present | Still executed |
+| LLM receives error | Validation error message |
 
 ---
 
-## 5. Error Handling
+## Error Handling Contract
 
 ### Fatal Errors (No Retry)
 
-| Error | Behavior |
-|-------|----------|
+| Error | Guarantee |
+|-------|-----------|
 | Auth errors | Session fails immediately |
 | Quota exceeded | Session fails immediately |
 
 ### Retryable Errors
 
-| Error | Behavior |
-|-------|----------|
+| Error | Guarantee |
+|-------|-----------|
 | Rate limits | Honor Retry-After, exponential backoff |
 | Network/timeout | Retry with next target immediately |
 | Invalid responses | Synthetic retry with error message |
@@ -143,119 +207,169 @@ Attempt N: targets[(N-1) % targets.length]
 
 ---
 
-## 6. Final Report Contract
+## Final Report Contract
 
 ### Every Session Produces EITHER
 
 1. **Tool-provided**: LLM calls `final_report` successfully
-2. **Text extraction fallback**: Final turn text without `final_report`
-3. **Synthetic failure**: Max turns exhausted
+2. **Text extraction**: Final turn text without `final_report` call
+3. **Synthetic failure**: Max turns exhausted without valid report
 
 ### Final Report Structure
 
-**System-determined**:
-- `status`: `'success'` | `'failure'` (by source, not model)
-- `format`: Must match session expectation
-- `ts`: Timestamp
+**System-determined fields**:
 
-**Model-provided**:
-- `content_json`: For JSON format
-- `content`: For text formats
-- `metadata`: Optional
+| Field | Type | Guarantee |
+|-------|------|-----------|
+| `status` | `'success'` \| `'failure'` | Based on source, not model claim |
+| `format` | string | Matches session expectation |
+| `ts` | number | Unix timestamp |
 
----
+**Model-provided fields**:
 
-## 7. Accounting Contract
-
-### LLM Entries
-
-Every LLM request produces:
-- `type`: `'llm'`
-- `provider`, `model`
-- `status`: `'ok'` | `'failed'`
-- `latency`, `tokens`, `timestamp`
-- Tracing: `agentId`, `callPath`, `txnId`
-
-### Tool Entries
-
-Every tool execution produces:
-- `type`: `'tool'`
-- `mcpServer`, `command`
-- `status`: `'ok'` | `'failed'`
-- `latency`, `timestamp`
-- `charactersIn`, `charactersOut`
-
-### Guarantees
-
-- Provider fallback observable in accounting sequence
-- All tool executions appear (success or failure)
-- Timing available for performance analysis
+| Field | Type | When Present |
+|-------|------|--------------|
+| `content_json` | object | JSON format |
+| `content` | string | Text formats |
+| `metadata` | object | Optional |
 
 ---
 
-## 8. Conversation Contract
+## Accounting Contract
 
-### Message Order
+### LLM Entry Guarantees
+
+Every LLM request produces an accounting entry with:
+
+| Field | Guarantee |
+|-------|-----------|
+| `type` | `'llm'` |
+| `provider`, `model` | Actual provider/model used |
+| `status` | `'ok'` or `'failed'` |
+| `latency` | Request duration |
+| `tokens` | Token counts (if available) |
+| `timestamp` | When request was made |
+| `agentId`, `callPath`, `txnId` | Tracing context |
+
+### Tool Entry Guarantees
+
+Every tool execution produces an accounting entry with:
+
+| Field | Guarantee |
+|-------|-----------|
+| `type` | `'tool'` |
+| `mcpServer`, `command` | Tool identification |
+| `status` | `'ok'` or `'failed'` |
+| `latency` | Execution duration |
+| `timestamp` | When executed |
+| `charactersIn`, `charactersOut` | I/O sizes |
+
+### Observable Guarantees
+
+| Guarantee | Details |
+|-----------|---------|
+| Provider fallback visible | Sequence shows provider changes |
+| All tools recorded | Success and failure |
+| Timing available | Latency for all operations |
+
+---
+
+## Conversation Contract
+
+### Message Order Guarantees
 
 1. System messages (initial)
 2. User message (task prompt)
 3. Alternating: assistant → tool → assistant → tool
 4. Final: assistant with `final_report` or text
 
-### Tool Messages
+### Tool Message Formats
 
-- Successful: `role: 'tool'` with content
-- Failed: `(tool failed: <reason>)`
-- Dropped: `(tool failed: context window budget exceeded)`
+| Outcome | Message Format |
+|---------|----------------|
+| Success | `role: 'tool'` with content |
+| Failed | `(tool failed: <reason>)` |
+| Dropped (budget) | `(tool failed: context window budget exceeded)` |
 
 ---
 
-## 9. Configuration Loading
+## Configuration Contract
 
-### Layer Precedence (highest to lowest)
+### Layer Precedence (Highest to Lowest)
 
-1. `--config` explicit path
-2. Current working directory
-3. Prompt directory
-4. Binary directory
-5. `$HOME/.ai-agent/ai-agent.json`
-6. `/etc/ai-agent/ai-agent.json`
+| Priority | Source |
+|----------|--------|
+| 1 | `--config` explicit path |
+| 2 | Current working directory |
+| 3 | Prompt directory |
+| 4 | Binary directory |
+| 5 | `$HOME/.ai-agent/ai-agent.json` |
+| 6 | `/etc/ai-agent/ai-agent.json` |
 
 ### Placeholder Expansion
 
-- `${VARIABLE}` resolves from `.ai-agent.env` then `process.env`
-- Throws if unresolved (with layer origin)
-- Protected: `${parameters.foo}` in REST tools not expanded
+| Guarantee | Details |
+|-----------|---------|
+| `${VARIABLE}` resolved | From `.ai-agent.env` then `process.env` |
+| Unresolved throws | With layer origin information |
+| `${parameters.foo}` protected | Not expanded in REST tool URLs |
 
 ---
 
-## 10. Contract Violations
+## Contract Violations
 
-Any deviation is a **critical bug**.
+**Any deviation from these contracts is a critical bug.**
 
 ### Examples of Violations
 
 | Violation | Description |
 |-----------|-------------|
 | Turn limit exceeded | 4 assistant messages when `maxTurns: 3` |
-| Context window exceeded | Provider rejects due to overflow |
+| Context overflow | Provider rejects due to context overflow |
 | Missing final report | `success: true` but `finalReport` undefined |
 | Wrong exit code | CLI exits 0 when `success: false` |
 | Config ignored | `temperature: 0.5` but provider receives 1.0 |
+| Accounting missing | LLM request without accounting entry |
 
 ### Non-Violations (Implementation Details)
 
+These may change without notice:
+
 | Allowed Change | Description |
 |----------------|-------------|
-| Log message wording | Internal logs can change |
-| State refactoring | Internal state can change |
-| Estimation improvement | Token estimation can improve |
+| Log message wording | Internal log text |
+| Internal state names | State refactoring |
+| Estimation algorithms | Token counting improvements |
+| Retry timing | Backoff adjustments |
+
+---
+
+## Testing Contract Compliance
+
+### Verification Approach
+
+For each contract guarantee:
+
+1. **Unit test**: Verify specific behavior
+2. **Integration test**: End-to-end scenario
+3. **Chaos test**: Behavior under failures
+
+### Key Test Scenarios
+
+| Scenario | Contract Tested |
+|----------|-----------------|
+| Run to maxTurns | Turn limit enforcement |
+| Large context | Context guard trigger |
+| Large tool output | Size limit handling |
+| Provider failure | Retry and cycling |
+| All providers fail | Error handling |
 
 ---
 
 ## See Also
 
 - [Architecture](Technical-Specs-Architecture) - System architecture
-- [Session Lifecycle](Technical-Specs-Session-Lifecycle) - Session flow
-- [docs/CONTRACT.md](../docs/CONTRACT.md) - Full contract
-
+- [Session Lifecycle](Technical-Specs-Session-Lifecycle) - Session execution flow
+- [Retry Strategy](Technical-Specs-Retry-Strategy) - Error handling details
+- [Context Management](Technical-Specs-Context-Management) - Token budget details
+- [specs/CONTRACT.md](specs/CONTRACT.md) - Full contract specification

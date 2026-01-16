@@ -1,43 +1,110 @@
-# Configuration Loading
+# Configuration Files
 
-How AI Agent finds and merges configuration files.
+How AI Agent finds, loads, and merges configuration files.
+
+---
+
+## Table of Contents
+
+- [Overview](#overview) - Configuration file concepts
+- [Resolution Order](#resolution-order) - Where config files are searched
+- [Environment Files](#environment-files) - Sidecar .env file loading
+- [Variable Expansion](#variable-expansion) - Placeholder substitution
+- [Configuration Layers](#configuration-layers) - Merging multiple sources
+- [Provider Configuration Merging](#provider-configuration-merging) - Per-model overrides
+- [Validating Configuration](#validating-configuration) - Debug and verify
+- [Multiple Config Files](#multiple-config-files) - Environment-specific configs
+- [Security Considerations](#security-considerations) - Protecting secrets
+- [Troubleshooting](#troubleshooting) - Common issues and solutions
+- [See Also](#see-also) - Related documentation
+
+---
+
+## Overview
+
+AI Agent uses a layered configuration system:
+
+- **Multiple config files** can exist at different locations
+- Files are **discovered in priority order** (first found wins for most settings)
+- **Environment variables** are expanded using layer-specific `.env` files
+- **Validation** ensures all required values are present before execution
 
 ---
 
 ## Resolution Order
 
-Configuration is searched in order (first found wins):
+Configuration files are searched in this order:
 
-1. `--config <path>` CLI option
-2. `.ai-agent.json` in current directory
-3. `.ai-agent.json` in agent file's directory (for frontmatter agents)
-4. `~/.ai-agent.json` in home directory
-5. `/etc/ai-agent/.ai-agent.json` system-wide
+| Priority | Location | Description |
+|----------|----------|-------------|
+| 1 | `--config <path>` | Explicit CLI option |
+| 2 | `./.ai-agent.json` | Current working directory |
+| 3 | `<agent-dir>/.ai-agent.json` | Agent file's directory |
+| 4 | `<binary-dir>/.ai-agent.json` | Directory containing ai-agent executable |
+| 5 | `~/.ai-agent.json` | Home directory |
+| 6 | `/etc/ai-agent/ai-agent.json` | System-wide |
 
-If no configuration is found, the program fails with an error.
+### Resolution Behavior
+
+- **First found wins** for most settings
+- **On-demand resolution**: Only providers/tools actually used are resolved
+- **Missing files**: Silently skipped (all layers are optional)
+- **No config found**: Fails with `Configuration file not found` error
+
+### Example
+
+```bash
+# Uses config from current directory
+ai-agent --agent ./myagent.ai "hello"
+
+# Explicit config path
+ai-agent --config ./production.json --agent ./myagent.ai "hello"
+
+# Uses config from agent's directory (if different from cwd)
+ai-agent --agent /path/to/agents/myagent.ai "hello"
+```
 
 ---
 
-## Environment File
+## Environment Files
 
-Environment variables are loaded from `.ai-agent.env` sidecar file:
+Environment variables are loaded from `.ai-agent.env` sidecar files.
 
-1. `.ai-agent.env` in same directory as config
-2. `.ai-agent.env` in current directory
+### Resolution
 
-Format:
+1. `.ai-agent.env` in the same directory as the config file
+2. `.ai-agent.env` in the current working directory
+
+### Format
+
 ```bash
-# Comments supported
-OPENAI_API_KEY=sk-...
+# Comments are supported
+OPENAI_API_KEY=sk-proj-...
 ANTHROPIC_API_KEY=sk-ant-...
-BRAVE_API_KEY=...
+BRAVE_API_KEY=BSA...
+
+# export prefix is allowed
+export GITHUB_TOKEN=ghp_...
+
+# Quoted values are supported
+DATABASE_URL="postgres://user:pass@host/db"
 ```
+
+### Scoping
+
+Each config layer has its own environment scope:
+
+- Variables from a layer's `.env` file are used **only** for that layer's placeholder expansion
+- Process environment (`process.env`) is checked after layer-specific variables
+- This prevents secrets from leaking across unrelated projects
 
 ---
 
 ## Variable Expansion
 
-All string values support `${VAR}` expansion:
+All string values in configuration support `${VAR}` expansion.
+
+### Basic Substitution
 
 ```json
 {
@@ -51,13 +118,15 @@ All string values support `${VAR}` expansion:
 
 ### Default Values
 
-Use `:-` for defaults:
+Use `:-` for fallback defaults:
 
 ```json
 {
   "baseUrl": "${OPENAI_BASE_URL:-https://api.openai.com/v1}"
 }
 ```
+
+If `OPENAI_BASE_URL` is unset or empty, uses the default value.
 
 ### Home Directory
 
@@ -71,22 +140,43 @@ Use `:-` for defaults:
 }
 ```
 
+### Special Handling
+
+These values are **NOT** expanded at config load time:
+
+| Field | Reason |
+|-------|--------|
+| `mcpServers.*.env` | Passed to child processes for runtime resolution |
+| `mcpServers.*.headers` | May contain secrets resolved at spawn time |
+| `restTools.*.bodyTemplate` | `${parameters.foo}` tokens for request templating |
+| `restTools.*.url` | `${parameters.foo}` tokens for URL templating |
+
+### MCP_ROOT Handling
+
+When `${MCP_ROOT}` resolves to blank, AI Agent falls back to `process.cwd()` and logs a verbose notice. This ensures stdio servers always have a working directory.
+
 ---
 
 ## Configuration Layers
 
-Settings are merged from multiple sources:
+Settings are merged from multiple sources with clear priority.
 
 ### Priority (highest to lowest)
 
-1. **CLI options**: `--temperature 0.2`
-2. **Per-agent frontmatter**: `temperature: 0.3`
-3. **Config file defaults**: `defaults.temperature: 0.7`
-4. **Built-in defaults**: hardcoded fallbacks
+| Priority | Source | Example |
+|----------|--------|---------|
+| 1 | CLI options | `--temperature 0.2` |
+| 2 | Per-agent frontmatter | `temperature: 0.3` in `.ai` file |
+| 3 | Config file defaults | `defaults.temperature: 0.7` |
+| 4 | Built-in defaults | Hardcoded fallbacks |
+
+### Merge Behavior
+
+For most settings, **first defined wins** (higher priority overrides lower).
 
 ### Example
 
-Config file:
+**Config file** (`~/.ai-agent.json`):
 ```json
 {
   "defaults": {
@@ -96,19 +186,19 @@ Config file:
 }
 ```
 
-Agent frontmatter:
+**Agent frontmatter** (`myagent.ai`):
 ```yaml
 ---
 temperature: 0.3
 ---
 ```
 
-CLI:
+**CLI**:
 ```bash
-ai-agent --agent test.ai --temperature 0.2
+ai-agent --agent myagent.ai --temperature 0.2
 ```
 
-Result: `temperature = 0.2` (CLI wins)
+**Result**: `temperature = 0.2` (CLI wins), `maxTurns = 10` (config default)
 
 ---
 
@@ -141,11 +231,19 @@ Provider settings can be overridden per-model:
 
 ### Merge Strategy
 
-Default merge is `overlay` (model settings extend provider settings).
+Default merge is **overlay** (model settings extend provider settings):
 
-Options:
-- `overlay` (default): Model settings add to/override provider settings
-- `replace`: Model settings completely replace provider settings
+| Strategy | Behavior |
+|----------|----------|
+| `overlay` (default) | Model settings add to/override provider settings |
+| `replace` | Model settings completely replace provider settings |
+
+### Resolution Order
+
+For model-specific settings:
+1. `models.<model>.<setting>` (model-specific)
+2. `<setting>` at provider level
+3. Built-in default
 
 ---
 
@@ -153,50 +251,89 @@ Options:
 
 ### Dry Run
 
+Validate configuration without calling the LLM:
+
 ```bash
 ai-agent --agent test.ai --dry-run
 ```
 
-Validates config without calling LLM.
+**Shows**:
+- Configuration resolution
+- Provider validation
+- MCP server discovery
+- Tool availability
 
 ### Verbose Mode
+
+See detailed configuration resolution:
 
 ```bash
 ai-agent --agent test.ai --verbose
 ```
 
-Shows configuration resolution in logs.
+**Shows**:
+- Which config files were loaded
+- Environment variable sources
+- Placeholder expansion results
+- Queue bindings
+
+### Validation Checks
+
+AI Agent validates:
+
+| Check | Error on Failure |
+|-------|------------------|
+| JSON syntax | `Invalid JSON in config file` |
+| Unresolved placeholders | `MissingVariableError: provider 'X' at Y` |
+| Unknown queues | `Unknown queue 'X'` |
+| Missing required fields | `Provider 'X' missing 'apiKey'` |
 
 ---
 
 ## Multiple Config Files
 
-For different environments:
+Use different configs for different environments:
 
 ```
 project/
 ├── .ai-agent.json          # Development
 ├── .ai-agent.prod.json     # Production
-└── .ai-agent.test.json     # Testing
+├── .ai-agent.test.json     # Testing
+├── .ai-agent.env           # Development secrets
+├── .ai-agent.prod.env      # Production secrets
+└── agents/
+    └── myagent.ai
 ```
 
-Use:
+### Usage
+
 ```bash
-ai-agent --config .ai-agent.prod.json --agent myagent.ai
+# Development (uses .ai-agent.json)
+ai-agent --agent agents/myagent.ai "query"
+
+# Production
+ai-agent --config .ai-agent.prod.json --agent agents/myagent.ai "query"
+
+# Testing
+ai-agent --config .ai-agent.test.json --agent agents/myagent.ai "query"
 ```
 
 ---
 
 ## Security Considerations
 
-### Do NOT commit secrets
+### Do NOT Commit Secrets
 
 Add to `.gitignore`:
-```
+
+```gitignore
 .ai-agent.env
+.ai-agent.*.env
 ```
 
-### Use environment variables
+### Use Environment Variables
+
+Store secrets in environment, not config files:
 
 ```json
 {
@@ -208,11 +345,25 @@ Add to `.gitignore`:
 }
 ```
 
-### Restrict file permissions
+### Restrict File Permissions
 
 ```bash
+# Secrets file - owner read/write only
 chmod 600 .ai-agent.env
+
+# Config file - owner read/write, group/others read
 chmod 644 .ai-agent.json
+```
+
+### CI/CD Secrets
+
+In CI/CD pipelines, inject secrets as environment variables:
+
+```yaml
+# GitHub Actions example
+env:
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
 ---
@@ -225,10 +376,15 @@ chmod 644 .ai-agent.json
 Error: Configuration file not found
 ```
 
-Check:
-1. File exists in expected location
-2. File is valid JSON
-3. File permissions allow reading
+**Causes**:
+- No `.ai-agent.json` in any expected location
+- File permissions prevent reading
+- Typo in filename
+
+**Solutions**:
+1. Create `.ai-agent.json` in current directory
+2. Use `--config <path>` to specify exact location
+3. Check file permissions: `ls -la .ai-agent.json`
 
 ### Variable not expanded
 
@@ -236,14 +392,75 @@ Check:
 Error: API key invalid: ${OPENAI_API_KEY}
 ```
 
-Check:
-1. Environment variable is set
-2. `.ai-agent.env` is in correct location
-3. Variable name matches exactly
+**Causes**:
+- Environment variable not set
+- `.ai-agent.env` not in correct location
+- Typo in variable name
+
+**Solutions**:
+1. Set variable: `export OPENAI_API_KEY=sk-...`
+2. Check `.ai-agent.env` location (same directory as config)
+3. Verify variable name matches exactly (case-sensitive)
+
+### MissingVariableError
+
+```
+MissingVariableError: provider 'openai' at home: OPENAI_API_KEY
+```
+
+**Meaning**: Variable `OPENAI_API_KEY` is missing in the config from `~/.ai-agent.json`.
+
+**Solutions**:
+1. Add to `~/.ai-agent.env`: `OPENAI_API_KEY=sk-...`
+2. Export in shell: `export OPENAI_API_KEY=sk-...`
+3. Use default syntax: `${OPENAI_API_KEY:-sk-default}`
+
+### Unknown queue error
+
+```
+Unknown queue 'playwright'
+```
+
+**Causes**:
+- MCP server or REST tool references undefined queue
+- Typo in queue name
+
+**Solutions**:
+1. Define the queue in config:
+```json
+{
+  "queues": {
+    "playwright": { "concurrent": 4 }
+  }
+}
+```
+2. Change tool to use `"queue": "default"`
+
+### Provider missing type warning
+
+```
+Warning: Provider 'custom' missing 'type' field
+```
+
+**Cause**: Legacy config omitted the `type` field.
+
+**Solution**: Add explicit type:
+```json
+{
+  "providers": {
+    "custom": {
+      "type": "openai-compatible",
+      "apiKey": "..."
+    }
+  }
+}
+```
 
 ---
 
 ## See Also
 
-- [Configuration](Configuration) - Overview
-- [docs/specs/configuration-loading.md](../docs/specs/configuration-loading.md) - Technical spec
+- [Configuration](Configuration) - Configuration overview
+- [LLM Providers](Configuration-Providers) - Provider setup
+- [Parameters Reference](Configuration-Parameters) - All configuration keys
+- [specs/configuration-loading.md](specs/configuration-loading.md) - Technical specification
