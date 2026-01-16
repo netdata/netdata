@@ -85,6 +85,8 @@ Current time: 2025-08-31T14:30:00+03:00
 
 **Notes**:
 
+- These variables are **only available in CLI inline prompt mode** (`ai-agent "sys" "user"`)
+- They are **not injected when running `.ai` files via headends** or the agent registry
 - `OS` attempts to read `/etc/os-release` on Linux for a friendly name
 - `USER` falls back to `USER` or `USERNAME` environment variables if `os.userInfo()` fails
 
@@ -108,15 +110,15 @@ Current time: 2025-08-31T14:30:00+03:00
 
 **FORMAT values by context**:
 
-| Context          | `${FORMAT}` expands to                                                                                   |
-| ---------------- | -------------------------------------------------------------------------------------------------------- |
-| Terminal (TTY)   | `a TTY-compatible plain monospaced text response. Use literal "\x1b[...m" sequences for ANSI colours...` |
-| Piped output     | `Plain text without any formatting or markdown. Do not wrap long lines.`                                 |
-| JSON expected    | `json`                                                                                                   |
-| Slack headend    | `Slack Block Kit JSON array of messages (not raw text or GitHub markdown)...`                            |
-| Markdown         | `GitHub Markdown`                                                                                        |
-| Markdown+Mermaid | `GiHub Markdown with Mermaid diagrams`                                                                   |
-| Sub-agent        | `Internal agent-to-agent exchange format (not user-facing).`                                             |
+| Context          | `${FORMAT}` expands to                                                                                    |
+| ---------------- | --------------------------------------------------------------------------------------------------------- |
+| Terminal (TTY)   | `a TTY-compatible plain monospaced text response. Use literal "\\x1b[...m" sequences for ANSI colours...` |
+| Piped output     | `Plain text without any formatting or markdown. Do not wrap long lines.`                                  |
+| JSON expected    | `json`                                                                                                    |
+| Slack headend    | `Slack Block Kit JSON array of messages (not raw text or GitHub markdown)`                                |
+| Markdown         | `GitHub Markdown`                                                                                         |
+| Markdown+Mermaid | `GiHub Markdown with Mermaid diagrams`                                                                    |
+| Sub-agent        | `Internal agent-to-agent exchange format (not user-facing).`                                              |
 
 **Important**: Always include `${FORMAT}` in your prompts to ensure consistent output across all invocation contexts.
 
@@ -174,6 +176,8 @@ Do not assume sudo access unless the user confirms.
 
 Respond in ${FORMAT}.
 ```
+
+**Note**: `${OS}`, `${ARCH}`, `${KERNEL}`, `${HOSTNAME}`, `${CD}`, and `${USER}` variables are **only available when running via CLI inline mode** (`ai-agent "sys" "user"`). They are not available when running `.ai` files via headends.
 
 ### Self-Limiting Agent
 
@@ -387,13 +391,13 @@ The available variables are a fixed set (listed above). If you need environment 
 
 ### Getting current values for debugging
 
-Run with `--dry-run` to see the resolved prompt:
+Use `--verbose` and `--trace-llm` flags to see variable expansion in action:
 
 ```bash
-ai-agent --agent my-agent.ai --dry-run "test"
+ai-agent --agent my-agent.ai --verbose --trace-llm "test"
 ```
 
-This shows the fully resolved system prompt with all variables substituted.
+This shows verbose logs including the expanded system prompt sent to the LLM.
 
 ### FORMAT not working as expected
 
@@ -456,8 +460,9 @@ If the task benefits from time/environment awareness, include them:
 
 ```markdown
 Current time: ${DATETIME}
-Working directory: ${CD}
 ```
+
+**Note**: Time variables (`${DATETIME}`, `${TIMESTAMP}`, `${DAY}`, `${TIMEZONE}`) are available in all contexts. System variables (`${OS}`, `${ARCH}`, `${KERNEL}`, `${HOSTNAME}`, `${CD}`, `${USER}`) are **only available in CLI inline mode**.
 
 ### 3. Help Agents Self-Limit
 

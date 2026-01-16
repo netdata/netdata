@@ -21,7 +21,7 @@ Get ai-agent installed and running your first agent in minutes.
 
 This chapter covers everything you need to start using ai-agent:
 
-- **Install ai-agent** on your system (multiple methods)
+- **Install ai-agent** on your system
 - **Configure** LLM providers (OpenAI, Anthropic, etc.)
 - **Create and run** your first agent
 - **Build a practical agent** with tools
@@ -36,7 +36,6 @@ This chapter covers everything you need to start using ai-agent:
 | **Node.js** | 20+                         | 22 LTS         |
 | **npm**     | 10+                         | Latest         |
 | **OS**      | Linux, macOS, Windows (WSL) | Linux or macOS |
-| **Memory**  | 512 MB                      | 1 GB+          |
 
 > **Note:** Windows native support works but WSL is recommended for better compatibility with MCP servers.
 
@@ -44,13 +43,7 @@ This chapter covers everything you need to start using ai-agent:
 
 ## Quick Install
 
-**Option A: Global installation (simplest)**
-
-```bash
-npm install -g @netdata/ai-agent
-```
-
-**Option B: From source (for development)**
+Install from source:
 
 ```bash
 git clone https://github.com/netdata/ai-agent.git
@@ -60,7 +53,7 @@ npm run build
 npm link
 ```
 
-For detailed installation options including local project installation, see [Installation](Getting-Started-Installation).
+For detailed installation options, see [Installation](Getting-Started-Installation).
 
 ---
 
@@ -76,7 +69,7 @@ ai-agent --version
 **Expected output:**
 
 ```
-ai-agent v0.0.0.698
+0.0.0.701
 ```
 
 ```bash
@@ -86,20 +79,7 @@ ai-agent --help
 
 **Expected output:**
 
-```
-Usage: ai-agent [options] <system-prompt> <user-prompt>
-
-AI Agent - Run intelligent agents powered by LLMs
-
-Options:
-  --agent <path>          Agent definition file (.ai)
-  --config               Configuration file path
-  --dry-run              Validate without calling LLM
-  --verbose              Enable verbose logging
-  -V, --version         Show version number
-  -h, --help             Show this help message
-  ...
-```
+Shows version, usage, and all available options. Run `ai-agent --help` to see complete help documentation.
 
 ---
 

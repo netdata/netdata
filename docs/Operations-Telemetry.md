@@ -58,9 +58,10 @@ AI_TELEMETRY_DISABLE=true ai-agent --agent test.ai "query"
 
 ```bash
 ai-agent --agent test.ai \
+  --telemetry-enabled \
+  --telemetry-prometheus-enabled \
   --telemetry-prometheus-host 0.0.0.0 \
-  --telemetry-prometheus-port 9464 \
-  --api 8080
+  --telemetry-prometheus-port 9464
 ```
 
 Access metrics:
@@ -101,14 +102,14 @@ curl http://localhost:9464/metrics
 
 ### Queue Metrics
 
-| Metric                            | Type      | Description                            |
-| --------------------------------- | --------- | -------------------------------------- |
-| `ai_agent_queue_depth`            | Gauge     | Current queue depth (in-use + waiting) |
-| `ai_agent_queue_in_use`           | Gauge     | Currently executing slots              |
-| `ai_agent_queue_last_wait_ms`     | Gauge     | Most recent wait time                  |
-| `ai_agent_queue_wait_duration_ms` | Histogram | Queue wait time distribution           |
+| Metric                            | Type      | Description                                                                      |
+| --------------------------------- | --------- | -------------------------------------------------------------------------------- |
+| `ai_agent_queue_depth`            | Gauge     | Number of queued tool executions awaiting a slot                                 |
+| `ai_agent_queue_in_use`           | Gauge     | Number of active tool executions consuming queue capacity                        |
+| `ai_agent_queue_last_wait_ms`     | Gauge     | Most recent observed wait duration per queue (milliseconds)                      |
+| `ai_agent_queue_wait_duration_ms` | Histogram | Latency between enqueue and start time for queued tool executions (milliseconds) |
 
-**Labels**: `queue`
+**Labels**: `queue`, `capacity`
 
 ### Context Guard Metrics
 
@@ -131,10 +132,9 @@ curl http://localhost:9464/metrics
 
 ### Retry Metrics
 
-| Metric                           | Type    | Description              |
-| -------------------------------- | ------- | ------------------------ |
-| `ai_agent_retry_collapse_total`  | Counter | maxTurns collapse events |
-| `ai_agent_retry_exhausted_total` | Counter | All retries exhausted    |
+| Metric                          | Type    | Description              |
+| ------------------------------- | ------- | ------------------------ |
+| `ai_agent_retry_collapse_total` | Counter | maxTurns collapse events |
 
 ---
 
@@ -168,15 +168,24 @@ Session (root span)
 
 ### Trace Attributes
 
-| Attribute             | Description            |
-| --------------------- | ---------------------- |
-| `ai_agent.session_id` | Session transaction ID |
-| `ai_agent.agent_id`   | Agent name             |
-| `ai_agent.agent_path` | Agent file path        |
-| `ai_agent.provider`   | LLM provider           |
-| `ai_agent.model`      | Model name             |
-| `ai_agent.turn`       | Turn number            |
-| `ai_agent.call_path`  | Hierarchical call path |
+| Attribute                   | Description            |
+| --------------------------- | ---------------------- |
+| `ai.session.run_id`         | Session run ID         |
+| `ai.session.source`         | Session source         |
+| `ai.session.headend_id`     | Headend identifier     |
+| `ai.session.thread_id`      | Thread/conversation ID |
+| `ai.llm.provider`           | LLM provider           |
+| `ai.llm.model`              | Model name             |
+| `ai.llm.is_final_turn`      | Whether turn is final  |
+| `ai.llm.status`             | LLM request status     |
+| `ai.llm.latency_ms`         | Request latency (ms)   |
+| `ai.llm.prompt_tokens`      | Input token count      |
+| `ai.llm.completion_tokens`  | Output token count     |
+| `ai.llm.cache_read_tokens`  | Cached input tokens    |
+| `ai.llm.cache_write_tokens` | Cached output tokens   |
+| `ai.llm.reasoning.level`    | Reasoning mode         |
+| `ai.context.trigger`        | Context guard trigger  |
+| `ai.context.outcome`        | Context guard outcome  |
 
 ### Sampling
 
@@ -408,16 +417,17 @@ groups:
           description: "Error rate is {{ $value | humanize }} per second"
 ```
 
-### Queue Saturation
+### Queue Depth Alert
 
 ```yaml
-- alert: QueueSaturation
-  expr: ai_agent_queue_depth > 0.8 * ai_agent_queue_capacity
+- alert: HighQueueDepth
+  expr: ai_agent_queue_depth{queue="default"} > 10
   for: 2m
   labels:
     severity: warning
   annotations:
-    summary: AI Agent queue near capacity
+    summary: AI Agent queue depth high
+    description: "Queue depth: {{ $value }}"
 ```
 
 ### High Latency

@@ -42,7 +42,7 @@ npm run lint
 
 ### Strict Mode
 
-TypeScript strict mode is enabled. All code must:
+TypeScript strict mode is enabled (target: ES2023). All code must:
 
 - Pass type checking without errors
 - Have explicit types where inference is insufficient
@@ -315,13 +315,11 @@ for (const provider of providers) {
 ### Keep Files Small
 
 - **One concern per file**: A file should have one primary purpose
-- **Target size**: 100-300 lines per file
-- **Split large files**: Extract modules when a file grows beyond 400 lines
+- Split large files by extracting modules as they grow
 
 ### Keep Functions Small
 
 - **One purpose per function**: Each function does one thing
-- **Target size**: 20-50 lines per function
 - **Extract complex logic**: Named helper functions improve readability
 
 ### Example Structure

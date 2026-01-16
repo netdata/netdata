@@ -30,66 +30,48 @@ This is non-negotiable. Documentation and code must stay synchronized.
 
 ### Source of Truth by Audience
 
-| Document | Purpose | Primary Audience |
-|----------|---------|------------------|
-| `docs/skills/ai-agent-configuration.md` | AI assistants creating agents | AI/LLMs |
-| `docs/specs/*.md` | Technical specifications | Contributors |
-| `docs/specs/CONTRACT.md` | User-facing guarantees | Operators |
-| Wiki pages (`docs/*.md`) | User documentation | End users |
+| Document                                | Purpose                       | Primary Audience |
+| --------------------------------------- | ----------------------------- | ---------------- |
+| `docs/skills/ai-agent-configuration.md` | AI assistants creating agents | AI/LLMs          |
+| `docs/specs/*.md`                       | Technical specifications      | Contributors     |
+| `docs/specs/CONTRACT.md`                | User-facing guarantees        | Operators        |
+| Wiki pages (`docs/*.md`)                | User documentation            | End users        |
 
 ### When to Update Each
 
-| Change Type | Update These |
-|-------------|--------------|
-| New configuration option | Spec file, ai-agent-configuration.md, wiki page |
-| Behavior change | Spec file, CONTRACT.md if affects guarantees |
-| New feature | Spec file, ai-agent-configuration.md, wiki page |
-| Bug fix changing behavior | Spec file, wiki if user-visible |
+| Change Type               | Update These                                    |
+| ------------------------- | ----------------------------------------------- |
+| New configuration option  | Spec file, ai-agent-configuration.md, wiki page |
+| Behavior change           | Spec file, CONTRACT.md if affects guarantees    |
+| New feature               | Spec file, ai-agent-configuration.md, wiki page |
+| Bug fix changing behavior | Spec file, wiki if user-visible                 |
 
 ---
 
 ## Spec Document Structure
 
-Each technical specification follows this template:
+Each technical specification follows this flexible structure (not all sections required):
 
 ```markdown
 # Feature Name
 
 ## TL;DR
+
 One-line description of what this feature does.
 
 ## Source Files
+
 - `src/file.ts:100-150` - Main implementation
 - `src/other.ts:50-75` - Supporting logic
 
-## Behaviors
-Exhaustive list of behaviors with conditions:
-- When X, the system does Y
-- If A is not provided, default to B
+## [Feature-Specific Sections]
 
-## Configuration
-Settings that affect this feature:
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `optionName` | string | `"default"` | What it controls |
+Specs include relevant sections based on the feature:
 
-## Telemetry
-Metrics and traces emitted by this feature.
-
-## Logging
-Log entries produced with levels and conditions.
-
-## Events
-Events emitted or consumed.
-
-## Test Coverage
-- `src/tests/unit/feature.spec.ts` - Unit tests
-- Phase 2 scenarios: `scenario-name`
-
-## Invariants
-Conditions that must always hold:
-- Invariant 1
-- Invariant 2
+- Data Structures
+- Algorithm/Flow descriptions
+- Error classifications
+- Input/output schemas
 ```
 
 ### Code References
@@ -131,10 +113,10 @@ Detailed description of the section scope and purpose.
 
 ## Topics
 
-| Document | Description |
-|----------|-------------|
-| [Page Name](Page-Link) | Brief description of page content |
-| [Another Page](Another-Link) | Brief description |
+| Document                     | Description                       |
+| ---------------------------- | --------------------------------- |
+| [Page Name](Page-Link)       | Brief description of page content |
+| [Another Page](Another-Link) | Brief description                 |
 
 ---
 
@@ -144,78 +126,18 @@ Detailed description of the section scope and purpose.
 - [Another Section](Link) - How it relates
 ```
 
-### Content Pages (Type B-E)
-
-```markdown
-# Feature Name
-
-Brief description of the feature.
-
 ---
 
-## Table of Contents
+## Test Coverage
 
-- [TL;DR](#tldr) - Quick summary
-- [Configuration](#configuration) - How to configure
-- [Usage](#usage) - How to use
-- [Examples](#examples) - Working examples
-- [See Also](#see-also) - Related pages
+Test files follow these patterns:
 
----
+- Unit tests: `src/tests/unit/<feature>.spec.ts`
+- Phase 2 scenarios: `src/tests/phase2/phase2-suite.spec.ts`
+- Phase 3 integration: `src/tests/phase3/phase3-suite.spec.ts`
+- Other test files: `src/tests/<feature>.spec.ts`
 
-## TL;DR
-
-One or two sentences explaining the feature for someone in a hurry.
-
----
-
-## Configuration
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `option1` | string | Required | What it does |
-| `option2` | number | `10` | What it controls |
-
----
-
-## Usage
-
-Step-by-step instructions for using the feature.
-
----
-
-## Examples
-
-### Basic Example
-
-```yaml
----
-option1: "value"
-option2: 5
----
-```
-
-**Expected behavior**: Description of what happens.
-
-### Advanced Example
-
-```yaml
----
-option1: "complex"
-option2: 20
-additionalOption: true
----
-```
-
-**Expected behavior**: Description of advanced behavior.
-
----
-
-## See Also
-
-- [Related Feature](Link) - How it relates
-- [Parent Section](Link) - Section this belongs to
-```
+Test reference pattern for Phase 2: `scenario-name` within the harness file.
 
 ---
 
@@ -223,32 +145,32 @@ additionalOption: true
 
 ### Voice and Tone
 
-| Do | Do Not |
-|----|--------|
-| "Configure the provider" | "You might want to configure the provider" |
-| "The agent calls the tool" | "The tool is called by the agent" |
-| "Use X for Y" | "You could potentially use X for Y" |
-| Assume intelligence | Talk down to users |
+| Do                         | Do Not                                     |
+| -------------------------- | ------------------------------------------ |
+| "Configure the provider"   | "You might want to configure the provider" |
+| "The agent calls the tool" | "The tool is called by the agent"          |
+| "Use X for Y"              | "You could potentially use X for Y"        |
+| Assume intelligence        | Talk down to users                         |
 
 ### Formatting Rules
 
-| Element | Use For | Example |
-|---------|---------|---------|
-| Tables | Configuration references | Option/Type/Default/Description |
-| Code blocks | All examples | ` ```yaml ` |
-| Bullet points | Lists of 3+ items | Features, options |
-| Numbered lists | Sequential steps only | Step 1, Step 2, Step 3 |
-| Bold | Key terms on first use | **frontmatter** |
-| Admonitions | Sparingly | `> **Note:**`, `> **Warning:**` |
+| Element        | Use For                  | Example                         |
+| -------------- | ------------------------ | ------------------------------- |
+| Tables         | Configuration references | Option/Type/Default/Description |
+| Code blocks    | All examples             | ` ```yaml `                     |
+| Bullet points  | Lists of 3+ items        | Features, options               |
+| Numbered lists | Sequential steps only    | Step 1, Step 2, Step 3          |
+| Bold           | Key terms on first use   | **frontmatter**                 |
+| Admonitions    | Sparingly                | `> **Note:**`, `> **Warning:**` |
 
 ### Linking Rules
 
-| Link Type | Format | Example |
-|-----------|--------|---------|
-| Wiki page | Relative | `[Page Name](Page-Name)` |
-| Spec file | Relative path | `[specs/file.md](specs/file.md)` |
-| External | Full URL | `[GitHub](https://github.com/...)` |
-| Anchor | Hash link | `[Section](#section-name)` |
+| Link Type | Format        | Example                            |
+| --------- | ------------- | ---------------------------------- |
+| Wiki page | Relative      | `[Page Name](Page-Name)`           |
+| Spec file | Relative path | `[specs/file.md](specs/file.md)`   |
+| External  | Full URL      | `[GitHub](https://github.com/...)` |
+| Anchor    | Hash link     | `[Section](#section-name)`         |
 
 **Rule**: Never have a dead-end page. Always provide "See also" or "Next steps".
 
@@ -274,16 +196,13 @@ additionalOption: true
 1. **If fix changes documented behavior** - Update documentation
 2. **Add test coverage reference** - Link test in spec
 
-### Business Logic Coverage
+### Verification Requirements
 
-Each spec should include verification dates:
+Spec documents follow actual file structure, not a template pattern. Each spec includes:
 
-```markdown
-## Business Logic Coverage (Verified 2025-01-15)
-
-- **Feature X**: Description with code reference (`src/file.ts:100-200`)
-- **Feature Y**: Description with code reference (`src/other.ts:50-100`)
-```
+- **TL;DR**: Brief feature description
+- **Source Files**: Specific file and line references
+- **Verification dates**: Found at top of spec docs (e.g., "Verified 2025-11-16" in index.md)
 
 ---
 
@@ -291,16 +210,17 @@ Each spec should include verification dates:
 
 When updating specs that affect runtime behavior, also update:
 
-| If You Change | Also Update |
-|---------------|-------------|
+| If You Change         | Also Update                             |
+| --------------------- | --------------------------------------- |
 | Configuration options | `docs/skills/ai-agent-configuration.md` |
-| Default values | `docs/specs/CONTRACT.md` |
-| User-visible behavior | Relevant wiki page |
-| API contracts | `docs/specs/index.md` |
+| Default values        | `docs/specs/CONTRACT.md`                |
+| User-visible behavior | Relevant wiki page                      |
+| API contracts         | `docs/specs/index.md`                   |
 
 ### Traceable Evidence
 
 Each behavior statement must cite:
+
 - **Specific source file and line**: `src/file.ts:100`
 - **Deterministic test ID**: Phase 2 scenario name
 
@@ -310,20 +230,22 @@ This keeps specs machine-verifiable.
 
 ## What NOT to Document
 
-| Skip | Reason |
-|------|--------|
-| Internal log strings | Implementation detail, may change |
-| Internal state names | Implementation detail |
-| Performance characteristics | May change with optimization |
-| Undocumented behaviors | Unless making them stable |
+| Skip                        | Reason                            |
+| --------------------------- | --------------------------------- |
+| Internal log strings        | Implementation detail, may change |
+| Internal state names        | Implementation detail             |
+| Performance characteristics | May change with optimization      |
+| Undocumented behaviors      | Unless making them stable         |
 
 ### Example
 
 ```markdown
 # Bad: Documents implementation details
+
 The session emits log entry "session-start-001" when beginning.
 
 # Good: Documents observable behavior
+
 The session logs a start message at INFO level when beginning.
 ```
 
@@ -345,3 +267,7 @@ For spec changes, use multi-agent review:
 - [Contributing](Contributing) - Contribution overview
 - [Technical-Specs](Technical-Specs) - Technical specification documents
 - [USER-DOCS-STANDARD.md](https://github.com/netdata/ai-agent/blob/master/docs/USER-DOCS-STANDARD.md) - Full documentation quality standard
+
+```
+
+```

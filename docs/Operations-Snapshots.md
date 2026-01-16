@@ -550,9 +550,9 @@ const callbacks = {
 
 ### Problem: Snapshot filename not matching session
 
-**Cause**: Filename uses origin transaction ID, which may differ from session ID for sub-agents.
+**Cause**: Filename uses `originId` (root transaction ID). This always matches the root session's `traceId`, but for sub-agents their `traceId` differs from the filename.
 
-**Solution**: Use the `traceId` field inside the snapshot:
+**Solution**: Use the `traceId` field inside the snapshot for each session:
 
 ```bash
 zcat "$SNAPSHOT" | jq '.opTree.traceId'

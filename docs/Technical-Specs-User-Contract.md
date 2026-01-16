@@ -75,12 +75,12 @@ Turn N (maxTurns): LLM → final_report ONLY
 
 ### maxRetries Contract
 
-| Guarantee                              | Details           |
-| -------------------------------------- | ----------------- |
-| `maxRetries` = total attempts per turn | Initial + retries |
-| `maxRetries: 1` = 1 attempt            | No retries        |
-| `maxRetries: 3` = 3 attempts           | 2 retries         |
-| Attempts cycle through targets         | Round-robin       |
+| Guarantee                                        | Details                                                                 |
+| ------------------------------------------------ | ----------------------------------------------------------------------- |
+| `maxRetries` = total attempts per turn           | Initial + retries                                                       |
+| `maxRetries: 1` = 1 attempt                      | No retries                                                              |
+| `maxRetries: 3` = 3 attempts                     | 2 retries                                                               |
+| Retry loop continues until success or exhaustion | Cycle through targets round-robin until `maxRetries` attempts completed |
 
 ---
 
@@ -100,7 +100,7 @@ Turn N (maxTurns): LLM → final_report ONLY
 Every `LLM request prepared` log satisfies:
 
 ```
-expectedTokens = ctxTokens + newTokens
+expectedTokens = ctxTokens + newTokens + schemaCtxTokens
 ```
 
 **Note:** `schemaCtxTokens` is included in `ctxTokens` for subsequent turns (via cache_read/cache_write tracking). For first turn, schema tokens are not included, resulting in a slight underestimate.
@@ -206,7 +206,20 @@ limit = contextWindow - contextWindowBufferTokens - maxOutputTokens
 
 ### Provider Cycling
 
+Provider/model cycling occurs on every LLM attempt (including retries):
+
 ```
+
+Attempt 1: targets[0]
+Attempt 2: targets[1]
+Attempt N: targets[(N-1) % targets.length]
+```
+
+**Cycle continues until:**
+
+- Success (tool calls or final_report received)
+- `maxRetries` exhausted across all targets
+- Fatal error encountered
 
 Attempt 1: targets[0]
 Attempt 2: targets[1]
@@ -378,6 +391,8 @@ For each contract guarantee:
 - [Retry Strategy](Technical-Specs-Retry-Strategy) - Error handling details
 - [Context Management](Technical-Specs-Context-Management) - Token budget details
 - [specs/CONTRACT.md](specs/CONTRACT.md) - Full contract specification
+
+```
 
 ```
 

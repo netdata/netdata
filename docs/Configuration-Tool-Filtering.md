@@ -35,11 +35,11 @@ Filtering is applied at tool discovery time. Tools that don't pass filters are n
 
 Tools follow a consistent naming pattern:
 
-| Source      | Pattern                 | Example                    |
-| ----------- | ----------------------- | -------------------------- |
-| MCP servers | `mcp__<server>__<tool>` | `mcp__github__search_code` |
-| REST tools  | `rest__<name>`          | `rest__weather`            |
-| Internal    | `agent__<name>`         | `agent__final_report`      |
+| Source      | Pattern            | Example               |
+| ----------- | ------------------ | --------------------- |
+| MCP servers | `<server>__<tool>` | `github__search_code` |
+| REST tools  | `rest__<name>`     | `rest__weather`       |
+| Internal    | `agent__<name>`    | `agent__final_report` |
 
 Understanding this convention is essential for writing filter patterns. When configuring filters in `mcpServers.<name>.toolsAllowed/Denied`, use the **local tool name** only (e.g., `search_code`), not the full `mcp__<server>__<tool>` format.
 
@@ -107,7 +107,7 @@ All tools are available except those listed.
 
 Use literal `*` or `any` to match all tools in filter lists.
 
-### Allow All Tools
+### Allow All Tools (Default Behavior)
 
 If `toolsAllowed` is not specified or is empty, all tools are allowed:
 
@@ -169,7 +169,7 @@ This matches `READ_FILE`, `read_file`, or `Read_File`.
 
 If both `toolsAllowed` and `toolsDenied` are specified at the same level:
 
-1. Tool must be in `toolsAllowed` (or `toolsAllowed` is empty)
+1. Tool must be in `toolsAllowed` (if `toolsAllowed` is specified with entries)
 2. Tool must NOT be in `toolsDenied`
 
 ```json
@@ -364,18 +364,18 @@ The `tools` array controls which tool sources are loaded (servers, `restTools`, 
 ### List Available Tools
 
 ```bash
-ai-agent --agent test.ai --dry-run --verbose
+ai-agent --list-tools <server>
 ```
 
-Shows which tools are available after filtering is applied.
+List tools from a specific MCP server (use `all` to list all servers).
 
 ### Trace Tool Discovery
 
 ```bash
-ai-agent --agent test.ai --trace-mcp "test query"
+ai-agent --agent test.ai --trace-mcp
 ```
 
-Shows:
+Enables detailed MCP protocol logging to see:
 
 - Tools discovered from each MCP server
 - Filtering decisions at server level
@@ -384,7 +384,7 @@ Shows:
 ### Verify Specific Tool
 
 ```bash
-ai-agent --agent test.ai --dry-run --verbose 2>&1 | grep "mcp__github__push"
+ai-agent --list-tools github 2>&1 | grep "search_code"
 ```
 
 If the tool doesn't appear, it was filtered out.

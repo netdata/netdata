@@ -495,6 +495,19 @@ Complete REST tool schema:
 | `hasComplexQueryParams` | `boolean`          | `false`     | Enable nested query params                                     |
 | `queryParamNames`       | `string[]`         | `[]`        | Params to serialize complexly                                  |
 
+### Streaming Options
+
+| Property             | Type               | Default     | Description                    |
+| -------------------- | ------------------ | ----------- | ------------------------------ |
+| `mode`               | `string`           | Required    | Must be `"json-stream"`        |
+| `linePrefix`         | `string`           | `""`        | Prefix to strip from each line |
+| `discriminatorField` | `string`           | `"type"`    | Field name for event type      |
+| `doneValue`          | `string`           | `"done"`    | Value indicating stream end    |
+| `tokenField`         | `string`           | `"content"` | Field containing token content |
+| `tokenValue`         | `string`           | `"token"`   | Discriminator value for tokens |
+| `answerField`        | `string`           | `"answer"`  | Field containing final answer  |
+| `timeoutMs`          | `number \| string` | -           | Stream timeout duration        |
+
 ---
 
 ## Caching
@@ -530,6 +543,9 @@ Complete REST tool schema:
 | Minutes      | `"5m"`  | 5 minutes  |
 | Hours        | `"1h"`  | 1 hour     |
 | Days         | `"1d"`  | 1 day      |
+| Weeks        | `"1w"`  | 1 week     |
+| Months       | `"1mo"` | 30 days    |
+| Years        | `"1y"`  | 365 days   |
 
 ### Cache Key
 

@@ -128,7 +128,7 @@ ai-agent --agent tools.ai --trace-mcp "Use the search tool"
 | Type     | Boolean       |
 | Default  | `false`       |
 
-**Description**: Dump raw payloads exchanged with the Vercel AI SDK. Low-level debugging.
+**Description**: Dump raw payloads exchanged with the AI SDK. Low-level debugging.
 
 ```bash
 ai-agent --agent debug.ai --trace-sdk "Test"
@@ -190,7 +190,7 @@ ai-agent --agent tools.ai --trace-llm --trace-mcp "Debug tool usage"
 ai-agent --agent test.ai --dry-run "Test query"
 ```
 
-**Validates:**
+**Validates**
 
 - Agent file syntax and frontmatter
 - Model availability and configuration

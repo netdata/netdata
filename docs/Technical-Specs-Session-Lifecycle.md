@@ -95,7 +95,7 @@ The static factory method validates configuration and creates the session instan
 
 - Config validation throws on invalid input (fail fast)
 - Session always receives a unique `txnId`
-- `originTxnId` defaults to `selfId` for root agents
+- `originTxnId` defaults to `txnId` for root agents
 
 **Example Transaction IDs**:
 
@@ -315,7 +315,7 @@ Executes tool calls after a successful LLM turn.
 
 ```mermaid
 flowchart TD
-    Start[Tool Calls Received] --> Log[Log Assistant Message]
+    Start[Tool Calls Received] --> Log[Log Tool Request]
     Log --> Loop[For Each Tool Call]
 
     Loop --> Begin[Begin Tool Op in OpTree]
@@ -361,26 +361,28 @@ flowchart TD
 
 **Steps**:
 
-| Step | Action                                         |
-| ---- | ---------------------------------------------- |
-| 1    | Capture final report (status, format, content) |
-| 2    | Validate JSON schema (if applicable)           |
-| 3    | Log finalization event                         |
-| 4    | End all open operations in opTree              |
-| 5    | Build AIAgentResult                            |
+| Step | Action                                            |
+| ---- | ------------------------------------------------- |
+| 1    | Capture final report (status, format, content)    |
+| 2    | Validate JSON schema (post-commit, if applicable) |
+| 3    | Log finalization event                            |
+| 4    | End all open operations in opTree                 |
+| 5    | Build AIAgentResult                               |
 
 **AIAgentResult Structure**:
 
 ```typescript
 {
     success: boolean,
-    exitCode: ExitCode,
+    error?: string,
     finalReport?: FinalReport,
     conversation: CoreMessage[],
     accounting: AccountingEntry[],
     logs: LogEntry[],
-    opTree: FlattenedOpTree,
-    metadata: SessionMetadata
+    opTree?: SessionNode,
+    childConversations?: ChildConversation[],
+    routerSelection?: RouterSelection,
+    finalAgentId?: string
 }
 ```
 

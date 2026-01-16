@@ -225,8 +225,9 @@ All string values support `${VAR}` expansion:
 {
   "providers": {
     "openai": {
+      "type": "openai",
       "apiKey": "${OPENAI_API_KEY}",
-      "baseUrl": "${OPENAI_BASE_URL:-https://api.openai.com/v1}"
+      "baseUrl": "${OPENAI_BASE_URL}"
     }
   }
 }
@@ -234,11 +235,9 @@ All string values support `${VAR}` expansion:
 
 ### Syntax
 
-| Syntax            | Behavior                                   |
-| ----------------- | ------------------------------------------ |
-| `${VAR}`          | Substitute with environment variable value |
-| `${VAR:-default}` | Use `default` if VAR is unset or empty     |
-| `${HOME}`         | Home directory (always available)          |
+| Syntax   | Behavior                                   |
+| -------- | ------------------------------------------ |
+| `${VAR}` | Substitute with environment variable value |
 
 ### Variable Sources
 
@@ -312,8 +311,7 @@ Production-ready configuration:
     },
     "anthropic": {
       "type": "anthropic",
-      "apiKey": "${ANTHROPIC_API_KEY}",
-      "cacheStrategy": "full"
+      "apiKey": "${ANTHROPIC_API_KEY}"
     }
   },
   "mcpServers": {

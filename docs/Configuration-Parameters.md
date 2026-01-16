@@ -47,11 +47,14 @@ AI Agent configuration is organized into:
   "restTools": {},
   "queues": {},
   "cache": {},
+  "toolOutput": {},
   "accounting": {},
   "pricing": {},
   "defaults": {},
+  "telemetry": {},
   "slack": {},
-  "toolOutput": {}
+  "api": {},
+  "embed": {}
 }
 ```
 
@@ -69,14 +72,24 @@ LLM provider configuration.
       "apiKey": "string",
       "baseUrl": "string",
       "headers": { "string": "string" },
-      "cacheStrategy": "full | none",
+      "custom": { "string": "unknown" },
+      "mergeStrategy": "overlay | override | deep",
+      "openaiMode": "responses | chat",
       "contextWindow": "number",
       "tokenizer": "string",
+      "reasoning": "string | number | [value, value, value, value] | null",
+      "reasoningValue": "string | number | null",
+      "reasoningAutoStreamLevel": "minimal | low | medium | high",
+      "toolChoice": "auto | required",
+      "contextWindowBufferTokens": "number",
       "models": {
         "<model>": {
           "contextWindow": "number",
           "tokenizer": "string",
           "interleaved": "boolean | string",
+          "reasoning": "string | number | [value, value, value, value] | null",
+          "toolChoice": "auto | required",
+          "contextWindowBufferTokens": "number",
           "overrides": {
             "temperature": "number | null",
             "top_p": "number | null",
@@ -96,32 +109,42 @@ LLM provider configuration.
 
 ### Provider Properties
 
-| Property                     | Type       | Default          | Description                  |
-| ---------------------------- | ---------- | ---------------- | ---------------------------- |
-| `type`                       | `string`   | Required         | Provider type                |
-| `apiKey`                     | `string`   | -                | API key (supports `${VAR}`)  |
-| `baseUrl`                    | `string`   | Provider default | API base URL                 |
-| `headers`                    | `object`   | `{}`             | Custom HTTP headers          |
-| `cacheStrategy`              | `string`   | `"full"`         | Anthropic cache control      |
-| `contextWindow`              | `number`   | Provider default | Token limit                  |
-| `tokenizer`                  | `string`   | Auto-detect      | Token counting method        |
-| `models`                     | `object`   | `{}`             | Per-model overrides          |
-| `toolsAllowed`               | `string[]` | `[]`             | Tools to expose              |
-| `toolsDenied`                | `string[]` | `[]`             | Tools to hide                |
-| `stringSchemaFormatsAllowed` | `string[]` | `[]`             | JSON Schema formats to allow |
-| `stringSchemaFormatsDenied`  | `string[]` | `[]`             | JSON Schema formats to strip |
+| Property                     | Type       | Default          | Description                        |
+| ---------------------------- | ---------- | ---------------- | ---------------------------------- |
+| `type`                       | `string`   | Required         | Provider type                      |
+| `apiKey`                     | `string`   | -                | API key (supports `${VAR}`)        |
+| `baseUrl`                    | `string`   | Provider default | API base URL                       |
+| `headers`                    | `object`   | `{}`             | Custom HTTP headers                |
+| `custom`                     | `object`   | `{}`             | Custom provider options            |
+| `mergeStrategy`              | `string`   | -                | Merge strategy for model overrides |
+| `openaiMode`                 | `string`   | -                | OpenAI mode (responses/chat)       |
+| `contextWindow`              | `number`   | Provider default | Token limit                        |
+| `tokenizer`                  | `string`   | Auto-detect      | Token counting method              |
+| `reasoning`                  | `mixed`    | -                | Reasoning mapping for provider     |
+| `reasoningValue`             | `mixed`    | -                | Reasoning token budget             |
+| `reasoningAutoStreamLevel`   | `string`   | -                | Auto-stream reasoning level        |
+| `toolChoice`                 | `string`   | -                | Tool choice mode                   |
+| `contextWindowBufferTokens`  | `number`   | -                | Context window buffer              |
+| `models`                     | `object`   | `{}`             | Per-model overrides                |
+| `toolsAllowed`               | `string[]` | `[]`             | Tools to expose                    |
+| `toolsDenied`                | `string[]` | `[]`             | Tools to hide                      |
+| `stringSchemaFormatsAllowed` | `string[]` | `[]`             | JSON Schema formats to allow       |
+| `stringSchemaFormatsDenied`  | `string[]` | `[]`             | JSON Schema formats to strip       |
 
 ### Model Properties
 
-| Property                   | Type             | Default        | Description                |
-| -------------------------- | ---------------- | -------------- | -------------------------- |
-| `contextWindow`            | `number`         | Provider value | Model token limit          |
-| `tokenizer`                | `string`         | Provider value | Model tokenizer            |
-| `interleaved`              | `boolean/string` | `false`        | Interleaved reasoning mode |
-| `overrides.temperature`    | `number/null`    | -              | Temperature override       |
-| `overrides.top_p`          | `number/null`    | -              | Top-p override             |
-| `overrides.top_k`          | `number/null`    | -              | Top-k override             |
-| `overrides.repeat_penalty` | `number/null`    | -              | Repeat penalty override    |
+| Property                    | Type             | Default        | Description                |
+| --------------------------- | ---------------- | -------------- | -------------------------- |
+| `contextWindow`             | `number`         | Provider value | Model token limit          |
+| `tokenizer`                 | `string`         | Provider value | Model tokenizer            |
+| `interleaved`               | `boolean/string` | `false`        | Interleaved reasoning mode |
+| `reasoning`                 | `mixed`          | -              | Reasoning mapping override |
+| `toolChoice`                | `string`         | -              | Tool choice mode override  |
+| `contextWindowBufferTokens` | `number`         | -              | Context buffer override    |
+| `overrides.temperature`     | `number/null`    | -              | Temperature override       |
+| `overrides.top_p`           | `number/null`    | -              | Top-p override             |
+| `overrides.top_k`           | `number/null`    | -              | Top-k override             |
+| `overrides.repeat_penalty`  | `number/null`    | -              | Repeat penalty override    |
 
 ---
 
@@ -197,10 +220,8 @@ REST API tool configuration.
         "tokenField": "string",
         "tokenValue": "string",
         "answerField": "string",
-        "timeoutMs": "number | string"
-      },
-      "hasComplexQueryParams": "boolean",
-      "queryParamNames": ["string"]
+        "timeoutMs": "number"
+      }
     }
   }
 }
@@ -208,32 +229,30 @@ REST API tool configuration.
 
 ### REST Tool Properties
 
-| Property                | Type       | Default     | Description                   |
-| ----------------------- | ---------- | ----------- | ----------------------------- |
-| `description`           | `string`   | Required    | Tool description              |
-| `method`                | `string`   | Required    | HTTP method                   |
-| `url`                   | `string`   | Required    | URL template                  |
-| `headers`               | `object`   | `{}`        | HTTP headers                  |
-| `parametersSchema`      | `object`   | Required    | JSON Schema for inputs        |
-| `bodyTemplate`          | `any`      | -           | Request body template         |
-| `queue`                 | `string`   | `"default"` | Concurrency queue             |
-| `cache`                 | `string`   | `"off"`     | Response cache TTL            |
-| `streaming`             | `object`   | -           | Streaming configuration       |
-| `hasComplexQueryParams` | `boolean`  | `false`     | Enable nested query params    |
-| `queryParamNames`       | `string[]` | `[]`        | Params to serialize complexly |
+| Property           | Type     | Default     | Description             |
+| ------------------ | -------- | ----------- | ----------------------- |
+| `description`      | `string` | Required    | Tool description        |
+| `method`           | `string` | Required    | HTTP method             |
+| `url`              | `string` | Required    | URL template            |
+| `headers`          | `object` | `{}`        | HTTP headers            |
+| `parametersSchema` | `object` | Required    | JSON Schema for inputs  |
+| `bodyTemplate`     | `any`    | -           | Request body template   |
+| `queue`            | `string` | `"default"` | Concurrency queue       |
+| `cache`            | `string` | `"off"`     | Response cache TTL      |
+| `streaming`        | `object` | -           | Streaming configuration |
 
 ### Streaming Properties
 
-| Property             | Type            | Default     | Description                |
-| -------------------- | --------------- | ----------- | -------------------------- |
-| `mode`               | `string`        | Required    | Must be `"json-stream"`    |
-| `linePrefix`         | `string`        | `""`        | Prefix to strip            |
-| `discriminatorField` | `string`        | `"type"`    | Event type field           |
-| `doneValue`          | `string`        | `"done"`    | End indicator              |
-| `tokenField`         | `string`        | `"content"` | Token content field        |
-| `tokenValue`         | `string`        | `"token"`   | Token event type           |
-| `answerField`        | `string`        | `"answer"`  | Final answer field         |
-| `timeoutMs`          | `number/string` | `60000`     | Stream timeout (REST only) |
+| Property             | Type     | Default     | Description                |
+| -------------------- | -------- | ----------- | -------------------------- |
+| `mode`               | `string` | Required    | Must be `"json-stream"`    |
+| `linePrefix`         | `string` | `""`        | Prefix to strip            |
+| `discriminatorField` | `string` | `"type"`    | Event type field           |
+| `doneValue`          | `string` | `"done"`    | End indicator              |
+| `tokenField`         | `string` | `"content"` | Token content field        |
+| `tokenValue`         | `string` | `"token"`   | Token event type           |
+| `answerField`        | `string` | `"answer"`  | Final answer field         |
+| `timeoutMs`          | `number` | `60000`     | Stream timeout (REST only) |
 
 ---
 
@@ -352,6 +371,8 @@ Default parameter values.
     "topP": "number",
     "topK": "number",
     "repeatPenalty": "number",
+    "reasoning": "string",
+    "reasoningValue": "string | number",
     "llmTimeout": "number",
     "toolTimeout": "number",
     "maxTurns": "number",
@@ -372,7 +393,7 @@ Default parameter values.
 | `temperature`               | `number`  | `0.0`    | LLM temperature        |
 | `topP`                      | `number`  | `null`   | Top-p sampling         |
 | `topK`                      | `number`  | `null`   | Top-k sampling         |
-| `repeatPenalty`             | `number`  | -        | Repetition penalty     |
+| `repeatPenalty`             | `number`  | `null`   | Repetition penalty     |
 | `llmTimeout`                | `number`  | `600000` | LLM timeout (ms)       |
 | `toolTimeout`               | `number`  | `300000` | Tool timeout (ms)      |
 | `maxTurns`                  | `number`  | `10`     | Max conversation turns |
@@ -393,23 +414,25 @@ Tool output handling configuration.
 {
   "toolOutput": {
     "enabled": "boolean",
+    "storeDir": "string",
     "maxChunks": "number",
     "overlapPercent": "number",
     "avgLineBytesThreshold": "number",
-    "models": ["string"]
+    "models": "string | string[]"
   }
 }
 ```
 
 ### Tool Output Properties
 
-| Property                | Type       | Default | Description                     |
-| ----------------------- | ---------- | ------- | ------------------------------- |
-| `enabled`               | `boolean`  | `true`  | Enable tool output storage      |
-| `maxChunks`             | `number`   | `1`     | Max stored chunks               |
-| `overlapPercent`        | `number`   | `10`    | Chunk overlap percentage        |
-| `avgLineBytesThreshold` | `number`   | `1000`  | Line size threshold             |
-| `models`                | `string[]` | `[]`    | Models that support tool output |
+| Property                | Type              | Default | Description                     |
+| ----------------------- | ----------------- | ------- | ------------------------------- |
+| `enabled`               | `boolean`         | `true`  | Enable tool output storage      |
+| `storeDir`              | `string`          | -       | Storage directory path          |
+| `maxChunks`             | `number`          | `1`     | Max stored chunks               |
+| `overlapPercent`        | `number`          | `10`    | Chunk overlap percentage        |
+| `avgLineBytesThreshold` | `number`          | `1000`  | Line size threshold             |
+| `models`                | `string/string[]` | `[]`    | Models that support tool output |
 
 ---
 
@@ -427,15 +450,13 @@ Slack integration configuration.
     "routing": {
       "rules": [
         {
-          "enabled": "boolean",
           "channels": ["string"],
           "agent": "string",
-          "engage": ["channel-posts", "direct-messages", "mentions", "threads"],
+          "engage": ["mentions", "channel-posts", "dms"],
           "promptTemplates": {
-            "channelPost": "string",
-            "directMessage": "string",
             "mention": "string",
-            "threadReply": "string"
+            "dm": "string",
+            "channelPost": "string"
           }
         }
       ]
@@ -458,7 +479,6 @@ Slack integration configuration.
 
 | Property          | Type       | Default | Description      |
 | ----------------- | ---------- | ------- | ---------------- |
-| `enabled`         | `boolean`  | `true`  | Enable rule      |
 | `channels`        | `string[]` | `[]`    | Channel IDs      |
 | `agent`           | `string`   | -       | Agent path       |
 | `engage`          | `string[]` | `[]`    | Engagement types |
@@ -502,9 +522,12 @@ Slack integration configuration.
 | `maxRetries`           | `number`   | `5`              | Max retries        |
 | `temperature`          | `number`   | `0.0`            | Temperature        |
 | `topP`                 | `number`   | `null`           | Top-p              |
-| `topK`                 | `number`   | -                | Top-k              |
+| `topK`                 | `number`   | `null`           | Top-k              |
 | `maxOutputTokens`      | `number`   | `4096`           | Max output         |
-| `reasoning`            | `string`   | `"none"`         | Reasoning mode     |
+| `repeatPenalty`        | `number`   | `null`           | Repetition penalty |
+| `reasoning`            | `string`   | -                | Reasoning mode     |
+| `reasoningTokens`      | `number`   | -                | Reasoning budget   |
+| `caching`              | `string`   | -                | Caching mode       |
 | `llmTimeout`           | `number`   | `600000`         | LLM timeout (ms)   |
 | `toolTimeout`          | `number`   | `300000`         | Tool timeout (ms)  |
 | `cache`                | `string`   | `"off"`          | Response cache TTL |
@@ -513,6 +536,7 @@ Slack integration configuration.
 | `advisors`             | `string[]` | -                | Advisor agents     |
 | `router.destinations`  | `string[]` | -                | Router targets     |
 | `handoff`              | `string`   | -                | Handoff agent      |
+| `toolOutput`           | `object`   | -                | Tool output config |
 | `input`                | `object`   | -                | Input schema       |
 | `output.format`        | `string`   | `"markdown"`     | Output format      |
 | `output.schema`        | `object`   | -                | Output JSON schema |

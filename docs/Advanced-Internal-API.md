@@ -141,7 +141,7 @@ interface AIAgentSessionConfig {
   // Required
   config: Configuration; // Provider and MCP server config
   targets: { provider: string; model: string }[]; // Provider/model pairs
-  tools: string[]; // MCP servers to expose
+  tools: string[]; // Tool names to expose (includes MCP servers, REST tools, sub-agents, and internal tools)
   subAgents?: PreloadedSubAgent[]; // Optional preloaded sub-agent definitions
   systemPrompt: string; // System prompt text
   userPrompt: string; // User prompt text
@@ -336,7 +336,7 @@ interface FinalReportPayload {
 
 ```typescript
 {
-  type: 'turn_started';
+  type: 'turn_started',
   turn: number;           // Turn number
   attempt: number;        // Retry attempt
   isRetry: boolean;       // Is this a retry?
@@ -425,11 +425,11 @@ interface ToolAccountingEntry {
 
 The `expectedOutput.format` controls final report structure:
 
-| Format     | Tool Schema                                             | Validation     |
-| ---------- | ------------------------------------------------------- | -------------- |
-| `json`     | `{ format: { const: 'json' }, content_json: <schema> }` | AJV validation |
-| `markdown` | `{ format: { const: 'markdown' }, content: string }`    | None           |
-| `text`     | `{ format: { const: 'text' }, content: string }`        | None           |
+| Format     | Tool Schema                                                        | Validation     |
+| ---------- | ------------------------------------------------------------------ | -------------- |
+| `json`     | `{ report_format: { const: 'json' }, content_json: <schema> }`     | AJV validation |
+| `markdown` | `{ report_format: { const: 'markdown' }, report_content: string }` | None           |
+| `text`     | `{ report_format: { const: 'text' }, report_content: string }`     | None           |
 
 **Example JSON output configuration**:
 
@@ -587,7 +587,7 @@ stopRef.stopping = true;
 
 ## See Also
 
-- [docs/AI-AGENT-INTERNAL-API.md](../docs/AI-AGENT-INTERNAL-API.md) - Full API documentation
+- [docs/specs/AI-AGENT-INTERNAL-API.md](../docs/specs/AI-AGENT-INTERNAL-API.md) - Full API documentation
 - [docs/specs/library-api.md](../docs/specs/library-api.md) - Library specification
-- [Headends-Library](Headends-Library) - Library headend integration
-- [Technical-Specs-Session-Lifecycle](Technical-Specs-Session-Lifecycle) - Session flow
+- [docs/Headends-Library.md](Headends-Library) - Library headend integration
+- [docs/Technical-Specs-Session-Lifecycle.md](Technical-Specs-Session-Lifecycle) - Session flow

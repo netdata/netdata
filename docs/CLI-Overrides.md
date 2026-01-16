@@ -404,7 +404,6 @@ ai-agent --config ./config/development.json --agent api.ai --api 8080
 | `--reasoning <level>`           | -        | Reasoning effort       |
 | `--reasoning-tokens <n>`        | -        | Thinking token budget  |
 | `--caching <mode>`              | `full`   | Anthropic cache mode   |
-| `--cache <ttl>`                 | -        | Response cache TTL     |
 
 ### All Agents
 

@@ -75,12 +75,13 @@ graph LR
     Schema --> Projected
 ```
 
-| Counter            | Description                                         | Updated When         |
-| ------------------ | --------------------------------------------------- | -------------------- |
-| `currentCtxTokens` | Tokens in committed conversation                    | After turn completes |
-| `pendingCtxTokens` | Tokens pending commit (tool outputs, retry notices) | During turn          |
-| `newCtxTokens`     | New tokens added this turn                          | During turn          |
-| `schemaCtxTokens`  | Tool schema token estimate                          | When tools change    |
+| Counter                  | Description                                                   | Updated When         |
+| ------------------------ | ------------------------------------------------------------- | -------------------- |
+| `currentCtxTokens`       | Tokens in committed conversation                              | After turn completes |
+| `pendingCtxTokens`       | Tokens pending commit (tool outputs, retry notices)           | During turn          |
+| `newCtxTokens`           | New tokens added this turn                                    | During turn          |
+| `schemaCtxTokens`        | Tool schema token estimate                                    | When tools change    |
+| `currentReasoningTokens` | Reasoning/thinking budget tokens for extended thinking models | At turn start        |
 
 ### Guard Triggers
 
@@ -182,9 +183,11 @@ The context window value is resolved from multiple sources (first defined wins):
 | Method          | Accuracy | Speed  | Used When               |
 | --------------- | -------- | ------ | ----------------------- |
 | Tokenizer-based | High     | Slower | Tokenizer configured    |
-| Character-based | Low      | Fast   | No tokenizer (fallback) |
+| Character-based | Low      | Fast   | Computed for comparison |
 
-**Character-based fallback**: `tokens ≈ characters / 4`
+**Combined approach**: Uses `Math.max(tokenizerResult, characterApproximation)` to get the higher of both estimates.
+
+**Character-based approximation**: `tokens ≈ characters / 4`
 
 ### Tokenizer Configuration
 
@@ -198,13 +201,14 @@ providers:
 
 ### What Gets Estimated
 
-| Content            | Estimation         |
-| ------------------ | ------------------ |
-| System prompt      | At session start   |
-| User message       | At session start   |
-| Assistant messages | After LLM response |
-| Tool results       | Before commit      |
-| Tool schemas       | When tools change  |
+| Content            | Estimation                               |
+| ------------------ | ---------------------------------------- |
+| System prompt      | At session start                         |
+| User message       | At session start                         |
+| Assistant messages | After LLM response                       |
+| Tool results       | Before commit (max of two methods)       |
+| Tool schemas       | When tools change (scaled × 2.09)        |
+| Reasoning/thinking | Set at turn start (display/logging only) |
 
 ---
 
@@ -255,9 +259,30 @@ toolBudgetCallbacks = {
     if (guard.blocked.length > 0) {
       this.toolBudgetExceeded = true;
       enforceContextFinalTurn();
-      return { ok: false, reason: "token_budget_exceeded" };
+      return {
+        ok: false,
+        tokens,
+        reason: "token_budget_exceeded",
+        availableTokens,
+      };
     }
 
+    // Accumulate tokens so subsequent tool reservations see the updated context
+    this.newCtxTokens += tokens;
+    return { ok: true, tokens };
+  },
+
+  previewToolOutput: async (output) => {
+    const tokens = estimateTokens(output);
+    const guard = evaluateContextGuard(tokens);
+    if (guard.blocked.length > 0) {
+      return {
+        ok: false,
+        tokens,
+        reason: "token_budget_exceeded",
+        availableTokens,
+      };
+    }
     return { ok: true, tokens };
   },
 
@@ -275,9 +300,10 @@ Once `toolBudgetExceeded` is set, `canExecuteTool()` returns `false` and the orc
 | --------------------------- | ------ | ------- | ------------------------- |
 | `contextWindow`             | number | 131,072 | Total token capacity      |
 | `contextWindowBufferTokens` | number | 8,192   | Safety margin             |
-| `maxOutputTokens`           | number | 4,096   | Reserved for LLM response |
+| `maxOutputTokens`           | number | 16,384  | Reserved for LLM response |
 | `tokenizer`                 | string | -       | Estimation accuracy       |
 | `toolResponseMaxBytes`      | number | 12,288  | Triggers disk storage     |
+| `reasoning`                 | enum   | -       | Enables extended thinking |
 
 ### Example Configuration
 
@@ -287,11 +313,12 @@ providers:
     contextWindow: 128000
     models:
       gpt-4-turbo:
-        maxOutputTokens: 4096
+        maxOutputTokens: 16384
         contextWindow: 128000
 
 defaults:
   toolResponseMaxBytes: 12288
+  maxOutputTokens: 16384
 ```
 
 ---
@@ -304,15 +331,17 @@ Enable detailed context guard logging with environment variable.
 
 ### Debug Topics
 
-| Topic                           | Information                |
-| ------------------------------- | -------------------------- |
-| `context-guard/init-counters`   | Initial token counts       |
-| `context-guard/loop-init`       | Per-turn initialization    |
-| `context-guard/schema-estimate` | Tool schema token estimate |
-| `context-guard/provider-eval`   | Per-provider evaluation    |
-| `context-guard/enforce`         | Guard enforcement events   |
-| `context-guard/tool-eval`       | Tool output evaluation     |
-| `context-guard/request-metrics` | LLM request token metrics  |
+| Topic                           | Information                            |
+| ------------------------------- | -------------------------------------- |
+| `context-guard/init-counters`   | Initial token counts                   |
+| `context-guard/loop-init`       | Per-turn initialization                |
+| `context-guard/schema-estimate` | Tool schema token estimate             |
+| `context-guard/evaluate`        | Full projection with reasoning tokens  |
+| `context-guard/evaluate-target` | Per-target limit calculation           |
+| `context-guard/provider-eval`   | Per-provider evaluation                |
+| `context-guard/build-metrics`   | Metrics for LLM request                |
+| `context-guard/enforce`         | Guard enforcement events               |
+| `context-guard/tool-eval`       | Tool output evaluation (via callbacks) |
 
 ### Example Debug Output
 
@@ -324,6 +353,18 @@ Enable detailed context guard logging with environment variable.
   projected: 50000
   limit: 111360
   status: ok
+```
+
+**With reasoning enabled**:
+
+```
+[context-guard/build-metrics] openai/gpt-4
+  ctxTokens: 45000
+  pendingCtxTokens: 2000
+  schemaCtxTokens: 3000
+  expectedTokens: 47000
+  reasoningTokens: 1000
+  maxOutputTokens: 16384
 ```
 
 ---
@@ -354,9 +395,10 @@ Enable detailed context guard logging with environment variable.
 
 **Causes**:
 
-- No tokenizer configured (using character fallback)
+- No tokenizer configured (character approximation used)
 - Wrong tokenizer for model
 - Provider counts differently
+- Estimation uses `Math.max(tokenizer, char_approx)` which may overestimate
 
 **Solutions**:
 
@@ -406,6 +448,7 @@ These rules MUST hold:
 3. **Output space reserved**: `maxOutputTokens` always carved out
 4. **Monotonic growth**: Counters only increase until turn commits
 5. **Final turn enforcement**: Triggered BEFORE next LLM/tool execution
+6. **Reasoning included**: Reasoning/thinking tokens are INSIDE `maxOutputTokens`, not added on top
 
 ---
 

@@ -29,7 +29,7 @@ AI Agent supports caching at multiple levels:
 | ----- | ------------------------------- | ------------------------------- |
 | Agent | Cache complete agent responses  | Frontmatter `cache:`            |
 | Tool  | Cache individual tool responses | Config `cache:` per server/tool |
-| LLM   | Provider-side prompt caching    | Provider `cacheStrategy`        |
+| LLM   | Provider-side prompt caching    | Frontmatter/CLI `caching:`      |
 
 Caching reduces costs, improves latency, and prevents redundant API calls.
 
@@ -199,30 +199,32 @@ Tool cache keys are computed from:
 
 Anthropic models support server-side prompt caching for cost savings.
 
-### Enable Cache Strategy
+### Enable Cache Mode
 
-```json
-{
-  "providers": {
-    "anthropic": {
-      "type": "anthropic",
-      "apiKey": "${ANTHROPIC_API_KEY}",
-      "cacheStrategy": "full"
-    }
-  }
-}
+The cache mode is controlled via frontmatter or CLI option, not provider configuration:
+
+```yaml
+---
+caching: full
+---
 ```
 
-### Cache Strategies
+Or via CLI:
 
-| Strategy | Description                                         |
-| -------- | --------------------------------------------------- |
-| `full`   | Apply ephemeral cache control to messages (default) |
-| `none`   | Disable cache control                               |
+```bash
+ai-agent --caching full --agent my.ai "query"
+```
+
+### Cache Modes
+
+| Mode   | Description                                         |
+| ------ | --------------------------------------------------- |
+| `full` | Apply ephemeral cache control to messages (default) |
+| `none` | Disable cache control                               |
 
 ### How It Works
 
-When `cacheStrategy: "full"`:
+When `caching: "full"`:
 
 1. Applies `cacheControl: { type: 'ephemeral' }` to the last valid user message per turn
 2. Anthropic caches the prompt prefix server-side
@@ -337,7 +339,7 @@ When a cache miss occurs:
 
 Caches are invalidated when:
 
-- **TTL expires**: Entry removed on next access
+- **TTL expires**: Expired entries skipped on access and removed during writes
 - **Agent modified**: New agent hash = new cache key
 - **Max entries exceeded**: LRU eviction removes oldest entries
 - **Manual clear**: Database deleted or entry removed
@@ -377,14 +379,18 @@ Cached responses may become stale:
 
 ### Provider Cache Options
 
-```json
-{
-  "providers": {
-    "<name>": {
-      "cacheStrategy": "full | none"
-    }
-  }
-}
+Cache mode is controlled via frontmatter or CLI, not provider configuration:
+
+```yaml
+---
+caching: full | none
+---
+```
+
+Or via CLI:
+
+```bash
+ai-agent --caching full --agent my.ai "query"
 ```
 
 ### MCP Server Cache Options
@@ -424,21 +430,21 @@ cache: "string | number"
 
 ### All Cache Properties
 
-| Location    | Property                | Type            | Default                  | Description              |
-| ----------- | ----------------------- | --------------- | ------------------------ | ------------------------ |
-| Global      | `cache.backend`         | `string`        | `"sqlite"`               | Backend type             |
-| Global      | `cache.sqlite.path`     | `string`        | `"~/.ai-agent/cache.db"` | SQLite path              |
-| Global      | `cache.redis.url`       | `string`        | -                        | Redis URL                |
-| Global      | `cache.redis.username`  | `string`        | -                        | Redis username           |
-| Global      | `cache.redis.password`  | `string`        | -                        | Redis password           |
-| Global      | `cache.redis.database`  | `number`        | -                        | Redis database number    |
-| Global      | `cache.redis.keyPrefix` | `string`        | `"ai-agent:cache:"`      | Redis key prefix         |
-| Global      | `cache.maxEntries`      | `number`        | `5000`                   | Max entries              |
-| Provider    | `cacheStrategy`         | `string`        | `"full"`                 | Anthropic cache strategy |
-| MCP Server  | `cache`                 | `string/number` | `"off"`                  | Server-wide TTL          |
-| MCP Server  | `toolsCache.<tool>`     | `string/number` | Server default           | Per-tool TTL             |
-| REST Tool   | `cache`                 | `string/number` | `"off"`                  | Tool TTL                 |
-| Frontmatter | `cache`                 | `string/number` | `"off"`                  | Agent response TTL       |
+| Location    | Property                | Type            | Default                  | Description           |
+| ----------- | ----------------------- | --------------- | ------------------------ | --------------------- |
+| Global      | `cache.backend`         | `string`        | `"sqlite"`               | Backend type          |
+| Global      | `cache.sqlite.path`     | `string`        | `"~/.ai-agent/cache.db"` | SQLite path           |
+| Global      | `cache.redis.url`       | `string`        | -                        | Redis URL             |
+| Global      | `cache.redis.username`  | `string`        | -                        | Redis username        |
+| Global      | `cache.redis.password`  | `string`        | -                        | Redis password        |
+| Global      | `cache.redis.database`  | `number`        | -                        | Redis database number |
+| Global      | `cache.redis.keyPrefix` | `string`        | `"ai-agent:cache:"`      | Redis key prefix      |
+| Global      | `cache.maxEntries`      | `number`        | `5000`                   | Max entries           |
+| Frontmatter | `caching`               | `string`        | `"full"`                 | Anthropic cache mode  |
+| MCP Server  | `cache`                 | `string/number` | `"off"`                  | Server-wide TTL       |
+| MCP Server  | `toolsCache.<tool>`     | `string/number` | Server default           | Per-tool TTL          |
+| REST Tool   | `cache`                 | `string/number` | `"off"`                  | Tool TTL              |
+| Frontmatter | `cache`                 | `string/number` | `"off"`                  | Agent response TTL    |
 
 ---
 
@@ -451,10 +457,10 @@ cache: "string | number"
 sqlite3 ~/.ai-agent/cache.db ".tables"
 
 # Count entries
-sqlite3 ~/.ai-agent/cache.db "SELECT COUNT(*) FROM cache"
+sqlite3 ~/.ai-agent/cache.db "SELECT COUNT(*) FROM cache_entries"
 
 # View recent entries
-sqlite3 ~/.ai-agent/cache.db "SELECT key, created_at FROM cache ORDER BY created_at DESC LIMIT 10"
+sqlite3 ~/.ai-agent/cache.db "SELECT key_hash, created_at FROM cache_entries ORDER BY created_at DESC LIMIT 10"
 ```
 
 ### Disable Cache Temporarily

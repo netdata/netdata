@@ -22,16 +22,21 @@ Test phases, harness usage, and coverage requirements for AI Agent.
 
 AI Agent uses three test phases, each with a different purpose:
 
-| Phase       | Type                  | Command               | Speed         | Uses Real LLM |
-| ----------- | --------------------- | --------------------- | ------------- | ------------- |
-| **Phase 1** | Unit tests            | `npm run test:phase1` | Fast (~300ms) | No            |
-| **Phase 2** | Deterministic harness | `npm run test:phase2` | Medium        | No            |
-| **Phase 3** | Live integration      | `npm run test:phase3` | Slow          | Yes           |
+| Phase       | Type                                | Command               | Speed         | Uses Real LLM |
+| ----------- | ----------------------------------- | --------------------- | ------------- | ------------- |
+| **Phase 1** | Unit tests                          | `npm run test:phase1` | Fast (~300ms) | No            |
+| **Phase 2** | Deterministic + live provider tests | `npm run test:phase2` | Medium        | Yes\*         |
+| **Phase 3** | Live integration                    | `npm run test:phase3` | Slow          | Yes           |
+
+**Phase 2 modes**:
+
+- Deterministic harness: `src/tests/phase2-harness.ts` uses test-llm provider (no real LLMs)
+- Live provider tests: `src/tests/phase2-runner.ts` uses real models (anthropic, ollama, openrouter, etc.)
 
 **When to run each phase**:
 
 - **Phase 1**: Run after every code change
-- **Phase 2**: Run before committing
+- **Phase 2**: Run before committing (includes deterministic harness + live provider tests)
 - **Phase 3**: Run when changing LLM interaction logic
 
 ---
@@ -85,35 +90,36 @@ describe("repairJson", () => {
 
 ---
 
-## Phase 2: Deterministic Harness
+## Phase 2: Deterministic + Live Provider Tests
 
-Phase 2 runs scripted scenarios against the core agent loop without production providers. This tests the orchestration logic with predictable inputs and outputs.
+Phase 2 has two test modes:
+
+1. **Deterministic harness**: Scripted scenarios against the core agent loop using the test-llm provider (no real LLMs). Tests orchestration logic with predictable inputs and outputs.
+
+2. **Live provider tests**: Real LLM provider testing using models from `phase2-models.ts` (anthropic, ollama, openrouter, etc.).
 
 ### Running Phase 2
 
 ```bash
-# Run all scenarios
+# Run all scenarios (both deterministic harness + live provider tests)
 npm run test:phase2
-
-# Run only parallel tests
-npm run test:phase2:parallel
-
-# Run only sequential tests
-npm run test:phase2:sequential
 ```
 
 ### Key Files
 
-| File                                       | Purpose                                                 |
-| ------------------------------------------ | ------------------------------------------------------- |
-| `src/llm-providers/test-llm.ts`            | Scripted LLM provider that returns predefined responses |
-| `src/tests/mcp/test-stdio-server.ts`       | Deterministic MCP server for tool testing               |
-| `src/tests/fixtures/test-llm-scenarios.ts` | Scenario definitions                                    |
-| `src/tests/phase2-harness.ts`              | Harness executor                                        |
+| File                                                  | Purpose                                            |
+| ----------------------------------------------------- | -------------------------------------------------- |
+| `src/llm-providers/test-llm.ts`                       | Scripted LLM provider for deterministic harness    |
+| `src/tests/mcp/test-stdio-server.ts`                  | Deterministic MCP server for tool testing          |
+| `src/tests/fixtures/test-llm-scenarios.ts`            | Scenario definitions for deterministic harness     |
+| `src/tests/phase2-harness.ts`                         | Deterministic harness executor (test-llm provider) |
+| `src/tests/phase2-runner.ts`                          | Live provider test runner (real LLMs)              |
+| `src/tests/phase2-models.ts`                          | Model configurations for live provider tests       |
+| `src/tests/phase2-harness-scenarios/phase2-runner.ts` | Phase 2 deterministic test harness implementation  |
 
-### Harness Controls
+### Deterministic Harness Controls
 
-Phase 2 tests manipulate five inputs:
+The deterministic harness (`phase2-harness.ts`) manipulates five inputs:
 
 | Input             | What You Control                         |
 | ----------------- | ---------------------------------------- |
@@ -142,12 +148,18 @@ Tests assert the **observable contract**, not internal implementation.
 
 ### Environment Variables
 
-| Variable                      | Purpose                      | Example                         |
+| Variable                      | Purpose                      | Example/Default                 |
 | ----------------------------- | ---------------------------- | ------------------------------- |
 | `PHASE1_ONLY_SCENARIO`        | Filter to specific scenarios | `PHASE1_ONLY_SCENARIO=retry`    |
 | `PHASE2_MODE`                 | Test mode                    | `all`, `parallel`, `sequential` |
 | `PHASE2_PARALLEL_CONCURRENCY` | Concurrency limit            | `4`                             |
 | `PHASE2_FORCE_SEQUENTIAL`     | Force sequential execution   | `1`                             |
+| `PHASE2_STOP_ON_FAILURE`      | Stop on first failure        | `0`                             |
+| `PHASE2_TRACE_LLM`            | Enable LLM tracing           | `0`                             |
+| `PHASE2_TRACE_MCP`            | Enable MCP tracing           | `0`                             |
+| `PHASE2_TRACE_SDK`            | Enable SDK tracing           | `0`                             |
+| `PHASE2_VERBOSE`              | Enable verbose output        | `0`                             |
+| `PHASE2_CONFIG`               | Path to custom config file   | `neda/.ai-agent.json`           |
 
 ### Writing Phase 2 Tests
 
@@ -201,9 +213,9 @@ node dist/tests/phase3-runner.js --model=nova/glm-4.7 --scenario=tool-output-aut
 
 ### Model Tiers
 
-| Tier | Models                                      | Purpose                     |
-| ---- | ------------------------------------------- | --------------------------- |
-| 1    | minimax-m2.1, glm-4.5-air, glm-4.6, glm-4.7 | Primary integration testing |
+| Tier | Models                                                          | Purpose                     |
+| ---- | --------------------------------------------------------------- | --------------------------- |
+| 1    | nova/minimax-m2.1, nova/glm-4.5-air, nova/glm-4.6, nova/glm-4.7 | Primary integration testing |
 
 ### Test Agents
 
@@ -218,13 +230,15 @@ Test agents are located in `src/tests/phase3/test-agents/`:
 
 ### Safeguards
 
-| Variable                 | Purpose                   | Default |
-| ------------------------ | ------------------------- | ------- |
-| `PHASE3_STOP_ON_FAILURE` | Stop on first failure     | `1`     |
-| `PHASE3_TRACE_LLM`       | Enable LLM tracing        | `0`     |
-| `PHASE3_TRACE_MCP`       | Enable MCP tracing        | `0`     |
-| `PHASE3_VERBOSE`         | Enable verbose output     | `0`     |
-| `PHASE3_DUMP_LLM`        | Dump failing LLM payloads | `0`     |
+| Variable                 | Purpose                    | Default               |
+| ------------------------ | -------------------------- | --------------------- |
+| `PHASE3_STOP_ON_FAILURE` | Stop on first failure      | `0`                   |
+| `PHASE3_TRACE_LLM`       | Enable LLM tracing         | `0`                   |
+| `PHASE3_TRACE_MCP`       | Enable MCP tracing         | `0`                   |
+| `PHASE3_TRACE_SDK`       | Enable SDK tracing         | `0`                   |
+| `PHASE3_VERBOSE`         | Enable verbose output      | `0`                   |
+| `PHASE3_DUMP_LLM`        | Dump failing LLM payloads  | `0`                   |
+| `PHASE3_CONFIG`          | Path to custom config file | `neda/.ai-agent.json` |
 
 ### Example: Running with Tracing
 
@@ -334,7 +348,7 @@ npm run test:phase3:tier1
 ### For New Features
 
 1. Add Phase 1 unit tests for isolated logic
-2. Add Phase 2 harness tests for integration behavior
+2. Add Phase 2 tests (deterministic harness or live provider tests)
 3. Run full test suite before PR
 
 ---

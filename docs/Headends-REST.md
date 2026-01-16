@@ -31,7 +31,6 @@ The REST API headend provides a simple HTTP interface for executing agents. Use 
 **Key features**:
 
 - GET-based API (easy to test with browser/curl)
-- Streaming via Server-Sent Events (SSE)
 - Concurrency limiting
 - JSON and Markdown output formats
 
@@ -216,7 +215,7 @@ Missing or invalid parameters.
 {
   "success": false,
   "output": "",
-  "finalReport": null,
+  "finalReport": undefined,
   "error": "Query parameter q is required"
 }
 ```
@@ -229,7 +228,7 @@ Agent not registered.
 {
   "success": false,
   "output": "",
-  "finalReport": null,
+  "finalReport": undefined,
   "error": "Agent 'chat' not registered"
 }
 ```
@@ -242,21 +241,36 @@ Using POST instead of GET for built-in routes.
 {
   "success": false,
   "output": "",
-  "finalReport": null,
+  "finalReport": undefined,
   "error": "method_not_allowed"
 }
 ```
 
 ### 500 Internal Server Error
 
-Agent execution failed.
+Agent execution failed. When the session completes but with errors, includes any partial output generated before failure.
 
 ```json
 {
   "success": false,
   "output": "Partial output before failure...",
   "error": "LLM communication failed",
-  "finalReport": null
+  "finalReport": {
+    "format": "markdown",
+    "content": "...partial response..."
+  },
+  "reasoning": "Agent attempted to call LLM..."
+}
+```
+
+When an unexpected error occurs, output is empty and finalReport is undefined:
+
+```json
+{
+  "success": false,
+  "output": "",
+  "error": "Unexpected error message",
+  "finalReport": undefined
 }
 ```
 
@@ -268,7 +282,7 @@ Concurrency limit reached.
 {
   "success": false,
   "output": "",
-  "finalReport": null,
+  "finalReport": undefined,
   "error": "concurrency_unavailable"
 }
 ```
@@ -308,17 +322,6 @@ const response = await fetch(
 );
 const data = await response.json();
 console.log(data.output);
-
-// With streaming
-const response = await fetch("http://localhost:8080/v1/chat?q=Hello");
-const reader = response.body.getReader();
-const decoder = new TextDecoder();
-
-while (true) {
-  const { done, value } = await reader.read();
-  if (done) break;
-  console.log(decoder.decode(value));
-}
 ```
 
 ### JavaScript (Browser)
@@ -363,7 +366,7 @@ ai-agent --agent chat.ai --api 8081
 
 ### Agent not found (404)
 
-**Symptom**: `{"success": false, "output": "", "finalReport": null, "error": "Agent 'xxx' not registered"}`
+**Symptom**: `{"success": false, "output": "", "finalReport": undefined, "error": "Agent 'xxx' not registered"}`
 
 **Cause**: The agent ID in the URL doesn't match any registered agent.
 
@@ -391,9 +394,9 @@ ai-agent --agent chat.ai --api 8081
 
 ### JSON format failing
 
-**Symptom**: `{"error": "JSON format requires schema"}`
+**Symptom**: Session fails with an error related to JSON output schema.
 
-**Cause**: Using `format=json` with an agent that has no output schema.
+**Cause**: Using `format=json` with an agent that has no output schema defined.
 
 **Solution**: Add an output schema to the agent frontmatter:
 

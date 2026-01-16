@@ -22,7 +22,7 @@ An agent file is a plain text file with a `.ai` extension that contains:
 1. **Frontmatter** (YAML) - Configuration at the top, between `---` markers
 2. **System Prompt** - Instructions for the agent after the frontmatter
 
-When you run `ai-agent --agent my-agent.ai`, the system:
+When you run `ai-agent my-agent.ai`, the system:
 
 1. Parses the frontmatter for configuration
 2. Extracts the system prompt
@@ -89,7 +89,7 @@ Respond in ${FORMAT}.
 Save as `assistant.ai` and run:
 
 ```bash
-ai-agent --agent assistant.ai "What is the capital of France?"
+ai-agent assistant.ai "What is the capital of France?"
 ```
 
 ### Agent with Tools
@@ -170,10 +170,10 @@ Agent files can be anywhere on the filesystem. Reference them with:
 
 ```bash
 # Relative path
-ai-agent --agent ./agents/my-agent.ai
+ai-agent ./agents/my-agent.ai
 
 # Absolute path
-ai-agent --agent /path/to/my-agent.ai
+ai-agent /path/to/my-agent.ai
 ```
 
 ### Recommended Organization
@@ -264,12 +264,12 @@ You coordinate research tasks. Delegate to specialists as needed.
 **Solution**: Remove these keys. Use CLI flags instead:
 
 ```bash
-ai-agent --stream --verbose --agent my-agent.ai
+ai-agent --stream --verbose my-agent.ai
 ```
 
-### "Must have exactly one '/' in provider/model"
+### "Invalid provider/model pair '${token}'. Expected format provider/model."
 
-**Problem**: Model specified without provider prefix.
+**Problem**: Model specified in incorrect format.
 
 **Solution**: Use `provider/model` format:
 

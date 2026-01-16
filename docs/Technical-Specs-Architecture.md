@@ -185,13 +185,13 @@ for turn = 1 to maxTurns:
 
 **Provider Types**:
 
-| Provider             | Kind    | Description                                |
-| -------------------- | ------- | ------------------------------------------ |
-| MCPProvider          | `mcp`   | Model Context Protocol tools               |
-| RestProvider         | `rest`  | REST/OpenAPI tools                         |
-| InternalToolProvider | `agent` | Built-in tools (final_report, task_status) |
-| AgentProvider        | `agent` | Sub-agent invocation                       |
-| RouterToolProvider   | `agent` | Router delegation tool                     |
+| Provider             | Kind    | Description                                                         |
+| -------------------- | ------- | ------------------------------------------------------------------- |
+| MCPProvider          | `mcp`   | Model Context Protocol tools                                        |
+| RestProvider         | `rest`  | REST/OpenAPI tools                                                  |
+| InternalToolProvider | `agent` | Built-in tools (final_report, task_status, batch, progress updates) |
+| AgentProvider        | `agent` | Sub-agent invocation                                                |
+| RouterToolProvider   | `agent` | Router delegation tool                                              |
 
 **Execution Flow**:
 
@@ -201,9 +201,9 @@ for turn = 1 to maxTurns:
 4. Begin opTree operation
 5. Apply timeout wrapper
 6. Call `provider.execute()`
-7. Apply response size cap
-8. Record accounting
-9. End opTree operation
+7. Record accounting
+8. End opTree operation
+9. Apply response size cap (via tool_output storage or truncation)
 
 ---
 
@@ -332,6 +332,14 @@ Session termination states returned in `AIAgentResult.exitCode`.
 | `EXIT-TOKEN-LIMIT`           | Token limit exceeded                  |
 | `EXIT-MAX-TURNS-NO-RESPONSE` | Max turns without valid response      |
 
+### Unexpected States
+
+| Exit Code                 | Description        |
+| ------------------------- | ------------------ |
+| `EXIT-UNCAUGHT-EXCEPTION` | Uncaught exception |
+| `EXIT-SIGNAL-RECEIVED`    | Signal received    |
+| `EXIT-UNKNOWN`            | Unknown error      |
+
 ---
 
 ## Session Configuration
@@ -343,7 +351,7 @@ Key configuration options that affect architecture behavior.
 | `targets`              | Array       | Model fallback chain (provider/model pairs) |
 | `systemPrompt`         | String      | System prompt template                      |
 | `maxTurns`             | Number      | Maximum action turns (default: 10)          |
-| `maxRetries`           | Number      | Max retries per turn (default: 5)           |
+| `maxRetries`           | Number      | Max retries per turn (default: 3)           |
 | `toolTimeout`          | Number      | Tool execution timeout in ms                |
 | `toolResponseMaxBytes` | Number      | Max tool response size before storage       |
 | `abortSignal`          | AbortSignal | Cancellation signal                         |

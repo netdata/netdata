@@ -20,6 +20,7 @@ Configure sub-agents that your agent can call as tools. Sub-agents enable delega
 ## Overview
 
 Sub-agents are other `.ai` agent files that your agent can call as tools. This enables:
+
 - **Specialization**: Each agent focuses on one task
 - **Reusability**: Same sub-agent used by multiple parents
 - **Composition**: Build complex systems from simple parts
@@ -79,7 +80,6 @@ output:
         items:
           type: string
 ---
-
 Search for information on the requested topic. Return findings with sources.
 ```
 
@@ -89,21 +89,23 @@ Search for information on the requested topic. Return findings with sources.
 
 ### agents
 
-| Property | Value |
-|----------|-------|
-| Type | `string` or `string[]` |
-| Default | `[]` (no sub-agents) |
+| Property     | Value                                     |
+| ------------ | ----------------------------------------- |
+| Type         | `string` or `string[]`                    |
+| Default      | `[]` (no sub-agents)                      |
 | Valid values | Relative or absolute paths to `.ai` files |
 
 **Description**: Sub-agent `.ai` files to load as tools. Each sub-agent becomes callable via `agent__<toolName>`.
 
 **What it affects**:
+
 - Available sub-agent tools
 - Multi-agent composition capabilities
 - Agent hierarchy and recursion
 - Resource usage (each sub-agent is a separate session)
 
 **Example**:
+
 ```yaml
 ---
 # Single sub-agent
@@ -122,14 +124,18 @@ agents:
 ```
 
 **Path Resolution**:
+
 - **Relative paths** resolve from the parent agent's directory
 - **Absolute paths** are used as-is
 
 **Tool Naming**:
 
 The tool name is `agent__<toolName>`:
+
 - If sub-agent has `toolName: researcher`, parent uses `agent__researcher`
-- If no `toolName`, derived from filename: `my-agent.ai` → `agent__my_agent`
+- If no `toolName`, derived from filename: `my-agent.ai` → `agent__my_agent` (filename is sanitized and lowercased)
+
+**Reserved tool names**: You cannot use these names for sub-agents: `task_status`, `final_report`, `batch`, `tool_output`
 
 ---
 
@@ -150,12 +156,14 @@ The tool name is `agent__<toolName>`:
 ### Communication
 
 **Parent → Sub-Agent**:
+
 ```
 Tool call: agent__researcher
-Input: { "prompt": "Research AI trends in 2024" }
+Input: { "prompt": "Research AI trends in 2024", "format": "sub-agent", "reason": "Research current trends" }
 ```
 
 **Sub-Agent → Parent**:
+
 ```
 Tool result: {
   "findings": ["AI spending increased 50%", "LLMs dominate"],
@@ -166,12 +174,14 @@ Tool result: {
 ### Isolation
 
 Each sub-agent session is completely isolated:
+
 - Own model and provider instances
 - Own MCP server connections
 - Own turn count and limits
 - Own accounting (aggregated to parent)
 
 The parent cannot:
+
 - Access sub-agent's internal state
 - Modify sub-agent's conversation
 - Share tools directly with sub-agent
@@ -184,19 +194,24 @@ When parent calls a sub-agent:
 {
   "tool": "agent__researcher",
   "input": {
-    "prompt": "Research AI trends"
+    "prompt": "Research AI trends",
+    "format": "sub-agent",
+    "reason": "Need to research current AI trends"
   }
 }
 ```
 
-If sub-agent has `input` schema, the input must match:
+**Note**: When using the default text format (no explicit `input` schema), you must include `"format": "sub-agent"` and `"reason"` is required.
+
+If sub-agent has explicit `input` schema with `format: json`, the `reason` field is automatically added to the schema and must be included in all calls. The input must match the schema:
 
 ```json
 {
   "tool": "agent__researcher",
   "input": {
     "query": "AI trends",
-    "maxResults": 10
+    "maxResults": 10,
+    "reason": "Get recent AI research findings"
   }
 }
 ```
@@ -281,6 +296,7 @@ input:
 Parent coordinates specialists:
 
 **Parent** (`coordinator.ai`):
+
 ```yaml
 ---
 description: Research project coordinator
@@ -333,6 +349,7 @@ Process documents through the pipeline:
 Same sub-agent used by multiple parents:
 
 **Shared** (`/shared/fact_checker.ai`):
+
 ```yaml
 ---
 description: Verifies facts against reliable sources
@@ -354,12 +371,14 @@ output:
 ```
 
 **Parent A** uses it:
+
 ```yaml
 agents:
   - /shared/fact_checker.ai
 ```
 
 **Parent B** uses it:
+
 ```yaml
 agents:
   - /shared/fact_checker.ai
@@ -370,6 +389,7 @@ agents:
 Sub-agents can have their own sub-agents:
 
 **Level 1** (`main.ai`):
+
 ```yaml
 ---
 agents:
@@ -378,6 +398,7 @@ agents:
 ```
 
 **Level 2** (`./research/coordinator.ai`):
+
 ```yaml
 ---
 agents:
@@ -387,6 +408,7 @@ agents:
 ```
 
 **Notes on nesting**:
+
 - Recursion is detected and prevented (A→B→A)
 - Deep nesting increases latency and cost
 
@@ -427,16 +449,17 @@ output:
       - name
       - summary
 ---
-
 Analyze the provided company and return structured data.
 ```
 
 Parent calls it:
+
 ```json
 {
   "tool": "agent__company_analyzer",
   "input": {
-    "company": "Acme Corp"
+    "company": "Acme Corp",
+    "reason": "Need company analysis for Acme Corp"
   }
 }
 ```
@@ -452,6 +475,7 @@ Parent calls it:
 **Cause**: Sub-agents require `description` for tool listing.
 
 **Solution**: Add description to sub-agent:
+
 ```yaml
 ---
 description: Handles data processing tasks
@@ -467,12 +491,12 @@ models:
 **Cause**: Same explicit `toolName` or derived from similar filenames.
 
 **Solution**: Use unique `toolName` values:
+
 ```yaml
 # researcher-v1.ai
 ---
 toolName: researcher_v1
 ---
-
 # researcher-v2.ai
 ---
 toolName: researcher_v2
@@ -486,6 +510,7 @@ toolName: researcher_v2
 **Cause**: Agent A includes Agent B which includes Agent A.
 
 **Solution**: Remove the circular reference:
+
 ```yaml
 # A.ai includes B.ai
 # B.ai should NOT include A.ai
@@ -498,6 +523,7 @@ toolName: researcher_v2
 **Cause**: Path is incorrect or file doesn't exist.
 
 **Solution**: Check path resolution:
+
 ```yaml
 # Relative to parent's directory
 agents:
@@ -513,11 +539,13 @@ agents:
 **Problem**: Parent agent never calls the sub-agent.
 
 **Causes**:
+
 1. Sub-agent's `description` unclear
 2. Parent prompt doesn't mention the sub-agent
 3. Task doesn't require delegation
 
 **Solutions**:
+
 1. Improve sub-agent description
 2. Mention sub-agent in parent prompt:
    ```yaml
@@ -532,6 +560,7 @@ agents:
 **Cause**: Task too complex for sub-agent's turn limit.
 
 **Solutions**:
+
 1. Increase sub-agent's `maxTurns`
 2. Simplify sub-agent's task scope
 3. Split into multiple sub-agents
@@ -543,6 +572,7 @@ agents:
 **Cause**: Parent's input doesn't match sub-agent's `input` schema.
 
 **Solution**: Check schema and parent's call format:
+
 ```yaml
 # Sub-agent expects:
 input:
@@ -556,7 +586,7 @@ input:
       - query
 
 # Parent must call with:
-# { "query": "search term" }
+# { "query": "search term", "reason": "Need to search for specific term" }
 ```
 
 ---

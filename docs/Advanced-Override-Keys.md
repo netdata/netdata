@@ -207,7 +207,7 @@ ai-agent --agent test.ai --override repeatPenalty=1.1 "query"
 | Property     | Value                                     |
 | ------------ | ----------------------------------------- |
 | Type         | `number` (ms) or duration string          |
-| Default      | `600000` (10 minutes)                     |
+| Default      | `600000` (2 minutes)                      |
 | Valid values | Positive integer or duration (`5s`, `2m`) |
 | Example      | `llmTimeout=300000`                       |
 
@@ -349,7 +349,7 @@ ai-agent --agent test.ai --override reasoning=medium "query"
 | Property     | Value                                       |
 | ------------ | ------------------------------------------- |
 | Type         | `integer` or `string`                       |
-| Default      | Computed from reasoning level               |
+| Default      | `undefined` (provider/model decides)        |
 | Valid values | Positive integer, `disabled`, `off`, `none` |
 | Example      | `reasoningTokens=16000`                     |
 
@@ -374,7 +374,7 @@ ai-agent --agent test.ai --override reasoningTokens=disabled "query"
 | Valid values | `true`, `false`, or field name  |
 | Example      | `interleaved=reasoning_content` |
 
-**Description**: Control interleaved reasoning injection for OpenAI-compatible providers.
+**Description**: Configure interleaved reasoning injection.
 
 ```bash
 # Disable interleaved reasoning
@@ -396,7 +396,7 @@ ai-agent --agent test.ai --override interleaved=reasoning_content "query"
 | Property     | Value                                      |
 | ------------ | ------------------------------------------ |
 | Type         | `string`                                   |
-| Default      | Off                                        |
+| Default      | `undefined` (no caching)                   |
 | Valid values | `off`, duration (`5m`, `1h`), milliseconds |
 | Example      | `cache=1h`                                 |
 
@@ -446,12 +446,12 @@ ai-agent --agent test.ai --override stream=false "query"
 
 #### mcpInitConcurrency
 
-| Property     | Value                  |
-| ------------ | ---------------------- |
-| Type         | `integer`              |
-| Default      | Varies                 |
-| Valid values | `1` or greater         |
-| Example      | `mcpInitConcurrency=4` |
+| Property     | Value                            |
+| ------------ | -------------------------------- |
+| Type         | `integer`                        |
+| Default      | `undefined` (resolved elsewhere) |
+| Valid values | `1` or greater                   |
+| Example      | `mcpInitConcurrency=4`           |
 
 **Description**: Override MCP server initialization concurrency.
 

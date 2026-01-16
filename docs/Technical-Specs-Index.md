@@ -62,15 +62,15 @@ Fundamental architecture and runtime behavior.
 
 LLM provider integrations and protocol handling.
 
-| Document            | Location                                                       | Description                         |
-| ------------------- | -------------------------------------------------------------- | ----------------------------------- |
-| Providers Overview  | [specs/providers-overview.md](specs/providers-overview.md)     | Provider architecture and interface |
-| OpenAI Provider     | [specs/providers-openai.md](specs/providers-openai.md)         | OpenAI API integration              |
-| Anthropic Provider  | [specs/providers-anthropic.md](specs/providers-anthropic.md)   | Anthropic API integration           |
-| Google Provider     | [specs/providers-google.md](specs/providers-google.md)         | Google AI API integration           |
-| OpenRouter Provider | [specs/providers-openrouter.md](specs/providers-openrouter.md) | OpenRouter API integration          |
-| Ollama Provider     | [specs/providers-ollama.md](specs/providers-ollama.md)         | Ollama local API integration        |
-| Test Provider       | [specs/providers-test.md](specs/providers-test.md)             | Mock provider for testing           |
+| Document | Location | Description |
+| -------- | -------- | ----------- |
+
+| OpenAI Provider | [specs/providers-openai.md](specs/providers-openai.md) | OpenAI API integration |
+| Anthropic Provider | [specs/providers-anthropic.md](specs/providers-anthropic.md) | Anthropic API integration |
+| Google Provider | [specs/providers-google.md](specs/providers-google.md) | Google AI API integration |
+| OpenRouter Provider | [specs/providers-openrouter.md](specs/providers-openrouter.md) | OpenRouter API integration |
+| Ollama Provider | [specs/providers-ollama.md](specs/providers-ollama.md) | Ollama local API integration |
+| Test Provider | [specs/providers-test.md](specs/providers-test.md) | Mock provider for testing |
 
 ---
 
@@ -160,10 +160,12 @@ Internal reference and troubleshooting documents.
 
 | Document     | Location                                                         | Description                  |
 | ------------ | ---------------------------------------------------------------- | ---------------------------- |
+| Specs Index  | [specs/index.md](specs/index.md)                                 | Complete specs index         |
+| Specs README | [specs/README.md](specs/README.md)                               | Directory overview           |
 | Internal API | [specs/AI-AGENT-INTERNAL-API.md](specs/AI-AGENT-INTERNAL-API.md) | Internal agent API reference |
 | AGENTS.md    | [specs/AGENTS.md](specs/AGENTS.md)                               | Agent system reference       |
-| CLAUDE.md    | [specs/CLAUDE.md](specs/CLAUDE.md)                               | Claude-specific notes        |
-| GEMINI.md    | [specs/GEMINI.md](specs/GEMINI.md)                               | Gemini-specific notes        |
+| CLAUDE.md    | [specs/CLAUDE.md](specs/CLAUDE.md)                               | Meta-specification format    |
+| GEMINI.md    | [specs/GEMINI.md](specs/GEMINI.md)                               | Meta-specification format    |
 | REASONING.md | [specs/REASONING.md](specs/REASONING.md)                         | Reasoning guidance           |
 | SLACK.md     | [specs/SLACK.md](specs/SLACK.md)                                 | Slack integration notes      |
 | CRUSH.md     | [specs/CRUSH.md](specs/CRUSH.md)                                 | CRUSH protocol notes         |
@@ -190,10 +192,10 @@ Architecture decisions and design rationale.
 
 User-facing guarantees and SLAs.
 
-| Document      | Location                                                             | Description                       |
-| ------------- | -------------------------------------------------------------------- | --------------------------------- |
-| User Contract | [specs/CONTRACT.md](specs/CONTRACT.md)                               | End-user behavioral guarantees    |
-| AI Guide      | [skills/ai-agent-configuration.md](skills/ai-agent-configuration.md) | AI-facing configuration reference |
+| Document      | Location                                                                       | Description                       |
+| ------------- | ------------------------------------------------------------------------------ | --------------------------------- |
+| User Contract | [specs/CONTRACT.md](specs/CONTRACT.md)                                         | End-user behavioral guarantees    |
+| AI Guide      | [docs/skills/ai-agent-configuration.md](docs/skills/ai-agent-configuration.md) | AI-facing configuration reference |
 
 **Wiki Page**: [User Contract](Technical-Specs-User-Contract)
 
@@ -225,18 +227,18 @@ Testing approaches and harness usage.
 
 ### By Use Case
 
-| Use Case                   | Start Here                                                       |
-| -------------------------- | ---------------------------------------------------------------- |
-| Understanding architecture | [specs/architecture.md](specs/architecture.md)                   |
-| Debugging session issues   | [specs/session-lifecycle.md](specs/session-lifecycle.md)         |
-| Context window problems    | [specs/context-management.md](specs/context-management.md)       |
-| Retry/error behavior       | [specs/retry-strategy.md](specs/retry-strategy.md)               |
-| Model information          | [specs/models-overview.md](specs/models-overview.md)             |
-| Adding a provider          | [specs/providers-overview.md](specs/providers-overview.md)       |
-| Tool development           | [specs/tools-overview.md](specs/tools-overview.md)               |
-| Headend development        | [specs/headends-overview.md](specs/headends-overview.md)         |
-| Configuration questions    | [specs/configuration-loading.md](specs/configuration-loading.md) |
-| Contract guarantees        | [specs/CONTRACT.md](specs/CONTRACT.md)                           |
+| Use Case                   | Start Here                                                 |
+| -------------------------- | ---------------------------------------------------------- |
+| Understanding architecture | [specs/architecture.md](specs/architecture.md)             |
+| Debugging session issues   | [specs/session-lifecycle.md](specs/session-lifecycle.md)   |
+| Context window problems    | [specs/context-management.md](specs/context-management.md) |
+| Retry/error behavior       | [specs/retry-strategy.md](specs/retry-strategy.md)         |
+| Model information          | [specs/models-overview.md](specs/models-overview.md)       |
+
+| Tool development | [specs/tools-overview.md](specs/tools-overview.md) |
+| Headend development | [specs/headends-overview.md](specs/headends-overview.md) |
+| Configuration questions | [specs/configuration-loading.md](specs/configuration-loading.md) |
+| Contract guarantees | [specs/CONTRACT.md](specs/CONTRACT.md) |
 
 ### By File Type
 

@@ -300,22 +300,22 @@ Complete MCP server configuration schema:
 
 ### All Options
 
-| Property           | Type               | Default     | Description                                |
-| ------------------ | ------------------ | ----------- | ------------------------------------------ |
-| `type`             | `string`           | Required    | Transport type                             |
-| `command`          | `string`           | -           | Command to run (stdio only)                |
-| `args`             | `string[]`         | `[]`        | Command arguments (stdio only)             |
-| `url`              | `string`           | -           | Server URL (http/sse/websocket)            |
-| `headers`          | `object`           | `{}`        | HTTP headers                               |
-| `env`              | `object`           | `{}`        | Environment variables (stdio only)         |
-| `queue`            | `string`           | `"default"` | Concurrency queue name                     |
-| `cache`            | `string \| number` | -           | Response cache TTL (no caching by default) |
-| `toolsCache`       | `object`           | `{}`        | Per-tool cache TTL overrides               |
-| `shared`           | `boolean`          | `true`      | Share server across sessions               |
-| `healthProbe`      | `string`           | `"ping"`    | Health check method                        |
-| `requestTimeoutMs` | `number \| string` | -           | Per-request timeout                        |
-| `toolsAllowed`     | `string[]`         | `["*"]`     | Tool allowlist                             |
-| `toolsDenied`      | `string[]`         | `[]`        | Tool denylist                              |
+| Property           | Type               | Default     | Description                                   |
+| ------------------ | ------------------ | ----------- | --------------------------------------------- |
+| `type`             | `string`           | Required    | Transport type                                |
+| `command`          | `string`           | -           | Command to run (stdio only)                   |
+| `args`             | `string[]`         | `[]`        | Command arguments (stdio only)                |
+| `url`              | `string`           | -           | Server URL (http/sse/websocket)               |
+| `headers`          | `object`           | `{}`        | HTTP headers                                  |
+| `env`              | `object`           | `{}`        | Environment variables (stdio only)            |
+| `queue`            | `string`           | `"default"` | Concurrency queue name                        |
+| `cache`            | `string \| number` | -           | Response cache TTL (no caching by default)    |
+| `toolsCache`       | `object`           | `{}`        | Per-tool cache TTL overrides                  |
+| `shared`           | `boolean`          | `true`      | Share server across sessions (default `true`) |
+| `healthProbe`      | `string`           | `"ping"`    | Health check method                           |
+| `requestTimeoutMs` | `number \| string` | -           | Per-request timeout                           |
+| `toolsAllowed`     | `string[]`         | `["*"]`     | Tool allowlist (default `["*"]`)              |
+| `toolsDenied`      | `string[]`         | `[]`        | Tool denylist                                 |
 
 ### Duration Formats
 
@@ -327,7 +327,7 @@ The following properties accept duration strings:
 | `toolsCache.*`     | `off`, milliseconds, duration | `"off"`, `60000`, `"5m"`, `"1h"` |
 | `requestTimeoutMs` | milliseconds, duration        | `60000`, `"30s"`, `"2m"`         |
 
-Duration units: `ms`, `s`, `m`, `h`, `d`, `w`
+Duration units: `ms`, `s`, `m`, `h`, `d`, `w`, `mo`, `y`
 
 ---
 
@@ -428,6 +428,8 @@ Override cache TTL for specific tools:
 | Hours        | `"1h"`  | 1 hour     |
 | Days         | `"1d"`  | 1 day      |
 | Weeks        | `"1w"`  | 1 week     |
+| Months       | `"1mo"` | 1 month    |
+| Years        | `"1y"`  | 1 year     |
 
 ---
 
@@ -551,10 +553,11 @@ Restart delays: `0, 1, 2, 5, 10, 30, 60` seconds (60s repeats)
 
 ### Logging
 
-Every restart decision is logged with `ERR` severity:
+Restart attempts are logged with `WRN` severity. Failed restart attempts are logged with `ERR` severity:
 
 ```
-[ERR] MCP server 'github' exited, scheduling restart (attempt 1, delay 1000ms)
+[WRN] shared restart attempt 1 for 'github' (transport-exit)
+[ERR] shared MCP server restart failed (attempt 1): connection refused [server='github', type=stdio]
 ```
 
 ### Stopping Restarts
@@ -650,7 +653,7 @@ Error: Tool 'mcp__server__tool' not found
 ### Initialization timeout (60s)
 
 ```
-Error: MCP server 'name' initialization timed out
+Error: MCP server 'name' initialization timed out after 60s
 ```
 
 **Causes:**
@@ -668,7 +671,7 @@ Error: MCP server 'name' initialization timed out
 ### Timeout during tool execution
 
 ```
-Error: Tool 'mcp__server__tool' timed out
+Error: Tool execution timed out
 ```
 
 **Causes:**

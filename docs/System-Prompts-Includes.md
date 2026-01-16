@@ -121,15 +121,15 @@ ${include:../shared/tone.md}              # Goes up one level, into shared/
 ${include:../shared/domain/product-info.md}
 ```
 
-### Absolute Paths (Not Supported)
+### Absolute Paths (Supported but Not Recommended)
 
-Absolute paths do not work:
+Absolute paths work but are discouraged for portability:
 
 ```markdown
-${include:/home/user/project/shared/file.md} # Will fail
+${include:/home/user/project/shared/file.md} # Works but not portable
 ```
 
-Use relative paths instead.
+Use relative paths for better portability across different environments.
 
 ---
 
@@ -478,7 +478,7 @@ ${include:shared/tone.md} # Wrong - looks in agents/shared/
 
 ### "Maximum include depth exceeded"
 
-**Problem**: Include nesting is too deep (> 8 levels).
+**Problem**: Include nesting is too deep (8 levels).
 
 **Cause**: Circular reference or excessively nested includes.
 

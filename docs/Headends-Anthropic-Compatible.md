@@ -173,8 +173,6 @@ Or with content array:
 | `role`    | `string`            | `user`, `assistant` | Message author role |
 | `content` | `string` or `array` | Any                 | Message content     |
 
-> **Note**: Messages with `tool_use` or `tool_result` blocks are rejected. Tool calling happens internally within agents.
-
 ### JSON Output Format
 
 For structured JSON output:
@@ -343,9 +341,9 @@ const stream = await client.messages.stream({
 for await (const event of stream) {
   if (
     event.type === "content_block_delta" &&
-    event.delta.type === "text_delta"
+    event.content_block.type === "text"
   ) {
-    process.stdout.write(event.delta.text);
+    process.stdout.write(event.content_block.text_delta);
   }
 }
 ```

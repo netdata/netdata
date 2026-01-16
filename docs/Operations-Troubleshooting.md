@@ -25,7 +25,7 @@ Problem/Cause/Solution reference for AI Agent issues.
 
 **Problem**: `Configuration file not found`
 
-**Cause**: `.ai-agent.json` not in current directory or parent directories.
+**Cause**: `.ai-agent.json` not in current directory, prompt directory, or `~/.ai-agent/ai-agent.json`.
 
 **Solution**:
 
@@ -94,7 +94,7 @@ head -50 myagent.ai | sed -n '/^---$/,/^---$/p'
 2. Use `--dry-run` to validate
 3. Review frontmatter documentation
 
-Valid keys: `models`, `maxTurns`, `maxToolCallsPerTurn`, `toolResponseMaxBytes`, `cache`, `toolsAllowed`, etc.
+Valid keys: `models`, `maxTurns`, `maxToolCallsPerTurn`, `toolResponseMaxBytes`, `cache`, etc.
 
 ---
 
@@ -206,7 +206,7 @@ ai-agent --agent myagent.ai --dry-run
 
 ### Provider Timeout
 
-**Problem**: `Request timeout after 120000ms`
+**Problem**: `Request timeout after 600000ms`
 
 **Cause**: LLM taking too long to respond.
 
@@ -525,7 +525,7 @@ cache: 1h
 
 2. Check provider supports caching (Anthropic does, some don't)
 
-3. Verify in accounting (check `cacheReadInputTokens`):
+3. Verify in accounting (check `cacheReadInputTokens` nested under `tokens`):
 
 ```bash
 tail -10 ~/.ai-agent/accounting.jsonl | jq '.tokens'

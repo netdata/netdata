@@ -65,7 +65,7 @@ If no `default` queue is defined, one is injected automatically:
 ```json
 {
   "queues": {
-    "default": { "concurrent": 32 }
+    "default": { "concurrent": 16 }
   }
 }
 ```
@@ -75,6 +75,14 @@ If no `default` queue is defined, one is injected automatically:
 - All tools without explicit queue assignment use `default`
 - Provides baseline concurrency control
 - Override with custom `default` configuration
+
+### Default Concurrency
+
+The injected default queue computes concurrency based on hardware:
+
+- Formula: `coreCount * 2` (from `os.availableParallelism()` or `os.cpus().length`)
+- Clamped between 1 and 64
+- Example values: 4 cores → 8, 8 cores → 16, 16 cores → 32
 
 ---
 
@@ -153,8 +161,7 @@ Assign a queue to a REST tool:
 When all slots are in use, new requests wait:
 
 ```
-[tool] queued: mcp__slow-server__query (queue: heavy, waiting: 2)
-[tool] acquired: mcp__slow-server__query (queue: heavy, wait: 1523ms)
+ts=2025-01-16T12:34:56.789Z level=vrb type=tool direction=request turn=1 subturn=2 remote=queue:heavy message=queued queue=heavy wait_ms=1523 queued_depth=2 queue_capacity=2
 ```
 
 ### FIFO Order
@@ -163,11 +170,17 @@ Waiting requests are processed in order (first-in, first-out).
 
 ### Queue Bypass
 
-The `agent__batch` tool bypasses queue concurrency to enable parallel tool execution within a batch. Other internal tools (`agent__final_report`, `agent__task_status`) use normal queue behavior.
+Internal tools do not use queue concurrency, while MCP and REST tools always acquire queue slots.
 
-| Tool           | Purpose                                                         |
-| -------------- | --------------------------------------------------------------- |
-| `agent__batch` | Batch tool execution (bypasses queues for parallel inner tools) |
+| Tool           | Purpose                                     |
+| -------------- | ------------------------------------------- |
+| `agent__batch` | Batch tool execution (internal, no queuing) |
+
+### Internal Tool Queue Behavior
+
+Internal tools (`agent__batch`, `agent__final_report`, `agent__task_status`) do not acquire queue slots. They execute immediately regardless of queue capacity.
+
+Tools invoked inside `agent__batch` (MCP and REST tools) follow normal queue behavior and must acquire slots.
 
 ---
 
@@ -368,10 +381,7 @@ Queue metrics are exported for monitoring:
 
 ```promql
 # Average wait time per queue
-avg(ai_agent_queue_wait_duration_ms) by (queue)
-
-# Queue utilization (waiting + in-use) / capacity
-(ai_agent_queue_depth + ai_agent_queue_in_use) / on(queue) group_left() (avg(ai_agent_queue_in_use) by (queue) / sum(quantile_over_time(ai_agent_queue_in_use[5m], 0.5)))
+rate(ai_agent_queue_wait_duration_ms_sum[5m]) / rate(ai_agent_queue_wait_duration_ms_count[5m]) by (queue)
 ```
 
 ---
@@ -386,13 +396,18 @@ With `--verbose`:
 ai-agent --agent test.ai --verbose "query"
 ```
 
-Output:
+Output (logfmt format):
 
 ```
-[tool] queued: mcp__api__query (queue: heavy, waiting: 2)
-[tool] acquired: mcp__api__query (queue: heavy, wait: 1523ms)
-[tool] completed: mcp__api__query (queue: heavy, duration: 3241ms)
+ts=2025-01-16T12:34:56.789Z level=vrb type=tool direction=request turn=1 subturn=2 remote=queue:heavy message=queued queue=heavy wait_ms=1523 queued_depth=2 queue_capacity=2
 ```
+
+A `queued` log entry is emitted only when a tool waits for a slot. The log includes:
+
+- `queue`: Queue name
+- `wait_ms`: Time spent waiting (milliseconds)
+- `queued_depth`: Position in wait queue when acquired
+- `queue_capacity`: Maximum concurrent executions for this queue
 
 ### Monitor Metrics
 
@@ -416,17 +431,9 @@ curl localhost:9090/metrics | grep ai_agent_queue
 
 **Deadlock symptoms:**
 
-- Internal tools should bypass queues
-- Check for circular dependencies
-- Verify queue assignments
-
-### Trace Queue Operations
-
-```bash
-DEBUG=queue ai-agent --agent test.ai "query"
-```
-
-Shows detailed queue acquisition/release operations.
+- Internal tools do not use queues (this is expected behavior)
+- Check for circular dependencies between tools
+- Verify queue assignments are valid
 
 ---
 

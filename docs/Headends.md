@@ -78,19 +78,19 @@ ai-agent \
 
 Each headend type has its own concurrency limit to prevent resource exhaustion:
 
-| CLI Option                                | Default | Description                  |
-| ----------------------------------------- | ------- | ---------------------------- |
-| `--api-concurrency <n>`                   | 10      | REST API concurrent sessions |
-| `--openai-completions-concurrency <n>`    | 10      | OpenAI headend sessions      |
-| `--anthropic-completions-concurrency <n>` | 10      | Anthropic headend sessions   |
-| `--embed-concurrency <n>`                 | 10      | Embed headend sessions       |
+| CLI Option                                | Default | Description                                                             |
+| ----------------------------------------- | ------- | ----------------------------------------------------------------------- |
+| `--api-concurrency <n>`                   | 10      | REST API concurrent sessions                                            |
+| `--openai-completions-concurrency <n>`    | 10      | OpenAI headend sessions                                                 |
+| `--anthropic-completions-concurrency <n>` | 10      | Anthropic headend sessions                                              |
+| `--embed-concurrency <n>`                 | 10      | Embed headend sessions (also configurable via embed.config.concurrency) |
 
 MCP and Slack headends use internal limits (10 concurrent sessions by default).
 
 **What happens when limit is reached**:
 
-- REST/OpenAI/Anthropic: Returns `503 Service Unavailable` with JSON error response
-- MCP: Blocks until a slot becomes available
+- REST/OpenAI/Anthropic/Embed: Returns `503 Service Unavailable` with JSON error response
+- MCP HTTP/SSE: Returns `503 Service Unavailable`; stdio has no concurrency limit
 - Slack: Queues the request
 
 ---

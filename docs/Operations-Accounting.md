@@ -210,8 +210,8 @@ cat accounting.jsonl | jq -s '
 ```bash
 cat accounting.jsonl | jq -s '
   map(select(.type == "llm")) |
-  group_by(.agentPath) |
-  map({agent: .[0].agentPath, cost: (map(.costUsd // 0) | add)})
+  group_by(.agentId) |
+  map({agent: .[0].agentId, cost: (map(.costUsd // 0) | add)})
 '
 ```
 

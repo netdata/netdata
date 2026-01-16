@@ -79,7 +79,6 @@ output:
 **What it affects**:
 
 - Displayed to parent agents when this agent is a sub-agent tool
-- Used in `--list-tools` output
 - Helps the LLM understand when to use this agent
 - Required for sub-agents (agent loader throws an error if missing)
 
@@ -133,10 +132,9 @@ description: Uses Claude 3.5 Sonnet with Brave search MCP
 
 **What it affects**:
 
-- Displayed in tool documentation
+- Displayed in tool documentation (as fallback for description if description is missing)
 - Helps parent agents understand how to call this agent
 - Shown in `--help` output when running the agent directly
-- Included in the tool's input schema description
 
 **Example**:
 

@@ -13,8 +13,8 @@ Deploy agents as Slack bots with Socket Mode integration, channel routing, and s
 - [Configuration Reference](#configuration-reference) - All config options
 - [Routing Configuration](#routing-configuration) - Channel and engagement routing
 - [Engagement Types](#engagement-types) - Mentions, DMs, channel posts
+- [Message Shortcuts](#message-shortcuts) - Message shortcuts
 - [Prompt Templates](#prompt-templates) - Customizing prompts per engagement
-- [Context Policy](#context-policy) - Thread context handling
 - [Opener Tones](#opener-tones) - Initial response styles
 - [Slash Commands](#slash-commands) - HTTP webhook commands
 - [Message Flow](#message-flow) - How messages are processed
@@ -283,7 +283,6 @@ The fallback when no rules match:
 | `agent`           | `string` | Path to agent file (relative to primary agent)                 |
 | `engage`          | `array`  | Engagement types to handle: `mentions`, `dms`, `channel-posts` |
 | `promptTemplates` | `object` | Custom prompts per engagement type                             |
-| `contextPolicy`   | `object` | Thread context handling                                        |
 
 ### Routing Rules
 
@@ -316,7 +315,6 @@ Ordered rules evaluated before the default:
 | `engage`          | `array`   | Engagement types                      |
 | `enabled`         | `boolean` | Enable/disable rule (default: `true`) |
 | `promptTemplates` | `object`  | Custom prompts                        |
-| `contextPolicy`   | `object`  | Context handling                      |
 
 ### Channel Patterns
 
@@ -358,8 +356,30 @@ Deny rules are evaluated **first**. If a deny matches, the message is ignored.
 | `mentions`      | `@YourBot hello` | User mentions the bot in a channel       |
 | `dms`           | Direct message   | User sends a direct message to the bot   |
 | `channel-posts` | Any message      | Any message in a channel (use carefully) |
+| `ask-bot`       | Message shortcut | User selects "Ask Bot" on a message      |
 
 **Warning**: `channel-posts` responds to ALL messages in matched channels. Use with caution and deny rules.
+
+---
+
+## Message Shortcuts
+
+### Ask Bot Shortcut
+
+Users can invoke a message shortcut on any Slack message to ask the bot about it. This routes like `channel-posts` with self-only context (no thread history).
+
+**Setup in Slack:**
+
+1. Go to **Interactivity & Shortcuts** in Slack app settings
+2. Click **Create New Shortcut**
+3. Configure:
+   - Name: `Ask Bot`
+   - Short Description: `Ask the AI agent about this message`
+   - Callback ID: `ask_bot`
+   - Trigger: **On messages**
+4. Click **Create**
+
+The shortcut extracts the message text, blocks, or attachments and sends them to the agent. If the bot is not a member of the channel, the response is sent as a DM.
 
 ---
 
@@ -391,23 +411,9 @@ Customize how user messages are presented to agents:
 
 ---
 
-## Context Policy
+## Context Handling
 
-Control how thread context is included:
-
-```json
-{
-  "contextPolicy": {
-    "channelPost": "selfAndPrevious"
-  }
-}
-```
-
-| Value             | Description                                      |
-| ----------------- | ------------------------------------------------ |
-| `selfOnly`        | Only include the current message                 |
-| `previousOnly`    | Include previous messages in thread, not current |
-| `selfAndPrevious` | Include both (default)                           |
+Thread context is automatically included for mentions and DMs based on the `historyLimit` and `historyCharsCap` settings. Channel posts do not include thread context.
 
 ---
 
@@ -423,12 +429,12 @@ Configure the initial response message style:
 }
 ```
 
-| Tone       | Example                               |
+| Tone       | Description                           |
 | ---------- | ------------------------------------- |
-| `random`   | Randomly selects from the others      |
-| `cheerful` | "On it! Let me help you with that..." |
-| `formal`   | "I'm processing your request..."      |
-| `busy`     | "Working on it..."                    |
+| `random`   | Randomly selects from all variations  |
+| `cheerful` | Enthusiastic, positive responses      |
+| `formal`   | Professional, business-like responses |
+| `busy`     | Quick, direct responses               |
 
 ---
 
@@ -584,11 +590,7 @@ If an agent fails:
 
 ### Rate Limiting
 
-Slack has rate limits. The headend:
-
-- Respects `Retry-After` headers
-- Queues messages during rate limiting
-- Logs rate limit events
+Slack has rate limits. Messages that hit rate limits will fail with API errors.
 
 ---
 
@@ -736,20 +738,8 @@ Slack has rate limits. The headend:
         {
           "channels": ["#engineering"],
           "agent": "./agents/technical.ai",
-          "engage": ["mentions"],
-          "contextPolicy": {
-            "channelPost": "selfOnly"
-          }
-        }
-      ],
-      "deny": [
-        {
-          "channels": ["#announcements", "#readonly-*"],
-          "engage": ["mentions", "channel-posts", "dms"]
-        }
-      ]
-    }
-  },
+          "engage": ["mentions"]
+        },
   "api": {
     "port": 8080
   }

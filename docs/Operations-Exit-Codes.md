@@ -20,14 +20,14 @@ Reference for AI Agent exit codes used in scripting and CI/CD pipelines.
 
 AI Agent uses standardized exit codes:
 
-| Code | Category                | Description                          |
-| ---- | ----------------------- | ------------------------------------ |
-| 0    | Success                 | Agent completed successfully         |
-| 1    | Configuration Error     | Invalid configuration or agent file  |
-| 2    | LLM Error               | Provider or model failure            |
-| 3    | Tool Error              | MCP server or tool execution failure |
-| 4    | CLI Error               | Invalid command-line arguments       |
-| 5    | Schema Validation Error | Tool schema validation failed        |
+| Code | Category                        | Description                                  |
+| ---- | ------------------------------- | -------------------------------------------- |
+| 0    | Success                         | Agent completed successfully                 |
+| 1    | Configuration Error             | Invalid configuration or agent file          |
+| 2    | LLM Error                       | Provider or model failure                    |
+| 3    | Tool Error                      | MCP server or tool execution failure         |
+| 4    | CLI Error                       | Invalid command-line arguments               |
+| 5    | Schema Validation or Tool Limit | Schema validation or max tool turns exceeded |
 
 ---
 
@@ -69,9 +69,8 @@ fi
 **Examples**:
 
 ```
-ERR: Failed to parse agent frontmatter: invalid YAML
-ERR: Unknown frontmatter key: unknownKey
-ERR: Configuration file not found: .ai-agent.json
+[VRB] ← [0.0] agent EXIT-LIST-TOOLS-CONFIG: failed to discover configuration layers: error message (fatal=true)
+[VRB] ← [0.0] agent EXIT-TOOL-OUTPUT-PREFLIGHT: tool_output preflight failed: error message (fatal=true)
 ```
 
 **Resolution**:
@@ -98,10 +97,7 @@ ERR: Configuration file not found: .ai-agent.json
 **Examples**:
 
 ```
-ERR: LLM communication error: 401 Unauthorized
-ERR: LLM request failed: 429 rate limited
-ERR: All retries exhausted for provider openai
-ERR: Context window exceeded
+[VRB] ← [0.0] agent EXIT-AGENT-FAILURE: agent failure: error message (fatal=true)
 ```
 
 **Resolution**:
@@ -127,9 +123,8 @@ ERR: Context window exceeded
 **Examples**:
 
 ```
-ERR: Failed to initialize MCP server: github
-ERR: Tool timeout after 30000 ms: mcp__api__slow_query
-ERR: Tool not found: mcp__server__unknown_tool
+[VRB] ← [0.0] agent EXIT-LIST-TOOLS-INIT: failed to initialize MCP server 'github': error message (fatal=true)
+[VRB] ← [0.0] agent EXIT-LIST-TOOLS-MISSING: Unknown MCP servers: github (fatal=true)
 ```
 
 **Resolution**:
@@ -155,9 +150,9 @@ ERR: Tool not found: mcp__server__unknown_tool
 **Examples**:
 
 ```
-ERR: Missing required argument: --agent
-ERR: Invalid --reasoning-tokens value: 'invalid'
-ERR: Unknown option: --invalid-flag
+[VRB] ← [0.0] agent EXIT-HEADEND-NO-AGENTS: headend mode requires at least one --agent <file> (fatal=true)
+[VRB] ← [0.0] agent EXIT-HEADEND-REASONING-TOKENS: invalid reasoningTokens value 'invalid' in config (fatal=true)
+[VRB] ← [0.0] agent EXIT-COMMANDER: error: option '--invalid-flag' not found (fatal=true)
 ```
 
 **Resolution**:
@@ -168,19 +163,20 @@ ERR: Unknown option: --invalid-flag
 
 ---
 
-### Exit Code 5: Schema Validation Error
+### Exit Code 5: Schema Validation or Tool Limit Exceeded
 
-**Meaning**: Tool schema validation failed during `--list-tools` operation.
+**Meaning**: Tool schema validation failed during `--list-tools` operation, or maximum tool turns exceeded.
 
 **Common causes**:
 
 - Tool input schema does not conform to the specified JSON Schema draft
 - Tool output schema validation errors
+- Maximum number of tool turns exceeded in a single session
 
 **Examples**:
 
 ```
-ERR: Schema validation failed for 3 tool(s)
+[VRB] ← [0.0] agent EXIT-LIST-TOOLS-SCHEMA: schema validation failed for 3 tool(s) (fatal=true)
 ```
 
 **Resolution**:

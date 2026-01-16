@@ -44,7 +44,7 @@ models:
   - openai/gpt-4o
 maxTurns: 10
 maxRetries: 3
-temperature: 0.3
+temperature: 0.2
 ---
 ```
 
@@ -149,7 +149,7 @@ maxToolCallsPerTurn: 5 # Limit parallel execution
 
 - LLMs can request multiple tool calls in one response
 - This setting limits how many are executed
-- Excess calls are queued for next turn
+- Exceeding the limit returns an error to the LLM, instructing it to retry on the next turn
 
 ---
 
@@ -204,13 +204,12 @@ maxRetries: 0 # No retries (fail immediately)
 
 ### llmTimeout
 
-| Property     | Value                                |
-| ------------ | ------------------------------------ |
-| Type         | `number` (ms) or `string` (duration) |
-| Default      | `600000` (10 minutes)                |
-| Valid values | Positive integer or duration string  |
-
-**Description**: How long to wait for the LLM to respond before timing out.
+| Property     | Value                                                                                   |
+| ------------ | --------------------------------------------------------------------------------------- |
+| Type         | `number` (ms) or `string` (duration)                                                    |
+| Default      | `600000` (10 minutes)                                                                   |
+| Description  | How long to wait for the LLM to respond (ms or duration like 5s/2m); default 10 minutes |
+| Valid values | Positive integer or duration string                                                     |
 
 **What it affects**:
 
@@ -295,7 +294,7 @@ toolTimeout: 30s # 30 seconds for fast tools
 | Property     | Value                                                    |
 | ------------ | -------------------------------------------------------- |
 | Type         | `number` or `null`                                       |
-| Default      | `0.0`                                                    |
+| Default      | `0.2`                                                    |
 | Valid values | `0.0` to `2.0`, or `null`/`none`/`off`/`unset`/`default` |
 
 **Description**: Controls response creativity/randomness. Lower values produce more focused, deterministic outputs.
@@ -425,7 +424,7 @@ topK: null # Don't send (use provider default)
 | Property     | Value          |
 | ------------ | -------------- |
 | Type         | `integer`      |
-| Default      | `4096`         |
+| Default      | `16384`        |
 | Valid values | `1` or greater |
 
 **Description**: Maximum number of tokens the model can generate per turn.
@@ -568,8 +567,8 @@ models:
 maxTurns: 3
 maxRetries: 2
 llmTimeout: 30s
-temperature: 0.3
-maxOutputTokens: 1024
+temperature: 0.2
+maxOutputTokens: 4096
 ---
 ```
 
@@ -586,7 +585,7 @@ maxRetries: 5
 llmTimeout: 5m
 toolTimeout: 3m
 temperature: 0.2
-maxOutputTokens: 8192
+maxOutputTokens: 16384
 ---
 ```
 
@@ -600,7 +599,7 @@ models:
 maxTurns: 5
 temperature: 0.9
 topP: 0.95
-maxOutputTokens: 4096
+maxOutputTokens: 8192
 repeatPenalty: 1.3
 ---
 ```

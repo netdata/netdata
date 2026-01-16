@@ -127,7 +127,6 @@ Need to guarantee isolation and predictability across agent runs:
 **Fresh session per run.**
 
 - Public API constructs new session per run
-- Retry operations create new session instances internally (with defensive copies of conversation, logs, accounting)
 - Sessions are never reused across runs (each run creates a new instance)
 
 ```mermaid
@@ -185,7 +184,7 @@ Under this model:
 **Negative**:
 
 - Cannot persist and resume sessions across separate runs
-- Retry operations continue conversation state (not a fresh start)
+- Each run creates a new session with empty conversation state
 - Tool connections re-established per run
 - Cold start for MCP servers
 

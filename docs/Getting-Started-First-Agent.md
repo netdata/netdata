@@ -111,6 +111,8 @@ Create a file named `researcher.ai`:
 #!/usr/bin/env ai-agent
 ---
 description: Web research agent that searches and summarizes
+expectedOutput:
+  format: markdown
 models:
   - openai/gpt-4o
 tools:
@@ -119,8 +121,6 @@ tools:
 maxTurns: 15
 maxToolCallsPerTurn: 5
 temperature: 0.3
-output:
-  format: markdown
 ---
 You are a thorough web researcher.
 
@@ -235,12 +235,14 @@ cache: 1h
 | `1h`  | 1 hour    |
 | `1d`  | 1 day     |
 | `1w`  | 1 week    |
+| `1mo` | 1 month   |
+| `1y`  | 1 year    |
 
 **How it works:**
 
 - Same agent + same prompt = cached response returned
 - Reduces costs and latency for repeated queries
-- Cache is stored locally in `~/.ai-agent/cache.db`
+- Cache is stored locally in `~/.ai-agent/cache.db` (default location; can be configured)
 
 **Test caching:**
 
@@ -273,10 +275,12 @@ maxRetries: 3
 
 **How fallbacks work:**
 
-1. First, tries `gpt-4o`
-2. If that fails (rate limit, timeout, error), tries `gpt-4o-mini`
-3. If that fails, tries `claude-sonnet-4-20250514`
-4. Each model gets `maxRetries` attempts before falling back
+For each turn, the agent iterates through the provider/model list:
+
+1. First, tries `openai/gpt-4o`
+2. If that fails (rate limit, timeout, error), tries the next model `openai/gpt-4o-mini`
+3. If that fails, tries `anthropic/claude-sonnet-4-20250514`
+4. Each **attempt** counts toward `maxRetries` (not each model - the entire turn fails after exhausting all provider/model combinations)
 
 **Requirements:**
 
@@ -318,11 +322,15 @@ curl -G "http://localhost:8080/v1/researcher" \
   "success": true,
   "output": "## Summary\n\nQuantum computing is...",
   "finalReport": {
-    "answer": "## Summary\n\nQuantum computing is..."
+    "format": "markdown",
+    "content": "## Summary\n\nQuantum computing is...",
+    "ts": 1737065534000
   },
   "reasoning": ""
 }
 ```
+
+Note: `ts` is a dynamic Unix timestamp in milliseconds (this example value is illustrative). When `format=json`, the response uses a `content_json` field instead of `content`.
 
 For production deployment options, see [Headends REST](Headends-REST).
 
@@ -339,6 +347,8 @@ description: Web research agent that searches and summarizes
 usage: |
   Ask any research question. Example:
   "What are the latest developments in quantum computing?"
+expectedOutput:
+  format: markdown
 models:
   - openai/gpt-4o
   - openai/gpt-4o-mini
@@ -350,8 +360,6 @@ maxToolCallsPerTurn: 5
 maxRetries: 3
 temperature: 0.3
 cache: 1h
-output:
-  format: markdown
 ---
 You are a thorough web researcher.
 

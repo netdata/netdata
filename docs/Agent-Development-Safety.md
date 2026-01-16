@@ -110,7 +110,7 @@ Respond with:
 - View ticket history
 ```
 
-**Tip:** Use configuration-level `toolsDenied` (in MCP server or provider config) to prevent dangerous tools from being exposed. The safety gate stops the agent from attempting those operations, providing helpful refusal messages.
+**Tip:** Use configuration-level `toolsDenied` (in MCP server config) to prevent dangerous tools from being exposed. The safety gate stops the agent from attempting those operations, providing helpful refusal messages.
 
 ---
 
@@ -159,7 +159,7 @@ If asked to create, update, delete, or modify files/branches:
 - Offer read-only alternatives if available
 ```
 
-**Layer 1 (Configuration)**: `toolsAllowed`/`toolsDenied` in MCP server or provider config blocks dangerous tools from being exposed.
+**Layer 1 (Configuration)**: `toolsAllowed`/`toolsDenied` in MCP server config blocks dangerous tools from being exposed.
 
 **Layer 2 (Prompt)**: Safety gate explains restrictions and provides helpful alternatives.
 

@@ -59,9 +59,9 @@ You coordinate a team of specialists.
 ## Your Team
 
 Call these tools to delegate work:
-- `researcher`: Gathers information on any topic
-- `writer`: Creates polished content
-- `reviewer`: Reviews and improves content
+- `agent__researcher`: Gathers information on any topic
+- `agent__writer`: Creates polished content
+- `agent__reviewer`: Reviews and improves content
 ```
 
 ### Sub-Agent Definition
@@ -104,8 +104,8 @@ Research the given topic thoroughly.
 ### How It Works
 
 1. Parent loads sub-agent configurations at startup
-2. Each sub-agent becomes a tool (named by filename without `.ai`)
-3. Parent calls them like any other tool: `{"name": "researcher", "arguments": {"topic": "..."}}`
+2. Each sub-agent becomes a tool (named by filename without `.ai`, prefixed with `agent__`)
+3. Parent calls them like any other tool: `{"name": "agent__researcher", "arguments": {"topic": "..."}}`
 4. Sub-agent runs in a completely isolated session
 5. Result returns to parent as tool response
 
@@ -142,30 +142,32 @@ Consider all perspectives before deciding.
 Advisors run with the same user prompt. Their outputs are injected as XML blocks:
 
 ```xml
-<advisory agent="technical">
+<advisory__XXXXXXXXXX agent="technical">
 Technical analysis: The proposed solution uses a microservices architecture
 which requires Kubernetes expertise...
-</advisory>
+</advisory__XXXXXXXXXX>
 
-<advisory agent="business">
+<advisory__XXXXXXXXXX agent="business">
 Business impact: This would affect revenue by approximately 15% in Q3...
-</advisory>
+</advisory__XXXXXXXXXX>
 
-<advisory agent="legal">
+<advisory__XXXXXXXXXX agent="legal">
 Legal considerations: GDPR compliance requires explicit consent...
-</advisory>
+</advisory__XXXXXXXXXX>
 ```
 
 The main agent sees all advisory blocks before processing.
+
+**Note:** Tag names include a random nonce suffix (`__XXXXXXXXXX`) for uniqueness and security.
 
 ### Handling Advisor Failures
 
 If an advisor fails (timeout, error), a synthetic advisory is created:
 
 ```xml
-<advisory agent="legal">
+<advisory__XXXXXXXXXX agent="legal">
 Advisor consultation failed for legal: timeout after 60000ms
-</advisory>
+</advisory__XXXXXXXXXX>
 ```
 
 The main agent continues regardless - advisory failures don't block execution.
@@ -223,12 +225,12 @@ The router pattern exposes a special `router__handoff-to` tool:
 The optional `message` becomes an advisory for the destination:
 
 ```xml
-<advisory agent="decision-maker">
+<advisory__XXXXXXXXXX agent="router">
 User is experiencing login issues on mobile
-</advisory>
+</advisory__XXXXXXXXXX>
 ```
 
-The advisory agent is the name of the agent that made the routing decision (not "router"). This helps the destination agent understand why it was invoked.
+The advisory agent is the name of the agent that made the routing decision. This helps the destination agent understand why it was invoked.
 
 ---
 
@@ -255,7 +257,7 @@ models:
   - openai/gpt-4o
 handoff: ./final.ai
 ---
-Review and improve the draft. The draft is in <response> tags.
+Review and improve the draft. The draft is in `<response__XXXXXXXXXX>` tags.
 ```
 
 ```yaml
@@ -272,9 +274,9 @@ Produce the final polished version.
 The previous agent's output is wrapped in XML:
 
 ```xml
-<response agent="draft">
+<response__XXXXXXXXXX agent="draft">
 Here is the draft content I created...
-</response>
+</response__XXXXXXXXXX>
 ```
 
 The receiving agent processes this wrapped content.

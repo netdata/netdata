@@ -49,7 +49,7 @@ Configuration files are searched in this order:
 - **First found wins** for most settings
 - **On-demand resolution**: Only providers/tools actually used are resolved
 - **Missing files**: Silently skipped (all layers are optional)
-- **No config found**: Fails with `Configuration file not found` error
+- **No config found**: All layers may be missing; built-in defaults apply
 
 ### Example
 
@@ -115,18 +115,6 @@ All string values in configuration support `${VAR}` expansion.
   }
 }
 ```
-
-### Default Values
-
-Use `:-` for fallback defaults:
-
-```json
-{
-  "baseUrl": "${OPENAI_BASE_URL:-https://api.openai.com/v1}"
-}
-```
-
-If `OPENAI_BASE_URL` is unset or empty, uses the default value.
 
 ### Home Directory
 
@@ -232,21 +220,11 @@ Provider settings can be overridden per-model:
 }
 ```
 
-### Merge Strategy
-
-Provider configuration supports three merge strategies:
-
-| Strategy            | Behavior                                            |
-| ------------------- | --------------------------------------------------- |
-| `overlay` (default) | Model settings add to/override provider settings    |
-| `override`          | Model settings completely replace provider settings |
-| `deep`              | Deep merge of model settings into provider settings |
-
 ### Resolution Order
 
 For model-specific settings:
 
-1. `models.<model>.<setting>` (model-specific)
+1. `models.<model>.overrides.<setting>` (model-specific)
 2. `<setting>` at provider level
 3. Built-in default
 
@@ -424,7 +402,6 @@ Unresolved variable ${OPENAI_API_KEY} for provider 'openai' at home. Define it i
 
 1. Add to `~/.ai-agent/ai-agent.env`: `OPENAI_API_KEY=sk-...`
 2. Export in shell: `export OPENAI_API_KEY=sk-...`
-3. Use default syntax: `${OPENAI_API_KEY:-sk-default}`
 
 ### Unknown queue error
 

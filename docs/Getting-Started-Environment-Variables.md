@@ -29,11 +29,15 @@ ai-agent uses environment variables for:
 
 **Variable sources (in priority order):**
 
-| Priority | Source                               | Description        |
-| -------- | ------------------------------------ | ------------------ |
-| 1        | Shell environment                    | `export VAR=value` |
-| 2        | `.ai-agent.env` in current directory | Project-specific   |
-| 3        | `~/.ai-agent/ai-agent.env`           | User-wide defaults |
+| Priority | Source                         | Description                    |
+| -------- | ------------------------------ | ------------------------------ |
+| 1        | `--config` path (if specified) | Explicit config path           |
+| 2        | Current working directory      | `.ai-agent.json/.ai-agent.env` |
+| 3        | Agent file directory           | `.ai-agent.json/.ai-agent.env` |
+| 4        | Binary directory               | `.ai-agent.json/.ai-agent.env` |
+| 5        | `~/.ai-agent/`                 | User-wide defaults             |
+| 6        | `/etc/ai-agent/`               | System-wide configuration      |
+| -        | Shell environment              | `export VAR=value` (fallback)  |
 
 ---
 
@@ -103,10 +107,16 @@ Store environment variables in a file for persistent configuration.
 
 ### File Locations
 
-| Location                   | Scope                       | Priority |
-| -------------------------- | --------------------------- | -------- |
-| `.ai-agent.env`            | Current directory (project) | Higher   |
-| `~/.ai-agent/ai-agent.env` | User home (global)          | Lower    |
+Environment files are searched in this priority order:
+
+| Priority | Location                          | Description                          |
+| -------- | --------------------------------- | ------------------------------------ |
+| 1        | Same directory as `--config` path | If using `--config` option           |
+| 2        | Current working directory         | `.ai-agent.env` in cwd               |
+| 3        | Agent file directory              | `.ai-agent.env` beside `.ai` file    |
+| 4        | Binary directory                  | Where `ai-agent` binary is installed |
+| 5        | `~/.ai-agent/`                    | User home directory                  |
+| 6        | `/etc/ai-agent/`                  | System-wide configuration            |
 
 ### File Format
 
@@ -162,30 +172,18 @@ Enable debugging output for troubleshooting.
 
 | Variable        | Type    | Default | Description                                                   |
 | --------------- | ------- | ------- | ------------------------------------------------------------- |
-| `DEBUG`         | boolean | `false` | Enable AI SDK debug mode; dumps raw LLM payloads to stderr    |
+| `DEBUG`         | boolean | `false` | Enable AI SDK logging warnings                                |
 | `CONTEXT_DEBUG` | boolean | `false` | Enable detailed context guard debugging; shows token counting |
 
 ### Usage
 
-**Enable LLM payload debugging:**
+**Enable AI SDK warnings:**
 
 ```bash
 DEBUG=true ai-agent --agent test.ai "Hello"
 ```
 
-**Expected additional output:**
-
-```
-[DEBUG] LLM Request: {
-  model: "openai/gpt-4o-mini",
-  messages: [...],
-  tools: [...]
-}
-[DEBUG] LLM Response: {
-  content: "Hello! ...",
-  usage: { promptTokens: 123, completionTokens: 45 }
-}
-```
+This enables additional warning messages from the AI SDK.
 
 **Enable context window debugging:**
 
@@ -198,12 +196,6 @@ CONTEXT_DEBUG=true ai-agent --agent test.ai "Hello"
 ```
 [CONTEXT] Token count: 1234/128000 (1%)
 [CONTEXT] Message compression: none needed
-```
-
-**Enable both:**
-
-```bash
-DEBUG=true CONTEXT_DEBUG=true ai-agent --agent test.ai "Hello"
 ```
 
 ---
@@ -245,15 +237,15 @@ ai-agent --agent my-agent.ai "What time is it?"
 
 System information variables used internally and available for prompt substitution.
 
-| Variable      | Source           | Description               | Example Value         |
-| ------------- | ---------------- | ------------------------- | --------------------- |
-| `USER`        | System           | Current username          | `costa`               |
-| `USERNAME`    | System (Windows) | Fallback for USER         | `costa`               |
-| `HOME`        | System           | Home directory path       | `/home/costa`         |
-| `USERPROFILE` | System (Windows) | Fallback for HOME         | `C:\Users\costa`      |
-| `PWD`         | System           | Current working directory | `/home/costa/project` |
+| Variable | Source                              | Description         | Example Value |
+| -------- | ----------------------------------- | ------------------- | ------------- |
+| `USER`   | `os.userInfo()` with fallback       | Current username    | `costa`       |
+| `HOME`   | `process.env.HOME` or `USERPROFILE` | Home directory path | `/home/costa` |
 
-These are read-only and come from the operating system.
+These are computed at runtime:
+
+- `USER` uses `os.userInfo().username` and falls back to `process.env.USER` or `process.env.USERNAME`
+- `HOME` uses `process.env.HOME` with fallback to `process.env.USERPROFILE`
 
 ---
 
@@ -375,13 +367,13 @@ All environment variables in one table:
 | `ANTHROPIC_API_KEY` | API Key | string | Required | Anthropic API key |
 | `GOOGLE_API_KEY` | API Key | string | Required | Google AI API key |
 | `OPENROUTER_API_KEY` | API Key | string | Required | OpenRouter API key |
-| `DEBUG`              | Debug    | boolean | `false`                  | Enable LLM payload debugging    |
+| `DEBUG`              | Debug    | boolean | `false`                  | Enable AI SDK logging warnings    |
 | `CONTEXT_DEBUG`      | Debug    | boolean | `false`                  | Enable context window debugging |
 | `OPENROUTER_REFERER` | Provider | string  | `https://ai-agent.local` | OpenRouter HTTP-Referer header  |
 | `OPENROUTER_TITLE`   | Provider | string  | `ai-agent`               | OpenRouter X-Title header       |
 | `TZ`                 | System   | string  | System default           | Timezone override               |
-| `USER`               | System   | string  | System user              | Current username                |
-| `HOME`               | System   | string  | System home              | Home directory path             |
+| `USER`               | System   | string  | Computed from os.userInfo() with env fallback | Current username |
+| `HOME`               | System   | string  | From process.env.HOME or USERPROFILE | Home directory path |
 
 ---
 

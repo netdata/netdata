@@ -52,8 +52,8 @@ AI Agent is designed library-first. The core performs no I/O and communicates en
 ## Quick Start
 
 ```typescript
-import { AIAgent } from "ai-agent";
-import type { AIAgentSessionConfig, Configuration } from "ai-agent";
+import { AIAgent } from "ai-agent-claude";
+import type { AIAgentSessionConfig, Configuration } from "ai-agent-claude";
 
 // Load your configuration
 const config: Configuration = {
@@ -91,7 +91,7 @@ console.log(`Success: ${result.success}`);
 ### From npm
 
 ```bash
-npm install ai-agent
+npm install ai-agent-claude
 ```
 
 ### Package Entry Points
@@ -583,10 +583,17 @@ const sessionConfig: AIAgentSessionConfig = {
           guidelines: { type: "string" },
         },
       },
+      hasExplicitInputSchema: true,
+      systemTemplate: "You are a code reviewer...",
+      loaded: {
+        /* LoadedAgent object created by agent loader */
+      },
     },
   ],
 };
 ```
+
+**Note**: `PreloadedSubAgent` objects are typically created by the agent loader when parsing `.ai` files. The `loaded` field is a runtime `LoadedAgent` object with `createSession` and `run` methods.
 
 ### With Abort Signal
 
@@ -759,8 +766,8 @@ if (!result.success) {
 
 ```typescript
 import express from "express";
-import { AIAgent } from "ai-agent";
-import type { AIAgentSessionConfig, Configuration } from "ai-agent";
+import { AIAgent } from "ai-agent-claude";
+import type { AIAgentSessionConfig, Configuration } from "ai-agent-claude";
 
 const app = express();
 app.use(express.json());
@@ -808,7 +815,7 @@ app.listen(3000, () => {
 
 ```typescript
 import express from "express";
-import { AIAgent } from "ai-agent";
+import { AIAgent } from "ai-agent-claude";
 
 const app = express();
 app.use(express.json());
@@ -852,8 +859,8 @@ app.post("/stream", async (req, res) => {
 ### Multi-Turn Conversation
 
 ```typescript
-import { AIAgent } from "ai-agent";
-import type { ConversationMessage } from "ai-agent";
+import { AIAgent } from "ai-agent-claude";
+import type { ConversationMessage } from "ai-agent-claude";
 
 async function chat(
   message: string,
@@ -931,7 +938,7 @@ const sessionConfig = {
 
 **Solutions**:
 
-1. Run `npm install ai-agent`
+1. Run `npm install ai-agent-claude`
 2. Set `"module": "NodeNext"` in tsconfig.json
 3. Verify `dist/` directory exists in package
 

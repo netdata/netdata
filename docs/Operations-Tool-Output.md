@@ -73,15 +73,21 @@ Fine-tune extraction behavior:
 toolOutput:
   enabled: true # Enable/disable storage (default: true)
   maxChunks: 1 # Max chunks per extraction
-  overlapPercent: 10 # Chunk overlap percentage
+  overlapPercent: 10 # Chunk overlap percentage (0-50)
+  avgLineBytesThreshold: 1000 # Threshold for choosing full-chunked mode
+  models: ["openai/gpt-4o"] # Target models for extraction
 ---
 ```
 
-| Option           | Type    | Default | Description                   |
-| ---------------- | ------- | ------- | ----------------------------- |
-| `enabled`        | boolean | `true`  | Enable tool output storage    |
-| `maxChunks`      | number  | `1`     | Maximum chunks for extraction |
-| `overlapPercent` | number  | `10`    | Overlap between chunks (0-50) |
+| Option                  | Type             | Default   | Description                                     |
+| ----------------------- | ---------------- | --------- | ----------------------------------------------- |
+| `enabled`               | boolean          | `true`    | Enable tool output storage                      |
+| `maxChunks`             | number           | `1`       | Maximum chunks for extraction                   |
+| `overlapPercent`        | number           | `10`      | Overlap between chunks (0-50)                   |
+| `avgLineBytesThreshold` | number           | `1000`    | Threshold for choosing full-chunked mode        |
+| `models`                | string\|string[] | undefined | Target models for extraction (provider/modelId) |
+
+**Note**: The `storeDir` option is accepted but ignored. Storage root is always `/tmp/ai-agent-<run-hash>`.
 
 ---
 
@@ -158,15 +164,17 @@ The `tool_output` tool allows targeted content retrieval:
 }
 ```
 
-### Extract Options
+### Extract Parameter
 
-| Extract Command | Description          | Example                   |
-| --------------- | -------------------- | ------------------------- |
-| `lines N-M`     | Specific line range  | `lines 1-100`             |
-| `first N lines` | First N lines        | `first 50 lines`          |
-| `last N lines`  | Last N lines         | `last 50 lines`           |
-| `grep PATTERN`  | Lines matching regex | `grep "function.*export"` |
-| `summary`       | AI-generated summary | `summary`                 |
+The `extract` parameter accepts free-form natural language instructions. Provide precise, detailed instructions about what content you need from the stored output, including specific keys, fields, sections, or patterns if known.
+
+**Examples**:
+
+- "Extract all function definitions"
+- "Find lines containing 'export default' and show 10 lines of context around each"
+- "List all error messages with their line numbers"
+- "Get the configuration section and summarize its values"
+- "Find all occurrences of pattern 'TODO' or 'FIXME'"
 
 ### Example Usage
 
@@ -177,7 +185,7 @@ The `tool_output` tool allows targeted content retrieval:
   "tool": "tool_output",
   "arguments": {
     "handle": "session-abc123/file-xyz789",
-    "extract": "lines 1-100"
+    "extract": "Extract all function definitions with their parameter types"
   }
 }
 ```
@@ -185,13 +193,15 @@ The `tool_output` tool allows targeted content retrieval:
 **Response**:
 
 ```
-[Lines 1-100 of 1234]
+ABSTRACT FROM TOOL OUTPUT tool_name WITH HANDLE session-abc123/file-xyz789, STRATEGY:full-chunked:
 
-function search(query: string) {
-  // ... first 100 lines of content
+function search(query: string): SearchResult {
+  // implementation...
 }
 
-[Showing lines 1-100. Use tool_output to get more lines.]
+function processData(input: Data): void {
+  // implementation...
+}
 ```
 
 ---
@@ -206,11 +216,11 @@ Tool output files are stored in a temporary directory:
     └── <file-uuid>
 ```
 
-| Component      | Description                |
-| -------------- | -------------------------- |
-| `run-hash`     | Hash of process start time |
-| `session-uuid` | Session transaction ID     |
-| `file-uuid`    | Unique file identifier     |
+| Component      | Description                                                                |
+| -------------- | -------------------------------------------------------------------------- |
+| `run-hash`     | 12-character hash of process identifier (PID), start time, and random UUID |
+| `session-uuid` | Session transaction ID                                                     |
+| `file-uuid`    | Unique file identifier                                                     |
 
 **Lifecycle**:
 
@@ -232,7 +242,10 @@ Storage events are logged:
 
 **Log details** include:
 
-- `tool`: Tool name
+- `tool`: Composed tool name (e.g., `mcp:filesystem/read_file`)
+- `tool_namespace`: Tool namespace (e.g., `filesystem`)
+- `provider`: Provider label (e.g., `mcp:filesystem`)
+- `tool_kind`: Tool kind (`mcp`, `rest`, `agent`, etc.)
 - `handle`: Storage handle (e.g. `session-abc/file-xyz`)
 - `reason`: Trigger reason (`size_cap`, `token_budget`, or `reserve_failed`)
 - `bytes`: Original response size in bytes
@@ -250,12 +263,14 @@ Tool accounting includes storage info:
   "timestamp": 1737012800000,
   "status": "ok",
   "latency": 150,
-  "mcpServer": "mcp:filesystem",
+  "mcpServer": "filesystem",
   "command": "read_file",
   "charactersIn": 256,
-  "charactersOut": 512
+  "charactersOut": 345
 }
 ```
+
+**Note**: When a response is stored, `charactersOut` is the length of the handle message (not the original output). `mcpServer` is the server namespace (not including the `mcp:` prefix).
 
 **Tool response details** (in `details` object) include:
 
@@ -263,13 +278,13 @@ Tool accounting includes storage info:
 - `tool_output_reason`: Trigger reason (`size_cap`, `token_budget`, or `reserve_failed`)
 - `truncated`: `true` when output was stored
 
-| Field                | Description                                     |
-| -------------------- | ----------------------------------------------- |
-| `tool_output_handle` | Storage handle                                  |
-| `tool_output_reason` | Trigger reason                                  |
-| `truncated`          | Whether response was stored/truncated           |
-| `charactersIn`       | Tool request size (parameters)                  |
-| `charactersOut`      | Response size (handle message or actual output) |
+| Field                | Description                                        |
+| -------------------- | -------------------------------------------------- |
+| `tool_output_handle` | Storage handle (when stored)                       |
+| `tool_output_reason` | Trigger reason (when stored)                       |
+| `truncated`          | Whether response was stored (replaced with handle) |
+| `charactersIn`       | Tool request size (parameters)                     |
+| `charactersOut`      | Response size (handle message or actual output)    |
 
 ---
 
@@ -329,8 +344,8 @@ models:
 toolResponseMaxBytes: 15000
 ---
 For code search results:
-  - If stored, use grep to find relevant patterns first
-  - Then extract specific line ranges
+  - If stored, ask for pattern matching first
+  - Then extract specific code sections with context
   - Focus on the most relevant matches
 ```
 
@@ -372,8 +387,8 @@ the content you need. Start with a summary or grep for relevant patterns.
 **Solution**:
 
 1. Increase `toolResponseMaxBytes` for this agent
-2. Guide LLM to extract larger chunks
-3. Use `summary` extraction first to understand content
+2. Guide LLM to extract more content in each call by using detailed instructions
+3. Ask LLM to summarize sections first to understand what's available
 
 ---
 

@@ -130,11 +130,11 @@ See [Testing Guide](Contributing-Testing) for detailed instructions.
 
 ### Documentation
 
-| Rule                   | Description                                            |
-| ---------------------- | ------------------------------------------------------ |
-| Synchronized updates   | Every behavior change updates specs at the same commit |
-| Spec-first development | Write or update specs before implementation            |
-| AI-AGENT-GUIDE.md      | Source of truth for AI assistants creating agents      |
+| Rule                                  | Description                                            |
+| ------------------------------------- | ------------------------------------------------------ |
+| Synchronized updates                  | Every behavior change updates specs at the same commit |
+| Spec-first development                | Write or update specs before implementation            |
+| docs/skills/ai-agent-configuration.md | Source of truth for AI assistants creating agents      |
 
 See [Documentation Standards](Contributing-Documentation) for detailed guidelines.
 

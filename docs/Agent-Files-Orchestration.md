@@ -111,8 +111,8 @@ advisors:
 1. All advisors run **in parallel** before the main session
 2. Each advisor receives the user's prompt
 3. Advisor outputs are collected
-4. Outputs are injected into the main agent's context
-5. Main session runs with advisory context available
+4. Outputs are injected as tagged XML blocks at the start of the user prompt
+5. Main session runs with advisory blocks in the prompt
 
 ### Execution Flow
 
@@ -145,7 +145,7 @@ User Request
 Advisors are regular `.ai` files. They should:
 
 - Have a `description`
-- Return useful advisory content
+- Return useful advisory content (final_report or last assistant message)
 - Be fast (they block the main session)
 
 **Example advisor** (`./advisors/compliance.ai`):
@@ -211,9 +211,10 @@ router:
 
 1. Router agent receives the user's request
 2. Router analyzes and decides which destination to use
-3. Router calls `router__handoff-to` tool with the destination
-4. Destination agent takes over and produces the final response
-5. Destination's response becomes the final output
+3. Router calls `router__handoff-to` tool with the destination to declare intent
+4. Orchestration layer executes the handoff after the router session completes
+5. Destination agent takes over and produces the final response
+6. Destination's response is merged into the overall result
 
 ### The router\_\_handoff-to Tool
 
@@ -652,7 +653,7 @@ agents:
 
 ## See Also
 
-- [Agent-Files](Agent-Files) - Overview of .ai file structure
-- [Agent-Files-Sub-Agents](Agent-Files-Sub-Agents) - On-demand agent delegation (tools)
-- [Agent-Files-Contracts](Agent-Files-Contracts) - Input/output for orchestration agents
-- [Technical-Specs-Session-Lifecycle](Technical-Specs-Session-Lifecycle) - How sessions execute
+- [Agent-Files](Agent-Files.md) - Overview of .ai file structure
+- [Agent-Files-Sub-Agents](Agent-Files-Sub-Agents.md) - On-demand agent delegation (tools)
+- [Agent-Files-Contracts](Agent-Files-Contracts.md) - Input/output for orchestration agents
+- [Technical-Specs-Session-Lifecycle](Technical-Specs-Session-Lifecycle.md) - How sessions execute

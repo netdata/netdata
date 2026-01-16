@@ -63,15 +63,19 @@ Include information the model cannot infer:
 
 Current time: ${DATETIME}
 Timezone: ${TIMEZONE}
-Operating system: ${OS}
 
 ## Your Tools
 
-You have access to:
+You have access to web search and file system tools. Actual tool names depend on your `tools:` frontmatter configuration.
 
-- `brave_search`: Web search for current information
-- `file_read`: Read files from the user's system
+Example tools include web search providers (brave, serper, jina), file readers (filesystem), or sub-agents (.ai files).
 ```
+
+**Note**: Available variables depend on invocation context:
+
+- **Always available**: DATETIME, TIMESTAMP, DAY, TIMEZONE, MAX_TURNS, MAX_TOOLS, FORMAT
+- **CLI only**: OS, ARCH, KERNEL, HOSTNAME, USER, CD (not available in REST, embed, Slack, or sub-agent contexts)
+- See [System-Prompts-Variables](System-Prompts-Variables) for complete reference
 
 ### 4. Use Clear Structure
 
@@ -111,7 +115,7 @@ You are a [role] that [primary function].
 # Context
 
 Current time: ${DATETIME}
-User: ${USER}
+Current user: ${USER}
 
 # Capabilities
 
@@ -141,6 +145,8 @@ Respond in ${FORMAT}.
 
 [Provide 1-3 examples of good responses]
 ```
+
+**Note**: The `USER` variable is only available in CLI context. Use `${DATETIME}` and `${FORMAT}` for cross-context compatibility.
 
 ---
 
@@ -301,11 +307,6 @@ maxTurns: 20
 
 You are a senior software engineer helping with code tasks.
 
-## Context
-
-Working directory: ${CD}
-Operating system: ${OS}
-
 ## Approach
 
 1. Understand the codebase before making changes
@@ -323,6 +324,8 @@ When showing code:
 - Show context around changes
 - Explain why, not just what
 ```
+
+**Note**: `CD` and `OS` variables are only available in CLI context. For cross-context agents, omit these or document they are CLI-specific.
 
 ### Customer Support Agent
 
@@ -443,7 +446,7 @@ Respond in ${FORMAT}.
 ## Tool Usage
 
 - Before calling a tool, state why you need it
-- Use `brave_search` for current information only
+- Use web search tools for current information only
 - Limit to 3 tool calls per turn unless necessary
 - If a tool fails, try an alternative approach
 ```
@@ -516,4 +519,6 @@ Track changes to your prompts like code. Small changes can have big effects.
 - [System-Prompts](System-Prompts) - Chapter overview
 - [System-Prompts-Includes](System-Prompts-Includes) - Reusing prompt content
 - [System-Prompts-Variables](System-Prompts-Variables) - All available variables
-- [Agent-Development-Frontmatter](Agent-Development-Frontmatter) - Configuration reference
+- [Agent-Development](Agent-Development) - Agent configuration and `.ai` file structure
+- [Agent-Files-Identity](Agent-Files-Identity) - `description`, `usage`, `toolName` fields
+- [Agent-Files-Behavior](Agent-Files-Behavior) - Runtime options (maxTurns, temperature, etc.)

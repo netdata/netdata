@@ -37,12 +37,7 @@ Monitor, debug, and maintain AI Agent deployments in production environments.
 ai-agent --agent myagent.ai --dry-run
 ```
 
-Validates configuration without making LLM calls. Shows:
-
-- Parsed frontmatter
-- Resolved model chain
-- Available tools
-- Configuration errors
+Validates configuration without making LLM calls. Exits with message "dry run complete: configuration and MCP servers validated".
 
 ### Enable Verbose Output
 
@@ -53,11 +48,11 @@ ai-agent --agent myagent.ai --verbose "test query"
 Shows turn-by-turn progress:
 
 ```
-VRB 1.0 → LLM main: openai/gpt-4o messages 3, 1523 bytes
-VRB 1.0 ← LLM main: LLM response received [2341ms, tokens: in 1523, out 456]
+VRB 1.0 → LLM main: openai/gpt-4o messages 3, 1247 bytes
+VRB 1.0 ← LLM main: LLM response received [$0.003456, 2341ms, tokens: in 1523, out 456]
 VRB 1.0 → MCP github:github search_code
 VRB 1.0 ← MCP github:github search_code [523ms, 12456 bytes]
-FIN 1.0 ← LLM main: requests=2 failed=0, tokens prompt=3046 output=912 cacheR=0 cacheW=0 total=3958
+FIN 1.0 ← LLM: requests=2 failed=0, tokens prompt=3046 output=912 cacheR=0 cacheW=0 total=3958, cost total=$0.00000 upstream=$0.00000, latency sum=2341ms avg=1170ms, providers/models: openai/gpt-4o
 ```
 
 ### Full Tracing
@@ -83,12 +78,12 @@ Enables internal debugging output for:
 
 ## Key Directories and Files
 
-| Path                             | Purpose                      |
-| -------------------------------- | ---------------------------- |
-| `~/.ai-agent/sessions/*.json.gz` | Session snapshots (gzipped)  |
-| `~/.ai-agent/accounting.jsonl`   | Token/cost accounting ledger |
-| `~/.ai-agent/cache.db`           | Response cache database      |
-| `/opt/neda/.ai-agent/sessions/`  | Production session snapshots |
+| Path                             | Purpose                                              |
+| -------------------------------- | ---------------------------------------------------- |
+| `~/.ai-agent/sessions/*.json.gz` | Session snapshots (gzipped)                          |
+| `~/.ai-agent/accounting.jsonl`   | Token/cost accounting ledger                         |
+| `~/.ai-agent/cache.db`           | Response cache database                              |
+| `/opt/neda/.ai-agent/sessions/`  | Production session snapshots (conventional location) |
 
 ### Session Snapshot Filename
 
@@ -108,12 +103,12 @@ ls -lt ~/.ai-agent/sessions/*.json.gz | head -1
 
 ## Environment Variables
 
-| Variable               | Purpose                                   | Default        |
-| ---------------------- | ----------------------------------------- | -------------- |
-| `DEBUG`                | Enable AI SDK debug output                | `false`        |
-| `CONTEXT_DEBUG`        | Enable context window debugging           | `false`        |
-| `AI_TELEMETRY_DISABLE` | Disable telemetry collection              | `false`        |
-| `HOME`                 | User home directory for config resolution | System default |
+| Variable               | Purpose                                                 | Default        |
+| ---------------------- | ------------------------------------------------------- | -------------- |
+| `DEBUG`                | Enable AI SDK debug output                              | Not set        |
+| `CONTEXT_DEBUG`        | Enable context window debugging                         | Not set        |
+| `AI_TELEMETRY_DISABLE` | Disable telemetry collection (values: 1, true, yes, on) | Not set        |
+| `HOME`                 | User home directory for config resolution               | System default |
 
 ### Example: Production Debug Session
 

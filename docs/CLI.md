@@ -57,6 +57,9 @@ ai-agent --agent tools.ai --mcp stdio
 
 # Multiple headends simultaneously
 ai-agent --agent main.ai --api 8080 --mcp stdio --slack
+
+# With concurrency limits
+ai-agent --agent api.ai --api 8080 --api-concurrency 10
 ```
 
 ### Debug and Inspect
@@ -128,6 +131,13 @@ Triggered when any headend flag is present:
 - `--embed <port>` - Embeddable chat widget
 - `--slack` - Slack Socket Mode
 
+Concurrency controls (headend-specific):
+
+- `--api-concurrency <n>` - Maximum concurrent REST API sessions
+- `--openai-completions-concurrency <n>` - Maximum concurrent OpenAI chat sessions
+- `--anthropic-completions-concurrency <n>` - Maximum concurrent Anthropic chat sessions
+- `--embed-concurrency <n>` - Maximum concurrent embed sessions
+
 ---
 
 ## Getting Help
@@ -136,6 +146,7 @@ Triggered when any headend flag is present:
 
 ```bash
 ai-agent --version
+ai-agent -V
 ```
 
 ### Help Output
@@ -159,6 +170,9 @@ ai-agent --list-tools all
 
 # List tools from a specific server
 ai-agent --list-tools github
+
+# Validate tool schemas against JSON Schema drafts
+ai-agent --list-tools all --schema-validate draft-07
 ```
 
 ---
@@ -194,8 +208,18 @@ Apply only to the top-level agent (not inherited by sub-agents):
 Apply to master agent and inherited by sub-agents when unset:
 
 - `--temperature` - Response creativity
+- `--top-p` - Token selection diversity (0.0-1.0)
+- `--top-k` - Limits token selection to K most probable tokens
 - `--max-turns` - Turn limit
 - `--max-retries` - Retry count
+- `--max-output-tokens` - Maximum response length per turn
+- `--repeat-penalty` - Reduces repetitive text (1.0=off, higher=stronger)
+- `--max-tool-calls-per-turn` - Maximum parallel tool calls per turn
+- `--reasoning` - Reasoning effort level (none, minimal, low, medium, high)
+- `--default-reasoning` - Default reasoning for agents that omit it
+- `--reasoning-tokens` - Reasoning token budget for Anthropic thinking mode
+- `--caching` - Anthropic caching mode (full or none)
+- `--cache` - Response cache TTL (off or duration like 5s/2m)
 - Timeout settings
 
 ### All Models Overrides
@@ -214,7 +238,27 @@ Application-level settings:
 - `--config` - Configuration file path
 - `--dry-run` - Validation mode
 - `--quiet` - Suppress output
-- Telemetry settings
+- `--sessions-dir` - Session save location
+- `--billing-file` - Token usage log
+- `--resume` - Resume interrupted session
+- `--save-all <dir>` - Save all agent and sub-agent conversations to directory
+- `--show-tree` - Dump full execution tree (ASCII) at the end
+- `--mcp-init-concurrency <n>` - MCP server initialization concurrency
+- Telemetry settings:
+  - `--telemetry-enabled` - Enable OTLP metrics / Prometheus
+  - `--telemetry-otlp-endpoint` - OTLP gRPC endpoint
+  - `--telemetry-otlp-timeout-ms` - OTLP export timeout
+  - `--telemetry-prometheus-enabled` - Expose Prometheus /metrics endpoint
+  - `--telemetry-prometheus-host` - Prometheus /metrics host interface
+  - `--telemetry-prometheus-port` - Prometheus /metrics port
+  - `--telemetry-traces-enabled` - Enable OTLP tracing
+  - `--telemetry-trace-sampler` - Tracing sampler (always_on, always_off, parent, ratio)
+  - `--telemetry-trace-ratio` - Sampling ratio (0-1) when sampler=ratio
+  - `--telemetry-label` - Additional telemetry labels (key=value)
+  - `--telemetry-log-format` - Logging format (journald, logfmt, json, none)
+  - `--telemetry-log-extra` - Additional log sinks (e.g., otlp)
+  - `--telemetry-logging-otlp-endpoint` - OTLP endpoint for log exports
+  - `--telemetry-logging-otlp-timeout-ms` - OTLP timeout for log exports
 
 ---
 

@@ -138,7 +138,6 @@ ai-agent --agent chat.ai --mcp sse:8082
 | Protocol    | WebSocket (ws://)              |
 | Sessions    | Per-connection                 |
 | Concurrency | Default 10 concurrent sessions |
-| Subprotocol | `mcp`                          |
 
 Bi-directional streaming communication.
 
@@ -166,10 +165,6 @@ When an agent has no custom input schema:
 {
   "type": "object",
   "properties": {
-    "prompt": {
-      "type": "string",
-      "description": "The user prompt"
-    },
     "format": {
       "type": "string",
       "enum": [
@@ -180,14 +175,23 @@ When an agent has no custom input schema:
         "pipe",
         "json",
         "sub-agent"
-      ]
+      ],
+      "description": "Output format to request from agent. Choose one of:\nmarkdown: GitHub Markdown.\nmarkdown+mermaid: GitHub Markdown with Mermaid diagrams.\nslack-block-kit: Slack Block Kit payload.\ntty: TTY-compatible monospaced text with ANSI colours.\npipe: Plain text (no formatting).\njson: JSON object.\nsub-agent: Internal agent-to-agent exchange format."
+    },
+    "prompt": {
+      "type": "string",
+      "description": "User prompt for the agent"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Optional extra parameters forwarded unchanged to agent"
     },
     "schema": {
       "type": "object",
-      "description": "JSON Schema when format=json"
+      "description": "Optional JSON schema describing the expected JSON response format"
     }
   },
-  "required": ["prompt", "format"]
+  "required": ["format", "prompt"]
 }
 ```
 
@@ -337,7 +341,7 @@ When an MCP client calls your agent:
 
 ## Format Requirements
 
-**Important**: MCP tool calls **must** include a `format` argument.
+**Important**: MCP tool calls **must** include a `format` argument. When `format=json`, a `schema` argument is also required.
 
 | Format             | Schema Required | Description                                      |
 | ------------------ | --------------- | ------------------------------------------------ |
@@ -381,7 +385,6 @@ The MCP server exposes standard MCP capabilities:
   "name": "ai-agent-mcp-headend",
   "version": "1.0.0",
   "capabilities": {
-    "tools": {},
     "logging": {}
   }
 }

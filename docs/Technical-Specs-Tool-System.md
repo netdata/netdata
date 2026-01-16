@@ -80,13 +80,9 @@ classDiagram
 
     class RouterToolProvider {
         +kind: "agent"
-        +tool: "router__handoff-to"
+        +namespace: "router"
     }
 
-    ToolProvider <|-- MCPProvider
-    ToolProvider <|-- RestProvider
-    ToolProvider <|-- InternalToolProvider
-    ToolProvider <|-- AgentProvider
     ToolProvider <|-- RouterToolProvider
 ```
 
@@ -229,7 +225,6 @@ Built-in tools provided by ai-agent itself.
 | `now`                    | string                                           | Current immediate step  |
 | `ready_for_final_report` | boolean                                          | Can finalize now        |
 | `need_to_run_more_tools` | boolean                                          | More tools needed       |
-| `need_to_run_more_tools` | boolean                                          | More tools needed       |
 
 ---
 
@@ -310,11 +305,11 @@ All tools follow the pattern: `{provider}__{toolname}`
 
 Tool names are sanitized for safe usage:
 
-| Rule                                | Example                            |
-| ----------------------------------- | ---------------------------------- |
-| Replace invalid characters with `_` | `my-tool` → `my_tool`              |
-| Truncate to max length              | Long names shortened               |
-| Normalize casing                    | Case preserved (provider-specific) |
+| Rule                                | Example               |
+| ----------------------------------- | --------------------- | ----------- | --- | ------ | ------------------------------------- |
+| Remove `<                           | prefix                | >` wrappers | `<  | github | search_code>`→`github\_\_search_code` |
+| Replace invalid characters with `_` | `my-tool` → `my_tool` |
+| Truncate to max length (200 chars)  | Long names shortened  |
 
 ### Resolution
 

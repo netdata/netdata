@@ -51,9 +51,7 @@ ai-agent --agent myagent.ai --dry-run
 **Example output**:
 
 ```
-Configuration valid.
-Models: openai/gpt-4o -> anthropic/claude-3-haiku (fallback)
-Tools: 12 tools from 3 MCP servers
+dry run complete: configuration and MCP servers validated
 ```
 
 ---
@@ -76,11 +74,10 @@ ai-agent --agent myagent.ai --verbose "your query here"
 **Example verbose output**:
 
 ```
-[llm] req: openai, gpt-4o, messages 3, 1523 chars
-[llm] res: input 1523, output 456, cached 0 tokens, tools 2, latency 2341 ms
-[mcp] req: 001 github, search_code
-[mcp] res: 001 github, search_code, latency 523 ms, size 12456 chars
-[turn 1] completed in 3452ms
+VRB 1.0 → LLM main: openai/gpt-4o LLM request prepared [ctx 1000, new 500, expected 1500 + output 4096 = 30% of 200000]
+VRB 1.1 ← LLM main: openai/gpt-4o LLM response received [$0.000123, 2341ms, tokens: in 1523, out 456, cR 0, cW 0, ctx 1979]
+VRB 1.2 → MCP main: github:search_code (query="test")
+VRB 1.3 ← MCP main: github:search_code [523ms, 12456 bytes]
 ```
 
 ---
@@ -94,13 +91,14 @@ ai-agent --agent myagent.ai "query"
 echo "Exit code: $?"
 ```
 
-| Code | Meaning             | Action                                |
-| ---- | ------------------- | ------------------------------------- |
-| 0    | Success             | Agent completed normally              |
-| 1    | Configuration Error | Check config file and frontmatter     |
-| 2    | LLM Error           | Check provider credentials and status |
-| 3    | Tool Error          | Check MCP server configuration        |
-| 4    | CLI Error           | Check command line arguments          |
+| Code | Meaning                 | Action                                |
+| ---- | ----------------------- | ------------------------------------- |
+| 0    | Success                 | Agent completed normally              |
+| 1    | Configuration Error     | Check config file and frontmatter     |
+| 2    | LLM Error               | Check provider credentials and status |
+| 3    | Tool Error              | Check MCP server configuration        |
+| 4    | CLI Error               | Check command line arguments          |
+| 5    | Max Tool Turns Exceeded | Reduce tool complexity or limit       |
 
 See [Exit Codes](Operations-Exit-Codes) for detailed reference.
 

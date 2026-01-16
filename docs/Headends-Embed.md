@@ -60,9 +60,9 @@ curl -X POST http://localhost:8090/v1/chat \
 ```html
 <script src="http://localhost:8090/ai-agent-public.js"></script>
 <script>
-  AIAgent.init({
+  const chat = new NetdataSupport({
     endpoint: "http://localhost:8090",
-    agent: "chat",
+    agentId: "chat",
   });
 </script>
 ```
@@ -89,11 +89,11 @@ ai-agent --agent chat.ai --embed 8090
 
 ### --embed-concurrency
 
-| Property     | Value        |
-| ------------ | ------------ |
-| Type         | `number`     |
-| Default      | `10`         |
-| Valid values | `1` to `100` |
+| Property     | Value    |
+| ------------ | -------- |
+| Type         | `number` |
+| Default      | `10`     |
+| Valid values | `> 0`    |
 
 **Description**: Maximum concurrent chat sessions.
 
@@ -154,9 +154,9 @@ Prometheus-format metrics when enabled.
 | ---------- | -------- | -------- | ---------------------------------------------------------------------------------------------------- |
 | `message`  | `string` | Yes      | User's message                                                                                       |
 | `agentId`  | `string` | No       | Agent to use (default from config)                                                                   |
-| `clientId` | `string` | No       | Stable client identifier                                                                             |
+| `clientId` | `string` | No       | Stable client identifier (UUID format)                                                               |
 | `history`  | `array`  | No       | Previous conversation turns                                                                          |
-| `format`   | `string` | No       | Output format: `markdown`, `markdown+mermaid`, `slack-block-kit`, `json`, `tty`, `pipe`, `sub-agent` |
+| `format`   | `string` | No       | Output format: `markdown`, `markdown+mermaid`, `slack-block-kit`, `tty`, `pipe`, `json`, `sub-agent` |
 
 ### History Format
 
@@ -200,7 +200,7 @@ Agent status updates.
 
 ```
 event: status
-data: {"agent":"support","status":"in-progress","message":"Searching...","done":"","pending":"3 tools","now":"web-search","timestamp":"2026-01-16T12:34:56.789Z"}
+data: {"agent":"support","agentPath":"support","status":"in-progress","message":"Searching...","done":"","pending":"3 tools","now":"web-search","timestamp":1737016496789}
 ```
 
 ### report
@@ -218,7 +218,7 @@ Completion event.
 
 ```
 event: done
-data: {"success":true,"metrics":{"tokens":1234,"cost":0.01},"reportLength":456}
+data: {"success":true,"metrics":{"durationMs":12345,"tokensIn":617,"tokensOut":617,"toolsRun":3},"reportLength":456}
 ```
 
 ### error
@@ -241,48 +241,50 @@ The public client is served at `/ai-agent-public.js`.
 ```html
 <script src="http://localhost:8090/ai-agent-public.js"></script>
 <script>
-  const chat = AIAgent.init({
+  const chat = new NetdataSupport({
     endpoint: 'http://localhost:8090',
-    agent: 'support'
+    agentId: 'support'
   });
 
   // Send message
-  const response = await chat.send('How do I configure alerts?');
-  console.log(response.content);
-</script>
-```
-
-### With Custom Container
-
-```html
-<div id="chat-widget"></div>
-<script src="http://localhost:8090/ai-agent-public.js"></script>
-<script>
-  AIAgent.create({
-    endpoint: "http://localhost:8090",
-    agent: "support",
-    container: "#chat-widget",
-  });
+  await chat.ask('How do I configure alerts?');
 </script>
 ```
 
 ### Event Handling
 
 ```javascript
-const chat = AIAgent.init({
+const chat = new NetdataSupport({
   endpoint: "http://localhost:8090",
-  agent: "support",
-  onStatus: (status) => {
-    console.log("Status:", status.message);
-  },
-  onChunk: (chunk) => {
-    document.getElementById("output").append(chunk);
-  },
-  onDone: (result) => {
-    console.log("Complete:", result);
-  },
-  onError: (error) => {
-    console.error("Error:", error.message);
+  agentId: "support",
+  onEvent: (event) => {
+    switch (event.type) {
+      case "client":
+        console.log("Client ID:", event.clientId, event.isNew);
+        break;
+      case "meta":
+        console.log(
+          "Session:",
+          event.sessionId,
+          "Turn:",
+          event.turn,
+          "Agent:",
+          event.agentId,
+        );
+        break;
+      case "status":
+        console.log("Status:", event.data.message);
+        break;
+      case "report":
+        document.getElementById("output").append(event.chunk);
+        break;
+      case "done":
+        console.log("Complete:", event.data);
+        break;
+      case "error":
+        console.error("Error:", event.error.code, event.error.message);
+        break;
+    }
   },
 });
 ```
@@ -340,7 +342,7 @@ In `.ai-agent.json`:
     "rateLimit": {
       "enabled": true,
       "requestsPerMinute": 10,
-      "burstSize": 5
+      "burstSize": 0
     },
     "auth": {
       "tiers": {
@@ -374,15 +376,15 @@ In `.ai-agent.json`:
 
 ### Configuration Options
 
-| Option                        | Type      | Default                       | Description                                         |
-| ----------------------------- | --------- | ----------------------------- | --------------------------------------------------- |
-| `defaultAgent`                | `string`  | First registered              | Default agent when not specified                    |
-| `corsOrigins`                 | `array`   | `[]`                          | Allowed origins (glob patterns)                     |
-| `rateLimit.enabled`           | `boolean` | `false` (disabled by default) | Enable rate limiting (requires `requestsPerMinute`) |
-| `rateLimit.requestsPerMinute` | `number`  | `10`                          | Default rate limit                                  |
-| `rateLimit.burstSize`         | `number`  | `0`                           | Burst allowance                                     |
-| `metrics.enabled`             | `boolean` | `true`                        | Enable metrics endpoint                             |
-| `metrics.path`                | `string`  | `/metrics`                    | Metrics endpoint path                               |
+| Option                        | Type      | Default                     | Description                                         |
+| ----------------------------- | --------- | --------------------------- | --------------------------------------------------- |
+| `defaultAgent`                | `string`  | First registered            | Default agent when not specified                    |
+| `corsOrigins`                 | `array`   | `[]`                        | Allowed origins (glob patterns)                     |
+| `rateLimit.enabled`           | `boolean` | `true` (enabled by default) | Enable rate limiting (requires `requestsPerMinute`) |
+| `rateLimit.requestsPerMinute` | `number`  | `10`                        | Default rate limit                                  |
+| `rateLimit.burstSize`         | `number`  | `0`                         | Burst allowance                                     |
+| `metrics.enabled`             | `boolean` | `true`                      | Enable metrics endpoint                             |
+| `metrics.path`                | `string`  | `/metrics`                  | Metrics endpoint path                               |
 
 ---
 
@@ -457,24 +459,24 @@ Client must include `Authorization: Bearer <token>` header.
 When enabled, `/metrics` returns Prometheus-format metrics:
 
 ```
-# HELP embed_requests_total Total embed chat requests
+# HELP embed_requests_total Total number of embed requests
 # TYPE embed_requests_total counter
 embed_requests_total{agent="support",origin="example.com",status="success"} 42
 
-# HELP embed_sessions_active Active embed sessions
+# HELP embed_sessions_active Current number of active embed sessions
 # TYPE embed_sessions_active gauge
 embed_sessions_active 5
 
-# HELP embed_session_duration_seconds Session duration
+# HELP embed_session_duration_seconds Total duration of embed sessions in seconds
 # TYPE embed_session_duration_seconds summary
 embed_session_duration_seconds_sum 123.45
 embed_session_duration_seconds_count 42
 
-# HELP embed_report_chunks_total Report chunks sent
+# HELP embed_report_chunks_total Total number of streamed report chunks
 # TYPE embed_report_chunks_total counter
 embed_report_chunks_total 1234
 
-# HELP embed_errors_total Errors by code
+# HELP embed_errors_total Total number of embed errors
 # TYPE embed_errors_total counter
 embed_errors_total{code="rate_limited"} 3
 ```

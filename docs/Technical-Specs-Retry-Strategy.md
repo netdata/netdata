@@ -93,16 +93,6 @@ flowchart TD
 
 ## Error Classification
 
-### Skip-Provider Errors
-
-These errors skip the current provider but continue with others.
-
-| Status           | Condition                         | Exit Code | Reason                |
-| ---------------- | --------------------------------- | --------- | --------------------- |
-| `auth_error`     | Invalid API key                   | -         | Skip to next provider |
-| `quota_exceeded` | Account quota hit                 | -         | Skip to next provider |
-| `model_error`    | Model unavailable (non-retryable) | -         | Skip to next provider |
-
 ### Retryable Errors
 
 These errors trigger retry with backoff.
@@ -114,6 +104,10 @@ These errors trigger retry with backoff.
 | `timeout`          | Request timeout    | Yes (graduated, max 30s)                | Wait then retry |
 | `invalid_response` | Malformed response | No                                      | Immediate retry |
 
+---
+
+## Provider Cycling
+
 ### Skip-Provider Errors
 
 These errors skip the current provider but continue with others.
@@ -124,9 +118,7 @@ These errors skip the current provider but continue with others.
 | `quota_exceeded` | Account quota hit                 | Skip to next provider |
 | `model_error`    | Model unavailable (non-retryable) | Skip to next provider |
 
----
-
-## Provider Cycling
+Note: `model_error` with `retryable: true` continues with same provider (immediate retry).
 
 ### Round-Robin Selection
 
@@ -261,7 +253,7 @@ flowchart TD
 1. Preserve tool call with sanitization marker
 2. Log ERR with full original payload
 3. Return tool failure response: `(tool failed: invalid JSON parameters)`
-4. Continue to next turn (no TURN-FAILED, no retry)
+4. Continue to next attempt within same turn (no TURN-FAILED added)
 
 ---
 

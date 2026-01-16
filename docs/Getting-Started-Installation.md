@@ -245,7 +245,7 @@ BRAVE_API_KEY=...
 GITHUB_TOKEN=ghp_...
 ```
 
-ai-agent automatically loads these files on startup, with higher-priority locations overriding lower-priority ones.
+ai-agent loads these files during configuration discovery. Each file provides variables for configuration at that location's priority layer; values from higher-priority files do not cascade to lower-priority files.
 
 > **Security:** Add `.ai-agent.env` to your `.gitignore` to prevent committing secrets.
 

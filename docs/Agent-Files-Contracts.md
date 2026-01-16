@@ -150,7 +150,7 @@ output:
 **Notes**:
 
 - `format: json` can optionally include a schema (inline or via `schemaRef`) for validation and tool documentation
-- Schema is required when format is `json` when calling via MCP headend
+- Schema is optional for all formats
 - The format affects the `${FORMAT}` variable in prompts
 - Headends use format to determine response type
 
@@ -246,10 +246,10 @@ output:
 
 ### input
 
-| Property | Value                                                   |
-| -------- | ------------------------------------------------------- |
-| Type     | `object`                                                |
-| Default  | `{ format: 'json', schema: DEFAULT_TOOL_INPUT_SCHEMA }` |
+| Property | Value                          |
+| -------- | ------------------------------ |
+| Type     | `object`                       |
+| Default  | Undefined (schema is optional) |
 
 **Description**: Input specification for sub-agent tools. Defines how parent agents should provide input.
 
@@ -352,6 +352,7 @@ input:
 - Invalid inputs return as tool errors to parent
 - Schema generates tool input schema for parent
 - Descriptions help parent understand usage
+- Schema is optional; if not provided, parent can call with simple text prompt
 
 ---
 

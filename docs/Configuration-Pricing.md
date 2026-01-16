@@ -95,7 +95,7 @@ Configure prices in `.ai-agent.json`:
 | Field        | Type     | Description                                                   |
 | ------------ | -------- | ------------------------------------------------------------- |
 | `unit`       | `string` | Price unit: `per_1k` (per thousand) or `per_1m` (per million) |
-| `currency`   | `string` | Currency code (e.g., "USD")                                   |
+| `currency`   | `string` | Currency type: `"USD"` (optional)                             |
 | `prompt`     | `number` | Input token price (optional, defaults to 0)                   |
 | `completion` | `number` | Output token price (optional, defaults to 0)                  |
 | `cacheRead`  | `number` | Cached input token read price (optional, defaults to 0)       |
@@ -141,7 +141,7 @@ Note: If both are configured, `persistence.billingFile` takes precedence.
 Or via CLI:
 
 ```bash
-ai-agent --agent test.ai --accounting ./accounting.jsonl "query"
+ai-agent --agent test.ai --billing-file ./accounting.jsonl "query"
 ```
 
 ### LLM Entry Format
@@ -341,7 +341,7 @@ Reference prices as of 2025. Update your config when prices change.
 | Location    | Property      | Type     | Default    | Description                                         |
 | ----------- | ------------- | -------- | ---------- | --------------------------------------------------- |
 | Pricing     | `unit`        | `string` | `"per_1m"` | Price unit: `"per_1k"` or `"per_1m"`                |
-| Pricing     | `currency`    | `string` | `"USD"`    | Currency code (optional)                            |
+| Pricing     | `currency`    | `string` | `"USD"`    | Currency type: `"USD"` (optional)                   |
 | Pricing     | `prompt`      | `number` | `0`        | Input token price (optional)                        |
 | Pricing     | `completion`  | `number` | `0`        | Output token price (optional)                       |
 | Pricing     | `cacheRead`   | `number` | `0`        | Cache read price (optional)                         |

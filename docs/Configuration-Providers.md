@@ -56,13 +56,13 @@ Configure LLM providers for AI Agent.
 
 ### Configuration Reference
 
-| Property        | Type     | Default                     | Description                      |
-| --------------- | -------- | --------------------------- | -------------------------------- |
-| `type`          | `string` | Required                    | Must be `"openai"`               |
-| `apiKey`        | `string` | Required                    | OpenAI API key (`sk-...`)        |
-| `baseUrl`       | `string` | `https://api.openai.com/v1` | API endpoint URL                 |
-| `contextWindow` | `number` | Model-specific              | Default context window size      |
-| `tokenizer`     | `string` | `tiktoken:gpt-4o`           | Tokenizer for context estimation |
+| Property        | Type     | Default           | Description                      |
+| --------------- | -------- | ----------------- | -------------------------------- |
+| `type`          | `string` | Required          | Must be `"openai"`               |
+| `apiKey`        | `string` | Required          | OpenAI API key (`sk-...`)        |
+| `baseUrl`       | `string` | Optional          | API endpoint URL                 |
+| `contextWindow` | `number` | Model-specific    | Default context window size      |
+| `tokenizer`     | `string` | `tiktoken:gpt-4o` | Tokenizer for context estimation |
 
 ### Usage in Agent
 
@@ -271,11 +271,11 @@ Local self-hosted models using Ollama.
 
 ### Configuration Reference
 
-| Property        | Type     | Default                  | Description            |
-| --------------- | -------- | ------------------------ | ---------------------- |
-| `type`          | `string` | Required                 | Must be `"ollama"`     |
-| `baseUrl`       | `string` | `http://localhost:11434` | Ollama server URL      |
-| `contextWindow` | `number` | `131072`                 | Default context window |
+| Property        | Type     | Default                      | Description            |
+| --------------- | -------- | ---------------------------- | ---------------------- |
+| `type`          | `string` | Required                     | Must be `"ollama"`     |
+| `baseUrl`       | `string` | `http://localhost:11434/api` | Ollama server URL      |
+| `contextWindow` | `number` | `131072`                     | Default context window |
 
 ### Usage in Agent
 
@@ -302,6 +302,12 @@ For Ollama on a different machine:
   }
 }
 ```
+
+**Note**: The baseUrl is automatically normalized:
+
+- Trailing `/v1` is replaced with `/api`
+- Paths ending with `/api` are preserved
+- All other URLs get `/api` appended
 
 ---
 

@@ -131,7 +131,9 @@ Running on: ${OS}
 User: ${USER}
 ```
 
-**Available variables**: `DATETIME`, `TIMESTAMP`, `DAY`, `TIMEZONE`, `OS`, `ARCH`, `KERNEL`, `HOSTNAME`, `USER`, `CD`, `MAX_TURNS`, `MAX_TOOLS`, `FORMAT`
+**Available variables (always)**: `DATETIME`, `TIMESTAMP`, `DAY`, `TIMEZONE`, `MAX_TURNS`, `MAX_TOOLS`, `FORMAT`
+
+**Additional CLI-only variables**: `OS`, `ARCH`, `KERNEL`, `HOSTNAME`, `USER`, `CD`
 
 See [System-Prompts-Variables](System-Prompts-Variables) for the complete reference.
 
@@ -157,7 +159,10 @@ The `${FORMAT}` variable contains output format instructions based on how the ag
 | Terminal (TTY)       | `a TTY-compatible plain monospaced text response. Use literal "\x1b[...m" sequences for ANSI colours and avoid decorative boxes. Do not output markdown. Do not wrap long lines.` |
 | Piped output         | `Plain text without any formatting or markdown. Do not wrap long lines.`                                                                                                          |
 | JSON output expected | `json`                                                                                                                                                                            |
+| Markdown             | `GitHub Markdown`                                                                                                                                                                 |
+| Markdown+Mermaid     | `GiHub Markdown with Mermaid diagrams`                                                                                                                                            |
 | Slack headend        | `Slack Block Kit JSON array of messages (not raw text or GitHub markdown).`                                                                                                       |
+| Sub-agent            | `Internal agent-to-agent exchange format (not user-facing).`                                                                                                                      |
 
 Always include `${FORMAT}` in your prompt to ensure consistent output across contexts.
 

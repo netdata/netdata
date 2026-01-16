@@ -157,7 +157,7 @@ Create a chat completion.
 | `response_format` | `object`  | No       | Structured output format                            |
 | `payload`         | `object`  | No       | Additional data passed to agent                     |
 
-> **Note**: OpenAI parameters like `temperature`, `top_p`, and `max_tokens` are not directly supported but can be passed via the `payload` field. Your agent must be configured to accept and use these values.
+> **Note**: OpenAI parameters like `temperature`, `top_p`, and `max_tokens` are not standard request fields. Pass them via the `payload` field instead. Your agent must be configured to accept and use these values.
 
 ### Message Format
 
@@ -168,10 +168,15 @@ Create a chat completion.
 }
 ```
 
-| Field     | Type     | Values                        | Description         |
-| --------- | -------- | ----------------------------- | ------------------- |
-| `role`    | `string` | `system`, `user`, `assistant` | Message author role |
-| `content` | `string` | Any                           | Message content     |
+| Field     | Type                        | Values                        | Description         |
+| --------- | --------------------------- | ----------------------------- | ------------------- |
+| `role`    | `string`                    | `system`, `user`, `assistant` | Message author role |
+| `content` | `string` or `array<object>` | Any                           | Message content     |
+
+The `content` field can be:
+
+- A string: `"Hello!"`
+- An array containing strings or objects with a `text` property: `["Hello!", {"text": "World!"}]`
 
 > **Note**: Messages with `tool_calls` are rejected. Tool calling happens internally within agents.
 
@@ -195,6 +200,13 @@ For structured JSON output:
   }
 }
 ```
+
+The `json_schema` field is optional if:
+
+- The agent has an `outputSchema` defined in frontmatter, OR
+- A schema is provided via `payload.schema`
+
+If no schema is available from any source, a `missing_schema` error is returned.
 
 ---
 
@@ -390,6 +402,36 @@ Duplicate names get numeric suffixes: `chat`, `chat-2`, `chat-3`.
 
 ## Troubleshooting
 
+### Missing model field
+
+**Symptom**: `{"error": "missing_model"}`
+
+**Cause**: Request body missing `model` field.
+
+**Solution**: Add the model field with an agent name:
+
+```json
+{
+  "model": "chat",
+  "messages": [{ "role": "user", "content": "Hello!" }]
+}
+```
+
+### Missing messages
+
+**Symptom**: `{"error": "missing_messages"}`
+
+**Cause**: Request body missing or empty `messages` array.
+
+**Solution**: Include at least one message:
+
+```json
+{
+  "model": "chat",
+  "messages": [{ "role": "user", "content": "Hello!" }]
+}
+```
+
 ### Model not found
 
 **Symptom**: `{"error": "unknown_model"}`
@@ -406,15 +448,32 @@ Duplicate names get numeric suffixes: `chat`, `chat-2`, `chat-3`.
 
 **Symptom**: `{"error": "missing_schema"}`
 
-**Cause**: Using `response_format.type: "json_object"` without a schema.
+**Cause**: Requesting JSON output when no schema is available from any source:
 
-**Solution**: Include `json_schema`:
+- No `outputSchema` in the agent's frontmatter
+- No `json_schema` in `response_format`
+- No `schema` in `payload`
+
+**Solution**: Provide a schema in one of these ways:
 
 ```json
 {
   "response_format": {
     "type": "json_object",
     "json_schema": {
+      "type": "object",
+      "properties": { "result": { "type": "string" } }
+    }
+  }
+}
+```
+
+Or via payload:
+
+```json
+{
+  "payload": {
+    "schema": {
       "type": "object",
       "properties": { "result": { "type": "string" } }
     }
@@ -447,6 +506,14 @@ Duplicate names get numeric suffixes: `chat`, `chat-2`, `chat-3`.
 ```python
 client = OpenAI(base_url="...", api_key="not-needed")
 ```
+
+### Concurrency limit reached
+
+**Symptom**: `{"error": "concurrency_unavailable"}` with message "Concurrency limit reached"
+
+**Cause**: Too many concurrent requests for the configured limit.
+
+**Solution**: Wait for current requests to complete or increase the limit using `--openai-completions-concurrency`.
 
 ---
 

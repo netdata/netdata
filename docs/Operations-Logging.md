@@ -131,9 +131,9 @@ Where:
 | VRB | Gray |
 | WRN | Yellow |
 | ERR | Red |
-| TRC | Cyan |
-| THK | Purple |
-| FIN | Green |
+| TRC | Gray |
+| THK | Gray |
+| FIN | Cyan |
 | LLM context (highlighting) | Blue |
 | Tool context (highlighting) | Green |
 
@@ -142,7 +142,7 @@ Where:
 Machine-parseable key=value pairs:
 
 ```
-ts=1699999999999 level=VRB turn=1 subturn=0 dir=response type=llm remote="openai:gpt-4" msg="LLM response received" latency_ms=1234
+ts=2024-11-14T12:34:56.789Z level=vrb turn=1 subturn=0 dir=response type=llm remote="openai:gpt-4" msg="LLM response received" latency_ms=1234
 ```
 
 ### JSON Format
@@ -151,19 +151,16 @@ Full structured output:
 
 ```json
 {
+  "ts": "2024-11-14T12:34:56.789Z",
   "timestamp": 1699999999999,
   "severity": "VRB",
   "turn": 1,
   "subturn": 0,
   "direction": "response",
   "type": "llm",
-  "remoteIdentifier": "openai:gpt-4",
+  "remote": "openai:gpt-4",
   "message": "LLM response received",
-  "details": {
-    "latency_ms": 1234,
-    "input_tokens": 100,
-    "output_tokens": 50
-  }
+  "latency_ms": 1234
 }
 ```
 
@@ -285,6 +282,7 @@ ai-agent --agent test.ai --trace-llm --trace-mcp "query"
 | `agent:EXIT-INACTIVITY-TIMEOUT`      | Inactivity timeout                 |
 | `agent:EXIT-MAX-RETRIES`             | Maximum retries exceeded           |
 | `agent:EXIT-MAX-TURNS-NO-RESPONSE`   | Max turns reached without response |
+| `agent:EXIT-ROUTER-HANDOFF`          | Router selected destination        |
 | `agent:EXIT-UNCAUGHT-EXCEPTION`      | Uncaught exception                 |
 | `agent:EXIT-SIGNAL-RECEIVED`         | Process signal received            |
 | `agent:EXIT-UNKNOWN`                 | Unknown error                      |
@@ -358,7 +356,7 @@ interface LogEntry {
   path?: string; // Stable hierarchical path label (e.g., "1.2.1")
   direction: "request" | "response";
   type: "llm" | "tool";
-  toolKind?: "mcp" | "rest" | "agent" | "command" | "internal" | "subagent";
+  toolKind?: "mcp" | "rest" | "agent" | "command";
   remoteIdentifier: string; // "provider:model" or "protocol:namespace:tool"
   fatal: boolean; // True if this caused agent to stop
   message: string; // Human readable message

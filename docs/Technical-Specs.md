@@ -30,13 +30,13 @@ Deep-dive technical documentation for contributors, maintainers, and advanced us
 
 ### What You'll Find
 
-| Spec Type        | Purpose                     | Example                         |
-| ---------------- | --------------------------- | ------------------------------- |
-| **Architecture** | How components fit together | Session → LLM Client → Provider |
-| **Lifecycle**    | Sequence of operations      | Turn execution order            |
-| **Algorithms**   | Decision logic              | Context guard projection        |
-| **Contracts**    | Guaranteed behaviors        | "Never exceed maxTurns"         |
-| **ADRs**         | Why decisions were made     | "Sub-agent as tool" rationale   |
+| Spec Type        | Purpose                     | Example                                                 |
+| ---------------- | --------------------------- | ------------------------------------------------------- |
+| **Architecture** | How components fit together | CLI/Headend → AIAgent → Session → LLM Client → Provider |
+| **Lifecycle**    | Sequence of operations      | Turn execution order                                    |
+| **Algorithms**   | Decision logic              | Context guard projection                                |
+| **Contracts**    | Guaranteed behaviors        | "Never exceed maxTurns"                                 |
+| **ADRs**         | Why decisions were made     | "Sub-agent as tool" rationale                           |
 
 ---
 
@@ -59,15 +59,16 @@ Deep-dive technical documentation for contributors, maintainers, and advanced us
 
 System design and component structure.
 
-| Document                                               | Description                                                      |
-| ------------------------------------------------------ | ---------------------------------------------------------------- |
-| [Architecture](Technical-Specs-Architecture)           | Layered component design: CLI → Session → LLM Client → Providers |
-| [Session Lifecycle](Technical-Specs-Session-Lifecycle) | Creation → Execution → Finalization flow                         |
-| [Design History](Technical-Specs-Design-History)       | Architectural Decision Records (ADRs)                            |
+| Document                                               | Description                                                                               |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| [Architecture](Technical-Specs-Architecture)           | Layered component design: CLI/Headend → AIAgent → AIAgentSession → LLM Client → Providers |
+| [Session Lifecycle](Technical-Specs-Session-Lifecycle) | Creation → Execution → Finalization flow                                                  |
+| [Design History](Technical-Specs-Design-History)       | Architectural Decision Records (ADRs)                                                     |
 
 ```mermaid
 graph LR
-    CLI[CLI / Headend] --> Session[AIAgentSession]
+    CLI[CLI / Headend] --> AIAgent[AIAgent]
+    AIAgent --> Session[AIAgentSession]
     Session --> LLMClient[LLM Client]
     Session --> Tools[Tools Orchestrator]
     LLMClient --> Providers[Providers]
@@ -105,15 +106,15 @@ User-facing promises that implementations MUST honor.
 
 Key implementation files for each subsystem.
 
-| Component             | File                        | Description                              |
-| --------------------- | --------------------------- | ---------------------------------------- |
-| Session Orchestration | `src/ai-agent.ts`           | Main session loop and orchestration      |
-| LLM Client            | `src/llm-client.ts`         | Provider interface and request execution |
-| Tool System           | `src/tools/tools.ts`        | Tool orchestration and routing           |
-| MCP Provider          | `src/tools/mcp-provider.ts` | MCP protocol implementation              |
-| Context Guard         | `src/context-guard.ts`      | Token budget enforcement                 |
-| Types                 | `src/types.ts`              | Core type definitions                    |
-| OpTree                | `src/session-tree.ts`       | Hierarchical operation tracking          |
+| Component             | File                        | Description                                                |
+| --------------------- | --------------------------- | ---------------------------------------------------------- |
+| Session Orchestration | `src/ai-agent.ts`           | AIAgent orchestration wrapper and AIAgentSession main loop |
+| LLM Client            | `src/llm-client.ts`         | Provider interface and request execution                   |
+| Tool System           | `src/tools/tools.ts`        | Tool orchestration and routing                             |
+| MCP Provider          | `src/tools/mcp-provider.ts` | MCP protocol implementation                                |
+| Context Guard         | `src/context-guard.ts`      | Token budget enforcement                                   |
+| Types                 | `src/types.ts`              | Core type definitions                                      |
+| OpTree                | `src/session-tree.ts`       | Hierarchical operation tracking                            |
 
 ---
 

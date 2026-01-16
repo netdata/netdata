@@ -31,11 +31,10 @@ ai-agent is designed for scripting:
 
 ```bash
 #!/bin/bash
-result=$(ai-agent --agent task.ai --quiet "Query" 2>/dev/null)
-if [[ $? -eq 0 ]]; then
+if result=$(ai-agent --agent task.ai --quiet "Query" 2>/dev/null); then
   echo "Success: $result"
 else
-  echo "Failed with exit code $?"
+  echo "Agent failed"
   exit 1
 fi
 ```
@@ -46,13 +45,13 @@ fi
 
 ai-agent uses consistent exit codes:
 
-| Code | Meaning | Common Causes |
-|------|---------|---------------|
-| `0` | Success | Agent completed normally |
-| `1` | General error | Runtime failures, tool errors |
-| `3` | Configuration error | Missing MCP servers, bad settings |
-| `4` | Invalid arguments | Bad CLI flags, missing required args |
-| `5` | Validation error | Schema validation failed |
+| Code | Meaning             | Common Causes                        |
+| ---- | ------------------- | ------------------------------------ |
+| `0`  | Success             | Agent completed normally             |
+| `1`  | General error       | Runtime failures, tool errors        |
+| `3`  | Configuration error | Missing MCP servers, bad settings    |
+| `4`  | Invalid arguments   | Bad CLI flags, missing required args |
+| `5`  | Validation error    | Schema validation failed             |
 
 ### Checking Exit Codes
 
@@ -84,6 +83,7 @@ In verbose mode, exit codes include tags for debugging:
 ```
 
 Common tags:
+
 - `EXIT-CLI` - General CLI error
 - `EXIT-COMMANDER` - Argument parsing error
 - `EXIT-HEADEND-*` - Headend startup errors
@@ -166,7 +166,7 @@ Request JSON format for structured parsing:
 result=$(ai-agent --agent data.ai --format json --quiet "Get user data")
 name=$(echo "$result" | jq -r '.name')
 
-# Using --schema for validation
+# Using --schema to specify expected output format
 ai-agent --agent extractor.ai \
   --schema '{"type":"object","properties":{"items":{"type":"array"}}}' \
   --quiet \
@@ -252,7 +252,7 @@ ai-agent --agent chat.ai --llm-timeout-ms 30000 --quiet "Quick query"
 
 ```bash
 # Dry run to validate config
-if ! ai-agent --agent task.ai --dry-run "test" 2>/dev/null; then
+if ! ai-agent --agent task.ai --dry-run 2>/dev/null; then
   echo "Configuration invalid"
   exit 1
 fi

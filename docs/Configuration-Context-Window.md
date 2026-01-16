@@ -251,13 +251,11 @@ Responses exceeding this size are stored and replaced with handles.
 2. Response stored in session storage
 3. Handle returned to LLM instead:
 
-```json
-{
-  "stored": true,
-  "handle": "session-abc123/tool-xyz",
-  "size": 45678,
-  "preview": "First 500 characters..."
-}
+```
+Tool output is too large (45678 bytes, 1200 lines, 11445 tokens).
+Call tool_output(handle = "session-abc123/file-uuid", extract = "what to extract").
+The handle is a relative path under tool_output root.
+Provide precise and detailed instructions in `extract` about what you are looking for.
 ```
 
 ### Retrieving Stored Output
@@ -268,11 +266,13 @@ Use the `tool_output` tool to retrieve stored responses:
 {
   "tool": "tool_output",
   "arguments": {
-    "handle": "session-abc123/tool-xyz",
-    "extract": "lines 1-100"
+    "handle": "session-abc123/file-uuid",
+    "extract": "Extract all lines containing 'error' or provide a summary of the output"
   }
 }
 ```
+
+The `extract` parameter accepts natural language instructions describing what you need from the stored output. Be specific and include keys, fields, or sections if known.
 
 ### Token-Based Guard
 
@@ -325,18 +325,18 @@ toolResponseMaxBytes: "number"
 
 ### All Context Properties
 
-| Location    | Property                    | Type     | Default             | Description                 |
-| ----------- | --------------------------- | -------- | ------------------- | --------------------------- |
-| Provider    | `contextWindow`             | `number` | `131072`            | Provider-wide context limit |
-| Provider    | `tokenizer`                 | `string` | approximate         | Token counting method       |
-| Model       | `contextWindow`             | `number` | Provider value      | Model-specific limit        |
-| Model       | `tokenizer`                 | `string` | Provider value      | Model-specific tokenizer    |
-| Defaults    | `contextWindowBufferTokens` | `number` | `8192`              | Safety buffer               |
-| Defaults    | `maxOutputTokens`           | `number` | `contextWindow / 4` | Max output tokens           |
-| Defaults    | `toolResponseMaxBytes`      | `number` | `12288`             | Max tool response size      |
-| Frontmatter | `contextWindow`             | `number` | Provider value      | Agent-specific limit        |
-| Frontmatter | `maxOutputTokens`           | `number` | Defaults value      | Agent output limit          |
-| Frontmatter | `toolResponseMaxBytes`      | `number` | Defaults value      | Agent tool response limit   |
+| Location    | Property                    | Type     | Default        | Description                 |
+| ----------- | --------------------------- | -------- | -------------- | --------------------------- |
+| Provider    | `contextWindow`             | `number` | `131072`       | Provider-wide context limit |
+| Provider    | `tokenizer`                 | `string` | approximate    | Token counting method       |
+| Model       | `contextWindow`             | `number` | Provider value | Model-specific limit        |
+| Model       | `tokenizer`                 | `string` | Provider value | Model-specific tokenizer    |
+| Defaults    | `contextWindowBufferTokens` | `number` | `8192`         | Safety buffer               |
+| Defaults    | `maxOutputTokens`           | `number` | `4096`         | Max output tokens           |
+| Defaults    | `toolResponseMaxBytes`      | `number` | `12288`        | Max tool response size      |
+| Frontmatter | `contextWindow`             | `number` | Provider value | Agent-specific limit        |
+| Frontmatter | `maxOutputTokens`           | `number` | Defaults value | Agent output limit          |
+| Frontmatter | `toolResponseMaxBytes`      | `number` | Defaults value | Agent tool response limit   |
 
 ---
 
