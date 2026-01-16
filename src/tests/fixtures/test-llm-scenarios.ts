@@ -4775,6 +4775,35 @@ const SCENARIOS: ScenarioDefinition[] = [
     ],
   },
   {
+    id: 'run-test-leaked-tool-name-tag-task-status',
+    description: 'Leaked tool-name tag with XML parameters is extracted and executed successfully.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        allowMissingTools: true,
+        response: {
+          kind: 'text',
+          assistantText: `Checking progress before continuing.\n\n<agent__task_status>\n<parameter name="status">in-progress</parameter>\n<parameter name="done">Researching MS SQL Server monitoring configuration</parameter>\n<pending>Verifying windows authentication configuration option</pending>\n<pending>Checking collect lock metrics configuration flags</pending>\n<now>Searching documentation and source code for MS SQL Server configuration</now>\n<ready_for_final_report">false</ready_for_final_report>\n<parameter name="need_to_run_more_tools">true</need_to_run_more_tools>\n</agent__task_status>`,
+          finishReason: 'stop',
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: [],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Status reported via tool-name tag.',
+          reportContent: `${RESULT_HEADING}Leaked tool-name tag was extracted and executed successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
     id: 'run-test-leaked-tools-unknown-tool',
     description: 'Leaked <tools> with unknown tool name surfaces error but no TURN_FAILED_NO_TOOLS message.',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],

@@ -53,6 +53,8 @@ export interface LeakedToolFallbackInput {
   executor: ToolExecutorFn;
   /** Reference to execution state for reading stats after execution */
   executionStatsRef: ExecutionStatsRef;
+  /** Optional allowlist of tools permitted for this turn */
+  allowedToolNames?: Set<string>;
 }
 
 /**
@@ -106,6 +108,114 @@ const TAG_PATTERNS: readonly { name: string; open: RegExp; close: string }[] = [
   { name: 'function_call', open: /<function_call>/gi, close: '</function_call>' },
   { name: 'function', open: /<function>/gi, close: '</function>' },
 ];
+
+const TASK_STATUS_FIELDS = new Set([
+  'status',
+  'done',
+  'pending',
+  'now',
+  'ready_for_final_report',
+  'need_to_run_more_tools',
+]);
+
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const normalizeXmlValue = (raw: string): string | boolean | undefined => {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return undefined;
+  const lower = trimmed.toLowerCase();
+  if (lower === 'true') return true;
+  if (lower === 'false') return false;
+  return trimmed;
+};
+
+const mergeParamValue = (
+  target: Record<string, unknown>,
+  name: string,
+  value: string | boolean
+): void => {
+  const existing = target[name];
+  if (typeof existing === 'string' && typeof value === 'string') {
+    target[name] = existing.length > 0 ? `${existing}\n${value}` : value;
+    return;
+  }
+  target[name] = value;
+};
+
+const parseXmlParameters = (content: string, toolName: string): Record<string, unknown> => {
+  const parameters: Record<string, unknown> = {};
+  const paramPattern = /<parameter\s+name\s*=\s*"([^"]+)"\s*>([\s\S]*?)<\/(?:parameter|\1)\s*>/gi;
+
+  // eslint-disable-next-line functional/no-loop-statements -- parsing XML-like segments
+  for (const match of content.matchAll(paramPattern)) {
+    const rawName = match[1].trim();
+    if (rawName.length === 0) continue;
+    const normalized = normalizeXmlValue(match[2]);
+    if (normalized === undefined) continue;
+    mergeParamValue(parameters, rawName, normalized);
+  }
+
+  const stripped = content.replace(paramPattern, '');
+  const isTaskStatusTool = sanitizeToolName(toolName).toLowerCase() === 'agent__task_status';
+  if (!isTaskStatusTool) {
+    return parameters;
+  }
+
+  const barePattern = /<([A-Za-z0-9_\-]+)"?\s*>([\s\S]*?)<\/\1\s*>/gi;
+  // eslint-disable-next-line functional/no-loop-statements -- parsing XML-like segments
+  for (const match of stripped.matchAll(barePattern)) {
+    const rawName = match[1].trim();
+    if (rawName.length === 0) continue;
+    if (!TASK_STATUS_FIELDS.has(rawName)) continue;
+    const normalized = normalizeXmlValue(match[2]);
+    if (normalized === undefined) continue;
+    mergeParamValue(parameters, rawName, normalized);
+  }
+
+  return parameters;
+};
+
+const extractToolTagOccurrences = (
+  content: string,
+  toolName: string
+): { extracted: string[]; remaining: string } => {
+  const extracted: string[] = [];
+  let remaining = content;
+  const escaped = escapeRegExp(toolName);
+  const open = new RegExp(`<${escaped}\\s*>`, 'gi');
+  const close = new RegExp(`</${escaped}\\s*>`, 'i');
+
+  open.lastIndex = 0;
+  // eslint-disable-next-line functional/no-loop-statements, @typescript-eslint/no-unnecessary-condition -- intentional loop with break
+  while (true) {
+    const openMatch = open.exec(remaining);
+    if (openMatch === null) break;
+    const openEnd = openMatch.index + openMatch[0].length;
+    const closeMatch = remaining.slice(openEnd).match(close);
+    if (closeMatch?.index === undefined) break;
+    const closeIndex = openEnd + closeMatch.index;
+    const innerContent = remaining.slice(openEnd, closeIndex).trim();
+    if (innerContent.length > 0) {
+      extracted.push(innerContent);
+    }
+    remaining = remaining.slice(0, openMatch.index) + remaining.slice(closeIndex + closeMatch[0].length);
+    open.lastIndex = 0;
+  }
+
+  return { extracted, remaining };
+};
+
+const parseToolNameTagToolCall = (toolName: string, content: string): ToolCall | undefined => {
+  const parameters = parseXmlParameters(content, toolName);
+  if (Object.keys(parameters).length === 0) {
+    return undefined;
+  }
+  return {
+    id: crypto.randomUUID(),
+    name: sanitizeToolName(toolName),
+    parameters,
+  };
+};
 
 /**
  * Normalize a parsed JSON object into a ToolCall.
@@ -221,7 +331,10 @@ const extractTagOccurrences = (
  * - content = "remaining", toolCalls = [...] : Extracted tools, some content remains
  * - content = null, toolCalls = [...] : Extracted tools, no content left
  */
-export const tryExtractLeakedToolCalls = (input: string): LeakedToolExtractionResult => {
+export const tryExtractLeakedToolCalls = (
+  input: string,
+  options?: { allowedToolNames?: Set<string> }
+): LeakedToolExtractionResult => {
   if (typeof input !== 'string') {
     return { content: input, toolCalls: [], patternsMatched: [] };
   }
@@ -229,6 +342,7 @@ export const tryExtractLeakedToolCalls = (input: string): LeakedToolExtractionRe
   const allToolCalls: ToolCall[] = [];
   const patternsMatched: string[] = [];
   let workingContent = input;
+  const allowedToolNames = options?.allowedToolNames;
 
   // Try each pattern
   // eslint-disable-next-line functional/no-loop-statements -- iterating over patterns
@@ -244,6 +358,24 @@ export const tryExtractLeakedToolCalls = (input: string): LeakedToolExtractionRe
       for (const jsonContent of extracted) {
         const tools = parseToolCalls(jsonContent);
         allToolCalls.push(...tools);
+      }
+    }
+  }
+
+  if (allowedToolNames !== undefined && allowedToolNames.size > 0) {
+    // eslint-disable-next-line functional/no-loop-statements -- iterating over allowed tools
+    for (const toolName of allowedToolNames) {
+      const { extracted, remaining } = extractToolTagOccurrences(workingContent, toolName);
+      if (extracted.length > 0) {
+        patternsMatched.push(toolName);
+        workingContent = remaining;
+        // eslint-disable-next-line functional/no-loop-statements -- iterating to parse extracted blocks
+        for (const xmlContent of extracted) {
+          const toolCall = parseToolNameTagToolCall(toolName, xmlContent);
+          if (toolCall !== undefined) {
+            allToolCalls.push(toolCall);
+          }
+        }
       }
     }
   }
@@ -285,7 +417,9 @@ export const processLeakedToolCalls = async (
   const { textContent, executor, executionStatsRef } = input;
 
   // Step 1: Extract tool calls from text
-  const extraction = tryExtractLeakedToolCalls(textContent);
+  const extraction = tryExtractLeakedToolCalls(textContent, {
+    allowedToolNames: input.allowedToolNames,
+  });
 
   // No tool calls found - nothing to do
   if (extraction.toolCalls.length === 0) {

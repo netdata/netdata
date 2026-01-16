@@ -4,6 +4,7 @@ import { tryExtractLeakedToolCalls } from '../../tool-call-fallback.js';
 
 // Common test inputs to avoid duplication
 const SIMPLE_TOOLS_INPUT = '<tools>{"name": "test", "arguments": {}}</tools>';
+const TASK_STATUS_ALLOWED = new Set(['agent__task_status']);
 
 describe('tryExtractLeakedToolCalls', () => {
   describe('no patterns found', () => {
@@ -243,6 +244,41 @@ describe('tryExtractLeakedToolCalls', () => {
       expect(result.toolCalls).toHaveLength(2);
       expect(result.toolCalls[0].name).toBe('bigquery__execute_sql');
       expect(result.toolCalls[1].name).toBe('bigquery__execute_sql');
+    });
+  });
+
+  describe('tool-name tag format (minimax)', () => {
+    it('extracts agent__task_status with parameters and bare tags', () => {
+      const input = `
+Intro text
+
+<agent__task_status>
+<parameter name="status">in-progress</parameter>
+<parameter name="done">Researching MS SQL Server monitoring configuration</parameter>
+<pending>Verifying windows authentication configuration option</pending>
+<pending>Checking collect lock metrics configuration flags</pending>
+<now>Searching documentation and source code for MS SQL Server configuration</now>
+<ready_for_final_report">false</ready_for_final_report>
+<parameter name="need_to_run_more_tools">true</need_to_run_more_tools>
+</agent__task_status>
+`;
+      const result = tryExtractLeakedToolCalls(input, { allowedToolNames: TASK_STATUS_ALLOWED });
+      expect(result.content).toBe('Intro text');
+      expect(result.toolCalls).toHaveLength(1);
+      const params = result.toolCalls[0].parameters;
+      expect(params.status).toBe('in-progress');
+      expect(params.done).toBe('Researching MS SQL Server monitoring configuration');
+      expect(params.pending).toBe('Verifying windows authentication configuration option\nChecking collect lock metrics configuration flags');
+      expect(params.now).toBe('Searching documentation and source code for MS SQL Server configuration');
+      expect(params.ready_for_final_report).toBe(false);
+      expect(params.need_to_run_more_tools).toBe(true);
+    });
+
+    it('ignores tool-name tags that are not allowed', () => {
+      const input = '<agent__task_status><parameter name="status">in-progress</parameter></agent__task_status>';
+      const result = tryExtractLeakedToolCalls(input, { allowedToolNames: new Set(['other_tool']) });
+      expect(result.content).toBe(input);
+      expect(result.toolCalls).toEqual([]);
     });
   });
 

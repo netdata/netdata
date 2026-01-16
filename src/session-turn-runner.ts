@@ -474,6 +474,7 @@ export class TurnRunner {
 
                 const toolSelection = this.selectToolsForTurn(provider, isFinalTurn);
                 this.state.pendingToolSelection = toolSelection;
+                let allowedToolNamesForAttempt = toolSelection.allowedToolNames;
                 this.schemaCtxTokens = this.estimateToolSchemaTokens(toolSelection.toolsForTurn);
                 const providerContextStatus = this.evaluateContextForProvider(provider, model);
                 if (providerContextStatus === 'final') {
@@ -485,6 +486,7 @@ export class TurnRunner {
                         syncFinalTurnFlags();
                         const finalToolSelection = this.selectToolsForTurn(provider, true);
                         this.state.pendingToolSelection = finalToolSelection;
+                        allowedToolNamesForAttempt = finalToolSelection.allowedToolNames;
                         this.schemaCtxTokens = this.computeForcedFinalSchemaTokens(provider);
                         const postEnforce = this.evaluateContextGuard();
                         if (postEnforce.blocked.length > 0) {
@@ -1037,7 +1039,7 @@ export class TurnRunner {
                         // FALLBACK: Extract and execute tool calls from leaked XML-like patterns
                         // Handles models that emit <tools>, <tool_call>, etc. instead of native tool calls
                         if (!sanitizedHasToolCalls && sanitizedHasText && assistantForAdoption !== undefined && textContent !== undefined) {
-                            const fallbackResult = await this.processLeakedToolCallsFallback(textContent, currentTurn, provider, model);
+                            const fallbackResult = await this.processLeakedToolCallsFallback(textContent, currentTurn, provider, model, allowedToolNamesForAttempt);
                             if (fallbackResult !== undefined) {
                                 assistantForAdoption.toolCalls = fallbackResult.toolCalls;
                                 assistantForAdoption.content = fallbackResult.cleanedContent ?? '';
@@ -2836,7 +2838,8 @@ export class TurnRunner {
         textContent: string,
         turn: number,
         provider: string,
-        model: string
+        model: string,
+        allowedToolNames?: Set<string>
     ): Promise<LeakedToolFallbackResult | undefined> {
         // Create execution state for the fallback executor
         const executionState: ToolExecutionState = {
@@ -2863,13 +2866,14 @@ export class TurnRunner {
         };
 
         // Create tool executor for fallback execution
-        const executor = this.ctx.sessionExecutor.createExecutor(turn, provider, model, executionState);
+        const executor = this.ctx.sessionExecutor.createExecutor(turn, provider, model, executionState, allowedToolNames);
 
         // Delegate to the module, passing executionState as stats reference
         const fallback = await processLeakedToolCalls({
             textContent,
             executor,
             executionStatsRef: executionState,
+            allowedToolNames,
         });
         this.state.routerSelection = executionState.routerSelection;
         return fallback;

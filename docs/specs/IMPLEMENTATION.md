@@ -235,6 +235,7 @@ Edge cases and compatibility
 
 - Legacy servers returning `parameters` instead of `inputSchema` are supported.
 - Zero‑argument tools are supported (empty input schema object).
+- Leaked tool-call fallback can parse XML-like tool-name tags (e.g., `<agent__task_status>...</agent__task_status>`) with `<parameter name="x">value</parameter>` and task_status bare tags; boolean strings are coerced to booleans, repeated fields join with newlines, malformed `</x>` closes are accepted, and extraction is limited to tools allowed for the current turn.
 - Tool timeouts return a failed result; never retried.
 - Client disconnects before a queued request acquires a slot are detected; the limiter removes them from the FIFO queue so abandoned work is never executed.
 - Non-text content from tools is preserved in principle; we currently surface non-text as a tagged placeholder in the tool result text. If desired later, we can attach resource links or structured content.
