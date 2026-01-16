@@ -1,0 +1,565 @@
+plugin_name: go.d.plugin
+modules:
+  - &module
+    meta: &meta
+      id: collector-go.d.plugin-mssql
+      plugin_name: go.d.plugin
+      module_name: mssql
+      monitored_instance:
+        name: Microsoft SQL Server
+        link: https://www.microsoft.com/en-us/sql-server
+        categories:
+          - data-collection.database-servers
+        icon_filename: mssql.svg
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+            - plugin_name: cgroups.plugin
+              module_name: cgroups
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - "db"
+        - "database"
+        - "mssql"
+        - "sql server"
+        - "microsoft"
+      most_popular: false
+    overview:
+      multi_instance: true
+      data_collection:
+        metrics_description: |
+          This collector monitors the health and performance of Microsoft SQL Server instances.
+
+          It collects metrics from:
+          - Performance counters (buffer manager, memory manager, SQL statistics)
+          - Dynamic management views (DMVs) for wait statistics, locks, and sessions
+          - Per-database transaction and lock statistics
+          - SQL Server Agent job status (if permissions allow)
+        method_description: |
+          It connects to the SQL Server instance via TCP using the go-mssqldb driver and executes queries against:
+
+          - `sys.dm_os_performance_counters` - Performance counter values
+          - `sys.dm_exec_sessions` - Connection information
+          - `sys.dm_os_wait_stats` - Wait statistics
+          - `sys.dm_tran_locks` - Lock information
+          - `sys.master_files` - Database file sizes
+          - `msdb.dbo.sysjobs` - SQL Agent job status (optional)
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it tries to connect to SQL Server on localhost:1433 without authentication.
+            You must configure proper credentials for monitoring.
+        limits:
+          description: ""
+        performance_impact:
+          description: |
+            The collector executes lightweight queries against system views.
+            Most queries complete in milliseconds and have minimal impact on server performance.
+      additional_permissions:
+        description: |
+          The monitoring user requires the VIEW SERVER STATE permission to access DMVs.
+          For SQL Agent job monitoring, access to the msdb database is required.
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list:
+          - title: Create monitoring user
+            description: |
+              Create a SQL Server login with VIEW SERVER STATE permission:
+
+              ```sql
+              -- Create login
+              CREATE LOGIN netdata_user WITH PASSWORD = 'YourStrongPassword!';
+
+              -- Grant VIEW SERVER STATE (required for DMVs)
+              GRANT VIEW SERVER STATE TO netdata_user;
+
+              -- Optional: Grant access to msdb for SQL Agent job monitoring
+              USE msdb;
+              CREATE USER netdata_user FOR LOGIN netdata_user;
+              GRANT SELECT ON dbo.sysjobs TO netdata_user;
+
+              -- Optional: Grant access to distribution database for replication monitoring
+              -- (only if replication is configured)
+              USE distribution;
+              CREATE USER netdata_user FOR LOGIN netdata_user;
+              GRANT SELECT ON dbo.MSreplication_monitordata TO netdata_user;
+              GRANT SELECT ON dbo.MSpublications TO netdata_user;
+              GRANT SELECT ON dbo.MSsubscriptions TO netdata_user;
+              ```
+
+              **Required permissions:**
+              - `VIEW SERVER STATE` - Access to dynamic management views
+
+              **Optional permissions:**
+              - `SELECT on msdb.dbo.sysjobs` - SQL Agent job status monitoring
+              - `SELECT on distribution.dbo.MSreplication_monitordata` - Replication monitoring
+              - `SELECT on distribution.dbo.MSpublications` - Publication information
+              - `SELECT on distribution.dbo.MSsubscriptions` - Subscription counts
+      configuration:
+        file:
+          name: go.d/mssql.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection interval (seconds).
+              default_value: 10
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: Autodetection retry interval (seconds). Set 0 to disable.
+              default_value: 0
+              required: false
+              group: Collection
+
+            - name: dsn
+              description: "SQL Server DSN (Data Source Name). See [DSN syntax](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn)."
+              default_value: "sqlserver://localhost:1433"
+              required: true
+              group: Target
+            - name: timeout
+              description: Query timeout (seconds).
+              default_value: 5
+              required: false
+              group: Target
+
+            - name: collect_transactions
+              description: Collect per-database transaction metrics.
+              default_value: true
+              required: false
+              group: Collection Options
+            - name: collect_waits
+              description: Collect wait statistics from sys.dm_os_wait_stats.
+              default_value: true
+              required: false
+              group: Collection Options
+            - name: collect_locks
+              description: Collect lock metrics from sys.dm_tran_locks.
+              default_value: true
+              required: false
+              group: Collection Options
+            - name: collect_jobs
+              description: Collect SQL Agent job status.
+              default_value: true
+              required: false
+              group: Collection Options
+            - name: collect_buffer_stats
+              description: Collect buffer manager and memory statistics.
+              default_value: true
+              required: false
+              group: Collection Options
+            - name: collect_database_size
+              description: Collect data file sizes for each database.
+              default_value: true
+              required: false
+              group: Collection Options
+            - name: collect_user_connections
+              description: Collect user connection counts.
+              default_value: true
+              required: false
+              group: Collection Options
+            - name: collect_blocked_processes
+              description: Collect blocked process count.
+              default_value: true
+              required: false
+              group: Collection Options
+            - name: collect_sql_errors
+              description: Collect SQL error statistics.
+              default_value: true
+              required: false
+              group: Collection Options
+            - name: collect_database_status
+              description: Collect database state and read-only status.
+              default_value: true
+              required: false
+              group: Collection Options
+            - name: collect_replication
+              description: Collect replication monitoring metrics (requires distribution database).
+              default_value: true
+              required: false
+              group: Collection Options
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic configuration
+              description: Connect to local SQL Server with SQL authentication.
+              config: |
+                jobs:
+                  - name: local
+                    dsn: "sqlserver://netdata_user:password@localhost:1433"
+            - name: Windows Authentication
+              description: Connect using Windows integrated authentication.
+              config: |
+                jobs:
+                  - name: local
+                    dsn: "sqlserver://localhost:1433?trusted_connection=yes"
+            - name: Named instance
+              description: Connect to a named SQL Server instance.
+              config: |
+                jobs:
+                  - name: named_instance
+                    dsn: "sqlserver://netdata_user:password@localhost/INSTANCENAME"
+            - name: Remote server
+              description: Connect to a remote SQL Server.
+              config: |
+                jobs:
+                  - name: remote
+                    dsn: "sqlserver://netdata_user:password@192.168.1.100:1433"
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Monitoring multiple SQL Server instances.
+              config: |
+                jobs:
+                  - name: production
+                    dsn: "sqlserver://netdata_user:password@prod-sql:1433"
+
+                  - name: development
+                    dsn: "sqlserver://netdata_user:password@dev-sql:1433"
+    troubleshooting:
+      problems:
+        list:
+          - name: Connection refused
+            description: |
+              Ensure SQL Server is running and accepting TCP connections on the configured port.
+              Check that the SQL Server Browser service is running if using named instances.
+          - name: Login failed
+            description: |
+              Verify the username and password in the DSN are correct.
+              Ensure SQL Server is configured for mixed mode authentication if using SQL logins.
+          - name: Permission denied
+            description: |
+              The monitoring user needs VIEW SERVER STATE permission.
+              Grant it with: `GRANT VIEW SERVER STATE TO netdata_user;`
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability:
+        - SQL Server 2016+
+        - SQL Server 2017
+        - SQL Server 2019
+        - SQL Server 2022
+        - Azure SQL Database
+      scopes:
+        - name: global
+          description: These metrics refer to the entire SQL Server instance.
+          labels: []
+          metrics:
+            - name: mssql.user_connections
+              description: User Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: user
+            - name: mssql.session_connections
+              description: Session Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: user
+                - name: internal
+            - name: mssql.blocked_processes
+              description: Blocked Processes
+              unit: processes
+              chart_type: line
+              dimensions:
+                - name: blocked
+            - name: mssql.batch_requests
+              description: Batch Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: batch
+            - name: mssql.compilations
+              description: SQL Compilations
+              unit: compilations/s
+              chart_type: line
+              dimensions:
+                - name: compilations
+            - name: mssql.recompilations
+              description: SQL Re-Compilations
+              unit: recompilations/s
+              chart_type: line
+              dimensions:
+                - name: recompilations
+            - name: mssql.auto_param_attempts
+              description: Auto-Parameterization Attempts
+              unit: attempts/s
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: safe
+                - name: failed
+            - name: mssql.sql_errors
+              description: SQL Errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: errors
+            - name: mssql.buffer_cache_hit_ratio
+              description: Buffer Cache Hit Ratio
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: hit_ratio
+            - name: mssql.buffer_page_life_expectancy
+              description: Page Life Expectancy
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: life_expectancy
+            - name: mssql.buffer_page_iops
+              description: Buffer Page I/O
+              unit: pages/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: written
+            - name: mssql.buffer_checkpoint_pages
+              description: Buffer Checkpoint Pages Flushed
+              unit: pages/s
+              chart_type: line
+              dimensions:
+                - name: flushed
+            - name: mssql.buffer_page_lookups
+              description: Buffer Page Lookups
+              unit: lookups/s
+              chart_type: line
+              dimensions:
+                - name: lookups
+            - name: mssql.buffer_lazy_writes
+              description: Buffer Lazy Writes
+              unit: writes/s
+              chart_type: line
+              dimensions:
+                - name: lazy_writes
+            - name: mssql.memory_total
+              description: Total Server Memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: memory
+            - name: mssql.memory_connection
+              description: Connection Memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: memory
+            - name: mssql.memory_pending_grants
+              description: Pending Memory Grants
+              unit: processes
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: mssql.memory_external_benefit
+              description: External Benefit of Memory
+              unit: benefit
+              chart_type: line
+              dimensions:
+                - name: benefit
+            - name: mssql.page_splits
+              description: Page Splits
+              unit: splits/s
+              chart_type: line
+              dimensions:
+                - name: page
+        - name: database
+          description: These metrics refer to individual databases.
+          labels:
+            - name: database
+              description: Database name
+          metrics:
+            - name: mssql.database_active_transactions
+              description: Active Transactions
+              unit: transactions
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: mssql.database_transactions
+              description: Transactions
+              unit: transactions/s
+              chart_type: line
+              dimensions:
+                - name: transactions
+            - name: mssql.database_write_transactions
+              description: Write Transactions
+              unit: transactions/s
+              chart_type: line
+              dimensions:
+                - name: write
+            - name: mssql.database_log_flushes
+              description: Log Flushes
+              unit: flushes/s
+              chart_type: line
+              dimensions:
+                - name: flushes
+            - name: mssql.database_log_flushed
+              description: Log Bytes Flushed
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: flushed
+            - name: mssql.database_data_file_size
+              description: Data File Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: size
+            - name: mssql.database_state
+              description: Database State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: online
+                - name: restoring
+                - name: recovering
+                - name: pending
+                - name: suspect
+                - name: emergency
+                - name: offline
+            - name: mssql.database_read_only
+              description: Database Read-Only Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: read_only
+                - name: read_write
+        - name: lock stats
+          description: These metrics refer to lock statistics by lock resource type (from performance counters).
+          labels:
+            - name: resource
+              description: Lock resource type (Database, File, Object, Page, Key, Extent, RID, HoBT, etc.)
+          metrics:
+            - name: mssql.lock_stats_deadlocks
+              description: Deadlocks by Resource Type
+              unit: deadlocks/s
+              chart_type: line
+              dimensions:
+                - name: deadlocks
+            - name: mssql.lock_stats_waits
+              description: Lock Waits by Resource Type
+              unit: waits/s
+              chart_type: line
+              dimensions:
+                - name: waits
+            - name: mssql.lock_stats_timeouts
+              description: Lock Timeouts by Resource Type
+              unit: timeouts/s
+              chart_type: line
+              dimensions:
+                - name: timeouts
+            - name: mssql.lock_stats_requests
+              description: Lock Requests by Resource Type
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+        - name: lock resource
+          description: These metrics refer to lock resource types (from sys.dm_tran_locks).
+          labels:
+            - name: resource
+              description: Lock resource type (Database, File, Object, Page, Key, etc.)
+          metrics:
+            - name: mssql.locks_by_resource
+              description: Lock Count by Resource Type
+              unit: locks
+              chart_type: line
+              dimensions:
+                - name: locks
+        - name: wait type
+          description: These metrics refer to individual wait types (from sys.dm_os_wait_stats).
+          labels:
+            - name: wait_type
+              description: Wait type name
+            - name: wait_category
+              description: Wait category (CPU, Lock, Latch, Buffer IO, etc.)
+          metrics:
+            - name: mssql.wait_total_time
+              description: Total Wait Time
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: duration
+            - name: mssql.wait_resource_time
+              description: Resource Wait Time
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: duration
+            - name: mssql.wait_signal_time
+              description: Signal Wait Time
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: duration
+            - name: mssql.wait_count
+              description: Wait Count
+              unit: waits/s
+              chart_type: line
+              dimensions:
+                - name: waits
+        - name: job
+          description: These metrics refer to SQL Server Agent jobs.
+          labels:
+            - name: job_name
+              description: Job name
+          metrics:
+            - name: mssql.job_status
+              description: Job Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: enabled
+                - name: disabled
+        - name: replication
+          description: These metrics refer to SQL Server replication publications.
+          labels:
+            - name: publisher_db
+              description: Publisher database name
+            - name: publication
+              description: Publication name
+          metrics:
+            - name: mssql.replication_status
+              description: Replication Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: status
+                - name: warning
+            - name: mssql.replication_latency
+              description: Replication Latency
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: average
+                - name: best
+                - name: worst
+            - name: mssql.replication_subscriptions
+              description: Replication Subscriptions
+              unit: subscriptions
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: agents_running

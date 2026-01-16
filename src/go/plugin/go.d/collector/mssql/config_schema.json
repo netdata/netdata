@@ -1,0 +1,152 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Microsoft SQL Server collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
+      },
+      "dsn": {
+        "title": "DSN",
+        "description": "Microsoft SQL Server [Data Source Name](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn).",
+        "type": "string",
+        "default": "sqlserver://localhost:1433"
+      },
+      "vnode": {
+        "title": "Virtual Node",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string",
+        "default": ""
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Query timeout, in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 5
+      },
+      "collect_transactions": {
+        "title": "Collect transactions",
+        "description": "Collect transaction metrics from performance counters.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_waits": {
+        "title": "Collect wait statistics",
+        "description": "Collect wait statistics from sys.dm_os_wait_stats.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_locks": {
+        "title": "Collect locks",
+        "description": "Collect lock metrics from sys.dm_tran_locks.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_jobs": {
+        "title": "Collect jobs",
+        "description": "Collect SQL Agent job status.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_buffer_stats": {
+        "title": "Collect buffer stats",
+        "description": "Collect buffer manager statistics.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_database_size": {
+        "title": "Collect database size",
+        "description": "Collect data file sizes for each database.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_user_connections": {
+        "title": "Collect user connections",
+        "description": "Collect user connection counts.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_blocked_processes": {
+        "title": "Collect blocked processes",
+        "description": "Collect blocked process count.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_sql_errors": {
+        "title": "Collect SQL errors",
+        "description": "Collect SQL error statistics.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_database_status": {
+        "title": "Collect database status",
+        "description": "Collect database state (online/offline/etc.) and read-only status.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_replication": {
+        "title": "Collect replication",
+        "description": "Collect replication monitoring metrics (requires distribution database).",
+        "type": "boolean",
+        "default": true
+      }
+    },
+    "required": [
+      "dsn"
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "dsn": {
+      "ui:placeholder": "sqlserver://user:password@localhost:1433"
+    },
+    "vnode": {
+      "ui:help": "Optional: Group metrics under a virtual node for multi-instance setups."
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for sub-second granularity (e.g., 0.5 for 500ms)."
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "dsn",
+            "timeout",
+            "vnode"
+          ]
+        },
+        {
+          "title": "Collection options",
+          "fields": [
+            "collect_transactions",
+            "collect_waits",
+            "collect_locks",
+            "collect_jobs",
+            "collect_buffer_stats",
+            "collect_database_size",
+            "collect_user_connections",
+            "collect_blocked_processes",
+            "collect_sql_errors",
+            "collect_database_status",
+            "collect_replication"
+          ]
+        }
+      ]
+    }
+  }
+}
