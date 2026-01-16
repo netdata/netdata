@@ -528,7 +528,7 @@ ALWAYS acknowledge when you're at a proprietary boundary.
 
 ### Instructions for accessing Netdata logs
 
-When providing instructions on how to check Netdata's own logs, keep in mind that this depends on how and where it is run:
+When providing instructions on how to check Netdata's own logs, keep in mind that this depends on how and where Netdata is run:
 
 - When running under Linux systemd, Netdata logs structured events to systemd journals, using the `netdata` journal namespace (append `--namespace netdata` to journalctl)
 - When running on MacOS/FreeBSD or Linux without systemd, it logs to `/var/log/netdata/{daemon,collector,health}.log` (or `/opt/netdata/var/log/netdata/{daemon,collector,health}.log` for static installations), in logfmt format (json supported too)
