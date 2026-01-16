@@ -27,6 +27,7 @@ Some CLI options are hidden from `--help` with `showInHelp: false`. These option
 - **Less stable**: May change between versions
 
 Hidden options exist for features that:
+
 1. Are still evolving
 2. Have complex interactions
 3. Are intended for power users
@@ -35,12 +36,12 @@ Hidden options exist for features that:
 
 ## --advisors
 
-| Property | Value |
-|----------|-------|
-| Type | `string` (comma-separated paths) |
-| Default | Empty (no advisors) |
-| Hidden | Yes |
-| Scope | Master agent only |
+| Property | Value                            |
+| -------- | -------------------------------- |
+| Type     | `string` (comma-separated paths) |
+| Default  | Empty (no advisors)              |
+| Hidden   | Yes                              |
+| Scope    | Master agent only                |
 
 **Description**: Run parallel pre-run agents whose outputs inject as `<advisory>` blocks into the main agent's prompt.
 
@@ -54,7 +55,7 @@ ai-agent --agent main.ai --advisors advisor1.ai,advisor2.ai "query"
 
 1. Before the main session starts, advisor agents run in parallel
 2. Each advisor receives the original user prompt
-3. Advisor outputs are wrapped in `<advisory source="agent-path">` blocks
+3. Advisor outputs are wrapped in `<advisory__nonce agent="agent-name">` blocks
 4. The main agent receives an enriched prompt with all advisory blocks
 5. Failed advisors contribute failure notices (not fatal to main session)
 
@@ -68,18 +69,21 @@ ai-agent --agent analyzer.ai \
 ```
 
 **What the main agent sees**:
+
 ```xml
-<advisory source="context-gatherer.ai">
+<advisory__XXXXXXXXXX agent="context-gatherer">
 Customer has been with us for 3 years, Enterprise tier, 500 nodes.
 Last support ticket was about alerting configuration.
-</advisory>
+</advisory__XXXXXXXXXX>
 
-<advisory source="background-researcher.ai">
+<advisory__XXXXXXXXXX agent="background-researcher">
 Similar complaints often relate to data retention settings or
 query timeout configuration.
-</advisory>
+</advisory__XXXXXXXXXX>
 
+<original_user_request__XXXXXXXXXX>
 Analyze the customer complaint about slow performance
+</original_user_request__XXXXXXXXXX>
 ```
 
 ### Use Cases
@@ -95,17 +99,18 @@ Analyze the customer complaint about slow performance
 - Advisory blocks are informational, not actionable
 - Failed advisors contribute failure notices (main session continues)
 - Advisors inherit global overrides but not frontmatter settings
+- XML tags include random nonce suffixes (`__XXXXXXXXXX`) for prompt uniqueness and security
 
 ---
 
 ## --handoff
 
-| Property | Value |
-|----------|-------|
-| Type | `string` (file path) |
-| Default | None |
-| Hidden | Yes |
-| Scope | Master agent only |
+| Property | Value                |
+| -------- | -------------------- |
+| Type     | `string` (file path) |
+| Default  | None                 |
+| Hidden   | Yes                  |
+| Scope    | Master agent only    |
 
 **Description**: Post-run execution chain for multi-stage workflows. The handoff agent receives the main agent's output and produces the final response.
 
@@ -119,8 +124,8 @@ ai-agent --agent analyzer.ai --handoff reporter.ai "query"
 
 1. Main session runs to completion
 2. If successful, handoff agent receives:
-   - `<original_user_request>` block with the original query
-   - `<response>` block with main agent's output
+   - `<original_user_request__nonce>` block with the original query
+   - `<response__nonce agent="agent-name">` block with main agent's output
 3. Handoff agent produces the final output
 
 ### Example
@@ -132,12 +137,9 @@ ai-agent --agent data-analyzer.ai --handoff executive-reporter.ai \
 ```
 
 **What the handoff agent sees**:
-```xml
-<original_user_request>
-What's our Q4 revenue trend?
-</original_user_request>
 
-<response>
+```xml
+<response__XXXXXXXXXX agent="analyzer">
 Revenue analysis shows:
 - October: $1.2M (+5% MoM)
 - November: $1.4M (+17% MoM)
@@ -145,7 +147,11 @@ Revenue analysis shows:
 
 The December dip correlates with holiday seasonality.
 Year-over-year Q4 growth is 23%.
-</response>
+</response__XXXXXXXXXX>
+
+<original_user_request__XXXXXXXXXX>
+What's our Q4 revenue trend?
+</original_user_request__XXXXXXXXXX>
 ```
 
 ### Use Cases
@@ -162,6 +168,7 @@ Year-over-year Q4 growth is 23%.
 - Handoff result becomes the final output to the user
 - Can chain multiple stages via frontmatter
 - Handoff agent has full tool access (unlike advisors)
+- XML tags include random nonce suffixes (`__XXXXXXXXXX`) for prompt uniqueness and security
 
 ---
 
@@ -183,12 +190,12 @@ Your task prompt here.
 
 ### Precedence
 
-| Source | Priority |
-|--------|----------|
-| CLI `--advisors` | 1 (highest) |
-| Frontmatter `advisors:` | 2 |
-| CLI `--handoff` | 1 (highest) |
-| Frontmatter `handoff:` | 2 |
+| Source                  | Priority    |
+| ----------------------- | ----------- |
+| CLI `--advisors`        | 1 (highest) |
+| Frontmatter `advisors:` | 2           |
+| CLI `--handoff`         | 1 (highest) |
+| Frontmatter `handoff:`  | 2           |
 
 ---
 
@@ -238,24 +245,16 @@ ai-agent --agent main.ai --advisors advisor.ai --verbose "query"
 
 Look for these log entries:
 
-| Logger | Description |
-|--------|-------------|
-| `agent:orchestrator` | Orchestration flow decisions |
-| `agent:advisor` | Advisor execution and results |
-| `agent:handoff` | Handoff execution |
-| `agent:router` | Router selection |
+| Logger               | Description                             |
+| -------------------- | --------------------------------------- |
+| `agent:orchestrator` | Orchestration flow decisions and errors |
 
 ### Example Log Output
 
 ```
-VRB orchestrator starting advisors: context-gatherer.ai, background-researcher.ai
-VRB advisor context-gatherer.ai completed in 1234ms
-VRB advisor background-researcher.ai completed in 2345ms
-VRB orchestrator enriched prompt with 2 advisory blocks
-VRB main session starting
-...
-VRB orchestrator starting handoff to final-reporter.ai
-VRB handoff final-reporter.ai completed in 1500ms
+WRN [agent:orchestrator] router_destination_missing: unknown-destination
+WRN [agent:orchestrator] router_handoff_failed: connection failed
+WRN [agent:orchestrator] handoff_failed: timeout
 ```
 
 ---
@@ -270,10 +269,10 @@ grep -r "showInHelp: false" src/options-registry.ts
 
 ### Current Hidden Options
 
-| Option | Purpose |
-|--------|---------|
-| `--advisors` | Parallel pre-run agents |
-| `--handoff` | Post-run execution chain |
+| Option       | Purpose                  |
+| ------------ | ------------------------ |
+| `--advisors` | Parallel pre-run agents  |
+| `--handoff`  | Post-run execution chain |
 
 ### Source Reference
 
@@ -302,11 +301,11 @@ strDef({
 
 ## Stability
 
-| Aspect | Status |
-|--------|--------|
-| **Functional** | Work as designed |
-| **Less Stable** | May change without deprecation warnings |
-| **Less Documented** | Source code is the authority |
+| Aspect              | Status                                  |
+| ------------------- | --------------------------------------- |
+| **Functional**      | Work as designed                        |
+| **Less Stable**     | May change without deprecation warnings |
+| **Less Documented** | Source code is the authority            |
 
 > **Tip:** When using hidden options in production, pin your ai-agent version and test upgrades thoroughly.
 

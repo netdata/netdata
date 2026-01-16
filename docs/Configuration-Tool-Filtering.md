@@ -2,17 +2,16 @@
 
 Control which tools agents can access with allowlists and denylists.
 
+**Note:** Provider-level tool filtering (`providers.<name>.toolsAllowed/Denied`) and agent-level tool filtering (`toolsAllowed/toolsDenied` in frontmatter) are not implemented. Use MCP server-level filtering for tool access control.
+
 ---
 
 ## Table of Contents
 
-- [Overview](#overview) - Defense-in-depth tool access control
+- [Overview](#overview) - Tool access control
 - [Tool Naming Convention](#tool-naming-convention) - Understanding tool identifiers
 - [Config-Level Filtering](#config-level-filtering) - Filter at MCP server level
-- [Provider-Level Filtering](#provider-level-filtering) - Filter by provider capabilities
-- [Agent-Level Filtering](#agent-level-filtering) - Filter in agent frontmatter
 - [Wildcard Patterns](#wildcard-patterns) - Pattern matching syntax
-- [Precedence Rules](#precedence-rules) - How filtering layers combine
 - [Common Patterns](#common-patterns) - Read-only, minimal access, safety gates
 - [Configuration Reference](#configuration-reference) - All filtering options
 - [Debugging](#debugging) - Verify filtering behavior
@@ -22,13 +21,11 @@ Control which tools agents can access with allowlists and denylists.
 
 ## Overview
 
-Tool filtering provides defense-in-depth access control:
+Tool filtering provides control over which tools are exposed to agents:
 
-| Layer | Scope | Configuration |
-|-------|-------|---------------|
+| Layer  | Scope                     | Configuration                           |
+| ------ | ------------------------- | --------------------------------------- |
 | Config | All agents using a server | `mcpServers.<name>.toolsAllowed/Denied` |
-| Provider | All agents using a provider | `providers.<name>.toolsAllowed/Denied` |
-| Agent | Single agent | Frontmatter `toolsAllowed/toolsDenied` |
 
 Filtering is applied at tool discovery time. Tools that don't pass filters are never exposed to the LLM.
 
@@ -38,19 +35,19 @@ Filtering is applied at tool discovery time. Tools that don't pass filters are n
 
 Tools follow a consistent naming pattern:
 
-| Source | Pattern | Example |
-|--------|---------|---------|
+| Source      | Pattern                 | Example                    |
+| ----------- | ----------------------- | -------------------------- |
 | MCP servers | `mcp__<server>__<tool>` | `mcp__github__search_code` |
-| REST tools | `rest__<name>` | `rest__weather` |
-| Internal | `agent__<name>` | `agent__final_report` |
+| REST tools  | `rest__<name>`          | `rest__weather`            |
+| Internal    | `agent__<name>`         | `agent__final_report`      |
 
-Understanding this convention is essential for writing filter patterns.
+Understanding this convention is essential for writing filter patterns. When configuring filters in `mcpServers.<name>.toolsAllowed/Denied`, use the **local tool name** only (e.g., `search_code`), not the full `mcp__<server>__<tool>` format.
 
 ---
 
 ## Config-Level Filtering
 
-Filter tools at the MCP server level in `.ai-agent.json`.
+Filter tools at the MCP server level in `.ai-agent.json`. Use **local tool names** (not the full `mcp__<server>__<tool>` format).
 
 ### Allow Specific Tools
 
@@ -99,33 +96,102 @@ All tools are available except those listed.
 
 ### MCP Server Filtering Reference
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
+| Property       | Type       | Default            | Description                   |
+| -------------- | ---------- | ------------------ | ----------------------------- |
 | `toolsAllowed` | `string[]` | `[]` (all allowed) | Tools to expose (empty = all) |
-| `toolsDenied` | `string[]` | `[]` | Tools to hide |
+| `toolsDenied`  | `string[]` | `[]`               | Tools to hide                 |
 
 ---
 
-## Provider-Level Filtering
+## Wildcard Patterns
 
-Filter tools available to all agents using a specific provider.
+Use literal `*` or `any` to match all tools in filter lists.
+
+### Allow All Tools
+
+If `toolsAllowed` is not specified or is empty, all tools are allowed:
 
 ```json
 {
-  "providers": {
-    "openai": {
-      "type": "openai",
-      "apiKey": "${OPENAI_API_KEY}",
-      "toolsAllowed": ["mcp__*", "rest__*"],
-      "toolsDenied": ["agent__batch"]
+  "mcpServers": {
+    "github": {
+      "toolsAllowed": [],
+      "toolsDenied": ["create_or_update_file", "delete_repository"]
     }
   }
 }
 ```
 
-### String Schema Format Filtering
+Or explicitly allow all:
 
-Some providers don't support certain JSON Schema string formats. Filter them:
+```json
+{
+  "mcpServers": {
+    "github": {
+      "toolsAllowed": ["*"],
+      "toolsDenied": ["create_or_update_file"]
+    }
+  }
+}
+```
+
+### Deny All Tools
+
+Use `*` or `any` in `toolsDenied` to block all tools from a server:
+
+```json
+{
+  "mcpServers": {
+    "experimental": {
+      "toolsDenied": ["*"]
+    }
+  }
+}
+```
+
+### Case Insensitivity
+
+Tool names are matched case-insensitively:
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "toolsAllowed": ["read_file", "write_file"]
+    }
+  }
+}
+```
+
+This matches `READ_FILE`, `read_file`, or `Read_File`.
+
+### Within a Single Level
+
+If both `toolsAllowed` and `toolsDenied` are specified at the same level:
+
+1. Tool must be in `toolsAllowed` (or `toolsAllowed` is empty)
+2. Tool must NOT be in `toolsDenied`
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "toolsAllowed": ["read_file", "write_file"],
+      "toolsDenied": ["delete_file", "sensitive_data"]
+    }
+  }
+}
+```
+
+Result: `read_file` allowed, `write_file` allowed, `delete_file` denied, `sensitive_data` denied.
+
+**Important:** Only exact tool name matching is supported (case-insensitive). Pattern matching like `query_*` or `search_*` is NOT supported.
+
+---
+
+## String Schema Format Filtering
+
+Some LLM providers don't support certain JSON Schema string formats. Configure this in the provider configuration:
 
 ```json
 {
@@ -140,132 +206,13 @@ Some providers don't support certain JSON Schema string formats. Filter them:
 }
 ```
 
-### Provider Filtering Reference
-
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `toolsAllowed` | `string[]` | `[]` (all allowed) | Tools to expose |
-| `toolsDenied` | `string[]` | `[]` | Tools to hide |
-| `stringSchemaFormatsAllowed` | `string[]` | `[]` (all allowed) | JSON Schema formats to allow |
-| `stringSchemaFormatsDenied` | `string[]` | `[]` | JSON Schema formats to strip |
-
----
-
-## Agent-Level Filtering
-
-Filter tools in agent frontmatter for per-agent control.
-
-```yaml
----
-models:
-  - openai/gpt-4o
-tools:
-  - github
-  - filesystem
-toolsAllowed:
-  - mcp__github__search_code
-  - mcp__github__get_file_contents
-  - mcp__filesystem__read_file
-toolsDenied:
-  - mcp__filesystem__write_file
-  - mcp__filesystem__delete_file
----
-You are a code review assistant with read-only access.
-```
-
-### Frontmatter Filtering Reference
-
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `tools` | `string[]` | `[]` | Tool sources to include (servers, `restTools`, `agents`) |
-| `toolsAllowed` | `string[]` | `[]` (all allowed) | Specific tools to expose |
-| `toolsDenied` | `string[]` | `[]` | Specific tools to hide |
-
----
-
-## Wildcard Patterns
-
-Use `*` for pattern matching in filter lists.
-
-### Match All Tools from a Server
-
-```yaml
-toolsAllowed:
-  - mcp__github__*        # All GitHub tools
-  - mcp__filesystem__*    # All filesystem tools
-```
-
-### Match Tool Prefixes
-
-```yaml
-toolsAllowed:
-  - mcp__filesystem__read_*   # read_file, read_dir, etc.
-  - mcp__github__get_*        # get_file_contents, get_issue, etc.
-```
-
-### Match Across Servers
-
-```yaml
-toolsDenied:
-  - mcp__*__delete_*      # All delete operations from any MCP
-  - mcp__*__write_*       # All write operations
-  - mcp__*__create_*      # All create operations
-```
-
-### Wildcard Rules
-
-| Pattern | Matches |
-|---------|---------|
-| `*` | Any characters (including none) |
-| `mcp__*` | All MCP tools |
-| `mcp__github__*` | All tools from `github` server |
-| `*__search_*` | Any tool containing `search_` |
-
----
-
-## Precedence Rules
-
-When multiple filter levels apply, they combine with AND logic:
-
-### Evaluation Order
-
-1. **Config level** (MCP server filters) - Applied first
-2. **Provider level** - Applied second
-3. **Agent level** - Applied last
-
-### Combined Filter Logic
-
-```
-tool_visible = (passes_config_filters) AND (passes_provider_filters) AND (passes_agent_filters)
-```
-
-### Within a Single Level
-
-If both `toolsAllowed` and `toolsDenied` are specified at the same level:
-
-1. Tool must be in `toolsAllowed` (or `toolsAllowed` is empty)
-2. Tool must NOT be in `toolsDenied`
-
-```json
-{
-  "mcpServers": {
-    "api": {
-      "toolsAllowed": ["query_*", "search_*"],
-      "toolsDenied": ["query_sensitive"]
-    }
-  }
-}
-```
-
-Result: `query_users` allowed, `query_sensitive` denied, `delete_user` denied.
+See [Providers](Configuration-Providers) for more details on provider configuration.
 
 ---
 
 ## Common Patterns
 
 ### Read-Only Database Access
-
-**Config level:**
 
 ```json
 {
@@ -286,44 +233,31 @@ Result: `query_users` allowed, `query_sensitive` denied, `delete_user` denied.
 }
 ```
 
-**Agent level:**
-
-```yaml
----
-models:
-  - openai/gpt-4o
-tools:
-  - database
-toolsAllowed:
-  - mcp__database__select
-  - mcp__database__describe
----
-You have read-only database access. Query data but never modify it.
-```
-
 ### Minimal Freshdesk Access
 
-```yaml
----
-description: Freshdesk ticket lookup (read-only)
-models:
-  - openai/gpt-4o
-tools:
-  - freshdesk
-toolsDenied:
-  - mcp__freshdesk__create_ticket
-  - mcp__freshdesk__update_ticket
-  - mcp__freshdesk__delete_ticket
-  - mcp__freshdesk__create_note
-  - mcp__freshdesk__update_note
-  - mcp__freshdesk__delete_note
-  - mcp__freshdesk__create_contact
-  - mcp__freshdesk__update_contact
-  - mcp__freshdesk__delete_contact
-  - mcp__freshdesk__create_company
-  - mcp__freshdesk__update_company
-  - mcp__freshdesk__delete_company
----
+```json
+{
+  "mcpServers": {
+    "freshdesk": {
+      "type": "stdio",
+      "command": "npx -y @anthropic/mcp-server-freshdesk",
+      "toolsDenied": [
+        "create_ticket",
+        "update_ticket",
+        "delete_ticket",
+        "create_note",
+        "update_note",
+        "delete_note",
+        "create_contact",
+        "update_contact",
+        "delete_contact",
+        "create_company",
+        "update_company",
+        "delete_company"
+      ]
+    }
+  }
+}
 ```
 
 ### Combined Safety (Filtering + Prompt Gates)
@@ -336,10 +270,6 @@ models:
   - openai/gpt-4o
 tools:
   - github
-toolsDenied:
-  - mcp__github__push_files
-  - mcp__github__create_or_update_file
-  - mcp__github__create_pull_request
 ---
 You are a code review assistant.
 
@@ -360,15 +290,21 @@ If asked to write code, provide it in your response but DO NOT commit it.
 
 ### Deny All Write Operations
 
-```yaml
-toolsDenied:
-  - mcp__*__create_*
-  - mcp__*__update_*
-  - mcp__*__delete_*
-  - mcp__*__write_*
-  - mcp__*__push_*
-  - mcp__*__insert_*
-  - mcp__*__drop_*
+```json
+{
+  "mcpServers": {
+    "github": {
+      "toolsDenied": [
+        "create_or_update_file",
+        "push_files",
+        "create_issue",
+        "update_issue",
+        "delete_issue",
+        "create_pull_request"
+      ]
+    }
+  }
+}
 ```
 
 ---
@@ -381,8 +317,6 @@ toolsDenied:
 {
   "providers": {
     "<name>": {
-      "toolsAllowed": ["string"],
-      "toolsDenied": ["string"],
       "stringSchemaFormatsAllowed": ["string"],
       "stringSchemaFormatsDenied": ["string"]
     }
@@ -401,24 +335,27 @@ toolsDenied:
 ```yaml
 ---
 tools: ["string"]
-toolsAllowed: ["string"]
-toolsDenied: ["string"]
 ---
 ```
 
+The `tools` array controls which tool sources are loaded (servers, `restTools`, agents). It does NOT support per-tool filtering.
+
 ### All Filtering Properties
 
-| Location | Property | Type | Description |
-|----------|----------|------|-------------|
-| Provider | `toolsAllowed` | `string[]` | Tools to expose |
-| Provider | `toolsDenied` | `string[]` | Tools to hide |
-| Provider | `stringSchemaFormatsAllowed` | `string[]` | JSON Schema formats to allow |
-| Provider | `stringSchemaFormatsDenied` | `string[]` | JSON Schema formats to strip |
-| MCP Server | `toolsAllowed` | `string[]` | Tools to expose (local names) |
-| MCP Server | `toolsDenied` | `string[]` | Tools to hide (local names) |
-| Frontmatter | `tools` | `string[]` | Tool sources to include |
-| Frontmatter | `toolsAllowed` | `string[]` | Tools to expose (full names) |
-| Frontmatter | `toolsDenied` | `string[]` | Tools to hide (full names) |
+| Location    | Property                     | Type       | Description                                        |
+| ----------- | ---------------------------- | ---------- | -------------------------------------------------- |
+| Provider    | `stringSchemaFormatsAllowed` | `string[]` | JSON Schema formats to allow                       |
+| Provider    | `stringSchemaFormatsDenied`  | `string[]` | JSON Schema formats to strip                       |
+| MCP Server  | `toolsAllowed`               | `string[]` | Tools to expose (local names)                      |
+| MCP Server  | `toolsDenied`                | `string[]` | Tools to hide (local names)                        |
+| Frontmatter | `tools`                      | `string[]` | Tool sources to include (servers, restTools, etc.) |
+
+**Important:**
+
+- Provider-level `toolsAllowed` and `toolsDenied` are defined in the configuration schema but **not implemented**.
+- Frontmatter `toolsAllowed` and `toolsDenied` are **not supported**.
+- Use MCP server-level filtering for tool access control.
+- Provider `stringSchemaFormatsAllowed/Denied` filters JSON Schema string formats, not tools.
 
 ---
 
@@ -430,7 +367,7 @@ toolsDenied: ["string"]
 ai-agent --agent test.ai --dry-run --verbose
 ```
 
-Shows which tools are available after all filtering layers are applied.
+Shows which tools are available after filtering is applied.
 
 ### Trace Tool Discovery
 
@@ -439,8 +376,9 @@ ai-agent --agent test.ai --trace-mcp "test query"
 ```
 
 Shows:
+
 - Tools discovered from each MCP server
-- Filtering decisions at each layer
+- Filtering decisions at server level
 - Final tool list exposed to LLM
 
 ### Verify Specific Tool
@@ -454,18 +392,20 @@ If the tool doesn't appear, it was filtered out.
 ### Common Issues
 
 **Tool not available:**
+
 - Check tool name spelling (use exact name from server)
-- Verify server is in `tools:` list
-- Check all filtering layers (config, provider, agent)
+- Verify server is in agent's `tools:` list
 
 **Wrong tool name pattern:**
+
 - MCP tools use local names in server config: `search_code`
-- MCP tools use full names in agent frontmatter: `mcp__github__search_code`
+- Only exact string matching is supported (case-insensitive)
 
 **Wildcard not matching:**
-- Wildcards match only at the position specified
-- `mcp__*__search` does not match `mcp__github__search_code`
-- Use `mcp__*__search_*` for prefix matching
+
+- Only literal `*` or `any` wildcard is supported
+- Pattern matching like `mcp__*` or `prefix_*` is NOT supported
+- Use `*` or `any` alone to match all tools, not for prefix/partial matching
 
 ---
 

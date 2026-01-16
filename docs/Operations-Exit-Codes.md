@@ -20,13 +20,14 @@ Reference for AI Agent exit codes used in scripting and CI/CD pipelines.
 
 AI Agent uses standardized exit codes:
 
-| Code | Category | Description |
-|------|----------|-------------|
-| 0 | Success | Agent completed successfully |
-| 1 | Configuration Error | Invalid configuration or agent file |
-| 2 | LLM Error | Provider or model failure |
-| 3 | Tool Error | MCP server or tool execution failure |
-| 4 | CLI Error | Invalid command-line arguments |
+| Code | Category                | Description                          |
+| ---- | ----------------------- | ------------------------------------ |
+| 0    | Success                 | Agent completed successfully         |
+| 1    | Configuration Error     | Invalid configuration or agent file  |
+| 2    | LLM Error               | Provider or model failure            |
+| 3    | Tool Error              | MCP server or tool execution failure |
+| 4    | CLI Error               | Invalid command-line arguments       |
+| 5    | Schema Validation Error | Tool schema validation failed        |
 
 ---
 
@@ -37,11 +38,13 @@ AI Agent uses standardized exit codes:
 **Meaning**: Agent completed successfully with a final report.
 
 **Conditions**:
+
 - Agent produced a valid final report
 - All required outputs generated
 - No fatal errors occurred
 
 **Script check**:
+
 ```bash
 ai-agent --agent test.ai "query"
 if [ $? -eq 0 ]; then
@@ -56,6 +59,7 @@ fi
 **Meaning**: Configuration file or agent file is invalid.
 
 **Common causes**:
+
 - Invalid YAML frontmatter
 - Unknown frontmatter keys
 - Missing required configuration
@@ -63,6 +67,7 @@ fi
 - Invalid model chain specification
 
 **Examples**:
+
 ```
 ERR: Failed to parse agent frontmatter: invalid YAML
 ERR: Unknown frontmatter key: unknownKey
@@ -70,6 +75,7 @@ ERR: Configuration file not found: .ai-agent.json
 ```
 
 **Resolution**:
+
 1. Validate agent file: `ai-agent --agent test.ai --dry-run`
 2. Check YAML syntax in frontmatter
 3. Verify `.ai-agent.json` JSON syntax
@@ -81,6 +87,7 @@ ERR: Configuration file not found: .ai-agent.json
 **Meaning**: LLM provider returned an unrecoverable error.
 
 **Common causes**:
+
 - Invalid API key (401 Unauthorized)
 - Rate limiting (429 Too Many Requests)
 - Model not available
@@ -89,6 +96,7 @@ ERR: Configuration file not found: .ai-agent.json
 - Context window exceeded
 
 **Examples**:
+
 ```
 ERR: LLM communication error: 401 Unauthorized
 ERR: LLM request failed: 429 rate limited
@@ -97,6 +105,7 @@ ERR: Context window exceeded
 ```
 
 **Resolution**:
+
 1. Verify API key: `echo $OPENAI_API_KEY | head -c 10`
 2. Check provider status page
 3. Add fallback models
@@ -109,12 +118,14 @@ ERR: Context window exceeded
 **Meaning**: MCP server or tool execution failed fatally.
 
 **Common causes**:
+
 - MCP server failed to start
 - Tool execution timeout
 - Required tool not found
 - Tool returned fatal error
 
 **Examples**:
+
 ```
 ERR: Failed to initialize MCP server: github
 ERR: Tool timeout after 30000 ms: mcp__api__slow_query
@@ -122,6 +133,7 @@ ERR: Tool not found: mcp__server__unknown_tool
 ```
 
 **Resolution**:
+
 1. Verify MCP server configuration
 2. Test server independently: `npx -y @server/package --help`
 3. Check tool availability with `--dry-run`
@@ -134,12 +146,14 @@ ERR: Tool not found: mcp__server__unknown_tool
 **Meaning**: Invalid command-line arguments or usage.
 
 **Common causes**:
+
 - Missing required argument
 - Invalid flag value
 - Conflicting options
 - Unknown options
 
 **Examples**:
+
 ```
 ERR: Missing required argument: --agent
 ERR: Invalid --reasoning-tokens value: 'invalid'
@@ -147,9 +161,33 @@ ERR: Unknown option: --invalid-flag
 ```
 
 **Resolution**:
+
 1. Check help: `ai-agent --help`
 2. Verify argument syntax
 3. Check for typos in option names
+
+---
+
+### Exit Code 5: Schema Validation Error
+
+**Meaning**: Tool schema validation failed during `--list-tools` operation.
+
+**Common causes**:
+
+- Tool input schema does not conform to the specified JSON Schema draft
+- Tool output schema validation errors
+
+**Examples**:
+
+```
+ERR: Schema validation failed for 3 tool(s)
+```
+
+**Resolution**:
+
+1. Review tool schemas against the specified JSON Schema draft
+2. Check `--schema-validate <draft>` argument
+3. Validate schemas independently using schema validation tools
 
 ---
 
@@ -157,17 +195,37 @@ ERR: Unknown option: --invalid-flag
 
 Internal exit codes logged during session execution (visible in logs and snapshots):
 
-| Exit Reason | Description | Fatal |
-|-------------|-------------|-------|
-| `EXIT-FINAL-ANSWER` | Normal completion with final report | No |
-| `EXIT-MAX-TURNS-WITH-RESPONSE` | Turn limit reached with valid output | No |
-| `EXIT-MAX-TURNS-WITHOUT-RESPONSE` | Turn limit reached without output | Yes |
-| `EXIT-TOKEN-LIMIT` | Context window exhausted | Yes |
-| `EXIT-AUTH-FAILURE` | Authentication error | Yes |
-| `EXIT-QUOTA-EXCEEDED` | Rate or quota limit | Yes |
-| `EXIT-TOOL-TIMEOUT` | Tool execution timeout | Yes |
-| `EXIT-LLM-ERROR` | Unrecoverable LLM error | Yes |
-| `EXIT-CONFIG-ERROR` | Configuration invalid | Yes |
+| Exit Reason                    | Description                                         | Fatal |
+| ------------------------------ | --------------------------------------------------- | ----- |
+| **Success Exits**              |                                                     |       |
+| `EXIT-FINAL-ANSWER`            | Normal completion with final report                 | No    |
+| `EXIT-MAX-TURNS-WITH-RESPONSE` | Turn limit reached with valid output                | No    |
+| `EXIT-ROUTER-HANDOFF`          | Router selected destination (orchestration handoff) | No    |
+| `EXIT-USER-STOP`               | User requested stop via stopRef                     | No    |
+| **LLM Failures**               |                                                     |       |
+| `EXIT-NO-LLM-RESPONSE`         | No response from LLM provider                       | Yes   |
+| `EXIT-EMPTY-RESPONSE`          | Empty response from LLM provider                    | Yes   |
+| `EXIT-AUTH-FAILURE`            | Authentication error (401, etc.)                    | Yes   |
+| `EXIT-QUOTA-EXCEEDED`          | Rate or quota limit (429, etc.)                     | Yes   |
+| `EXIT-MODEL-ERROR`             | Model or provider-specific error                    | Yes   |
+| **Tool Failures**              |                                                     |       |
+| `EXIT-TOOL-FAILURE`            | General tool execution failure                      | Yes   |
+| `EXIT-MCP-CONNECTION-LOST`     | MCP server connection lost                          | Yes   |
+| `EXIT-TOOL-NOT-AVAILABLE`      | Requested tool not found/available                  | Yes   |
+| `EXIT-TOOL-TIMEOUT`            | Tool execution timeout                              | Yes   |
+| **Configuration**              |                                                     |       |
+| `EXIT-NO-PROVIDERS`            | No LLM providers configured                         | Yes   |
+| `EXIT-INVALID-MODEL`           | Invalid model specified                             | Yes   |
+| `EXIT-MCP-INIT-FAILED`         | MCP server initialization failed                    | Yes   |
+| **Timeout/Limits**             |                                                     |       |
+| `EXIT-INACTIVITY-TIMEOUT`      | Session inactivity timeout                          | Yes   |
+| `EXIT-MAX-RETRIES`             | All retries exhausted                               | Yes   |
+| `EXIT-TOKEN-LIMIT`             | Context window exhausted                            | Yes   |
+| `EXIT-MAX-TURNS-NO-RESPONSE`   | Turn limit reached without output                   | Yes   |
+| **Unexpected**                 |                                                     |       |
+| `EXIT-UNCAUGHT-EXCEPTION`      | Uncaught exception in agent                         | Yes   |
+| `EXIT-SIGNAL-RECEIVED`         | Process signal received (SIGTERM, etc.)             | Yes   |
+| `EXIT-UNKNOWN`                 | Unknown error condition                             | Yes   |
 
 ### Finding Exit Reason in Snapshot
 
