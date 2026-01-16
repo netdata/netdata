@@ -1352,14 +1352,13 @@ void dict_mssql_insert_jobs_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
 // Options
 void netdata_mount_mssql_connection_string(struct netdata_mssql_conn *dbInput)
 {
-    SQLCHAR conn[1024];
+    SQLCHAR conn[2048];
     const char *serverAddress;
     const char *serverAddressArg;
     if (unlikely(!dbInput)) {
         return;
     }
 
-    char auth[512];
     if (likely(dbInput->server && dbInput->address)) {
         nd_log(
             NDLS_COLLECTORS,
@@ -1377,6 +1376,7 @@ void netdata_mount_mssql_connection_string(struct netdata_mssql_conn *dbInput)
         serverAddress = dbInput->address;
     }
 
+    char auth[1024];
     if (likely(dbInput->windows_auth))
         snprintfz(auth, sizeof(auth) - 1, "Trusted_Connection = yes");
     else if (unlikely(!dbInput->username || !dbInput->password)) {
@@ -1388,6 +1388,11 @@ void netdata_mount_mssql_connection_string(struct netdata_mssql_conn *dbInput)
         return;
     } else {
         snprintfz(auth, sizeof(auth) - 1, "UID=%s;PWD=%s;", dbInput->username, dbInput->password);
+    }
+
+    if (likely(dbInput->trust_server_certificate)) {
+        size_t length = strlen(auth);
+        snprintfz(&auth[length], sizeof(auth) - length, ";TrustServerCertificate=True;");
     }
 
     snprintfz(
