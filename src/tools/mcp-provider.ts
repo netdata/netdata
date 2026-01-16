@@ -795,7 +795,7 @@ export class MCPProvider extends ToolProvider {
   private serverInitPromises = new Map<string, Promise<void>>();
   private toolNameMap = new Map<string, { serverName: string; originalName: string }>();
   private toolQueue = new Map<string, string>();
-  private readonly ajv: AjvInstance = new AjvCtor({ allErrors: true, strict: false });
+  private readonly ajv: AjvInstance = new AjvCtor({ allErrors: true, strict: false, coerceTypes: true });
   private readonly toolValidators = new Map<string, AjvValidateFn | null>();
   private initialized = false;
   private initializationPromise?: Promise<void>;
