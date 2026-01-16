@@ -96,6 +96,14 @@ endif()
 
 if(${DISTRO} IN_LIST RHEL_DISTROS)
   set(DISTRO "rhel")
+  # Strip to major version only (e.g., "9.6" -> "9")
+  string(REGEX REPLACE "^([0-9]+).*" "\\1" DISTRO_VERSION "${DISTRO_VERSION}")
+elseif(${DISTRO} STREQUAL "rhel")
+  # Strip RHEL version to major version only
+  string(REGEX REPLACE "^([0-9]+).*" "\\1" DISTRO_VERSION "${DISTRO_VERSION}")
+elseif(${DISTRO} STREQUAL "ol")
+  # Strip Oracle Linux version to major version only
+  string(REGEX REPLACE "^([0-9]+).*" "\\1" DISTRO_VERSION "${DISTRO_VERSION}")
 elseif(${DISTRO} STREQUAL "opensuse-leap")
   set(DISTRO "opensuse")
 elseif(${DISTRO} STREQUAL "opensuse-tumbleweed")
@@ -219,12 +227,17 @@ elseif(${DISTRO} IN_LIST RPM_DISTROS)
     endif()
   elseif(${DISTRO} STREQUAL "rhel")
     set(DIST_NAME "el")
+    # Use the major version only for RHEL/CentOS-compatible distros
+    set(DIST_VERSION "${DISTRO_VERSION}")
 
     if(${DISTRO_VERSION} VERSION_LESS_EQUAL 8)
       set(CPACK_RPM_PACKAGE_REQUIRES "yum-plugin-priorities, epel-release")
     else()
       set(CPACK_RPM_PACKAGE_REQUIRES "epel-release")
     endif()
+  elseif(${DISTRO} STREQUAL "ol")
+    # Use the major version only for Oracle Linux
+    set(DIST_VERSION "${DISTRO_VERSION}")
   endif()
 
   message(STATUS "Generating stable repository configuration for ${DISTRO} ${DISTRO_VERSION}")
