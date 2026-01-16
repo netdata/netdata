@@ -166,7 +166,7 @@ For Anthropic, change `models:` to `- anthropic/claude-sonnet-4-20250514`.
 | `maxTurns` | Maximum conversation turns |
 | Text after `---` | System prompt - agent instructions |
 
-### Step 2.3: Make Executable (Optional)
+### Step 2.3: Make Executable
 
 ```bash
 chmod +x docs-helper.ai
@@ -178,9 +178,17 @@ chmod +x docs-helper.ai
 
 ### Step 3.1: Basic Run
 
+Two ways to run an agent:
+
 ```bash
+# Direct execution (requires chmod +x and shebang)
+./docs-helper.ai "How do I create a React component?"
+
+# Explicit invocation (works without chmod)
 ai-agent @docs-helper.ai "How do I create a React component?"
 ```
+
+Both are equivalent. Direct execution is shorter; explicit invocation works on any `.ai` file.
 
 **Output streams**:
 
@@ -189,12 +197,12 @@ ai-agent @docs-helper.ai "How do I create a React component?"
 | `stdout` | Final agent response only |
 | `stderr` | Progress, tool calls, debugging info |
 
-This separation allows piping: `ai-agent @agent.ai "query" > result.txt`
+This separation allows piping: `./docs-helper.ai "query" > result.txt`
 
 ### Step 3.2: Verbose Mode
 
 ```bash
-ai-agent @docs-helper.ai --verbose "How do I use useState in React?"
+./docs-helper.ai --verbose "How do I use useState in React?"
 ```
 
 Verbose output shows:
@@ -207,7 +215,7 @@ Verbose output shows:
 ### Step 3.3: Dry Run (Validation Only)
 
 ```bash
-ai-agent @docs-helper.ai --dry-run "test"
+./docs-helper.ai --dry-run "test"
 ```
 
 Validates configuration and agent file without calling the LLM. Use this to check for errors before real runs.
@@ -226,7 +234,7 @@ Validates configuration and agent file without calling the LLM. Use this to chec
 **Script usage**:
 
 ```bash
-ai-agent @docs-helper.ai "query"
+./docs-helper.ai "query"
 if [ $? -eq 0 ]; then
   echo "Success"
 else
