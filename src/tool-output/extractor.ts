@@ -64,11 +64,11 @@ interface ExtractSource {
 }
 
 const NO_RELEVANT_DATA = 'NO RELEVANT DATA FOUND';
-const SOURCE_TOOL_LABEL = 'SOURCE TOOL';
+const SOURCE_TOOL_LABEL = 'THE DATA COME FROM A TOOL OUTPUT AS OF THE FOLLOWING REQUEST';
 const WHAT_TO_EXTRACT_LABEL = 'WHAT TO EXTRACT';
 const OUTPUT_FORMAT_LABEL = 'OUTPUT FORMAT (required)';
 const OUTPUT_WRAPPER_LABEL = '- Emit exactly one XML final-report wrapper:';
-const NO_RELEVANT_LABEL = '- If no relevant data exists, output:';
+const NO_RELEVANT_LABEL = '- If no relevant data exists your XML final report must contain:';
 const MODE_AUTO: ToolOutputMode = 'auto';
 const MODE_FULL_CHUNKED: Exclude<ToolOutputMode, 'auto'> = 'full-chunked';
 const MODE_READ_GREP: Exclude<ToolOutputMode, 'auto'> = 'read-grep';
@@ -86,7 +86,10 @@ const buildMapSystemPrompt = (args: {
   nonce: string;
 }): string => {
   return [
-    'You are an internal extraction agent. You must extract information from a document chunk.',
+    'You are a helpful information extractor and summarizer. ' +
+    'Your mission is to find relevant information from a document chunk you receive from the user.' +
+    'CRITICAL: DO NOT CALL ANY TOOLS. YOU DONT HAVE ANY TOOLS. Read the information the user provided and extract the relevant data.' +
+    'Think step by step and make sure you extract all relevant information',
     '',
     SOURCE_TOOL_LABEL,
     `- Name: ${args.toolName}`,
@@ -122,7 +125,10 @@ const buildReduceSystemPrompt = (args: {
   nonce: string;
 }): string => {
   return [
-    'You are an internal extraction agent. You must synthesize multiple chunk extractions into one final answer.',
+    'You are a helpful information extractor and summarizer. ' +
+    'Your mission is to synthesize multiple chunks of information from the document chunks you receive from the user.' +
+    'CRITICAL: DO NOT CALL ANY TOOLS. Read the information the user provided and extract the relevant data.' +
+    'Think step by step and make sure you extract all relevant information',
     '',
     SOURCE_TOOL_LABEL,
     `- Name: ${args.toolName}`,
@@ -152,7 +158,11 @@ const buildReadGrepSystemPrompt = (args: {
   nonce: string;
 }): string => {
   return [
-    'You are an internal extraction agent. You can only use Read and Grep tools.',
+    'You are a helpful information extractor and summarizer. ' +
+    'Your mission is to extract information from a document chunk you receive from the user. ' + 
+    'You can only use Read and Grep tools, to find the relevant data on the given file.' +
+    'Think step by step and make sure you extract all relevant information. Do not give up on the first match.' +
+    'CRITICAL: YOU MUST ENSURE YOU EXTRACTED ALL POSSIBLE RELEVANT INFORMATION BY USING THE TOOLS PROVIDED.',
     '',
     'IMPORTANT: The handle is a relative path under the root directory.',
     'Use the handle exactly as given when calling Read or Grep.',
@@ -354,6 +364,13 @@ export class ToolOutputExtractor {
         return endFailure('full-chunked map failed to emit final report');
       }
       chunkOutputs.push(extracted);
+    }
+
+    // Skip reduce step when there's only 1 chunk - the map output is the final output
+    if (chunkOutputs.length === 1) {
+      child.endTurn(1);
+      child.endSession(true);
+      return { ok: true, text: chunkOutputs[0], mode: MODE_FULL_CHUNKED, childOpTree: child.getSession() };
     }
 
     const reduceOp = child.beginOp(1, 'llm', { provider: target.provider, model: target.model, stage: 'reduce' });

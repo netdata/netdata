@@ -32,7 +32,7 @@ const TOOL_OUTPUT_SCHEMA: MCPTool = {
       mode: {
         type: 'string',
         enum: ['auto', 'full-chunked', 'read-grep', 'truncate'],
-        description: 'Optional override. auto=module decides; full-chunked=LLM chunk+reduce; read-grep=dynamic sub-agent with Read/Grep; truncate=keeps top and bottom, truncates in the middle.'
+        description: 'Use auto for optimal extraction strategy.'
       }
     }
   }
@@ -70,7 +70,7 @@ export class ToolOutputProvider extends ToolProvider {
       '- When a tool result is too large, you will receive a handle and instructions to call tool_output.',
       '- The handle is a relative path under the tool_output root (session-<uuid>/<file-uuid>).',
       '- Always provide a detailed `extract` instruction describing exactly what you need from the stored output.',
-      '- Use mode=auto unless you must override the strategy (full-chunked, read-grep, truncate).',
+      '- Use mode=auto for optimal strategy.',
     ].join('\n');
   }
 
