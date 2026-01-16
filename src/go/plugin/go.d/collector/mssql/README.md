@@ -33,11 +33,25 @@ The collector provides the following metric categories:
 - **Connection memory** - Memory used for connections
 - **Memory grants pending** - Queries waiting for memory
 
+### Process memory metrics
+
+- **Resident memory** - SQL Server process resident memory (working set)
+- **Virtual memory** - SQL Server process committed virtual memory
+- **Memory utilization** - Percentage of committed memory in the working set
+- **Page faults** - Number of page faults incurred by the SQL Server process
+
+### OS memory metrics
+
+- **Physical memory** - OS physical memory (used and available)
+- **Page file** - OS page file (used and available)
+
 ### Per-database metrics
 
 - **Transactions** - Transaction throughput
 - **Active transactions** - Currently active transactions
 - **Log bytes flushed** - Transaction log write throughput
+- **Log growths** - Number of times the transaction log has been expanded
+- **I/O stall time** - Read and write I/O stall (latency) time in milliseconds
 - **Data file size** - Size of database data files
 - **Backup/restore throughput** - Throughput of backup/restore operations
 - **Database state** - Online, restoring, recovering, pending, suspect, emergency, offline

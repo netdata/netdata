@@ -142,6 +142,14 @@ func (c *Collector) collectInstanceMetrics(mx map[string]int64) error {
 		}
 	}
 
+	// Process and OS memory metrics (always collected)
+	if err := c.collectProcessMemory(mx); err != nil {
+		c.Warning(err)
+	}
+	if err := c.collectOSMemory(mx); err != nil {
+		c.Warning(err)
+	}
+
 	return nil
 }
 
@@ -336,6 +344,13 @@ func (c *Collector) collectDatabaseMetrics(mx map[string]int64) error {
 		if err := c.collectDatabaseStatus(mx); err != nil {
 			c.Warning(err)
 		}
+	}
+	// Collect I/O stall and log growth metrics per database
+	if err := c.collectIOStall(mx); err != nil {
+		c.Warning(err)
+	}
+	if err := c.collectLogGrowths(mx); err != nil {
+		c.Warning(err)
 	}
 	return nil
 }
@@ -721,4 +736,107 @@ func boolToInt(b bool) int64 {
 		return 1
 	}
 	return 0
+}
+
+func (c *Collector) collectProcessMemory(mx map[string]int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
+	defer cancel()
+
+	var resident, virtual, utilization, pageFaults int64
+	err := c.db.QueryRowContext(ctx, queryProcessMemory).Scan(&resident, &virtual, &utilization, &pageFaults)
+	if err != nil {
+		return fmt.Errorf("process memory query failed: %v", err)
+	}
+
+	mx["process_memory_resident"] = resident
+	mx["process_memory_virtual"] = virtual
+	mx["process_memory_utilization"] = utilization
+	mx["process_page_faults"] = pageFaults
+	return nil
+}
+
+func (c *Collector) collectOSMemory(mx map[string]int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
+	defer cancel()
+
+	var memUsed, memAvailable, pagefileUsed, pagefileAvailable int64
+	err := c.db.QueryRowContext(ctx, queryOSMemory).Scan(&memUsed, &memAvailable, &pagefileUsed, &pagefileAvailable)
+	if err != nil {
+		return fmt.Errorf("OS memory query failed: %v", err)
+	}
+
+	mx["os_memory_used"] = memUsed
+	mx["os_memory_available"] = memAvailable
+	mx["os_pagefile_used"] = pagefileUsed
+	mx["os_pagefile_available"] = pagefileAvailable
+	return nil
+}
+
+func (c *Collector) collectIOStall(mx map[string]int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
+	defer cancel()
+
+	rows, err := c.db.QueryContext(ctx, queryIOStall)
+	if err != nil {
+		return fmt.Errorf("IO stall query failed: %v", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var dbName string
+		var readMs, writeMs, totalMs int64
+		if err := rows.Scan(&dbName, &readMs, &writeMs, &totalMs); err != nil {
+			continue
+		}
+
+		dbName = strings.TrimSpace(dbName)
+		if dbName == "" {
+			continue
+		}
+
+		if !c.seenDatabases[dbName] {
+			c.seenDatabases[dbName] = true
+			c.addDatabaseCharts(dbName)
+		}
+
+		dbID := cleanDatabaseName(dbName)
+		mx[fmt.Sprintf("database_%s_io_stall_read", dbID)] = readMs
+		mx[fmt.Sprintf("database_%s_io_stall_write", dbID)] = writeMs
+	}
+
+	return rows.Err()
+}
+
+func (c *Collector) collectLogGrowths(mx map[string]int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
+	defer cancel()
+
+	rows, err := c.db.QueryContext(ctx, queryLogGrowths)
+	if err != nil {
+		return fmt.Errorf("log growths query failed: %v", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var dbName string
+		var growths int64
+		if err := rows.Scan(&dbName, &growths); err != nil {
+			continue
+		}
+
+		dbName = strings.TrimSpace(dbName)
+		if dbName == "" {
+			continue
+		}
+
+		if !c.seenDatabases[dbName] {
+			c.seenDatabases[dbName] = true
+			c.addDatabaseCharts(dbName)
+		}
+
+		dbID := cleanDatabaseName(dbName)
+		mx[fmt.Sprintf("database_%s_log_growths", dbID)] = growths
+	}
+
+	return rows.Err()
 }

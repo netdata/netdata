@@ -45,6 +45,9 @@ modules:
           - `sys.dm_exec_sessions` - Connection information
           - `sys.dm_os_wait_stats` - Wait statistics
           - `sys.dm_tran_locks` - Lock information
+          - `sys.dm_io_virtual_file_stats` - I/O stall (latency) statistics
+          - `sys.dm_os_process_memory` - SQL Server process memory
+          - `sys.dm_os_sys_memory` - OS physical memory and page file
           - `sys.master_files` - Database file sizes
           - `msdb.dbo.sysjobs` - SQL Agent job status (optional)
       default_behavior:
@@ -385,6 +388,44 @@ modules:
               chart_type: line
               dimensions:
                 - name: page
+            - name: mssql.process_memory_resident
+              description: SQL Server Process Resident Memory (Working Set)
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: resident
+            - name: mssql.process_memory_virtual
+              description: SQL Server Process Virtual Memory Committed
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: virtual
+            - name: mssql.process_memory_utilization
+              description: SQL Server Process Memory Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: mssql.process_page_faults
+              description: SQL Server Process Page Faults
+              unit: faults
+              chart_type: line
+              dimensions:
+                - name: page_faults
+            - name: mssql.os_memory
+              description: OS Physical Memory
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: available
+            - name: mssql.os_pagefile
+              description: OS Page File
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: available
         - name: database
           description: These metrics refer to individual databases.
           labels:
@@ -421,6 +462,19 @@ modules:
               chart_type: line
               dimensions:
                 - name: flushed
+            - name: mssql.database_log_growths
+              description: Log Growths
+              unit: growths
+              chart_type: line
+              dimensions:
+                - name: growths
+            - name: mssql.database_io_stall
+              description: I/O Stall Time
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
             - name: mssql.database_data_file_size
               description: Data File Size
               unit: bytes

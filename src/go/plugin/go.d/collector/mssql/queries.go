@@ -236,6 +236,50 @@ LEFT JOIN distribution.dbo.MSsubscriptions s
 GROUP BY p.publisher_db, p.publication;
 `
 
+// queryIOStall gets I/O stall (latency) metrics per database from sys.dm_io_virtual_file_stats
+const queryIOStall = `
+SELECT
+  DB_NAME(a.database_id) AS database_name,
+  SUM(io_stall_read_ms) AS io_stall_read_ms,
+  SUM(io_stall_write_ms) AS io_stall_write_ms,
+  SUM(io_stall) AS io_stall_total_ms
+FROM sys.dm_io_virtual_file_stats(NULL, NULL) a
+INNER JOIN sys.master_files b ON a.database_id = b.database_id AND a.file_id = b.file_id
+WHERE a.database_id > 4
+GROUP BY a.database_id;
+`
+
+// queryProcessMemory gets SQL Server process memory metrics from sys.dm_os_process_memory
+const queryProcessMemory = `
+SELECT
+  physical_memory_in_use_kb * 1024 AS resident_memory_bytes,
+  virtual_address_space_committed_kb * 1024 AS virtual_memory_bytes,
+  memory_utilization_percentage,
+  page_fault_count
+FROM sys.dm_os_process_memory;
+`
+
+// queryOSMemory gets OS memory metrics from sys.dm_os_sys_memory
+const queryOSMemory = `
+SELECT
+  (total_physical_memory_kb - available_physical_memory_kb) * 1024 AS os_memory_used_bytes,
+  available_physical_memory_kb * 1024 AS os_memory_available_bytes,
+  (total_page_file_kb - available_page_file_kb) * 1024 AS os_pagefile_used_bytes,
+  available_page_file_kb * 1024 AS os_pagefile_available_bytes
+FROM sys.dm_os_sys_memory;
+`
+
+// queryLogGrowths gets log growth events per database from performance counters
+const queryLogGrowths = `
+SELECT
+  RTRIM(instance_name) AS database_name,
+  cntr_value
+FROM sys.dm_os_performance_counters
+WHERE object_name LIKE '%Databases%'
+  AND counter_name = 'Log Growths'
+  AND instance_name NOT IN ('_Total', 'mssqlsystemresource');
+`
+
 // waitTypeCategories maps wait types to their categories
 var waitTypeCategories = map[string]string{
 	"ASYNC_IO_COMPLETION":              "Other Disk IO",

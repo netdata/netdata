@@ -34,11 +34,21 @@ const (
 	prioMemoryPendingGrants
 	prioMemoryExternalBenefit
 
+	prioProcessMemoryResident
+	prioProcessMemoryVirtual
+	prioProcessMemoryUtilization
+	prioProcessPageFaults
+
+	prioOSMemory
+	prioOSPageFile
+
 	prioDatabaseActiveTransactions
 	prioDatabaseTransactions
 	prioDatabaseWriteTransactions
 	prioDatabaseLogFlushes
 	prioDatabaseLogFlushed
+	prioDatabaseLogGrowths
+	prioDatabaseIOStall
 	prioDatabaseDeadlocks
 	prioDatabaseLockWaits
 	prioDatabaseLockTimeouts
@@ -86,6 +96,14 @@ var instanceCharts = module.Charts{
 	memoryConnectionChart.Copy(),
 	memoryPendingGrantsChart.Copy(),
 	memoryExternalBenefitChart.Copy(),
+
+	processMemoryResidentChart.Copy(),
+	processMemoryVirtualChart.Copy(),
+	processMemoryUtilizationChart.Copy(),
+	processPageFaultsChart.Copy(),
+
+	osMemoryChart.Copy(),
+	osPageFileChart.Copy(),
 }
 
 var (
@@ -306,6 +324,76 @@ var (
 			{ID: "memory_external_benefit", Name: "benefit"},
 		},
 	}
+
+	processMemoryResidentChart = module.Chart{
+		ID:       "process_memory_resident",
+		Title:    "Process resident memory (working set)",
+		Units:    "bytes",
+		Fam:      "process memory",
+		Ctx:      "mssql.process_memory_resident",
+		Priority: prioProcessMemoryResident,
+		Dims: module.Dims{
+			{ID: "process_memory_resident", Name: "resident"},
+		},
+	}
+	processMemoryVirtualChart = module.Chart{
+		ID:       "process_memory_virtual",
+		Title:    "Process virtual memory committed",
+		Units:    "bytes",
+		Fam:      "process memory",
+		Ctx:      "mssql.process_memory_virtual",
+		Priority: prioProcessMemoryVirtual,
+		Dims: module.Dims{
+			{ID: "process_memory_virtual", Name: "virtual"},
+		},
+	}
+	processMemoryUtilizationChart = module.Chart{
+		ID:       "process_memory_utilization",
+		Title:    "Process memory utilization",
+		Units:    "percentage",
+		Fam:      "process memory",
+		Ctx:      "mssql.process_memory_utilization",
+		Priority: prioProcessMemoryUtilization,
+		Dims: module.Dims{
+			{ID: "process_memory_utilization", Name: "utilization"},
+		},
+	}
+	processPageFaultsChart = module.Chart{
+		ID:       "process_page_faults",
+		Title:    "Process page faults",
+		Units:    "faults",
+		Fam:      "process memory",
+		Ctx:      "mssql.process_page_faults",
+		Priority: prioProcessPageFaults,
+		Dims: module.Dims{
+			{ID: "process_page_faults", Name: "page_faults", Algo: module.Incremental},
+		},
+	}
+
+	osMemoryChart = module.Chart{
+		ID:       "os_memory",
+		Title:    "OS physical memory",
+		Units:    "bytes",
+		Fam:      "os memory",
+		Ctx:      "mssql.os_memory",
+		Priority: prioOSMemory,
+		Dims: module.Dims{
+			{ID: "os_memory_used", Name: "used"},
+			{ID: "os_memory_available", Name: "available"},
+		},
+	}
+	osPageFileChart = module.Chart{
+		ID:       "os_pagefile",
+		Title:    "OS page file",
+		Units:    "bytes",
+		Fam:      "os memory",
+		Ctx:      "mssql.os_pagefile",
+		Priority: prioOSPageFile,
+		Dims: module.Dims{
+			{ID: "os_pagefile_used", Name: "used"},
+			{ID: "os_pagefile_available", Name: "available"},
+		},
+	}
 )
 
 // Database chart templates
@@ -414,6 +502,29 @@ var (
 		Dims: module.Dims{
 			{ID: "database_%s_read_only", Name: "read_only"},
 			{ID: "database_%s_read_write", Name: "read_write"},
+		},
+	}
+	databaseLogGrowthsChartTmpl = module.Chart{
+		ID:       "database_%s_log_growths",
+		Title:    "Database log growths",
+		Units:    "growths",
+		Fam:      "db log",
+		Ctx:      "mssql.database_log_growths",
+		Priority: prioDatabaseLogGrowths,
+		Dims: module.Dims{
+			{ID: "database_%s_log_growths", Name: "growths", Algo: module.Incremental},
+		},
+	}
+	databaseIOStallChartTmpl = module.Chart{
+		ID:       "database_%s_io_stall",
+		Title:    "Database I/O stall time",
+		Units:    "ms",
+		Fam:      "db io",
+		Ctx:      "mssql.database_io_stall",
+		Priority: prioDatabaseIOStall,
+		Dims: module.Dims{
+			{ID: "database_%s_io_stall_read", Name: "read", Algo: module.Incremental},
+			{ID: "database_%s_io_stall_write", Name: "write", Algo: module.Incremental},
 		},
 	}
 )
@@ -621,6 +732,8 @@ func (c *Collector) addDatabaseCharts(dbName string) {
 		databaseWriteTransactionsChartTmpl.Copy(),
 		databaseLogFlushesChartTmpl.Copy(),
 		databaseLogFlushedChartTmpl.Copy(),
+		databaseLogGrowthsChartTmpl.Copy(),
+		databaseIOStallChartTmpl.Copy(),
 		databaseDataFileSizeChartTmpl.Copy(),
 		databaseBackupRestoreThroughputChartTmpl.Copy(),
 		databaseStateChartTmpl.Copy(),
