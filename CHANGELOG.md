@@ -171,6 +171,12 @@
 - Fix(cgroups.plugin): correct is_cgroup_duplicate check ([#21559](https://github.com/netdata/netdata/issues/21559))
 - Add sentry error reporting ([#21558](https://github.com/netdata/netdata/issues/21558))
 - Allow systemd-journal plugin if journal-viewer does not exist. ([#21561](https://github.com/netdata/netdata/issues/21561))
+- Fix(go.d): disable logger color in terminal on Win ([#21562](https://github.com/netdata/netdata/issues/21562))
+- Docs(go.d/proxysql): add alerts to metadata.yaml ([#21565](https://github.com/netdata/netdata/issues/21565))
+- Regenerate integrations docs ([#21566](https://github.com/netdata/netdata/issues/21566))
+- Add On-Prem Release Notes to map.csv ([#21571](https://github.com/netdata/netdata/issues/21571))
+- Use host-prefixed log directories under containers. ([#21568](https://github.com/netdata/netdata/issues/21568))
+- Bring back systemd-journal.plugin setcap (from source install) ([#21569](https://github.com/netdata/netdata/issues/21569))
 
 ## [2.8.0] - 2025-11-19
 
