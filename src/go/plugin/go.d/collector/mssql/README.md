@@ -107,7 +107,7 @@ sqlserver://username:password@host:port?param=value
 Common parameters:
 - `database` - Initial database to connect to
 - `encrypt` - Enable encryption (disable/false/true/strict)
-- `TrustServerCertificate` - Skip certificate validation
+- `TrustServerCertificate` - Skip certificate validation (use only in dev/test environments)
 - `ApplicationIntent` - ReadOnly for read-only routing
 
 ### Windows Authentication

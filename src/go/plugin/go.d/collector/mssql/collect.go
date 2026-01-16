@@ -691,12 +691,9 @@ func (c *Collector) collectReplicationStatus(mx map[string]int64) error {
 		mx[fmt.Sprintf("replication_%s_warning_mergeslowrunspeed", pubID)] = boolToInt(warning&0x40 != 0)
 
 		mx[fmt.Sprintf("replication_%s_latency_avg", pubID)] = avgLatency
-		// Handle the noLatencySentinel for "no value"
+		// Handle the noLatencySentinel for "no value" (only bestLatency uses sentinel in query)
 		if bestLatency == noLatencySentinel {
 			bestLatency = 0
-		}
-		if worstLatency == noLatencySentinel {
-			worstLatency = 0
 		}
 		mx[fmt.Sprintf("replication_%s_latency_best", pubID)] = bestLatency
 		mx[fmt.Sprintf("replication_%s_latency_worst", pubID)] = worstLatency

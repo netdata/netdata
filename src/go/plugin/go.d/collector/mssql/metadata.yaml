@@ -261,9 +261,6 @@ modules:
       description: ""
       availability:
         - SQL Server 2016+
-        - SQL Server 2017
-        - SQL Server 2019
-        - SQL Server 2022
         - Azure SQL Database
       scopes:
         - name: global
