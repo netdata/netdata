@@ -27,7 +27,6 @@ Model configuration controls:
 - **Extended reasoning** for complex problems (`reasoning`, `reasoningTokens`)
 - **Prompt caching** for cost optimization (`caching`)
 
-**User questions answered**: "How do I change the model?" / "How do I set up fallbacks?" / "How do I enable extended thinking?"
 
 ---
 

@@ -25,7 +25,6 @@ Sub-agents are other `.ai` agent files that your agent can call as tools. This e
 - **Reusability**: Same sub-agent used by multiple parents
 - **Composition**: Build complex systems from simple parts
 
-**User questions answered**: "How do I call another agent?" / "How do agents work together?"
 
 **Key concept**: When you list an agent in `agents:`, it becomes a tool the parent can call. The tool name is `agent__<toolName>`.
 

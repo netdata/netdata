@@ -26,7 +26,6 @@ Contracts define:
 - **Output schema**: JSON Schema for structured JSON output
 - **Input schema**: JSON Schema for sub-agent input validation
 
-**User questions answered**: "How do I get structured output?" / "How do I validate input?"
 
 **Why use contracts?**
 

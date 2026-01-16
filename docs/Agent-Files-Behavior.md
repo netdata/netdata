@@ -29,7 +29,6 @@ Behavior configuration controls:
 - **Output**: Response length and repetition handling
 - **Caching**: Response cache for cost optimization
 
-**User questions answered**: "How do I limit turns?" / "How do I adjust temperature?" / "How do I set timeouts?"
 
 ---
 

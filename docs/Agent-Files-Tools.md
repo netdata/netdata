@@ -26,7 +26,6 @@ Tool configuration controls:
 - **Which specific tools** are denied from a source (`toolsDenied`)
 - **Tool output handling** (`toolResponseMaxBytes`, `toolOutput`)
 
-**User questions answered**: "How do I give my agent tools?" / "How do I restrict tools?"
 
 ---
 

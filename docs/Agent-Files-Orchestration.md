@@ -28,7 +28,6 @@ Orchestration patterns run **outside** the main session loop:
 
 These differ from `agents` (sub-agents), which are tools called DURING the session.
 
-**User questions answered**: "How do I set up advisors?" / "How do I route to different agents?"
 
 ---
 
