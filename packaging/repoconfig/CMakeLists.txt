@@ -96,19 +96,16 @@ endif()
 
 if(${DISTRO} IN_LIST RHEL_DISTROS)
   set(DISTRO "rhel")
-  # Strip to major version only (e.g., "9.6" -> "9")
-  string(REGEX REPLACE "^([0-9]+).*" "\\1" DISTRO_VERSION "${DISTRO_VERSION}")
-elseif(${DISTRO} STREQUAL "rhel")
-  # Strip RHEL version to major version only
-  string(REGEX REPLACE "^([0-9]+).*" "\\1" DISTRO_VERSION "${DISTRO_VERSION}")
-elseif(${DISTRO} STREQUAL "ol")
-  # Strip Oracle Linux version to major version only
-  string(REGEX REPLACE "^([0-9]+).*" "\\1" DISTRO_VERSION "${DISTRO_VERSION}")
 elseif(${DISTRO} STREQUAL "opensuse-leap")
   set(DISTRO "opensuse")
 elseif(${DISTRO} STREQUAL "opensuse-tumbleweed")
   set(DISTRO "opensuse")
   set(DISTRO_VERSION "tumbleweed")
+endif()
+
+# Strip version to major version only for RHEL-compatible and Oracle Linux
+if(${DISTRO} STREQUAL "rhel" OR ${DISTRO} STREQUAL "ol")
+  string(REGEX REPLACE "^([0-9]+).*" "\\1" DISTRO_VERSION "${DISTRO_VERSION}")
 endif()
 
 if(${DISTRO} IN_LIST DEB_DISTROS)
