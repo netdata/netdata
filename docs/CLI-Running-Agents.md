@@ -57,11 +57,11 @@ First argument is the system prompt; second is the user prompt.
 
 ### The `--agent` Flag
 
-| Property | Value |
-|----------|-------|
-| Flag | `--agent <path>` |
-| Repeatable | Yes |
-| Required | Yes (for headend mode), optional for inline prompts |
+| Property   | Value                                               |
+| ---------- | --------------------------------------------------- |
+| Flag       | `--agent <path>`                                    |
+| Repeatable | Yes                                                 |
+| Required   | Yes (for headend mode), optional for inline prompts |
 
 **Description**: Register an agent file (`.ai`) for execution. In headend mode, multiple agents can be registered.
 
@@ -79,6 +79,7 @@ ai-agent --agent agents/*.ai --api 8080
 ```
 
 **Resolution**:
+
 - Paths are relative to current working directory
 - Sub-agents referenced in frontmatter are auto-loaded
 - Missing files cause immediate exit with error
@@ -157,11 +158,11 @@ EOF
 
 ### Output Format
 
-| Property | Value |
-|----------|-------|
-| Flag | `--format <format>` |
-| Default | None (uses agent default or markdown) |
-| Values | `markdown`, `json`, `slack-block-kit`, `text`, custom |
+| Property | Value                                                                    |
+| -------- | ------------------------------------------------------------------------ |
+| Flag     | `--format <format>`                                                      |
+| Default  | None (uses agent default or markdown)                                    |
+| Values   | `markdown`, `markdown+mermaid`, `slack-block-kit`, `tty`, `pipe`, `json` |
 
 **Description**: Controls how the agent formats its response. This is passed to the agent via the `${FORMAT}` variable.
 
@@ -170,15 +171,15 @@ EOF
 ai-agent --agent api.ai --format json "Get user data"
 
 # Request plain text
-ai-agent --agent chat.ai --format text "Simple answer please"
+ai-agent --agent chat.ai --format pipe "Simple answer please"
 ```
 
 ### Structured Output (JSON Schema)
 
-| Property | Value |
-|----------|-------|
-| Flag | `--schema <schema>` |
-| Format | Inline JSON or `@path` to file |
+| Property | Value                          |
+| -------- | ------------------------------ |
+| Flag     | `--schema <schema>`            |
+| Format   | Inline JSON or `@path` to file |
 
 **Description**: Forces JSON output with validation against a schema.
 
@@ -192,10 +193,10 @@ ai-agent --agent extractor.ai --schema @schemas/person.json "Extract person data
 
 ### Streaming Control
 
-| Property | Value |
-|----------|-------|
-| Flag | `--stream` / `--no-stream` |
-| Default | `true` (streaming enabled) |
+| Property | Value                      |
+| -------- | -------------------------- |
+| Flag     | `--stream` / `--no-stream` |
+| Default  | `true` (streaming enabled) |
 
 **Description**: Controls whether output is streamed as generated or delivered complete.
 
@@ -209,10 +210,10 @@ ai-agent --agent chat.ai --stream "Hello"
 
 ### Quiet Mode
 
-| Property | Value |
-|----------|-------|
-| Flag | `--quiet` |
-| Default | `false` |
+| Property | Value     |
+| -------- | --------- |
+| Flag     | `--quiet` |
+| Default  | `false`   |
 
 **Description**: Suppress all log output except critical errors. Only the agent's response is printed.
 
@@ -228,11 +229,11 @@ When headend flags are present, ai-agent starts persistent servers instead of ru
 
 ### REST API Headend
 
-| Property | Value |
-|----------|-------|
-| Flag | `--api <port>` |
-| Repeatable | Yes |
-| Concurrency | `--api-concurrency <n>` (default: 4) |
+| Property    | Value                                 |
+| ----------- | ------------------------------------- |
+| Flag        | `--api <port>`                        |
+| Repeatable  | Yes                                   |
+| Concurrency | `--api-concurrency <n>` (default: 10) |
 
 ```bash
 # Single port
@@ -244,9 +245,9 @@ ai-agent --agent api.ai --api 8080 --api 8081
 
 ### MCP Headend
 
-| Property | Value |
-|----------|-------|
-| Flag | `--mcp <transport>` |
+| Property   | Value                                             |
+| ---------- | ------------------------------------------------- |
+| Flag       | `--mcp <transport>`                               |
 | Transports | `stdio`, `http:<port>`, `sse:<port>`, `ws:<port>` |
 
 ```bash
@@ -262,10 +263,10 @@ ai-agent --agent tools.ai --mcp sse:3000
 
 ### OpenAI-Compatible API
 
-| Property | Value |
-|----------|-------|
-| Flag | `--openai-completions <port>` |
-| Concurrency | `--openai-completions-concurrency <n>` (default: 4) |
+| Property    | Value                                                |
+| ----------- | ---------------------------------------------------- |
+| Flag        | `--openai-completions <port>`                        |
+| Concurrency | `--openai-completions-concurrency <n>` (default: 10) |
 
 ```bash
 ai-agent --agent chat.ai --openai-completions 8080
@@ -273,10 +274,10 @@ ai-agent --agent chat.ai --openai-completions 8080
 
 ### Anthropic-Compatible API
 
-| Property | Value |
-|----------|-------|
-| Flag | `--anthropic-completions <port>` |
-| Concurrency | `--anthropic-completions-concurrency <n>` (default: 4) |
+| Property    | Value                                                   |
+| ----------- | ------------------------------------------------------- |
+| Flag        | `--anthropic-completions <port>`                        |
+| Concurrency | `--anthropic-completions-concurrency <n>` (default: 10) |
 
 ```bash
 ai-agent --agent chat.ai --anthropic-completions 8080
@@ -284,9 +285,9 @@ ai-agent --agent chat.ai --anthropic-completions 8080
 
 ### Embed Headend
 
-| Property | Value |
-|----------|-------|
-| Flag | `--embed <port>` |
+| Property    | Value                                   |
+| ----------- | --------------------------------------- |
+| Flag        | `--embed <port>`                        |
 | Concurrency | `--embed-concurrency <n>` (default: 10) |
 
 ```bash
@@ -295,9 +296,9 @@ ai-agent --agent widget.ai --embed 8080
 
 ### Slack Headend
 
-| Property | Value |
-|----------|-------|
-| Flag | `--slack` |
+| Property | Value     |
+| -------- | --------- |
+| Flag     | `--slack` |
 
 ```bash
 ai-agent --agent slackbot.ai --slack
@@ -311,11 +312,11 @@ Requires Slack environment variables. See [Headends-Slack](Headends-Slack).
 
 ### The `--tools` Flag
 
-| Property | Value |
-|----------|-------|
-| Flag | `--tools <list>` |
-| Aliases | `--tool`, `--mcp`, `--mcp-tool`, `--mcp-tools` |
-| Format | Comma-separated MCP server names |
+| Property | Value                                          |
+| -------- | ---------------------------------------------- |
+| Flag     | `--tools <list>`                               |
+| Aliases  | `--tool`, `--mcp`, `--mcp-tool`, `--mcp-tools` |
+| Format   | Comma-separated MCP server names               |
 
 **Description**: Specify which MCP servers the agent can access.
 
@@ -333,7 +334,10 @@ ai-agent --agent research.ai --tools "github,slack,web" "Research topic"
 # List all configured MCP servers and their tools
 ai-agent --list-tools all
 
-# List specific server
+# List specific servers (comma-separated)
+ai-agent --list-tools github,slack
+
+# List a single server
 ai-agent --list-tools github
 ```
 
@@ -343,10 +347,10 @@ ai-agent --list-tools github
 
 ### The `--agents` Flag
 
-| Property | Value |
-|----------|-------|
-| Flag | `--agents <list>` |
-| Format | Comma-separated paths to .ai files |
+| Property | Value                              |
+| -------- | ---------------------------------- |
+| Flag     | `--agents <list>`                  |
+| Format   | Comma-separated paths to .ai files |
 
 **Description**: Load sub-agents as tools for the master agent.
 

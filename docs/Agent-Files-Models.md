@@ -21,6 +21,7 @@ Configure which LLMs your agent uses, including fallback chains, reasoning modes
 ## Overview
 
 Model configuration controls:
+
 - **Which LLMs** handle requests (`models`)
 - **Fallback order** when a model fails
 - **Extended reasoning** for complex problems (`reasoning`, `reasoningTokens`)
@@ -71,16 +72,17 @@ reasoningTokens: 32000
 
 ### models
 
-| Property | Value |
-|----------|-------|
-| Type | `string` or `string[]` |
-| Default | None |
-| Required | **Yes** |
+| Property     | Value                  |
+| ------------ | ---------------------- |
+| Type         | `string` or `string[]` |
+| Default      | None                   |
+| Required     | **Yes**                |
 | Valid values | `provider/model` pairs |
 
 **Description**: List of provider/model pairs to use. The agent tries each in order if one fails (fallback chain).
 
 **What it affects**:
+
 - Which LLM(s) handle requests
 - Fallback order on failures (rate limits, errors, timeouts)
 - Cost and performance characteristics
@@ -101,15 +103,16 @@ models:
 
 **Common Providers**:
 
-| Provider | Example Models | Notes |
-|----------|---------------|-------|
-| `openai` | `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo` | Standard OpenAI API |
-| `anthropic` | `claude-sonnet-4-20250514`, `claude-3-5-sonnet-20241022` | Supports reasoning |
-| `google` | `gemini-2.0-flash`, `gemini-1.5-pro` | Google AI |
-| `openrouter` | `anthropic/claude-3.5-sonnet`, `openai/gpt-4-turbo` | Aggregator |
-| `ollama` | `llama3.2:latest`, `mistral:latest` | Local models |
+| Provider     | Example Models                                           | Notes               |
+| ------------ | -------------------------------------------------------- | ------------------- |
+| `openai`     | `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`                   | Standard OpenAI API |
+| `anthropic`  | `claude-sonnet-4-20250514`, `claude-3-5-sonnet-20241022` | Supports reasoning  |
+| `google`     | `gemini-2.0-flash`, `gemini-1.5-pro`                     | Google AI           |
+| `openrouter` | `anthropic/claude-3.5-sonnet`, `openai/gpt-4-turbo`      | Aggregator          |
+| `ollama`     | `llama3.2:latest`, `mistral:latest`                      | Local models        |
 
 **Notes**:
+
 - Provider names must match entries in `.ai-agent.json` `providers` section
 - First model is primary; others are fallbacks
 - Models inherit capabilities from their provider configuration
@@ -118,15 +121,16 @@ models:
 
 ### reasoning
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Default | Not sent (provider default) |
+| Property     | Value                                                                     |
+| ------------ | ------------------------------------------------------------------------- |
+| Type         | `string`                                                                  |
+| Default      | Not sent (provider default)                                               |
 | Valid values | `none`, `unset`, `default`, `inherit`, `minimal`, `low`, `medium`, `high` |
 
 **Description**: Controls extended thinking/reasoning effort for models that support it.
 
 **What it affects**:
+
 - Whether the model uses extended reasoning (chain-of-thought)
 - Reasoning effort level and token budget
 - Cost and latency (higher reasoning = more expensive/slower)
@@ -134,33 +138,33 @@ models:
 
 **Reasoning Levels**:
 
-| Level | Description | Use Case |
-|-------|-------------|----------|
-| `none` | Disable reasoning | Fast responses, simple tasks |
-| `unset` | Same as `none` | Explicitly disable |
-| `minimal` | Light reasoning | Quick analysis |
-| `low` | Basic reasoning | Moderate complexity |
-| `medium` | Moderate reasoning | Complex analysis |
-| `high` | Maximum reasoning | Difficult problems |
-| `default` | Inherit from parent/global | Use configured default |
-| `inherit` | Same as `default` | Use configured default |
+| Level     | Description                | Use Case                     |
+| --------- | -------------------------- | ---------------------------- |
+| `none`    | Disable reasoning          | Fast responses, simple tasks |
+| `unset`   | Same as `none`             | Explicitly disable           |
+| `minimal` | Light reasoning            | Quick analysis               |
+| `low`     | Basic reasoning            | Moderate complexity          |
+| `medium`  | Moderate reasoning         | Complex analysis             |
+| `high`    | Maximum reasoning          | Difficult problems           |
+| `default` | Inherit from parent/global | Use configured default       |
+| `inherit` | Same as `default`          | Use configured default       |
 
 **Example**:
+
 ```yaml
 ---
-reasoning: none      # Disable - fast responses
+reasoning: none # Disable - fast responses
 ---
-
 ---
-reasoning: medium    # Moderate reasoning effort
+reasoning: medium # Moderate reasoning effort
 ---
-
 ---
-reasoning: high      # Maximum reasoning for hard problems
+reasoning: high # Maximum reasoning for hard problems
 ---
 ```
 
 **Notes**:
+
 - `none` or `unset` explicitly disables reasoning
 - `default` or `inherit` (or omitting the key) uses global fallback from `--default-reasoning` or `defaults.reasoning`
 - Reasoning is model-dependent:
@@ -172,35 +176,36 @@ reasoning: high      # Maximum reasoning for hard problems
 
 ### reasoningTokens
 
-| Property | Value |
-|----------|-------|
-| Type | `number` or `string` |
-| Default | Provider decides |
-| Valid values | Positive integer, `0`, or `disabled` |
+| Property     | Value                                                     |
+| ------------ | --------------------------------------------------------- |
+| Type         | `number` or `string`                                      |
+| Default      | Provider decides                                          |
+| Valid values | Positive integer, `0`, `"disabled"`, `"off"`, or `"none"` |
 
 **Description**: Token budget for extended reasoning (primarily Anthropic thinking mode).
 
 **What it affects**:
+
 - Maximum tokens the model can use for internal reasoning
-- `0` or `disabled` turns off reasoning
+- `0`, `"disabled"`, `"off"`, or `"none"` disable reasoning (set to `null` internally)
 - Higher values allow more thorough analysis but cost more
 
 **Example**:
+
 ```yaml
 ---
-reasoningTokens: 16000   # Allow up to 16K reasoning tokens
+reasoningTokens: 16000 # Allow up to 16K reasoning tokens
 ---
-
 ---
-reasoningTokens: 32000   # Maximum for complex problems
+reasoningTokens: 32000 # Maximum for complex problems
 ---
-
 ---
-reasoningTokens: 0       # Disable reasoning
+reasoningTokens: 0 # Disable reasoning
 ---
 ```
 
 **Notes**:
+
 - Only meaningful when `reasoning` is enabled
 - Provider may have minimum/maximum limits
 - More tokens = better reasoning but higher cost and latency
@@ -209,36 +214,39 @@ reasoningTokens: 0       # Disable reasoning
 
 ### caching
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Default | `full` |
+| Property     | Value          |
+| ------------ | -------------- |
+| Type         | `string`       |
+| Default      | `full`         |
 | Valid values | `none`, `full` |
 
 **Description**: Controls Anthropic prompt caching behavior.
 
 **What it affects**:
+
 - Whether Anthropic's prompt cache is used
 - Cost optimization for repeated prompts
 - Only affects Anthropic provider
 
 **Example**:
+
 ```yaml
 ---
-caching: full    # Enable prompt caching (default)
+caching: full # Enable prompt caching (default)
 ---
-
 ---
-caching: none    # Disable prompt caching
+caching: none # Disable prompt caching
 ---
 ```
 
 **How Prompt Caching Works**:
+
 - Anthropic caches prompt prefixes that are reused
 - Subsequent requests with the same prefix are cheaper
 - Useful for agents with long system prompts called repeatedly
 
 **Notes**:
+
 - Only affects Anthropic provider
 - `full` enables cache reuse for repeated prompt prefixes
 - Other providers ignore this setting
@@ -253,19 +261,28 @@ Fallback chains provide resilience against model failures. When the primary mode
 
 ```yaml
 models:
-  - anthropic/claude-sonnet-4-20250514   # Try first
-  - openai/gpt-4o                         # If Claude fails
-  - openai/gpt-4o-mini                    # Last resort
+  - anthropic/claude-sonnet-4-20250514 # First model in chain
+  - openai/gpt-4o # Second model in chain
+  - openai/gpt-4o-mini # Third model in chain
 ```
 
+**Retry mechanism**:
+
+- For each turn, the system cycles through all configured provider/model pairs
+- Up to `maxRetries` attempts are made per turn (default: 3)
+- Each attempt tries the next model in the sequence (wrapping around if needed)
+- Example: With models [A, B, C] and maxRetries=3, a single failing turn could try: A, B, C, A, B before giving up
+
 **Fallback triggers**:
+
 1. Rate limit errors (429)
 2. Server errors (500+)
-3. Timeout (no response within `llmTimeout`)
+3. Timeout (no response within `llmTimeout`; default: 600000ms / 10 minutes)
 4. Authentication errors
 5. Model-specific errors
 
 **Fallback does NOT trigger for**:
+
 - Successful responses (even if low quality)
 - Validation errors in your configuration
 - Network issues that affect all providers
@@ -273,6 +290,7 @@ models:
 ### Recommended Patterns
 
 **High availability**:
+
 ```yaml
 models:
   - anthropic/claude-sonnet-4-20250514
@@ -281,6 +299,7 @@ models:
 ```
 
 **Cost optimization** (try cheap first):
+
 ```yaml
 models:
   - openai/gpt-4o-mini
@@ -289,6 +308,7 @@ models:
 ```
 
 **Quality optimization** (try best first):
+
 ```yaml
 models:
   - anthropic/claude-sonnet-4-20250514
@@ -296,6 +316,7 @@ models:
 ```
 
 **Local with cloud fallback**:
+
 ```yaml
 models:
   - ollama/llama3.2:latest
@@ -311,6 +332,7 @@ Extended reasoning enables models to "think" before responding, improving qualit
 ### When to Use Reasoning
 
 **Good for**:
+
 - Complex analysis
 - Multi-step problems
 - Code generation and review
@@ -318,6 +340,7 @@ Extended reasoning enables models to "think" before responding, improving qualit
 - Decision making
 
 **Not needed for**:
+
 - Simple Q&A
 - Data extraction
 - Formatting tasks
@@ -326,6 +349,7 @@ Extended reasoning enables models to "think" before responding, improving qualit
 ### Configuring Reasoning
 
 **Basic reasoning**:
+
 ```yaml
 ---
 models:
@@ -335,6 +359,7 @@ reasoning: medium
 ```
 
 **Maximum reasoning with budget**:
+
 ```yaml
 ---
 models:
@@ -345,6 +370,7 @@ reasoningTokens: 32000
 ```
 
 **Disable reasoning for speed**:
+
 ```yaml
 ---
 models:
@@ -355,12 +381,12 @@ reasoning: none
 
 ### Provider Support
 
-| Provider | Reasoning Support |
-|----------|------------------|
-| Anthropic | Full (thinking mode) |
-| OpenAI | Via reasoning models (o1, o3) |
-| Google | Limited |
-| Ollama | Model-dependent |
+| Provider  | Reasoning Support             |
+| --------- | ----------------------------- |
+| Anthropic | Full (thinking mode)          |
+| OpenAI    | Via reasoning models (o1, o3) |
+| Google    | Limited                       |
+| Ollama    | Model-dependent               |
 
 ---
 
@@ -380,7 +406,7 @@ Anthropic's prompt caching reduces costs for agents called repeatedly with the s
 ---
 models:
   - anthropic/claude-sonnet-4-20250514
-caching: full    # Enable (default)
+caching: full # Enable (default)
 ---
 ```
 
@@ -388,13 +414,14 @@ caching: full    # Enable (default)
 ---
 models:
   - anthropic/claude-sonnet-4-20250514
-caching: none    # Disable if needed
+caching: none # Disable if needed
 ---
 ```
 
 ### When to Disable
 
 Disable caching when:
+
 - System prompt changes frequently
 - Using dynamic prompt content
 - Debugging prompt issues
@@ -474,6 +501,7 @@ models:
 **Cause**: Models must include provider prefix.
 
 **Solution**: Use `provider/model` format:
+
 ```yaml
 # Wrong
 models: gpt-4o
@@ -489,6 +517,7 @@ models: openai/gpt-4o
 **Cause**: Provider must exist in configuration.
 
 **Solution**: Add provider to `.ai-agent.json`:
+
 ```json
 {
   "providers": {
@@ -515,6 +544,7 @@ models: openai/gpt-4o
 **Cause**: Must use `none` or `full`.
 
 **Solution**:
+
 ```yaml
 caching: full   # Enable
 caching: none   # Disable
@@ -527,7 +557,8 @@ caching: none   # Disable
 **Cause**: Model too slow or timeout too short.
 
 **Solutions**:
-1. Increase timeout:
+
+1. Increase timeout (default: 10 minutes / 600000ms):
    ```yaml
    llmTimeout: 5m
    ```
@@ -535,7 +566,7 @@ caching: none   # Disable
    ```yaml
    models:
      - anthropic/claude-sonnet-4-20250514
-     - openai/gpt-4o-mini   # Faster fallback
+     - openai/gpt-4o-mini # Faster fallback
    ```
 3. Reduce reasoning if enabled:
    ```yaml
@@ -550,6 +581,7 @@ caching: none   # Disable
 **Cause**: All providers failing (network, auth, etc.).
 
 **Solutions**:
+
 1. Check API keys in environment
 2. Verify provider configuration in `.ai-agent.json`
 3. Increase `maxRetries`:
