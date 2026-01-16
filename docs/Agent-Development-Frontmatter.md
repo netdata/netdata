@@ -4,6 +4,17 @@ Complete reference for all YAML frontmatter keys in `.ai` agent files.
 
 ---
 
+## Table of Contents
+
+- [Overview](#overview) - What frontmatter is and what it controls
+- [Quick Example](#quick-example) - Minimal and production examples
+- [Configuration Reference](#configuration-reference) - All frontmatter keys with full details
+- [Common Patterns](#common-patterns) - Typical configurations for common use cases
+- [Troubleshooting](#troubleshooting) - Common mistakes and how to fix them
+- [See Also](#see-also) - Related documentation
+
+---
+
 ## Overview
 
 Frontmatter is the YAML configuration block at the top of every `.ai` file. It defines:

@@ -4,6 +4,20 @@
 
 ---
 
+## Table of Contents
+
+- [Prerequisites](#prerequisites) - What you need before starting
+- [Step 1: Set Up Your API Key](#step-1-set-up-your-api-key) - Configure LLM provider access
+- [Step 2: Create a Configuration File](#step-2-create-a-configuration-file) - Set up ai-agent.json
+- [Step 3: Create Your First Agent](#step-3-create-your-first-agent) - Write a .ai file
+- [Step 4: Run Your Agent](#step-4-run-your-agent) - Execute and see output
+- [Step 5: Verify It Worked](#step-5-verify-it-worked) - Test different scenarios
+- [Common Issues](#common-issues) - Troubleshooting guide
+- [What You Learned](#what-you-learned) - Summary of skills gained
+- [Next Steps](#next-steps) - Where to go from here
+
+---
+
 ## Prerequisites
 
 Before starting, ensure you have:
