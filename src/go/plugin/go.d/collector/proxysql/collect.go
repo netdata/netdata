@@ -251,7 +251,10 @@ func (c *Collector) openConnection() error {
 
 	db.SetConnMaxLifetime(10 * time.Minute)
 
-	if err := db.Ping(); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
 		_ = db.Close()
 		return fmt.Errorf("error on pinging the proxysql instance [%s]: %v", c.DSN, err)
 	}
