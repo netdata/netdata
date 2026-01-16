@@ -43,12 +43,12 @@ This prevents context window overflow while preserving all data for retrieval.
 
 The threshold for triggering storage:
 
-| Property     | Value                               |
-| ------------ | ----------------------------------- |
-| Type         | `number`                            |
-| Default      | `12288` (12 KB)                     |
-| Valid values | `0` (no lower bound) to `1,000,000` |
-| Required     | No                                  |
+| Property     | Value                 |
+| ------------ | --------------------- |
+| Type         | `number`              |
+| Default      | `12288` (12 KB)       |
+| Valid values | `0` to no upper bound |
+| Required     | No                    |
 
 **Frontmatter**:
 
@@ -149,7 +149,7 @@ The `tool_output` tool allows targeted content retrieval:
   "parameters": {
     "handle": {
       "type": "string",
-      "description": "Handle of the stored tool output (relative path under the tool_output root, e.g. session-<uuid>/<file-uuid>; provided in the tool-result message)"
+      "description": "Handle of the stored tool output (relative path under the tool_output root, e.g. session-<uuid>/<file-uuid>; provided in the tool-result message: tool_output(handle = \"...\", ...))"
     },
     "extract": {
       "type": "string",
@@ -272,19 +272,7 @@ Tool accounting includes storage info:
 
 **Note**: When a response is stored, `charactersOut` is the length of the handle message (not the original output). `mcpServer` is the server namespace (not including the `mcp:` prefix).
 
-**Tool response details** (in `details` object) include:
-
-- `tool_output_handle`: Storage handle (e.g. `session-abc/file-xyz`)
-- `tool_output_reason`: Trigger reason (`size_cap`, `token_budget`, or `reserve_failed`)
-- `truncated`: `true` when output was stored
-
-| Field                | Description                                        |
-| -------------------- | -------------------------------------------------- |
-| `tool_output_handle` | Storage handle (when stored)                       |
-| `tool_output_reason` | Trigger reason (when stored)                       |
-| `truncated`          | Whether response was stored (replaced with handle) |
-| `charactersIn`       | Tool request size (parameters)                     |
-| `charactersOut`      | Response size (handle message or actual output)    |
+Storage details (`tool_output_handle`, `tool_output_reason`, `truncated`) are available in VRB log entries (in the `details` object), not in accounting entries.
 
 ---
 

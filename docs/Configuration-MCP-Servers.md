@@ -596,17 +596,7 @@ Tools are exposed with namespaced names:
 
 In agent frontmatter, reference tools by server name. All allowed tools from that server become available.
 
-To restrict further, use `toolsAllowed` or `toolsDenied` in frontmatter:
-
-```yaml
----
-tools:
-  - github
-toolsAllowed:
-  - mcp__github__search_code
-  - mcp__github__get_file_contents
----
-```
+To restrict which tools are exposed, use `toolsAllowed` or `toolsDenied` in the MCP server configuration.
 
 ---
 

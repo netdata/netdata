@@ -30,8 +30,8 @@ AI Agent uses three test phases, each with a different purpose:
 
 **Phase 2 modes**:
 
-- Deterministic harness: `src/tests/phase2-harness.ts` uses test-llm provider (no real LLMs)
-- Live provider tests: `src/tests/phase2-runner.ts` uses real models (anthropic, ollama, openrouter, etc.)
+- Deterministic harness: `src/tests/phase2-harness-scenarios/phase2-runner.ts` uses test-llm provider (no real LLMs)
+- Live provider tests: `src/tests/phase2-runner.ts` uses real models (vllm, ollama, anthropic, openrouter, etc.)
 
 **When to run each phase**:
 
@@ -107,19 +107,19 @@ npm run test:phase2
 
 ### Key Files
 
-| File                                                  | Purpose                                            |
-| ----------------------------------------------------- | -------------------------------------------------- |
-| `src/llm-providers/test-llm.ts`                       | Scripted LLM provider for deterministic harness    |
-| `src/tests/mcp/test-stdio-server.ts`                  | Deterministic MCP server for tool testing          |
-| `src/tests/fixtures/test-llm-scenarios.ts`            | Scenario definitions for deterministic harness     |
-| `src/tests/phase2-harness.ts`                         | Deterministic harness executor (test-llm provider) |
-| `src/tests/phase2-runner.ts`                          | Live provider test runner (real LLMs)              |
-| `src/tests/phase2-models.ts`                          | Model configurations for live provider tests       |
-| `src/tests/phase2-harness-scenarios/phase2-runner.ts` | Phase 2 deterministic test harness implementation  |
+| File                                                  | Purpose                                                                                    |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `src/llm-providers/test-llm.ts`                       | Scripted LLM provider for deterministic harness                                            |
+| `src/tests/mcp/test-stdio-server.ts`                  | Deterministic MCP server for tool testing                                                  |
+| `src/tests/fixtures/test-llm-scenarios.ts`            | Scenario definitions for deterministic harness                                             |
+| `src/tests/phase2-harness.ts`                         | Deterministic harness entry point (delegates to phase2-harness-scenarios/phase2-runner.ts) |
+| `src/tests/phase2-runner.ts`                          | Live provider test runner (real LLMs)                                                      |
+| `src/tests/phase2-models.ts`                          | Model configurations for live provider tests                                               |
+| `src/tests/phase2-harness-scenarios/phase2-runner.ts` | Phase 2 deterministic test harness implementation                                          |
 
 ### Deterministic Harness Controls
 
-The deterministic harness (`phase2-harness.ts`) manipulates five inputs:
+The deterministic harness (`phase2-harness-scenarios/phase2-runner.ts`) manipulates five inputs:
 
 | Input             | What You Control                         |
 | ----------------- | ---------------------------------------- |
@@ -167,22 +167,28 @@ Tests assert the **observable contract**, not internal implementation.
 // In src/tests/fixtures/test-llm-scenarios.ts
 export const scenarios: ScenarioDefinition[] = [
   {
-    id: "tool-call-success",
-    description: "Agent calls tool and receives response",
+    id: "run-test-1",
+    description: "LLM + MCP success path.",
     systemPromptMustInclude: ["Phase 1 deterministic harness"],
     turns: [
       {
         turn: 1,
         response: {
           kind: "tool-call",
-          toolCalls: [{ toolName: "test", arguments: { query: "data" } }],
+          toolCalls: [
+            {
+              toolName: "test__test",
+              arguments: { text: "phase-1-tool-success" },
+            },
+          ],
         },
       },
       {
         turn: 2,
         response: {
           kind: "final-report",
-          reportContent: "Here is the data: ...",
+          reportContent:
+            "# Phase 1 Result\n\nTool execution succeeded and data was recorded.",
           reportFormat: "markdown",
           status: "success",
         },
@@ -301,7 +307,7 @@ The test MCP server (`src/tests/mcp/test-stdio-server.ts`) provides deterministi
 
 ## Running All Tests
 
-### Quick Test (Phase 1 + Phase 2 + Phase 3 Tier 1)
+### Quick Test (Phase 1 Unit Tests)
 
 ```bash
 npm test
@@ -327,11 +333,11 @@ npm run test:phase3    # Live provider tests only
 
 ### Minimum Requirements
 
-| Step | Command         | Passes When                                 |
-| ---- | --------------- | ------------------------------------------- |
-| 1    | `npm run build` | No compilation errors                       |
-| 2    | `npm run lint`  | Zero warnings, zero errors                  |
-| 3    | `npm test`      | Phase 1, Phase 2, and Phase 3 (Tier 1) pass |
+| Step | Command            | Passes When                                 |
+| ---- | ------------------ | ------------------------------------------- |
+| 1    | `npm run build`    | No compilation errors                       |
+| 2    | `npm run lint`     | Zero warnings, zero errors                  |
+| 3    | `npm run test:all` | Phase 1, Phase 2, and Phase 3 (Tier 1) pass |
 
 ### For Core Changes
 

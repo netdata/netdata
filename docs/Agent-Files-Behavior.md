@@ -294,7 +294,7 @@ toolTimeout: 30s # 30 seconds for fast tools
 | Property     | Value                                                    |
 | ------------ | -------------------------------------------------------- |
 | Type         | `number` or `null`                                       |
-| Default      | `0.2`                                                    |
+| Default      | `0.0`                                                    |
 | Valid values | `0.0` to `2.0`, or `null`/`none`/`off`/`unset`/`default` |
 
 **Description**: Controls response creativity/randomness. Lower values produce more focused, deterministic outputs.
@@ -424,7 +424,7 @@ topK: null # Don't send (use provider default)
 | Property     | Value          |
 | ------------ | -------------- |
 | Type         | `integer`      |
-| Default      | `16384`        |
+| Default      | `4096`         |
 | Valid values | `1` or greater |
 
 **Description**: Maximum number of tokens the model can generate per turn.

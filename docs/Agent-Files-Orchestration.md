@@ -216,7 +216,7 @@ router:
 5. Destination agent takes over and produces the final response
 6. Destination's response is merged into the overall result
 
-### The router\_\_handoff-to Tool
+### The router__handoff-to Tool
 
 When `router.destinations` is configured, a special tool becomes available:
 
@@ -568,7 +568,7 @@ models:
 If compliance issues were identified, do not proceed.
 ```
 
-### "router\_\_handoff-to not available"
+### "router__handoff-to not available"
 
 **Problem**: Tool not appearing for router agent.
 

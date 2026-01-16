@@ -85,10 +85,10 @@ graph LR
 
 ### Guard Triggers
 
-| Trigger          | When Checked                  | Action if Exceeded |
-| ---------------- | ----------------------------- | ------------------ |
-| `turn_preflight` | Before each LLM request       | Force final turn   |
-| `tool_preflight` | Before committing tool output | Block tool output  |
+| Trigger          | When Checked                  | Action if Exceeded                                                                                                                                                                                             |
+| ---------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `turn_preflight` | Before each LLM request       | Depends on evaluation:<br/>• `final`: Force final turn<br/>• `skip`: Skip this provider, try next<br/>• `ok`: Proceed<br/>Special case: If only schema tokens overflow and base projection fits, allow request |
+| `tool_preflight` | Before committing tool output | Block tool output (replace with failure message) and set toolBudgetExceeded flag                                                                                                                               |
 
 ---
 
@@ -112,6 +112,8 @@ flowchart TD
     Inject --> Proceed
 ```
 
+**Special Case**: If only schema tokens overflow and base projection (without schema) fits within limit, the guard returns `ok` and allows the request to proceed.
+
 ### Projection Formula
 
 ```
@@ -132,9 +134,11 @@ When the guard triggers:
 | ---- | -------------------------------------------- |
 | 1    | Set `forcedFinalTurnReason = 'context'`      |
 | 2    | Log context guard enforcement                |
-| 3    | Restrict tools to `agent__final_report` only |
-| 4    | Emit telemetry event                         |
-| 5    | Recompute schema tokens (only final_report)  |
+| 3    | Commit pending tokens to current             |
+| 4    | Reset new tokens counter                     |
+| 5    | Restrict tools to `agent__final_report` only |
+| 6    | Emit telemetry event                         |
+| 7    | Recompute schema tokens (only final_report)  |
 
 ---
 
@@ -237,16 +241,23 @@ flowchart TD
 
 When output exceeds `toolResponseMaxBytes`:
 
-| Step | Action                              |
-| ---- | ----------------------------------- |
-| 1    | Write output to disk                |
-| 2    | Generate unique handle              |
-| 3    | Replace output with handle message  |
-| 4    | Log warning with bytes/lines/tokens |
+| Step | Action                                             |
+| ---- | -------------------------------------------------- |
+| 1    | Truncate output to size limit with warning message |
+| 2    | Write (truncated) output to disk                   |
+| 3    | Generate unique fileId (UUID)                      |
+| 4    | Replace output with handle message                 |
+| 5    | Log warning with bytes/lines/tokens                |
 
-**Handle Format**: `session-<uuid>/<file-uuid>`
+**Handle Format**: `session-<sessionId>/<fileId>`
 
-**Storage Location**: `/tmp/ai-agent-<run-hash>/`
+**Storage Location**: `/tmp/ai-agent-<runHash>/session-<sessionId>/`
+
+Where:
+
+- `runHash` = 12-character hash generated per-process (derived from PID, timestamp, and UUID)
+- `sessionId` = Transaction ID (txnId)
+- `fileId` = UUID generated per stored output
 
 ### Budget Callback Interface
 
@@ -287,6 +298,21 @@ toolBudgetCallbacks = {
   },
 
   canExecuteTool: () => !this.toolBudgetExceeded,
+
+  countTokens: (text: string): number => {
+    // Use the same tokenizer logic as estimateTokens for consistency
+    let maxTokens = 0;
+    const targets = this.getTargets();
+    for (const target of targets) {
+      const tokenizer = resolveTokenizer(target.tokenizerId);
+      const tokens = tokenizer.countText(text);
+      if (tokens > maxTokens) {
+        maxTokens = tokens;
+      }
+    }
+    const approxTokens = Math.ceil(text.length / 4);
+    return Math.max(maxTokens, approxTokens);
+  },
 };
 ```
 
@@ -296,14 +322,14 @@ Once `toolBudgetExceeded` is set, `canExecuteTool()` returns `false` and the orc
 
 ## Configuration Options
 
-| Setting                     | Type   | Default | Effect                    |
-| --------------------------- | ------ | ------- | ------------------------- |
-| `contextWindow`             | number | 131,072 | Total token capacity      |
-| `contextWindowBufferTokens` | number | 8,192   | Safety margin             |
-| `maxOutputTokens`           | number | 16,384  | Reserved for LLM response |
-| `tokenizer`                 | string | -       | Estimation accuracy       |
-| `toolResponseMaxBytes`      | number | 12,288  | Triggers disk storage     |
-| `reasoning`                 | enum   | -       | Enables extended thinking |
+| Setting                     | Type   | Default | Effect                        |
+| --------------------------- | ------ | ------- | ----------------------------- |
+| `contextWindow`             | number | 131,072 | Total token capacity          |
+| `contextWindowBufferTokens` | number | 8,192   | Safety margin                 |
+| `maxOutputTokens`           | number | 16,384  | Reserved for LLM response     |
+| `tokenizer`                 | string | -       | Estimation accuracy           |
+| `toolResponseMaxBytes`      | number | 12,288  | Triggers truncation + storage |
+| `reasoning`                 | enum   | -       | Enables extended thinking     |
 
 ### Example Configuration
 
@@ -387,7 +413,7 @@ Enable detailed context guard logging with environment variable.
 1. Check `contextWindow` matches your model's actual limit
 2. Reduce `contextWindowBufferTokens` (carefully)
 3. Use `toolsAllowed`/`toolsDenied` to limit tools
-4. Configure `toolResponseMaxBytes` to store large outputs
+4. Configure `toolResponseMaxBytes` to truncate large outputs early
 
 ### Token Count Mismatch
 
@@ -418,7 +444,7 @@ Enable detailed context guard logging with environment variable.
 
 **Solutions**:
 
-1. Lower `toolResponseMaxBytes` to store large outputs
+1. Lower `toolResponseMaxBytes` to truncate large outputs early
 2. Increase `contextWindow` if model supports it
 3. Review tool output sizes
 4. Consider breaking into multiple sessions

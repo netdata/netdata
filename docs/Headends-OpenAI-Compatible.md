@@ -116,11 +116,13 @@ List available models (agents).
     {
       "id": "chat",
       "object": "model",
+      "created": 1705432891,
       "owned_by": "ai-agent"
     },
     {
       "id": "analyzer",
       "object": "model",
+      "created": 1705432891,
       "owned_by": "ai-agent"
     }
   ]
@@ -431,6 +433,40 @@ Duplicate names get numeric suffixes: `chat`, `chat-2`, `chat-3`.
   "messages": [{ "role": "user", "content": "Hello!" }]
 }
 ```
+
+### Final message must be user
+
+**Symptom**: `{"error": "missing_user_prompt"}`
+
+**Cause**: The last message in `messages` is not a user message.
+
+**Solution**: Ensure the final message has `role: "user"`:
+
+```json
+{
+  "model": "chat",
+  "messages": [
+    { "role": "system", "content": "You are helpful." },
+    { "role": "user", "content": "Hello!" }
+  ]
+}
+```
+
+### Invalid request body
+
+**Symptom**: `{"error": "empty_body"}` or `{"error": "invalid_json"}`
+
+**Cause**: Request body is empty or contains invalid JSON.
+
+**Solution**: Provide valid JSON in the request body.
+
+### Payload too large
+
+**Symptom**: `{"error": "payload_too_large"}`
+
+**Cause**: Request body exceeds 1 MiB size limit.
+
+**Solution**: Reduce the size of the request payload.
 
 ### Model not found
 

@@ -228,8 +228,11 @@ Apply to every agent including sub-agents:
 
 - `--override` - Key=value overrides
 - `--verbose` - Logging level
-- `--trace-*` - Tracing flags
-- `--format` - Output format
+- `--trace-llm` - Show detailed logs of all LLM API calls
+- `--trace-mcp` - Show detailed logs of all tool calls (MCP protocol)
+- `--trace-slack` - Show detailed logs of Slack bot communication
+- `--trace-sdk` - Dump raw UI/LLM payloads exchanged with AI SDK
+- `--format` - Output format (markdown, json, slack-block-kit, etc.)
 
 ### Global Controls
 

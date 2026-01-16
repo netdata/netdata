@@ -239,10 +239,9 @@ flowchart TD
 
 **Behavior**:
 
-1. Log warning: "Synthetic retry: assistant returned content without tool calls"
+1. Set lastErrorType to 'invalid_response'
 2. Add TURN-FAILED guidance message to conversation
-3. Increment attempt counter
-4. Continue to next retry attempt
+3. Continue to next retry attempt
 
 ### Invalid Tool Parameters
 
@@ -252,7 +251,7 @@ flowchart TD
 
 1. Preserve tool call with sanitization marker
 2. Log ERR with full original payload
-3. Return tool failure response: `(tool failed: invalid JSON parameters)`
+3. Return tool failure response: `(tool failed: invalid tool call payload. <reason>. Original payload<truncation note>: <original payload>)`
 4. Continue to next attempt within same turn (no TURN-FAILED added)
 
 ---

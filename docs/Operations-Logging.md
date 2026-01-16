@@ -125,15 +125,11 @@ Where:
 - `agent`: Agent identifier (main for top-level)
 - `message`: Log message with optional context
 
-**Color scheme**:
-| Severity | Color |
+**Highlight colors**:
+| Context | Color |
 |----------|-------|
-| VRB | Gray |
-| WRN | Yellow |
-| ERR | Red |
-| TRC | Gray |
-| THK | Gray |
-| FIN | Cyan |
+| Error lines (full) | Red |
+| Warning lines (full) | Yellow |
 | LLM context (highlighting) | Blue |
 | Tool context (highlighting) | Green |
 
@@ -142,8 +138,18 @@ Where:
 Machine-parseable key=value pairs:
 
 ```
-ts=2024-11-14T12:34:56.789Z level=vrb turn=1 subturn=0 dir=response type=llm remote="openai:gpt-4" msg="LLM response received" latency_ms=1234
+ts=2024-11-14T12:34:56.789Z level=vrb turn=1 subturn=0 direction=response type=llm remote="openai:gpt-4" message="LLM response received" latency_ms=1234
 ```
+
+**Severity colors** (when enabled):
+| Severity | Color |
+|----------|-------|
+| VRB | Gray |
+| WRN | Yellow |
+| ERR | Red |
+| TRC | Gray |
+| THK | Gray |
+| FIN | Cyan |
 
 ### JSON Format
 
@@ -160,7 +166,9 @@ Full structured output:
   "type": "llm",
   "remote": "openai:gpt-4",
   "message": "LLM response received",
-  "latency_ms": 1234
+  "labels": {
+    "latency_ms": 1234
+  }
 }
 ```
 
@@ -252,12 +260,16 @@ ai-agent --agent test.ai --trace-llm --trace-mcp "query"
 
 ### Turn Events
 
-| Event ID             | Description             |
-| -------------------- | ----------------------- |
-| `agent:turn-start`   | New LLM turn begins     |
-| `agent:final-turn`   | Final turn detected     |
-| `agent:context`      | Context guard triggered |
-| `{provider}:{model}` | LLM request/response    |
+| Event ID                      | Description                               |
+| ----------------------------- | ----------------------------------------- |
+| `agent:turn-start`            | New LLM turn begins                       |
+| `agent:final-turn`            | Final turn detected                       |
+| `agent:context`               | Context guard triggered                   |
+| `agent:text-extraction`       | Parsed a final report candidate from text |
+| `agent:fallback-report`       | Fallback accepted after retries exhausted |
+| `agent:final-report-accepted` | Final report committed                    |
+| `agent:failure-report`        | Synthetic failure report generated        |
+| `{provider}:{model}`          | LLM request/response                      |
 
 ### Exit Events
 
@@ -282,7 +294,6 @@ ai-agent --agent test.ai --trace-llm --trace-mcp "query"
 | `agent:EXIT-INACTIVITY-TIMEOUT`      | Inactivity timeout                 |
 | `agent:EXIT-MAX-RETRIES`             | Maximum retries exceeded           |
 | `agent:EXIT-MAX-TURNS-NO-RESPONSE`   | Max turns reached without response |
-| `agent:EXIT-ROUTER-HANDOFF`          | Router selected destination        |
 | `agent:EXIT-UNCAUGHT-EXCEPTION`      | Uncaught exception                 |
 | `agent:EXIT-SIGNAL-RECEIVED`         | Process signal received            |
 | `agent:EXIT-UNKNOWN`                 | Unknown error                      |

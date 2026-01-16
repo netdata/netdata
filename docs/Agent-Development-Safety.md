@@ -163,11 +163,7 @@ If asked to create, update, delete, or modify files/branches:
 
 **Layer 2 (Prompt)**: Safety gate explains restrictions and provides helpful alternatives.
 
-If the LLM tries to call a denied tool:
-
-1. The code blocks the call (tool not available)
-2. The LLM gets an error message
-3. On retry, the safety gate guides proper behavior
+Denied tools are filtered during initialization and never appear in the LLM's available tool list. The LLM cannot attempt to call tools that are not exposed to it.
 
 ---
 
@@ -281,7 +277,7 @@ To avoid excessive API usage:
 **Combine with frontmatter:**
 
 - `maxTurns` enforces an absolute limit on iterations
-- `maxToolCallsPerTurn` can limit parallel tool calls
+- `maxToolCallsPerTurn` limits total tool calls per turn
 
 ---
 

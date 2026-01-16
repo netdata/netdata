@@ -205,7 +205,6 @@ ai-agent --agent test.ai --billing-file ./accounting.jsonl "query"
 | `txnId`       | `string` | Transaction ID                  |
 | `parentTxnId` | `string` | Parent transaction ID           |
 | `originTxnId` | `string` | Origin transaction ID           |
-| `details`     | `object` | Optional additional details     |
 
 #### LLM Entry Fields
 

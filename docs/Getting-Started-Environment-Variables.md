@@ -29,15 +29,15 @@ ai-agent uses environment variables for:
 
 **Variable sources (in priority order):**
 
-| Priority | Source                         | Description                    |
-| -------- | ------------------------------ | ------------------------------ |
-| 1        | `--config` path (if specified) | Explicit config path           |
-| 2        | Current working directory      | `.ai-agent.json/.ai-agent.env` |
-| 3        | Agent file directory           | `.ai-agent.json/.ai-agent.env` |
-| 4        | Binary directory               | `.ai-agent.json/.ai-agent.env` |
-| 5        | `~/.ai-agent/`                 | User-wide defaults             |
-| 6        | `/etc/ai-agent/`               | System-wide configuration      |
-| -        | Shell environment              | `export VAR=value` (fallback)  |
+| Priority | Source                         | Description                          |
+| -------- | ------------------------------ | ------------------------------------ |
+| 1        | `--config` path (if specified) | Explicit config path                 |
+| 2        | Current working directory      | `.ai-agent.json` and `.ai-agent.env` |
+| 3        | Agent file directory           | `.ai-agent.json` and `.ai-agent.env` |
+| 4        | Binary directory               | `.ai-agent.json` and `.ai-agent.env` |
+| 5        | `~/.ai-agent/`                 | `ai-agent.json` and `ai-agent.env`   |
+| 6        | `/etc/ai-agent/`               | `ai-agent.json` and `ai-agent.env`   |
+| -        | Shell environment              | `export VAR=value` (fallback)        |
 
 ---
 
@@ -109,14 +109,14 @@ Store environment variables in a file for persistent configuration.
 
 Environment files are searched in this priority order:
 
-| Priority | Location                          | Description                          |
-| -------- | --------------------------------- | ------------------------------------ |
-| 1        | Same directory as `--config` path | If using `--config` option           |
-| 2        | Current working directory         | `.ai-agent.env` in cwd               |
-| 3        | Agent file directory              | `.ai-agent.env` beside `.ai` file    |
-| 4        | Binary directory                  | Where `ai-agent` binary is installed |
-| 5        | `~/.ai-agent/`                    | User home directory                  |
-| 6        | `/etc/ai-agent/`                  | System-wide configuration            |
+| Priority | Location                          | Description                                                    |
+| -------- | --------------------------------- | -------------------------------------------------------------- |
+| 1        | Same directory as `--config` path | If using `--config` option, `.ai-agent.env` in that directory  |
+| 2        | Current working directory         | `.ai-agent.json` and `.ai-agent.env` in cwd                    |
+| 3        | Agent file directory              | `.ai-agent.json` and `.ai-agent.env` beside `.ai` file         |
+| 4        | Binary directory                  | `.ai-agent.json` and `.ai-agent.env` where binary is installed |
+| 5        | `~/.ai-agent/`                    | `ai-agent.json` and `ai-agent.env` in user home directory      |
+| 6        | `/etc/ai-agent/`                  | `ai-agent.json` and `ai-agent.env` system-wide configuration   |
 
 ### File Format
 
@@ -193,10 +193,14 @@ CONTEXT_DEBUG=true ai-agent --agent test.ai "Hello"
 
 **Expected additional output:**
 
+Context guard debug output is logged as JSON objects:
+
+```json
+context-guard/build-metrics { "provider": "openai", "model": "gpt-4o", "ctxTokens": 1234, "expectedPct": 1 }
+context-guard/loop-init { "currentCtxTokens": 0, "pendingCtxTokens": 0, "turn": 1 }
 ```
-[CONTEXT] Token count: 1234/128000 (1%)
-[CONTEXT] Message compression: none needed
-```
+
+See individual context-guard log entries for detailed token tracking information.
 
 ---
 
@@ -312,7 +316,7 @@ You are a helpful assistant.
 
 ## Limits
 
-You have 5 turns and can make up to 20 tool calls per turn.
+You have 5 turns and can make up to 10 tool calls per turn.
 ```
 
 ---

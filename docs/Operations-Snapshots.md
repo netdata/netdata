@@ -27,7 +27,7 @@ Capture and analyze complete session state for debugging and post-mortem analysi
 Session snapshots capture **complete session state** including:
 
 - **opTree hierarchy**: Turns and operations
-- **LLM request/response payloads**: Full HTTP bodies (base64 encoded)
+- **LLM request/response payloads**: Full HTTP bodies (base64 encoded, stored as `{format, encoding: 'base64', value}`)
 - **Tool request/response payloads**: Arguments and results
 - **All logs**: VRB, WRN, ERR, TRC, THK, FIN entries
 - **Accounting entries**: Token counts and costs
@@ -246,7 +246,7 @@ zcat "$SNAPSHOT" | jq '[.opTree.turns[].ops[] | select(.kind == "llm") | .accoun
 ### Decode Raw HTTP Payload (Base64)
 
 ```bash
-zcat "$SNAPSHOT" | jq -r '.opTree.turns[0].ops[] | select(.kind == "llm") | .request.payload.raw // empty' | base64 -d
+zcat "$SNAPSHOT" | jq -r '.opTree.turns[0].ops[] | select(.kind == "llm") | .request.payload.raw.value // empty' | base64 -d
 ```
 
 ---
@@ -437,13 +437,13 @@ zcat "$SNAPSHOT" | jq '[.opTree.turns[].ops[] | select(.kind == "tool") | .attri
 ### Token Usage Per Turn
 
 ```bash
-zcat "$SNAPSHOT" | jq '[.opTree.turns[].ops[] | select(.kind == "llm") | .accounting[] | {turn: .turn, input: .tokens.inputTokens, output: .tokens.outputTokens}]'
+zcat "$SNAPSHOT" | jq '[.opTree.turns[] | {turn: .index, ops: [.ops[] | select(.kind == "llm") | .accounting[] | {input: .tokens.inputTokens, output: .tokens.outputTokens}]}]'
 ```
 
 ### Failed Operations
 
 ```bash
-zcat "$SNAPSHOT" | jq '[.opTree.turns[].ops[] | select(.status == "failed") | {kind, name: .attributes.name, error}]'
+zcat "$SNAPSHOT" | jq '[.opTree.turns[].ops[] | select(.status == "failed") | {kind, name: .attributes.name, status}]'
 ```
 
 ### Compare Two Sessions

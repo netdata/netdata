@@ -25,7 +25,7 @@ Problem/Cause/Solution reference for AI Agent issues.
 
 **Problem**: `Configuration file not found`
 
-**Cause**: `.ai-agent.json` not in current directory, prompt directory, or `~/.ai-agent/ai-agent.json`.
+**Cause**: Configuration file not found. Searches for `.ai-agent.json` in current/prompt directories or `ai-agent.json` in `~/.ai-agent/`.
 
 **Solution**:
 
@@ -206,7 +206,7 @@ ai-agent --agent myagent.ai --dry-run
 
 ### Provider Timeout
 
-**Problem**: `Request timeout after 600000ms`
+**Problem**: `Request timed out` or `LLM API timeout`
 
 **Cause**: LLM taking too long to respond.
 
@@ -275,7 +275,7 @@ ai-agent --agent myagent.ai --trace-mcp "query"
 
 ### Tool Timeout
 
-**Problem**: `Tool timeout after 30000 ms`
+**Problem**: `Tool execution timed out`
 
 **Cause**: Tool execution taking too long.
 
@@ -306,7 +306,7 @@ ai-agent --agent myagent.ai --tool-timeout-ms 120000 "query"
 
 ### Tool Not Found
 
-**Problem**: `Tool not found: mcp__server__toolname`
+**Problem**: `Unknown tool: toolname` or `Requested MCP tools not found in configuration`
 
 **Cause**: Tool not available or filtered out.
 

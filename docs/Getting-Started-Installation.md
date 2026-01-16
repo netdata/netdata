@@ -151,7 +151,7 @@ ai-agent searches for configuration in this order:
 | 2        | `.ai-agent.json` in current directory    | Project-specific config |
 | 3        | `.ai-agent.json` in agent file directory | Agent-specific config   |
 | 4        | `.ai-agent.json` in binary directory     | Binary-bundled config   |
-| 5        | `~/.ai-agent/ai-agent.json`              | User-wide config        |
+| 5        | `~/.ai-agent.json`                       | User-wide config        |
 | 6        | `/etc/ai-agent/ai-agent.json`            | System-wide config      |
 
 ### Minimal Configuration
@@ -230,10 +230,10 @@ ai-agent automatically loads `.ai-agent.env` from the same locations as configur
 - `.ai-agent.env` in current directory
 - `.ai-agent.env` in agent file directory
 - `.ai-agent.env` in binary directory
-- `~/.ai-agent/ai-agent.env` (user-wide)
+- `~/.ai-agent.env` (user-wide)
 - `/etc/ai-agent/ai-agent.env` (system-wide)
 
-Create `.ai-agent.env` in your working directory or `~/.ai-agent/ai-agent.env` for user-wide config:
+Create `.ai-agent.env` in your working directory or `~/.ai-agent.env` for user-wide config:
 
 ```bash
 # API Keys
@@ -306,6 +306,8 @@ Run with `--dry-run` to validate without calling the LLM:
 ```bash
 ai-agent --agent test.ai --dry-run "test"
 ```
+
+The `--dry-run` flag checks configuration and MCP server setup without actually running the agent.
 
 **Expected output:**
 

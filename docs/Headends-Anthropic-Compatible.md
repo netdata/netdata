@@ -221,6 +221,8 @@ For structured JSON output:
 }
 ```
 
+**Note**: Returns HTTP 200 on success, HTTP 500 on execution failure, or other 4xx status codes on request validation errors.
+
 ### With Thinking Content
 
 When agents emit reasoning:
@@ -378,15 +380,16 @@ curl http://localhost:8083/v1/models
 
 ## Model Selection
 
-The `model` field maps to agent filenames:
+The `model` field maps to agents. The model ID is determined by:
+
+1. `toolName` from frontmatter (if specified)
+2. Filename without `.ai` extension (as fallback)
 
 | Agent File       | Model Name    |
 | ---------------- | ------------- |
 | `chat.ai`        | `chat`        |
 | `researcher.ai`  | `researcher`  |
 | `code_review.ai` | `code_review` |
-
-If an agent has `toolName` in frontmatter, that name is used instead.
 
 > **Note**: Anthropic model names use underscores for deduplication (`chat`, `chat_2`), unlike OpenAI which uses dashes.
 
@@ -422,7 +425,7 @@ If an agent has `toolName` in frontmatter, that name is used instead.
 
 ### JSON format errors
 
-**Symptom**: `{"error": "missing_schema", "message": "JSON format requires schema"}`
+**Symptom**: `{"error": "missing_schema"}`
 
 **Cause**: Using `format: "json"` without providing a schema.
 

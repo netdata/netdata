@@ -150,15 +150,15 @@ Analyze the provided company and return structured data.
 
 Agent configuration is organized into these categories:
 
-| Category          | Keys                                                                                                                                                     | Purpose                             | Documentation                                          |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------ |
-| **Identity**      | `description`, `usage`, `toolName`                                                                                                                       | Name and describe your agent        | [Agent-Files-Identity](Agent-Files-Identity)           |
-| **Models**        | `models`, `reasoning`, `reasoningTokens`, `caching`                                                                                                      | Select LLMs and configure reasoning | [Agent-Files-Models](Agent-Files-Models)               |
-| **Tools**         | `tools`, `toolResponseMaxBytes`, `toolOutput`                                                                                                            | Give your agent capabilities        | [Agent-Files-Tools](Agent-Files-Tools)                 |
-| **Sub-Agents**    | `agents`                                                                                                                                                 | Delegate to other agents            | [Agent-Files-Sub-Agents](Agent-Files-Sub-Agents)       |
-| **Orchestration** | `advisors`, `router`, `handoff`                                                                                                                          | Multi-agent patterns                | [Agent-Files-Orchestration](Agent-Files-Orchestration) |
-| **Behavior**      | `maxTurns`, `maxRetries`, `maxToolCallsPerTurn`, `temperature`, `topP`, `topK`, `llmTimeout`, `toolTimeout`, `maxOutputTokens`, `repeatPenalty`, `cache` | Limits and sampling                 | [Agent-Files-Behavior](Agent-Files-Behavior)           |
-| **Contracts**     | `input`, `output`                                                                                                                                        | Structured I/O schemas              | [Agent-Files-Contracts](Agent-Files-Contracts)         |
+| Category          | Keys                                                                                                                                            | Purpose                             | Documentation                                          |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------ |
+| **Identity**      | `description`, `toolName`                                                                                                                       | Name and describe your agent        | [Agent-Files-Identity](Agent-Files-Identity)           |
+| **Models**        | `models`, `reasoning`, `reasoningTokens`, `caching`                                                                                             | Select LLMs and configure reasoning | [Agent-Files-Models](Agent-Files-Models)               |
+| **Tools**         | `tools`, `toolResponseMaxBytes`, `toolOutput`                                                                                                   | Give your agent capabilities        | [Agent-Files-Tools](Agent-Files-Tools)                 |
+| **Sub-Agents**    | `agents`                                                                                                                                        | Delegate to other agents            | [Agent-Files-Sub-Agents](Agent-Files-Sub-Agents)       |
+| **Orchestration** | `advisors`, `router`, `handoff`                                                                                                                 | Multi-agent patterns                | [Agent-Files-Orchestration](Agent-Files-Orchestration) |
+| **Behavior**      | `maxTurns`, `maxRetries`, `maxToolCallsPerTurn`, `temperature`, `topP`, `topK`, `llmTimeout`, `toolTimeout`, `maxOutputTokens`, `repeatPenalty` | Limits and sampling                 | [Agent-Files-Behavior](Agent-Files-Behavior)           |
+| **Contracts**     | `input`, `output`                                                                                                                               | Structured I/O schemas              | [Agent-Files-Contracts](Agent-Files-Contracts)         |
 
 ---
 
@@ -226,7 +226,7 @@ tools:
   - fetcher
 maxTurns: 15
 maxToolCallsPerTurn: 10
-cache: 1h
+caching: 1h
 ---
 You are a research assistant. Search for information and synthesize findings.
 ```

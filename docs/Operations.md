@@ -55,13 +55,21 @@ VRB 1.0 ← MCP github:github search_code [523ms, 12456 bytes]
 FIN 1.0 ← LLM: requests=2 failed=0, tokens prompt=3046 output=912 cacheR=0 cacheW=0 total=3958, cost total=$0.00000 upstream=$0.00000, latency sum=2341ms avg=1170ms, providers/models: openai/gpt-4o
 ```
 
+VRB 1.0 → LLM main: openai/gpt-4o messages 3, 1247 bytes
+VRB 1.0 ← LLM main: LLM response received [$0.003456, 2341ms, tokens: in 1523, out 456]
+VRB 1.0 → MCP github:github search_code
+VRB 1.0 ← MCP github:github search_code [523ms, 12456 bytes]
+FIN 1.0 ← LLM: requests=2 failed=0, tokens prompt=3046 output=912 cacheR=0 cacheW=0 total=3958, cost total=$0.00000 upstream=$0.00000, latency sum=2341ms avg=1170ms, providers/models: openai/gpt-4o
+
+````
+
 ### Full Tracing
 
 ```bash
-ai-agent --agent myagent.ai --trace-llm --trace-mcp "test query"
-```
+ai-agent --agent myagent.ai --trace-sdk "test query"
+````
 
-Shows complete request/response payloads for debugging protocol issues.
+Dumps raw UI/LLM payloads exchanged with AI SDK for debugging protocol issues.
 
 ### Debug Environment Variables
 

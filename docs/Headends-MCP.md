@@ -221,9 +221,9 @@ input:
 
 ## Client Configuration
 
-### Claude Code / Claude Desktop
+### Claude Code / Claude Desktop (stdio)
 
-In your `claude_desktop_config.json` (or MCP settings):
+In your `claude_desktop_config.json`:
 
 ```json
 {
@@ -241,47 +241,6 @@ In your `claude_desktop_config.json` (or MCP settings):
 - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 - Linux: `~/.config/claude/claude_desktop_config.json`
-
-### HTTP Client Configuration
-
-In your `.ai-agent.json`:
-
-```json
-{
-  "mcpServers": {
-    "remote-agents": {
-      "type": "http",
-      "url": "http://localhost:8081/mcp"
-    }
-  }
-}
-```
-
-### SSE Client Configuration
-
-```json
-{
-  "mcpServers": {
-    "remote-agents": {
-      "type": "sse",
-      "url": "http://localhost:8082/mcp/sse"
-    }
-  }
-}
-```
-
-### WebSocket Client Configuration
-
-```json
-{
-  "mcpServers": {
-    "remote-agents": {
-      "type": "ws",
-      "url": "ws://localhost:8083/"
-    }
-  }
-}
-```
 
 ---
 

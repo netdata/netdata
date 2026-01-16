@@ -141,7 +141,7 @@ interface AIAgentSessionConfig {
   // Required
   config: Configuration; // Provider and MCP server config
   targets: { provider: string; model: string }[]; // Provider/model pairs
-  tools: string[]; // Tool names to expose (includes MCP servers, REST tools, sub-agents, and internal tools)
+  tools: string[]; // Tool names to expose (MCP server names and REST tool names; internal tools and sub-agents are not listed here)
   subAgents?: PreloadedSubAgent[]; // Optional preloaded sub-agent definitions
   systemPrompt: string; // System prompt text
   userPrompt: string; // User prompt text
@@ -158,11 +158,11 @@ interface AIAgentSessionConfig {
   temperature?: number | null; // Default: 0.0
   topP?: number | null; // Default: not sent
   topK?: number | null; // Default: not sent
-  maxOutputTokens?: number; // Default: 4096
+  maxOutputTokens?: number; // Computed as contextWindow/4 if not specified
   repeatPenalty?: number | null; // Default: not sent
 
   // Execution limits
-  maxRetries?: number; // Default: 5
+  maxRetries?: number; // Default: 3
   maxTurns?: number; // Default: 10
   maxToolCallsPerTurn?: number; // Default: 10
   llmTimeout?: number; // Default: 600000 (10 min)
@@ -587,7 +587,7 @@ stopRef.stopping = true;
 
 ## See Also
 
-- [docs/specs/AI-AGENT-INTERNAL-API.md](../docs/specs/AI-AGENT-INTERNAL-API.md) - Full API documentation
-- [docs/specs/library-api.md](../docs/specs/library-api.md) - Library specification
+- [docs/specs/AI-AGENT-INTERNAL-API.md](specs/AI-AGENT-INTERNAL-API.md) - Full API documentation
+- [docs/specs/library-api.md](specs/library-api.md) - Library specification
 - [docs/Headends-Library.md](Headends-Library) - Library headend integration
 - [docs/Technical-Specs-Session-Lifecycle.md](Technical-Specs-Session-Lifecycle) - Session flow

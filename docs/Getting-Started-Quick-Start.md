@@ -33,16 +33,19 @@ Before starting, ensure you have:
 Export your API key as an environment variable. Choose the provider you have access to:
 
 **OpenAI:**
+
 ```bash
 export OPENAI_API_KEY="sk-..."
 ```
 
 **Anthropic:**
+
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
 **Verification**: Confirm the variable is set:
+
 ```bash
 echo $OPENAI_API_KEY
 # Should print: sk-... (your key, partially hidden for security)
@@ -59,6 +62,7 @@ Create a configuration file in your working directory. This tells ai-agent how t
 Create `.ai-agent.json`:
 
 **For OpenAI:**
+
 ```json
 {
   "providers": {
@@ -71,6 +75,7 @@ Create `.ai-agent.json`:
 ```
 
 **For Anthropic:**
+
 ```json
 {
   "providers": {
@@ -91,6 +96,7 @@ Create `.ai-agent.json`:
 Create a file named `hello.ai` with this content:
 
 **For OpenAI:**
+
 ```yaml
 #!/usr/bin/env ai-agent
 ---
@@ -103,6 +109,7 @@ You are a friendly assistant. Greet the user warmly and answer their questions c
 ```
 
 **For Anthropic:**
+
 ```yaml
 #!/usr/bin/env ai-agent
 ---
@@ -116,14 +123,14 @@ You are a friendly assistant. Greet the user warmly and answer their questions c
 
 **File structure explained:**
 
-| Section | Purpose |
-|---------|---------|
-| `#!/usr/bin/env ai-agent` | Shebang - makes the file executable |
-| `---` | YAML frontmatter delimiters |
-| `description` | Human-readable agent description |
-| `models` | LLM model(s) to use (format: `provider/model`) |
-| `maxTurns` | Maximum conversation turns before completing |
-| Text after `---` | System prompt - instructions for the agent |
+| Section                   | Purpose                                        |
+| ------------------------- | ---------------------------------------------- |
+| `#!/usr/bin/env ai-agent` | Shebang - makes the file executable            |
+| `---`                     | YAML frontmatter delimiters                    |
+| `description`             | Human-readable agent description               |
+| `models`                  | LLM model(s) to use (format: `provider/model`) |
+| `maxTurns`                | Maximum conversation turns before completing   |
+| Text after `---`          | System prompt - instructions for the agent     |
 
 ---
 
@@ -132,10 +139,11 @@ You are a friendly assistant. Greet the user warmly and answer their questions c
 Execute the agent with a user prompt:
 
 ```bash
-ai-agent --agent hello.ai "Hello, who are you?"
+ai-agent @hello.ai "Hello, who are you?"
 ```
 
 **Expected output:**
+
 ```
 Hello! I'm a friendly AI assistant. I'm here to help you with questions, provide
 information, or just have a pleasant conversation. How can I assist you today?
@@ -150,21 +158,27 @@ information, or just have a pleasant conversation. How can I assist you today?
 Confirm your agent is working correctly by testing these scenarios:
 
 **Test 1: Different question**
+
 ```bash
-ai-agent --agent hello.ai "What can you help me with?"
+ai-agent @hello.ai "What can you help me with?"
 ```
+
 Expected: A response listing capabilities or offering assistance.
 
 **Test 2: Dry run (validation only)**
+
 ```bash
-ai-agent --agent hello.ai --dry-run "Test"
+ai-agent @hello.ai --dry-run "Test"
 ```
+
 Expected: Validates configuration and agent file without calling the LLM.
 
 **Test 3: Verbose mode (for debugging)**
+
 ```bash
-ai-agent --agent hello.ai --verbose "Hello"
+ai-agent @hello.ai --verbose "Hello"
 ```
+
 Expected: Additional logging showing configuration resolution, model selection, and timing.
 
 ---
@@ -182,6 +196,7 @@ Expected: Additional logging showing configuration resolution, model selection, 
 **Cause:** Environment variable not exported or incorrect key.
 
 **Solution:**
+
 1. Verify the variable is set: `echo $OPENAI_API_KEY`
 2. Re-export if needed: `export OPENAI_API_KEY="sk-..."`
 3. Check the key is valid in your provider's dashboard
@@ -191,6 +206,7 @@ Expected: Additional logging showing configuration resolution, model selection, 
 **Cause:** Model name doesn't match provider's available models.
 
 **Solution:** Use exact model names. For example:
+
 - OpenAI: `openai/gpt-4o`, `openai/gpt-4o-mini`, `openai/gpt-4-turbo`
 - Anthropic: `anthropic/claude-sonnet-4-20250514`, `anthropic/claude-3-5-sonnet-20241022`
 
@@ -199,6 +215,7 @@ Expected: Additional logging showing configuration resolution, model selection, 
 **Cause:** Invalid YAML in frontmatter.
 
 **Solution:**
+
 1. Ensure exactly three dashes (`---`) on separate lines
 2. Check indentation (use 2 spaces, not tabs)
 3. Ensure quotes around values with special characters
@@ -220,13 +237,13 @@ After completing this quick start, you can:
 
 Now that your first agent works, continue learning:
 
-| Goal | Page |
-|------|------|
-| Build a real-world agent with tools | [First Agent Tutorial](Getting-Started-First-Agent) |
-| Understand the `.ai` file format | [Agent Files](Agent-Development-Agent-Files) |
-| Learn all frontmatter options | [Frontmatter Reference](Agent-Development-Frontmatter) |
-| Deploy agents as REST APIs | [REST Headend](Headends-REST) |
-| Complete CLI options | [CLI Reference](Getting-Started-CLI-Reference) |
+| Goal                                | Page                                                   |
+| ----------------------------------- | ------------------------------------------------------ |
+| Build a real-world agent with tools | [First Agent Tutorial](Getting-Started-First-Agent)    |
+| Understand the `.ai` file format    | [Agent Files](Agent-Development-Agent-Files)           |
+| Learn all frontmatter options       | [Frontmatter Reference](Agent-Development-Frontmatter) |
+| Deploy agents as REST APIs          | [REST Headend](Headends-REST)                          |
+| Complete CLI options                | [CLI Reference](Getting-Started-CLI-Reference)         |
 
 ---
 

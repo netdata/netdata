@@ -72,11 +72,21 @@ npm run lint
 
 ### Step 5: Run Tests
 
+**Quick test (Phase 1 only)**:
+
 ```bash
 npm test
 ```
 
-**Expected output**: Phase 1, Phase 2, Phase 3 (Tier 1), and additional tests pass.
+**Expected output**: Phase 1 unit tests pass.
+
+**Full test suite (all phases)**:
+
+```bash
+npm run test:all
+```
+
+**Expected output**: Phase 1, Phase 2, Phase 3 (Tier 1) pass.
 
 ---
 
@@ -84,12 +94,12 @@ npm test
 
 Complete this checklist before creating a pull request:
 
-| Step | Command         | Requirement                                   |
-| ---- | --------------- | --------------------------------------------- |
-| 1    | `npm run build` | No compilation errors                         |
-| 2    | `npm run lint`  | Zero warnings, zero errors                    |
-| 3    | `npm test`      | Phase 1, Phase 2, Phase 3 (Tier 1) tests pass |
-| 4    | Manual check    | Documentation updated if behavior changed     |
+| Step | Command            | Requirement                                   |
+| ---- | ------------------ | --------------------------------------------- |
+| 1    | `npm run build`    | No compilation errors                         |
+| 2    | `npm run lint`     | Zero warnings, zero errors                    |
+| 3    | `npm run test:all` | Phase 1, Phase 2, Phase 3 (Tier 1) tests pass |
+| 4    | Manual check       | Documentation updated if behavior changed     |
 
 ### Commit Guidelines
 
@@ -120,11 +130,11 @@ See [Code Style](Contributing-Code-Style) for detailed guidelines.
 
 ### Testing
 
-| Phase   | Purpose                         | Command               |
-| ------- | ------------------------------- | --------------------- |
-| Phase 1 | Unit tests (vitest)             | `npm run test:phase1` |
-| Phase 2 | Deterministic harness scenarios | `npm run test:phase2` |
-| Phase 3 | Live provider integration       | `npm run test:phase3` |
+| Phase   | Purpose                                     | Command               |
+| ------- | ------------------------------------------- | --------------------- |
+| Phase 1 | Unit tests (vitest)                         | `npm run test:phase1` |
+| Phase 2 | Deterministic harness + live provider tests | `npm run test:phase2` |
+| Phase 3 | Live provider integration                   | `npm run test:phase3` |
 
 See [Testing Guide](Contributing-Testing) for detailed instructions.
 
@@ -180,4 +190,4 @@ Error messages sent to the LLM must be:
 
 - [Technical-Specs](Technical-Specs) - Architecture and implementation specifications
 - [Getting-Started](Getting-Started) - Installation and first steps
-- [CLAUDE.md](https://github.com/netdata/ai-agent/blob/master/CLAUDE.md) - Full development instructions for AI assistants
+- [CLAUDE.md](../CLAUDE.md) - Full development instructions for AI assistants

@@ -69,7 +69,17 @@ classDiagram
     }
 
     class InternalToolProvider {
-        +kind: varies
+        +kind: "agent"
+        +namespace: "agent"
+    }
+
+    class AgentProvider {
+        +kind: "agent"
+        +namespace: "subagent"
+    }
+
+    class RouterToolProvider {
+        +kind: "agent"
         +namespace: "agent"
     }
 
@@ -98,7 +108,12 @@ interface ToolExecuteResult {
   latencyMs: number; // Execution time
   kind: ToolKind; // Provider type
   namespace: string; // Provider namespace
-  extras?: Record<string, unknown>; // Additional metadata
+  extras?:
+    | Record<string, unknown>
+    | {
+        taskStatusCompleted?: boolean;
+        taskStatusData?: TaskStatusData;
+      }; // Additional metadata (task_status-specific fields possible)
 }
 ```
 
@@ -226,6 +241,8 @@ Built-in tools provided by ai-agent itself.
 | `ready_for_final_report` | boolean                                          | Can finalize now        |
 | `need_to_run_more_tools` | boolean                                          | More tools needed       |
 
+**Completion Behavior**: When `status` is set to `'completed'`, the agent signals task completion and forces a final turn (even without calling `final_report`).
+
 ---
 
 ### AgentProvider
@@ -333,8 +350,11 @@ flowchart TD
 
 ```typescript
 class ToolsOrchestrator {
-  providers: Map<string, ToolProvider>;
-  mapping: Map<string, ToolProvider>; // tool → provider
+  providers: ToolProvider[];
+  mapping: Map<
+    string,
+    { provider: ToolProvider; kind: ToolKind; queueName?: string }
+  >; // tool → provider info
   aliases: Map<string, string>; // alias → canonical name
   canceled: boolean;
   pendingQueueControllers: Set<AbortController>;
@@ -571,10 +591,10 @@ queues:
 
 ### Events
 
-| Event           | Description         |
-| --------------- | ------------------- |
-| `tool_started`  | Execution began     |
-| `tool_finished` | Execution completed |
+| Event           | Description                                    |
+| --------------- | ---------------------------------------------- |
+| `tool_started`  | Execution began                                |
+| `tool_finished` | Execution completed (status: 'ok' or 'failed') |
 
 ---
 

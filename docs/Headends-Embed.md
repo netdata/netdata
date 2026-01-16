@@ -205,12 +205,14 @@ data: {"agent":"support","agentPath":"support","status":"in-progress","message":
 
 ### report
 
-Final report content chunks.
+Final report content chunks. Client accumulates chunks and provides full report in event object.
 
 ```
 event: report
 data: {"chunk":"Here is your answer...","index":0}
 ```
+
+**Note**: Server sends only `chunk` and `index`. JavaScript client accumulates chunks into `report` field for convenience.
 
 ### done
 
@@ -317,7 +319,7 @@ async function chat(message) {
     for (const line of lines) {
       if (line.startsWith("event:")) {
         const eventType = line.split(":")[1].trim();
-        const dataLine = lines.find((l) => l.startsWith("data:"));
+        const dataLine = line.split("\n").find((l) => l.startsWith("data:"));
         if (dataLine) {
           const data = JSON.parse(dataLine.substring(5));
           console.log(eventType, data);
@@ -337,7 +339,7 @@ In `.ai-agent.json`:
 ```json
 {
   "embed": {
-    "defaultAgent": "support.ai",
+    "defaultAgent": "support",
     "corsOrigins": ["*.example.com", "localhost:*"],
     "rateLimit": {
       "enabled": true,
@@ -376,15 +378,16 @@ In `.ai-agent.json`:
 
 ### Configuration Options
 
-| Option                        | Type      | Default                     | Description                                         |
-| ----------------------------- | --------- | --------------------------- | --------------------------------------------------- |
-| `defaultAgent`                | `string`  | First registered            | Default agent when not specified                    |
-| `corsOrigins`                 | `array`   | `[]`                        | Allowed origins (glob patterns)                     |
-| `rateLimit.enabled`           | `boolean` | `true` (enabled by default) | Enable rate limiting (requires `requestsPerMinute`) |
-| `rateLimit.requestsPerMinute` | `number`  | `10`                        | Default rate limit                                  |
-| `rateLimit.burstSize`         | `number`  | `0`                         | Burst allowance                                     |
-| `metrics.enabled`             | `boolean` | `true`                      | Enable metrics endpoint                             |
-| `metrics.path`                | `string`  | `/metrics`                  | Metrics endpoint path                               |
+| Option                        | Type      | Default                       | Description                                         |
+| ----------------------------- | --------- | ----------------------------- | --------------------------------------------------- |
+| `concurrency`                 | `number`  | `10`                          | Maximum concurrent chat sessions                    |
+| `defaultAgent`                | `string`  | First registered              | Default agent when not specified                    |
+| `corsOrigins`                 | `array`   | `[]`                          | Allowed origins (glob patterns)                     |
+| `rateLimit.enabled`           | `boolean` | `false` (disabled by default) | Enable rate limiting (requires `requestsPerMinute`) |
+| `rateLimit.requestsPerMinute` | `number`  | `10`                          | Default rate limit when enabled                     |
+| `rateLimit.burstSize`         | `number`  | `0`                           | Burst allowance                                     |
+| `metrics.enabled`             | `boolean` | `true`                        | Enable metrics endpoint                             |
+| `metrics.path`                | `string`  | `/metrics`                    | Metrics endpoint path                               |
 
 ---
 
@@ -451,6 +454,8 @@ For secure access:
 ```
 
 Client must include `Authorization: Bearer <token>` header.
+
+**Note**: Token is compared as a static string against the secret. The `ttlSeconds` option is not currently validated.
 
 ---
 
@@ -603,7 +608,7 @@ Access-Control-Allow-Headers: Content-Type, Authorization, X-Netdata-Agent-GUID
 
 ### JavaScript client not loading
 
-**Symptom**: `AIAgent is not defined`
+**Symptom**: `NetdataSupport is not defined`
 
 **Cause**: Script not loaded.
 

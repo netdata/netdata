@@ -2,7 +2,7 @@
 
 Control which tools agents can access with allowlists and denylists.
 
-**Note:** Provider-level tool filtering (`providers.<name>.toolsAllowed/Denied`) and agent-level tool filtering (`toolsAllowed/toolsDenied` in frontmatter) are not implemented. Use MCP server-level filtering for tool access control.
+**Note:** Provider-level tool filtering (`providers.<name>.toolsAllowed/toolsDenied`) and agent-level tool filtering (`toolsAllowed/toolsDenied` in frontmatter) are not implemented. Use MCP server-level filtering for tool access control.
 
 ---
 
@@ -41,7 +41,7 @@ Tools follow a consistent naming pattern:
 | REST tools  | `rest__<name>`     | `rest__weather`       |
 | Internal    | `agent__<name>`    | `agent__final_report` |
 
-Understanding this convention is essential for writing filter patterns. When configuring filters in `mcpServers.<name>.toolsAllowed/Denied`, use the **local tool name** only (e.g., `search_code`), not the full `mcp__<server>__<tool>` format.
+Understanding this convention is essential for writing filter patterns. When configuring filters in `mcpServers.<name>.toolsAllowed/Denied`, use the **local tool name** only (e.g., `search_code`), not the full `<server>__<tool>` format.
 
 ---
 
@@ -404,7 +404,7 @@ If the tool doesn't appear, it was filtered out.
 **Wildcard not matching:**
 
 - Only literal `*` or `any` wildcard is supported
-- Pattern matching like `mcp__*` or `prefix_*` is NOT supported
+- Pattern matching like `server__*` or `prefix_*` is NOT supported
 - Use `*` or `any` alone to match all tools, not for prefix/partial matching
 
 ---

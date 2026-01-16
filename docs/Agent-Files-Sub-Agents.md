@@ -135,7 +135,7 @@ The tool name is `agent__<toolName>`:
 - If sub-agent has `toolName: researcher`, parent uses `agent__researcher`
 - If no `toolName`, derived from filename: `my-agent.ai` → `agent__my_agent` (filename is sanitized and lowercased)
 
-**Reserved tool names**: You cannot use these names for sub-agents: `task_status`, `final_report`, `batch`, `tool_output`
+**Reserved tool names**: You cannot use these names for sub-agents: `agent__task_status`, `agent__final_report`, `agent__batch`, `tool_output`
 
 ---
 

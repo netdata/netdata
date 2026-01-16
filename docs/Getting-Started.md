@@ -69,7 +69,7 @@ ai-agent --version
 **Expected output:**
 
 ```
-0.0.0.701
+0.0.0.702
 ```
 
 ```bash
@@ -122,7 +122,7 @@ You are a friendly assistant. Greet the user and answer their questions.
 **4. Run it:**
 
 ```bash
-ai-agent --agent hello.ai "Hello, who are you?"
+ai-agent @hello.ai "Hello, who are you?"
 ```
 
 **Expected output:**

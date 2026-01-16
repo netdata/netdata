@@ -44,14 +44,14 @@ Deep-dive technical documentation for contributors, maintainers, and advanced us
 
 **Most Common Questions**:
 
-| Question                          | Document                                                 |
-| --------------------------------- | -------------------------------------------------------- |
-| "How does a session work?"        | [Session Lifecycle](Technical-Specs-Session-Lifecycle)   |
-| "Why did my session stop early?"  | [Context Management](Technical-Specs-Context-Management) |
-| "What happens when an LLM fails?" | [Retry Strategy](Technical-Specs-Retry-Strategy)         |
-| "How are tools executed?"         | [Tool System](Technical-Specs-Tool-System)               |
-| "What guarantees can I rely on?"  | [User Contract](Technical-Specs-User-Contract)           |
-| "Why is it designed this way?"    | [Design History](Technical-Specs-Design-History)         |
+| Question                          | Document                                                  |
+| --------------------------------- | --------------------------------------------------------- |
+| "How does a session work?"        | [Session Lifecycle](Technical-Specs-Session-Lifecycle.md) |
+| "Why did my session stop early?"  | [Context Management](context-management.md)               |
+| "What happens when an LLM fails?" | [Retry Strategy](retry-strategy.md)                       |
+| "How are tools executed?"         | [Tool System](tools-overview.md)                          |
+| "What guarantees can I rely on?"  | [User Contract](CONTRACT.md)                              |
+| "Why is it designed this way?"    | [Design History](ADR-001-sub-agent-as-tool.md)            |
 
 ---
 
@@ -59,11 +59,11 @@ Deep-dive technical documentation for contributors, maintainers, and advanced us
 
 System design and component structure.
 
-| Document                                               | Description                                                                               |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| [Architecture](Technical-Specs-Architecture)           | Layered component design: CLI/Headend → AIAgent → AIAgentSession → LLM Client → Providers |
-| [Session Lifecycle](Technical-Specs-Session-Lifecycle) | Creation → Execution → Finalization flow                                                  |
-| [Design History](Technical-Specs-Design-History)       | Architectural Decision Records (ADRs)                                                     |
+| Document                                                  | Description                                                                               |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [Architecture](Technical-Specs-Architecture.md)           | Layered component design: CLI/Headend → AIAgent → AIAgentSession → LLM Client → Providers |
+| [Session Lifecycle](Technical-Specs-Session-Lifecycle.md) | Creation → Execution → Finalization flow                                                  |
+| [Design History](ADR-001-sub-agent-as-tool.md)            | Architectural Decision Records (ADRs)                                                     |
 
 ```mermaid
 graph LR
@@ -87,7 +87,7 @@ How sessions execute at runtime.
 | -------------------------------------------------------- | --------------------------------------------------- |
 | [Context Management](Technical-Specs-Context-Management) | Token budgets, context guard, overflow handling     |
 | [Retry Strategy](Technical-Specs-Retry-Strategy)         | Error classification, provider cycling, backoff     |
-| [Tool System](Technical-Specs-Tool-System)               | Tool providers, execution routing, queue management |
+| [Tool System](tools-overview.md)                         | Tool providers, execution routing, queue management |
 
 ---
 
@@ -98,7 +98,7 @@ User-facing promises that implementations MUST honor.
 | Document                                       | Description                                          |
 | ---------------------------------------------- | ---------------------------------------------------- |
 | [User Contract](Technical-Specs-User-Contract) | End-user guarantees (limits, error handling, output) |
-| [Specifications Index](Technical-Specs-Index)  | Complete index of all spec documents                 |
+| [Specifications Index](index.md)  | Complete index of all spec documents                 |
 
 ---
 
@@ -124,9 +124,8 @@ These rules MUST hold under all conditions. Violations are critical bugs.
 
 ### Session Invariants
 
-1. **Configuration Immutable**: Config cannot change after session creation
-2. **Turn Ordering**: Turn 0 = system setup, action turns are 1-based
-3. **Max Turns Honored**: Session NEVER exceeds configured `maxTurns`
+1. **Turn Ordering**: Turn 0 = system setup, action turns are 1-based
+2. **Max Turns Honored**: Session NEVER exceeds configured `maxTurns`
 
 ### Provider Invariants
 
@@ -148,11 +147,11 @@ These rules MUST hold under all conditions. Violations are critical bugs.
 
 ## Reading Order for New Contributors
 
-1. **Start**: [Architecture](Technical-Specs-Architecture) - Understand the layers
-2. **Then**: [Session Lifecycle](Technical-Specs-Session-Lifecycle) - Follow a request through
-3. **Deep Dive**: [Context Management](Technical-Specs-Context-Management) or [Tool System](Technical-Specs-Tool-System)
+1. **Start**: [Architecture](Technical-Specs-Architecture.md) - Understand the layers
+2. **Then**: [Session Lifecycle](Technical-Specs-Session-Lifecycle.md) - Follow a request through
+3. **Deep Dive**: [Context Management](Technical-Specs-Context-Management) or [Tool System](tools-overview.md)
 4. **Why**: [Design History](Technical-Specs-Design-History) - Understand decisions
-5. **Reference**: [Specifications Index](Technical-Specs-Index) - Find detailed specs
+5. **Reference**: [Specifications Index](Technical-Specs-Index.md) - Find detailed specs
 
 ---
 

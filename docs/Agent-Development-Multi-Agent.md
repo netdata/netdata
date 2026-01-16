@@ -194,11 +194,11 @@ router:
 You are a request router.
 
 Analyze the user's request and route to the appropriate handler:
-- **sales**: Pricing, demos, features questions
-- **support**: Technical issues, bugs, how-to questions
-- **billing**: Invoices, payments, subscriptions
+- **./handlers/sales.ai**: Pricing, demos, features questions
+- **./handlers/support.ai**: Technical issues, bugs, how-to questions
+- **./handlers/billing.ai**: Invoices, payments, subscriptions
 
-Use the `router__handoff-to` tool to delegate.
+Use the `router__handoff-to` tool to delegate with the exact destination path.
 ```
 
 ### Router Tool
@@ -209,7 +209,7 @@ The router pattern exposes a special `router__handoff-to` tool:
 {
   "name": "router__handoff-to",
   "arguments": {
-    "agent": "support",
+    "agent": "./handlers/support.ai",
     "message": "User is experiencing login issues on mobile"
   }
 }
@@ -217,7 +217,7 @@ The router pattern exposes a special `router__handoff-to` tool:
 
 **Arguments:**
 
-- `agent` (required): Destination agent name (filename without `.ai`)
+- `agent` (required): Destination agent path (exact string from `router.destinations`)
 - `message` (optional): Context to pass to the destination
 
 ### Message Injection

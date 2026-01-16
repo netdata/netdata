@@ -108,10 +108,10 @@ Analyze the customer complaint about slow performance
 
 ### Notes
 
-- Advisors run independently (no tool access to main session)
+- Advisors run independently
 - Advisory blocks are informational, not actionable
 - Failed advisors contribute failure notices (main session continues)
-- Advisors inherit global overrides but not frontmatter settings
+- Advisors receive parent session configuration including tools and defaults
 - XML tags include random nonce suffixes (`__HEX`) for prompt uniqueness and security
 
 ---
@@ -185,10 +185,9 @@ What's our Q4 revenue trend?
 
 ### Notes
 
-- Handoff only runs if main session succeeds
 - Handoff result becomes the final output to the user
 - Can chain multiple stages via frontmatter
-- Handoff agent has full tool access (unlike advisors)
+- Handoff agent has full tool access
 - XML tags include random nonce suffixes (`__HEX`) for prompt uniqueness and security
 
 ---

@@ -65,10 +65,12 @@ If no `default` queue is defined, one is injected automatically:
 ```json
 {
   "queues": {
-    "default": { "concurrent": 16 }
+    "default": { "concurrent": <computed> }
   }
 }
 ```
+
+The injected `default` queue's `concurrent` value is computed from hardware (see [Default Concurrency](#default-concurrency) below).
 
 ### Default Queue Behavior
 

@@ -135,25 +135,20 @@ class ToolExecutor {
 
 Imports must follow this order, with blank lines between groups:
 
-1. Node builtins
+1. Node builtins (with `node:` protocol)
 2. External packages
-3. Type imports
-4. Internal modules
-5. Parent imports
-6. Sibling imports
-7. Index imports
+3. Type and value imports (grouped together by module)
 
 ### Example
 
 ```typescript
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import fs from "node:fs";
+import path from "node:path";
 
 import Ajv from "ajv";
 import { z } from "zod";
 
 import type { Configuration, ToolDefinition } from "./types.js";
-
 import { formatError } from "../utils/errors.js";
 import { Logger } from "../utils/logger.js";
 
@@ -213,15 +208,13 @@ function handleEvent(event: Event, _context: Context): void {
 Map external errors to internal types without using `any`:
 
 ```typescript
-// Good: Map to internal type with explicit fields
+// Good: Map error with explicit message handling
 try {
   await provider.complete(messages);
 } catch (err) {
-  const error: AgentError = {
-    code: 'PROVIDER_ERROR',
-    message: err instanceof Error ? err.message : 'Unknown error',
-    details: { provider: 'openai', model: 'gpt-4' }
-  };
+  const message = err instanceof Error ? err.message : String(err);
+  const error = new Error(`Provider failed: ${message}`);
+  error.name = 'ProviderError';
   throw error;
 }
 
@@ -390,15 +383,6 @@ registerAgents(config);
 | 4    | Imports ordered correctly      | Linter catches this |
 | 5    | Unused code removed            | Linter catches this |
 | 6    | Comments explain "why"         | Manual review       |
-| 7    | Tests pass                     | `npm test`          |
-
-### Quick Verification
-
-```bash
-npm run build && npm run lint && npm test
-```
-
-All three must pass before committing.
 
 ---
 

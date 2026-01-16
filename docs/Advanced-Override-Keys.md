@@ -207,7 +207,7 @@ ai-agent --agent test.ai --override repeatPenalty=1.1 "query"
 | Property     | Value                                     |
 | ------------ | ----------------------------------------- |
 | Type         | `number` (ms) or duration string          |
-| Default      | `600000` (2 minutes)                      |
+| Default      | `600000` (10 minutes)                     |
 | Valid values | Positive integer or duration (`5s`, `2m`) |
 | Example      | `llmTimeout=300000`                       |
 
@@ -346,12 +346,12 @@ ai-agent --agent test.ai --override reasoning=medium "query"
 
 #### reasoningTokens
 
-| Property     | Value                                       |
-| ------------ | ------------------------------------------- |
-| Type         | `integer` or `string`                       |
-| Default      | `undefined` (provider/model decides)        |
-| Valid values | Positive integer, `disabled`, `off`, `none` |
-| Example      | `reasoningTokens=16000`                     |
+| Property     | Value                                   |
+| ------------ | --------------------------------------- |
+| Type         | `integer` or `string`                   |
+| Default      | `undefined` (provider/model decides)    |
+| Valid values | Integer >= 0, `disabled`, `off`, `none` |
+| Example      | `reasoningTokens=16000`                 |
 
 **Description**: Explicit token budget for reasoning.
 
@@ -536,11 +536,11 @@ Override keys have highest priority in the configuration stack:
 
 ## Override vs Default
 
-| Mechanism               | Behavior                               | Use When                           |
-| ----------------------- | -------------------------------------- | ---------------------------------- |
-| `--override key=value`  | Forces value, ignores all other config | Testing/debugging, forced behavior |
-| `--default-reasoning X` | Sets fallback when frontmatter omits   | Operational defaults               |
-| `defaults.X` in config  | Sets fallback from config file         | System-wide defaults               |
+| Mechanism               | Behavior                                                    | Use When                           |
+| ----------------------- | ----------------------------------------------------------- | ---------------------------------- |
+| `--override key=value`  | Forces value, ignores all other config                      | Testing/debugging, forced behavior |
+| `--default-reasoning X` | Sets fallback when frontmatter omits reasoning key entirely | Operational defaults               |
+| `defaults.X` in config  | Sets fallback from config file                              | System-wide defaults               |
 
 **Example comparison**:
 
@@ -572,13 +572,13 @@ grep -A2 "case '" src/cli.ts | grep -E "case '(models|tools|temperature)"
 
 ### Current Override Keys (Source of Truth)
 
-From `src/options-registry.ts`:
+From `src/cli.ts` and `src/options-registry.ts`:
 
 ```
 models, tools, agents, temperature, topP, topK, maxOutputTokens,
 repeatPenalty, llmTimeout, toolTimeout, maxRetries, maxTurns,
 maxToolCallsPerTurn, toolResponseMaxBytes, mcpInitConcurrency,
-stream, interleaved, reasoning, reasoningTokens, caching,
+stream, cache, interleaved, reasoning, reasoningTokens, caching,
 contextWindow, no-batch, no-progress
 ```
 

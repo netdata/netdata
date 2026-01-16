@@ -74,10 +74,10 @@ ai-agent --agent myagent.ai --verbose "your query here"
 **Example verbose output**:
 
 ```
-VRB 1.0 → LLM main: openai/gpt-4o LLM request prepared [ctx 1000, new 500, expected 1500 + output 4096 = 30% of 200000]
-VRB 1.1 ← LLM main: openai/gpt-4o LLM response received [$0.000123, 2341ms, tokens: in 1523, out 456, cR 0, cW 0, ctx 1979]
-VRB 1.2 → MCP main: github:search_code (query="test")
-VRB 1.3 ← MCP main: github:search_code [523ms, 12456 bytes]
+VRB 1.0 → llm main: openai/gpt-4o LLM request prepared [ctx 1000, new 500, expected 1500 + output 4096 = 30% of 200000]
+VRB 1.1 ← llm main: openai/gpt-4o LLM response received [$0.000123, 2341ms, tokens: in 1523, out 456, cR 0, cW 0, ctx 1979]
+VRB 1.2 → tool mcp:github:search_code (query="test")
+VRB 1.3 ← tool mcp:github:search_code [523ms, 12456 bytes]
 ```
 
 ---
@@ -269,7 +269,7 @@ zcat "$SNAPSHOT" | jq '.opTree.turns[-1].ops[] | select(.kind == "final" or .att
 
 ### Tool Not Found
 
-**Error**: `unknown_tool: mcp__server__toolname`
+**Error**: `unknown_tool:mcp__server__toolname`
 
 **Debug**:
 

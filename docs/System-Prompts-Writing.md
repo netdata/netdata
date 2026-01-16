@@ -325,8 +325,6 @@ When showing code:
 - Explain why, not just what
 ```
 
-**Note**: `CD` and `OS` variables are only available in CLI context. For cross-context agents, omit these or document they are CLI-specific.
-
 ### Customer Support Agent
 
 ```markdown
@@ -447,7 +445,7 @@ Respond in ${FORMAT}.
 
 - Before calling a tool, state why you need it
 - Use web search tools for current information only
-- Limit to 3 tool calls per turn unless necessary
+- Limit to 10 tool calls per turn unless necessary (default: 10, configurable via maxToolCallsPerTurn)
 - If a tool fails, try an alternative approach
 ```
 

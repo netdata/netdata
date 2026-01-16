@@ -157,14 +157,29 @@ export type {
   AIAgentEvent,
   AIAgentEventCallbacks,
   AIAgentEventMeta,
+  AIAgentOptions,
+  AIAgentRunOptions,
   Configuration,
+  EventSource,
+  FinalReportPayload,
+  ProviderConfig,
+  MCPServerConfig,
+  MCPTool,
+  MCPServer,
   ConversationMessage,
   ToolCall,
   ToolResult,
   TokenUsage,
+  TurnRequest,
+  TurnResult,
+  TurnStatus,
+  ToolStatus,
   LogEntry,
   AccountingEntry,
-  // ... and more
+  LLMAccountingEntry,
+  ToolAccountingEntry,
+  LLMProvider,
+  ToolChoiceMode,
 };
 ```
 
@@ -222,16 +237,25 @@ export type {
 | `toolTimeout` | `number` | -       | Tool timeout in milliseconds    |
 | `cacheTtlMs`  | `number` | -       | Response cache TTL (0 disables) |
 
+### Optional Orchestration
+
+| Option                 | Type                         | Default | Description                  |
+| ---------------------- | ---------------------------- | ------- | ---------------------------- |
+| `orchestration`        | `OrchestrationConfig`        | -       | Orchestration configuration  |
+| `orchestrationRuntime` | `OrchestrationRuntimeConfig` | -       | Runtime orchestration config |
+
 ### Optional Behavior
 
-| Option                        | Type      | Default | Description                 |
-| ----------------------------- | --------- | ------- | --------------------------- |
-| `stream`                      | `boolean` | -       | Enable streaming output     |
-| `verbose`                     | `boolean` | -       | Verbose logging             |
-| `traceLLM`                    | `boolean` | -       | Trace LLM calls             |
-| `traceMCP`                    | `boolean` | -       | Trace MCP calls             |
-| `traceSdk`                    | `boolean` | -       | Trace SDK calls             |
-| `headendWantsProgressUpdates` | `boolean` | -       | Enable progress update tool |
+| Option                        | Type      | Default | Description                    |
+| ----------------------------- | --------- | ------- | ------------------------------ |
+| `stream`                      | `boolean` | -       | Enable streaming output        |
+| `verbose`                     | `boolean` | -       | Verbose logging                |
+| `traceLLM`                    | `boolean` | -       | Trace LLM calls                |
+| `traceMCP`                    | `boolean` | -       | Trace MCP calls                |
+| `traceSdk`                    | `boolean` | -       | Trace SDK calls                |
+| `headendWantsProgressUpdates` | `boolean` | -       | Enable progress update tool    |
+| `isMaster`                    | `boolean` | -       | Whether this is a master agent |
+| `pendingHandoffCount`         | `number`  | -       | Count of pending handoffs      |
 
 ### Optional Callbacks
 
@@ -262,6 +286,40 @@ export type {
 | `trace.callPath`  | `string` | Call hierarchy path |
 | `trace.agentPath` | `string` | Agent file path     |
 | `trace.turnPath`  | `string` | Turn path prefix    |
+
+### Optional Rendering
+
+| Option         | Type   | Default | Description |
+| -------------- | ------ | ------- | ----------- | ----- | ------- | ------------ | --- | -------------------------------- |
+| `renderTarget` | `'cli' | 'slack' | 'api'       | 'web' | 'embed' | 'sub-agent'` | -   | Rendering target for diagnostics |
+
+### Optional Tool Output
+
+| Option       | Type                    | Default | Description                       |
+| ------------ | ----------------------- | ------- | --------------------------------- |
+| `toolOutput` | `ToolOutputConfigInput` | -       | Tool output storage configuration |
+
+### Optional Agent Identity
+
+| Option         | Type     | Default | Description                          |
+| -------------- | -------- | ------- | ------------------------------------ |
+| `agentHash`    | `string` | -       | Agent hash for tracking              |
+| `initialTitle` | `string` | -       | Pre-set session title (no tool turn) |
+
+### Optional Session Tracing
+
+| Option           | Type       | Default | Description                              |
+| ---------------- | ---------- | ------- | ---------------------------------------- |
+| `agentPath`      | `string`   | -       | Agent file path                          |
+| `turnPathPrefix` | `string`   | -       | Turn path prefix                         |
+| `ancestors`      | `string[]` | -       | Ancestors chain for recursion prevention |
+| `contextWindow`  | `number`   | -       | Override context window for all targets  |
+
+### Optional MCP
+
+| Option               | Type     | Default | Description                             |
+| -------------------- | -------- | ------- | --------------------------------------- |
+| `mcpInitConcurrency` | `number` | -       | Preferred MCP init concurrency override |
 
 ### Optional Cancellation
 
@@ -411,7 +469,7 @@ const callbacks: AIAgentEventCallbacks = {
 
       case "handoff":
         // Agent delegation
-        console.log(`Handing off to: ${event.report.targetAgent}`);
+        console.log(`Handoff (format: ${event.report.format})`);
         break;
 
       case "snapshot":

@@ -192,11 +192,11 @@ ai-agent --agent test.ai --dry-run "Test query"
 
 **Validates**
 
-- Agent file syntax and frontmatter
-- Model availability and configuration
+- Configuration parsing and agent file syntax
+- Model availability
 - MCP server connectivity
-- Tool schema validity
-- Configuration file parsing
+
+Note: Tool schema validation occurs during normal agent loading, not during dry-run.
 
 **Use for:**
 
@@ -322,8 +322,8 @@ ai-agent --agent tools.ai --tool-timeout-ms 300000 "use slow tool"
 # Trace LLM to see actual response
 ai-agent --agent format.ai --trace-llm "return json"
 
-# Check schema validation
-ai-agent --agent format.ai --trace-llm --schema @schema.json "return data"
+# Validate output against JSON schema (expectedOutputSchema)
+ai-agent --agent format.ai --schema @schema.json "return data"
 ```
 
 ### Context Window Exceeded

@@ -132,9 +132,9 @@ description: Uses Claude 3.5 Sonnet with Brave search MCP
 
 **What it affects**:
 
-- Displayed in tool documentation (as fallback for description if description is missing)
-- Helps parent agents understand how to call this agent
-- Shown in `--help` output when running the agent directly
+- Used as the description for the `prompt` field in the sub-agent's input schema (when no explicit input schema is provided)
+- Shown in MCP and completions headend interfaces
+- Provides usage context for the sub-agent in headend environments
 
 **Example**:
 
@@ -259,7 +259,7 @@ toolName: analyze_company_financials_and_generate_structured_reports
 
 ### Standalone Agent (No Sub-Agents)
 
-For agents run directly from CLI, only `description` is needed:
+For agents run directly from CLI, include `description` and `models`:
 
 ```yaml
 ---
@@ -331,6 +331,20 @@ toolName: market_researcher
 
 - `agent__company_researcher`
 - `agent__market_researcher`
+
+**Note**: When calling a sub-agent, use the `prompt` parameter (required) and optionally `format`:
+
+```
+Tool: agent__company_researcher
+Input: { "prompt": "Research Apple Inc." }
+```
+
+With explicit format:
+
+```
+Tool: agent__company_researcher
+Input: { "prompt": "Research Apple Inc.", "format": "json" }
+```
 
 ---
 

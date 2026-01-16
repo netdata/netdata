@@ -79,6 +79,8 @@ Follow these steps:
 ${include:shared/guidelines.md}
 ```
 
+Both `${include:...}` and `{{include:...}}` syntaxes are supported for include directives.
+
 **Key insight**: The prompt is regular Markdown text. Use headings, lists, and formatting to make it clear and scannable for the LLM.
 
 ---
@@ -143,8 +145,10 @@ Reuse content across multiple agents:
 
 ```markdown
 ${include:shared/tone.md}
-${include:shared/safety-rules.md}
+{{include:shared/safety-rules.md}}
 ```
+
+Both `${include:...}` and `{{include:...}}` syntaxes are supported.
 
 Includes are resolved before variable substitution. Nested includes are supported.
 
@@ -204,6 +208,8 @@ Yes. Headings, lists, and bold text help the model understand structure. Avoid c
 
 ## See Also
 
-- [Agent-Development-Agent-Files](Agent-Development-Agent-Files) - `.ai` file structure
-- [Agent-Development-Frontmatter](Agent-Development-Frontmatter) - Configuration options
+- [Agent-Files](Agent-Files) - `.ai` file structure
+- [Agent-Files-Identity](Agent-Files-Identity) - Identity configuration
+- [Agent-Files-Contracts](Agent-Files-Contracts) - Input/output schemas
+- [Agent-Files-Orchestration](Agent-Files-Orchestration) - Advisors, router, handoff
 - [Agent-Development-Multi-Agent](Agent-Development-Multi-Agent) - Multi-agent workflows

@@ -87,10 +87,13 @@ Each headend type has its own concurrency limit to prevent resource exhaustion:
 
 MCP and Slack headends use internal limits (10 concurrent sessions by default).
 
+**Note**: MCP stdio transport has no concurrency limit (only HTTP/SSE/WS transports respect the limit).
+
 **What happens when limit is reached**:
 
 - REST/OpenAI/Anthropic/Embed: Returns `503 Service Unavailable` with JSON error response
-- MCP HTTP/SSE: Returns `503 Service Unavailable`; stdio has no concurrency limit
+- MCP HTTP/SSE: Returns `503 Service Unavailable`
+- MCP stdio: No concurrency limit (unlimited concurrent sessions)
 - Slack: Queues the request
 
 ---
@@ -120,7 +123,7 @@ ai-agent --agent agents/main.ai --agent agents/helper.ai --api 8080
 
 ## Health Checks
 
-All network headends expose health endpoints for load balancer integration:
+The following network headends expose health endpoints for load balancer integration:
 
 | Headend   | Endpoint      | Response          |
 | --------- | ------------- | ----------------- |
@@ -128,6 +131,8 @@ All network headends expose health endpoints for load balancer integration:
 | OpenAI    | `GET /health` | `{"status":"ok"}` |
 | Anthropic | `GET /health` | `{"status":"ok"}` |
 | Embed     | `GET /health` | `{"status":"ok"}` |
+
+**Note**: MCP (stdio/HTTP/SSE/WS) and Slack headends do not expose health endpoints.
 
 ---
 

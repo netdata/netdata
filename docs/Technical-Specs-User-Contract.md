@@ -103,7 +103,7 @@ Every `LLM request prepared` log satisfies:
 expectedTokens = ctxTokens + newTokens + schemaCtxTokens
 ```
 
-**Note:** `schemaCtxTokens` is included in `ctxTokens` for subsequent turns (via cache_read/cache_write tracking). For first turn, schema tokens are not included, resulting in a slight underestimate.
+**Note:** Schema tokens are tracked separately (`schemaCtxTokens`) and added to context via cache_write (first turn) and cache_read (subsequent turns). They are included in the `ctxTokens` value reported by providers (input + output + cache_read + cache_write), so `expectedTokens = ctxTokens + newTokens + schemaCtxTokens` accurately reflects total context.
 
 ### Guard Projection
 
@@ -128,12 +128,12 @@ limit = contextWindow - contextWindowBufferTokens - maxOutputTokens
 
 ### toolResponseMaxBytes Contract
 
-| Guarantee                           | Details                                        |
-| ----------------------------------- | ---------------------------------------------- |
-| Responses exceeding size are stored | Written to disk                                |
-| Replaced with `tool_output` handle  | LLM receives handle                            |
-| Handle includes metadata            | `handle`, `reason`, `bytes`, `lines`, `tokens` |
-| Original preserved                  | Under `/tmp/ai-agent-<run-hash>/`              |
+| Guarantee                           | Details                                                                                      |
+| ----------------------------------- | -------------------------------------------------------------------------------------------- |
+| Responses exceeding size are stored | Written to disk                                                                              |
+| Replaced with `tool_output` handle  | LLM receives handle                                                                          |
+| Handle includes metadata            | `handle`, `reason`, `bytes`, `lines`, `tokens`                                               |
+| Original preserved                  | Stored under per-run directory (e.g., `/tmp/ai-agent-<run-hash>/session-<uuid>/<file-uuid>`) |
 
 ### toolTimeout Contract
 
@@ -220,10 +220,6 @@ Attempt N: targets[(N-1) % targets.length]
 - Success (tool calls or final_report received)
 - `maxRetries` exhausted across all targets
 - Fatal error encountered
-
-Attempt 1: targets[0]
-Attempt 2: targets[1]
-Attempt N: targets[(N-1) % targets.length]
 
 ```
 

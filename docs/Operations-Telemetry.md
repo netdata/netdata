@@ -98,7 +98,7 @@ curl http://localhost:9464/metrics
 | `ai_agent_tool_bytes_out_total`   | Counter   | Tool response bytes                   |
 | `ai_agent_tool_errors_total`      | Counter   | Tool errors (with `error_type` label) |
 
-**Labels**: `agent`, `call_path`, `tool_name`, `tool_kind`, `provider`, `headend`, `status`
+**Labels**: `agent`, `call_path`, `tool`, `tool_kind`, `provider`, `headend`, `status`
 
 ### Queue Metrics
 
@@ -144,6 +144,8 @@ curl http://localhost:9464/metrics
 
 ```bash
 ai-agent --agent test.ai \
+  --telemetry-enabled \
+  --telemetry-traces-enabled \
   --telemetry-otlp-endpoint http://collector:4317 \
   "query"
 ```
@@ -196,8 +198,6 @@ Configure trace sampling:
 ai-agent --telemetry-trace-sampler always_on "query"
 
 # Sample 10% of traces
-ai-agent --telemetry-trace-sampler ratio:0.1 "query"
-# Or with separate ratio option:
 ai-agent --telemetry-trace-sampler ratio --telemetry-trace-ratio 0.1 "query"
 
 # Never sample (metrics only)
@@ -222,6 +222,8 @@ ai-agent --telemetry-trace-sampler parent "query"
 
 ```bash
 ai-agent --agent test.ai \
+  --telemetry-enabled \
+  --telemetry-log-extra otlp \
   --telemetry-logging-otlp-endpoint http://collector:4317 \
   "query"
 ```
@@ -241,17 +243,29 @@ ai-agent --agent test.ai \
 
 Exported logs include:
 
-| Attribute   | Description         |
-| ----------- | ------------------- |
-| `type`      | Log type (llm/tool) |
-| `direction` | request/response    |
-| `turn`      | Turn number         |
-| `subturn`   | Tool call index     |
-| `agent`     | Agent ID            |
-| `call_path` | Call hierarchy      |
-| `remote`    | Remote identifier   |
-| `provider`  | Provider name       |
-| `model`     | Model name          |
+| Attribute        | Description                          |
+| ---------------- | ------------------------------------ |
+| `type`           | Log type (llm/tool)                  |
+| `direction`      | request/response                     |
+| `turn`           | Turn number                          |
+| `subturn`        | Tool call index                      |
+| `agent`          | Agent ID                             |
+| `call_path`      | Call hierarchy                       |
+| `remote`         | Remote identifier (if set)           |
+| `provider`       | Provider name (if set)               |
+| `model`          | Model name (if set)                  |
+| `message_id`     | Message ID (if set)                  |
+| `tool_kind`      | Tool kind (if set)                   |
+| `tool_namespace` | Tool namespace (if set)              |
+| `tool`           | Tool name (if set)                   |
+| `headend`        | Headend identifier (if set)          |
+| `txn_id`         | Transaction ID (if set)              |
+| `parent_txn_id`  | Parent transaction ID (if set)       |
+| `origin_txn_id`  | Origin transaction ID (if set)       |
+| `priority`       | Log priority                         |
+| `severity`       | Severity level                       |
+| `ts`             | ISO timestamp                        |
+| `label.{key}`    | Custom label for each key-value pair |
 
 ---
 

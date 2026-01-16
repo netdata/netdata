@@ -72,8 +72,7 @@ Environment variables are loaded from `.ai-agent.env` sidecar files.
 
 ### Resolution
 
-1. `.ai-agent.env` in the same directory as the config file
-2. `.ai-agent.env` in the current working directory
+Each config layer has its own `.ai-agent.env` file in the same directory as that layer's `.ai-agent.json`. Environment variables are resolved from the layer's paired `.env` file first, then from `process.env`.
 
 ### Format
 
@@ -130,14 +129,14 @@ All string values in configuration support `${VAR}` expansion.
 
 ### Special Handling
 
-These values are **NOT** expanded at config load time:
+Environment variable expansion works differently for certain fields:
 
-| Field                      | Reason                                            |
-| -------------------------- | ------------------------------------------------- |
-| `mcpServers.*.env`         | Passed to child processes for runtime resolution  |
-| `mcpServers.*.headers`     | May contain secrets resolved at spawn time        |
-| `restTools.*.bodyTemplate` | `${parameters.foo}` tokens for request templating |
-| `restTools.*.url`          | `${parameters.foo}` tokens for URL templating     |
+| Field                      | Special Behavior                                                  |
+| -------------------------- | ----------------------------------------------------------------- |
+| `restTools.*.bodyTemplate` | `${parameters.foo}` tokens are preserved for runtime substitution |
+| `restTools.*.url`          | `${parameters.foo}` tokens are preserved for runtime substitution |
+| `mcpServers.*.env`         | Environment variables are expanded at config load time            |
+| `mcpServers.*.headers`     | Environment variables are expanded at config load time            |
 
 ### MCP_ROOT Handling
 
@@ -449,30 +448,11 @@ provider 'custom' at /path/to/.ai-agent.json missing "type"; defaulting to 'open
 }
 ```
 
-Warning: Provider 'custom' missing 'type' field
-
-````
-
-**Cause**: Legacy config omitted the `type` field.
-
-**Solution**: Add explicit type:
-
-```json
-{
-  "providers": {
-    "custom": {
-      "type": "openai-compatible",
-      "apiKey": "..."
-    }
-  }
-}
-````
-
 ---
 
 ## See Also
 
-- [Configuration](Configuration) - Configuration overview
-- [LLM Providers](Configuration-Providers) - Provider setup
-- [Parameters Reference](Configuration-Parameters) - All configuration keys
+- [Configuration.md](Configuration.md) - Configuration overview
+- [Configuration-Providers.md](Configuration-Providers.md) - Provider setup
+- [Configuration-Parameters.md](Configuration-Parameters.md) - All configuration keys
 - [specs/configuration-loading.md](specs/configuration-loading.md) - Technical specification

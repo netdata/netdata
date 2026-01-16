@@ -272,9 +272,9 @@ Concurrency queue configuration.
 
 ### Queue Properties
 
-| Property     | Type     | Default  | Description                 |
-| ------------ | -------- | -------- | --------------------------- |
-| `concurrent` | `number` | Required | Max simultaneous executions |
+| Property     | Type     | Default                      | Description                 |
+| ------------ | -------- | ---------------------------- | --------------------------- |
+| `concurrent` | `number` | `cpuCount * 2, capped at 64` | Max simultaneous executions |
 
 ---
 
@@ -290,7 +290,11 @@ Cache backend configuration.
       "path": "string"
     },
     "redis": {
-      "url": "string"
+      "url": "string",
+      "username": "string",
+      "password": "string",
+      "database": "number",
+      "keyPrefix": "string"
     },
     "maxEntries": "number"
   }
@@ -299,12 +303,16 @@ Cache backend configuration.
 
 ### Cache Properties
 
-| Property      | Type     | Default                  | Description       |
-| ------------- | -------- | ------------------------ | ----------------- |
-| `backend`     | `string` | `"sqlite"`               | Cache backend     |
-| `sqlite.path` | `string` | `"~/.ai-agent/cache.db"` | SQLite path       |
-| `redis.url`   | `string` | -                        | Redis URL         |
-| `maxEntries`  | `number` | `5000`                   | Max cache entries |
+| Property          | Type     | Default                  | Description       |
+| ----------------- | -------- | ------------------------ | ----------------- |
+| `backend`         | `string` | `"sqlite"`               | Cache backend     |
+| `sqlite.path`     | `string` | `"~/.ai-agent/cache.db"` | SQLite path       |
+| `redis.url`       | `string` | -                        | Redis URL         |
+| `redis.username`  | `string` | -                        | Redis username    |
+| `redis.password`  | `string` | -                        | Redis password    |
+| `redis.database`  | `number` | -                        | Redis database    |
+| `redis.keyPrefix` | `string` | -                        | Redis key prefix  |
+| `maxEntries`      | `number` | `5000`                   | Max cache entries |
 
 ---
 
@@ -380,6 +388,7 @@ Default parameter values.
     "maxRetries": "number",
     "maxOutputTokens": "number",
     "toolResponseMaxBytes": "number",
+    "mcpInitConcurrency": "number",
     "contextWindowBufferTokens": "number",
     "stream": "boolean"
   }
@@ -401,6 +410,7 @@ Default parameter values.
 | `maxRetries`                | `number`  | `5`      | Max retry attempts     |
 | `maxOutputTokens`           | `number`  | `4096`   | Max output tokens      |
 | `toolResponseMaxBytes`      | `number`  | `12288`  | Max tool response size |
+| `mcpInitConcurrency`        | `number`  | -        | MCP init concurrency   |
 | `contextWindowBufferTokens` | `number`  | -        | Context buffer         |
 | `stream`                    | `boolean` | `true`   | Enable streaming       |
 

@@ -289,9 +289,10 @@ cat accounting.jsonl | jq -s '
   {
     totalInput: (map(.tokens.inputTokens) | add),
     cacheRead: (map(.tokens.cacheReadInputTokens) | add),
-    cacheRate: ((map(.tokens.cacheReadInputTokens) | add) / (map(.tokens.inputTokens + .tokens.cacheReadInputTokens) | add))
+    cacheWrite: (map(.tokens.cacheWriteInputTokens) | add),
+    cacheRate: ((map(.tokens.cacheReadInputTokens) | add) / (map(.tokens.inputTokens + .tokens.cacheWriteInputTokens) | add))
   }
-'
+  '
 ```
 
 ### Cost by Session
@@ -348,7 +349,7 @@ const callbacks = {
 | `accounting`       | Each LLM/tool call | Single `AccountingEntry` |
 | `accounting_flush` | Session end        | Array of all entries     |
 
-File writing is skipped when custom callbacks handle accounting.
+File writing is controlled by `persistence.billingFile` configuration and occurs in addition to any custom callbacks.
 
 ---
 

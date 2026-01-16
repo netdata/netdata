@@ -110,15 +110,15 @@ Current time: 2025-08-31T14:30:00+03:00
 
 **FORMAT values by context**:
 
-| Context          | `${FORMAT}` expands to                                                                                    |
-| ---------------- | --------------------------------------------------------------------------------------------------------- |
-| Terminal (TTY)   | `a TTY-compatible plain monospaced text response. Use literal "\\x1b[...m" sequences for ANSI colours...` |
-| Piped output     | `Plain text without any formatting or markdown. Do not wrap long lines.`                                  |
-| JSON expected    | `json`                                                                                                    |
-| Slack headend    | `Slack Block Kit JSON array of messages (not raw text or GitHub markdown)`                                |
-| Markdown         | `GitHub Markdown`                                                                                         |
-| Markdown+Mermaid | `GiHub Markdown with Mermaid diagrams`                                                                    |
-| Sub-agent        | `Internal agent-to-agent exchange format (not user-facing).`                                              |
+| Context          | `${FORMAT}` expands to                                                                                                                                                             |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Terminal (TTY)   | `a TTY-compatible plain monospaced text response. Use literal "\\x1b[...m" sequences for ANSI colours and avoid decorative boxes. Do not output markdown. Do not wrap long lines.` |
+| Piped output     | `Plain text without any formatting or markdown. Do not wrap long lines.`                                                                                                           |
+| JSON expected    | `json`                                                                                                                                                                             |
+| Slack headend    | `Slack Block Kit JSON array of messages (not raw text or GitHub markdown)`                                                                                                         |
+| Markdown         | `GitHub Markdown`                                                                                                                                                                  |
+| Markdown+Mermaid | `GiHub Markdown with Mermaid diagrams`                                                                                                                                             |
+| Sub-agent        | `Internal agent-to-agent exchange format (not user-facing).`                                                                                                                       |
 
 **Important**: Always include `${FORMAT}` in your prompts to ensure consistent output across all invocation contexts.
 

@@ -45,13 +45,14 @@ fi
 
 ai-agent uses consistent exit codes:
 
-| Code | Meaning             | Common Causes                        |
-| ---- | ------------------- | ------------------------------------ |
-| `0`  | Success             | Agent completed normally             |
-| `1`  | General error       | Runtime failures, tool errors        |
-| `3`  | Configuration error | Missing MCP servers, bad settings    |
-| `4`  | Invalid arguments   | Bad CLI flags, missing required args |
-| `5`  | Validation error    | Schema validation failed             |
+| Code | Meaning                                | Common Causes                                                    |
+| ---- | -------------------------------------- | ---------------------------------------------------------------- |
+| `0`  | Success                                | Agent completed normally                                         |
+| `1`  | General error                          | Runtime failures, tool errors, preflight checks, headend errors  |
+| `2`  | Agent failure                          | Session failure without specific categorization                  |
+| `3`  | Configuration error                    | Missing or failed MCP servers                                    |
+| `4`  | Invalid arguments or validation errors | Bad CLI flags, missing required args, option validation failures |
+| `5`  | Validation error                       | Schema validation failures (tool listing, final report)          |
 
 ### Checking Exit Codes
 
@@ -88,6 +89,8 @@ Common tags:
 - `EXIT-COMMANDER` - Argument parsing error
 - `EXIT-HEADEND-*` - Headend startup errors
 - `EXIT-LIST-TOOLS-*` - Tool listing errors
+- `EXIT-AGENT-FAILURE` - Agent session failure
+- `EXIT-TOOL-OUTPUT-PREFLIGHT` - Tool output preflight failure
 
 ---
 
@@ -166,7 +169,7 @@ Request JSON format for structured parsing:
 result=$(ai-agent --agent data.ai --format json --quiet "Get user data")
 name=$(echo "$result" | jq -r '.name')
 
-# Using --schema to specify expected output format
+# Using --schema to specify expected JSON output (forces JSON format)
 ai-agent --agent extractor.ai \
   --schema '{"type":"object","properties":{"items":{"type":"array"}}}' \
   --quiet \

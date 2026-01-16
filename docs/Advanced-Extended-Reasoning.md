@@ -71,13 +71,13 @@ ai-agent --agent my-agent.ai --reasoning medium "complex query"
 
 **Where to configure**:
 
-| Location             | Syntax                               | Priority                                                  |
-| -------------------- | ------------------------------------ | --------------------------------------------------------- |
-| Global/CLI override  | `--override reasoning=medium`        | 1 (highest, stomps everything)                            |
-| Frontmatter          | `reasoning: medium`                  | 2                                                         |
-| CLI flag             | `--reasoning medium`                 | 3 (overrides frontmatter)                                 |
-| CLI default flag     | `--default-reasoning medium`         | 4 (only when agent has `reasoning: default` or omits key) |
-| Config file defaults | `options.defaultReasoning: "medium"` | 5 (lowest)                                                |
+| Location             | Syntax                         | Priority                                                  |
+| -------------------- | ------------------------------ | --------------------------------------------------------- |
+| Global/CLI override  | `--override reasoning=medium`  | 1 (highest, stomps everything)                            |
+| CLI flag             | `--reasoning medium`           | 2                                                         |
+| Frontmatter          | `reasoning: medium`            | 3                                                         |
+| CLI default flag     | `--default-reasoning medium`   | 4 (only when agent has `reasoning: default` or omits key) |
+| Config file defaults | `defaults.reasoning: "medium"` | 5 (lowest)                                                |
 
 **Frontmatter example**:
 
@@ -107,13 +107,16 @@ ai-agent --agent test.ai --override reasoning=high "query"
 ```json
 {
   "options": {
+    "reasoning": "medium"
+  },
+  "defaults": {
     "reasoning": "medium",
-    "defaultReasoning": "medium"
+    "reasoningValue": 16000
   }
 }
 ```
 
-> **Note**: In config files, use `options.reasoning` to set reasoning for master agent, and `options.defaultReasoning` as the fallback for sub-agents.
+> **Note**: In config files, use `options.reasoning` to set reasoning for master agent, and `defaults.reasoning` as the fallback for sub-agents.
 
 Note: `reasoningTokens` maps to `defaults.reasoningValue` in the config file. Use frontmatter (`reasoningTokens: 16000`), CLI flag (`--reasoning-tokens 16000`), or config file (`defaults.reasoningValue: 16000`).
 
@@ -147,14 +150,14 @@ reasoningTokens: 16000
 ai-agent --agent test.ai --reasoning-tokens 16000 "query"
 
 # Disable reasoning tokens
-ai-agent --agent test.ai --override reasoningTokens=disabled "query"
+ai-agent --agent test.ai --override reasoning=none "query"
 ```
 
 ---
 
 **Understanding `--reasoning` vs `--default-reasoning`**:
 
-- `--reasoning <level>`: Sets reasoning for the master agent. If sub-agents don't have explicit reasoning in their frontmatter, they inherit this value.
+- `--reasoning <level>`: Sets reasoning for the master agent only. Sub-agents do NOT inherit this value.
 - `--default-reasoning <level>`: Sets fallback reasoning only for agents that don't specify `reasoning: default` or omit the key. Has lower priority than frontmatter and `--reasoning`.
 
 Use `--override reasoning=<level>` when you want to force reasoning on every agent, ignoring frontmatter.
@@ -167,19 +170,19 @@ Use `--override reasoning=<level>` when you want to force reasoning on every age
 | --------- | ------------------------------------------- | ------------------------------------------- |
 | `none`    | Disable reasoning entirely                  | 0                                           |
 | `default` | Explicitly fall back to global/CLI defaults | Uses --default-reasoning or config defaults |
-| `minimal` | Quick thinking, simple tasks                | Provider minimum (1024)                     |
+| `minimal` | Quick thinking, simple tasks                | Provider minimum (1,024)                    |
 | `low`     | 20% of max output tokens                    | 20% × maxOutputTokens                       |
 | `medium`  | 50% of max output tokens                    | 50% × maxOutputTokens                       |
 | `high`    | 80% of max output tokens                    | 80% × maxOutputTokens                       |
 
 **Example token budgets** (assuming 4096 max output tokens, Anthropic provider):
 
-| Level     | Calculated Budget   |
-| --------- | ------------------- |
-| `minimal` | 1,024 tokens        |
-| `low`     | ~819 tokens (20%)   |
-| `medium`  | ~2,048 tokens (50%) |
-| `high`    | ~3,277 tokens (80%) |
+| Level     | Calculated Budget  |
+| --------- | ------------------ |
+| `minimal` | 1,024 tokens       |
+| `low`     | 819 tokens (20%)   |
+| `medium`  | 2,048 tokens (50%) |
+| `high`    | 3,277 tokens (80%) |
 
 > **Note**: Actual budgets are computed dynamically from `maxOutputTokens`. Providers have different limits (Anthropic: min 1024, max 128,000).
 
@@ -189,12 +192,12 @@ Use `--override reasoning=<level>` when you want to force reasoning on every age
 
 ### Anthropic
 
-| Aspect        | Behavior                                                                 |
-| ------------- | ------------------------------------------------------------------------ |
-| Signatures    | Reasoning blocks have cryptographic signatures                           |
-| Preservation  | Signatures must survive serialization for replay                         |
-| First request | If no signatures returned, reasoning may be disabled on subsequent turns |
-| Streaming     | Auto-enabled when reasoning active AND max output tokens >= 21,333       |
+| Aspect           | Behavior                                                                  |
+| ---------------- | ------------------------------------------------------------------------- |
+| Signatures       | Reasoning blocks have cryptographic signatures                            |
+| Preservation     | Signatures must survive serialization for replay                          |
+| Subsequent turns | Prior assistant tool calls require valid signatures to continue reasoning |
+| Streaming        | Auto-enabled when reasoning active AND max output tokens >= 21,333        |
 
 **Signature handling**:
 
@@ -282,7 +285,7 @@ Multi-turn conversations require special handling for reasoning blocks.
 ### Implementation
 
 - `ConversationMessage.reasoning` stores reasoning segments
-- `normalizeReasoningSegments` validates signatures before turns
+- `stripReasoningWithoutSignature` validates signatures before turns (Anthropic provider)
 - Sessions with invalid signatures gracefully continue without reasoning
 
 **Example conversation message with reasoning**:
@@ -309,11 +312,11 @@ Multi-turn conversations require special handling for reasoning blocks.
 | -------------------------------- | ------------------------------------ |
 | Frontmatter `reasoning`          | NOT copied to sub-agents             |
 | Frontmatter `reasoning: default` | Sub-agents use default flag (if set) |
-| CLI `--reasoning`                | Propagates to sub-agents             |
+| CLI `--reasoning`                | NOT inherited by sub-agents          |
 | CLI `--default-reasoning`        | Propagates as fallback to sub-agents |
 | `--override reasoning=X`         | Propagates to all sub-agents         |
 
-**Why**: Prevents master agents from forcing expensive reasoning on every sub-agent. Sub-agents can override by explicitly setting `reasoning` in their frontmatter.
+**Why**: Prevents master agents from forcing expensive reasoning on every sub-agent. Use `--default-reasoning` to set a fallback for sub-agents, and sub-agents can override by explicitly setting `reasoning` in their frontmatter.
 
 ---
 

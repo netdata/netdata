@@ -150,8 +150,8 @@ output:
 **Notes**:
 
 - `format: json` can optionally include a schema (inline or via `schemaRef`) for validation and tool documentation
-- Schema is optional for all formats
-- The format affects the `${FORMAT}` variable in prompts
+- Schema and schemaRef are only applicable to `json` format; they are ignored for `markdown` and `text`
+- The format affects the `${FORMAT}` variable in prompts (mapped to session output format)
 - Headends use format to determine response type
 
 ---
@@ -195,9 +195,9 @@ output:
 
 **Notes**:
 
-- Schema is used for validation
-- Schema is shown in tool documentation for sub-agents
-- Agent is instructed to match the schema
+- For `json` format: Schema is used for validation and shown in tool documentation for sub-agents
+- Schema is ignored for `markdown` and `text` formats
+- Agent is instructed to match the schema (for `json` format only)
 
 ---
 

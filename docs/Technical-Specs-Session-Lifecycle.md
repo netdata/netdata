@@ -114,18 +114,22 @@ Sets up all session state before execution begins.
 
 **Steps**:
 
-| Step | Action                                      |
-| ---- | ------------------------------------------- |
-| 1    | Store config references                     |
-| 2    | Set up abort signal listener                |
-| 3    | Initialize target context configs           |
-| 4    | Initialize SubAgentRegistry (if configured) |
-| 5    | Set trace IDs                               |
-| 6    | Initialize opTree (SessionTreeBuilder)      |
-| 7    | Initialize progressReporter                 |
-| 8    | Begin system turn (turn 0)                  |
-| 9    | Initialize ToolsOrchestrator                |
-| 10   | Apply initial session title                 |
+| Step | Action                                           |
+| ---- | ------------------------------------------------ |
+| 1    | Store config references                          |
+| 2    | Set up abort signal listener                     |
+| 3    | Initialize target context configs                |
+| 4    | Initialize SubAgentRegistry (if configured)      |
+| 5    | Set trace IDs                                    |
+| 6    | Initialize opTree (SessionTreeBuilder)           |
+| 7    | Initialize progressReporter                      |
+| 8    | Initialize finalReportManager                    |
+| 9    | Begin system turn (turn 0)                       |
+| 10   | Initialize ToolsOrchestrator                     |
+| 11   | Initialize sessionExecutor (SessionToolExecutor) |
+| 12   | Initialize xmlTransport (XmlToolTransport)       |
+| 13   | Initialize toolNameCorrections                   |
+| 14   | Apply initial session title                      |
 
 Note: Initial context token count is computed in Phase 5 (agent loop execution), not during constructor. |
 
@@ -211,7 +215,7 @@ Main entry point for session execution.
 
 **Entry Point**: `TurnRunner.execute()`
 
-The core multi-turn execution loop.
+The core multi-turn execution loop. Previously in `AIAgentSession.run()`, now extracted to `TurnRunner.execute()`.
 
 ```
 for turn = 1 to maxTurns:
@@ -222,6 +226,7 @@ for turn = 1 to maxTurns:
     while attempts < maxRetries and not successful:
         select provider/model (round-robin)
         check context guard
+        evaluate context for provider (ok/skip/final)
         execute single turn (LLM request)
         sanitize messages
         process tool calls
@@ -243,12 +248,16 @@ for turn = 1 to maxTurns:
 
 **Key State During Loop**:
 
-| State                   | Purpose                        |
-| ----------------------- | ------------------------------ |
-| `currentTurn`           | Current turn number (1-based)  |
-| `pairCursor`            | Provider cycling index         |
-| `attempts`              | Retry counter for current turn |
-| `forcedFinalTurnReason` | Why tools are restricted       |
+| State                       | Purpose                                       |
+| --------------------------- | --------------------------------------------- |
+| `currentTurn`               | Current turn number (1-based)                 |
+| `pairCursor`                | Provider cycling index                        |
+| `attempts`                  | Retry counter for current turn                |
+| `forcedFinalTurnReason`     | Why tools are restricted                      |
+| `turnFailedEvents`          | Accumulated turn failure events               |
+| `finalReportToolFailedEver` | Whether final_report tool ever failed         |
+| `finalReportInvalidFormat`  | Whether final report format was invalid       |
+| `finalReportSchemaFailed`   | Whether final report schema validation failed |
 
 ---
 
@@ -282,13 +291,39 @@ sequenceDiagram
 
 ```typescript
 {
-    messages: CoreMessage[],
-    tools: ToolDefinition[],
+    messages: ConversationMessage[],
+    provider: string,
     model: string,
-    temperature?: number,
+    tools: MCPTool[],
+    toolExecutor: ToolExecutor,
+    temperature?: number | null,
+    topP?: number | null,
+    topK?: number | null,
     maxOutputTokens?: number,
-    reasoning?: ReasoningConfig,
-    // ... provider-specific options
+    repeatPenalty?: number | null,
+    stream?: boolean,
+    toolChoiceRequired?: boolean,
+    toolChoice?: ToolChoiceMode,
+    isFinalTurn?: boolean,
+    llmTimeout?: number,
+    turnMetadata?: {
+        attempt: number,
+        maxAttempts: number,
+        turn: number,
+        isFinalTurn: boolean,
+        reasoningLevel?: ReasoningLevel,
+        reasoningValue?: ProviderReasoningValue | null
+    },
+    abortSignal?: AbortSignal,
+    onChunk?: (chunk: string, type: 'content' | 'thinking') => void,
+    reasoningLevel?: ReasoningLevel,
+    reasoningValue?: ProviderReasoningValue | null,
+    interleaved?: boolean | string,
+    sendReasoning?: boolean,
+    caching?: CachingMode,
+    sdkTrace?: boolean,
+    sdkTraceLogger?: (event: { stage: 'request' | 'response'; provider: string; model: string; payload: unknown }) => void,
+    contextMetrics?: TurnRequestContextMetrics
 }
 ```
 
@@ -296,12 +331,24 @@ sequenceDiagram
 
 ```typescript
 {
-    status: 'success' | 'rate_limit' | 'auth_error' | ...,
-    messages: CoreMessage[],
-    toolCalls: ToolCall[],
-    tokens: TokenUsage,
-    metadata: ResponseMetadata,
-    retry?: RetryDirective
+    status: TurnStatus,
+    response?: string,
+    toolCalls?: ToolCall[],
+    tokens?: TokenUsage,
+    latencyMs: number,
+    messages: ConversationMessage[],
+    hasReasoning?: boolean,
+    hasContent?: boolean,
+    stopReason?: string,
+    providerMetadata?: ProviderTurnMetadata,
+    retry?: TurnRetryDirective,
+    responseBytes?: number,
+    executionStats?: {
+        executedTools: number,
+        executedNonProgressBatchTools: number,
+        executedProgressBatchTools: number,
+        unknownToolEncountered?: boolean
+    }
 }
 ```
 
@@ -309,16 +356,17 @@ sequenceDiagram
 
 ## Phase 7: Tool Execution
 
-**Entry Point**: `ToolsOrchestrator.executeWithManagement()`
+**Entry Point**: `SessionToolExecutor.createExecutor()` and `orchestrator.executeWithManagement()`
 
-Executes tool calls after a successful LLM turn.
+Executes tool calls after a successful LLM turn. The executor wraps each tool call with context budget checking, timeout handling, and response sanitization.
 
 ```mermaid
 flowchart TD
-    Start[Tool Calls Received] --> Log[Log Tool Request]
-    Log --> Loop[For Each Tool Call]
-
-    Loop --> Begin[Begin Tool Op in OpTree]
+    Start[Tool Calls Received] --> Loop[For Each Tool Call]
+    Loop --> Validate[Validate Parameters]
+    Validate --> Sanitize{Sanitization OK?}
+    Sanitize -->|No| Fail[Return Failure Message]
+    Sanitize -->|Yes| Begin[Begin Tool Op in OpTree]
     Begin --> Route[Route to Provider]
     Route --> Timeout[Apply Timeout Wrapper]
     Timeout --> Execute[Execute Tool]
@@ -329,6 +377,7 @@ flowchart TD
     Budget -->|Exceeded| Drop[Drop Result]
 
     Capture --> End[End Tool Op]
+    Fail --> End
     Drop --> End
     End --> More{More Tools?}
 
@@ -339,13 +388,15 @@ flowchart TD
 
 **Tool Result Outcomes**:
 
-| Outcome         | Conversation Message                            |
-| --------------- | ----------------------------------------------- |
-| Success         | Tool result content                             |
-| Timeout         | `(tool failed: timeout)`                        |
-| Error           | `(tool failed: <error>)`                        |
-| Size exceeded   | `tool_output` handle reference                  |
-| Budget exceeded | `(tool failed: context window budget exceeded)` |
+| Outcome                 | Conversation Message                                                                      |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
+| Success                 | Tool result content                                                                       |
+| Timeout                 | `(tool failed: timeout)`                                                                  |
+| Error                   | `(tool failed: <error>)`                                                                  |
+| Size exceeded           | Oversized output stored, `tool_output` handle reference or `(tool failed: size exceeded)` |
+| Budget exceeded         | `(tool failed: context window budget exceeded)`                                           |
+| Unknown tool            | `(tool failed: <unknown_tool_error_message>)`                                             |
+| Per-turn limit exceeded | `(tool failed: <limit_message>)`                                                          |
 
 ---
 
@@ -356,18 +407,24 @@ flowchart TD
 - `agent__final_report` tool called successfully
 - Max turns reached
 - Context guard enforced (forced final turn)
-- Error conditions (auth failure, quota exceeded)
+- Task status completed with `status: 'completed'`
+- Retry exhaustion (forced final turn)
+- Error conditions (auth failure, quota exceeded, model errors)
 - Cancellation (abort signal, graceful stop)
 
 **Steps**:
 
-| Step | Action                                            |
-| ---- | ------------------------------------------------- |
-| 1    | Capture final report (status, format, content)    |
-| 2    | Validate JSON schema (post-commit, if applicable) |
-| 3    | Log finalization event                            |
-| 4    | End all open operations in opTree                 |
-| 5    | Build AIAgentResult                               |
+| Step | Action                                                             |
+| ---- | ------------------------------------------------------------------ |
+| 1    | Capture final report (format, content, content_json, metadata, ts) |
+| 2    | Validate JSON schema (if applicable, during commit)                |
+| 3    | Log finalization event                                             |
+| 4    | End system turn and session in opTree                              |
+| 5    | Flatten opTree                                                     |
+| 6    | Emit completion event                                              |
+| 7    | Persist final snapshot                                             |
+| 8    | Flush accounting                                                   |
+| 9    | Build and return AIAgentResult                                     |
 
 **AIAgentResult Structure**:
 
@@ -375,12 +432,20 @@ flowchart TD
 {
     success: boolean,
     error?: string,
-    finalReport?: FinalReport,
-    conversation: CoreMessage[],
+    finalReport?: FinalReportPayload,
+    conversation: ConversationMessage[],
     accounting: AccountingEntry[],
     logs: LogEntry[],
+    treeAscii?: string,
+    opTreeAscii?: string,
     opTree?: SessionNode,
-    childConversations?: ChildConversation[],
+    childConversations?: {
+        agentId?: string,
+        toolName: string,
+        promptPath: string,
+        conversation: ConversationMessage[],
+        trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string }
+    }[],
     routerSelection?: RouterSelection,
     finalAgentId?: string
 }
@@ -434,16 +499,19 @@ AbortSignal → Session → LLMClient → Provider
 
 ### Key Log Events
 
-| Event                         | Severity | Description                   |
-| ----------------------------- | -------- | ----------------------------- |
-| `agent:init`                  | INF      | Session initialized           |
-| `agent:settings`              | VRB      | Configuration summary         |
-| `agent:tools`                 | INF      | Tool banner (available tools) |
-| `agent:turn-start`            | INF      | Turn begins                   |
-| `agent:final-turn`            | WRN      | Final turn detected           |
-| `agent:context`               | WRN      | Context guard events          |
-| `agent:final-report-accepted` | INF      | Final report committed        |
-| `agent:fin`                   | INF      | Session finalized             |
+| Event                         | Severity | Description                                     |
+| ----------------------------- | -------- | ----------------------------------------------- |
+| `agent:init`                  | VRB      | Session initialized                             |
+| `agent:settings`              | VRB      | Configuration summary                           |
+| `agent:tools`                 | INF      | Tool banner (available tools)                   |
+| `agent:turn-start`            | INF      | Turn begins                                     |
+| `agent:final-turn`            | WRN      | Final turn detected                             |
+| `agent:context`               | WRN      | Context guard events                            |
+| `agent:final-report-accepted` | INF      | Final report committed                          |
+| `agent:fin`                   | INF      | Session finalized                               |
+| `agent:failure-report`        | ERR      | Synthetic failure final report (context-forced) |
+| `agent:fallback-report`       | WRN      | Cached pending final report accepted            |
+| `agent:text-extraction`       | VRB      | Final report payload extracted from text        |
 
 ---
 

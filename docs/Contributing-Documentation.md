@@ -88,43 +88,19 @@ This allows verification that documentation matches implementation.
 
 ## Wiki Page Structure
 
-### Landing Pages (Type A)
+Wiki pages follow flexible patterns documented in `docs/USER-DOCS-STANDARD.md`:
 
-```markdown
-# Section Name
+- **Landing/Index Pages**: Navigation pages with section overviews (e.g., Home.md, Technical-Specs.md)
+- **Conceptual Pages**: Detailed explanations with TL;DR, examples, and See Also sections
+- **Reference Pages**: Comprehensive documentation with tables of contents and detailed sections
 
-Brief description of what this section covers.
+Each page includes:
 
----
+- Clear purpose statement
+- Table of Contents for navigation
+- Links to related pages (See Also)
 
-## Table of Contents
-
-- [Overview](#overview) - What this section covers
-- [Topics](#topics) - Links to detailed pages
-- [See Also](#see-also) - Related sections
-
----
-
-## Overview
-
-Detailed description of the section scope and purpose.
-
----
-
-## Topics
-
-| Document                     | Description                       |
-| ---------------------------- | --------------------------------- |
-| [Page Name](Page-Link)       | Brief description of page content |
-| [Another Page](Another-Link) | Brief description                 |
-
----
-
-## See Also
-
-- [Related Section](Link) - How it relates
-- [Another Section](Link) - How it relates
-```
+Refer to `USER-DOCS-STANDARD.md` for detailed templates and quality standards.
 
 ---
 
@@ -137,7 +113,7 @@ Test files follow these patterns:
 - Phase 3 integration: `src/tests/phase3/phase3-suite.spec.ts`
 - Other test files: `src/tests/<feature>.spec.ts`
 
-Test reference pattern for Phase 2: `scenario-name` within the harness file.
+Test reference pattern for Phase 2: scenario names use `run-test-XX` format (e.g., `run-test-11`, `run-test-21`) within the harness file.
 
 ---
 
@@ -202,7 +178,7 @@ Spec documents follow actual file structure, not a template pattern. Each spec i
 
 - **TL;DR**: Brief feature description
 - **Source Files**: Specific file and line references
-- **Verification dates**: Found at top of spec docs (e.g., "Verified 2025-11-16" in index.md)
+- **Verification status**: Spec verification dates are tracked in `docs/specs/index.md` (e.g., "Verified 2025-11-16")
 
 ---
 
@@ -267,7 +243,3 @@ For spec changes, use multi-agent review:
 - [Contributing](Contributing) - Contribution overview
 - [Technical-Specs](Technical-Specs) - Technical specification documents
 - [USER-DOCS-STANDARD.md](https://github.com/netdata/ai-agent/blob/master/docs/USER-DOCS-STANDARD.md) - Full documentation quality standard
-
-```
-
-```

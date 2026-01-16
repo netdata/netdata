@@ -11,6 +11,7 @@ How to override agent configuration at runtime. Covers model selection, sampling
 - [Sampling Parameters](#sampling-parameters) - Temperature, top-p, top-k
 - [Limits and Timeouts](#limits-and-timeouts) - Turns, retries, timeouts
 - [Output Control](#output-control) - Tokens, format, streaming
+- [Cache Settings](#cache-settings) - Response cache TTL
 - [The Override Flag](#the-override-flag) - Universal `--override` mechanism
 - [Configuration File](#configuration-file) - The `--config` flag
 - [Quick Reference](#quick-reference) - All override flags in one table
@@ -32,12 +33,12 @@ CLI flags override agent frontmatter, which overrides configuration files.
 
 **Override Scopes:**
 
-| Scope          | Description                          | Example Flags                     |
-| -------------- | ------------------------------------ | --------------------------------- |
-| Master Only    | Affects only the top-level agent     | `--models`, `--tools`, `--agents` |
-| Master Default | Inherited by sub-agents when unset   | `--temperature`, `--max-turns`    |
-| All Agents     | Applies to master and all sub-agents | `--override`, `--verbose`         |
-| Global         | Application-level settings           | `--config`, `--dry-run`           |
+| Scope          | Description                          | Example Flags                                    |
+| -------------- | ------------------------------------ | ------------------------------------------------ |
+| Master Only    | Affects only the top-level agent     | `--models`, `--tools`, `--agents`                |
+| Master Default | Inherited by sub-agents when unset   | `--temperature`, `--max-turns`                   |
+| All Agents     | Applies to master and all sub-agents | `--override`, `--verbose`, `--stream`, `--cache` |
+| Global         | Application-level settings           | `--config`, `--dry-run`                          |
 
 ---
 
@@ -285,6 +286,35 @@ ai-agent --agent data.ai --tool-response-max-bytes 50000 "Fetch large dataset"
 
 ---
 
+## Cache Settings
+
+### Response Cache TTL
+
+| Property | Value                |
+| -------- | -------------------- |
+| Flag     | `--cache <ttl>`      |
+| Scope    | All Agents           |
+| Default  | Not set (no caching) |
+
+**Description**: Time-to-live for response caching (agent and tool responses).
+
+**Examples**:
+
+```bash
+# Disable caching
+ai-agent --agent research.ai --cache off "Query"
+
+# Cache for 1 hour
+ai-agent --agent research.ai --cache 1h "Query"
+
+# Cache for 15 minutes
+ai-agent --agent api.ai --cache 15m "API call"
+```
+
+**TTL format**: `off` | `<ms>` | `<N.Nu>` where u=`ms|s|m|h|d|w|mo|y`
+
+---
+
 ## The Override Flag
 
 ### Universal Overrides
@@ -308,10 +338,11 @@ ai-agent --agent data.ai --tool-response-max-bytes 50000 "Fetch large dataset"
 - `maxRetries`, `maxTurns`, `maxToolCallsPerTurn` - Limits
 - `toolResponseMaxBytes` - Response size
 - `mcpInitConcurrency` - MCP startup
+- `cache` - Response cache TTL (time-to-live)
 - `stream` - Streaming mode
 - `interleaved` - Interleaved reasoning
 - `reasoning`, `reasoningTokens` - Reasoning mode
-- `caching` - Anthropic cache mode
+- `caching` - Anthropic cache mode (provider-side prompt caching)
 - `contextWindow` - Context size override
 - `no-batch` - Disable batch tool execution
 - `no-progress` - Disable progress-only task_status
@@ -388,33 +419,37 @@ ai-agent --config ./config/development.json --agent api.ai --api 8080
 
 ### Master Default (inherited by sub-agents)
 
-| Flag                            | Default  | Description            |
-| ------------------------------- | -------- | ---------------------- |
-| `--temperature <n>`             | `0`      | Response creativity    |
-| `--top-p <n>`                   | -        | Nucleus sampling       |
-| `--top-k <n>`                   | -        | Token selection limit  |
-| `--repeat-penalty <n>`          | -        | Repetition penalty     |
-| `--max-turns <n>`               | `10`     | Maximum turns          |
-| `--max-retries <n>`             | `5`      | Retry count            |
-| `--max-tool-calls-per-turn <n>` | `10`     | Parallel tool calls    |
-| `--max-output-tokens <n>`       | `4096`   | Response length        |
-| `--llm-timeout-ms <ms>`         | `600000` | LLM timeout            |
-| `--tool-timeout-ms <ms>`        | `300000` | Tool timeout           |
-| `--tool-response-max-bytes <n>` | `12288`  | Max inline tool output |
-| `--reasoning <level>`           | -        | Reasoning effort       |
-| `--reasoning-tokens <n>`        | -        | Thinking token budget  |
-| `--caching <mode>`              | `full`   | Anthropic cache mode   |
+| Flag                            | Default  | Description                                          |
+| ------------------------------- | -------- | ---------------------------------------------------- |
+| `--temperature <n>`             | `0`      | Response creativity                                  |
+| `--top-p <n>`                   | -        | Nucleus sampling                                     |
+| `--top-k <n>`                   | -        | Token selection limit                                |
+| `--repeat-penalty <n>`          | -        | Repetition penalty                                   |
+| `--max-turns <n>`               | `10`     | Maximum turns                                        |
+| `--max-retries <n>`             | `5`      | Retry count                                          |
+| `--max-tool-calls-per-turn <n>` | `10`     | Parallel tool calls                                  |
+| `--max-output-tokens <n>`       | `4096`   | Response length                                      |
+| `--llm-timeout-ms <ms>`         | `600000` | LLM timeout                                          |
+| `--tool-timeout-ms <ms>`        | `300000` | Tool timeout                                         |
+| `--tool-response-max-bytes <n>` | `12288`  | Max inline tool output                               |
+| `--cache <ttl>`                 | -        | Response cache TTL                                   |
+| `--reasoning <level>`           | -        | Reasoning effort                                     |
+| `--default-reasoning <level>`   | -        | Default reasoning for agents                         |
+| `--reasoning-tokens <n>`        | -        | Thinking token budget                                |
+| `--caching <mode>`              | `full`   | Anthropic caching mode (full=enabled, none=disabled) |
 
 ### All Agents
 
-| Flag                       | Default | Description        |
-| -------------------------- | ------- | ------------------ |
-| `--override <key=value>`   | -       | Universal override |
-| `--stream` / `--no-stream` | `true`  | Streaming mode     |
-| `--format <format>`        | -       | Output format      |
-| `--verbose`                | `false` | Detailed logging   |
-| `--trace-llm`              | `false` | LLM tracing        |
-| `--trace-mcp`              | `false` | Tool tracing       |
+| Flag                       | Default | Description             |
+| -------------------------- | ------- | ----------------------- |
+| `--override <key=value>`   | -       | Universal override      |
+| `--stream` / `--no-stream` | `true`  | Streaming mode          |
+| `--format <format>`        | -       | Output format           |
+| `--verbose`                | `false` | Detailed logging        |
+| `--trace-llm`              | `false` | LLM tracing             |
+| `--trace-mcp`              | `false` | Tool tracing            |
+| `--trace-slack`            | `false` | Slack bot communication |
+| `--trace-sdk`              | `false` | AI SDK raw payloads     |
 
 ### Global
 

@@ -101,11 +101,11 @@ Health check for load balancer integration.
 
 Execute an agent and return the response.
 
-| Parameter | Location | Required | Description                                                                             |
-| --------- | -------- | -------- | --------------------------------------------------------------------------------------- |
-| `agentId` | Path     | Yes      | Agent filename without `.ai` extension                                                  |
-| `q`       | Query    | Yes      | User prompt (URL-encoded)                                                               |
-| `format`  | Query    | No       | Output format: `markdown`, `json`, `pipe`, `tty`, `slack-block-kit`, `markdown+mermaid` |
+| Parameter | Location | Required | Description                                                                                                  |
+| --------- | -------- | -------- | ------------------------------------------------------------------------------------------------------------ |
+| `agentId` | Path     | Yes      | Agent filename without `.ai` extension                                                                       |
+| `q`       | Query    | Yes      | User prompt (URL-encoded)                                                                                    |
+| `format`  | Query    | No       | Output format: `json`, `markdown`, `markdown+mermaid`, `pipe`, `slack-block-kit`, `tty`, `text`, `sub-agent` |
 
 **Example**:
 
@@ -139,11 +139,11 @@ curl "http://localhost:8080/v1/chat?q=What%20is%20the%20weather%20in%20Paris%3F"
 
 ### format (optional)
 
-| Property     | Value                                                                    |
-| ------------ | ------------------------------------------------------------------------ |
-| Type         | `string`                                                                 |
-| Default      | `markdown`                                                               |
-| Valid values | `markdown`, `json`, `pipe`, `tty`, `slack-block-kit`, `markdown+mermaid` |
+| Property     | Value                                                                                         |
+| ------------ | --------------------------------------------------------------------------------------------- |
+| Type         | `string`                                                                                      |
+| Default      | `markdown`                                                                                    |
+| Valid values | `json`, `markdown`, `markdown+mermaid`, `pipe`, `slack-block-kit`, `tty`, `text`, `sub-agent` |
 
 **Description**: Desired output format. When `json` is specified, the agent must have an output schema defined in frontmatter, or validation will fail.
 
@@ -172,7 +172,8 @@ curl "http://localhost:8080/v1/chat?q=Hello&format=pipe"
   "output": "Hello! How can I help you today?",
   "finalReport": {
     "content": "Hello! How can I help you today?",
-    "format": "markdown"
+    "format": "markdown",
+    "ts": 1736976960123
   },
   "reasoning": "The user said hello, so I responded with a friendly greeting."
 }
@@ -187,18 +188,19 @@ curl "http://localhost:8080/v1/chat?q=Hello&format=pipe"
 
 ### JSON Format Response
 
-When `format=json` is specified:
+When `format=json` is specified, the final report contains structured JSON data in `content_json`:
 
 ```json
 {
   "success": true,
-  "output": "{\"summary\":\"Text analysis\",\"sentiment\":\"positive\"}",
+  "output": "Agent's text output...",
   "finalReport": {
     "content_json": {
       "summary": "Text analysis",
       "sentiment": "positive"
     },
-    "format": "json"
+    "format": "json",
+    "ts": 1736976960123
   }
 }
 ```
@@ -215,7 +217,6 @@ Missing or invalid parameters.
 {
   "success": false,
   "output": "",
-  "finalReport": undefined,
   "error": "Query parameter q is required"
 }
 ```
@@ -228,7 +229,6 @@ Agent not registered.
 {
   "success": false,
   "output": "",
-  "finalReport": undefined,
   "error": "Agent 'chat' not registered"
 }
 ```
@@ -241,7 +241,6 @@ Using POST instead of GET for built-in routes.
 {
   "success": false,
   "output": "",
-  "finalReport": undefined,
   "error": "method_not_allowed"
 }
 ```
@@ -257,20 +256,20 @@ Agent execution failed. When the session completes but with errors, includes any
   "error": "LLM communication failed",
   "finalReport": {
     "format": "markdown",
-    "content": "...partial response..."
+    "content": "...partial response...",
+    "ts": 1736976960123
   },
   "reasoning": "Agent attempted to call LLM..."
 }
 ```
 
-When an unexpected error occurs, output is empty and finalReport is undefined:
+When an unexpected error occurs, output is empty:
 
 ```json
 {
   "success": false,
   "output": "",
-  "error": "Unexpected error message",
-  "finalReport": undefined
+  "error": "Unexpected error message"
 }
 ```
 
@@ -282,7 +281,6 @@ Concurrency limit reached.
 {
   "success": false,
   "output": "",
-  "finalReport": undefined,
   "error": "concurrency_unavailable"
 }
 ```
@@ -366,7 +364,7 @@ ai-agent --agent chat.ai --api 8081
 
 ### Agent not found (404)
 
-**Symptom**: `{"success": false, "output": "", "finalReport": undefined, "error": "Agent 'xxx' not registered"}`
+**Symptom**: `{"success": false, "output": "", "error": "Agent 'xxx' not registered"}`
 
 **Cause**: The agent ID in the URL doesn't match any registered agent.
 

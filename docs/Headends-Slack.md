@@ -315,6 +315,7 @@ Ordered rules evaluated before the default:
 | `engage`          | `array`   | Engagement types                      |
 | `enabled`         | `boolean` | Enable/disable rule (default: `true`) |
 | `promptTemplates` | `object`  | Custom prompts                        |
+| `contextPolicy`   | `object`  | Context policy for channel posts      |
 
 ### Channel Patterns
 
@@ -356,7 +357,6 @@ Deny rules are evaluated **first**. If a deny matches, the message is ignored.
 | `mentions`      | `@YourBot hello` | User mentions the bot in a channel       |
 | `dms`           | Direct message   | User sends a direct message to the bot   |
 | `channel-posts` | Any message      | Any message in a channel (use carefully) |
-| `ask-bot`       | Message shortcut | User selects "Ask Bot" on a message      |
 
 **Warning**: `channel-posts` responds to ALL messages in matched channels. Use with caution and deny rules.
 
@@ -366,7 +366,7 @@ Deny rules are evaluated **first**. If a deny matches, the message is ignored.
 
 ### Ask Bot Shortcut
 
-Users can invoke a message shortcut on any Slack message to ask the bot about it. This routes like `channel-posts` with self-only context (no thread history).
+Users can invoke a message shortcut on any Slack message to ask the bot about it. This routes internally as `channel-posts` and uses the channel-post prompt template with no thread history.
 
 **Setup in Slack:**
 
@@ -413,7 +413,29 @@ Customize how user messages are presented to agents:
 
 ## Context Handling
 
-Thread context is automatically included for mentions and DMs based on the `historyLimit` and `historyCharsCap` settings. Channel posts do not include thread context.
+Thread context is automatically included for mentions and DMs based on the `historyLimit` and `historyCharsCap` settings. Channel posts do not include thread context by default, but this can be configured using the `contextPolicy` routing option.
+
+---
+
+## Context Policy
+
+Control thread context inclusion for channel posts:
+
+```json
+{
+  "contextPolicy": {
+    "channelPost": "selfOnly"
+  }
+}
+```
+
+| Value             | Description                                   |
+| ----------------- | --------------------------------------------- |
+| `selfOnly`        | No thread history (default for channel-posts) |
+| `previousOnly`    | Include messages before the current message   |
+| `selfAndPrevious` | Include current message and previous messages |
+
+Applies to `channel-posts` type only. Mentions and DMs always include thread context.
 
 ---
 
@@ -498,7 +520,7 @@ Acquire session slot (queue if limit reached).
 
 ### 4. Post Opener
 
-Send initial "thinking" message based on `openerTone`.
+Send initial "thinking" message based on `openerTone`, then update it with Stop/Abort buttons.
 
 ### 5. Run Agent
 

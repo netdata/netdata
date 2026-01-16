@@ -48,24 +48,40 @@ graph TB
     subgraph "Orchestration Layer"
         AIAgent[AIAgent<br/>Advisors/Router/Handoff]
         Session[AIAgentSession<br/>Multi-turn Loop]
-    end
+        TurnRunner[TurnRunner<br/>Turn Iteration]
+        LLMClient[LLMClient<br/>Request Execution]
+        end
 
     subgraph "LLM Layer"
         LLMClient[LLMClient<br/>Request Execution]
         OpenAI[OpenAI Provider]
+        OpenAICompat[OpenAI-Compatible Provider]
         Anthropic[Anthropic Provider]
         Google[Google Provider]
         Ollama[Ollama Provider]
         OpenRouter[OpenRouter Provider]
-    end
+        TestLLM[Test LLM Provider]
+        end
 
-    subgraph "Tool Layer"
+    subgraph "LLM Layer"
+        LLMClient[LLMClient<br/>Request Execution]
+        OpenAI[OpenAI Provider]
+        OpenAICompat[OpenAI-Compatible Provider]
+        Anthropic[Anthropic Provider]
+        Google[Google Provider]
+        Ollama[Ollama Provider]
+        OpenRouter[OpenRouter Provider]
+        TestLLM[Test LLM Provider]
+        end
+
+     subgraph "Tool Layer"
         ToolsOrch[ToolsOrchestrator<br/>Routing & Queues]
         MCPProv[MCP Provider]
         RESTProv[REST Provider]
         InternalProv[Internal Tools]
         AgentProv[Agent Provider]
-    end
+        RouterProv[Router Tool Provider]
+        end
 
     CLI --> AIAgent
     REST --> AIAgent
@@ -77,6 +93,7 @@ graph TB
     Session --> ToolsOrch
 
     LLMClient --> OpenAI
+    LLMClient --> OpenAI
     LLMClient --> Anthropic
     LLMClient --> Google
     LLMClient --> Ollama
@@ -86,6 +103,7 @@ graph TB
     ToolsOrch --> RESTProv
     ToolsOrch --> InternalProv
     ToolsOrch --> AgentProv
+    ToolsOrch --> RouterProv
 ```
 
 ---
@@ -146,6 +164,8 @@ for turn = 1 to maxTurns:
     record accounting
 ```
 
+The core loop is implemented in `TurnRunner.execute()` and invoked by `AIAgentSession.run()`.
+
 ---
 
 ### 3. LLMClient
@@ -185,13 +205,13 @@ for turn = 1 to maxTurns:
 
 **Provider Types**:
 
-| Provider             | Kind    | Description                                                         |
-| -------------------- | ------- | ------------------------------------------------------------------- |
-| MCPProvider          | `mcp`   | Model Context Protocol tools                                        |
-| RestProvider         | `rest`  | REST/OpenAPI tools                                                  |
-| InternalToolProvider | `agent` | Built-in tools (final_report, task_status, batch, progress updates) |
-| AgentProvider        | `agent` | Sub-agent invocation                                                |
-| RouterToolProvider   | `agent` | Router delegation tool                                              |
+| Provider             | Kind    | Description                                                                      |
+| -------------------- | ------- | -------------------------------------------------------------------------------- |
+| MCPProvider          | `mcp`   | Model Context Protocol tools                                                     |
+| RestProvider         | `rest`  | REST/OpenAPI tools                                                               |
+| InternalToolProvider | `agent` | Built-in tools (final_report, task_status, batch, progress updates)              |
+| AgentProvider        | `agent` | Sub-agent invocation                                                             |
+| RouterToolProvider   | `agent` | Router delegation tool (registered only when router destinations are configured) |
 
 **Execution Flow**:
 
@@ -207,7 +227,15 @@ for turn = 1 to maxTurns:
 
 ---
 
-### 5. SessionTreeBuilder (OpTree)
+### 5. TurnRunner
+
+**File**: `src/session-turn-runner.ts`
+
+**Responsibility**: Turn iteration and retry logic, provider/model cycling, context guard evaluation, LLM call orchestration, message sanitization, final report extraction/adoption.
+
+---
+
+### 6. SessionTreeBuilder (OpTree)
 
 **File**: `src/session-tree.ts`
 
@@ -243,21 +271,23 @@ sequenceDiagram
     participant User
     participant AIAgent
     participant Session as AIAgentSession
+    participant TurnRunner
     participant LLMClient
     participant Provider
     participant LLM as LLM API
 
     User->>AIAgent: run(prompt)
     AIAgent->>Session: run()
-    Session->>Session: executeAgentLoop()
+    Session->>TurnRunner: execute()
     loop Each Turn
-        Session->>LLMClient: executeTurn(request)
+        TurnRunner->>LLMClient: executeTurn(request)
         LLMClient->>Provider: executeTurn(request)
         Provider->>LLM: HTTP Request
         LLM-->>Provider: HTTP Response
         Provider-->>LLMClient: TurnResult
-        LLMClient-->>Session: TurnResult
+        LLMClient-->>TurnRunner: TurnResult
     end
+    TurnRunner-->>Session: AIAgentResult
     Session-->>AIAgent: AIAgentResult
     AIAgent-->>User: AIAgentResult
 ```
@@ -266,11 +296,12 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    Response[LLM Response] --> Parse[Provider Parses]
+    Response[LLM API Response] --> Parse[Provider Parses]
     Parse --> Result[TurnResult]
-    Result --> Check{Has Tool Calls?}
+    Result --> TurnRunner[TurnRunner processes]
+    TurnRunner --> Check{Has Tool Calls?}
 
-    Check -->|Yes| Execute[Execute Tools]
+    Check -->|Yes| Execute[Execute Tools via SessionToolExecutor]
     Execute --> AddResults[Add Tool Results]
     AddResults --> NextTurn[Continue to Next Turn]
 
@@ -279,7 +310,8 @@ flowchart TD
     Final -->|No| Retry[Synthetic Retry]
 
     Retry --> NextTurn
-    NextTurn --> Response
+    TurnRunner --> FinalResult[Return AIAgentResult]
+    FinalResult --> Session[Session completes]
 ```
 
 ---

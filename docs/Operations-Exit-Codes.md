@@ -92,7 +92,6 @@ fi
 - Model not available
 - Provider timeout
 - All retries exhausted
-- Context window exceeded
 
 **Examples**:
 
@@ -191,37 +190,15 @@ fi
 
 Internal exit codes logged during session execution (visible in logs and snapshots):
 
-| Exit Reason                    | Description                                         | Fatal |
-| ------------------------------ | --------------------------------------------------- | ----- |
-| **Success Exits**              |                                                     |       |
-| `EXIT-FINAL-ANSWER`            | Normal completion with final report                 | No    |
-| `EXIT-MAX-TURNS-WITH-RESPONSE` | Turn limit reached with valid output                | No    |
-| `EXIT-ROUTER-HANDOFF`          | Router selected destination (orchestration handoff) | No    |
-| `EXIT-USER-STOP`               | User requested stop via stopRef                     | No    |
-| **LLM Failures**               |                                                     |       |
-| `EXIT-NO-LLM-RESPONSE`         | No response from LLM provider                       | Yes   |
-| `EXIT-EMPTY-RESPONSE`          | Empty response from LLM provider                    | Yes   |
-| `EXIT-AUTH-FAILURE`            | Authentication error (401, etc.)                    | Yes   |
-| `EXIT-QUOTA-EXCEEDED`          | Rate or quota limit (429, etc.)                     | Yes   |
-| `EXIT-MODEL-ERROR`             | Model or provider-specific error                    | Yes   |
-| **Tool Failures**              |                                                     |       |
-| `EXIT-TOOL-FAILURE`            | General tool execution failure                      | Yes   |
-| `EXIT-MCP-CONNECTION-LOST`     | MCP server connection lost                          | Yes   |
-| `EXIT-TOOL-NOT-AVAILABLE`      | Requested tool not found/available                  | Yes   |
-| `EXIT-TOOL-TIMEOUT`            | Tool execution timeout                              | Yes   |
-| **Configuration**              |                                                     |       |
-| `EXIT-NO-PROVIDERS`            | No LLM providers configured                         | Yes   |
-| `EXIT-INVALID-MODEL`           | Invalid model specified                             | Yes   |
-| `EXIT-MCP-INIT-FAILED`         | MCP server initialization failed                    | Yes   |
-| **Timeout/Limits**             |                                                     |       |
-| `EXIT-INACTIVITY-TIMEOUT`      | Session inactivity timeout                          | Yes   |
-| `EXIT-MAX-RETRIES`             | All retries exhausted                               | Yes   |
-| `EXIT-TOKEN-LIMIT`             | Context window exhausted                            | Yes   |
-| `EXIT-MAX-TURNS-NO-RESPONSE`   | Turn limit reached without output                   | Yes   |
-| **Unexpected**                 |                                                     |       |
-| `EXIT-UNCAUGHT-EXCEPTION`      | Uncaught exception in agent                         | Yes   |
-| `EXIT-SIGNAL-RECEIVED`         | Process signal received (SIGTERM, etc.)             | Yes   |
-| `EXIT-UNKNOWN`                 | Unknown error condition                             | Yes   |
+| Exit Reason                  | Description                                         | Fatal |
+| ---------------------------- | --------------------------------------------------- | ----- |
+| **Success Exits**            |                                                     |       |
+| `EXIT-FINAL-ANSWER`          | Normal completion with final report                 | No    |
+| `EXIT-ROUTER-HANDOFF`        | Router selected destination (orchestration handoff) | No    |
+| `EXIT-TOKEN-LIMIT`           | Context window exhausted, forced final turn         | No    |
+| **Limits/Failures**          |                                                     |       |
+| `EXIT-MAX-TURNS-NO-RESPONSE` | Turn limit reached without output                   | Yes   |
+| `EXIT-UNCAUGHT-EXCEPTION`    | Uncaught exception in agent                         | Yes   |
 
 ### Finding Exit Reason in Snapshot
 

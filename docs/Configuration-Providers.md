@@ -56,13 +56,13 @@ Configure LLM providers for AI Agent.
 
 ### Configuration Reference
 
-| Property        | Type     | Default           | Description                      |
-| --------------- | -------- | ----------------- | -------------------------------- |
-| `type`          | `string` | Required          | Must be `"openai"`               |
-| `apiKey`        | `string` | Required          | OpenAI API key (`sk-...`)        |
-| `baseUrl`       | `string` | Optional          | API endpoint URL                 |
-| `contextWindow` | `number` | Model-specific    | Default context window size      |
-| `tokenizer`     | `string` | `tiktoken:gpt-4o` | Tokenizer for context estimation |
+| Property        | Type     | Default        | Description                      |
+| --------------- | -------- | -------------- | -------------------------------- |
+| `type`          | `string` | Required       | Must be `"openai"`               |
+| `apiKey`        | `string` | Required       | OpenAI API key (`sk-...`)        |
+| `baseUrl`       | `string` | Optional       | API endpoint URL                 |
+| `contextWindow` | `number` | Model-specific | Default context window size      |
+| `tokenizer`     | `string` | Model-specific | Tokenizer for context estimation |
 
 ### Usage in Agent
 
@@ -82,6 +82,7 @@ models:
 | `gpt-4o`      | 128,000        | Latest GPT-4 Omni       |
 | `gpt-4o-mini` | 128,000        | Cost-effective GPT-4    |
 | `o1`          | 200,000        | Reasoning model         |
+| `o1-mini`     | 200,000        | Compact reasoning model |
 | `o3-mini`     | 200,000        | Compact reasoning model |
 
 ---
@@ -275,7 +276,7 @@ Local self-hosted models using Ollama.
 | --------------- | -------- | ---------------------------- | ---------------------- |
 | `type`          | `string` | Required                     | Must be `"ollama"`     |
 | `baseUrl`       | `string` | `http://localhost:11434/api` | Ollama server URL      |
-| `contextWindow` | `number` | `131072`                     | Default context window |
+| `contextWindow` | `number` | Model-specific               | Default context window |
 
 ### Usage in Agent
 
@@ -331,13 +332,13 @@ For self-hosted or custom APIs that follow the OpenAI API format.
 
 ### Configuration Reference
 
-| Property        | Type     | Default  | Description                   |
-| --------------- | -------- | -------- | ----------------------------- |
-| `type`          | `string` | Required | Must be `"openai-compatible"` |
-| `apiKey`        | `string` | Optional | API key if required           |
-| `baseUrl`       | `string` | Required | API endpoint URL              |
-| `headers`       | `object` | `{}`     | Custom HTTP headers           |
-| `contextWindow` | `number` | `131072` | Default context window        |
+| Property        | Type     | Default        | Description                   |
+| --------------- | -------- | -------------- | ----------------------------- |
+| `type`          | `string` | Required       | Must be `"openai-compatible"` |
+| `apiKey`        | `string` | Optional       | API key if required           |
+| `baseUrl`       | `string` | Required       | API endpoint URL              |
+| `headers`       | `object` | `{}`           | Custom HTTP headers           |
+| `contextWindow` | `number` | Model-specific | Default context window        |
 
 ### Usage in Agent
 
@@ -403,12 +404,16 @@ Complete provider configuration schema:
 {
   "providers": {
     "<name>": {
-      "type": "openai | anthropic | google | openrouter | ollama | openai-compatible",
+      "type": "openai | anthropic | google | openrouter | ollama | openai-compatible | test-llm",
       "apiKey": "string",
       "baseUrl": "string",
       "headers": { "string": "string" },
+      "custom": { "string": "unknown" },
+      "mergeStrategy": "overlay | override | deep",
+      "openaiMode": "responses | chat",
       "contextWindow": "number",
       "tokenizer": "string",
+      "contextWindowBufferTokens": "number",
       "models": {
         "<model>": {
           "contextWindow": "number",
@@ -417,15 +422,21 @@ Complete provider configuration schema:
           "overrides": {
             "temperature": "number | null",
             "top_p": "number | null",
+            "topP": "number | null",
             "top_k": "number | null",
-            "repeat_penalty": "number | null"
+            "topK": "number | null",
+            "repeat_penalty": "number | null",
+            "repeatPenalty": "number | null"
           }
         }
       },
       "toolsAllowed": ["string"],
       "toolsDenied": ["string"],
       "stringSchemaFormatsAllowed": ["string"],
-      "stringSchemaFormatsDenied": ["string"]
+      "stringSchemaFormatsDenied": ["string"],
+      "reasoning": "string | number | [string, string, string, string] | null",
+      "reasoningAutoStreamLevel": "minimal | low | medium | high",
+      "toolChoice": "auto | required"
     }
   }
 }
@@ -462,21 +473,25 @@ Override settings for specific models within a provider:
 
 ### Model Settings Reference
 
-| Property        | Type                | Description                         |
-| --------------- | ------------------- | ----------------------------------- |
-| `contextWindow` | `number`            | Maximum tokens for this model       |
-| `tokenizer`     | `string`            | Tokenizer ID for context estimation |
-| `interleaved`   | `boolean \| string` | Enable reasoning replay             |
-| `overrides`     | `object`            | Force or disable LLM parameters     |
+| Property                    | Type                        | Description                                    |
+| --------------------------- | --------------------------- | ---------------------------------------------- |
+| `contextWindow`             | `number`                    | Maximum tokens for this model                  |
+| `tokenizer`                 | `string`                    | Tokenizer ID for context estimation            |
+| `interleaved`               | `boolean \| string`         | Enable reasoning replay                        |
+| `overrides`                 | `object`                    | Force or disable LLM parameters                |
+| `contextWindowBufferTokens` | `number`                    | Additional buffer tokens beyond context window |
+| `reasoning`                 | `string \| number \| tuple` | Reasoning budget or configuration              |
+| `toolChoice`                | `auto \| required`          | Tool selection mode (auto or required)         |
 
 ### Tokenizer Options
 
-| Tokenizer         | Models                     |
-| ----------------- | -------------------------- |
-| `tiktoken:gpt-4o` | OpenAI GPT-4o, GPT-4o-mini |
-| `tiktoken:gpt-4`  | OpenAI GPT-4               |
-| `anthropic`       | Anthropic Claude models    |
-| `google:gemini`   | Google Gemini models       |
+| Tokenizer         | Models                             |
+| ----------------- | ---------------------------------- |
+| `tiktoken:gpt-4o` | OpenAI GPT-4o, GPT-4o-mini         |
+| `tiktoken:gpt-4`  | OpenAI GPT-4                       |
+| `anthropic`       | Anthropic Claude models            |
+| `google:gemini`   | Google Gemini models               |
+| `approximate`     | Approximate tokenization (default) |
 
 ---
 
@@ -731,3 +746,44 @@ Error: Request timeout
 - [Context Window](Configuration-Context-Window) - Token budget management
 - [Pricing](Configuration-Pricing) - Cost tracking
 - [Fallback Chains](Agent-Files-Models) - Agent model configuration
+
+---
+
+## Provider-Specific Notes
+
+### OpenAI
+
+- Supports `openaiMode` option: `"responses"` (default) uses OpenAI Responses API, `"chat"` uses Chat Completions API
+- `reasoningValue` maps to `reasoningEffort` parameter with levels: `minimal`, `low`, `medium`, `high`
+
+### Anthropic
+
+- `reasoningValue` maps to `thinking` budget in tokens (min 1,024, max 128,000)
+- Cache control applied via `caching` session option (not in provider config)
+- Tool choice is disabled when reasoning is active
+
+### Google
+
+- `reasoningValue` maps to `thinkingConfig.thinkingBudget` in tokens (min 1,024, max 32,768)
+- `repeatPenalty` maps to `frequencyPenalty`
+
+### OpenRouter
+
+- Environment variables: `OPENROUTER_REFERER` (default: `https://ai-agent.local`), `OPENROUTER_TITLE` (default: `ai-agent`)
+- `custom.provider` object merges into `openrouter.provider` for backend routing preferences
+- Captures actual provider/model from responses in accounting metadata
+
+### Ollama
+
+- `baseUrl` is automatically normalized:
+  - Trailing `/v1` is replaced with `/api`
+  - Paths ending with `/api` are preserved
+  - All other URLs get `/api` appended
+- Default `baseUrl`: `http://localhost:11434/api`
+- `custom.providerOptions` can include Ollama-specific options
+
+### OpenAI-Compatible
+
+- Requires `baseUrl` (no default)
+- `custom.providerOptions` can pass provider-specific options to the underlying SDK
+- `reasoningValue` maps to `reasoningEffort` (string level) or token budget (number)
