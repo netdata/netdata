@@ -2255,6 +2255,10 @@ modules:
               description: Set to yes to use Windows credentials instead of SQL Server authentication.
               default_value: no
               required: false
+            - name: trust server certificate
+              description: Set to yes to trust the server's SSL certificate chain.
+              default_value: yes
+              required: false
             - name: express
               description: Set to yes when running SQL Express version.
               default_value: no
