@@ -376,6 +376,17 @@ var (
 			{ID: "database_%s_data_file_size", Name: "size"},
 		},
 	}
+	databaseBackupRestoreThroughputChartTmpl = module.Chart{
+		ID:       "database_%s_backup_restore_throughput",
+		Title:    "Backup/Restore throughput",
+		Units:    "bytes/s",
+		Fam:      "db backup",
+		Ctx:      "mssql.database_backup_restore_throughput",
+		Priority: prioDatabaseDataFileSize + 1,
+		Dims: module.Dims{
+			{ID: "database_%s_backup_restore_throughput", Name: "throughput", Algo: module.Incremental},
+		},
+	}
 	databaseStateChartTmpl = module.Chart{
 		ID:       "database_%s_state",
 		Title:    "Database state",
@@ -514,6 +525,17 @@ var (
 			{ID: "wait_%s_tasks", Name: "waits", Algo: module.Incremental},
 		},
 	}
+	waitMaxTimeChartTmpl = module.Chart{
+		ID:       "wait_%s_max_time",
+		Title:    "Maximum wait time",
+		Units:    "ms",
+		Fam:      "waits",
+		Ctx:      "mssql.wait_max_time",
+		Priority: prioWaitMaxTime,
+		Dims: module.Dims{
+			{ID: "wait_%s_max_ms", Name: "max_time"},
+		},
+	}
 )
 
 // Job status chart template
@@ -540,8 +562,29 @@ var (
 		Ctx:      "mssql.replication_status",
 		Priority: prioReplicationStatus,
 		Dims: module.Dims{
-			{ID: "replication_%s_status", Name: "status"},
-			{ID: "replication_%s_warning", Name: "warning"},
+			{ID: "replication_%s_status_started", Name: "started"},
+			{ID: "replication_%s_status_succeeded", Name: "succeeded"},
+			{ID: "replication_%s_status_in_progress", Name: "in_progress"},
+			{ID: "replication_%s_status_idle", Name: "idle"},
+			{ID: "replication_%s_status_retrying", Name: "retrying"},
+			{ID: "replication_%s_status_failed", Name: "failed"},
+		},
+	}
+	replicationWarningChartTmpl = module.Chart{
+		ID:       "replication_%s_warning",
+		Title:    "Replication warnings",
+		Units:    "flags",
+		Fam:      "replication",
+		Ctx:      "mssql.replication_warning",
+		Priority: prioReplicationStatus + 1,
+		Dims: module.Dims{
+			{ID: "replication_%s_warning_expiration", Name: "expiration"},
+			{ID: "replication_%s_warning_latency", Name: "latency"},
+			{ID: "replication_%s_warning_mergeexpiration", Name: "merge_expiration"},
+			{ID: "replication_%s_warning_mergeslowrunduration", Name: "merge_slow_duration"},
+			{ID: "replication_%s_warning_mergefastrunduration", Name: "merge_fast_duration"},
+			{ID: "replication_%s_warning_mergefastrunspeed", Name: "merge_fast_speed"},
+			{ID: "replication_%s_warning_mergeslowrunspeed", Name: "merge_slow_speed"},
 		},
 	}
 	replicationLatencyChartTmpl = module.Chart{
@@ -579,6 +622,7 @@ func (c *Collector) addDatabaseCharts(dbName string) {
 		databaseLogFlushesChartTmpl.Copy(),
 		databaseLogFlushedChartTmpl.Copy(),
 		databaseDataFileSizeChartTmpl.Copy(),
+		databaseBackupRestoreThroughputChartTmpl.Copy(),
 		databaseStateChartTmpl.Copy(),
 		databaseReadOnlyChartTmpl.Copy(),
 	}
@@ -605,6 +649,7 @@ func (c *Collector) addWaitTypeCharts(waitType string, waitCategory string) {
 		waitTotalTimeChartTmpl.Copy(),
 		waitResourceTimeChartTmpl.Copy(),
 		waitSignalTimeChartTmpl.Copy(),
+		waitMaxTimeChartTmpl.Copy(),
 		waitCountChartTmpl.Copy(),
 	}
 
@@ -690,6 +735,7 @@ func (c *Collector) addJobCharts(jobName string) {
 func (c *Collector) addReplicationCharts(pubDB, publication string) {
 	charts := &module.Charts{
 		replicationStatusChartTmpl.Copy(),
+		replicationWarningChartTmpl.Copy(),
 		replicationLatencyChartTmpl.Copy(),
 		replicationSubscriptionsChartTmpl.Copy(),
 	}

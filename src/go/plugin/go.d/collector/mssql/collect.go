@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+// noLatencySentinel is the value SQL Server returns when no latency data is available
+const noLatencySentinel = 999999
+
 func (c *Collector) collect() (map[string]int64, error) {
 	if c.db == nil {
 		db, err := c.openConnection()
@@ -371,7 +374,7 @@ func (c *Collector) collectDatabaseCounters(mx map[string]int64) error {
 		case "Write Transactions/sec":
 			mx[fmt.Sprintf("database_%s_write_transactions", dbID)] = value
 		case "Backup/Restore Throughput/sec":
-			// Currently not charted
+			mx[fmt.Sprintf("database_%s_backup_restore_throughput", dbID)] = value
 		case "Log Bytes Flushed/sec":
 			mx[fmt.Sprintf("database_%s_log_flushed", dbID)] = value
 		case "Log Flushes/sec":
@@ -515,6 +518,7 @@ func (c *Collector) collectWaitStats(mx map[string]int64) error {
 		mx[fmt.Sprintf("wait_%s_total_ms", waitID)] = totalWait
 		mx[fmt.Sprintf("wait_%s_resource_ms", waitID)] = resourceWait
 		mx[fmt.Sprintf("wait_%s_signal_ms", waitID)] = signalWait
+		mx[fmt.Sprintf("wait_%s_max_ms", waitID)] = maxWait
 		mx[fmt.Sprintf("wait_%s_tasks", waitID)] = waitingTasks
 	}
 
@@ -649,12 +653,35 @@ func (c *Collector) collectReplicationStatus(mx map[string]int64) error {
 		}
 
 		pubID := cleanPublicationName(pubDB, publication)
-		mx[fmt.Sprintf("replication_%s_status", pubID)] = status
-		mx[fmt.Sprintf("replication_%s_warning", pubID)] = warning
+
+		// Decode status into 6 discrete states (matching C implementation)
+		// 1=started, 2=succeeded, 3=in_progress, 4=idle, 5=retrying, 6=failed
+		mx[fmt.Sprintf("replication_%s_status_started", pubID)] = boolToInt(status == 1)
+		mx[fmt.Sprintf("replication_%s_status_succeeded", pubID)] = boolToInt(status == 2)
+		mx[fmt.Sprintf("replication_%s_status_in_progress", pubID)] = boolToInt(status == 3)
+		mx[fmt.Sprintf("replication_%s_status_idle", pubID)] = boolToInt(status == 4)
+		mx[fmt.Sprintf("replication_%s_status_retrying", pubID)] = boolToInt(status == 5)
+		mx[fmt.Sprintf("replication_%s_status_failed", pubID)] = boolToInt(status == 6)
+
+		// Decode warning into 7 individual flags (bitfield)
+		// Bit 0x01: expiration, 0x02: latency, 0x04: mergeexpiration
+		// 0x08: mergeslowrunduration, 0x10: mergefastrunduration
+		// 0x20: mergefastrunspeed, 0x40: mergeslowrunspeed
+		mx[fmt.Sprintf("replication_%s_warning_expiration", pubID)] = boolToInt(warning&0x01 != 0)
+		mx[fmt.Sprintf("replication_%s_warning_latency", pubID)] = boolToInt(warning&0x02 != 0)
+		mx[fmt.Sprintf("replication_%s_warning_mergeexpiration", pubID)] = boolToInt(warning&0x04 != 0)
+		mx[fmt.Sprintf("replication_%s_warning_mergeslowrunduration", pubID)] = boolToInt(warning&0x08 != 0)
+		mx[fmt.Sprintf("replication_%s_warning_mergefastrunduration", pubID)] = boolToInt(warning&0x10 != 0)
+		mx[fmt.Sprintf("replication_%s_warning_mergefastrunspeed", pubID)] = boolToInt(warning&0x20 != 0)
+		mx[fmt.Sprintf("replication_%s_warning_mergeslowrunspeed", pubID)] = boolToInt(warning&0x40 != 0)
+
 		mx[fmt.Sprintf("replication_%s_latency_avg", pubID)] = avgLatency
-		// Handle the 999999 sentinel for "no value"
-		if bestLatency == 999999 {
+		// Handle the noLatencySentinel for "no value"
+		if bestLatency == noLatencySentinel {
 			bestLatency = 0
+		}
+		if worstLatency == noLatencySentinel {
+			worstLatency = 0
 		}
 		mx[fmt.Sprintf("replication_%s_latency_best", pubID)] = bestLatency
 		mx[fmt.Sprintf("replication_%s_latency_worst", pubID)] = worstLatency

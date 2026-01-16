@@ -427,6 +427,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: size
+            - name: mssql.database_backup_restore_throughput
+              description: Backup/Restore Throughput
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: throughput
             - name: mssql.database_state
               description: Database State
               unit: state
@@ -514,6 +520,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: duration
+            - name: mssql.wait_max_time
+              description: Maximum Wait Time
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: max_time
             - name: mssql.wait_count
               description: Wait Count
               unit: waits/s
@@ -546,8 +558,24 @@ modules:
               unit: status
               chart_type: line
               dimensions:
-                - name: status
-                - name: warning
+                - name: started
+                - name: succeeded
+                - name: in_progress
+                - name: idle
+                - name: retrying
+                - name: failed
+            - name: mssql.replication_warning
+              description: Replication Warnings
+              unit: flags
+              chart_type: line
+              dimensions:
+                - name: expiration
+                - name: latency
+                - name: merge_expiration
+                - name: merge_slow_duration
+                - name: merge_fast_duration
+                - name: merge_fast_speed
+                - name: merge_slow_speed
             - name: mssql.replication_latency
               description: Replication Latency
               unit: seconds

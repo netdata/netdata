@@ -17,6 +17,9 @@ The collector provides the following metric categories:
 - **Blocked processes** - Number of blocked processes
 - **Batch requests** - Number of batch requests per second
 - **SQL compilations/recompilations** - Query compilation statistics
+- **Auto-parameterization attempts** - Auto-param total, safe, and failed attempts
+- **SQL errors** - SQL error rate
+- **Page splits** - Number of page splits per second
 
 ### Buffer and memory metrics
 
@@ -24,6 +27,8 @@ The collector provides the following metric categories:
 - **Page life expectancy** - How long pages stay in buffer pool
 - **Page reads/writes** - Buffer I/O operations
 - **Checkpoint pages** - Pages flushed during checkpoint
+- **Lazy writes** - Lazy writer operations per second
+- **Page lookups** - Page lookups per second
 - **Total server memory** - Memory used by SQL Server
 - **Connection memory** - Memory used for connections
 - **Memory grants pending** - Queries waiting for memory
@@ -34,11 +39,15 @@ The collector provides the following metric categories:
 - **Active transactions** - Currently active transactions
 - **Log bytes flushed** - Transaction log write throughput
 - **Data file size** - Size of database data files
+- **Backup/restore throughput** - Throughput of backup/restore operations
+- **Database state** - Online, restoring, recovering, pending, suspect, emergency, offline
+- **Read-only status** - Whether database is read-only or read-write
 - **Lock statistics** - Requests, waits, timeouts, deadlocks by lock type
 
 ### Wait statistics
 
-- **Wait time** - Resource and signal wait times by wait type
+- **Wait time** - Total, resource, and signal wait times by wait type
+- **Maximum wait time** - Maximum wait time by wait type
 - **Waiting tasks** - Number of tasks waiting
 
 ### Lock metrics
@@ -51,7 +60,8 @@ The collector provides the following metric categories:
 
 ### Replication metrics (optional)
 
-- **Replication status** - Publication status and warning flags
+- **Replication status** - Publication status (started, succeeded, in_progress, idle, retrying, failed)
+- **Replication warnings** - Warning flags (expiration, latency, merge warnings)
 - **Replication latency** - Average, best, and worst latency in seconds
 - **Subscription count** - Number of subscriptions and running agents
 
