@@ -1384,6 +1384,10 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       // until execution completes. Without this, the idle timer would abort the stream.
       let pendingToolCalls = 0;
 
+      // Track whether reasoning was streamed via reasoning-delta events.
+      // Used to prevent duplicate emission in backfill logic.
+      let reasoningStreamedDuringStream = false;
+
       // eslint-disable-next-line functional/no-loop-statements
       while (fullStep.done !== true) {
         const part = fullStep.value;
@@ -1401,6 +1405,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           // Skip empty chunks to avoid emitting empty thinking deltas
           if (request.onChunk !== undefined && part.text.length > 0) {
             request.onChunk(part.text, 'thinking');
+            reasoningStreamedDuringStream = true;
           }
         } else if (part.type === 'tool-call') {
           // Tool execution starting - suspend idle timer until result arrives
@@ -1533,10 +1538,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
               
               // Emit reasoning if we haven't streamed it yet
               if (p.type === this.REASONING_TYPE && p.text !== undefined && p.text.length > 0) {
-                if (!hasEmittedReasoning) {
-                  // Only emit if we didn't already stream reasoning-delta
-                  // We track this by checking if response already contains the reasoning
-                  // (This is a heuristic - ideally we'd track what was actually streamed)
+                if (!hasEmittedReasoning && !reasoningStreamedDuringStream) {
+                  // Only emit if we didn't already stream reasoning-delta during the stream
                   request.onChunk(p.text, 'thinking');
                   hasEmittedReasoning = true;
                 }
