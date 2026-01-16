@@ -61,7 +61,7 @@ where
     type Output = NonZeroU64;
 
     fn visit(&mut self, object: &ValueGuard<'a, Self::Object>) -> Result<Option<Self::Output>> {
-        if object.hash() == self.hash && object.get_payload() == self.payload {
+        if object.hash() == self.hash && object.raw_payload() == self.payload {
             Ok(Some(object.offset()))
         } else {
             Ok(None)
@@ -532,7 +532,7 @@ impl<M: MemoryMap> JournalFile<M> {
 
                     for data_offset in data_offsets.iter().copied() {
                         let data_object = self.data_ref(data_offset)?;
-                        let payload = data_object.payload_bytes();
+                        let payload = data_object.raw_payload();
 
                         if payload == remapping_payload {
                             continue;
@@ -564,7 +564,7 @@ impl<M: MemoryMap> JournalFile<M> {
             if field.payload.starts_with(b"ND") {
                 continue;
             }
-            let s = String::from_utf8(field.get_payload().to_vec()).expect("utf8 data");
+            let s = String::from_utf8(field.raw_payload().to_vec()).expect("utf8 data");
             field_map.insert(s.clone(), s);
         }
 

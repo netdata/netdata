@@ -335,6 +335,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "812e12b5285cc515a9c72a5c1d3b6d46a19dac5acfef5265968c166106e31dd3"
 
 [[package]]
+name = "block-buffer"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
+dependencies = [
+ "generic-array",
+]
+
+[[package]]
 name = "block2"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -345,7 +354,7 @@ dependencies = [
 
 [[package]]
 name = "bridge"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "console-subscriber",
@@ -579,6 +588,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "crc"
+version = "3.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9710d3b3739c2e349eb44fe848ad0b7c8cb1e42bd87ee49371df2f7acaf3e675"
+dependencies = [
+ "crc-catalog",
+]
+
+[[package]]
+name = "crc-catalog"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19d374276b40fb8bbdee95aef7c7fa6b5316ec764510eb64b8dd0e2ed0d7e7f5"
+
+[[package]]
 name = "crc32fast"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -620,6 +644,16 @@ name = "crossbeam-utils"
 version = "0.8.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
+
+[[package]]
+name = "crypto-common"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
+dependencies = [
+ "generic-array",
+ "typenum",
+]
 
 [[package]]
 name = "ctor"
@@ -683,6 +717,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ececcb659e7ba858fb4f10388c250a7252eb0a27373f1a72b8748afdd248e587"
 dependencies = [
  "powerfmt",
+]
+
+[[package]]
+name = "digest"
+version = "0.10.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
+dependencies = [
+ "block-buffer",
+ "crypto-common",
 ]
 
 [[package]]
@@ -803,7 +847,7 @@ dependencies = [
 
 [[package]]
 name = "flatten_otel"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "flatten-serde-json",
  "opentelemetry-proto",
@@ -852,7 +896,7 @@ dependencies = [
 
 [[package]]
 name = "foundation"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "tokio",
 ]
@@ -1079,6 +1123,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c31b6d751ae2c7f11320402d34e41349dd1016f8d5d45e48c4312bc8625af50c"
 dependencies = [
  "byteorder",
+]
+
+[[package]]
+name = "generic-array"
+version = "0.14.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
+dependencies = [
+ "typenum",
+ "version_check",
 ]
 
 [[package]]
@@ -1586,7 +1640,7 @@ dependencies = [
 
 [[package]]
 name = "journal-common"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "allocative",
  "nix",
@@ -1597,7 +1651,7 @@ dependencies = [
 
 [[package]]
 name = "journal-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "allocative",
  "anyhow",
@@ -1608,7 +1662,8 @@ dependencies = [
  "journal-common",
  "journal-registry",
  "libc",
- "lz4",
+ "lz4_flex",
+ "lzma-rust2",
  "md5",
  "memmap2",
  "nix",
@@ -1633,12 +1688,11 @@ dependencies = [
  "uuid",
  "walkdir",
  "zerocopy 0.9.0-alpha.0",
- "zstd",
 ]
 
 [[package]]
 name = "journal-engine"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "allocative",
  "async-stream",
@@ -1667,7 +1721,7 @@ dependencies = [
 
 [[package]]
 name = "journal-function"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "allocative",
  "async-stream",
@@ -1695,7 +1749,7 @@ dependencies = [
 
 [[package]]
 name = "journal-index"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "allocative",
  "journal-common",
@@ -1713,7 +1767,7 @@ dependencies = [
 
 [[package]]
 name = "journal-log-writer"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "flatten-serde-json",
  "journal-common",
@@ -1731,7 +1785,7 @@ dependencies = [
 
 [[package]]
 name = "journal-registry"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "allocative",
  "journal-common",
@@ -1747,7 +1801,7 @@ dependencies = [
 
 [[package]]
 name = "journal-viewer-plugin"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1876,6 +1930,22 @@ checksum = "6bd8c0d6c6ed0cd30b3652886bb8711dc4bb01d637a68105a3d5158039b418e6"
 dependencies = [
  "cc",
  "libc",
+]
+
+[[package]]
+name = "lz4_flex"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab6473172471198271ff72e9379150e9dfd70d8e533e0752a27e515b48dd375e"
+
+[[package]]
+name = "lzma-rust2"
+version = "0.15.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1670343e58806300d87950e3401e820b519b9384281bbabfb15e3636689ffd69"
+dependencies = [
+ "crc",
+ "sha2",
 ]
 
 [[package]]
@@ -2045,7 +2115,7 @@ dependencies = [
 
 [[package]]
 name = "netdata-plugin-charts-derive"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2054,14 +2124,14 @@ dependencies = [
 
 [[package]]
 name = "netdata-plugin-error"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "thiserror 2.0.17",
 ]
 
 [[package]]
 name = "netdata-plugin-protocol"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "atoi",
  "bytes",
@@ -2080,7 +2150,7 @@ dependencies = [
 
 [[package]]
 name = "netdata-plugin-schema"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "netdata-plugin-error",
  "netdata-plugin-types",
@@ -2091,7 +2161,7 @@ dependencies = [
 
 [[package]]
 name = "netdata-plugin-types"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bitflags 2.10.0",
  "netdata-plugin-error",
@@ -2447,7 +2517,7 @@ dependencies = [
 
 [[package]]
 name = "otel-plugin"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "atty",
@@ -2865,7 +2935,7 @@ dependencies = [
 
 [[package]]
 name = "rdp"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "md5",
 ]
@@ -2995,7 +3065,7 @@ dependencies = [
 
 [[package]]
 name = "rt"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -3307,6 +3377,17 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
+]
+
+[[package]]
+name = "sha2"
+version = "0.10.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "digest",
 ]
 
 [[package]]
@@ -3934,6 +4015,12 @@ checksum = "9ea3136b675547379c4bd395ca6b938e5ad3c3d20fad76e7fe85f9e0d011419c"
 dependencies = [
  "rand 0.9.2",
 ]
+
+[[package]]
+name = "typenum"
+version = "1.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "562d481066bde0658276a35467c4af00bdc6ee726305698a55b86e61d7ad82bb"
 
 [[package]]
 name = "uname"
