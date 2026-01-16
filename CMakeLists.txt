@@ -207,11 +207,21 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL)
     endif()
 
     if(ENABLE_NETDATA_JOURNAL_FILE_READER)
-      if(STATIC_BUILD)
-        corrosion_add_target_rustflags(journal-viewer-plugin --cfg=tracing_unstable "-C" "target-feature=+crt-static")
-      else()
-        corrosion_add_target_rustflags(journal-viewer-plugin --cfg=tracing_unstable)
+      set(JOURNAL_VIEWER_RUSTFLAGS --cfg=tracing_unstable)
+
+      # We depend (transitively) on the `io-uring` crate which doesn't provide
+      # prebuilt bindings for 32-bit arches. Considering this is a compile-time
+      # and not a runtime dependency (because we don't use foyer's io-uring
+      # engine), we can simply skip the check.
+      if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        list(APPEND JOURNAL_VIEWER_RUSTFLAGS --cfg=io_uring_skip_arch_check)
       endif()
+
+      if(STATIC_BUILD)
+        list(APPEND JOURNAL_VIEWER_RUSTFLAGS "-C" "target-feature=+crt-static")
+      endif()
+
+      corrosion_add_target_rustflags(journal-viewer-plugin ${JOURNAL_VIEWER_RUSTFLAGS})
     endif()
 
     if(ENABLE_PLUGIN_OTEL)

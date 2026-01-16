@@ -26,10 +26,7 @@ export NETDATA_CMAKE_OPTIONS="-DSTATIC_BUILD=On -DENABLE_LIBBACKTRACE=On"
 
 case "${BUILDARCH}" in
     armv6l)
-        export INSTALLER_ARGS="--disable-plugin-otel --disable-plugin-systemd-journal"
-        ;;
-    armv7l)
-        export INSTALLER_ARGS="--enable-plugin-otel --disable-plugin-systemd-journal"
+        export INSTALLER_ARGS="--disable-plugin-otel --enable-plugin-systemd-journal"
         ;;
     *)
         export INSTALLER_ARGS="--enable-plugin-otel --enable-plugin-systemd-journal"
