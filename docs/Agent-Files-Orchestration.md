@@ -177,10 +177,55 @@ If an advisor fails:
 
 ### Best Practices
 
+**Performance**:
 - Keep advisors **fast** (low `maxTurns`, simple tasks)
 - Use cheaper/faster models for advisors
 - Design for parallel execution (no dependencies between advisors)
-- Handle the case where advisor fails gracefully
+
+**Pattern: Pre-Classification**
+
+Use advisors to classify user intent before the main agent runs:
+
+```yaml
+---
+advisors:
+  - ./advisors/intent-classifier.ai
+---
+React based on the classification in the advisory block.
+Do not re-analyze the user's raw request.
+```
+
+The main agent trusts the advisor's classification rather than re-interpreting raw input.
+
+**Pattern: Security Screening**
+
+Use advisors to screen user input for injection attacks, PII, or policy violations:
+
+```yaml
+---
+advisors:
+  - ./advisors/security-screen.ai
+  - ./advisors/pii-detector.ai
+---
+If security issues were flagged in advisories, refuse the request.
+If PII was detected, ask user to remove it before proceeding.
+```
+
+The main agent reacts to **advisory flags**, not raw user input. This separates security logic from business logic.
+
+**Pattern: Context Enrichment**
+
+Use advisors to gather context the main agent needs:
+
+```yaml
+---
+advisors:
+  - ./advisors/user-history.ai
+  - ./advisors/account-status.ai
+---
+```
+
+Advisors fetch user history, account info, or other context in parallel while the main agent focuses on the task.
 
 ---
 
@@ -390,10 +435,102 @@ Request → Router → Destination → Handoff → Final Response
 
 ### Handoff Best Practices
 
-- Use for formatting, summarization, translation
+**General**:
 - Keep handoff agents focused and fast
-- Don't add new information in handoff (it receives all context)
+- Don't add new information in handoff (it has all context)
 - Single handoff only (no chaining via frontmatter)
+
+**Pattern: Formatting**
+
+Handoff keeps main agents focused on work, not presentation:
+
+```yaml
+# research.ai - focused on research only
+---
+handoff: ./formatters/executive-report.ai
+---
+Research thoroughly. Don't worry about formatting.
+```
+
+```yaml
+# formatters/executive-report.ai
+---
+description: Formats research into executive summary
+---
+Transform the research into:
+- 3-5 key takeaways
+- Findings organized by theme
+- Action items
+```
+
+Main agents produce raw output; handoff handles presentation.
+
+**Pattern: Sensitive Data Redaction**
+
+Use handoff to scrub sensitive data before final output:
+
+```yaml
+# worker.ai
+---
+handoff: ./security/redactor.ai
+---
+```
+
+```yaml
+# security/redactor.ai
+---
+description: Redacts PII and sensitive data
+---
+Review the response and redact:
+- Personal identifiable information (names, emails, phones)
+- Internal system identifiers
+- API keys or credentials
+- Internal URLs or paths
+
+Replace with [REDACTED] or generic placeholders.
+```
+
+Workers produce complete output; handoff sanitizes for external consumption.
+
+**Pattern: Response Classification**
+
+Use handoff to classify/tag the response:
+
+```yaml
+# support.ai
+---
+handoff: ./classifiers/response-tagger.ai
+---
+```
+
+The handoff adds metadata like sentiment, category, escalation flags, or confidence scores to the response.
+
+**Pattern: Quality Assurance**
+
+Use handoff as a QA pass before delivery:
+
+```yaml
+# worker.ai
+---
+handoff: ./qa/reviewer.ai
+---
+```
+
+```yaml
+# qa/reviewer.ai
+---
+description: Reviews response for quality
+---
+Review the response for:
+- Factual accuracy
+- Completeness (all questions answered?)
+- Tone appropriateness
+- Grammar and clarity
+
+If issues found, fix them. Do not add disclaimers about your review.
+```
+
+The QA handoff catches errors and improves quality without the main agent needing to self-review.
 
 ---
 
