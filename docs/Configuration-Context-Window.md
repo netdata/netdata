@@ -131,7 +131,7 @@ Configure how tokens are counted for each provider/model.
     },
     "google": {
       "type": "google",
-      "tokenizer": "gemini:google"
+      "tokenizer": "google:gemini"
     }
   }
 }
@@ -139,12 +139,12 @@ Configure how tokens are counted for each provider/model.
 
 ### Supported Tokenizers
 
-| Tokenizer | Provider | Models |
-|-----------|----------|--------|
-| `tiktoken:gpt-4o` | OpenAI | GPT-4o, GPT-4o-mini |
-| `tiktoken:gpt-4` | OpenAI | GPT-4, GPT-4-turbo |
-| `anthropic` | Anthropic | All Claude models |
-| `gemini:google` | Google | All Gemini models |
+| Tokenizer         | Provider  | Models              |
+| ----------------- | --------- | ------------------- |
+| `tiktoken:gpt-4o` | OpenAI    | GPT-4o, GPT-4o-mini |
+| `tiktoken:gpt-4`  | OpenAI    | GPT-4, GPT-4-turbo  |
+| `anthropic`       | Anthropic | All Claude models   |
+| `google:gemini`   | Google    | All Gemini models   |
 
 ### Tokenizer Selection
 
@@ -161,7 +161,7 @@ Safety margin reserved for final messages.
 ```json
 {
   "defaults": {
-    "contextWindowBufferTokens": 256
+    "contextWindowBufferTokens": 8192
   }
 }
 ```
@@ -169,6 +169,7 @@ Safety margin reserved for final messages.
 ### Purpose
 
 The buffer ensures:
+
 - Forced-final-turn messages fit within budget
 - System messages for error handling have space
 - Small variations in token counting don't cause failures
@@ -181,9 +182,9 @@ available_budget = contextWindow - maxOutputTokens - buffer
 
 ### Buffer Reference
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `contextWindowBufferTokens` | `number` | `256` | Reserved token buffer |
+| Property                    | Type     | Default | Description           |
+| --------------------------- | -------- | ------- | --------------------- |
+| `contextWindowBufferTokens` | `number` | `8192`  | Reserved token buffer |
 
 ---
 
@@ -197,11 +198,11 @@ available_budget = contextWindow - maxOutputTokens - buffer
 
 ### Guard Triggers
 
-| Trigger | Action |
-|---------|--------|
-| Projected overflow | Enter forced-final-turn mode |
-| Tool result overflow | Reject tool call with error |
-| Max turns reached | Force final response |
+| Trigger              | Action                       |
+| -------------------- | ---------------------------- |
+| Projected overflow   | Enter forced-final-turn mode |
+| Tool result overflow | Reject tool call with error  |
+| Max turns reached    | Force final response         |
 
 ### Forced-Final-Turn Flow
 
@@ -232,7 +233,7 @@ Handle large tool responses that would overflow context.
 
 ```yaml
 ---
-toolResponseMaxBytes: 12288  # 12 KB default
+toolResponseMaxBytes: 12288 # 12 KB default
 ---
 ```
 
@@ -240,8 +241,8 @@ Responses exceeding this size are stored and replaced with handles.
 
 ### Configuration
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
+| Property               | Type     | Default | Description                |
+| ---------------------- | -------- | ------- | -------------------------- |
 | `toolResponseMaxBytes` | `number` | `12288` | Max response size in bytes |
 
 ### How Storage Works
@@ -324,18 +325,18 @@ toolResponseMaxBytes: "number"
 
 ### All Context Properties
 
-| Location | Property | Type | Default | Description |
-|----------|----------|------|---------|-------------|
-| Provider | `contextWindow` | `number` | `131072` | Provider-wide context limit |
-| Provider | `tokenizer` | `string` | Auto-detect | Token counting method |
-| Model | `contextWindow` | `number` | Provider value | Model-specific limit |
-| Model | `tokenizer` | `string` | Provider value | Model-specific tokenizer |
-| Defaults | `contextWindowBufferTokens` | `number` | `256` | Safety buffer |
-| Defaults | `maxOutputTokens` | `number` | Model default | Max output tokens |
-| Defaults | `toolResponseMaxBytes` | `number` | `12288` | Max tool response size |
-| Frontmatter | `contextWindow` | `number` | Provider value | Agent-specific limit |
-| Frontmatter | `maxOutputTokens` | `number` | Defaults value | Agent output limit |
-| Frontmatter | `toolResponseMaxBytes` | `number` | Defaults value | Agent tool response limit |
+| Location    | Property                    | Type     | Default             | Description                 |
+| ----------- | --------------------------- | -------- | ------------------- | --------------------------- |
+| Provider    | `contextWindow`             | `number` | `131072`            | Provider-wide context limit |
+| Provider    | `tokenizer`                 | `string` | approximate         | Token counting method       |
+| Model       | `contextWindow`             | `number` | Provider value      | Model-specific limit        |
+| Model       | `tokenizer`                 | `string` | Provider value      | Model-specific tokenizer    |
+| Defaults    | `contextWindowBufferTokens` | `number` | `8192`              | Safety buffer               |
+| Defaults    | `maxOutputTokens`           | `number` | `contextWindow / 4` | Max output tokens           |
+| Defaults    | `toolResponseMaxBytes`      | `number` | `12288`             | Max tool response size      |
+| Frontmatter | `contextWindow`             | `number` | Provider value      | Agent-specific limit        |
+| Frontmatter | `maxOutputTokens`           | `number` | Defaults value      | Agent output limit          |
+| Frontmatter | `toolResponseMaxBytes`      | `number` | Defaults value      | Agent tool response limit   |
 
 ---
 
@@ -348,6 +349,7 @@ CONTEXT_DEBUG=true ai-agent --agent test.ai "query"
 ```
 
 Shows:
+
 - Token estimates per turn
 - Budget calculations
 - Guard activation decisions
@@ -376,12 +378,13 @@ Accounting entries include context metrics:
 
 ### Telemetry Metrics
 
-| Metric | Description |
-|--------|-------------|
-| `ai_agent_context_guard_events_total` | Guard activation count |
+| Metric                                    | Description                    |
+| ----------------------------------------- | ------------------------------ |
+| `ai_agent_context_guard_events_total`     | Guard activation count         |
 | `ai_agent_context_guard_remaining_tokens` | Remaining budget at activation |
 
 Labels:
+
 - `provider`: LLM provider
 - `model`: Model name
 - `trigger`: What triggered the guard
@@ -390,16 +393,19 @@ Labels:
 ### Common Issues
 
 **Session ends abruptly:**
+
 - Check if context guard triggered
 - Review token usage in accounting
 - Consider increasing `contextWindow` or reducing tool responses
 
 **Tool calls rejected:**
+
 - Tool response would overflow context
 - Use `toolResponseMaxBytes` to store large responses
 - Consider chunked/paginated tool responses
 
 **Inaccurate token counts:**
+
 - Verify tokenizer matches model
 - Different tokenizers produce different counts
 
@@ -413,9 +419,9 @@ Labels:
 ---
 models:
   - openai/gpt-4o
-contextWindow: 100000     # Leave 28K headroom from 128K
-maxOutputTokens: 4096     # Reserve for response
-toolResponseMaxBytes: 25000  # Allow larger tool responses
+contextWindow: 100000 # Leave 28K headroom from 128K
+maxOutputTokens: 4096 # Reserve for response
+toolResponseMaxBytes: 25000 # Allow larger tool responses
 ---
 ```
 
@@ -436,6 +442,7 @@ contextWindow: 180000
 ### Monitor Token Usage
 
 Use telemetry to track:
+
 - How often guards activate
 - Which tools trigger guards
 - Remaining budget patterns
@@ -449,12 +456,12 @@ Use telemetry to track:
 
 ### Model Selection by Context Need
 
-| Use Case | Recommended Model | Context Window |
-|----------|-------------------|----------------|
-| Simple queries | gpt-4o-mini | 128K |
-| Code analysis | claude-sonnet-4 | 200K |
-| Large document | claude-sonnet-4 | 200K |
-| Multi-turn research | gpt-4o | 128K |
+| Use Case            | Recommended Model | Context Window |
+| ------------------- | ----------------- | -------------- |
+| Simple queries      | gpt-4o-mini       | 128K           |
+| Code analysis       | claude-sonnet-4   | 200K           |
+| Large document      | claude-sonnet-4   | 200K           |
+| Multi-turn research | gpt-4o            | 128K           |
 
 ---
 

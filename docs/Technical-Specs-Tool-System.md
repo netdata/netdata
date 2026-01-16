@@ -96,13 +96,13 @@ Every tool execution returns this structure.
 
 ```typescript
 interface ToolExecuteResult {
-    ok: boolean;           // Success flag
-    result?: string;       // Output content (if success)
-    error?: string;        // Error message (if failure)
-    latencyMs: number;     // Execution time
-    kind: ToolKind;        // Provider type
-    namespace: string;     // Provider namespace
-    extras?: Record<string, unknown>; // Additional metadata
+  ok: boolean; // Success flag
+  result?: string; // Output content (if success)
+  error?: string; // Error message (if failure)
+  latencyMs: number; // Execution time
+  kind: ToolKind; // Provider type
+  namespace: string; // Provider namespace
+  extras?: Record<string, unknown>; // Additional metadata
 }
 ```
 
@@ -118,32 +118,34 @@ Model Context Protocol tools from external servers.
 
 **Protocols Supported**:
 
-| Protocol | Description | Use Case |
-|----------|-------------|----------|
-| `stdio` | Spawned process with stdin/stdout | Local executables |
-| `websocket` | WebSocket connection | Remote servers |
-| `http` | HTTP POST requests | REST-style MCP |
-| `sse` | Server-Sent Events | Streaming responses |
+| Protocol    | Description                       | Use Case            |
+| ----------- | --------------------------------- | ------------------- |
+| `stdio`     | Spawned process with stdin/stdout | Local executables   |
+| `websocket` | WebSocket connection              | Remote servers      |
+| `http`      | HTTP POST requests                | REST-style MCP      |
+| `sse`       | Server-Sent Events                | Streaming responses |
 
 **Tool Naming**: `{namespace}__{toolname}`
 
 Example: `github__search_code`, `slack__send_message`
 
 **Configuration Example**:
+
 ```json
 {
-    "type": "stdio",
-    "command": "npx",
-    "args": ["-y", "@mcp/github"],
-    "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" },
-    "toolsAllowed": ["search_code", "get_file"],
-    "toolsDenied": ["delete_repo"],
-    "cache": 300000,
-    "queue": "github-queue"
+  "type": "stdio",
+  "command": "npx",
+  "args": ["-y", "@mcp/github"],
+  "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" },
+  "toolsAllowed": ["search_code", "get_file"],
+  "toolsDenied": ["delete_repo"],
+  "cache": 300000,
+  "queue": "github-queue"
 }
 ```
 
 **Features**:
+
 - Connection management with auto-reconnection
 - Tool discovery via `tools/list`
 - Parameter validation via AJV
@@ -162,25 +164,27 @@ REST API tools defined inline or via OpenAPI specs.
 **Tool Naming**: `rest__{toolname}`
 
 **Configuration Example**:
+
 ```json
 {
-    "description": "Get weather data for a city",
-    "method": "GET",
-    "url": "https://api.weather.com/v1/${parameters.city}",
-    "headers": {
-        "Authorization": "Bearer ${WEATHER_API_KEY}"
+  "description": "Get weather data for a city",
+  "method": "GET",
+  "url": "https://api.weather.com/v1/${parameters.city}",
+  "headers": {
+    "Authorization": "Bearer ${WEATHER_API_KEY}"
+  },
+  "parametersSchema": {
+    "type": "object",
+    "properties": {
+      "city": { "type": "string", "description": "City name" }
     },
-    "parametersSchema": {
-        "type": "object",
-        "properties": {
-            "city": { "type": "string", "description": "City name" }
-        },
-        "required": ["city"]
-    }
+    "required": ["city"]
+  }
 }
 ```
 
 **Features**:
+
 - URL template expansion with `${parameters.x}`
 - Query parameter handling
 - Request body construction
@@ -198,32 +202,34 @@ Built-in tools provided by ai-agent itself.
 
 **Available Tools**:
 
-| Tool | Purpose | Always Available |
-|------|---------|------------------|
-| `agent__final_report` | Deliver final answer | Yes |
-| `agent__task_status` | Track task progress | Optional |
-| `agent__batch` | Batch tool execution | Optional |
+| Tool                  | Purpose              | Always Available |
+| --------------------- | -------------------- | ---------------- |
+| `agent__final_report` | Deliver final answer | Yes              |
+| `agent__task_status`  | Track task progress  | Optional         |
+| `agent__batch`        | Batch tool execution | Optional         |
 
 **final_report Parameters**:
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `status` | `'success'` \| `'failure'` \| `'partial'` | Completion status |
-| `format` | string | Output format identifier |
-| `content_json` | object | JSON content (for JSON formats) |
-| `content` | string | Text content (for text formats) |
-| `metadata` | object | Optional metadata |
+| Parameter      | Type                                      | Description                                 |
+| -------------- | ----------------------------------------- | ------------------------------------------- |
+| `status`       | `'success'` \| `'failure'` \| `'partial'` | Completion status                           |
+| `format`       | string                                    | Output format identifier (varies by format) |
+| `content_json` | object                                    | JSON content (for JSON formats)             |
+| `content`      | string                                    | Text content (for text formats)             |
+| `messages`     | array                                     | Messages array (for slack-block-kit)        |
+| `metadata`     | object                                    | Optional metadata                           |
 
 **task_status Parameters**:
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `status` | `'starting'` \| `'in-progress'` \| `'completed'` | Current status |
-| `done` | string | What has been completed |
-| `pending` | string | What remains |
-| `now` | string | Current immediate step |
-| `ready_for_final_report` | boolean | Can finalize now |
-| `need_to_run_more_tools` | boolean | More tools needed |
+| Parameter                | Type                                             | Description             |
+| ------------------------ | ------------------------------------------------ | ----------------------- |
+| `status`                 | `'starting'` \| `'in-progress'` \| `'completed'` | Current status          |
+| `done`                   | string                                           | What has been completed |
+| `pending`                | string                                           | What remains            |
+| `now`                    | string                                           | Current immediate step  |
+| `ready_for_final_report` | boolean                                          | Can finalize now        |
+| `need_to_run_more_tools` | boolean                                          | More tools needed       |
+| `need_to_run_more_tools` | boolean                                          | More tools needed       |
 
 ---
 
@@ -257,6 +263,7 @@ sequenceDiagram
 ```
 
 **Features**:
+
 - Recursive composition
 - Trace context propagation
 - OpTree hierarchy (child sessions nested)
@@ -273,6 +280,7 @@ Dynamic agent routing.
 **Tool**: `router__handoff-to`
 
 **Parameters**:
+
 ```typescript
 {
     agent: string;      // Must be in router.destinations
@@ -290,23 +298,23 @@ Dynamic agent routing.
 
 All tools follow the pattern: `{provider}__{toolname}`
 
-| Provider Type | Namespace | Example |
-|---------------|-----------|---------|
-| MCP Server | Server name | `github__search_code` |
-| REST | `rest` | `rest__weather_api` |
-| Sub-Agent | `agent` | `agent__researcher` |
-| Internal | `agent` | `agent__final_report` |
-| Router | `router` | `router__handoff-to` |
+| Provider Type | Namespace   | Example               |
+| ------------- | ----------- | --------------------- |
+| MCP Server    | Server name | `github__search_code` |
+| REST          | `rest`      | `rest__weather_api`   |
+| Sub-Agent     | `agent`     | `agent__researcher`   |
+| Internal      | `agent`     | `agent__final_report` |
+| Router        | `router`    | `router__handoff-to`  |
 
 ### Sanitization Rules
 
 Tool names are sanitized for safe usage:
 
-| Rule | Example |
-|------|---------|
-| Replace invalid characters with `_` | `my-tool` → `my_tool` |
-| Truncate to max length | Long names shortened |
-| Normalize casing | Case preserved (provider-specific) |
+| Rule                                | Example                            |
+| ----------------------------------- | ---------------------------------- |
+| Replace invalid characters with `_` | `my-tool` → `my_tool`              |
+| Truncate to max length              | Long names shortened               |
+| Normalize casing                    | Case preserved (provider-specific) |
 
 ### Resolution
 
@@ -330,24 +338,24 @@ flowchart TD
 
 ```typescript
 class ToolsOrchestrator {
-    providers: Map<string, ToolProvider>;
-    mapping: Map<string, ToolProvider>;     // tool → provider
-    aliases: Map<string, string>;           // alias → canonical name
-    canceled: boolean;
-    pendingQueueControllers: Set<AbortController>;
+  providers: Map<string, ToolProvider>;
+  mapping: Map<string, ToolProvider>; // tool → provider
+  aliases: Map<string, string>; // alias → canonical name
+  canceled: boolean;
+  pendingQueueControllers: Set<AbortController>;
 }
 ```
 
 ### Key Methods
 
-| Method | Purpose |
-|--------|---------|
-| `register(provider)` | Add provider to orchestrator |
-| `listTools()` | Get all available tools |
-| `warmup()` | Initialize all providers |
-| `executeWithManagement()` | Execute with queue/budget/timeout |
-| `cancel()` | Cancel all pending operations |
-| `cleanup()` | Release resources (close connections) |
+| Method                    | Purpose                               |
+| ------------------------- | ------------------------------------- |
+| `register(provider)`      | Add provider to orchestrator          |
+| `listTools()`             | Get all available tools               |
+| `warmup()`                | Initialize all providers              |
+| `executeWithManagement()` | Execute with queue/budget/timeout     |
+| `cancel()`                | Cancel all pending operations         |
+| `cleanup()`               | Release resources (close connections) |
 
 ### Execution Flow
 
@@ -381,30 +389,31 @@ flowchart TD
 ### Purpose
 
 Queues control concurrency to:
+
 - Respect rate limits
 - Prevent overload
 - Prioritize requests
 
 ### Queue Types
 
-| Type | Scope | Use Case |
-|------|-------|----------|
-| Per-server queue | All tools from one MCP server | Server rate limits |
-| Per-tool queue | Individual tool | Tool-specific limits |
-| No queue | Immediate execution | Low-traffic tools |
+| Type             | Scope                         | Use Case             |
+| ---------------- | ----------------------------- | -------------------- |
+| Per-server queue | All tools from one MCP server | Server rate limits   |
+| Per-tool queue   | Individual tool               | Tool-specific limits |
+| No queue         | Immediate execution           | Low-traffic tools    |
 
 ### Configuration
 
 ```json
 {
-    "queues": {
-        "github": { "concurrent": 3 },
-        "slow-api": { "concurrent": 1 }
-    },
-    "mcpServers": {
-        "github": { "queue": "github" },
-        "slow-service": { "queue": "slow-api" }
-    }
+  "queues": {
+    "github": { "concurrent": 3 },
+    "slow-api": { "concurrent": 1 }
+  },
+  "mcpServers": {
+    "github": { "queue": "github" },
+    "slow-service": { "queue": "slow-api" }
+  }
 }
 ```
 
@@ -464,15 +473,16 @@ flowchart TD
 When output exceeds `toolResponseMaxBytes`:
 
 **Handle Message**:
+
 ```json
 {
-    "tool_output": {
-        "handle": "session-abc123/file-xyz789",
-        "reason": "size_limit_exceeded",
-        "bytes": 1048576,
-        "lines": 25000,
-        "tokens": 250000
-    }
+  "tool_output": {
+    "handle": "session-abc123/file-xyz789",
+    "reason": "size_limit_exceeded",
+    "bytes": 1048576,
+    "lines": 25000,
+    "tokens": 250000
+  }
 }
 ```
 
@@ -480,12 +490,12 @@ When output exceeds `toolResponseMaxBytes`:
 
 ### Output Outcomes
 
-| Outcome | Conversation Message |
-|---------|---------------------|
-| Success | Tool result content |
-| Timeout | `(tool failed: timeout)` |
-| Error | `(tool failed: <error message>)` |
-| Size exceeded | `tool_output` handle reference |
+| Outcome         | Conversation Message                            |
+| --------------- | ----------------------------------------------- |
+| Success         | Tool result content                             |
+| Timeout         | `(tool failed: timeout)`                        |
+| Error           | `(tool failed: <error message>)`                |
+| Size exceeded   | `tool_output` handle reference                  |
 | Budget exceeded | `(tool failed: context window budget exceeded)` |
 
 ---
@@ -494,29 +504,29 @@ When output exceeds `toolResponseMaxBytes`:
 
 ### Global Settings
 
-| Setting | Type | Default | Effect |
-|---------|------|---------|--------|
-| `toolTimeout` | number | varies | Global timeout per tool |
-| `toolResponseMaxBytes` | number | varies | Triggers disk storage |
-| `traceMCP` | boolean | false | Enable MCP tracing logs |
-| `mcpInitConcurrency` | number | varies | Parallel MCP initialization |
+| Setting                | Type    | Default | Effect                              |
+| ---------------------- | ------- | ------- | ----------------------------------- |
+| `toolTimeout`          | number  | 300000  | Global timeout per tool (5 minutes) |
+| `toolResponseMaxBytes` | number  | 12288   | Triggers disk storage               |
+| `traceMCP`             | boolean | false   | Enable MCP tracing logs             |
+| `mcpInitConcurrency`   | number  | varies  | Parallel MCP initialization         |
 
 ### Per-Server Settings
 
-| Setting | Type | Description |
-|---------|------|-------------|
-| `toolsAllowed` | array | Whitelist of tool names |
-| `toolsDenied` | array | Blacklist of tool names |
-| `queue` | string | Queue name to use |
-| `cache` | number | Cache duration in ms |
+| Setting            | Type   | Description             |
+| ------------------ | ------ | ----------------------- |
+| `toolsAllowed`     | array  | Whitelist of tool names |
+| `toolsDenied`      | array  | Blacklist of tool names |
+| `queue`            | string | Queue name to use       |
+| `cache`            | number | Cache duration in ms    |
 | `requestTimeoutMs` | number | Server-specific timeout |
 
 ### Example Configuration
 
 ```yaml
 defaults:
-  toolTimeout: 30000
-  toolResponseMaxBytes: 100000
+  toolTimeout: 300000
+  toolResponseMaxBytes: 12288
 
 mcpServers:
   github:
@@ -537,23 +547,25 @@ queues:
 
 ### Metrics Per Tool Execution
 
-| Metric | Description |
-|--------|-------------|
-| `latencyMs` | Execution duration |
-| `charactersIn` | Input parameter size |
-| `charactersOut` | Output size |
-| `status` | `ok` or `failed` |
-| `namespace` | Provider namespace |
+| Metric          | Description          |
+| --------------- | -------------------- |
+| `latencyMs`     | Execution duration   |
+| `charactersIn`  | Input parameter size |
+| `charactersOut` | Output size          |
+| `status`        | `ok` or `failed`     |
+| `namespace`     | Provider namespace   |
 
 ### Log Events
 
 **Request Logs** (VRB severity):
+
 ```
 [VRB] tool request → github__search_code
     parameters: { query: "foo", limit: 10 }
 ```
 
 **Response Logs**:
+
 ```
 [VRB] tool response ← github__search_code
     latency: 234ms, output: 4521 chars, status: ok
@@ -564,9 +576,9 @@ queues:
 
 ### Events
 
-| Event | Description |
-|-------|-------------|
-| `tool_started` | Execution began |
+| Event           | Description         |
+| --------------- | ------------------- |
+| `tool_started`  | Execution began     |
 | `tool_finished` | Execution completed |
 
 ---
@@ -578,12 +590,14 @@ queues:
 **Symptom**: "Tool not found" error.
 
 **Causes**:
+
 - Tool name misspelled
 - MCP server not started
 - Tool in `toolsDenied` list
 - Server `enabled: false`
 
 **Solutions**:
+
 1. Check exact tool name in logs
 2. Verify MCP server initialization
 3. Review `toolsAllowed`/`toolsDenied` configuration
@@ -594,12 +608,14 @@ queues:
 **Symptom**: `(tool failed: timeout)` in conversation.
 
 **Causes**:
+
 - `toolTimeout` too low
 - Server slow to respond
 - Network latency
 - Tool execution genuinely slow
 
 **Solutions**:
+
 1. Increase `toolTimeout`
 2. Check `requestTimeoutMs` per server
 3. Review server performance
@@ -610,14 +626,17 @@ queues:
 **Symptom**: `tool_output` handle instead of content.
 
 **Causes**:
+
 - Output exceeded `toolResponseMaxBytes`
 
 **Behavior**:
+
 - Normal operation (size limit working correctly)
 - LLM receives handle reference instead of content
 - Original content preserved on disk
 
 **Solutions**:
+
 1. Increase `toolResponseMaxBytes` if needed
 2. Review tool output (may need filtering at source)
 
@@ -626,12 +645,14 @@ queues:
 **Symptom**: MCP server fails to initialize.
 
 **Causes**:
+
 - Command not found
 - Missing environment variables
 - Port already in use
 - Spawn permissions
 
 **Solutions**:
+
 1. Verify `command` exists and is executable
 2. Check `env` variables are set
 3. For websocket/http, check URL accessibility
@@ -642,11 +663,13 @@ queues:
 **Symptom**: Tools hang waiting for queue.
 
 **Causes**:
+
 - Concurrent limit too low
 - Tools not releasing slots
 - Circular dependencies
 
 **Solutions**:
+
 1. Increase `concurrent` limit
 2. Review timeout settings
 3. Check for hanging tool executions

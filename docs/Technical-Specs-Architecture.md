@@ -98,13 +98,14 @@ graph TB
 
 **Responsibility**: Wraps the inner session loop with higher-level orchestration patterns.
 
-| Feature | Description |
-|---------|-------------|
+| Feature      | Description                                      |
+| ------------ | ------------------------------------------------ |
 | **Advisors** | Parallel pre-consultation with specialist agents |
-| **Router** | Dynamic agent selection based on task |
-| **Handoff** | Post-session delegation to another agent |
+| **Router**   | Dynamic agent selection based on task            |
+| **Handoff**  | Post-session delegation to another agent         |
 
 **Lifecycle**:
+
 1. Run advisor sessions in parallel (if configured)
 2. Build enriched prompt with advisory context
 3. Execute main `AIAgentSession.run()`
@@ -122,18 +123,19 @@ graph TB
 
 **Key State**:
 
-| Property | Purpose |
-|----------|---------|
-| `conversation` | Full conversation history (messages array) |
-| `logs` | Structured log entries for debugging |
-| `accounting` | Token and cost tracking |
-| `currentTurn` | Current turn index (1-based for action turns) |
-| `opTree` | Hierarchical operation tracking for snapshots |
-| `toolsOrchestrator` | Tool execution engine |
-| `llmClient` | LLM request executor |
-| `finalReport` | Captured `final_report` tool result |
+| Property            | Purpose                                       |
+| ------------------- | --------------------------------------------- |
+| `conversation`      | Full conversation history (messages array)    |
+| `logs`              | Structured log entries for debugging          |
+| `accounting`        | Token and cost tracking                       |
+| `currentTurn`       | Current turn index (1-based for action turns) |
+| `opTree`            | Hierarchical operation tracking for snapshots |
+| `toolsOrchestrator` | Tool execution engine                         |
+| `llmClient`         | LLM request executor                          |
+| `finalReport`       | Captured `final_report` tool result           |
 
 **Core Loop**:
+
 ```
 for turn = 1 to maxTurns:
     select provider/model
@@ -154,22 +156,24 @@ for turn = 1 to maxTurns:
 
 **Key Operations**:
 
-| Method | Purpose |
-|--------|---------|
+| Method                     | Purpose                                |
+| -------------------------- | -------------------------------------- |
 | `executeTurn(TurnRequest)` | Execute one LLM request/response cycle |
-| Provider selection | Route to correct provider by name |
-| Metadata collection | Gather cost, routing, cache statistics |
-| Pricing computation | Calculate token costs |
+| Provider selection         | Route to correct provider by name      |
+| Metadata collection        | Gather cost, routing, cache statistics |
+| Pricing computation        | Calculate token costs                  |
 
 **Registered Providers**:
 
-| Name | Class | Protocol |
-|------|-------|----------|
-| `openai` | OpenAIProvider | OpenAI API |
-| `anthropic` | AnthropicProvider | Anthropic API |
-| `google` | GoogleProvider | Google AI API |
-| `openrouter` | OpenRouterProvider | OpenRouter API |
-| `ollama` | OllamaProvider | Ollama local API |
+| Name                | Class                    | Protocol              |
+| ------------------- | ------------------------ | --------------------- |
+| `openai`            | OpenAIProvider           | OpenAI API            |
+| `openai-compatible` | OpenAICompatibleProvider | OpenAI-compatible API |
+| `anthropic`         | AnthropicProvider        | Anthropic API         |
+| `google`            | GoogleProvider           | Google AI API         |
+| `openrouter`        | OpenRouterProvider       | OpenRouter API        |
+| `ollama`            | OllamaProvider           | Ollama local API      |
+| `test-llm`          | TestLLMProvider          | Test/mock provider    |
 
 ---
 
@@ -181,15 +185,16 @@ for turn = 1 to maxTurns:
 
 **Provider Types**:
 
-| Provider | Kind | Description |
-|----------|------|-------------|
-| MCPProvider | `mcp` | Model Context Protocol tools |
-| RestProvider | `rest` | REST/OpenAPI tools |
+| Provider             | Kind    | Description                                |
+| -------------------- | ------- | ------------------------------------------ |
+| MCPProvider          | `mcp`   | Model Context Protocol tools               |
+| RestProvider         | `rest`  | REST/OpenAPI tools                         |
 | InternalToolProvider | `agent` | Built-in tools (final_report, task_status) |
-| AgentProvider | `agent` | Sub-agent invocation |
-| RouterToolProvider | `agent` | Router delegation tool |
+| AgentProvider        | `agent` | Sub-agent invocation                       |
+| RouterToolProvider   | `agent` | Router delegation tool                     |
 
 **Execution Flow**:
+
 1. Validate tool exists in registry
 2. Check tool response cache
 3. Acquire queue slot (if queued)
@@ -209,6 +214,7 @@ for turn = 1 to maxTurns:
 **Responsibility**: Hierarchical operation tracking for debugging and snapshots.
 
 **Structure**:
+
 ```
 Session
 ├── Turn 0 (system setup)
@@ -284,47 +290,47 @@ Session termination states returned in `AIAgentResult.exitCode`.
 
 ### Success States
 
-| Exit Code | Description |
-|-----------|-------------|
-| `EXIT-FINAL-ANSWER` | Agent called `final_report` tool successfully |
-| `EXIT-MAX-TURNS-WITH-RESPONSE` | Max turns reached with valid response |
-| `EXIT-USER-STOP` | User-initiated graceful stop |
+| Exit Code                      | Description                                   |
+| ------------------------------ | --------------------------------------------- |
+| `EXIT-FINAL-ANSWER`            | Agent called `final_report` tool successfully |
+| `EXIT-MAX-TURNS-WITH-RESPONSE` | Max turns reached with valid response         |
+| `EXIT-USER-STOP`               | User-initiated graceful stop                  |
 
 ### LLM Failure States
 
-| Exit Code | Description |
-|-----------|-------------|
-| `EXIT-NO-LLM-RESPONSE` | No response received from any provider |
-| `EXIT-EMPTY-RESPONSE` | Empty response after all retries |
-| `EXIT-AUTH-FAILURE` | Authentication failed (API key invalid) |
-| `EXIT-QUOTA-EXCEEDED` | Account quota exceeded |
-| `EXIT-MODEL-ERROR` | Model returned an error |
+| Exit Code              | Description                             |
+| ---------------------- | --------------------------------------- |
+| `EXIT-NO-LLM-RESPONSE` | No response received from any provider  |
+| `EXIT-EMPTY-RESPONSE`  | Empty response after all retries        |
+| `EXIT-AUTH-FAILURE`    | Authentication failed (API key invalid) |
+| `EXIT-QUOTA-EXCEEDED`  | Account quota exceeded                  |
+| `EXIT-MODEL-ERROR`     | Model returned an error                 |
 
 ### Tool Failure States
 
-| Exit Code | Description |
-|-----------|-------------|
-| `EXIT-TOOL-FAILURE` | Critical tool execution failed |
-| `EXIT-MCP-CONNECTION-LOST` | MCP server disconnected |
-| `EXIT-TOOL-NOT-AVAILABLE` | Requested tool not in registry |
-| `EXIT-TOOL-TIMEOUT` | Tool execution exceeded timeout |
+| Exit Code                  | Description                     |
+| -------------------------- | ------------------------------- |
+| `EXIT-TOOL-FAILURE`        | Critical tool execution failed  |
+| `EXIT-MCP-CONNECTION-LOST` | MCP server disconnected         |
+| `EXIT-TOOL-NOT-AVAILABLE`  | Requested tool not in registry  |
+| `EXIT-TOOL-TIMEOUT`        | Tool execution exceeded timeout |
 
 ### Configuration States
 
-| Exit Code | Description |
-|-----------|-------------|
-| `EXIT-NO-PROVIDERS` | No LLM providers configured |
-| `EXIT-INVALID-MODEL` | Specified model not available |
+| Exit Code              | Description                      |
+| ---------------------- | -------------------------------- |
+| `EXIT-NO-PROVIDERS`    | No LLM providers configured      |
+| `EXIT-INVALID-MODEL`   | Specified model not available    |
 | `EXIT-MCP-INIT-FAILED` | MCP server initialization failed |
 
 ### Limit States
 
-| Exit Code | Description |
-|-----------|-------------|
-| `EXIT-INACTIVITY-TIMEOUT` | Session inactive too long |
-| `EXIT-MAX-RETRIES` | Max retries exhausted without success |
-| `EXIT-TOKEN-LIMIT` | Token limit exceeded |
-| `EXIT-MAX-TURNS-NO-RESPONSE` | Max turns without valid response |
+| Exit Code                    | Description                           |
+| ---------------------------- | ------------------------------------- |
+| `EXIT-INACTIVITY-TIMEOUT`    | Session inactive too long             |
+| `EXIT-MAX-RETRIES`           | Max retries exhausted without success |
+| `EXIT-TOKEN-LIMIT`           | Token limit exceeded                  |
+| `EXIT-MAX-TURNS-NO-RESPONSE` | Max turns without valid response      |
 
 ---
 
@@ -332,16 +338,16 @@ Session termination states returned in `AIAgentResult.exitCode`.
 
 Key configuration options that affect architecture behavior.
 
-| Setting | Type | Description |
-|---------|------|-------------|
-| `targets` | Array | Model fallback chain (provider/model pairs) |
-| `systemPrompt` | String | System prompt template |
-| `maxTurns` | Number | Maximum action turns (default: 25) |
-| `maxRetries` | Number | Max retries per turn (default: 3) |
-| `toolTimeout` | Number | Tool execution timeout in ms |
-| `toolResponseMaxBytes` | Number | Max tool response size before storage |
-| `abortSignal` | AbortSignal | Cancellation signal |
-| `callbacks` | Object | Event callbacks for streaming |
+| Setting                | Type        | Description                                 |
+| ---------------------- | ----------- | ------------------------------------------- |
+| `targets`              | Array       | Model fallback chain (provider/model pairs) |
+| `systemPrompt`         | String      | System prompt template                      |
+| `maxTurns`             | Number      | Maximum action turns (default: 10)          |
+| `maxRetries`           | Number      | Max retries per turn (default: 5)           |
+| `toolTimeout`          | Number      | Tool execution timeout in ms                |
+| `toolResponseMaxBytes` | Number      | Max tool response size before storage       |
+| `abortSignal`          | AbortSignal | Cancellation signal                         |
+| `callbacks`            | Object      | Event callbacks for streaming               |
 
 ---
 

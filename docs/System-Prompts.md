@@ -38,33 +38,44 @@ models:
   - openai/gpt-4o
 maxTurns: 10
 ---
+
 # 1. Role Definition
+
 You are a [role] that [primary function].
 
 # 2. Context
+
 Current time: ${DATETIME}
 User: ${USER}
 
 # 3. Capabilities
+
 You can:
+
 - Do this
 - Do that
 
 # 4. Constraints
+
 You must NOT:
+
 - Do dangerous thing
 - Share sensitive info
 
 # 5. Output Format
+
 Respond in ${FORMAT}.
 
 # 6. Workflow (for complex agents)
+
 Follow these steps:
+
 1. First...
 2. Then...
 3. Finally...
 
 # 7. Shared Content (optional)
+
 ${include:shared/guidelines.md}
 ```
 
@@ -141,12 +152,12 @@ See [System-Prompts-Includes](System-Prompts-Includes) for syntax and patterns.
 
 The `${FORMAT}` variable contains output format instructions based on how the agent is invoked:
 
-| Context | FORMAT value |
-|---------|--------------|
-| Terminal (TTY) | TTY-compatible plain text with ANSI colors |
-| Piped output | Plain text without formatting |
-| JSON output expected | `json` |
-| Slack headend | Slack Block Kit instructions |
+| Context              | FORMAT value                                                                                                                                                                      |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Terminal (TTY)       | `a TTY-compatible plain monospaced text response. Use literal "\x1b[...m" sequences for ANSI colours and avoid decorative boxes. Do not output markdown. Do not wrap long lines.` |
+| Piped output         | `Plain text without any formatting or markdown. Do not wrap long lines.`                                                                                                          |
+| JSON output expected | `json`                                                                                                                                                                            |
+| Slack headend        | `Slack Block Kit JSON array of messages (not raw text or GitHub markdown).`                                                                                                       |
 
 Always include `${FORMAT}` in your prompt to ensure consistent output across contexts.
 
@@ -156,12 +167,12 @@ Always include `${FORMAT}` in your prompt to ensure consistent output across con
 
 This chapter contains four pages:
 
-| Page | Description |
-|------|-------------|
-| **[System-Prompts](System-Prompts)** | This page - overview and anatomy |
-| **[System-Prompts-Writing](System-Prompts-Writing)** | Best practices, structure, patterns, dos and don'ts |
-| **[System-Prompts-Includes](System-Prompts-Includes)** | `@include` syntax, resolution, nesting |
-| **[System-Prompts-Variables](System-Prompts-Variables)** | All variables, when available, examples |
+| Page                                                     | Description                                         |
+| -------------------------------------------------------- | --------------------------------------------------- |
+| **[System-Prompts](System-Prompts)**                     | This page - overview and anatomy                    |
+| **[System-Prompts-Writing](System-Prompts-Writing)**     | Best practices, structure, patterns, dos and don'ts |
+| **[System-Prompts-Includes](System-Prompts-Includes)**   | `@include` syntax, resolution, nesting              |
+| **[System-Prompts-Variables](System-Prompts-Variables)** | All variables, when available, examples             |
 
 ---
 

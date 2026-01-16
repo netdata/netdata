@@ -25,11 +25,11 @@ Configure response caching for agents and tools.
 
 AI Agent supports caching at multiple levels:
 
-| Level | Purpose | Configuration |
-|-------|---------|---------------|
-| Agent | Cache complete agent responses | Frontmatter `cache:` |
-| Tool | Cache individual tool responses | Config `cache:` per server/tool |
-| LLM | Provider-side prompt caching | Provider `cacheStrategy` |
+| Level | Purpose                         | Configuration                   |
+| ----- | ------------------------------- | ------------------------------- |
+| Agent | Cache complete agent responses  | Frontmatter `cache:`            |
+| Tool  | Cache individual tool responses | Config `cache:` per server/tool |
+| LLM   | Provider-side prompt caching    | Provider `cacheStrategy`        |
 
 Caching reduces costs, improves latency, and prevents redundant API calls.
 
@@ -46,7 +46,7 @@ Configure where cached data is stored.
   "cache": {
     "backend": "sqlite",
     "sqlite": {
-      "path": "${HOME}/.ai-agent/cache.db"
+      "path": "~/.ai-agent/cache.db"
     },
     "maxEntries": 5000
   }
@@ -69,12 +69,16 @@ Configure where cached data is stored.
 
 ### Backend Configuration Reference
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `backend` | `string` | `"sqlite"` | Cache backend: `sqlite` or `redis` |
-| `sqlite.path` | `string` | `"${HOME}/.ai-agent/cache.db"` | SQLite database path |
-| `redis.url` | `string` | - | Redis connection URL |
-| `maxEntries` | `number` | `5000` | Maximum cache entries (LRU eviction) |
+| Property          | Type     | Default                  | Description                          |
+| ----------------- | -------- | ------------------------ | ------------------------------------ |
+| `backend`         | `string` | `"sqlite"`               | Cache backend: `sqlite` or `redis`   |
+| `sqlite.path`     | `string` | `"~/.ai-agent/cache.db"` | SQLite database path                 |
+| `redis.url`       | `string` | -                        | Redis connection URL                 |
+| `redis.username`  | `string` | -                        | Redis username                       |
+| `redis.password`  | `string` | -                        | Redis password                       |
+| `redis.database`  | `number` | -                        | Redis database number                |
+| `redis.keyPrefix` | `string` | `"ai-agent:cache:"`      | Redis key prefix                     |
+| `maxEntries`      | `number` | `5000`                   | Maximum cache entries (LRU eviction) |
 
 ---
 
@@ -96,6 +100,7 @@ Answer questions about our documentation.
 ### Cache Key Components
 
 Agent cache keys are computed from:
+
 - **Agent hash**: Expanded system prompt + configuration
 - **User prompt**: The input query
 - **Output format**: Expected format and schema (if any)
@@ -184,6 +189,7 @@ Override cache TTL for specific tools:
 ### Tool Cache Key Components
 
 Tool cache keys are computed from:
+
 - **Tool identity**: Namespace + tool name
 - **Request payload**: All parameters serialized
 
@@ -209,25 +215,26 @@ Anthropic models support server-side prompt caching for cost savings.
 
 ### Cache Strategies
 
-| Strategy | Description |
-|----------|-------------|
-| `full` | Apply ephemeral cache control to messages (default) |
-| `none` | Disable cache control |
+| Strategy | Description                                         |
+| -------- | --------------------------------------------------- |
+| `full`   | Apply ephemeral cache control to messages (default) |
+| `none`   | Disable cache control                               |
 
 ### How It Works
 
 When `cacheStrategy: "full"`:
+
 1. Applies `cacheControl: { type: 'ephemeral' }` to the last valid user message per turn
 2. Anthropic caches the prompt prefix server-side
 3. Subsequent requests with the same prefix use cached tokens
 
 ### Cost Implications
 
-| Token Type | Price Impact |
-|------------|--------------|
-| Cache write | Slightly higher than normal input |
-| Cache read | Significantly lower than normal input |
-| Cache hit | Major cost savings on long prompts |
+| Token Type  | Price Impact                          |
+| ----------- | ------------------------------------- |
+| Cache write | Slightly higher than normal input     |
+| Cache read  | Significantly lower than normal input |
+| Cache hit   | Major cost savings on long prompts    |
 
 ### Cache Token Accounting
 
@@ -236,12 +243,13 @@ When `cacheStrategy: "full"`:
   "type": "llm",
   "inputTokens": 1523,
   "outputTokens": 456,
-  "cacheReadTokens": 1200,
-  "cacheWriteTokens": 323
+  "cacheReadInputTokens": 1200,
+  "cacheWriteInputTokens": 323
 }
 ```
 
 Telemetry metrics:
+
 - `ai_agent_llm_cache_read_tokens_total`
 - `ai_agent_llm_cache_write_tokens_total`
 
@@ -251,15 +259,17 @@ Telemetry metrics:
 
 Cache TTL (Time To Live) can be specified in multiple formats.
 
-| Format | Example | Duration |
-|--------|---------|----------|
-| Disabled | `off` | No caching |
+| Format       | Example | Duration   |
+| ------------ | ------- | ---------- |
+| Disabled     | `off`   | No caching |
 | Milliseconds | `60000` | 60 seconds |
-| Seconds | `30s` | 30 seconds |
-| Minutes | `5m` | 5 minutes |
-| Hours | `1h` | 1 hour |
-| Days | `1d` | 1 day |
-| Weeks | `1w` | 1 week |
+| Seconds      | `30s`   | 30 seconds |
+| Minutes      | `5m`    | 5 minutes  |
+| Hours        | `1h`    | 1 hour     |
+| Days         | `1d`    | 1 day      |
+| Weeks        | `1w`    | 1 week     |
+| Months       | `1mo`   | 30 days    |
+| Years        | `1y`    | 365 days   |
 
 ### Examples
 
@@ -283,6 +293,7 @@ hash(agent_hash + user_prompt + output_format)
 ```
 
 Where `agent_hash` is computed from:
+
 - Expanded system prompt (after variable substitution)
 - All frontmatter configuration
 - Model selection
@@ -309,13 +320,15 @@ All parameters are included, so different parameter values produce different key
 ### Cache Hits
 
 When a cache hit occurs:
+
 - Response returned immediately
 - No LLM or tool calls made
-- Logged at verbose level: `[cache] hit: <key>`
+- Logged at verbose level: `cache hit: <agent_name>` or `cache hit: <tool_name>`
 
 ### Cache Misses
 
 When a cache miss occurs:
+
 - Normal execution proceeds
 - Result stored in cache with TTL
 - Silent (no log by default)
@@ -323,6 +336,7 @@ When a cache miss occurs:
 ### Cache Invalidation
 
 Caches are invalidated when:
+
 - **TTL expires**: Entry removed on next access
 - **Agent modified**: New agent hash = new cache key
 - **Max entries exceeded**: LRU eviction removes oldest entries
@@ -331,6 +345,7 @@ Caches are invalidated when:
 ### Stale Data
 
 Cached responses may become stale:
+
 - External data changes after caching
 - Tool responses reflect old state
 - Use appropriate TTLs for data volatility
@@ -349,7 +364,11 @@ Cached responses may become stale:
       "path": "string"
     },
     "redis": {
-      "url": "string"
+      "url": "string",
+      "username": "string",
+      "password": "string",
+      "database": "number",
+      "keyPrefix": "string"
     },
     "maxEntries": "number"
   }
@@ -405,17 +424,21 @@ cache: "string | number"
 
 ### All Cache Properties
 
-| Location | Property | Type | Default | Description |
-|----------|----------|------|---------|-------------|
-| Global | `cache.backend` | `string` | `"sqlite"` | Backend type |
-| Global | `cache.sqlite.path` | `string` | `"~/.ai-agent/cache.db"` | SQLite path |
-| Global | `cache.redis.url` | `string` | - | Redis URL |
-| Global | `cache.maxEntries` | `number` | `5000` | Max entries |
-| Provider | `cacheStrategy` | `string` | `"full"` | Anthropic cache strategy |
-| MCP Server | `cache` | `string/number` | `"off"` | Server-wide TTL |
-| MCP Server | `toolsCache.<tool>` | `string/number` | Server default | Per-tool TTL |
-| REST Tool | `cache` | `string/number` | `"off"` | Tool TTL |
-| Frontmatter | `cache` | `string/number` | `"off"` | Agent response TTL |
+| Location    | Property                | Type            | Default                  | Description              |
+| ----------- | ----------------------- | --------------- | ------------------------ | ------------------------ |
+| Global      | `cache.backend`         | `string`        | `"sqlite"`               | Backend type             |
+| Global      | `cache.sqlite.path`     | `string`        | `"~/.ai-agent/cache.db"` | SQLite path              |
+| Global      | `cache.redis.url`       | `string`        | -                        | Redis URL                |
+| Global      | `cache.redis.username`  | `string`        | -                        | Redis username           |
+| Global      | `cache.redis.password`  | `string`        | -                        | Redis password           |
+| Global      | `cache.redis.database`  | `number`        | -                        | Redis database number    |
+| Global      | `cache.redis.keyPrefix` | `string`        | `"ai-agent:cache:"`      | Redis key prefix         |
+| Global      | `cache.maxEntries`      | `number`        | `5000`                   | Max entries              |
+| Provider    | `cacheStrategy`         | `string`        | `"full"`                 | Anthropic cache strategy |
+| MCP Server  | `cache`                 | `string/number` | `"off"`                  | Server-wide TTL          |
+| MCP Server  | `toolsCache.<tool>`     | `string/number` | Server default           | Per-tool TTL             |
+| REST Tool   | `cache`                 | `string/number` | `"off"`                  | Tool TTL                 |
+| Frontmatter | `cache`                 | `string/number` | `"off"`                  | Agent response TTL       |
 
 ---
 
@@ -474,31 +497,31 @@ ai-agent --agent test.ai "What is the weather? (fresh)"
 
 ### Do Cache
 
-| Use Case | Suggested TTL |
-|----------|---------------|
-| Static reference data | `1d` - `1w` |
-| Documentation lookups | `1h` - `4h` |
-| API responses (stable) | `15m` - `1h` |
-| Search results | `1h` - `4h` |
-| Expensive computations | `1h` |
+| Use Case               | Suggested TTL |
+| ---------------------- | ------------- |
+| Static reference data  | `1d` - `1w`   |
+| Documentation lookups  | `1h` - `4h`   |
+| API responses (stable) | `15m` - `1h`  |
+| Search results         | `1h` - `4h`   |
+| Expensive computations | `1h`          |
 
 ### Don't Cache
 
-| Use Case | Reason |
-|----------|--------|
-| Real-time data | Stale immediately |
-| User-specific responses | Wrong data for other users |
+| Use Case                     | Reason                          |
+| ---------------------------- | ------------------------------- |
+| Real-time data               | Stale immediately               |
+| User-specific responses      | Wrong data for other users      |
 | Operations with side effects | Cached response != action taken |
-| Security-sensitive queries | Cache may leak data |
+| Security-sensitive queries   | Cache may leak data             |
 
 ### TTL Guidelines
 
-| Data Volatility | TTL |
-|-----------------|-----|
+| Data Volatility  | TTL            |
+| ---------------- | -------------- |
 | Static/immutable | `1w` or longer |
-| Daily updates | `1h` - `4h` |
-| Hourly updates | `15m` - `30m` |
-| Real-time | `off` |
+| Daily updates    | `1h` - `4h`    |
+| Hourly updates   | `15m` - `30m`  |
+| Real-time        | `off`          |
 
 ### Production Recommendations
 

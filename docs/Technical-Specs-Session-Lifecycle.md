@@ -81,22 +81,24 @@ The static factory method validates configuration and creates the session instan
 
 **Steps**:
 
-| Step | Description |
-|------|-------------|
-| 1 | Validate config (providers, MCP servers, prompts) |
-| 2 | Generate unique session transaction ID |
-| 3 | Infer agent path from config |
-| 4 | Enrich config with trace fields |
-| 5 | Create LLMClient with provider configurations |
-| 6 | Instantiate AIAgentSession |
-| 7 | Bind external log relay |
+| Step | Description                                       |
+| ---- | ------------------------------------------------- |
+| 1    | Validate config (providers, MCP servers, prompts) |
+| 2    | Generate unique session transaction ID            |
+| 3    | Infer agent path from config                      |
+| 4    | Enrich config with trace fields                   |
+| 5    | Create LLMClient with provider configurations     |
+| 6    | Instantiate AIAgentSession                        |
+| 7    | Bind external log relay                           |
 
 **Invariants**:
+
 - Config validation throws on invalid input (fail fast)
 - Session always receives a unique `txnId`
 - `originTxnId` defaults to `selfId` for root agents
 
 **Example Transaction IDs**:
+
 ```
 Root agent:    txnId=abc123, originTxnId=abc123
 Sub-agent:     txnId=def456, originTxnId=abc123
@@ -112,26 +114,28 @@ Sets up all session state before execution begins.
 
 **Steps**:
 
-| Step | Action |
-|------|--------|
-| 1 | Store config references |
-| 2 | Set up abort signal listener |
-| 3 | Initialize target context configs |
-| 4 | Compute initial context token count |
-| 5 | Initialize SubAgentRegistry (if configured) |
-| 6 | Set trace IDs |
-| 7 | Initialize opTree (SessionTreeBuilder) |
-| 8 | Initialize progressReporter |
-| 9 | Begin system turn (turn 0) |
-| 10 | Initialize ToolsOrchestrator |
-| 11 | Apply initial session title |
+| Step | Action                                      |
+| ---- | ------------------------------------------- |
+| 1    | Store config references                     |
+| 2    | Set up abort signal listener                |
+| 3    | Initialize target context configs           |
+| 4    | Initialize SubAgentRegistry (if configured) |
+| 5    | Set trace IDs                               |
+| 6    | Initialize opTree (SessionTreeBuilder)      |
+| 7    | Initialize progressReporter                 |
+| 8    | Begin system turn (turn 0)                  |
+| 9    | Initialize ToolsOrchestrator                |
+| 10   | Apply initial session title                 |
+
+Note: Initial context token count is computed in Phase 5 (agent loop execution), not during constructor. |
 
 **Key Initializations**:
+
 ```typescript
-conversation = []           // Empty message array
-currentTurn = 0            // System turn (action turns start at 1)
-currentCtxTokens = 0       // Will be computed
-accounting = []            // Empty entries array
+conversation = []; // Empty message array
+currentTurn = 0; // System turn (action turns start at 1)
+currentCtxTokens = 0; // Will be computed
+accounting = []; // Empty entries array
 ```
 
 ---
@@ -166,11 +170,11 @@ flowchart TD
 
 **Orchestration Features**:
 
-| Feature | Trigger | Behavior |
-|---------|---------|----------|
-| **Advisors** | `advisors` configured | Run in parallel, inject advice into prompt |
-| **Router** | `router.destinations` configured | Route to selected agent |
-| **Handoff** | `handoff` configured | Post-session delegation |
+| Feature      | Trigger                          | Behavior                                   |
+| ------------ | -------------------------------- | ------------------------------------------ |
+| **Advisors** | `advisors` configured            | Run in parallel, inject advice into prompt |
+| **Router**   | `router.destinations` configured | Route to selected agent                    |
+| **Handoff**  | `handoff` configured             | Post-session delegation                    |
 
 ---
 
@@ -182,31 +186,30 @@ Main entry point for session execution.
 
 **Steps**:
 
-| Step | Action |
-|------|--------|
-| 1 | Create OpenTelemetry span |
-| 2 | Emit `agent_started` event |
-| 3 | Warm up tools orchestrator |
-| 4 | Log settings summary (if verbose) |
-| 5 | Log tools banner |
-| 6 | Check pricing coverage |
-| 7 | Expand system and user prompts |
-| 8 | Build enhanced system prompt |
-| 9 | Initialize conversation with messages |
-| 10 | **Execute agent loop** |
-| 11 | Flatten opTree |
-| 12 | End system turn |
-| 13 | End session in opTree |
-| 14 | Emit completion event |
-| 15 | Persist final snapshot |
-| 16 | Flush accounting |
-| 17 | Return AIAgentResult |
+| Step | Action                                           |
+| ---- | ------------------------------------------------ |
+| 1    | Create OpenTelemetry span                        |
+| 2    | Emit `agent_started` event                       |
+| 3    | Warm up tools orchestrator                       |
+| 4    | Log settings summary (if verbose)                |
+| 5    | Log tools banner                                 |
+| 6    | Check pricing coverage                           |
+| 7    | Expand system and user prompts                   |
+| 8    | Build enhanced system prompt                     |
+| 9    | Initialize conversation with messages            |
+| 10   | **Execute agent loop** (delegated to TurnRunner) |
+| 11   | End system turn and session in opTree            |
+| 12   | Flatten opTree                                   |
+| 13   | Emit completion event                            |
+| 14   | Persist final snapshot                           |
+| 15   | Flush accounting                                 |
+| 16   | Return AIAgentResult                             |
 
 ---
 
 ## Phase 5: Agent Loop
 
-**Entry Point**: `executeAgentLoop()`
+**Entry Point**: `TurnRunner.execute()`
 
 The core multi-turn execution loop.
 
@@ -240,12 +243,12 @@ for turn = 1 to maxTurns:
 
 **Key State During Loop**:
 
-| State | Purpose |
-|-------|---------|
-| `currentTurn` | Current turn number (1-based) |
-| `pairCursor` | Provider cycling index |
-| `attempts` | Retry counter for current turn |
-| `forcedFinalTurnReason` | Why tools are restricted |
+| State                   | Purpose                        |
+| ----------------------- | ------------------------------ |
+| `currentTurn`           | Current turn number (1-based)  |
+| `pairCursor`            | Provider cycling index         |
+| `attempts`              | Retry counter for current turn |
+| `forcedFinalTurnReason` | Why tools are restricted       |
 
 ---
 
@@ -276,6 +279,7 @@ sequenceDiagram
 ```
 
 **TurnRequest Structure**:
+
 ```typescript
 {
     messages: CoreMessage[],
@@ -289,6 +293,7 @@ sequenceDiagram
 ```
 
 **TurnResult Structure**:
+
 ```typescript
 {
     status: 'success' | 'rate_limit' | 'auth_error' | ...,
@@ -334,12 +339,12 @@ flowchart TD
 
 **Tool Result Outcomes**:
 
-| Outcome | Conversation Message |
-|---------|---------------------|
-| Success | Tool result content |
-| Timeout | `(tool failed: timeout)` |
-| Error | `(tool failed: <error>)` |
-| Size exceeded | `tool_output` handle reference |
+| Outcome         | Conversation Message                            |
+| --------------- | ----------------------------------------------- |
+| Success         | Tool result content                             |
+| Timeout         | `(tool failed: timeout)`                        |
+| Error           | `(tool failed: <error>)`                        |
+| Size exceeded   | `tool_output` handle reference                  |
 | Budget exceeded | `(tool failed: context window budget exceeded)` |
 
 ---
@@ -347,6 +352,7 @@ flowchart TD
 ## Phase 8: Finalization
 
 **Triggers**:
+
 - `agent__final_report` tool called successfully
 - Max turns reached
 - Context guard enforced (forced final turn)
@@ -355,15 +361,16 @@ flowchart TD
 
 **Steps**:
 
-| Step | Action |
-|------|--------|
-| 1 | Capture final report (status, format, content) |
-| 2 | Validate JSON schema (if applicable) |
-| 3 | Log finalization event |
-| 4 | End all open operations in opTree |
-| 5 | Build AIAgentResult |
+| Step | Action                                         |
+| ---- | ---------------------------------------------- |
+| 1    | Capture final report (status, format, content) |
+| 2    | Validate JSON schema (if applicable)           |
+| 3    | Log finalization event                         |
+| 4    | End all open operations in opTree              |
+| 5    | Build AIAgentResult                            |
 
 **AIAgentResult Structure**:
+
 ```typescript
 {
     success: boolean,
@@ -386,12 +393,14 @@ flowchart TD
 **Trigger**: External `AbortSignal` fires
 
 **Behavior**:
+
 - Checked at turn start
 - Propagated to child operations
 - Current operation may complete
 - Returns `finalizeCanceledSession()` result
 
 **Propagation**:
+
 ```
 AbortSignal → Session → LLMClient → Provider
                     ↘→ ToolsOrchestrator → Tool Providers
@@ -402,6 +411,7 @@ AbortSignal → Session → LLMClient → Provider
 **Trigger**: `stopRef.stopping` set to `true`
 
 **Behavior**:
+
 - Checked at turn start
 - Current turn allowed to complete
 - No new turns started
@@ -413,25 +423,25 @@ AbortSignal → Session → LLMClient → Provider
 
 ### Lifecycle Events
 
-| Event | When | Payload |
-|-------|------|---------|
-| `agent_started` | Session begins | Session config summary |
-| `agent_update` | Progress update | Turn number, status |
-| `agent_finished` | Success completion | Final report |
-| `agent_failed` | Error completion | Error details |
+| Event            | When               | Payload                |
+| ---------------- | ------------------ | ---------------------- |
+| `agent_started`  | Session begins     | Session config summary |
+| `agent_update`   | Progress update    | Turn number, status    |
+| `agent_finished` | Success completion | Final report           |
+| `agent_failed`   | Error completion   | Error details          |
 
 ### Key Log Events
 
-| Event | Severity | Description |
-|-------|----------|-------------|
-| `agent:init` | INF | Session initialized |
-| `agent:settings` | VRB | Configuration summary |
-| `agent:tools` | INF | Tool banner (available tools) |
-| `agent:turn-start` | INF | Turn begins |
-| `agent:final-turn` | WRN | Final turn detected |
-| `agent:context` | WRN | Context guard events |
-| `agent:final-report-accepted` | INF | Final report committed |
-| `agent:fin` | INF | Session finalized |
+| Event                         | Severity | Description                   |
+| ----------------------------- | -------- | ----------------------------- |
+| `agent:init`                  | INF      | Session initialized           |
+| `agent:settings`              | VRB      | Configuration summary         |
+| `agent:tools`                 | INF      | Tool banner (available tools) |
+| `agent:turn-start`            | INF      | Turn begins                   |
+| `agent:final-turn`            | WRN      | Final turn detected           |
+| `agent:context`               | WRN      | Context guard events          |
+| `agent:final-report-accepted` | INF      | Final report committed        |
+| `agent:fin`                   | INF      | Session finalized             |
 
 ---
 

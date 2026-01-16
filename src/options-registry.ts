@@ -230,7 +230,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   strDef({
     key: "reasoningTokens",
     description:
-      "Reasoning token budget for Anthropics thinking mode (0 disables).",
+      "Reasoning token budget for Anthropic thinking mode (0 disables).",
     cli: { names: ["--reasoning-tokens"], showInHelp: true },
     fm: { allowed: true, key: "reasoningTokens" },
     config: { path: "defaults.reasoningValue" },

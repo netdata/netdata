@@ -21,14 +21,15 @@ Build complex workflows with advisors, routers, handoffs, and sub-agents. Each p
 
 AI Agent supports four orchestration patterns:
 
-| Pattern | When to Use | How it Works |
-|---------|-------------|--------------|
-| **Sub-Agents** | Delegate specific tasks | Parent calls child as a tool |
-| **Advisors** | Get expert opinions first | Multiple agents run in parallel before main |
-| **Router** | Dynamic request routing | LLM decides which handler to invoke |
-| **Handoff** | Sequential processing | Output passes to next agent |
+| Pattern        | When to Use               | How it Works                                |
+| -------------- | ------------------------- | ------------------------------------------- |
+| **Sub-Agents** | Delegate specific tasks   | Parent calls child as a tool                |
+| **Advisors**   | Get expert opinions first | Multiple agents run in parallel before main |
+| **Router**     | Dynamic request routing   | LLM decides which handler to invoke         |
+| **Handoff**    | Sequential processing     | Output passes to next agent                 |
 
 **Execution order when combined:**
+
 1. Advisors run in parallel
 2. Main agent runs with advisory context
 3. If router used, destination runs
@@ -162,8 +163,8 @@ The main agent sees all advisory blocks before processing.
 If an advisor fails (timeout, error), a synthetic advisory is created:
 
 ```xml
-<advisory agent="legal" status="failed">
-Advisory unavailable: timeout after 60000ms
+<advisory agent="legal">
+Advisor consultation failed for legal: timeout after 60000ms
 </advisory>
 ```
 
@@ -213,6 +214,7 @@ The router pattern exposes a special `router__handoff-to` tool:
 ```
 
 **Arguments:**
+
 - `agent` (required): Destination agent name (filename without `.ai`)
 - `message` (optional): Context to pass to the destination
 
@@ -221,12 +223,12 @@ The router pattern exposes a special `router__handoff-to` tool:
 The optional `message` becomes an advisory for the destination:
 
 ```xml
-<advisory agent="router">
+<advisory agent="decision-maker">
 User is experiencing login issues on mobile
 </advisory>
 ```
 
-This helps the destination agent understand why it was invoked.
+The advisory agent is the name of the agent that made the routing decision (not "router"). This helps the destination agent understand why it was invoked.
 
 ---
 
@@ -294,15 +296,15 @@ Use multiple patterns together for complex workflows:
 models:
   - openai/gpt-4o
 advisors:
-  - ./advisors/context.ai      # Gather context first
+  - ./advisors/context.ai # Gather context first
 agents:
-  - ./workers/researcher.ai    # Callable workers
+  - ./workers/researcher.ai # Callable workers
   - ./workers/analyst.ai
 router:
-  destinations:                 # Dynamic routing option
+  destinations: # Dynamic routing option
     - ./handlers/simple.ai
     - ./handlers/complex.ai
-handoff: ./finalizer.ai        # Post-process result
+handoff: ./finalizer.ai # Post-process result
 ---
 ```
 
@@ -369,8 +371,8 @@ Sub-agents have their own timeouts. Set appropriate limits:
 ---
 agents:
   - ./slow-research.ai
-llmTimeout: 300000    # 5 minutes for complex sub-tasks
-toolTimeout: 180000   # 3 minutes per tool (including sub-agents)
+llmTimeout: 300000 # 5 minutes for complex sub-tasks
+toolTimeout: 180000 # 3 minutes per tool (including sub-agents)
 ---
 ```
 
@@ -399,12 +401,12 @@ Each agent should do one thing well:
 
 ```yaml
 # Good: Focused agents
-- researcher.ai      # Only research
-- synthesizer.ai     # Only synthesis
-- formatter.ai       # Only formatting
+- researcher.ai # Only research
+- synthesizer.ai # Only synthesis
+- formatter.ai # Only formatting
 
 # Avoid: Kitchen-sink agents
-- do-everything.ai   # Research, analyze, format, publish...
+- do-everything.ai # Research, analyze, format, publish...
 ```
 
 **Why:** Focused agents are easier to test, debug, and reuse.

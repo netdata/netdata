@@ -22,6 +22,7 @@ Expose agents as MCP (Model Context Protocol) tools for AI-powered clients like 
 ## Overview
 
 The MCP headend makes your agents available as tools for MCP-aware clients:
+
 - **Claude Code** - Desktop AI assistant
 - **Codex CLI** - OpenAI's command-line tool
 - **Gemini CLI** - Google's command-line tool
@@ -29,6 +30,7 @@ The MCP headend makes your agents available as tools for MCP-aware clients:
 - **Any MCP-compatible client**
 
 **Key features**:
+
 - Multiple transport options (stdio, HTTP, SSE, WebSocket)
 - Each agent exposed as a single MCP tool
 - Automatic schema generation from agent configuration
@@ -56,22 +58,24 @@ ai-agent --agent chat.ai --mcp http:8081
 
 ### --mcp
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Format | `stdio` or `<transport>:<port>` |
-| Required | Yes (to enable MCP headend) |
-| Repeatable | Yes |
+| Property   | Value                           |
+| ---------- | ------------------------------- |
+| Type       | `string`                        |
+| Format     | `stdio` or `<transport>:<port>` |
+| Required   | Yes (to enable MCP headend)     |
+| Repeatable | Yes                             |
 
 **Description**: MCP transport specification. Can be specified multiple times to enable multiple transports.
 
 **Valid formats**:
+
 - `stdio` - Standard input/output
 - `http:<port>` - HTTP streaming transport
 - `sse:<port>` - Server-Sent Events transport
 - `ws:<port>` - WebSocket transport
 
 **Example**:
+
 ```bash
 # Single transport
 ai-agent --agent chat.ai --mcp stdio
@@ -86,12 +90,12 @@ ai-agent --agent chat.ai --mcp stdio --mcp http:8081 --mcp sse:8082
 
 ### stdio
 
-| Property | Value |
-|----------|-------|
-| Protocol | Standard input/output pipes |
-| Sessions | Single connection only |
-| Concurrency | No limiting |
-| Use case | CLI integration (Claude Code, etc.) |
+| Property    | Value                               |
+| ----------- | ----------------------------------- |
+| Protocol    | Standard input/output pipes         |
+| Sessions    | Single connection only              |
+| Concurrency | No limiting                         |
+| Use case    | CLI integration (Claude Code, etc.) |
 
 Communicates via stdin/stdout. Best for local CLI tools.
 
@@ -101,12 +105,12 @@ ai-agent --agent chat.ai --mcp stdio
 
 ### HTTP (Streamable)
 
-| Property | Value |
-|----------|-------|
-| Protocol | HTTP POST with streaming responses |
-| Sessions | Multiple via `mcp-session-id` header |
-| Concurrency | Default 10 concurrent sessions |
-| Endpoint | `POST /mcp` |
+| Property    | Value                                |
+| ----------- | ------------------------------------ |
+| Protocol    | HTTP POST with streaming responses   |
+| Sessions    | Multiple via `mcp-session-id` header |
+| Concurrency | Default 10 concurrent sessions       |
+| Endpoint    | `POST /mcp`                          |
 
 ```bash
 ai-agent --agent chat.ai --mcp http:8081
@@ -114,12 +118,12 @@ ai-agent --agent chat.ai --mcp http:8081
 
 ### SSE (Server-Sent Events)
 
-| Property | Value |
-|----------|-------|
-| Protocol | Server-Sent Events |
-| Sessions | Multiple concurrent clients |
-| Concurrency | Default 10 concurrent sessions |
-| Endpoints | `GET /mcp/sse` (stream), `POST /mcp/sse/message` (send) |
+| Property    | Value                                                   |
+| ----------- | ------------------------------------------------------- |
+| Protocol    | Server-Sent Events                                      |
+| Sessions    | Multiple concurrent clients                             |
+| Concurrency | Default 10 concurrent sessions                          |
+| Endpoints   | `GET /mcp/sse` (stream), `POST /mcp/sse/message` (send) |
 
 Legacy SSE transport for backwards compatibility.
 
@@ -129,12 +133,12 @@ ai-agent --agent chat.ai --mcp sse:8082
 
 ### WebSocket
 
-| Property | Value |
-|----------|-------|
-| Protocol | WebSocket (ws://) |
-| Sessions | Per-connection |
+| Property    | Value                          |
+| ----------- | ------------------------------ |
+| Protocol    | WebSocket (ws://)              |
+| Sessions    | Per-connection                 |
 | Concurrency | Default 10 concurrent sessions |
-| Subprotocol | `mcp` |
+| Subprotocol | `mcp`                          |
 
 Bi-directional streaming communication.
 
@@ -148,11 +152,11 @@ ai-agent --agent chat.ai --mcp ws:8083
 
 Each agent becomes an MCP tool. The tool definition is derived from the agent configuration:
 
-| Tool Field | Source |
-|------------|--------|
-| `name` | Filename (without `.ai`) or frontmatter `toolName` |
-| `description` | Frontmatter `description` |
-| `inputSchema` | Frontmatter `input` or default schema |
+| Tool Field    | Source                                             |
+| ------------- | -------------------------------------------------- |
+| `name`        | Filename (without `.ai`) or frontmatter `toolName` |
+| `description` | Frontmatter `description`                          |
+| `inputSchema` | Frontmatter `input` or default schema              |
 
 ### Default Input Schema
 
@@ -168,8 +172,15 @@ When an agent has no custom input schema:
     },
     "format": {
       "type": "string",
-      "enum": ["markdown", "json", "text"],
-      "default": "markdown"
+      "enum": [
+        "markdown",
+        "markdown+mermaid",
+        "slack-block-kit",
+        "tty",
+        "pipe",
+        "json",
+        "sub-agent"
+      ]
     },
     "schema": {
       "type": "object",
@@ -222,6 +233,7 @@ In your `claude_desktop_config.json` (or MCP settings):
 ```
 
 **Config file locations**:
+
 - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 - Linux: `~/.config/claude/claude_desktop_config.json`
@@ -309,7 +321,10 @@ When an MCP client calls your agent:
     "schema": {
       "type": "object",
       "properties": {
-        "sentiment": { "type": "string", "enum": ["positive", "negative", "neutral"] },
+        "sentiment": {
+          "type": "string",
+          "enum": ["positive", "negative", "neutral"]
+        },
         "confidence": { "type": "number" }
       },
       "required": ["sentiment", "confidence"]
@@ -324,11 +339,15 @@ When an MCP client calls your agent:
 
 **Important**: MCP tool calls **must** include a `format` argument.
 
-| Format | Schema Required | Description |
-|--------|-----------------|-------------|
-| `markdown` | No | Rich text output (default) |
-| `text` | No | Plain text output |
-| `json` | Yes | Structured JSON output |
+| Format             | Schema Required | Description                                      |
+| ------------------ | --------------- | ------------------------------------------------ |
+| `markdown`         | No              | GitHub Markdown                                  |
+| `markdown+mermaid` | No              | GitHub Markdown with Mermaid diagrams            |
+| `slack-block-kit`  | No              | Slack Block Kit payload                          |
+| `tty`              | No              | TTY-compatible monospaced text with ANSI colours |
+| `pipe`             | No              | Plain text (no formatting)                       |
+| `json`             | Yes             | JSON object                                      |
+| `sub-agent`        | No              | Internal agent-to-agent exchange format          |
 
 When `format=json`, you must also provide a `schema`:
 
@@ -359,10 +378,11 @@ The MCP server exposes standard MCP capabilities:
 
 ```json
 {
-  "name": "ai-agent",
+  "name": "ai-agent-mcp-headend",
   "version": "1.0.0",
   "capabilities": {
-    "tools": {}
+    "tools": {},
+    "logging": {}
   }
 }
 ```
@@ -378,11 +398,13 @@ If `instructions` are configured, they appear in `getInstructions()` responses.
 **Symptom**: Agent tools don't show up in Claude Code or other clients.
 
 **Possible causes**:
+
 1. MCP server not started
 2. Client configuration incorrect
 3. Agent not registered
 
 **Solutions**:
+
 1. Verify ai-agent is running with `--mcp` flag
 2. Check client config file path and syntax
 3. Verify `--agent` flag points to valid agent file
@@ -392,11 +414,13 @@ If `instructions` are configured, they appear in `getInstructions()` responses.
 **Symptom**: Client cannot connect to MCP server.
 
 **Possible causes**:
+
 1. Wrong port number
 2. Server not running
 3. Firewall blocking connection
 
 **Solutions**:
+
 1. Verify port matches between server and client config
 2. Check ai-agent process is running
 3. Check firewall rules for the port
@@ -408,6 +432,7 @@ If `instructions` are configured, they appear in `getInstructions()` responses.
 **Cause**: MCP tools require explicit `format` argument.
 
 **Solution**: Always include `format` in tool arguments:
+
 ```json
 {
   "prompt": "Hello",
@@ -422,6 +447,7 @@ If `instructions` are configured, they appear in `getInstructions()` responses.
 **Cause**: JSON format requires a schema.
 
 **Solution**: Include `schema` when using `format: "json"`:
+
 ```json
 {
   "prompt": "Extract data",
@@ -435,10 +461,12 @@ If `instructions` are configured, they appear in `getInstructions()` responses.
 **Symptom**: Long-running requests timeout.
 
 **Possible causes**:
+
 1. Concurrency limit reached
 2. Agent execution taking too long
 
 **Solutions**:
+
 1. Check if other sessions are active
 2. Review agent timeout settings
 3. Consider increasing concurrency limit

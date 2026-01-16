@@ -268,10 +268,10 @@ models:
 
 **Retry mechanism**:
 
-- For each turn, the system cycles through all configured provider/model pairs
+- For each turn, system cycles through all configured provider/model pairs
 - Up to `maxRetries` attempts are made per turn (default: 3)
 - Each attempt tries the next model in the sequence (wrapping around if needed)
-- Example: With models [A, B, C] and maxRetries=3, a single failing turn could try: A, B, C, A, B before giving up
+- Example: With models [A, B, C] and maxRetries=3, a single failing turn could try: A, B, C, A, B, C, A, B before giving up
 
 **Fallback triggers**:
 

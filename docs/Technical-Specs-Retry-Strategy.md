@@ -37,6 +37,7 @@ Retry strategy affects you when:
 - **Unexpected completion**: Forced final turn triggered
 
 Understanding retries helps you:
+
 - Configure appropriate retry limits
 - Set up effective provider fallbacks
 - Debug "retry exhausted" failures
@@ -52,10 +53,10 @@ Each LLM turn result includes a retry directive.
 
 ```typescript
 interface TurnRetryDirective {
-    action: 'retry' | 'skip-provider' | 'abort';
-    backoffMs?: number;      // Optional wait time
-    logMessage?: string;     // Human-readable reason
-    sources?: string[];      // Error sources
+  action: "retry" | "skip-provider" | "abort";
+  backoffMs?: number; // Optional wait time
+  logMessage?: string; // Human-readable reason
+  sources?: string[]; // Error sources
 }
 ```
 
@@ -92,36 +93,36 @@ flowchart TD
 
 ## Error Classification
 
-### Fatal Errors (No Retry)
+### Skip-Provider Errors
 
-These errors immediately terminate the session.
+These errors skip the current provider but continue with others.
 
-| Status | Condition | Exit Code | Reason |
-|--------|-----------|-----------|--------|
-| `auth_error` | Invalid API key | EXIT-AUTH-FAILURE | Cannot recover |
-| `quota_exceeded` | Account quota hit | EXIT-QUOTA-EXCEEDED | Cannot recover |
+| Status           | Condition                         | Exit Code | Reason                |
+| ---------------- | --------------------------------- | --------- | --------------------- |
+| `auth_error`     | Invalid API key                   | -         | Skip to next provider |
+| `quota_exceeded` | Account quota hit                 | -         | Skip to next provider |
+| `model_error`    | Model unavailable (non-retryable) | -         | Skip to next provider |
 
 ### Retryable Errors
 
-These errors trigger retry with the next provider.
+These errors trigger retry with backoff.
 
-| Status | Condition | Backoff | Behavior |
-|--------|-----------|---------|----------|
-| `rate_limit` | Too many requests | Yes (provider-specified or exponential) | Wait then retry |
-| `model_error` | Model unavailable | No | Skip to next provider |
-| `network_error` | Connection failed | No | Immediate retry |
-| `timeout` | Request timeout | No | Immediate retry |
-| `invalid_response` | Malformed response | No | Immediate retry |
+| Status             | Condition          | Backoff                                 | Behavior        |
+| ------------------ | ------------------ | --------------------------------------- | --------------- |
+| `rate_limit`       | Too many requests  | Yes (provider-specified or exponential) | Wait then retry |
+| `network_error`    | Connection failed  | Yes (graduated, max 30s)                | Wait then retry |
+| `timeout`          | Request timeout    | Yes (graduated, max 30s)                | Wait then retry |
+| `invalid_response` | Malformed response | No                                      | Immediate retry |
 
 ### Skip-Provider Errors
 
 These errors skip the current provider but continue with others.
 
-| Condition | Action |
-|-----------|--------|
-| Model not supported by provider | Skip to next target |
-| Provider temporary issue | Skip to next target |
-| Context too large for provider | Skip to next target |
+| Status           | Condition                         | Action                |
+| ---------------- | --------------------------------- | --------------------- |
+| `auth_error`     | Invalid API key                   | Skip to next provider |
+| `quota_exceeded` | Account quota hit                 | Skip to next provider |
+| `model_error`    | Model unavailable (non-retryable) | Skip to next provider |
 
 ---
 
@@ -151,12 +152,14 @@ graph LR
 ```
 
 **Selection Formula**:
+
 ```
 target = targets[pairCursor % targets.length]
 pairCursor++
 ```
 
 **Behavior**:
+
 - Cycles through all configured targets
 - Wraps around when array exhausted
 - Each attempt increments cursor
@@ -169,11 +172,11 @@ let rateLimitedInCycle = 0;
 let maxRateLimitWaitMs = 0;
 ```
 
-| Scenario | Behavior |
-|----------|----------|
-| One provider rate-limited | Continue to next |
+| Scenario                   | Behavior               |
+| -------------------------- | ---------------------- |
+| One provider rate-limited  | Continue to next       |
 | All providers rate-limited | Wait max observed time |
-| After successful turn | Reset counters |
+| After successful turn      | Reset counters         |
 
 ---
 
@@ -203,12 +206,13 @@ flowchart TD
 
 ### Backoff Values
 
-| Constant | Value | Purpose |
-|----------|-------|---------|
-| `RATE_LIMIT_MIN_WAIT_MS` | 1,000 | Minimum wait time |
+| Constant                 | Value  | Purpose           |
+| ------------------------ | ------ | ----------------- |
+| `RATE_LIMIT_MIN_WAIT_MS` | 1,000  | Minimum wait time |
 | `RATE_LIMIT_MAX_WAIT_MS` | 60,000 | Maximum wait time |
 
 **Fallback Formula**:
+
 ```
 fallbackWait = min(max(attempts * 1000, 1000), 60000)
 ```
@@ -242,6 +246,7 @@ flowchart TD
 ```
 
 **Behavior**:
+
 1. Log warning: "Synthetic retry: assistant returned content without tool calls"
 2. Add TURN-FAILED guidance message to conversation
 3. Increment attempt counter
@@ -252,6 +257,7 @@ flowchart TD
 **Trigger**: Tool call has malformed JSON parameters.
 
 **Behavior**:
+
 1. Preserve tool call with sanitization marker
 2. Log ERR with full original payload
 3. Return tool failure response: `(tool failed: invalid JSON parameters)`
@@ -280,6 +286,7 @@ stateDiagram-v2
 ```
 
 **Actions**:
+
 1. Set `forcedFinalTurnReason = 'context'`
 2. Inject instruction message
 3. Restrict tools to `agent__final_report`
@@ -291,6 +298,7 @@ stateDiagram-v2
 **Trigger**: `currentTurn === maxTurns`
 
 **Actions**:
+
 1. Set `forcedFinalTurnReason = 'maxTurns'`
 2. Inject instruction message
 3. Restrict tools to `agent__final_report`
@@ -304,6 +312,7 @@ stateDiagram-v2
 ### Attempt Tracking
 
 `finalReportAttempts` increments when:
+
 - Sanitizer drops malformed `final_report` calls
 - Tool executor receives legitimate `final_report` call
 
@@ -311,11 +320,11 @@ stateDiagram-v2
 
 When final report is attempted or incomplete detection triggers:
 
-| Step | Action |
-|------|--------|
-| 1 | Set `maxTurns = currentTurn + 1` |
-| 2 | Log `agent:orchestrator` with old/new limits |
-| 3 | Emit `ai_agent_retry_collapse_total` metric |
+| Step | Action                                       |
+| ---- | -------------------------------------------- |
+| 1    | Set `maxTurns = currentTurn + 1`             |
+| 2    | Log `agent:orchestrator` with old/new limits |
+| 3    | Emit `ai_agent_retry_collapse_total` metric  |
 
 ### Pending Cache
 
@@ -350,22 +359,22 @@ When exhausted without valid final report:
 
 ### Key Settings
 
-| Setting | Type | Default | Effect |
-|---------|------|---------|--------|
-| `maxRetries` | number | 3 | Total attempts per turn (initial + retries) |
-| `maxTurns` | number | 25 | When to enforce final turn |
-| `targets` | array | - | Provider/model cycling pool |
-| `llmTimeout` | number | varies | Request timeout threshold |
+| Setting      | Type   | Default | Effect                                      |
+| ------------ | ------ | ------- | ------------------------------------------- |
+| `maxRetries` | number | 3       | Total attempts per turn (initial + retries) |
+| `maxTurns`   | number | 10      | When to enforce final turn                  |
+| `targets`    | array  | -       | Provider/model cycling pool                 |
+| `llmTimeout` | number | 600000  | Request timeout threshold (10 minutes)      |
 
 ### Retry vs. Attempts
 
 > **Note**: `maxRetries: 3` means **3 total attempts**, not "initial + 3 retries".
 
 | maxRetries | Total Attempts | Retries After Initial |
-|------------|----------------|----------------------|
-| 1 | 1 | 0 |
-| 2 | 2 | 1 |
-| 3 | 3 | 2 |
+| ---------- | -------------- | --------------------- |
+| 1          | 1              | 0                     |
+| 2          | 2              | 1                     |
+| 3          | 3              | 2                     |
 
 ### Example Configuration
 
@@ -386,23 +395,23 @@ models:
 
 ### Per Retry Attempt
 
-| Metric | Description |
-|--------|-------------|
-| `attempt` | Attempt number (1-based) |
-| `provider` | Provider name |
-| `model` | Model name |
-| `status` | Result status |
-| `latencyMs` | Request latency |
-| `errorDetails` | Error information (if failed) |
-| `backoffMs` | Backoff duration (if rate-limited) |
+| Metric         | Description                        |
+| -------------- | ---------------------------------- |
+| `attempt`      | Attempt number (1-based)           |
+| `provider`     | Provider name                      |
+| `model`        | Model name                         |
+| `status`       | Result status                      |
+| `latencyMs`    | Request latency                    |
+| `errorDetails` | Error information (if failed)      |
+| `backoffMs`    | Backoff duration (if rate-limited) |
 
 ### Per Turn
 
-| Metric | Description |
-|--------|-------------|
-| `totalAttempts` | Attempts used this turn |
-| `finalStatus` | Turn outcome |
-| `retryLoopDurationMs` | Time in retry loop |
+| Metric                | Description             |
+| --------------------- | ----------------------- |
+| `totalAttempts`       | Attempts used this turn |
+| `finalStatus`         | Turn outcome            |
+| `retryLoopDurationMs` | Time in retry loop      |
 
 ---
 
@@ -413,11 +422,13 @@ models:
 **Symptom**: Session fails after few attempts.
 
 **Causes**:
+
 - `maxRetries` too low
 - All providers returning same error
 - Only one target configured
 
 **Solutions**:
+
 1. Increase `maxRetries` (consider cost implications)
 2. Add more diverse providers to `targets`
 3. Check provider error logs for patterns
@@ -427,11 +438,13 @@ models:
 **Symptom**: Many retries but no progress.
 
 **Causes**:
+
 - Model consistently returning content without tools
 - Final turn instructions unclear
 - Tool schema issues
 
 **Solutions**:
+
 1. Review system prompt for clear tool usage instructions
 2. Check model's tool-calling capabilities
 3. Simplify available tools
@@ -442,11 +455,13 @@ models:
 **Symptom**: Session pauses for extended periods.
 
 **Causes**:
+
 - Provider rate limits aggressive
 - Single provider in targets
 - High request volume
 
 **Solutions**:
+
 1. Add more providers to distribute load
 2. Implement request queuing
 3. Upgrade provider plan
@@ -457,11 +472,13 @@ models:
 **Symptom**: "Synthetic retry" warnings when expecting response.
 
 **Causes**:
+
 - Model misunderstanding task
 - Missing tool schemas
 - Prompt unclear about tool requirement
 
 **Solutions**:
+
 1. Review prompt for clarity
 2. Verify tools are correctly registered
 3. Check for tool schema issues
@@ -476,7 +493,7 @@ These rules MUST hold:
 1. **Retry cap honored**: Never exceed `maxRetries` per turn
 2. **Provider cycling**: Round-robin through all targets
 3. **Backoff respected**: Wait before retry when directed
-4. **Fatal errors immediate**: No retry on `auth_error`/`quota_exceeded`
+4. **Skip-provider errors**: `auth_error`/`quota_exceeded`/non-retryable `model_error` skip to next provider
 5. **Conversation integrity**: Failed attempts don't corrupt history
 6. **Final turn enforcement**: Last turn restricted to `final_report`
 

@@ -27,6 +27,7 @@ Include directives let you share prompt content across multiple agents. This is 
 - **Composition**: Build agents from modular pieces
 
 **Key facts**:
+
 - Includes are resolved at load time, before variable substitution
 - Nested includes are supported (includes can include other files)
 - Maximum nesting depth is 8 levels (prevents infinite recursion)
@@ -48,14 +49,17 @@ The content of the referenced file replaces the directive entirely.
 **Example**:
 
 `shared/tone.md`:
+
 ```markdown
 ## Tone and Voice
+
 - Be professional but friendly
 - Use simple, clear language
 - Avoid jargon
 ```
 
 `my-agent.ai`:
+
 ```yaml
 ---
 models:
@@ -69,10 +73,12 @@ Answer the user's questions clearly.
 ```
 
 **Result** (after include resolution):
+
 ```markdown
 You are a helpful assistant.
 
 ## Tone and Voice
+
 - Be professional but friendly
 - Use simple, clear language
 - Avoid jargon
@@ -90,8 +96,8 @@ Paths are resolved relative to the file containing the include directive.
 
 ```markdown
 ${include:shared/file.md}          # Same directory, then shared/
-${include:../common/file.md}       # Parent directory, then common/
-${include:./helpers/file.md}       # Explicit current directory
+${include:../common/file.md} # Parent directory, then common/
+${include:./helpers/file.md} # Explicit current directory
 ```
 
 ### Project Structure Example
@@ -109,6 +115,7 @@ my-project/
 ```
 
 From `agents/main.ai`:
+
 ```markdown
 ${include:../shared/tone.md}              # Goes up one level, into shared/
 ${include:../shared/domain/product-info.md}
@@ -117,8 +124,9 @@ ${include:../shared/domain/product-info.md}
 ### Absolute Paths (Not Supported)
 
 Absolute paths do not work:
+
 ```markdown
-${include:/home/user/project/shared/file.md}  # Will fail
+${include:/home/user/project/shared/file.md} # Will fail
 ```
 
 Use relative paths instead.
@@ -132,27 +140,34 @@ Includes can contain other includes. Each file's includes are resolved relative 
 ### Example
 
 `shared/all-guidelines.md`:
+
 ```markdown
 ## Guidelines
+
 ${include:safety.md}
 ${include:tone.md}
 ```
 
 `shared/safety.md`:
+
 ```markdown
 ### Safety Rules
+
 - Never share credentials
 - Verify before destructive actions
 ```
 
 `shared/tone.md`:
+
 ```markdown
 ### Tone
+
 - Be professional
 - Be concise
 ```
 
 `agents/main.ai`:
+
 ```yaml
 ---
 models:
@@ -164,14 +179,19 @@ ${include:../shared/all-guidelines.md}
 ```
 
 **Final result**:
+
 ```markdown
 You are a helpful assistant.
 
 ## Guidelines
+
 ### Safety Rules
+
 - Never share credentials
 - Verify before destructive actions
+
 ### Tone
+
 - Be professional
 - Be concise
 ```
@@ -184,6 +204,8 @@ Maximum nesting depth is 8 levels. If exceeded, you'll get an error:
 Maximum include depth (8) exceeded - possible circular reference or deeply nested includes
 ```
 
+**Note**: The depth value in the error message matches the actual limit (8).
+
 ---
 
 ## Common Patterns
@@ -193,8 +215,10 @@ Maximum include depth (8) exceeded - possible circular reference or deeply neste
 Create consistent behavior across all agents.
 
 `shared/guidelines.md`:
+
 ```markdown
 ## Guidelines
+
 - Be helpful and concise
 - Cite sources for factual claims
 - Acknowledge uncertainty rather than guessing
@@ -202,6 +226,7 @@ Create consistent behavior across all agents.
 ```
 
 `any-agent.ai`:
+
 ```yaml
 ---
 models:
@@ -219,8 +244,10 @@ Help users find accurate information.
 Maintain consistent personality.
 
 `shared/tone.md`:
+
 ```markdown
 ## Tone and Voice
+
 - Professional but friendly
 - Use simple language (no jargon)
 - Be direct and actionable
@@ -232,16 +259,19 @@ Maintain consistent personality.
 Enforce security boundaries.
 
 `shared/safety-gates.md`:
+
 ```markdown
 ## Safety Rules
 
 **NEVER:**
+
 - Share API keys, passwords, or credentials
 - Execute destructive operations without confirmation
 - Access files outside the specified scope
 - Make changes to production systems without approval
 
 **ALWAYS:**
+
 - Verify user permissions before sensitive operations
 - Ask for confirmation on irreversible actions
 - Log all significant actions
@@ -253,6 +283,7 @@ Enforce security boundaries.
 Share product/company information.
 
 `shared/domain/product-info.md`:
+
 ```markdown
 ## Product Information
 
@@ -261,12 +292,14 @@ Share product/company information.
 **Pricing**: $49/month (Starter), $199/month (Pro), $499/month (Enterprise)
 
 **Key Features**:
+
 - Real-time dashboards
 - Custom alerts
 - API access (Pro and above)
 - SSO integration (Enterprise only)
 
 **Support Channels**:
+
 - Email: support@acme.com
 - Chat: Available 9am-6pm EST
 - Phone: Enterprise only
@@ -277,6 +310,7 @@ Share product/company information.
 Standardize response structure.
 
 `shared/output-template.md`:
+
 ```markdown
 ## Response Structure
 
@@ -351,6 +385,7 @@ shared/
 One topic per file. Easier to mix and match.
 
 **Good**:
+
 ```
 safety.md      - Safety rules only
 tone.md        - Tone guidelines only
@@ -358,6 +393,7 @@ output.md      - Output formatting only
 ```
 
 **Avoid**:
+
 ```
 everything.md  - All guidelines in one file
 ```
@@ -386,6 +422,7 @@ ${include:shared/safety/customer-data.md}
 ### 4. Version Control Shared Files
 
 Shared includes affect multiple agents. Track changes carefully:
+
 - Review changes to shared files before deploying
 - Consider the impact on all agents using the include
 - Test representative agents after modifying shared content
@@ -395,6 +432,7 @@ Shared includes affect multiple agents. Track changes carefully:
 Keep nesting shallow (2-3 levels max). Deep nesting makes debugging harder.
 
 **Prefer**:
+
 ```markdown
 ${include:safety.md}
 ${include:tone.md}
@@ -402,8 +440,9 @@ ${include:output.md}
 ```
 
 **Over**:
+
 ```markdown
-${include:all-config.md}  # Which includes safety.md, which includes...
+${include:all-config.md} # Which includes safety.md, which includes...
 ```
 
 ---
@@ -417,21 +456,23 @@ ${include:all-config.md}  # Which includes safety.md, which includes...
 **Cause**: Path is wrong or file doesn't exist.
 
 **Fix**:
+
 1. Check the path is relative to the including file
 2. Verify the file exists
 3. Check for typos in the filename
 
 ```markdown
 # If you're in agents/main.ai and shared/ is at the project root:
+
 ${include:../shared/tone.md}    # Correct - go up one level
-${include:shared/tone.md}       # Wrong - looks in agents/shared/
+${include:shared/tone.md} # Wrong - looks in agents/shared/
 ```
 
 ### "including this file is forbidden"
 
 **Problem**: Trying to include a protected file.
 
-**Cause**: Attempting to include `.env` or other sensitive files.
+**Cause**: Attempting to include a file named exactly `.env` (case-insensitive). The security check only blocks files named `.env`; files like `.env.local`, `.env.production`, or `my.env` are NOT blocked.
 
 **Fix**: Don't include `.env` files. If you need configuration values, use environment variables in your `.ai-agent.json` config instead.
 
@@ -442,6 +483,7 @@ ${include:shared/tone.md}       # Wrong - looks in agents/shared/
 **Cause**: Circular reference or excessively nested includes.
 
 **Fix**:
+
 1. Check for circular includes (A includes B, B includes A)
 2. Flatten the structure (include files directly instead of through intermediaries)
 3. Combine small includes into larger files
@@ -453,12 +495,11 @@ ${include:shared/tone.md}       # Wrong - looks in agents/shared/
 **Cause**: Syntax error in the directive.
 
 **Fix**: Check syntax:
+
 ```markdown
 ${include:file.md}     # Correct
-${ include:file.md}    # Wrong - space after {
-${include: file.md}    # Wrong - space after :
-${include:file.md }    # Wrong - space before }
-{{include:file.md}}    # Also correct (alternative syntax)
+${include:file.md } # Correct (spaces inside braces are trimmed)
+{{include:file.md}} # Also correct (alternative syntax)
 ```
 
 ### Wrong content included

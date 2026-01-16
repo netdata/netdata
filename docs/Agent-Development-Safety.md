@@ -23,11 +23,12 @@ Prompt patterns for building safe, reliable agents that refuse dangerous operati
 ## What is a Safety Gate?
 
 A **safety gate** is a prompt section that explicitly restricts agent behavior. It tells the agent:
+
 - What operations are forbidden
 - How to refuse dangerous requests
 - What alternatives to offer
 
-Safety gates work alongside code-level tool filtering (`toolsDenied`) to provide defense in depth.
+Safety gates work alongside configuration-level tool filtering (`toolsAllowed`/`toolsDenied`) to provide defense in depth.
 
 ---
 
@@ -68,6 +69,7 @@ Before executing ANY database operation:
 ```
 
 **Key elements:**
+
 - Clear heading with "Mandatory" to signal importance
 - Numbered checklist for the agent to follow
 - Explicit refusal language with exact response text
@@ -77,7 +79,7 @@ Before executing ANY database operation:
 
 ## Real-World Example
 
-This production agent from Neda CRM demonstrates both prompt and code-level safety:
+This production agent from Neda CRM demonstrates a read-only Freshdesk assistant:
 
 ```yaml
 ---
@@ -86,13 +88,6 @@ models:
   - openai/gpt-4o
 tools:
   - freshdesk
-toolsDenied:
-  - create_ticket
-  - update_ticket
-  - delete_ticket
-  - create_contact
-  - update_contact
-  - delete_contact
 ---
 You are a Freshdesk read-only assistant.
 
@@ -115,10 +110,7 @@ Respond with:
 - View ticket history
 ```
 
-**Why both?**
-- `toolsDenied` prevents the agent from calling dangerous tools even if it tries
-- The safety gate stops the agent from attempting in the first place
-- Users get a helpful refusal message instead of a cryptic error
+**Tip:** Use configuration-level `toolsDenied` (in MCP server or provider config) to prevent dangerous tools from being exposed. The safety gate stops the agent from attempting those operations, providing helpful refusal messages.
 
 ---
 
@@ -126,29 +118,54 @@ Respond with:
 
 Combine prompt-level and code-level safety for maximum protection:
 
+**Configuration-level filtering** (in `.ai-agent.json` or provider/MCP server config):
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "toolsAllowed": [
+        "search_code",
+        "get_file_contents",
+        "list_issues",
+        "get_issue"
+      ],
+      "toolsDenied": [
+        "create_or_update_file",
+        "push_files",
+        "create_issue",
+        "delete_branch"
+      ]
+    }
+  }
+}
+```
+
+**Prompt-level safety gate** (in `.ai` agent file):
+
 ```yaml
 ---
 tools:
   - github
-toolsAllowed:
-  - search_code
-  - get_file_contents
-  - list_issues
-  - get_issue
-toolsDenied:
-  - create_or_update_file
-  - push_files
-  - create_issue
-  - delete_branch
 ---
+You are a GitHub code review assistant.
+
+## Safety Gate (Mandatory)
+
+I will NOT perform any write operations on GitHub repositories.
+If asked to create, update, delete, or modify files/branches:
+- REFUSE the request
+- Explain: "I can only read repository data. I cannot make any changes."
+- Offer read-only alternatives if available
 ```
 
-**Layer 1 (Code)**: `toolsAllowed` restricts to a whitelist; `toolsDenied` blocks specific dangerous tools.
+**Layer 1 (Configuration)**: `toolsAllowed`/`toolsDenied` in MCP server or provider config blocks dangerous tools from being exposed.
 
 **Layer 2 (Prompt)**: Safety gate explains restrictions and provides helpful alternatives.
 
 If the LLM tries to call a denied tool:
-1. The code blocks the call
+
+1. The code blocks the call (tool not available)
 2. The LLM gets an error message
 3. On retry, the safety gate guides proper behavior
 
@@ -185,6 +202,7 @@ For DESTRUCTIVE operations (delete, overwrite, rename):
 ```
 
 **Why "CONFIRM"?**
+
 - Prevents accidental approval via casual language
 - Creates a clear audit trail
 - User must consciously type the exact word
@@ -221,6 +239,7 @@ NEVER:
 ```
 
 **Use cases:**
+
 - Code assistants limited to a project directory
 - Log viewers restricted to log directories
 - Configuration helpers limited to config paths
@@ -260,6 +279,7 @@ To avoid excessive API usage:
 ```
 
 **Combine with frontmatter:**
+
 - `maxTurns` enforces an absolute limit on iterations
 - `maxToolCallsPerTurn` can limit parallel tool calls
 
@@ -295,6 +315,7 @@ If asked to expose full sensitive data:
 ```
 
 **Why this matters:**
+
 - LLM responses may be logged
 - Users may accidentally share outputs
 - Regulatory compliance (GDPR, PCI-DSS, etc.)
@@ -342,7 +363,7 @@ Agent: [Should refuse each step that violates safety gate]
 1. **Be explicit**: List exactly what's allowed and forbidden - don't rely on implication
 2. **Use strong language**: "NEVER", "REFUSE", "Mandatory" - not "try to avoid"
 3. **Provide alternatives**: Tell the agent what it CAN do, not just what it can't
-4. **Defense in depth**: Combine `toolsDenied` filtering with prompt safety gates
+4. **Defense in depth**: Combine configuration-level filtering (`toolsAllowed`/`toolsDenied`) with prompt safety gates
 5. **Test adversarially**: Try to break your own safety gates before users do
 6. **Include refusal text**: Give the agent exact words to use when refusing
 7. **Keep gates visible**: Use clear headings like "## Safety Gate (Mandatory)"
@@ -351,7 +372,7 @@ Agent: [Should refuse each step that violates safety gate]
 
 ## See Also
 
-- [Agent Files: Tools](Agent-Files-Tools) - Tool filtering with `toolsAllowed`/`toolsDenied`
+- [Agent Files: Tools](Agent-Files-Tools) - Tool filtering with `toolsAllowed`/`toolsDenied` (configuration level)
 - [Agent Files: Behavior](Agent-Files-Behavior) - Turn and retry limits
 - [System Prompts: Writing](System-Prompts-Writing) - Prompt best practices
 - [AI Agent Configuration Guide](skills/ai-agent-configuration.md) - Complete reference

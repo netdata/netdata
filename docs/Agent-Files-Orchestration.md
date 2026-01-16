@@ -21,6 +21,7 @@ Configure advanced multi-agent patterns: advisors for pre-consultation, routers 
 ## Overview
 
 Orchestration patterns run **outside** the main session loop:
+
 - **Advisors**: Run in parallel BEFORE the main session, inject context
 - **Router**: Enables the main session to hand off to a destination agent
 - **Handoff**: Runs AFTER the main session, post-processes the output
@@ -65,9 +66,8 @@ router:
 maxTurns: 3
 temperature: 0
 ---
-
 Analyze the request and route to the appropriate handler.
-Use `router__handoff-to` with the destination name.
+Use `router__handoff-to` with the destination path.
 ```
 
 ### Handoff
@@ -81,7 +81,6 @@ tools:
   - brave
 handoff: ./formatters/report.ai
 ---
-
 Research the topic thoroughly. Results will be formatted automatically.
 ```
 
@@ -93,11 +92,11 @@ Advisors are agents that run **before** the main session. Their outputs are inje
 
 ### Configuration
 
-| Property | Value |
-|----------|-------|
-| Type | `string` or `string[]` |
-| Default | `[]` (no advisors) |
-| Valid values | Paths to `.ai` files |
+| Property     | Value                  |
+| ------------ | ---------------------- |
+| Type         | `string` or `string[]` |
+| Default      | `[]` (no advisors)     |
+| Valid values | Paths to `.ai` files   |
 
 ```yaml
 ---
@@ -144,11 +143,13 @@ User Request
 ### Advisor Requirements
 
 Advisors are regular `.ai` files. They should:
+
 - Have a `description`
 - Return useful advisory content
 - Be fast (they block the main session)
 
 **Example advisor** (`./advisors/compliance.ai`):
+
 ```yaml
 ---
 description: Reviews requests for compliance issues
@@ -170,6 +171,7 @@ If no issues: respond "No compliance issues identified."
 ### Advisor Failure Handling
 
 If an advisor fails:
+
 - It becomes a synthetic advisory block with error info
 - Main session still runs
 - Failure does NOT stop execution
@@ -189,10 +191,10 @@ Router pattern enables an agent to dynamically delegate to specialized handlers.
 
 ### Configuration
 
-| Property | Value |
-|----------|-------|
-| Type | `object` with `destinations: string[]` |
-| Default | None (no routing) |
+| Property | Value                                       |
+| -------- | ------------------------------------------- |
+| Type     | `object` with `destinations: string[]`      |
+| Default  | None (no routing)                           |
 | Required | `destinations` array with at least one path |
 
 ```yaml
@@ -213,24 +215,26 @@ router:
 4. Destination agent takes over and produces the final response
 5. Destination's response becomes the final output
 
-### The router__handoff-to Tool
+### The router\_\_handoff-to Tool
 
 When `router.destinations` is configured, a special tool becomes available:
 
 **Tool**: `router__handoff-to`
 **Input**:
+
 ```json
 {
-  "agent": "billing",      // Destination name (derived from filename or toolName)
-  "message": "..."         // Optional message to pass along
+  "agent": "./handlers/billing.ai", // Destination path (exact string from router.destinations)
+  "message": "..." // Optional message to pass along
 }
 ```
 
-The `agent` parameter is an enum of destination names.
+The `agent` parameter is an enum of destination paths (exact strings from the `router.destinations` configuration).
 
 ### Router Example
 
 **Router** (`router.ai`):
+
 ```yaml
 ---
 description: Customer service router
@@ -248,14 +252,15 @@ temperature: 0
 You are a customer service router.
 
 Analyze the user's request and route to the appropriate handler:
-- `billing`: Payment, invoices, subscription issues
-- `technical`: Product bugs, API issues, integration help
-- `general`: Everything else
+- `./handlers/billing.ai`: Payment, invoices, subscription issues
+- `./handlers/technical.ai`: Product bugs, API issues, integration help
+- `./handlers/general.ai`: Everything else
 
-Use the `router__handoff-to` tool with the appropriate destination.
+Use the `router__handoff-to` tool with the appropriate destination path.
 ```
 
 **Destination** (`./handlers/billing.ai`):
+
 ```yaml
 ---
 description: Handles billing and payment issues
@@ -265,7 +270,6 @@ models:
 tools:
   - stripe
 ---
-
 You handle billing and payment issues.
 ```
 
@@ -284,10 +288,10 @@ Handoff runs an agent **after** the main session completes, for post-processing.
 
 ### Configuration
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Default | None (no handoff) |
+| Property     | Value                     |
+| ------------ | ------------------------- |
+| Type         | `string`                  |
+| Default      | None (no handoff)         |
 | Valid values | Single path to `.ai` file |
 
 ```yaml
@@ -334,6 +338,7 @@ User Request
 ### Handoff Example
 
 **Main agent** (`research.ai`):
+
 ```yaml
 ---
 description: Research agent
@@ -345,11 +350,11 @@ tools:
 handoff: ./formatters/executive-summary.ai
 maxTurns: 15
 ---
-
 Research the topic thoroughly. Gather data from multiple sources.
 ```
 
 **Handoff agent** (`./formatters/executive-summary.ai`):
+
 ```yaml
 ---
 description: Creates executive summaries
@@ -372,6 +377,7 @@ Keep it concise and actionable.
 ### Handoff with Router
 
 If the main agent uses router AND handoff:
+
 1. Router agent runs
 2. Router delegates to destination
 3. Destination agent runs
@@ -449,6 +455,7 @@ handoff: ./formatters/report.ai
 ```
 
 Flow:
+
 1. Advisors run (parallel)
 2. Router runs (with advisor context)
 3. Router selects destination
@@ -458,19 +465,21 @@ Flow:
 
 ### Orchestration vs Sub-Agents
 
-| Feature | Orchestration | Sub-Agents |
-|---------|---------------|------------|
-| **When runs** | Before/after main session | During main session |
-| **Control** | Automatic (frontmatter) | LLM decides (tool call) |
-| **Relationship** | Pipeline stages | On-demand delegation |
-| **Use case** | Pre/post processing | Task specialization |
+| Feature          | Orchestration             | Sub-Agents              |
+| ---------------- | ------------------------- | ----------------------- |
+| **When runs**    | Before/after main session | During main session     |
+| **Control**      | Automatic (frontmatter)   | LLM decides (tool call) |
+| **Relationship** | Pipeline stages           | On-demand delegation    |
+| **Use case**     | Pre/post processing       | Task specialization     |
 
 **Use orchestration when**:
+
 - You need consistent pre/post processing
 - Flow is deterministic
 - Pattern is always applied
 
 **Use sub-agents when**:
+
 - LLM should decide when to delegate
 - Multiple specialists available on-demand
 - Dynamic task decomposition
@@ -553,17 +562,19 @@ models:
 **Expected behavior**: Advisor failures don't stop execution.
 
 **If you need strict advisors**: Handle in the main agent's prompt:
+
 ```yaml
 If compliance issues were identified, do not proceed.
 ```
 
-### "router__handoff-to not available"
+### "router\_\_handoff-to not available"
 
 **Problem**: Tool not appearing for router agent.
 
 **Cause**: `router.destinations` not configured or empty.
 
 **Solution**: Ensure destinations are defined:
+
 ```yaml
 router:
   destinations:
@@ -575,13 +586,14 @@ router:
 
 **Problem**: Router tries to hand off to unknown destination.
 
-**Cause**: Destination name doesn't match any configured destination.
+**Cause**: Destination path doesn't match any configured destination.
 
-**Solution**: Check destination names match `toolName` or derived filename:
+**Solution**: Check destination paths match the exact strings in `router.destinations`:
+
 ```yaml
 router:
   destinations:
-    - ./handlers/billing.ai   # toolName: billing or filename-derived
+    - ./handlers/billing.ai # Use this exact path string
 ```
 
 ### "Handoff not receiving main response"
@@ -591,6 +603,7 @@ router:
 **Cause**: Main session failed or handoff misconfigured.
 
 **Solution**: Check:
+
 1. Main session completes successfully
 2. Handoff path is correct
 3. Single string (not array) for handoff
@@ -602,6 +615,7 @@ router:
 **Limitation**: Only single handoff supported in frontmatter.
 
 **Workaround**: The handoff agent can have its own handoff:
+
 ```yaml
 # main.ai
 handoff: ./stage1.ai
@@ -611,6 +625,7 @@ handoff: ./stage2.ai
 ```
 
 Or use sub-agents within handoff:
+
 ```yaml
 # main.ai
 handoff: ./post-processor.ai
@@ -628,6 +643,7 @@ agents:
 **Expected**: Advisors run in parallel.
 
 **If slow**:
+
 - Check advisor complexity
 - Reduce advisor `maxTurns`
 - Use faster models for advisors

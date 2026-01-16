@@ -43,10 +43,10 @@ Understanding design history helps you:
 
 Multi-agent behavior can be architected two ways:
 
-| Approach | Description |
-|----------|-------------|
-| **Tool Abstraction** | Sub-agents as first-class tools |
-| **Recursive Orchestrator** | Coordinating autonomous agents |
+| Approach                   | Description                     |
+| -------------------------- | ------------------------------- |
+| **Tool Abstraction**       | Sub-agents as first-class tools |
+| **Recursive Orchestrator** | Coordinating autonomous agents  |
 
 ```mermaid
 graph LR
@@ -72,34 +72,36 @@ The master agent is unaware of a tool's origin. Whether it's an MCP server, sub-
 
 ### Rationale
 
-| Benefit | Explanation |
-|---------|-------------|
-| **Predictability** | Single abstraction reduces cognitive load |
-| **Isolation** | Tool calls are naturally bounded |
-| **Maintainability** | Unified registry is easier to test |
-| **Simplicity** | No special-case handling for agents |
+| Benefit             | Explanation                               |
+| ------------------- | ----------------------------------------- |
+| **Predictability**  | Single abstraction reduces cognitive load |
+| **Isolation**       | Tool calls are naturally bounded          |
+| **Maintainability** | Unified registry is easier to test        |
+| **Simplicity**      | No special-case handling for agents       |
 
 ### Invariants
 
 These rules MUST hold to preserve the design:
 
-| Invariant | Description |
-|-----------|-------------|
-| **Opaque Origin** | No branching on tool origin type in core loop |
-| **No Global Mutable State** | No `process.chdir`, no direct `process.env` reads |
-| **Per-Session Isolation** | Tools receive only explicit inputs |
-| **Uniform Budgets** | Depth caps and resource limits apply uniformly |
-| **Unified Observability** | Consistent logging independent of origin |
-| **Semantics over Optimization** | Pooling must not change isolation |
+| Invariant                       | Description                                                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **Opaque Origin**               | No branching on tool origin type in core loop                                                                 |
+| **No Global Mutable State**     | No `process.chdir`, no direct `process.env` reads during session execution (startup/config reads are allowed) |
+| **Per-Session Isolation**       | Tools receive only explicit inputs                                                                            |
+| **Uniform Budgets**             | Depth caps and resource limits apply uniformly                                                                |
+| **Unified Observability**       | Consistent logging independent of origin                                                                      |
+| **Semantics over Optimization** | Pooling must not change isolation                                                                             |
 
 ### Consequences
 
 **Positive**:
+
 - Simple, testable orchestration loop
 - Tools are interchangeable
 - Clear boundaries for accounting/tracing
 
 **Negative**:
+
 - No direct agent-to-agent communication
 - Sub-agent latency appears as tool latency
 - Cannot "share context" between sub-agents
@@ -115,18 +117,18 @@ These rules MUST hold to preserve the design:
 
 Need to guarantee isolation and predictability across agent runs:
 
-| Approach | Risk |
-|----------|------|
+| Approach                        | Risk                         |
+| ------------------------------- | ---------------------------- |
 | **Reusable, stateful sessions** | Shared mutation, state bleed |
-| **Fresh session per run** | Cold start overhead |
+| **Fresh session per run**       | Cold start overhead          |
 
 ### Decision
 
 **Fresh session per run.**
 
 - Public API constructs new session per run
-- Retry operations create new sessions internally
-- Sessions are never reused across runs
+- Retry operations create new session instances internally (with defensive copies of conversation, logs, accounting)
+- Sessions are never reused across runs (each run creates a new instance)
 
 ```mermaid
 graph TD
@@ -145,42 +147,45 @@ graph TD
 
 ### Rationale
 
-| Benefit | Explanation |
-|---------|-------------|
-| **Isolation** | No cross-run state bleed |
-| **Concurrency** | Parallel runs never share state |
+| Benefit         | Explanation                        |
+| --------------- | ---------------------------------- |
+| **Isolation**   | No cross-run state bleed           |
+| **Concurrency** | Parallel runs never share state    |
 | **API clarity** | Simple create → run → result model |
-| **Debugging** | Each session is self-contained |
+| **Debugging**   | Each session is self-contained     |
 
 ### Sub-Agent Semantics
 
 Under this model:
 
-| Rule | Implication |
-|------|-------------|
-| Sub-agents as foreign services | No special internal handling |
-| No implicit retries on failure | Parent decides retry policy |
-| Explicit context in request | No hidden state transfer |
+| Rule                            | Implication                      |
+| ------------------------------- | -------------------------------- |
+| Sub-agents as foreign services  | No special internal handling     |
+| No implicit retries on failure  | Parent decides retry policy      |
+| Explicit context in request     | No hidden state transfer         |
 | Session state as tokens/handles | Explicit serialization if needed |
 
 ### Invariants
 
-| Invariant | Description |
-|-----------|-------------|
-| **Fresh instances per run** | No session reuse |
-| **No global mutable state** | Enforced by ADR-001 |
+| Invariant                            | Description          |
+| ------------------------------------ | -------------------- |
+| **Fresh instances per run**          | No session reuse     |
+| **No global mutable state**          | Enforced by ADR-001  |
 | **Structured results at boundaries** | No thrown exceptions |
-| **Explicit context transfer** | No hidden state |
+| **Explicit context transfer**        | No hidden state      |
 
 ### Consequences
 
 **Positive**:
+
 - Completely isolated runs
 - Safe concurrent execution
 - Predictable behavior
 
 **Negative**:
-- Cannot resume sessions
+
+- Cannot persist and resume sessions across separate runs
+- Retry operations continue conversation state (not a fresh start)
 - Tool connections re-established per run
 - Cold start for MCP servers
 
@@ -209,12 +214,12 @@ No special cases. No branching on tool type in core logic.
 
 **Each session is independent.**
 
-| Property | Owned By Session |
-|----------|------------------|
-| Conversation history | Yes |
-| Accounting | Yes |
-| Context budget | Yes |
-| Tool connections | Yes |
+| Property             | Owned By Session |
+| -------------------- | ---------------- |
+| Conversation history | Yes              |
+| Accounting           | Yes              |
+| Context budget       | Yes              |
+| Tool connections     | Yes              |
 
 No shared mutable state between sessions.
 
@@ -222,21 +227,21 @@ No shared mutable state between sessions.
 
 **Silent failures are not justified.**
 
-| Principle | Implementation |
-|-----------|----------------|
-| All errors logged | No swallowed exceptions |
-| User config errors stop execution | Fail early |
+| Principle                              | Implementation                |
+| -------------------------------------- | ----------------------------- |
+| All errors logged                      | No swallowed exceptions       |
+| User config errors stop execution      | Fail early                    |
 | Other errors: retry, recover, continue | Resilient to transient issues |
 
 ### 4. Model-Facing Error Quality
 
 **Error messages to the model must be exceptional.**
 
-| Requirement | Why |
-|-------------|-----|
-| Extremely detailed | Model needs specific information |
-| Descriptive of exact issue | Not "something went wrong" |
-| Direct instructions to overcome | Actionable guidance |
+| Requirement                     | Why                              |
+| ------------------------------- | -------------------------------- |
+| Extremely detailed              | Model needs specific information |
+| Descriptive of exact issue      | Not "something went wrong"       |
+| Direct instructions to overcome | Actionable guidance              |
 
 Bad: `"Error processing your request"`
 Good: `"Tool call failed: parameter 'limit' must be number, received string 'ten'. Use a numeric value like 10."`
@@ -245,11 +250,11 @@ Good: `"Tool call failed: parameter 'limit' must be number, received string 'ten
 
 **Keep main loops lean.**
 
-| Principle | Implementation |
-|-----------|----------------|
-| Move complexity to specialized modules | Not inline in loop |
-| Separation of concerns paramount | Each module has one job |
-| Gradual improvement over time | Refactor continually |
+| Principle                              | Implementation          |
+| -------------------------------------- | ----------------------- |
+| Move complexity to specialized modules | Not inline in loop      |
+| Separation of concerns paramount       | Each module has one job |
+| Gradual improvement over time          | Refactor continually    |
 
 ---
 
@@ -272,10 +277,10 @@ const session = new Session({ cwd: newDir, config: settings });
 
 ```typescript
 // BAD: Branching on tool type
-if (tool.type === 'subagent') {
-    // special handling
-} else if (tool.type === 'mcp') {
-    // different handling
+if (tool.type === "subagent") {
+  // special handling
+} else if (tool.type === "mcp") {
+  // different handling
 }
 
 // GOOD: Uniform interface
@@ -287,17 +292,17 @@ const result = await toolsOrchestrator.execute(toolName, params);
 ```typescript
 // BAD: Silent swallow
 try {
-    await riskyOperation();
+  await riskyOperation();
 } catch {
-    // ignore
+  // ignore
 }
 
 // GOOD: Log and handle
 try {
-    await riskyOperation();
+  await riskyOperation();
 } catch (error) {
-    logger.error('Operation failed', { error });
-    throw new OperationError(error);
+  logger.error("Operation failed", { error });
+  throw new OperationError(error);
 }
 ```
 
@@ -305,12 +310,13 @@ try {
 
 ```typescript
 // BAD: Vague
-return { error: 'Invalid request' };
+return { error: "Invalid request" };
 
 // GOOD: Specific and actionable
 return {
-    error: `Parameter 'query' is required but was not provided. ` +
-           `Please call this tool with { "query": "<your search terms>" }`
+  error:
+    `Parameter 'query' is required but was not provided. ` +
+    `Please call this tool with { "query": "<your search terms>" }`,
 };
 ```
 
@@ -325,6 +331,7 @@ Areas for potential architectural evolution.
 **Goal**: Reduce cold-start latency for MCP servers.
 
 **Constraints**:
+
 - MUST preserve isolation semantics
 - MUST NOT change overlays behavior
 - MUST NOT introduce shared state
@@ -336,6 +343,7 @@ Areas for potential architectural evolution.
 **Goal**: Human or agent-to-agent messaging.
 
 **Constraints**:
+
 - MUST build on tool abstraction
 - MUST NOT bypass session isolation
 - MUST fit within turn/tool model
@@ -347,6 +355,7 @@ Areas for potential architectural evolution.
 **Goal**: Real-time token output, progressive tool results.
 
 **Constraints**:
+
 - MUST NOT change session semantics
 - MUST preserve accounting accuracy
 - MUST support abort/cancel
@@ -366,18 +375,23 @@ For future architectural decisions:
 **Date**: YYYY-MM-DD
 
 ### Context
+
 What is the issue? Why is a decision needed?
 
 ### Decision
+
 What is the decision?
 
 ### Rationale
+
 Why this decision over alternatives?
 
 ### Consequences
+
 Positive and negative impacts.
 
 ### Invariants
+
 Rules that must hold to preserve the design.
 ```
 

@@ -23,6 +23,7 @@ How to override agent configuration at runtime. Covers model selection, sampling
 CLI flags override agent frontmatter, which overrides configuration files.
 
 **Precedence (highest to lowest):**
+
 1. `--override key=value` (applies to all agents)
 2. Direct CLI flags (e.g., `--temperature`)
 3. Agent frontmatter
@@ -31,12 +32,12 @@ CLI flags override agent frontmatter, which overrides configuration files.
 
 **Override Scopes:**
 
-| Scope | Description | Example Flags |
-|-------|-------------|---------------|
-| Master Only | Affects only the top-level agent | `--models`, `--tools`, `--agents` |
-| Master Default | Inherited by sub-agents when unset | `--temperature`, `--max-turns` |
-| All Agents | Applies to master and all sub-agents | `--override`, `--verbose` |
-| Global | Application-level settings | `--config`, `--dry-run` |
+| Scope          | Description                          | Example Flags                     |
+| -------------- | ------------------------------------ | --------------------------------- |
+| Master Only    | Affects only the top-level agent     | `--models`, `--tools`, `--agents` |
+| Master Default | Inherited by sub-agents when unset   | `--temperature`, `--max-turns`    |
+| All Agents     | Applies to master and all sub-agents | `--override`, `--verbose`         |
+| Global         | Application-level settings           | `--config`, `--dry-run`           |
 
 ---
 
@@ -44,11 +45,11 @@ CLI flags override agent frontmatter, which overrides configuration files.
 
 ### The `--models` Flag
 
-| Property | Value |
-|----------|-------|
-| Flag | `--models <list>` |
-| Scope | Master Only |
-| Format | Comma-separated `provider/model` pairs |
+| Property | Value                                  |
+| -------- | -------------------------------------- |
+| Flag     | `--models <list>`                      |
+| Scope    | Master Only                            |
+| Format   | Comma-separated `provider/model` pairs |
 
 **Description**: Specify which LLM models to use. Multiple models create a fallback chain.
 
@@ -66,6 +67,7 @@ ai-agent --agent chat.ai --models ollama/llama3.2 "Hello"
 ```
 
 **Provider format**: `provider/model-name`
+
 - `openai/gpt-4o`
 - `anthropic/claude-3-5-sonnet-20241022`
 - `ollama/llama3.2`
@@ -77,14 +79,15 @@ ai-agent --agent chat.ai --models ollama/llama3.2 "Hello"
 
 ### Temperature
 
-| Property | Value |
-|----------|-------|
-| Flag | `--temperature <n>` |
-| Scope | Master Default |
-| Range | `0.0` to `2.0` |
-| Default | `0` |
+| Property | Value               |
+| -------- | ------------------- |
+| Flag     | `--temperature <n>` |
+| Scope    | Master Default      |
+| Range    | `0.0` to `2.0`      |
+| Default  | `0.0`               |
 
 **Description**: Controls response creativity/variance.
+
 - `0` = Deterministic, focused responses
 - `0.7` = Balanced creativity
 - `1.5+` = High creativity, may be incoherent
@@ -102,12 +105,12 @@ ai-agent --agent chat.ai --temperature default "Hello"
 
 ### Top-P (Nucleus Sampling)
 
-| Property | Value |
-|----------|-------|
-| Flag | `--top-p <n>` |
-| Scope | Master Default |
-| Range | `0.0` to `1.0` |
-| Default | Not sent (provider decides) |
+| Property | Value                       |
+| -------- | --------------------------- |
+| Flag     | `--top-p <n>`               |
+| Scope    | Master Default              |
+| Range    | `0.0` to `1.0`              |
+| Default  | Not sent (provider decides) |
 
 **Description**: Token selection diversity. Lower values = more focused.
 
@@ -121,12 +124,12 @@ ai-agent --agent chat.ai --top-p 0.95 "Creative answer"
 
 ### Top-K
 
-| Property | Value |
-|----------|-------|
-| Flag | `--top-k <n>` |
-| Scope | Master Default |
-| Range | `1` to unlimited (integer) |
-| Default | Not sent (provider decides) |
+| Property | Value                       |
+| -------- | --------------------------- |
+| Flag     | `--top-k <n>`               |
+| Scope    | Master Default              |
+| Range    | `1` to unlimited (integer)  |
+| Default  | Not sent (provider decides) |
 
 **Description**: Limits token selection to K most probable tokens.
 
@@ -136,12 +139,12 @@ ai-agent --agent chat.ai --top-k 40 "Generate text"
 
 ### Repeat Penalty
 
-| Property | Value |
-|----------|-------|
-| Flag | `--repeat-penalty <n>` |
-| Scope | Master Default |
-| Range | `0.0` to `2.0` |
-| Default | Not sent |
+| Property | Value                  |
+| -------- | ---------------------- |
+| Flag     | `--repeat-penalty <n>` |
+| Scope    | Master Default         |
+| Range    | `0.0` and above        |
+| Default  | Not sent               |
 
 **Description**: Reduces repetitive text. `1.0` = off, higher = stronger penalty.
 
@@ -155,12 +158,12 @@ ai-agent --agent writer.ai --repeat-penalty 1.2 "Write without repetition"
 
 ### Max Turns
 
-| Property | Value |
-|----------|-------|
-| Flag | `--max-turns <n>` |
-| Scope | Master Default |
-| Range | `1` to `100` |
-| Default | `10` |
+| Property | Value             |
+| -------- | ----------------- |
+| Flag     | `--max-turns <n>` |
+| Scope    | Master Default    |
+| Range    | `1` and above     |
+| Default  | `10`              |
 
 **Description**: Maximum tool-using turns before forcing a final answer.
 
@@ -174,12 +177,12 @@ ai-agent --agent research.ai --max-turns 25 "Deep research topic"
 
 ### Max Retries
 
-| Property | Value |
-|----------|-------|
-| Flag | `--max-retries <n>` |
-| Scope | Master Default |
-| Range | `0` to `20` |
-| Default | `5` |
+| Property | Value               |
+| -------- | ------------------- |
+| Flag     | `--max-retries <n>` |
+| Scope    | Master Default      |
+| Range    | `0` and above       |
+| Default  | `5`                 |
 
 **Description**: Retry count when LLM calls fail. Cycles through fallback models.
 
@@ -193,12 +196,12 @@ ai-agent --agent test.ai --max-retries 1 "Quick test"
 
 ### Max Tool Calls Per Turn
 
-| Property | Value |
-|----------|-------|
-| Flag | `--max-tool-calls-per-turn <n>` |
-| Scope | Master Default |
-| Range | `1` to `50` |
-| Default | `10` |
+| Property | Value                           |
+| -------- | ------------------------------- |
+| Flag     | `--max-tool-calls-per-turn <n>` |
+| Scope    | Master Default                  |
+| Range    | `1` and above                   |
+| Default  | `10`                            |
 
 **Description**: Maximum parallel tool calls in a single turn.
 
@@ -209,12 +212,12 @@ ai-agent --agent batch.ai --max-tool-calls-per-turn 20 "Process many items"
 
 ### LLM Timeout
 
-| Property | Value |
-|----------|-------|
-| Flag | `--llm-timeout-ms <ms>` |
-| Scope | Master Default |
-| Format | Milliseconds or duration (e.g., `5s`, `2m`) |
-| Default | `600000` (10 minutes) |
+| Property | Value                                       |
+| -------- | ------------------------------------------- |
+| Flag     | `--llm-timeout-ms <ms>`                     |
+| Scope    | Master Default                              |
+| Format   | Milliseconds or duration (e.g., `5s`, `2m`) |
+| Default  | `600000` (10 minutes)                       |
 
 **Description**: How long to wait for LLM response.
 
@@ -228,12 +231,12 @@ ai-agent --agent reasoning.ai --llm-timeout-ms 5m "Complex problem"
 
 ### Tool Timeout
 
-| Property | Value |
-|----------|-------|
-| Flag | `--tool-timeout-ms <ms>` |
-| Scope | Master Default |
-| Format | Milliseconds or duration |
-| Default | `300000` (5 minutes) |
+| Property | Value                    |
+| -------- | ------------------------ |
+| Flag     | `--tool-timeout-ms <ms>` |
+| Scope    | Master Default           |
+| Format   | Milliseconds or duration |
+| Default  | `300000` (5 minutes)     |
 
 **Description**: How long to wait for each tool execution.
 
@@ -248,12 +251,12 @@ ai-agent --agent compute.ai --tool-timeout-ms 10m "Run heavy computation"
 
 ### Max Output Tokens
 
-| Property | Value |
-|----------|-------|
-| Flag | `--max-output-tokens <n>` |
-| Scope | Master Default |
-| Range | `1` to model maximum |
-| Default | `4096` |
+| Property | Value                     |
+| -------- | ------------------------- |
+| Flag     | `--max-output-tokens <n>` |
+| Scope    | Master Default            |
+| Range    | `1` to model maximum      |
+| Default  | `4096`                    |
 
 **Description**: Maximum response length per turn.
 
@@ -267,11 +270,11 @@ ai-agent --agent concise.ai --max-output-tokens 500 "Brief answer"
 
 ### Tool Response Max Bytes
 
-| Property | Value |
-|----------|-------|
-| Flag | `--tool-response-max-bytes <n>` |
-| Scope | Master Default |
-| Default | `12288` (12KB) |
+| Property | Value                           |
+| -------- | ------------------------------- |
+| Flag     | `--tool-response-max-bytes <n>` |
+| Scope    | Master Default                  |
+| Default  | `12288` (12KB)                  |
 
 **Description**: Maximum tool output size kept in conversation. Larger outputs are stored externally.
 
@@ -286,15 +289,16 @@ ai-agent --agent data.ai --tool-response-max-bytes 50000 "Fetch large dataset"
 
 ### Universal Overrides
 
-| Property | Value |
-|----------|-------|
-| Flag | `--override <key=value>` |
-| Scope | All Agents |
-| Repeatable | Yes |
+| Property   | Value                    |
+| ---------- | ------------------------ |
+| Flag       | `--override <key=value>` |
+| Scope      | All Agents               |
+| Repeatable | Yes                      |
 
 **Description**: Override any setting for all agents including sub-agents. Takes precedence over other flags.
 
 **Supported keys**:
+
 - `models` - Model list
 - `tools` - Tool access
 - `agents` - Sub-agents
@@ -353,10 +357,10 @@ ai-agent --agent reason.ai --override interleaved=true "Think step by step"
 
 ### The `--config` Flag
 
-| Property | Value |
-|----------|-------|
-| Flag | `--config <path>` |
-| Scope | Global |
+| Property | Value             |
+| -------- | ----------------- |
+| Flag     | `--config <path>` |
+| Scope    | Global            |
 
 **Description**: Use a specific configuration file, overriding auto-discovery.
 
@@ -375,54 +379,54 @@ ai-agent --config ./config/development.json --agent api.ai --api 8080
 
 ### Master Only (top-level agent)
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--models <list>` | - | LLM model(s) to use |
-| `--tools <list>` | - | MCP servers to enable |
-| `--agents <list>` | - | Sub-agent files |
-| `--schema <json>` | - | JSON output schema |
+| Flag              | Default | Description           |
+| ----------------- | ------- | --------------------- |
+| `--models <list>` | -       | LLM model(s) to use   |
+| `--tools <list>`  | -       | MCP servers to enable |
+| `--agents <list>` | -       | Sub-agent files       |
+| `--schema <json>` | -       | JSON output schema    |
 
 ### Master Default (inherited by sub-agents)
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--temperature <n>` | `0` | Response creativity |
-| `--top-p <n>` | - | Nucleus sampling |
-| `--top-k <n>` | - | Token selection limit |
-| `--repeat-penalty <n>` | - | Repetition penalty |
-| `--max-turns <n>` | `10` | Maximum turns |
-| `--max-retries <n>` | `5` | Retry count |
-| `--max-tool-calls-per-turn <n>` | `10` | Parallel tool calls |
-| `--max-output-tokens <n>` | `4096` | Response length |
-| `--llm-timeout-ms <ms>` | `600000` | LLM timeout |
-| `--tool-timeout-ms <ms>` | `300000` | Tool timeout |
-| `--tool-response-max-bytes <n>` | `12288` | Max inline tool output |
-| `--reasoning <level>` | - | Reasoning effort |
-| `--reasoning-tokens <n>` | - | Thinking token budget |
-| `--caching <mode>` | `full` | Anthropic cache mode |
-| `--cache <ttl>` | - | Response cache TTL |
+| Flag                            | Default  | Description            |
+| ------------------------------- | -------- | ---------------------- |
+| `--temperature <n>`             | `0`      | Response creativity    |
+| `--top-p <n>`                   | -        | Nucleus sampling       |
+| `--top-k <n>`                   | -        | Token selection limit  |
+| `--repeat-penalty <n>`          | -        | Repetition penalty     |
+| `--max-turns <n>`               | `10`     | Maximum turns          |
+| `--max-retries <n>`             | `5`      | Retry count            |
+| `--max-tool-calls-per-turn <n>` | `10`     | Parallel tool calls    |
+| `--max-output-tokens <n>`       | `4096`   | Response length        |
+| `--llm-timeout-ms <ms>`         | `600000` | LLM timeout            |
+| `--tool-timeout-ms <ms>`        | `300000` | Tool timeout           |
+| `--tool-response-max-bytes <n>` | `12288`  | Max inline tool output |
+| `--reasoning <level>`           | -        | Reasoning effort       |
+| `--reasoning-tokens <n>`        | -        | Thinking token budget  |
+| `--caching <mode>`              | `full`   | Anthropic cache mode   |
+| `--cache <ttl>`                 | -        | Response cache TTL     |
 
 ### All Agents
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--override <key=value>` | - | Universal override |
-| `--stream` / `--no-stream` | `true` | Streaming mode |
-| `--format <format>` | - | Output format |
-| `--verbose` | `false` | Detailed logging |
-| `--trace-llm` | `false` | LLM tracing |
-| `--trace-mcp` | `false` | Tool tracing |
+| Flag                       | Default | Description        |
+| -------------------------- | ------- | ------------------ |
+| `--override <key=value>`   | -       | Universal override |
+| `--stream` / `--no-stream` | `true`  | Streaming mode     |
+| `--format <format>`        | -       | Output format      |
+| `--verbose`                | `false` | Detailed logging   |
+| `--trace-llm`              | `false` | LLM tracing        |
+| `--trace-mcp`              | `false` | Tool tracing       |
 
 ### Global
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--config <path>` | Auto-discovered | Config file |
-| `--dry-run` | `false` | Validation only |
-| `--quiet` | `false` | Suppress logs |
+| Flag                    | Default                 | Description     |
+| ----------------------- | ----------------------- | --------------- |
+| `--config <path>`       | Auto-discovered         | Config file     |
+| `--dry-run`             | `false`                 | Validation only |
+| `--quiet`               | `false`                 | Suppress logs   |
 | `--sessions-dir <path>` | `~/.ai-agent/sessions/` | Session storage |
-| `--billing-file <path>` | - | Cost tracking |
-| `--resume <id>` | - | Resume session |
+| `--billing-file <path>` | -                       | Cost tracking   |
+| `--resume <id>`         | -                       | Resume session  |
 
 ---
 

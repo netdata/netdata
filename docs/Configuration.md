@@ -18,18 +18,18 @@ System-wide configuration for providers, tools, caching, and runtime behavior.
 
 ## Pages in This Section
 
-| Page | Description |
-|------|-------------|
-| [Configuration Files](Configuration-Files) | File locations, resolution order, layer merging |
-| [LLM Providers](Configuration-Providers) | OpenAI, Anthropic, Google, Ollama, OpenRouter setup |
-| [MCP Servers](Configuration-MCP-Servers) | MCP tool server configuration (stdio, HTTP, SSE, WebSocket) |
-| [REST Tools](Configuration-REST-Tools) | REST/OpenAPI endpoint tools |
-| [Tool Filtering](Configuration-Tool-Filtering) | Allowlists, denylists, and wildcard patterns |
-| [Caching](Configuration-Caching) | Response caching for agents and tools |
-| [Context Window](Configuration-Context-Window) | Token budgets, limits, and guards |
-| [Queues](Configuration-Queues) | Concurrency control and rate limiting |
-| [Pricing](Configuration-Pricing) | Cost tracking and token pricing |
-| [Parameters Reference](Configuration-Parameters) | Complete reference of all configuration keys |
+| Page                                             | Description                                                 |
+| ------------------------------------------------ | ----------------------------------------------------------- |
+| [Configuration Files](Configuration-Files)       | File locations, resolution order, layer merging             |
+| [LLM Providers](Configuration-Providers)         | OpenAI, Anthropic, Google, Ollama, OpenRouter setup         |
+| [MCP Servers](Configuration-MCP-Servers)         | MCP tool server configuration (stdio, HTTP, SSE, WebSocket) |
+| [REST Tools](Configuration-REST-Tools)           | REST/OpenAPI endpoint tools                                 |
+| [Tool Filtering](Configuration-Tool-Filtering)   | Allowlists, denylists, and wildcard patterns                |
+| [Caching](Configuration-Caching)                 | Response caching for agents and tools                       |
+| [Context Window](Configuration-Context-Window)   | Token budgets, limits, and guards                           |
+| [Queues](Configuration-Queues)                   | Concurrency control and rate limiting                       |
+| [Pricing](Configuration-Pricing)                 | Cost tracking and token pricing                             |
+| [Parameters Reference](Configuration-Parameters) | Complete reference of all configuration keys                |
 
 ---
 
@@ -47,9 +47,9 @@ Create `.ai-agent.json` in your working directory:
   },
   "mcpServers": {},
   "defaults": {
-    "temperature": 0.7,
-    "llmTimeout": 120000,
-    "toolTimeout": 60000
+    "temperature": 0.2,
+    "llmTimeout": 600000,
+    "toolTimeout": 300000
   }
 }
 ```
@@ -172,11 +172,11 @@ Global default settings for all agents.
 ```json
 {
   "defaults": {
-    "temperature": 0.7,
-    "llmTimeout": 120000,
-    "toolTimeout": 60000,
-    "stream": true,
-    "contextWindowBufferTokens": 256
+    "temperature": 0.2,
+    "llmTimeout": 600000,
+    "toolTimeout": 300000,
+    "stream": false,
+    "contextWindowBufferTokens": 8192
   }
 }
 ```
@@ -193,8 +193,8 @@ Token pricing for cost tracking.
     "openai": {
       "gpt-4o": {
         "unit": "per_1m",
-        "prompt": 2.50,
-        "completion": 10.00
+        "prompt": 2.5,
+        "completion": 10.0
       }
     }
   }
@@ -234,15 +234,16 @@ All string values support `${VAR}` expansion:
 
 ### Syntax
 
-| Syntax | Behavior |
-|--------|----------|
-| `${VAR}` | Substitute with environment variable value |
-| `${VAR:-default}` | Use `default` if VAR is unset or empty |
-| `${HOME}` | Home directory (always available) |
+| Syntax            | Behavior                                   |
+| ----------------- | ------------------------------------------ |
+| `${VAR}`          | Substitute with environment variable value |
+| `${VAR:-default}` | Use `default` if VAR is unset or empty     |
+| `${HOME}`         | Home directory (always available)          |
 
 ### Variable Sources
 
 Variables are resolved from:
+
 1. **Layer-specific `.ai-agent.env`** file (same directory as config)
 2. **Process environment** (`process.env`)
 
@@ -254,16 +255,17 @@ Variables are resolved from:
 
 Settings merge from multiple sources with this priority (highest to lowest):
 
-| Priority | Source | Example |
-|----------|--------|---------|
-| 1 | CLI options | `--temperature 0.2` |
-| 2 | Agent frontmatter | `temperature: 0.3` |
-| 3 | Config defaults | `defaults.temperature: 0.7` |
-| 4 | Built-in defaults | Hardcoded fallbacks |
+| Priority | Source            | Example                     |
+| -------- | ----------------- | --------------------------- |
+| 1        | CLI options       | `--temperature 0.2`         |
+| 2        | Agent frontmatter | `temperature: 0.3`          |
+| 3        | Config defaults   | `defaults.temperature: 0.7` |
+| 4        | Built-in defaults | Hardcoded fallbacks         |
 
 ### Example
 
 Config file:
+
 ```json
 {
   "defaults": {
@@ -274,6 +276,7 @@ Config file:
 ```
 
 Agent frontmatter:
+
 ```yaml
 ---
 temperature: 0.3
@@ -281,6 +284,7 @@ temperature: 0.3
 ```
 
 CLI:
+
 ```bash
 ai-agent --agent test.ai --temperature 0.2
 ```
@@ -342,26 +346,26 @@ Production-ready configuration:
     "openai": {
       "gpt-4o": {
         "unit": "per_1m",
-        "prompt": 2.50,
-        "completion": 10.00
+        "prompt": 2.5,
+        "completion": 10.0
       }
     },
     "anthropic": {
       "claude-sonnet-4-20250514": {
         "unit": "per_1m",
-        "prompt": 3.00,
-        "completion": 15.00,
-        "cacheRead": 0.30,
+        "prompt": 3.0,
+        "completion": 15.0,
+        "cacheRead": 0.3,
         "cacheWrite": 3.75
       }
     }
   },
   "defaults": {
-    "temperature": 0.7,
-    "llmTimeout": 120000,
-    "toolTimeout": 60000,
+    "temperature": 0.2,
+    "llmTimeout": 600000,
+    "toolTimeout": 300000,
     "toolResponseMaxBytes": 12288,
-    "contextWindowBufferTokens": 256
+    "contextWindowBufferTokens": 8192
   },
   "accounting": {
     "file": "${HOME}/ai-agent-accounting.jsonl"

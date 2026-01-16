@@ -23,6 +23,7 @@ An agent file is a plain text file with a `.ai` extension that contains:
 2. **System Prompt** - Instructions for the agent after the frontmatter
 
 When you run `ai-agent --agent my-agent.ai`, the system:
+
 1. Parses the frontmatter for configuration
 2. Extracts the system prompt
 3. Initializes the agent with the specified model, tools, and behavior
@@ -43,7 +44,6 @@ tools:
   - filesystem
 maxTurns: 10
 ---
-
 # SYSTEM PROMPT: Instructions for the agent
 You are a helpful assistant.
 
@@ -81,7 +81,6 @@ description: A helpful assistant
 models:
   - openai/gpt-4o
 ---
-
 You are a helpful assistant. Answer questions clearly and concisely.
 
 Respond in ${FORMAT}.
@@ -108,7 +107,6 @@ tools:
 maxTurns: 15
 temperature: 0.3
 ---
-
 You are a research assistant with access to web search.
 
 1. Search for relevant information
@@ -143,7 +141,6 @@ output:
       - industry
       - summary
 ---
-
 Analyze the provided company and return structured data.
 ```
 
@@ -153,15 +150,15 @@ Analyze the provided company and return structured data.
 
 Agent configuration is organized into these categories:
 
-| Category | Keys | Purpose | Documentation |
-|----------|------|---------|---------------|
-| **Identity** | `description`, `usage`, `toolName` | Name and describe your agent | [Agent-Files-Identity](Agent-Files-Identity) |
-| **Models** | `models`, `reasoning`, `reasoningTokens`, `caching` | Select LLMs and configure reasoning | [Agent-Files-Models](Agent-Files-Models) |
-| **Tools** | `tools`, `toolsAllowed`, `toolsDenied` | Give your agent capabilities | [Agent-Files-Tools](Agent-Files-Tools) |
-| **Sub-Agents** | `agents` | Delegate to other agents | [Agent-Files-Sub-Agents](Agent-Files-Sub-Agents) |
-| **Orchestration** | `advisors`, `router`, `handoff` | Multi-agent patterns | [Agent-Files-Orchestration](Agent-Files-Orchestration) |
-| **Behavior** | `maxTurns`, `maxRetries`, `temperature`, `topP`, `topK`, timeouts | Limits and sampling | [Agent-Files-Behavior](Agent-Files-Behavior) |
-| **Contracts** | `input`, `output` | Structured I/O schemas | [Agent-Files-Contracts](Agent-Files-Contracts) |
+| Category          | Keys                                                                                                                                                     | Purpose                             | Documentation                                          |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------ |
+| **Identity**      | `description`, `usage`, `toolName`                                                                                                                       | Name and describe your agent        | [Agent-Files-Identity](Agent-Files-Identity)           |
+| **Models**        | `models`, `reasoning`, `reasoningTokens`, `caching`                                                                                                      | Select LLMs and configure reasoning | [Agent-Files-Models](Agent-Files-Models)               |
+| **Tools**         | `tools`, `toolResponseMaxBytes`, `toolOutput`                                                                                                            | Give your agent capabilities        | [Agent-Files-Tools](Agent-Files-Tools)                 |
+| **Sub-Agents**    | `agents`                                                                                                                                                 | Delegate to other agents            | [Agent-Files-Sub-Agents](Agent-Files-Sub-Agents)       |
+| **Orchestration** | `advisors`, `router`, `handoff`                                                                                                                          | Multi-agent patterns                | [Agent-Files-Orchestration](Agent-Files-Orchestration) |
+| **Behavior**      | `maxTurns`, `maxRetries`, `maxToolCallsPerTurn`, `temperature`, `topP`, `topK`, `llmTimeout`, `toolTimeout`, `maxOutputTokens`, `repeatPenalty`, `cache` | Limits and sampling                 | [Agent-Files-Behavior](Agent-Files-Behavior)           |
+| **Contracts**     | `input`, `output`                                                                                                                                        | Structured I/O schemas              | [Agent-Files-Contracts](Agent-Files-Contracts)         |
 
 ---
 
@@ -214,7 +211,6 @@ models:
 maxTurns: 5
 temperature: 0.3
 ---
-
 You are a helpful assistant. Answer questions clearly and concisely.
 ```
 
@@ -232,7 +228,6 @@ maxTurns: 15
 maxToolCallsPerTurn: 10
 cache: 1h
 ---
-
 You are a research assistant. Search for information and synthesize findings.
 ```
 
@@ -249,7 +244,6 @@ agents:
   - ./helpers/writer.ai
 maxTurns: 20
 ---
-
 You coordinate research tasks. Delegate to specialists as needed.
 ```
 
@@ -268,6 +262,7 @@ You coordinate research tasks. Delegate to specialists as needed.
 **Problem**: Using runtime-only flags in frontmatter.
 
 **Solution**: Remove these keys. Use CLI flags instead:
+
 ```bash
 ai-agent --stream --verbose --agent my-agent.ai
 ```
@@ -277,6 +272,7 @@ ai-agent --stream --verbose --agent my-agent.ai
 **Problem**: Model specified without provider prefix.
 
 **Solution**: Use `provider/model` format:
+
 ```yaml
 # Wrong
 models: gpt-4o

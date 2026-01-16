@@ -12,7 +12,6 @@ Expose agents as HTTP REST endpoints for web applications and scripts.
 - [Endpoints](#endpoints) - API reference
 - [Request Parameters](#request-parameters) - Query and body parameters
 - [Response Format](#response-format) - Response structure
-- [Streaming](#streaming) - Server-Sent Events
 - [Error Responses](#error-responses) - Error handling
 - [Integration Examples](#integration-examples) - Python, JavaScript, curl
 - [Troubleshooting](#troubleshooting) - Common issues
@@ -23,12 +22,14 @@ Expose agents as HTTP REST endpoints for web applications and scripts.
 ## Overview
 
 The REST API headend provides a simple HTTP interface for executing agents. Use it when:
+
 - Building web applications that call agents
 - Integrating agents into existing services
 - Testing agents programmatically
 - Creating webhooks or automation
 
 **Key features**:
+
 - GET-based API (easy to test with browser/curl)
 - Streaming via Server-Sent Events (SSE)
 - Concurrency limiting
@@ -52,30 +53,31 @@ curl "http://localhost:8080/v1/chat?q=Hello"
 
 ### --api
 
-| Property | Value |
-|----------|-------|
-| Type | `number` |
-| Required | Yes (to enable REST headend) |
-| Repeatable | Yes |
+| Property   | Value                        |
+| ---------- | ---------------------------- |
+| Type       | `number`                     |
+| Required   | Yes (to enable REST headend) |
+| Repeatable | Yes                          |
 
 **Description**: HTTP port to listen on. Can be specified multiple times to listen on multiple ports.
 
 **Example**:
+
 ```bash
 ai-agent --agent chat.ai --api 8080 --api 8081
 ```
 
 ### --api-concurrency
 
-| Property | Value |
-|----------|-------|
-| Type | `number` |
-| Default | `4` |
-| Valid values | `1` to `100` |
+| Property | Value    |
+| -------- | -------- |
+| Type     | `number` |
+| Default  | `10`     |
 
 **Description**: Maximum number of concurrent agent sessions. Additional requests receive `503 Service Unavailable`.
 
 **Example**:
+
 ```bash
 ai-agent --agent chat.ai --api 8080 --api-concurrency 10
 ```
@@ -89,6 +91,7 @@ ai-agent --agent chat.ai --api 8080 --api-concurrency 10
 Health check for load balancer integration.
 
 **Response**: `200 OK`
+
 ```json
 {
   "status": "ok"
@@ -99,13 +102,14 @@ Health check for load balancer integration.
 
 Execute an agent and return the response.
 
-| Parameter | Location | Required | Description |
-|-----------|----------|----------|-------------|
-| `agentId` | Path | Yes | Agent filename without `.ai` extension |
-| `q` | Query | Yes | User prompt (URL-encoded) |
-| `format` | Query | No | Output format: `markdown`, `json`, `text` |
+| Parameter | Location | Required | Description                                                                             |
+| --------- | -------- | -------- | --------------------------------------------------------------------------------------- |
+| `agentId` | Path     | Yes      | Agent filename without `.ai` extension                                                  |
+| `q`       | Query    | Yes      | User prompt (URL-encoded)                                                               |
+| `format`  | Query    | No       | Output format: `markdown`, `json`, `pipe`, `tty`, `slack-block-kit`, `markdown+mermaid` |
 
 **Example**:
+
 ```bash
 curl "http://localhost:8080/v1/chat?q=What%20is%202%2B2"
 ```
@@ -116,15 +120,16 @@ curl "http://localhost:8080/v1/chat?q=What%20is%202%2B2"
 
 ### q (required)
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
+| Property | Value           |
+| -------- | --------------- |
+| Type     | `string`        |
 | Location | Query parameter |
-| Required | Yes |
+| Required | Yes             |
 
 **Description**: The user prompt to send to the agent. Must be URL-encoded.
 
 **Example**:
+
 ```bash
 # Simple prompt
 curl "http://localhost:8080/v1/chat?q=Hello"
@@ -135,21 +140,25 @@ curl "http://localhost:8080/v1/chat?q=What%20is%20the%20weather%20in%20Paris%3F"
 
 ### format (optional)
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Default | `markdown` |
-| Valid values | `markdown`, `json`, `text` |
+| Property     | Value                                                                    |
+| ------------ | ------------------------------------------------------------------------ |
+| Type         | `string`                                                                 |
+| Default      | `markdown`                                                               |
+| Valid values | `markdown`, `json`, `pipe`, `tty`, `slack-block-kit`, `markdown+mermaid` |
 
 **Description**: Desired output format. When `json` is specified, the agent must have an output schema defined in frontmatter, or validation will fail.
 
 **Example**:
+
 ```bash
 # Markdown output (default)
 curl "http://localhost:8080/v1/chat?q=Hello"
 
 # JSON output (requires agent with output schema)
 curl "http://localhost:8080/v1/analyzer?q=Analyze%20this&format=json"
+
+# Plain text output
+curl "http://localhost:8080/v1/chat?q=Hello&format=pipe"
 ```
 
 ---
@@ -170,12 +179,12 @@ curl "http://localhost:8080/v1/analyzer?q=Analyze%20this&format=json"
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `success` | `boolean` | Always `true` for successful responses |
-| `output` | `string` | Concatenated streamed text output |
-| `finalReport` | `object` | Structured final report from agent |
-| `reasoning` | `string` | (Optional) Aggregated thinking/reasoning output |
+| Field         | Type      | Description                                     |
+| ------------- | --------- | ----------------------------------------------- |
+| `success`     | `boolean` | Always `true` for successful responses          |
+| `output`      | `string`  | Concatenated streamed text output               |
+| `finalReport` | `object`  | Structured final report from agent              |
+| `reasoning`   | `string`  | (Optional) Aggregated thinking/reasoning output |
 
 ### JSON Format Response
 
@@ -197,25 +206,6 @@ When `format=json` is specified:
 
 ---
 
-## Streaming
-
-Responses are streamed via Server-Sent Events (SSE). Use the `-N` flag with curl to see real-time output:
-
-```bash
-curl -N "http://localhost:8080/v1/chat?q=Hello"
-```
-
-### SSE Event Format
-
-```
-data: {"type": "text", "content": "Hello"}
-data: {"type": "text", "content": "! How"}
-data: {"type": "text", "content": " can I help?"}
-data: {"type": "done"}
-```
-
----
-
 ## Error Responses
 
 ### 400 Bad Request
@@ -224,6 +214,9 @@ Missing or invalid parameters.
 
 ```json
 {
+  "success": false,
+  "output": "",
+  "finalReport": null,
   "error": "Query parameter q is required"
 }
 ```
@@ -234,7 +227,10 @@ Agent not registered.
 
 ```json
 {
-  "error": "Agent 'unknown' not registered"
+  "success": false,
+  "output": "",
+  "finalReport": null,
+  "error": "Agent 'chat' not registered"
 }
 ```
 
@@ -244,6 +240,9 @@ Using POST instead of GET for built-in routes.
 
 ```json
 {
+  "success": false,
+  "output": "",
+  "finalReport": null,
   "error": "method_not_allowed"
 }
 ```
@@ -267,8 +266,10 @@ Concurrency limit reached.
 
 ```json
 {
-  "error": "No available slots",
-  "retry_after": 5
+  "success": false,
+  "output": "",
+  "finalReport": null,
+  "error": "concurrency_unavailable"
 }
 ```
 
@@ -303,7 +304,7 @@ print(data["finalReport"]["content_json"])
 ```javascript
 // Using fetch
 const response = await fetch(
-  "http://localhost:8080/v1/chat?q=" + encodeURIComponent("Hello!")
+  "http://localhost:8080/v1/chat?q=" + encodeURIComponent("Hello!"),
 );
 const data = await response.json();
 console.log(data.output);
@@ -326,19 +327,11 @@ while (true) {
 // Simple fetch
 async function askAgent(question) {
   const response = await fetch(
-    `http://localhost:8080/v1/chat?q=${encodeURIComponent(question)}`
+    `http://localhost:8080/v1/chat?q=${encodeURIComponent(question)}`,
   );
   const data = await response.json();
   return data.output;
 }
-
-// Using EventSource for streaming
-const eventSource = new EventSource(
-  `http://localhost:8080/v1/chat?q=${encodeURIComponent("Hello")}`
-);
-eventSource.onmessage = (event) => {
-  console.log(JSON.parse(event.data));
-};
 ```
 
 ### curl
@@ -346,9 +339,6 @@ eventSource.onmessage = (event) => {
 ```bash
 # Basic request
 curl "http://localhost:8080/v1/chat?q=Hello"
-
-# With streaming output
-curl -N "http://localhost:8080/v1/chat?q=Hello"
 
 # URL-encoded complex prompt
 curl "http://localhost:8080/v1/chat?q=$(echo 'What is 2+2?' | jq -sRr @uri)"
@@ -366,17 +356,19 @@ curl "http://localhost:8080/v1/analyzer?q=Analyze%20this&format=json"
 **Symptom**: Server fails to start with "EADDRINUSE" error.
 
 **Solution**: Choose a different port or stop the process using that port:
+
 ```bash
 ai-agent --agent chat.ai --api 8081
 ```
 
 ### Agent not found (404)
 
-**Symptom**: `{"error": "Agent 'xxx' not registered"}`
+**Symptom**: `{"success": false, "output": "", "finalReport": null, "error": "Agent 'xxx' not registered"}`
 
 **Cause**: The agent ID in the URL doesn't match any registered agent.
 
 **Solution**:
+
 1. Check the agent filename (without `.ai` extension)
 2. Verify the agent was loaded with `--agent`
 3. For `chat.ai`, the endpoint is `/v1/chat`
@@ -386,11 +378,13 @@ ai-agent --agent chat.ai --api 8081
 **Symptom**: Requests hang or timeout without response.
 
 **Possible causes**:
+
 1. Agent execution taking too long
 2. LLM provider not responding
 3. Tool execution stuck
 
 **Solutions**:
+
 1. Check agent timeout settings
 2. Verify LLM provider connectivity
 3. Review tool configurations
@@ -402,6 +396,7 @@ ai-agent --agent chat.ai --api 8081
 **Cause**: Using `format=json` with an agent that has no output schema.
 
 **Solution**: Add an output schema to the agent frontmatter:
+
 ```yaml
 ---
 output:

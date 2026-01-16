@@ -21,11 +21,11 @@
 
 Before installing ai-agent, ensure you have:
 
-| Requirement | Minimum Version | How to Check | Install Guide |
-|-------------|-----------------|--------------|---------------|
-| **Node.js** | 20+ | `node --version` | [nodejs.org](https://nodejs.org/) |
-| **npm** | 10+ | `npm --version` | Comes with Node.js |
-| **Git** | Any | `git --version` | [git-scm.com](https://git-scm.com/) (for source install only) |
+| Requirement | Minimum Version | How to Check     | Install Guide                                                 |
+| ----------- | --------------- | ---------------- | ------------------------------------------------------------- |
+| **Node.js** | 20+             | `node --version` | [nodejs.org](https://nodejs.org/)                             |
+| **npm**     | 10+             | `npm --version`  | Comes with Node.js                                            |
+| **Git**     | Any             | `git --version`  | [git-scm.com](https://git-scm.com/) (for source install only) |
 
 **Check your versions:**
 
@@ -51,7 +51,7 @@ v20.10.0
 Install ai-agent globally for command-line use anywhere:
 
 ```bash
-npm install -g @netdata/ai-agent
+npm install -g ai-agent-claude
 ```
 
 **Expected output:**
@@ -72,13 +72,13 @@ Install as a project dependency:
 
 ```bash
 cd your-project
-npm install @netdata/ai-agent
+npm install ai-agent-claude
 ```
 
 Run via npx:
 
 ```bash
-npx ai-agent --agent hello.ai "Hello"
+npx ai-agent-claude --agent hello.ai "Hello"
 ```
 
 Or add to `package.json` scripts:
@@ -145,12 +145,14 @@ ai-agent requires a configuration file to connect to LLM providers. Create one o
 
 ai-agent searches for configuration in this order:
 
-| Priority | Location | Use Case |
-|----------|----------|----------|
-| 1 | `--config <file>` CLI option | Override all defaults |
-| 2 | `.ai-agent.json` in current directory | Project-specific config |
-| 3 | `~/.ai-agent/ai-agent.json` | User-wide config |
-| 4 | `/etc/ai-agent/ai-agent.json` | System-wide config |
+| Priority | Location                                 | Use Case                |
+| -------- | ---------------------------------------- | ----------------------- |
+| 1        | `--config <file>` CLI option             | Override all defaults   |
+| 2        | `.ai-agent.json` in current directory    | Project-specific config |
+| 3        | `.ai-agent.json` in agent file directory | Agent-specific config   |
+| 4        | `.ai-agent.json` in binary directory     | Binary-bundled config   |
+| 5        | `~/.ai-agent/ai-agent.json`              | User-wide config        |
+| 6        | `/etc/ai-agent/ai-agent.json`            | System-wide config      |
 
 ### Minimal Configuration
 
@@ -223,7 +225,15 @@ source ~/.bashrc
 
 ### Option 2: Environment File (Recommended)
 
-Create `~/.ai-agent/ai-agent.env` or `.ai-agent.env` in your working directory:
+ai-agent automatically loads `.ai-agent.env` from the same locations as configuration files:
+
+- `.ai-agent.env` in current directory
+- `.ai-agent.env` in agent file directory
+- `.ai-agent.env` in binary directory
+- `~/.ai-agent/ai-agent.env` (user-wide)
+- `/etc/ai-agent/ai-agent.env` (system-wide)
+
+Create `.ai-agent.env` in your working directory or `~/.ai-agent/ai-agent.env` for user-wide config:
 
 ```bash
 # API Keys
@@ -235,7 +245,7 @@ BRAVE_API_KEY=...
 GITHUB_TOKEN=ghp_...
 ```
 
-ai-agent automatically loads this file on startup.
+ai-agent automatically loads these files on startup, with higher-priority locations overriding lower-priority ones.
 
 > **Security:** Add `.ai-agent.env` to your `.gitignore` to prevent committing secrets.
 
@@ -262,6 +272,8 @@ Run these tests to confirm ai-agent is installed and configured correctly.
 
 ```bash
 ai-agent --version
+# or
+ai-agent -V
 ```
 
 **Expected:** Version number displayed (e.g., `ai-agent v1.0.0`)
@@ -298,10 +310,7 @@ ai-agent --agent test.ai --dry-run "test"
 **Expected output:**
 
 ```
-[DRY-RUN] Configuration valid
-[DRY-RUN] Agent file valid: test.ai
-[DRY-RUN] Provider: openai
-[DRY-RUN] Model: gpt-4o-mini
+dry run complete: configuration and MCP servers validated
 ```
 
 ### Test 4: Live API Call
@@ -329,11 +338,13 @@ Installation successful!
 **Solutions:**
 
 1. Find npm global bin directory:
+
    ```bash
    npm config get prefix
    ```
 
 2. Add to PATH (replace `/usr/local` with your prefix):
+
    ```bash
    export PATH="$PATH:/usr/local/bin"
    ```
@@ -356,11 +367,13 @@ Installation successful!
 **Solutions:**
 
 1. Verify the variable is exported:
+
    ```bash
    echo $OPENAI_API_KEY
    ```
 
 2. If empty, export it:
+
    ```bash
    export OPENAI_API_KEY="sk-..."
    ```
@@ -401,12 +414,12 @@ ai-agent --agent ./test.ai "test"  # Use explicit path
 
 Installation complete. Continue with:
 
-| Goal | Page |
-|------|------|
-| Run your first agent | [Quick Start](Getting-Started-Quick-Start) |
-| Build a real-world agent | [First Agent Tutorial](Getting-Started-First-Agent) |
+| Goal                          | Page                                                           |
+| ----------------------------- | -------------------------------------------------------------- |
+| Run your first agent          | [Quick Start](Getting-Started-Quick-Start)                     |
+| Build a real-world agent      | [First Agent Tutorial](Getting-Started-First-Agent)            |
 | Learn all environment options | [Environment Variables](Getting-Started-Environment-Variables) |
-| Configure multiple providers | [Configuration Providers](Configuration-Providers) |
+| Configure multiple providers  | [Configuration Providers](Configuration-Providers)             |
 
 ---
 

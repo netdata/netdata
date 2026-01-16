@@ -39,6 +39,7 @@ The user contract defines what you can **rely on**:
 - **Debugging**: Know what's guaranteed vs. implementation detail
 
 **Contract vs. Implementation**:
+
 - **Contract**: "Session never exceeds maxTurns" - guaranteed
 - **Implementation**: "Retries use round-robin" - may change
 
@@ -48,14 +49,15 @@ The user contract defines what you can **rely on**:
 
 ### maxTurns Contract
 
-| Guarantee | Details |
-|-----------|---------|
-| Session NEVER exceeds `maxTurns` | Absolute limit on LLM turns |
-| 1 turn = 1 LLM request/response + tool phase | Definition of a turn |
-| Retries don't count toward limit | Retries happen within a turn |
-| Max turns without final_report → synthetic failure | Always produces output |
+| Guarantee                                          | Details                      |
+| -------------------------------------------------- | ---------------------------- |
+| Session NEVER exceeds `maxTurns`                   | Absolute limit on LLM turns  |
+| 1 turn = 1 LLM request/response + tool phase       | Definition of a turn         |
+| Retries don't count toward limit                   | Retries happen within a turn |
+| Max turns without final_report → synthetic failure | Always produces output       |
 
 **Behavior**:
+
 ```
 Turn 1: LLM → Tools → (retry if needed)
 Turn 2: LLM → Tools
@@ -65,20 +67,20 @@ Turn N (maxTurns): LLM → final_report ONLY
 
 ### maxToolCallsPerTurn Contract
 
-| Guarantee | Details |
-|-----------|---------|
-| Excess tool calls are dropped | Never executed |
+| Guarantee                       | Details           |
+| ------------------------------- | ----------------- |
+| Excess tool calls are dropped   | Never executed    |
 | LLM receives error about excess | Informed of limit |
-| Valid calls still executed | Up to limit |
+| Valid calls still executed      | Up to limit       |
 
 ### maxRetries Contract
 
-| Guarantee | Details |
-|-----------|---------|
+| Guarantee                              | Details           |
+| -------------------------------------- | ----------------- |
 | `maxRetries` = total attempts per turn | Initial + retries |
-| `maxRetries: 1` = 1 attempt | No retries |
-| `maxRetries: 3` = 3 attempts | 2 retries |
-| Attempts cycle through targets | Round-robin |
+| `maxRetries: 1` = 1 attempt            | No retries        |
+| `maxRetries: 3` = 3 attempts           | 2 retries         |
+| Attempts cycle through targets         | Round-robin       |
 
 ---
 
@@ -86,33 +88,38 @@ Turn N (maxTurns): LLM → final_report ONLY
 
 ### Token Counter Guarantees
 
-| Counter | Guarantee |
-|---------|-----------|
-| `currentCtxTokens` | Committed conversation tokens |
+| Counter            | Guarantee                                  |
+| ------------------ | ------------------------------------------ |
+| `currentCtxTokens` | Committed conversation tokens              |
 | `pendingCtxTokens` | Uncommitted tokens (tool outputs, notices) |
-| `schemaCtxTokens` | Tool schema overhead |
-| `contextWindow` | Model capacity |
+| `schemaCtxTokens`  | Tool schema overhead                       |
+| `contextWindow`    | Model capacity                             |
 
 ### LLM Request Metrics
 
 Every `LLM request prepared` log satisfies:
+
 ```
-expectedTokens = ctxTokens + pendingCtxTokens + schemaCtxTokens
+expectedTokens = ctxTokens + newTokens
 ```
+
+**Note:** `schemaCtxTokens` is included in `ctxTokens` for subsequent turns (via cache_read/cache_write tracking). For first turn, schema tokens are not included, resulting in a slight underestimate.
 
 ### Guard Projection
 
 ```
+
 projected = currentCtxTokens + pendingCtxTokens + newCtxTokens + schemaCtxTokens
 limit = contextWindow - contextWindowBufferTokens - maxOutputTokens
+
 ```
 
 ### Enforcement Guarantees
 
-| Condition | Guarantee |
-|-----------|-----------|
-| `projected > limit` | Forced final turn |
-| Forced final turn | Tools restricted to `final_report` |
+| Condition               | Guarantee                             |
+| ----------------------- | ------------------------------------- |
+| `projected > limit`     | Forced final turn                     |
+| Forced final turn       | Tools restricted to `final_report`    |
 | Still over after shrink | Proceed best-effort (may fail at API) |
 
 ---
@@ -121,20 +128,20 @@ limit = contextWindow - contextWindowBufferTokens - maxOutputTokens
 
 ### toolResponseMaxBytes Contract
 
-| Guarantee | Details |
-|-----------|---------|
-| Responses exceeding size are stored | Written to disk |
-| Replaced with `tool_output` handle | LLM receives handle |
-| Handle includes metadata | `handle`, `reason`, `bytes`, `lines`, `tokens` |
-| Original preserved | Under `/tmp/ai-agent-<run-hash>/` |
+| Guarantee                           | Details                                        |
+| ----------------------------------- | ---------------------------------------------- |
+| Responses exceeding size are stored | Written to disk                                |
+| Replaced with `tool_output` handle  | LLM receives handle                            |
+| Handle includes metadata            | `handle`, `reason`, `bytes`, `lines`, `tokens` |
+| Original preserved                  | Under `/tmp/ai-agent-<run-hash>/`              |
 
 ### toolTimeout Contract
 
-| Guarantee | Details |
-|-----------|---------|
-| Tool aborted after timeout | Execution stops |
-| Timed-out tools marked `failed` | Status recorded |
-| LLM receives failure message | `(tool failed: timeout)` |
+| Guarantee                       | Details                  |
+| ------------------------------- | ------------------------ |
+| Tool aborted after timeout      | Execution stops          |
+| Timed-out tools marked `failed` | Status recorded          |
+| LLM receives failure message    | `(tool failed: timeout)` |
 
 ---
 
@@ -144,39 +151,39 @@ limit = contextWindow - contextWindowBufferTokens - maxOutputTokens
 
 **Guarantee**: ai-agent NEVER crashes without returning `AIAgentResult`.
 
-| Scenario | Result |
-|----------|--------|
-| Model provides final_report | `success: true`, `finalReport` populated |
+| Scenario                       | Result                                     |
+| ------------------------------ | ------------------------------------------ |
+| Model provides final_report    | `success: true`, `finalReport` populated   |
 | Max turns without final_report | `success: false`, synthetic failure report |
-| Fatal error | `success: false`, `error` field populated |
+| Fatal error                    | `success: false`, `error` field populated  |
 
 ### CLI Exit Codes
 
-| Code | Meaning | When |
-|------|---------|------|
-| 0 | Success | Session completed successfully |
-| 1 | Generic failure | Session failed |
-| 3 | MCP failure | Missing/failed MCP servers |
-| 4 | Invalid config | Invalid arguments or configuration |
-| 5 | Schema error | Schema validation failures |
+| Code | Meaning         | When                               |
+| ---- | --------------- | ---------------------------------- |
+| 0    | Success         | Session completed successfully     |
+| 1    | Generic failure | Session failed                     |
+| 3    | MCP failure     | Missing/failed MCP servers         |
+| 4    | Invalid config  | Invalid arguments or configuration |
+| 5    | Schema error    | Schema validation failures         |
 
 ### Empty/Invalid Response Handling
 
 **Empty content without tool calls**:
 
-| Condition | Behavior |
-|-----------|----------|
-| Only reasoning present | Preserve reasoning, retry with guidance |
-| Nothing present | NOT added to conversation, synthetic retry |
-| Counts as attempt | Toward `maxRetries` |
+| Condition              | Behavior                                   |
+| ---------------------- | ------------------------------------------ |
+| Only reasoning present | Preserve reasoning, retry with guidance    |
+| Nothing present        | NOT added to conversation, synthetic retry |
+| Counts as attempt      | Toward `maxRetries`                        |
 
 **Invalid tool parameters**:
 
-| Condition | Behavior |
-|-----------|----------|
-| Malformed JSON | Call dropped |
-| Valid calls present | Still executed |
-| LLM receives error | Validation error message |
+| Condition           | Behavior                 |
+| ------------------- | ------------------------ |
+| Malformed JSON      | Call dropped             |
+| Valid calls present | Still executed           |
+| LLM receives error  | Validation error message |
 
 ---
 
@@ -184,25 +191,27 @@ limit = contextWindow - contextWindowBufferTokens - maxOutputTokens
 
 ### Fatal Errors (No Retry)
 
-| Error | Guarantee |
-|-------|-----------|
-| Auth errors | Session fails immediately |
+| Error          | Guarantee                 |
+| -------------- | ------------------------- |
+| Auth errors    | Session fails immediately |
 | Quota exceeded | Session fails immediately |
 
 ### Retryable Errors
 
-| Error | Guarantee |
-|-------|-----------|
-| Rate limits | Honor Retry-After, exponential backoff |
-| Network/timeout | Retry with next target immediately |
-| Invalid responses | Synthetic retry with error message |
+| Error             | Guarantee                              |
+| ----------------- | -------------------------------------- |
+| Rate limits       | Honor Retry-After, exponential backoff |
+| Network/timeout   | Retry with next target immediately     |
+| Invalid responses | Synthetic retry with error message     |
 
 ### Provider Cycling
 
 ```
+
 Attempt 1: targets[0]
 Attempt 2: targets[1]
 Attempt N: targets[(N-1) % targets.length]
+
 ```
 
 ---
@@ -217,21 +226,17 @@ Attempt N: targets[(N-1) % targets.length]
 
 ### Final Report Structure
 
-**System-determined fields**:
+**Fields in FinalReportPayload**:
 
-| Field | Type | Guarantee |
-|-------|------|-----------|
-| `status` | `'success'` \| `'failure'` | Based on source, not model claim |
-| `format` | string | Matches session expectation |
-| `ts` | number | Unix timestamp |
+| Field          | Type                                                                                                                        | When Present                    |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| `format`       | `'json'` \| `'markdown'` \| `'markdown+mermaid'` \| `'slack-block-kit'` \| `'tty'` \| `'pipe'` \| `'sub-agent'` \| `'text'` | Always present                  |
+| `content_json` | object                                                                                                                      | JSON format                     |
+| `content`      | string                                                                                                                      | Text formats                    |
+| `metadata`     | object                                                                                                                      | Optional                        |
+| `ts`           | number                                                                                                                      | Unix timestamp (always present) |
 
-**Model-provided fields**:
-
-| Field | Type | When Present |
-|-------|------|--------------|
-| `content_json` | object | JSON format |
-| `content` | string | Text formats |
-| `metadata` | object | Optional |
+**Session-level status**: The `success` field in `AIAgentResult` indicates overall session success/failure. This is distinct from the final report payload itself.
 
 ---
 
@@ -241,36 +246,36 @@ Attempt N: targets[(N-1) % targets.length]
 
 Every LLM request produces an accounting entry with:
 
-| Field | Guarantee |
-|-------|-----------|
-| `type` | `'llm'` |
-| `provider`, `model` | Actual provider/model used |
-| `status` | `'ok'` or `'failed'` |
-| `latency` | Request duration |
-| `tokens` | Token counts (if available) |
-| `timestamp` | When request was made |
-| `agentId`, `callPath`, `txnId` | Tracing context |
+| Field                          | Guarantee                   |
+| ------------------------------ | --------------------------- |
+| `type`                         | `'llm'`                     |
+| `provider`, `model`            | Actual provider/model used  |
+| `status`                       | `'ok'` or `'failed'`        |
+| `latency`                      | Request duration            |
+| `tokens`                       | Token counts (if available) |
+| `timestamp`                    | When request was made       |
+| `agentId`, `callPath`, `txnId` | Tracing context             |
 
 ### Tool Entry Guarantees
 
 Every tool execution produces an accounting entry with:
 
-| Field | Guarantee |
-|-------|-----------|
-| `type` | `'tool'` |
-| `mcpServer`, `command` | Tool identification |
-| `status` | `'ok'` or `'failed'` |
-| `latency` | Execution duration |
-| `timestamp` | When executed |
-| `charactersIn`, `charactersOut` | I/O sizes |
+| Field                           | Guarantee            |
+| ------------------------------- | -------------------- |
+| `type`                          | `'tool'`             |
+| `mcpServer`, `command`          | Tool identification  |
+| `status`                        | `'ok'` or `'failed'` |
+| `latency`                       | Execution duration   |
+| `timestamp`                     | When executed        |
+| `charactersIn`, `charactersOut` | I/O sizes            |
 
 ### Observable Guarantees
 
-| Guarantee | Details |
-|-----------|---------|
+| Guarantee                 | Details                         |
+| ------------------------- | ------------------------------- |
 | Provider fallback visible | Sequence shows provider changes |
-| All tools recorded | Success and failure |
-| Timing available | Latency for all operations |
+| All tools recorded        | Success and failure             |
+| Timing available          | Latency for all operations      |
 
 ---
 
@@ -285,10 +290,10 @@ Every tool execution produces an accounting entry with:
 
 ### Tool Message Formats
 
-| Outcome | Message Format |
-|---------|----------------|
-| Success | `role: 'tool'` with content |
-| Failed | `(tool failed: <reason>)` |
+| Outcome          | Message Format                                  |
+| ---------------- | ----------------------------------------------- |
+| Success          | `role: 'tool'` with content                     |
+| Failed           | `(tool failed: <reason>)`                       |
 | Dropped (budget) | `(tool failed: context window budget exceeded)` |
 
 ---
@@ -297,22 +302,22 @@ Every tool execution produces an accounting entry with:
 
 ### Layer Precedence (Highest to Lowest)
 
-| Priority | Source |
-|----------|--------|
-| 1 | `--config` explicit path |
-| 2 | Current working directory |
-| 3 | Prompt directory |
-| 4 | Binary directory |
-| 5 | `$HOME/.ai-agent/ai-agent.json` |
-| 6 | `/etc/ai-agent/ai-agent.json` |
+| Priority | Source                          |
+| -------- | ------------------------------- |
+| 1        | `--config` explicit path        |
+| 2        | Current working directory       |
+| 3        | Prompt directory                |
+| 4        | Binary directory                |
+| 5        | `$HOME/.ai-agent/ai-agent.json` |
+| 6        | `/etc/ai-agent/ai-agent.json`   |
 
 ### Placeholder Expansion
 
-| Guarantee | Details |
-|-----------|---------|
-| `${VARIABLE}` resolved | From `.ai-agent.env` then `process.env` |
-| Unresolved throws | With layer origin information |
-| `${parameters.foo}` protected | Not expanded in REST tool URLs |
+| Guarantee                     | Details                                 |
+| ----------------------------- | --------------------------------------- |
+| `${VARIABLE}` resolved        | From `.ai-agent.env` then `process.env` |
+| Unresolved throws             | With layer origin information           |
+| `${parameters.foo}` protected | Not expanded in REST tool URLs          |
 
 ---
 
@@ -322,25 +327,25 @@ Every tool execution produces an accounting entry with:
 
 ### Examples of Violations
 
-| Violation | Description |
-|-----------|-------------|
-| Turn limit exceeded | 4 assistant messages when `maxTurns: 3` |
-| Context overflow | Provider rejects due to context overflow |
-| Missing final report | `success: true` but `finalReport` undefined |
-| Wrong exit code | CLI exits 0 when `success: false` |
-| Config ignored | `temperature: 0.5` but provider receives 1.0 |
-| Accounting missing | LLM request without accounting entry |
+| Violation            | Description                                  |
+| -------------------- | -------------------------------------------- |
+| Turn limit exceeded  | 4 assistant messages when `maxTurns: 3`      |
+| Context overflow     | Provider rejects due to context overflow     |
+| Missing final report | `success: true` but `finalReport` undefined  |
+| Wrong exit code      | CLI exits 0 when `success: false`            |
+| Config ignored       | `temperature: 0.5` but provider receives 1.0 |
+| Accounting missing   | LLM request without accounting entry         |
 
 ### Non-Violations (Implementation Details)
 
 These may change without notice:
 
-| Allowed Change | Description |
-|----------------|-------------|
-| Log message wording | Internal log text |
-| Internal state names | State refactoring |
+| Allowed Change        | Description                 |
+| --------------------- | --------------------------- |
+| Log message wording   | Internal log text           |
+| Internal state names  | State refactoring           |
 | Estimation algorithms | Token counting improvements |
-| Retry timing | Backoff adjustments |
+| Retry timing          | Backoff adjustments         |
 
 ---
 
@@ -356,13 +361,13 @@ For each contract guarantee:
 
 ### Key Test Scenarios
 
-| Scenario | Contract Tested |
-|----------|-----------------|
-| Run to maxTurns | Turn limit enforcement |
-| Large context | Context guard trigger |
-| Large tool output | Size limit handling |
-| Provider failure | Retry and cycling |
-| All providers fail | Error handling |
+| Scenario           | Contract Tested        |
+| ------------------ | ---------------------- |
+| Run to maxTurns    | Turn limit enforcement |
+| Large context      | Context guard trigger  |
+| Large tool output  | Size limit handling    |
+| Provider failure   | Retry and cycling      |
+| All providers fail | Error handling         |
 
 ---
 
@@ -373,3 +378,7 @@ For each contract guarantee:
 - [Retry Strategy](Technical-Specs-Retry-Strategy) - Error handling details
 - [Context Management](Technical-Specs-Context-Management) - Token budget details
 - [specs/CONTRACT.md](specs/CONTRACT.md) - Full contract specification
+
+```
+
+```

@@ -27,11 +27,13 @@ The `--override` flag allows runtime configuration changes that:
 - **Take highest priority**: Nothing can override an override
 
 **Primary use cases**:
+
 - Testing and debugging
 - Forcing specific behavior
 - Temporary configuration changes
 
 **Syntax**:
+
 ```bash
 ai-agent --agent test.ai --override key=value "query"
 ```
@@ -65,11 +67,11 @@ ai-agent --agent test.ai \
 
 #### models
 
-| Property | Value |
-|----------|-------|
-| Type | `string` (comma-separated) |
-| Default | From frontmatter/CLI |
-| Example | `models=openai/gpt-4o,anthropic/claude-sonnet-4` |
+| Property | Value                                            |
+| -------- | ------------------------------------------------ |
+| Type     | `string` (comma-separated)                       |
+| Default  | From frontmatter/CLI                             |
+| Example  | `models=openai/gpt-4o,anthropic/claude-sonnet-4` |
 
 **Description**: Override model selection for all agents.
 
@@ -81,11 +83,11 @@ ai-agent --agent test.ai --override models=openai/gpt-4o "query"
 
 #### tools
 
-| Property | Value |
-|----------|-------|
-| Type | `string` (comma-separated) |
-| Default | From frontmatter |
-| Example | `tools=github,slack` |
+| Property | Value                      |
+| -------- | -------------------------- |
+| Type     | `string` (comma-separated) |
+| Default  | From frontmatter           |
+| Example  | `tools=github,slack`       |
 
 **Description**: Override available tools.
 
@@ -97,11 +99,11 @@ ai-agent --agent test.ai --override tools=github,filesystem "query"
 
 #### agents
 
-| Property | Value |
-|----------|-------|
-| Type | `string` (comma-separated paths) |
-| Default | From frontmatter |
-| Example | `agents=helper.ai,analyzer.ai` |
+| Property | Value                            |
+| -------- | -------------------------------- |
+| Type     | `string` (comma-separated paths) |
+| Default  | From frontmatter                 |
+| Example  | `agents=helper.ai,analyzer.ai`   |
 
 **Description**: Override sub-agent definitions.
 
@@ -115,12 +117,12 @@ ai-agent --agent test.ai --override agents=helper.ai "query"
 
 #### temperature
 
-| Property | Value |
-|----------|-------|
-| Type | `number` |
-| Default | `0.0` |
-| Valid values | `0.0` to `2.0` |
-| Example | `temperature=0.7` |
+| Property     | Value             |
+| ------------ | ----------------- |
+| Type         | `number`          |
+| Default      | `0.0`             |
+| Valid values | `0.0` to `2.0`    |
+| Example      | `temperature=0.7` |
 
 **Description**: Override response creativity/variance.
 
@@ -132,12 +134,12 @@ ai-agent --agent test.ai --override temperature=0.5 "query"
 
 #### topP
 
-| Property | Value |
-|----------|-------|
-| Type | `number` |
-| Default | Not sent (provider decides) |
-| Valid values | `0.0` to `1.0` |
-| Example | `topP=0.9` |
+| Property     | Value                       |
+| ------------ | --------------------------- |
+| Type         | `number`                    |
+| Default      | Not sent (provider decides) |
+| Valid values | `0.0` to `1.0`              |
+| Example      | `topP=0.9`                  |
 
 **Description**: Override token selection diversity.
 
@@ -149,12 +151,12 @@ ai-agent --agent test.ai --override topP=0.95 "query"
 
 #### topK
 
-| Property | Value |
-|----------|-------|
-| Type | `integer` |
-| Default | Not sent (provider decides) |
-| Valid values | `1` or greater |
-| Example | `topK=40` |
+| Property     | Value                       |
+| ------------ | --------------------------- |
+| Type         | `integer`                   |
+| Default      | Not sent (provider decides) |
+| Valid values | `1` or greater              |
+| Example      | `topK=40`                   |
 
 **Description**: Limit token selection to K most probable.
 
@@ -166,12 +168,12 @@ ai-agent --agent test.ai --override topK=50 "query"
 
 #### maxOutputTokens
 
-| Property | Value |
-|----------|-------|
-| Type | `integer` |
-| Default | `4096` |
-| Valid values | `1` or greater |
-| Example | `maxOutputTokens=8192` |
+| Property     | Value                  |
+| ------------ | ---------------------- |
+| Type         | `integer`              |
+| Default      | `4096`                 |
+| Valid values | `1` or greater         |
+| Example      | `maxOutputTokens=8192` |
 
 **Description**: Override maximum response length per turn.
 
@@ -183,12 +185,12 @@ ai-agent --agent test.ai --override maxOutputTokens=16384 "query"
 
 #### repeatPenalty
 
-| Property | Value |
-|----------|-------|
-| Type | `number` |
-| Default | Not sent (provider decides) |
+| Property     | Value                          |
+| ------------ | ------------------------------ |
+| Type         | `number`                       |
+| Default      | Not sent (provider decides)    |
 | Valid values | `0.0` or greater (`1.0` = off) |
-| Example | `repeatPenalty=1.2` |
+| Example      | `repeatPenalty=1.2`            |
 
 **Description**: Reduce repetitive text.
 
@@ -202,12 +204,12 @@ ai-agent --agent test.ai --override repeatPenalty=1.1 "query"
 
 #### llmTimeout
 
-| Property | Value |
-|----------|-------|
-| Type | `number` (ms) or duration string |
-| Default | `600000` (10 minutes) |
+| Property     | Value                                     |
+| ------------ | ----------------------------------------- |
+| Type         | `number` (ms) or duration string          |
+| Default      | `600000` (10 minutes)                     |
 | Valid values | Positive integer or duration (`5s`, `2m`) |
-| Example | `llmTimeout=300000` |
+| Example      | `llmTimeout=300000`                       |
 
 **Description**: Override LLM response timeout.
 
@@ -219,12 +221,12 @@ ai-agent --agent test.ai --override llmTimeout=120000 "query"
 
 #### toolTimeout
 
-| Property | Value |
-|----------|-------|
-| Type | `number` (ms) or duration string |
-| Default | `300000` (5 minutes) |
+| Property     | Value                                     |
+| ------------ | ----------------------------------------- |
+| Type         | `number` (ms) or duration string          |
+| Default      | `300000` (5 minutes)                      |
 | Valid values | Positive integer or duration (`5s`, `2m`) |
-| Example | `toolTimeout=60000` |
+| Example      | `toolTimeout=60000`                       |
 
 **Description**: Override tool execution timeout.
 
@@ -236,12 +238,12 @@ ai-agent --agent test.ai --override toolTimeout=60000 "query"
 
 #### maxRetries
 
-| Property | Value |
-|----------|-------|
-| Type | `integer` |
-| Default | `5` |
+| Property     | Value          |
+| ------------ | -------------- |
+| Type         | `integer`      |
+| Default      | `5`            |
 | Valid values | `0` or greater |
-| Example | `maxRetries=3` |
+| Example      | `maxRetries=3` |
 
 **Description**: Override retry count on LLM failures.
 
@@ -253,12 +255,12 @@ ai-agent --agent test.ai --override maxRetries=10 "query"
 
 #### maxTurns
 
-| Property | Value |
-|----------|-------|
-| Type | `integer` |
-| Default | `10` |
+| Property     | Value          |
+| ------------ | -------------- |
+| Type         | `integer`      |
+| Default      | `10`           |
 | Valid values | `1` or greater |
-| Example | `maxTurns=25` |
+| Example      | `maxTurns=25`  |
 
 **Description**: Override maximum tool-using turns.
 
@@ -270,12 +272,12 @@ ai-agent --agent test.ai --override maxTurns=50 "query"
 
 #### maxToolCallsPerTurn
 
-| Property | Value |
-|----------|-------|
-| Type | `integer` |
-| Default | `10` |
-| Valid values | `1` or greater |
-| Example | `maxToolCallsPerTurn=20` |
+| Property     | Value                    |
+| ------------ | ------------------------ |
+| Type         | `integer`                |
+| Default      | `10`                     |
+| Valid values | `1` or greater           |
+| Example      | `maxToolCallsPerTurn=20` |
 
 **Description**: Override maximum parallel tool calls per turn.
 
@@ -287,12 +289,12 @@ ai-agent --agent test.ai --override maxToolCallsPerTurn=5 "query"
 
 #### toolResponseMaxBytes
 
-| Property | Value |
-|----------|-------|
-| Type | `integer` |
-| Default | `12288` (12KB) |
-| Valid values | `0` or greater |
-| Example | `toolResponseMaxBytes=65536` |
+| Property     | Value                        |
+| ------------ | ---------------------------- |
+| Type         | `integer`                    |
+| Default      | `12288` (12KB)               |
+| Valid values | `0` or greater               |
+| Example      | `toolResponseMaxBytes=65536` |
 
 **Description**: Override tool output size cap.
 
@@ -306,12 +308,12 @@ ai-agent --agent test.ai --override toolResponseMaxBytes=32768 "query"
 
 #### contextWindow
 
-| Property | Value |
-|----------|-------|
-| Type | `integer` |
-| Default | From provider/model config |
-| Valid values | Positive integer |
-| Example | `contextWindow=65536` |
+| Property     | Value                      |
+| ------------ | -------------------------- |
+| Type         | `integer`                  |
+| Default      | From provider/model config |
+| Valid values | Positive integer           |
+| Example      | `contextWindow=65536`      |
 
 **Description**: Override context window size for all providers.
 
@@ -325,12 +327,12 @@ ai-agent --agent test.ai --override contextWindow=131072 "query"
 
 #### reasoning
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Default | `unset` |
-| Valid values | `none`, `unset`, `inherit`, `minimal`, `low`, `medium`, `high` |
-| Example | `reasoning=high` |
+| Property     | Value                                      |
+| ------------ | ------------------------------------------ |
+| Type         | `string`                                   |
+| Default      | `unset`                                    |
+| Valid values | `none`, `minimal`, `low`, `medium`, `high` |
+| Example      | `reasoning=high`                           |
 
 **Description**: Force reasoning level on all agents/sub-agents (ignores frontmatter).
 
@@ -344,12 +346,12 @@ ai-agent --agent test.ai --override reasoning=medium "query"
 
 #### reasoningTokens
 
-| Property | Value |
-|----------|-------|
-| Type | `integer` or `string` |
-| Default | Computed from reasoning level |
+| Property     | Value                                       |
+| ------------ | ------------------------------------------- |
+| Type         | `integer` or `string`                       |
+| Default      | Computed from reasoning level               |
 | Valid values | Positive integer, `disabled`, `off`, `none` |
-| Example | `reasoningTokens=16000` |
+| Example      | `reasoningTokens=16000`                     |
 
 **Description**: Explicit token budget for reasoning.
 
@@ -365,12 +367,12 @@ ai-agent --agent test.ai --override reasoningTokens=disabled "query"
 
 #### interleaved
 
-| Property | Value |
-|----------|-------|
-| Type | `boolean` or `string` |
-| Default | From provider config |
-| Valid values | `true`, `false`, or field name |
-| Example | `interleaved=reasoning_content` |
+| Property     | Value                           |
+| ------------ | ------------------------------- |
+| Type         | `boolean` or `string`           |
+| Default      | From provider config            |
+| Valid values | `true`, `false`, or field name  |
+| Example      | `interleaved=reasoning_content` |
 
 **Description**: Control interleaved reasoning injection for OpenAI-compatible providers.
 
@@ -391,12 +393,12 @@ ai-agent --agent test.ai --override interleaved=reasoning_content "query"
 
 #### cache
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Default | Off |
+| Property     | Value                                      |
+| ------------ | ------------------------------------------ |
+| Type         | `string`                                   |
+| Default      | Off                                        |
 | Valid values | `off`, duration (`5m`, `1h`), milliseconds |
-| Example | `cache=1h` |
+| Example      | `cache=1h`                                 |
 
 **Description**: Override response cache TTL.
 
@@ -408,12 +410,12 @@ ai-agent --agent test.ai --override cache=30m "query"
 
 #### caching
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Default | `full` |
+| Property     | Value          |
+| ------------ | -------------- |
+| Type         | `string`       |
+| Default      | `full`         |
 | Valid values | `none`, `full` |
-| Example | `caching=none` |
+| Example      | `caching=none` |
 
 **Description**: Anthropic prompt caching mode.
 
@@ -425,12 +427,12 @@ ai-agent --agent test.ai --override caching=none "query"
 
 #### stream
 
-| Property | Value |
-|----------|-------|
-| Type | `boolean` |
-| Default | `true` |
+| Property     | Value           |
+| ------------ | --------------- |
+| Type         | `boolean`       |
+| Default      | `true`          |
 | Valid values | `true`, `false` |
-| Example | `stream=false` |
+| Example      | `stream=false`  |
 
 **Description**: Override streaming mode.
 
@@ -444,12 +446,12 @@ ai-agent --agent test.ai --override stream=false "query"
 
 #### mcpInitConcurrency
 
-| Property | Value |
-|----------|-------|
-| Type | `integer` |
-| Default | Varies |
-| Valid values | `1` or greater |
-| Example | `mcpInitConcurrency=4` |
+| Property     | Value                  |
+| ------------ | ---------------------- |
+| Type         | `integer`              |
+| Default      | Varies                 |
+| Valid values | `1` or greater         |
+| Example      | `mcpInitConcurrency=4` |
 
 **Description**: Override MCP server initialization concurrency.
 
@@ -463,12 +465,12 @@ ai-agent --agent test.ai --override mcpInitConcurrency=2 "query"
 
 #### no-batch
 
-| Property | Value |
-|----------|-------|
-| Type | `boolean` |
-| Default | `false` |
+| Property     | Value           |
+| ------------ | --------------- |
+| Type         | `boolean`       |
+| Default      | `false`         |
 | Valid values | `true`, `false` |
-| Example | `no-batch=true` |
+| Example      | `no-batch=true` |
 
 **Description**: Disable `agent__batch` parallel tool execution.
 
@@ -484,12 +486,12 @@ ai-agent --agent test.ai --override no-batch=true "query"
 
 #### no-progress
 
-| Property | Value |
-|----------|-------|
-| Type | `boolean` |
-| Default | `false` |
-| Valid values | `true`, `false` |
-| Example | `no-progress=true` |
+| Property     | Value              |
+| ------------ | ------------------ |
+| Type         | `boolean`          |
+| Default      | `false`            |
+| Valid values | `true`, `false`    |
+| Example      | `no-progress=true` |
 
 **Description**: Disable progress-only `task_status` tool behavior.
 
@@ -522,23 +524,23 @@ ai-agent --agent test.ai \
 
 Override keys have highest priority in the configuration stack:
 
-| Priority | Source |
-|----------|--------|
-| 1 (highest) | `--override key=value` |
-| 2 | CLI flags (`--temperature`, etc.) |
-| 3 | Frontmatter |
-| 4 | Config file |
-| 5 (lowest) | System defaults |
+| Priority    | Source                            |
+| ----------- | --------------------------------- |
+| 1 (highest) | `--override key=value`            |
+| 2           | CLI flags (`--temperature`, etc.) |
+| 3           | Frontmatter                       |
+| 4           | Config file                       |
+| 5 (lowest)  | System defaults                   |
 
 ---
 
 ## Override vs Default
 
-| Mechanism | Behavior | Use When |
-|-----------|----------|----------|
-| `--override key=value` | Forces value, ignores all other config | Testing/debugging, forced behavior |
-| `--default-reasoning X` | Sets fallback when frontmatter omits | Operational defaults |
-| `defaults.X` in config | Sets fallback from config file | System-wide defaults |
+| Mechanism               | Behavior                               | Use When                           |
+| ----------------------- | -------------------------------------- | ---------------------------------- |
+| `--override key=value`  | Forces value, ignores all other config | Testing/debugging, forced behavior |
+| `--default-reasoning X` | Sets fallback when frontmatter omits   | Operational defaults               |
+| `defaults.X` in config  | Sets fallback from config file         | System-wide defaults               |
 
 **Example comparison**:
 
@@ -556,9 +558,9 @@ ai-agent --agent test.ai --default-reasoning high "query"
 
 Override keys are processed in:
 
-| File | Purpose |
-|------|---------|
-| `src/cli.ts` | CLI parsing and validation |
+| File                  | Purpose                      |
+| --------------------- | ---------------------------- |
+| `src/cli.ts`          | CLI parsing and validation   |
 | `src/agent-loader.ts` | Application to loaded agents |
 
 ### Find All Override Keys
@@ -571,6 +573,7 @@ grep -A2 "case '" src/cli.ts | grep -E "case '(models|tools|temperature)"
 ### Current Override Keys (Source of Truth)
 
 From `src/options-registry.ts`:
+
 ```
 models, tools, agents, temperature, topP, topK, maxOutputTokens,
 repeatPenalty, llmTimeout, toolTimeout, maxRetries, maxTurns,
@@ -583,11 +586,11 @@ contextWindow, no-batch, no-progress
 
 ## Stability
 
-| Aspect | Status |
-|--------|--------|
-| **Internal** | Primarily for development/testing |
-| **Undocumented** | Not part of stable API |
-| **May Change** | Without deprecation warnings |
+| Aspect           | Status                            |
+| ---------------- | --------------------------------- |
+| **Internal**     | Primarily for development/testing |
+| **Undocumented** | Not part of stable API            |
+| **May Change**   | Without deprecation warnings      |
 
 > **Tip:** For production use, prefer frontmatter or config file settings over overrides.
 

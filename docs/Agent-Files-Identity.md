@@ -18,6 +18,7 @@ Configure how your agent identifies itself and how it appears when used as a sub
 ## Overview
 
 Identity keys define:
+
 - **What** the agent does (`description`)
 - **How** to use it (`usage`)
 - **Name** when exposed as a tool (`toolName`)
@@ -67,21 +68,23 @@ output:
 
 ### description
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Default | None |
+| Property | Value                    |
+| -------- | ------------------------ |
+| Type     | `string`                 |
+| Default  | None                     |
 | Required | **Yes** (for sub-agents) |
 
 **Description**: Short description of what the agent does. Shown in tool listings when the agent is exposed as a sub-agent tool.
 
 **What it affects**:
+
 - Displayed to parent agents when this agent is a sub-agent tool
 - Used in `--list-tools` output
 - Helps the LLM understand when to use this agent
 - Required for sub-agents (agent loader throws an error if missing)
 
 **Example**:
+
 ```yaml
 ---
 description: Analyzes company financials and returns structured reports
@@ -89,12 +92,14 @@ description: Analyzes company financials and returns structured reports
 ```
 
 **Best Practices**:
+
 - Keep it concise (one sentence, under 100 characters)
 - Describe the agent's purpose, not its implementation
 - Focus on what it does, not how it works
 - Use action verbs ("Analyzes...", "Searches...", "Generates...")
 
 **Good Examples**:
+
 ```yaml
 description: Searches the web and summarizes findings
 description: Analyzes code for security vulnerabilities
@@ -102,6 +107,7 @@ description: Translates text between languages
 ```
 
 **Bad Examples**:
+
 ```yaml
 # Too vague
 description: A helpful agent
@@ -117,21 +123,23 @@ description: Uses Claude 3.5 Sonnet with Brave search MCP
 
 ### usage
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Default | None |
-| Required | No |
+| Property | Value    |
+| -------- | -------- |
+| Type     | `string` |
+| Default  | None     |
+| Required | No       |
 
 **Description**: Usage instructions for users or parent agents. Describes how to interact with the agent.
 
 **What it affects**:
+
 - Displayed in tool documentation
 - Helps parent agents understand how to call this agent
 - Shown in `--help` output when running the agent directly
 - Included in the tool's input schema description
 
 **Example**:
+
 ```yaml
 ---
 usage: "Provide a company name or domain. Returns financial analysis in JSON."
@@ -148,12 +156,14 @@ usage: |
 ```
 
 **Best Practices**:
+
 - Describe expected input format
 - Describe expected output format
 - Include an example if helpful
 - Be specific about what the agent can and cannot do
 
 **Good Examples**:
+
 ```yaml
 usage: "Provide a URL to fetch and summarize"
 usage: "Ask any research question. Returns findings with citations."
@@ -166,21 +176,23 @@ usage: |
 
 ### toolName
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Default | Derived from filename |
+| Property | Value                               |
+| -------- | ----------------------------------- |
+| Type     | `string`                            |
+| Default  | Derived from filename               |
 | Required | No (but recommended for sub-agents) |
 
 **Description**: Stable identifier when exposing the agent as a callable tool. Parent agents call this agent using `agent__<toolName>`.
 
 **What it affects**:
+
 - Tool name exposed to parent agents
 - Must be unique among sibling sub-agents
 - Used in tool calls: `agent__<toolName>`
 - Affects prompt references and debugging
 
 **Example**:
+
 ```yaml
 ---
 toolName: company_researcher
@@ -188,6 +200,7 @@ toolName: company_researcher
 ```
 
 When a parent agent calls this sub-agent, it uses:
+
 ```
 Tool: agent__company_researcher
 Input: { "prompt": "Analyze Acme Corp" }
@@ -197,25 +210,28 @@ Input: { "prompt": "Analyze Acme Corp" }
 
 If `toolName` is omitted, it's derived from the filename:
 
-| Filename | Derived toolName |
-|----------|-----------------|
-| `company-researcher.ai` | `company_researcher` |
-| `web_search.ai` | `web_search` |
-| `DataAnalyzer.ai` | `dataanalyzer` |
+| Filename                | Derived toolName     |
+| ----------------------- | -------------------- |
+| `company-researcher.ai` | `company-researcher` |
+| `web_search.ai`         | `web_search`         |
+| `DataAnalyzer.ai`       | `dataanalyzer`       |
 
 **Naming Rules**:
-- Use lowercase letters, numbers, and underscores
-- No spaces, hyphens are converted to underscores
-- Cannot use reserved names: `final_report`, `task_status`, `batch`
+
+- Use lowercase letters, numbers, underscores, or hyphens
+- No spaces (spaces are converted to underscores)
+- Cannot use reserved names: `final_report`, `task_status`, `batch`, `tool_output`
 - Must be unique among sibling sub-agents
 
 **Best Practices**:
+
 - Explicitly set `toolName` for sub-agents (safer for refactoring)
 - Use descriptive, action-oriented names
 - Use underscores between words
 - Keep it short but meaningful
 
 **Good Examples**:
+
 ```yaml
 toolName: web_researcher
 toolName: code_analyzer
@@ -224,6 +240,7 @@ toolName: report_generator
 ```
 
 **Bad Examples**:
+
 ```yaml
 # Reserved name
 toolName: final_report
@@ -252,7 +269,6 @@ description: General-purpose assistant
 models:
   - openai/gpt-4o
 ---
-
 You are a helpful assistant. Answer questions clearly.
 ```
 
@@ -288,7 +304,6 @@ output:
             snippet:
               type: string
 ---
-
 Search for the requested information and return structured results.
 ```
 
@@ -297,6 +312,7 @@ Search for the requested information and return structured results.
 When you have multiple sub-agents, explicit `toolName` prevents conflicts:
 
 **researchers/company.ai**:
+
 ```yaml
 ---
 description: Researches company information
@@ -305,6 +321,7 @@ toolName: company_researcher
 ```
 
 **researchers/market.ai**:
+
 ```yaml
 ---
 description: Researches market trends
@@ -313,6 +330,7 @@ toolName: market_researcher
 ```
 
 **Parent agent uses them via**:
+
 - `agent__company_researcher`
 - `agent__market_researcher`
 
@@ -327,6 +345,7 @@ toolName: market_researcher
 **Cause**: Sub-agents require a `description` so parent agents know what the tool does.
 
 **Solution**: Add `description` to the sub-agent's frontmatter:
+
 ```yaml
 ---
 description: Handles data processing tasks
@@ -342,12 +361,12 @@ models:
 **Cause**: Either explicitly set to the same name or derived from similar filenames.
 
 **Solution**: Use explicit unique `toolName` values:
+
 ```yaml
 # researcher-v1.ai
 ---
 toolName: researcher_v1
 ---
-
 # researcher-v2.ai
 ---
 toolName: researcher_v2
@@ -361,6 +380,7 @@ toolName: researcher_v2
 **Cause**: Using `final_report`, `task_status`, or `batch` as `toolName`.
 
 **Solution**: Choose a different name:
+
 ```yaml
 # Wrong
 toolName: final_report
@@ -376,6 +396,7 @@ toolName: report_generator
 **Cause**: Often due to unclear `description` or missing `usage`.
 
 **Solution**: Improve identity metadata:
+
 ```yaml
 ---
 # Clear description tells parent WHAT this does

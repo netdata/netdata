@@ -22,13 +22,14 @@ Test phases, harness usage, and coverage requirements for AI Agent.
 
 AI Agent uses three test phases, each with a different purpose:
 
-| Phase | Type | Command | Speed | Uses Real LLM |
-|-------|------|---------|-------|---------------|
-| **Phase 1** | Unit tests | `npm run test:phase1` | Fast (~300ms) | No |
-| **Phase 2** | Deterministic harness | `npm run test:phase2` | Medium | No |
-| **Phase 3** | Live integration | `npm run test:phase3` | Slow | Yes |
+| Phase       | Type                  | Command               | Speed         | Uses Real LLM |
+| ----------- | --------------------- | --------------------- | ------------- | ------------- |
+| **Phase 1** | Unit tests            | `npm run test:phase1` | Fast (~300ms) | No            |
+| **Phase 2** | Deterministic harness | `npm run test:phase2` | Medium        | No            |
+| **Phase 3** | Live integration      | `npm run test:phase3` | Slow          | Yes           |
 
 **When to run each phase**:
+
 - **Phase 1**: Run after every code change
 - **Phase 2**: Run before committing
 - **Phase 3**: Run when changing LLM interaction logic
@@ -45,7 +46,7 @@ Unit tests run in parallel via Vitest. They test isolated functions without exte
 npm run test:phase1
 ```
 
-**Expected output**: ~200 tests pass in ~300ms.
+**Expected output**: All unit tests pass.
 
 ### Test Location
 
@@ -53,22 +54,22 @@ Unit tests live in: `src/tests/unit/*.spec.ts`
 
 ### What Phase 1 Covers
 
-| Area | Examples |
-|------|----------|
-| JSON repair | Malformed JSON handling |
-| Tool output parsing | `tool_output` extraction |
-| XML tool handling | Tool call parsing |
-| Slack formatting | Message formatting |
-| Configuration parsing | Frontmatter validation |
+| Area                  | Examples                 |
+| --------------------- | ------------------------ |
+| JSON repair           | Malformed JSON handling  |
+| Tool output parsing   | `tool_output` extraction |
+| XML tool handling     | Tool call parsing        |
+| Slack formatting      | Message formatting       |
+| Configuration parsing | Frontmatter validation   |
 
 ### Writing Unit Tests
 
 ```typescript
-import { describe, it, expect } from 'vitest';
-import { repairJson } from '../utils/json-repair.js';
+import { describe, it, expect } from "vitest";
+import { repairJson } from "../utils/json-repair.js";
 
-describe('repairJson', () => {
-  it('fixes trailing commas', () => {
+describe("repairJson", () => {
+  it("fixes trailing commas", () => {
     const input = '{"a": 1,}';
     const result = repairJson(input);
     expect(result).toEqual({ a: 1 });
@@ -77,6 +78,7 @@ describe('repairJson', () => {
 ```
 
 **Guidelines**:
+
 - One describe block per function or module
 - Test edge cases and error conditions
 - Keep tests isolated with no shared state
@@ -102,70 +104,79 @@ npm run test:phase2:sequential
 
 ### Key Files
 
-| File | Purpose |
-|------|---------|
-| `src/llm-providers/test-llm.ts` | Scripted LLM provider that returns predefined responses |
-| `src/tests/mcp/test-stdio-server.ts` | Deterministic MCP server for tool testing |
-| `src/tests/fixtures/test-llm-scenarios.ts` | Scenario definitions |
-| `src/tests/phase2-harness.ts` | Harness executor |
+| File                                       | Purpose                                                 |
+| ------------------------------------------ | ------------------------------------------------------- |
+| `src/llm-providers/test-llm.ts`            | Scripted LLM provider that returns predefined responses |
+| `src/tests/mcp/test-stdio-server.ts`       | Deterministic MCP server for tool testing               |
+| `src/tests/fixtures/test-llm-scenarios.ts` | Scenario definitions                                    |
+| `src/tests/phase2-harness.ts`              | Harness executor                                        |
 
 ### Harness Controls
 
 Phase 2 tests manipulate five inputs:
 
-| Input | What You Control |
-|-------|------------------|
-| User prompt | Task description, history, configuration |
-| Test MCP tool | Mocked tool responses |
-| Test LLM provider | Scripted assistant outputs |
-| Final response | What to inspect in final report |
-| Accounting | Observable LLM/tool entries |
+| Input             | What You Control                         |
+| ----------------- | ---------------------------------------- |
+| User prompt       | Task description, history, configuration |
+| Test MCP tool     | Mocked tool responses                    |
+| Test LLM provider | Scripted assistant outputs               |
+| Final response    | What to inspect in final report          |
+| Accounting        | Observable LLM/tool entries              |
 
 ### Contract Testing
 
 Tests assert the **observable contract**, not internal implementation.
 
 **DO assert on**:
+
 - Configuration settings are respected
 - Business rules are enforced
 - Final report structure is correct
 - Accounting reflects actual behavior
 
 **DO NOT assert on**:
+
 - Internal log strings
 - Log identifiers
 - Log severities
 
 ### Environment Variables
 
-| Variable | Purpose | Example |
-|----------|---------|---------|
-| `PHASE1_ONLY_SCENARIO` | Filter to specific scenarios | `PHASE1_ONLY_SCENARIO=retry` |
-| `PHASE2_MODE` | Test mode | `all`, `parallel`, `sequential` |
-| `PHASE2_PARALLEL_CONCURRENCY` | Concurrency limit | `4` |
-| `PHASE2_FORCE_SEQUENTIAL` | Force sequential execution | `1` |
+| Variable                      | Purpose                      | Example                         |
+| ----------------------------- | ---------------------------- | ------------------------------- |
+| `PHASE1_ONLY_SCENARIO`        | Filter to specific scenarios | `PHASE1_ONLY_SCENARIO=retry`    |
+| `PHASE2_MODE`                 | Test mode                    | `all`, `parallel`, `sequential` |
+| `PHASE2_PARALLEL_CONCURRENCY` | Concurrency limit            | `4`                             |
+| `PHASE2_FORCE_SEQUENTIAL`     | Force sequential execution   | `1`                             |
 
 ### Writing Phase 2 Tests
 
 ```typescript
 // In src/tests/fixtures/test-llm-scenarios.ts
-export const scenarios: TestScenario[] = [
+export const scenarios: ScenarioDefinition[] = [
   {
-    name: 'tool-call-success',
-    description: 'Agent calls tool and receives response',
-    prompt: 'Use the test tool to get data',
-    llmResponses: [
-      { type: 'tool_call', tool: 'test', args: { query: 'data' } },
-      { type: 'final', content: 'Here is the data: ...' }
+    id: "tool-call-success",
+    description: "Agent calls tool and receives response",
+    systemPromptMustInclude: ["Phase 1 deterministic harness"],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: "tool-call",
+          toolCalls: [{ toolName: "test", arguments: { query: "data" } }],
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: "final-report",
+          reportContent: "Here is the data: ...",
+          reportFormat: "markdown",
+          status: "success",
+        },
+      },
     ],
-    toolResponses: {
-      test: { success: true, data: 'test data' }
-    },
-    assertions: (result) => {
-      expect(result.finalReport).toContain('data');
-      expect(result.accounting.toolCalls).toBe(1);
-    }
-  }
+  },
 ];
 ```
 
@@ -190,30 +201,30 @@ node dist/tests/phase3-runner.js --model=nova/glm-4.7 --scenario=tool-output-aut
 
 ### Model Tiers
 
-| Tier | Models | Purpose |
-|------|--------|---------|
-| 1 | minimax-m2.1, glm-4.5-air, glm-4.6, glm-4.7 | Primary integration testing |
+| Tier | Models                                      | Purpose                     |
+| ---- | ------------------------------------------- | --------------------------- |
+| 1    | minimax-m2.1, glm-4.5-air, glm-4.6, glm-4.7 | Primary integration testing |
 
 ### Test Agents
 
 Test agents are located in `src/tests/phase3/test-agents/`:
 
-| Agent | Purpose |
-|-------|---------|
-| `test-master.ai` | Base test agent |
-| `test-agent1.ai` | Secondary test agent |
-| `tool-output-agent.ai` | Tool output handling tests |
-| `orchestration-*.ai` | Multi-agent orchestration tests |
+| Agent                  | Purpose                         |
+| ---------------------- | ------------------------------- |
+| `test-master.ai`       | Base test agent                 |
+| `test-agent1.ai`       | Secondary test agent            |
+| `tool-output-agent.ai` | Tool output handling tests      |
+| `orchestration-*.ai`   | Multi-agent orchestration tests |
 
 ### Safeguards
 
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `PHASE3_STOP_ON_FAILURE` | Stop on first failure | `1` |
-| `PHASE3_TRACE_LLM` | Enable LLM tracing | `0` |
-| `PHASE3_TRACE_MCP` | Enable MCP tracing | `0` |
-| `PHASE3_VERBOSE` | Enable verbose output | `0` |
-| `PHASE3_DUMP_LLM` | Dump failing LLM payloads | `0` |
+| Variable                 | Purpose                   | Default |
+| ------------------------ | ------------------------- | ------- |
+| `PHASE3_STOP_ON_FAILURE` | Stop on first failure     | `1`     |
+| `PHASE3_TRACE_LLM`       | Enable LLM tracing        | `0`     |
+| `PHASE3_TRACE_MCP`       | Enable MCP tracing        | `0`     |
+| `PHASE3_VERBOSE`         | Enable verbose output     | `0`     |
+| `PHASE3_DUMP_LLM`        | Dump failing LLM payloads | `0`     |
 
 ### Example: Running with Tracing
 
@@ -243,12 +254,12 @@ Provides a summarized coverage report in the terminal.
 
 ### Coverage Guidelines
 
-| Area | Target |
-|------|--------|
-| Core orchestration | High coverage required |
-| Provider implementations | Medium coverage |
-| Utilities | High coverage required |
-| CLI parsing | Medium coverage |
+| Area                     | Target                 |
+| ------------------------ | ---------------------- |
+| Core orchestration       | High coverage required |
+| Provider implementations | Medium coverage        |
+| Utilities                | High coverage required |
+| CLI parsing              | Medium coverage        |
 
 ---
 
@@ -258,25 +269,25 @@ The test MCP server (`src/tests/mcp/test-stdio-server.ts`) provides deterministi
 
 ### Available Tools
 
-| Tool | Purpose |
-|------|---------|
-| `test` | Basic test responses |
-| `test-summary` | Summary responses |
+| Tool           | Purpose              |
+| -------------- | -------------------- |
+| `test`         | Basic test responses |
+| `test-summary` | Summary responses    |
 
 ### Supported Behaviors
 
-| Behavior | Description |
-|----------|-------------|
-| Success responses | Returns configured success data |
+| Behavior                 | Description                       |
+| ------------------------ | --------------------------------- |
+| Success responses        | Returns configured success data   |
 | Explicit error responses | Returns configured error messages |
-| Large payload storage | Tests context window handling |
-| Simulated timeouts | Tests timeout handling |
+| Large payload storage    | Tests context window handling     |
+| Simulated timeouts       | Tests timeout handling            |
 
 ---
 
 ## Running All Tests
 
-### Quick Test (Phase 1 + Phase 2)
+### Quick Test (Phase 1 + Phase 2 + Phase 3 Tier 1)
 
 ```bash
 npm test
@@ -302,11 +313,11 @@ npm run test:phase3    # Live provider tests only
 
 ### Minimum Requirements
 
-| Step | Command | Passes When |
-|------|---------|-------------|
-| 1 | `npm run build` | No compilation errors |
-| 2 | `npm run lint` | Zero warnings, zero errors |
-| 3 | `npm test` | Phase 1 and Phase 2 pass |
+| Step | Command         | Passes When                                 |
+| ---- | --------------- | ------------------------------------------- |
+| 1    | `npm run build` | No compilation errors                       |
+| 2    | `npm run lint`  | Zero warnings, zero errors                  |
+| 3    | `npm test`      | Phase 1, Phase 2, and Phase 3 (Tier 1) pass |
 
 ### For Core Changes
 

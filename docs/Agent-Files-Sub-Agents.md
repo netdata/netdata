@@ -388,7 +388,6 @@ agents:
 
 **Notes on nesting**:
 - Recursion is detected and prevented (A→B→A)
-- Max depth is configurable (default ~3)
 - Deep nesting increases latency and cost
 
 ### Structured Input/Output

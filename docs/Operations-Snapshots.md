@@ -35,6 +35,7 @@ Session snapshots capture **complete session state** including:
 - **Session metadata**: Timestamps, IDs, totals
 
 Snapshots are saved automatically at session end and can be used for:
+
 - **Post-mortem debugging**: Understand what went wrong
 - **Regression testing**: Compare session behavior
 - **Auditing**: Review agent actions
@@ -44,10 +45,10 @@ Snapshots are saved automatically at session end and can be used for:
 
 ## Snapshot Locations
 
-| Environment | Path |
-|-------------|------|
-| Default | `~/.ai-agent/sessions/{originId}.json.gz` |
-| Production | `/opt/neda/.ai-agent/sessions/{originId}.json.gz` |
+| Environment | Path                                              |
+| ----------- | ------------------------------------------------- |
+| Default     | `~/.ai-agent/sessions/{originId}.json.gz`         |
+| Production  | `/opt/neda/.ai-agent/sessions/{originId}.json.gz` |
 
 **Filename format**: `{UUID}.json.gz` where UUID is the origin transaction ID.
 
@@ -94,6 +95,7 @@ zcat "$SNAPSHOT" | jq '{
 ```
 
 **Example output**:
+
 ```json
 {
   "traceId": "756b8ce8-3ad8-4a5a-8094-e45f0ba23a11",
@@ -117,18 +119,20 @@ zcat "$SNAPSHOT" | jq '{
 ```
 snapshot.json.gz
 ├── version: 1                    # Schema version
-├── reason: "final"               # Trigger: "final" or "subagent_finish"
+├── reason: "final"               # Optional trigger (e.g., "final", "subagent_finish")
 └── opTree
     ├── id                        # Internal session ID
-    ├── traceId                   # Public transaction ID (matches filename)
-    ├── agentId                   # Agent name
-    ├── callPath                  # Hierarchical path for sub-agents
+    ├── traceId?                  # Public transaction ID (matches filename)
+    ├── agentId?                  # Agent name
+    ├── callPath?                 # Hierarchical path for sub-agents
     ├── sessionTitle              # Session title
+    ├── latestStatus?             # Latest status string
     ├── startedAt                 # Unix timestamp (ms)
-    ├── endedAt                   # Unix timestamp (ms)
-    ├── success                   # Boolean outcome
-    ├── error                     # Error message if failed
-    ├── totals                    # Aggregated metrics
+    ├── endedAt?                  # Unix timestamp (ms)
+    ├── success?                  # Boolean outcome
+    ├── error?                    # Error message if failed
+    ├── attributes?               # Optional session-level attributes
+    ├── totals?                   # Aggregated metrics
     │   ├── tokensIn
     │   ├── tokensOut
     │   ├── tokensCacheRead
@@ -137,24 +141,25 @@ snapshot.json.gz
     │   ├── toolsRun
     │   └── agentsRun
     └── turns[]                   # Array of TurnNode
+        ├── id                    # Turn ID
         ├── index                 # 1-based turn number
         ├── startedAt
-        ├── endedAt
-        ├── attributes
+        ├── endedAt?
+        ├── attributes?
         │   └── prompts          # {system, user}
         └── ops[]                # Array of OperationNode
             ├── opId
             ├── kind             # "llm" | "tool" | "system" | "session"
             ├── startedAt
-            ├── endedAt
-            ├── status           # "ok" | "failed"
-            ├── attributes       # {provider, model, name, toolKind}
+            ├── endedAt?
+            ├── status?          # "ok" | "failed"
+            ├── attributes?      # {provider, model, name, toolKind}
             ├── logs[]           # LogEntry array
             ├── accounting[]     # AccountingEntry array
-            ├── request          # {kind, payload, size}
-            ├── response         # {payload, size, truncated}
-            ├── reasoning        # {chunks, final} for thinking models
-            └── childSession     # Nested SessionNode for sub-agents
+            ├── request?         # {kind, payload, size}
+            ├── response?        # {payload, size, truncated}
+            ├── reasoning?       # {chunks, final} for thinking models
+            └── childSession?   # Nested SessionNode for sub-agents
 ```
 
 ---
@@ -470,21 +475,21 @@ done
 }
 ```
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| `sessionsDir` | Directory for snapshot files | `~/.ai-agent/sessions/` |
-| `billingFile` | Path for accounting ledger | `~/.ai-agent/accounting.jsonl` |
+| Setting       | Description                  | Default                        |
+| ------------- | ---------------------------- | ------------------------------ |
+| `sessionsDir` | Directory for snapshot files | `~/.ai-agent/sessions/`        |
+| `billingFile` | Path for accounting ledger   | `~/.ai-agent/accounting.jsonl` |
 
 ### Custom Snapshot Handling (Library Mode)
 
 ```typescript
 const callbacks = {
   onEvent: (event) => {
-    if (event.type === 'snapshot') {
+    if (event.type === "snapshot") {
       // Custom snapshot handling
       myStorage.save(event.payload);
     }
-  }
+  },
 };
 ```
 
@@ -497,6 +502,7 @@ const callbacks = {
 **Cause**: Callback error or disk permission issue.
 
 **Solution**:
+
 1. Check disk space: `df -h ~/.ai-agent/`
 2. Check permissions: `ls -la ~/.ai-agent/sessions/`
 3. Check for errors in stderr during session
@@ -508,6 +514,7 @@ const callbacks = {
 **Cause**: Session ended before operation completed.
 
 **Solution**:
+
 - Check `endedAt` timestamp on operations
 - Verify operation `status` field
 - LLM payloads are always captured; check `request.payload.raw`
@@ -519,6 +526,7 @@ const callbacks = {
 **Cause**: Many tool responses or large payloads.
 
 **Solution**:
+
 - Lower `toolResponseMaxBytes` to store large responses externally
 - Use tool_output handles for large responses
 - Review tool response sizes:
@@ -533,6 +541,7 @@ const callbacks = {
 **Cause**: Corrupted file or incomplete write.
 
 **Solution**:
+
 1. Check file size: `ls -la "$SNAPSHOT"`
 2. Try gzip test: `gzip -t "$SNAPSHOT"`
 3. Check for incomplete session (crashed before flush)
@@ -544,6 +553,7 @@ const callbacks = {
 **Cause**: Filename uses origin transaction ID, which may differ from session ID for sub-agents.
 
 **Solution**: Use the `traceId` field inside the snapshot:
+
 ```bash
 zcat "$SNAPSHOT" | jq '.opTree.traceId'
 ```

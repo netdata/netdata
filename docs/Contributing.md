@@ -21,6 +21,7 @@ Guidelines for contributing to AI Agent development.
 This section helps you contribute code, tests, and documentation to AI Agent. Whether you are fixing a bug, adding a feature, or improving documentation, these guides ensure your contribution meets project standards.
 
 **What you will learn**:
+
 - How to set up your development environment
 - Code style and linting requirements
 - Testing approach and commands
@@ -30,11 +31,11 @@ This section helps you contribute code, tests, and documentation to AI Agent. Wh
 
 ## Contributing Topics
 
-| Document | Description |
-|----------|-------------|
-| [Testing Guide](Contributing-Testing) | Test phases, harness usage, and coverage requirements |
-| [Code Style](Contributing-Code-Style) | TypeScript guidelines, naming conventions, ESLint rules |
-| [Documentation Standards](Contributing-Documentation) | How to maintain specs and wiki pages |
+| Document                                              | Description                                             |
+| ----------------------------------------------------- | ------------------------------------------------------- |
+| [Testing Guide](Contributing-Testing)                 | Test phases, harness usage, and coverage requirements   |
+| [Code Style](Contributing-Code-Style)                 | TypeScript guidelines, naming conventions, ESLint rules |
+| [Documentation Standards](Contributing-Documentation) | How to maintain specs and wiki pages                    |
 
 ---
 
@@ -75,7 +76,7 @@ npm run lint
 npm test
 ```
 
-**Expected output**: All Phase 1 and Phase 2 tests pass.
+**Expected output**: Phase 1, Phase 2, Phase 3 (Tier 1), and additional tests pass.
 
 ---
 
@@ -83,12 +84,12 @@ npm test
 
 Complete this checklist before creating a pull request:
 
-| Step | Command | Requirement |
-|------|---------|-------------|
-| 1 | `npm run build` | No compilation errors |
-| 2 | `npm run lint` | Zero warnings, zero errors |
-| 3 | `npm test` | All tests pass |
-| 4 | Manual check | Documentation updated if behavior changed |
+| Step | Command         | Requirement                                   |
+| ---- | --------------- | --------------------------------------------- |
+| 1    | `npm run build` | No compilation errors                         |
+| 2    | `npm run lint`  | Zero warnings, zero errors                    |
+| 3    | `npm test`      | Phase 1, Phase 2, Phase 3 (Tier 1) tests pass |
+| 4    | Manual check    | Documentation updated if behavior changed     |
 
 ### Commit Guidelines
 
@@ -108,32 +109,32 @@ Complete this checklist before creating a pull request:
 
 ### Code Quality
 
-| Requirement | Description |
-|-------------|-------------|
-| TypeScript strict mode | All code must pass strict type checking |
-| Zero lint warnings | No warnings or errors from ESLint |
-| Precise types | Use `Record<string, unknown>` over `any` |
-| Type guards | Narrow `unknown` values with runtime checks |
+| Requirement            | Description                                 |
+| ---------------------- | ------------------------------------------- |
+| TypeScript strict mode | All code must pass strict type checking     |
+| Zero lint warnings     | No warnings or errors from ESLint           |
+| Precise types          | Use `Record<string, unknown>` over `any`    |
+| Type guards            | Narrow `unknown` values with runtime checks |
 
 See [Code Style](Contributing-Code-Style) for detailed guidelines.
 
 ### Testing
 
-| Phase | Purpose | Command |
-|-------|---------|---------|
-| Phase 1 | Unit tests (vitest) | `npm run test:phase1` |
+| Phase   | Purpose                         | Command               |
+| ------- | ------------------------------- | --------------------- |
+| Phase 1 | Unit tests (vitest)             | `npm run test:phase1` |
 | Phase 2 | Deterministic harness scenarios | `npm run test:phase2` |
-| Phase 3 | Live provider integration | `npm run test:phase3` |
+| Phase 3 | Live provider integration       | `npm run test:phase3` |
 
 See [Testing Guide](Contributing-Testing) for detailed instructions.
 
 ### Documentation
 
-| Rule | Description |
-|------|-------------|
-| Synchronized updates | Every behavior change updates specs at the same commit |
-| Spec-first development | Write or update specs before implementation |
-| AI-AGENT-GUIDE.md | Source of truth for AI assistants creating agents |
+| Rule                   | Description                                            |
+| ---------------------- | ------------------------------------------------------ |
+| Synchronized updates   | Every behavior change updates specs at the same commit |
+| Spec-first development | Write or update specs before implementation            |
+| AI-AGENT-GUIDE.md      | Source of truth for AI assistants creating agents      |
 
 See [Documentation Standards](Contributing-Documentation) for detailed guidelines.
 
@@ -153,6 +154,7 @@ These principles guide all development decisions:
 ### 2. Model-Facing Error Quality
 
 Error messages sent to the LLM must be:
+
 - Extremely detailed and descriptive
 - Include specific instructions to overcome the issue
 - Never generic like "something went wrong"

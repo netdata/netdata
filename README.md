@@ -161,16 +161,28 @@ Each headend flag is repeatable. All headends share the same agent registry and 
 
 ---
 
-## Documentation for AI Assistants
+## Documentation
 
-**See [`docs/skills/ai-agent-configuration.md`](docs/skills/ai-agent-configuration.md)**: Single-page reference for LLM agents designing ai-agents. Covers:
+**[Full Documentation Wiki](https://github.com/netdata/ai-agent/wiki)**
 
-- Frontmatter schema and all available keys
-- Tool composition patterns
-- Provider/tool selection guidance
-- Common patterns and anti-patterns
-- Prompt variable substitutions
-- Output format contracts
+### Getting Started
+- [Installation](https://github.com/netdata/ai-agent/wiki/Getting-Started-Installation)
+- [Quick Start](https://github.com/netdata/ai-agent/wiki/Getting-Started-Quick-Start)
+- [Your First Agent](https://github.com/netdata/ai-agent/wiki/Getting-Started-First-Agent)
+
+### Core Concepts
+- [Agent Files (.ai)](https://github.com/netdata/ai-agent/wiki/Agent-Files) - Frontmatter configuration
+- [System Prompts](https://github.com/netdata/ai-agent/wiki/System-Prompts) - Writing effective prompts
+- [CLI Reference](https://github.com/netdata/ai-agent/wiki/CLI) - Command-line usage
+
+### Configuration
+- [Providers](https://github.com/netdata/ai-agent/wiki/Configuration-Providers) - LLM provider setup
+- [MCP Servers](https://github.com/netdata/ai-agent/wiki/Configuration-MCP-Servers) - Tool server configuration
+- [All Parameters](https://github.com/netdata/ai-agent/wiki/Configuration-Parameters) - Complete config reference
+
+### For AI Assistants
+
+**See [`docs/skills/ai-agent-configuration.md`](docs/skills/ai-agent-configuration.md)**: Single-page reference for LLM agents designing ai-agents.
 
 ---
 

@@ -37,53 +37,53 @@ The AI Agent library can be embedded in Node.js applications without using the C
 ## Quick Start
 
 ```typescript
-import { AIAgent } from 'ai-agent';
+import { AIAgent } from "ai-agent";
 
 // Configuration for providers
 const config = {
   providers: {
     openai: {
       apiKey: process.env.OPENAI_API_KEY,
-      type: 'openai'
-    }
+      type: "openai",
+    },
   },
-  mcpServers: {}
+  mcpServers: {},
 };
 
 // Collect results
 const logs = [];
 const accounting = [];
-let output = '';
+let output = "";
 
 // Session configuration
 const sessionConfig = {
   config,
-  targets: [{ provider: 'openai', model: 'gpt-4o-mini' }],
+  targets: [{ provider: "openai", model: "gpt-4o-mini" }],
   tools: [],
-  systemPrompt: 'You are a helpful assistant.',
-  userPrompt: 'Say hello.',
-  outputFormat: 'markdown',
+  systemPrompt: "You are a helpful assistant.",
+  userPrompt: "Say hello.",
+  outputFormat: "markdown",
   maxRetries: 3,
   maxTurns: 5,
   callbacks: {
     onEvent: (event, meta) => {
-      if (event.type === 'log') logs.push(event.entry);
-      if (event.type === 'accounting') accounting.push(event.entry);
-      if (event.type === 'output' && meta.source !== 'finalize') {
+      if (event.type === "log") logs.push(event.entry);
+      if (event.type === "accounting") accounting.push(event.entry);
+      if (event.type === "output" && meta.source !== "finalize") {
         output += event.text;
       }
-    }
-  }
+    },
+  },
 };
 
 // Run the agent
 const session = AIAgent.create(sessionConfig);
 const result = await AIAgent.run(session);
 
-console.log('Success:', result.success);
-console.log('Output:', output);
-console.log('Total logs:', logs.length);
-console.log('Total accounting entries:', accounting.length);
+console.log("Success:", result.success);
+console.log("Output:", output);
+console.log("Total logs:", logs.length);
+console.log("Total accounting entries:", accounting.length);
 ```
 
 ---
@@ -92,11 +92,11 @@ console.log('Total accounting entries:', accounting.length);
 
 ### AIAgent.create()
 
-| Property | Value |
-|----------|-------|
-| Parameters | `sessionConfig: AIAgentSessionConfig` |
-| Returns | `AIAgentSession` |
-| Description | Creates a new session instance |
+| Property    | Value                                 |
+| ----------- | ------------------------------------- |
+| Parameters  | `sessionConfig: AIAgentSessionConfig` |
+| Returns     | `AIAgentSession`                      |
+| Description | Creates a new session instance        |
 
 ```typescript
 const session = AIAgent.create(sessionConfig);
@@ -106,10 +106,10 @@ const session = AIAgent.create(sessionConfig);
 
 ### AIAgent.run()
 
-| Property | Value |
-|----------|-------|
-| Parameters | `session: AIAgentSession` |
-| Returns | `Promise<AIAgentResult>` |
+| Property    | Value                                                            |
+| ----------- | ---------------------------------------------------------------- |
+| Parameters  | `session: AIAgentSession`                                        |
+| Returns     | `Promise<AIAgentResult>`                                         |
 | Description | Runs session with full orchestration (advisors, router, handoff) |
 
 ```typescript
@@ -120,10 +120,10 @@ const result = await AIAgent.run(session);
 
 ### session.run()
 
-| Property | Value |
-|----------|-------|
-| Parameters | None |
-| Returns | `Promise<AIAgentResult>` |
+| Property    | Value                                          |
+| ----------- | ---------------------------------------------- |
+| Parameters  | None                                           |
+| Returns     | `Promise<AIAgentResult>`                       |
 | Description | Runs inner session directly (no orchestration) |
 
 ```typescript
@@ -139,58 +139,65 @@ const result = await session.run();
 ```typescript
 interface AIAgentSessionConfig {
   // Required
-  config: Configuration;          // Provider and MCP server config
+  config: Configuration; // Provider and MCP server config
   targets: { provider: string; model: string }[]; // Provider/model pairs
-  tools: string[];                // MCP servers to expose
-  systemPrompt: string;           // System prompt text
-  userPrompt: string;             // User prompt text
-  outputFormat: OutputFormatId;   // Required output format
+  tools: string[]; // MCP servers to expose
+  subAgents?: PreloadedSubAgent[]; // Optional preloaded sub-agent definitions
+  systemPrompt: string; // System prompt text
+  userPrompt: string; // User prompt text
+  outputFormat: OutputFormatId; // Required output format
+  renderTarget?: "cli" | "slack" | "api" | "web" | "embed" | "sub-agent"; // Rendering target
 
   // Output contract
   expectedOutput?: {
-    format: 'json' | 'markdown' | 'text';
-    schema?: Record<string, unknown>;  // JSON Schema for 'json' format
+    format: "json" | "markdown" | "text";
+    schema?: Record<string, unknown>; // JSON Schema for 'json' format
   };
 
   // Sampling parameters
-  temperature?: number | null;    // Default: 0.0
-  topP?: number | null;           // Default: not sent
-  topK?: number | null;           // Default: not sent
-  maxOutputTokens?: number;       // Default: 4096
-  repeatPenalty?: number | null;  // Default: not sent
+  temperature?: number | null; // Default: 0.0
+  topP?: number | null; // Default: not sent
+  topK?: number | null; // Default: not sent
+  maxOutputTokens?: number; // Default: 4096
+  repeatPenalty?: number | null; // Default: not sent
 
   // Execution limits
-  maxRetries?: number;            // Default: 5
-  maxTurns?: number;              // Default: 10
-  maxToolCallsPerTurn?: number;   // Default: 10
-  llmTimeout?: number;            // Default: 600000 (10 min)
-  toolTimeout?: number;           // Default: 300000 (5 min)
-  toolResponseMaxBytes?: number;  // Default: 12288 (12KB)
+  maxRetries?: number; // Default: 5
+  maxTurns?: number; // Default: 10
+  maxToolCallsPerTurn?: number; // Default: 10
+  llmTimeout?: number; // Default: 600000 (10 min)
+  toolTimeout?: number; // Default: 300000 (5 min)
+  toolResponseMaxBytes?: number; // Default: 12288 (12KB)
 
   // Orchestration
   orchestration?: OrchestrationConfig;
   orchestrationRuntime?: OrchestrationRuntimeConfig;
 
   // Caching
-  cacheTtlMs?: number;            // Response cache TTL
-  agentHash?: string;             // Cache key component
+  cacheTtlMs?: number; // Response cache TTL
+  agentHash?: string; // Cache key component
 
   // Reasoning
-  reasoning?: ReasoningLevel;     // 'minimal' | 'low' | 'medium' | 'high'
-  reasoningValue?: number | null; // Explicit token budget
-  caching?: CachingMode;          // 'none' | 'full'
+  reasoning?: ReasoningLevel; // 'minimal' | 'low' | 'medium' | 'high'
+  reasoningValue?: string | number | null; // Explicit token budget
+  caching?: CachingMode; // 'none' | 'full'
 
   // Streaming and debugging
-  stream?: boolean;               // Default: true
-  traceLLM?: boolean;             // Default: false
-  traceMCP?: boolean;             // Default: false
-  traceSdk?: boolean;             // Default: false
-  verbose?: boolean;              // Default: false
+  stream?: boolean; // Default: true
+  traceLLM?: boolean; // Default: false
+  traceMCP?: boolean; // Default: false
+  traceSdk?: boolean; // Default: false
+  verbose?: boolean; // Default: false
 
   // Identity and tracing
-  agentId?: string;               // Agent identifier
-  headendId?: string;             // Headend identifier
-  trace?: {                       // Trace context propagation
+  agentId?: string; // Agent identifier
+  headendId?: string; // Headend identifier
+  headendWantsProgressUpdates?: boolean; // Progress updates requested
+  telemetryLabels?: Record<string, string>; // Telemetry labels
+  isMaster?: boolean; // Is this the master agent?
+  pendingHandoffCount?: number; // Pending handoffs
+  trace?: {
+    // Trace context propagation
     selfId?: string;
     originId?: string;
     parentId?: string;
@@ -203,13 +210,17 @@ interface AIAgentSessionConfig {
   callbacks?: AIAgentEventCallbacks;
 
   // Control
-  abortSignal?: AbortSignal;      // External cancellation
+  abortSignal?: AbortSignal; // External cancellation
   stopRef?: { stopping: boolean }; // Graceful stop
 
   // Context
-  contextWindow?: number;         // Override context window
+  contextWindow?: number; // Override context window
   conversationHistory?: ConversationMessage[]; // Prior conversation
-  ancestors?: string[];           // Recursion prevention
+  ancestors?: string[]; // Recursion prevention
+  agentPath?: string; // Agent path
+  turnPathPrefix?: string; // Turn path prefix
+  initialTitle?: string; // Pre-set session title
+  toolOutput?: ToolOutputConfigInput; // Tool output config
 }
 ```
 
@@ -227,21 +238,21 @@ interface AIAgentEventCallbacks {
 
 ### AIAgentEventMeta
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `agentId` | `string?` | Agent identifier |
-| `callPath` | `string?` | Hierarchical call path |
-| `sessionId` | `string?` | Session identifier |
-| `parentId` | `string?` | Parent session ID |
-| `originId` | `string?` | Root session ID |
-| `headendId` | `string?` | Headend identifier |
-| `renderTarget` | `string?` | Target renderer type |
-| `isMaster` | `boolean` | Is this the master agent? |
-| `isFinal` | `boolean` | Authoritative only for `final_report` |
-| `pendingHandoffCount` | `number` | Pending handoffs |
-| `handoffConfigured` | `boolean` | Handoff is configured |
-| `sequence` | `number` | Event sequence number |
-| `source` | `EventSource?` | 'stream', 'replay', or 'finalize' |
+| Field                 | Type           | Description                           |
+| --------------------- | -------------- | ------------------------------------- |
+| `agentId`             | `string?`      | Agent identifier                      |
+| `callPath`            | `string?`      | Hierarchical call path                |
+| `sessionId`           | `string?`      | Session identifier                    |
+| `parentId`            | `string?`      | Parent session ID                     |
+| `originId`            | `string?`      | Root session ID                       |
+| `headendId`           | `string?`      | Headend identifier                    |
+| `renderTarget`        | `string?`      | Target renderer type                  |
+| `isMaster`            | `boolean`      | Is this the master agent?             |
+| `isFinal`             | `boolean`      | Authoritative only for `final_report` |
+| `pendingHandoffCount` | `number`       | Pending handoffs                      |
+| `handoffConfigured`   | `boolean`      | Handoff is configured                 |
+| `sequence`            | `number`       | Event sequence number                 |
+| `source`              | `EventSource?` | 'stream', 'replay', or 'finalize'     |
 
 ---
 
@@ -251,22 +262,28 @@ interface AIAgentEventCallbacks {
 
 ```typescript
 interface AIAgentResult {
-  success: boolean;               // Run succeeded
-  error?: string;                 // Error message if failed
-  finalAgentId?: string;          // Agent that produced final report
+  success: boolean; // Run succeeded
+  error?: string; // Error message if failed
+  finalAgentId?: string; // Agent that produced final report
   conversation: ConversationMessage[]; // Full conversation
-  logs: LogEntry[];               // All log entries
-  accounting: AccountingEntry[];  // All accounting entries
+  logs: LogEntry[]; // All log entries
+  accounting: AccountingEntry[]; // All accounting entries
 
   // Optional fields
-  treeAscii?: string;             // ASCII execution tree
-  opTreeAscii?: string;           // Hierarchical operation tree
-  opTree?: SessionNode;           // Operation tree structure
-  childConversations?: {          // Sub-agent conversations
+  treeAscii?: string; // ASCII execution tree
+  opTreeAscii?: string; // Hierarchical operation tree
+  opTree?: SessionNode; // Operation tree structure
+  childConversations?: {
+    // Sub-agent conversations
     agentId?: string;
     toolName: string;
     promptPath: string;
-    trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string };
+    trace?: {
+      originId?: string;
+      parentId?: string;
+      selfId?: string;
+      callPath?: string;
+    };
     conversation: ConversationMessage[];
   }[];
   routerSelection?: RouterSelection;
@@ -278,12 +295,19 @@ interface AIAgentResult {
 
 ```typescript
 interface FinalReportPayload {
-  format: 'json' | 'markdown' | 'markdown+mermaid' | 'slack-block-kit' |
-          'tty' | 'pipe' | 'sub-agent' | 'text';
-  content?: string;               // Text content
+  format:
+    | "json"
+    | "markdown"
+    | "markdown+mermaid"
+    | "slack-block-kit"
+    | "tty"
+    | "pipe"
+    | "sub-agent"
+    | "text";
+  content?: string; // Text content
   content_json?: Record<string, unknown>; // JSON content
-  metadata?: Record<string, unknown>;     // Additional metadata
-  ts: number;                     // Timestamp
+  metadata?: Record<string, unknown>; // Additional metadata
+  ts: number; // Timestamp
 }
 ```
 
@@ -293,20 +317,20 @@ interface FinalReportPayload {
 
 ### AIAgentEvent
 
-| Type | Payload | Description |
-|------|---------|-------------|
-| `output` | `{ text: string }` | Assistant output stream |
-| `thinking` | `{ text: string }` | Reasoning stream |
-| `turn_started` | See below | LLM turn start |
-| `progress` | `{ event: ProgressEvent }` | Progress events |
-| `status` | `{ event: ProgressEvent }` | Mirror of progress |
-| `final_report` | `{ report: FinalReportPayload }` | Final report |
-| `handoff` | `{ report: FinalReportPayload }` | Handoff payload |
-| `log` | `{ entry: LogEntry }` | Structured log |
-| `accounting` | `{ entry: AccountingEntry }` | Accounting entry |
-| `snapshot` | `{ payload: SessionSnapshotPayload }` | Session snapshot |
-| `accounting_flush` | `{ payload: AccountingFlushPayload }` | Batched accounting |
-| `op_tree` | `{ tree: SessionNode }` | Operation tree snapshot |
+| Type               | Payload                               | Description             |
+| ------------------ | ------------------------------------- | ----------------------- |
+| `output`           | `{ text: string }`                    | Assistant output stream |
+| `thinking`         | `{ text: string }`                    | Reasoning stream        |
+| `turn_started`     | See below                             | LLM turn start          |
+| `progress`         | `{ event: ProgressEvent }`            | Progress events         |
+| `status`           | `{ event: ProgressEvent }`            | Mirror of progress      |
+| `final_report`     | `{ report: FinalReportPayload }`      | Final report            |
+| `handoff`          | `{ report: FinalReportPayload }`      | Handoff payload         |
+| `log`              | `{ entry: LogEntry }`                 | Structured log          |
+| `accounting`       | `{ entry: AccountingEntry }`          | Accounting entry        |
+| `snapshot`         | `{ payload: SessionSnapshotPayload }` | Session snapshot        |
+| `accounting_flush` | `{ payload: AccountingFlushPayload }` | Batched accounting      |
+| `op_tree`          | `{ tree: SessionNode }`               | Operation tree snapshot |
 
 ### turn_started Event
 
@@ -324,14 +348,14 @@ interface FinalReportPayload {
 
 ### ProgressEvent Types
 
-| Type | Description |
-|------|-------------|
-| `agent_started` | Agent execution started |
-| `agent_update` | Agent status update |
+| Type             | Description                  |
+| ---------------- | ---------------------------- |
+| `agent_started`  | Agent execution started      |
+| `agent_update`   | Agent status update          |
 | `agent_finished` | Agent completed successfully |
-| `agent_failed` | Agent failed |
-| `tool_started` | Tool execution started |
-| `tool_finished` | Tool execution completed |
+| `agent_failed`   | Agent failed                 |
+| `tool_started`   | Tool execution started       |
+| `tool_finished`  | Tool execution completed     |
 
 ---
 
@@ -341,14 +365,14 @@ interface FinalReportPayload {
 
 ```typescript
 interface LLMAccountingEntry {
-  type: 'llm';
+  type: "llm";
   timestamp: number;
   provider: string;
   model: string;
-  actualProvider?: string;  // For routed providers
+  actualProvider?: string; // For routed providers
   actualModel?: string;
-  status: 'ok' | 'failed';
-  latency: number;          // Milliseconds
+  status: "ok" | "failed";
+  latency: number; // Milliseconds
   tokens: {
     inputTokens: number;
     outputTokens: number;
@@ -375,14 +399,14 @@ interface LLMAccountingEntry {
 
 ```typescript
 interface ToolAccountingEntry {
-  type: 'tool';
+  type: "tool";
   timestamp: number;
-  mcpServer: string;      // 'agent' for internal tools
-  command: string;        // Tool name
-  status: 'ok' | 'failed';
-  latency: number;        // Milliseconds
-  charactersIn: number;   // Input size
-  charactersOut: number;  // Output size
+  mcpServer: string; // 'agent' for internal tools
+  command: string; // Tool name
+  status: "ok" | "failed";
+  latency: number; // Milliseconds
+  charactersIn: number; // Input size
+  charactersOut: number; // Output size
   error?: string;
 
   // Tracing fields
@@ -401,11 +425,11 @@ interface ToolAccountingEntry {
 
 The `expectedOutput.format` controls final report structure:
 
-| Format | Tool Schema | Validation |
-|--------|-------------|------------|
-| `json` | `{ format: { const: 'json' }, content_json: <schema> }` | AJV validation |
-| `markdown` | `{ format: { const: 'markdown' }, content: string }` | None |
-| `text` | `{ format: { const: 'text' }, content: string }` | None |
+| Format     | Tool Schema                                             | Validation     |
+| ---------- | ------------------------------------------------------- | -------------- |
+| `json`     | `{ format: { const: 'json' }, content_json: <schema> }` | AJV validation |
+| `markdown` | `{ format: { const: 'markdown' }, content: string }`    | None           |
+| `text`     | `{ format: { const: 'text' }, content: string }`        | None           |
 
 **Example JSON output configuration**:
 
@@ -413,16 +437,16 @@ The `expectedOutput.format` controls final report structure:
 const sessionConfig = {
   // ...
   expectedOutput: {
-    format: 'json',
+    format: "json",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
-        summary: { type: 'string' },
-        items: { type: 'array', items: { type: 'string' } }
+        summary: { type: "string" },
+        items: { type: "array", items: { type: "string" } },
       },
-      required: ['summary']
-    }
-  }
+      required: ["summary"],
+    },
+  },
 };
 ```
 
@@ -430,14 +454,14 @@ const sessionConfig = {
 
 ## Library Guarantees
 
-| Guarantee | Description |
-|-----------|-------------|
-| **No Direct I/O** | Never writes to stdout/stderr or files |
-| **Real-time Callbacks** | Events emitted as they occur |
-| **Always Returns Result** | `run()` resolves even on errors |
-| **FIN Summaries** | Always emitted at end of run |
-| **Error Transparency** | Errors in logs and `result.error` |
-| **Accounting Completeness** | All entries recorded |
+| Guarantee                   | Description                            |
+| --------------------------- | -------------------------------------- |
+| **No Direct I/O**           | Never writes to stdout/stderr or files |
+| **Real-time Callbacks**     | Events emitted as they occur           |
+| **Always Returns Result**   | `run()` resolves even on errors        |
+| **FIN Summaries**           | Always emitted at end of run           |
+| **Error Transparency**      | Errors in logs and `result.error`      |
+| **Accounting Completeness** | All entries recorded                   |
 
 ---
 
@@ -495,37 +519,39 @@ const result = await AIAgent.run(session);
 
 if (!result.success) {
   // Run-level failure
-  console.error('Run failed:', result.error);
-  console.error('Logs:', result.logs);
+  console.error("Run failed:", result.error);
+  console.error("Logs:", result.logs);
   return;
 }
 
-if (result.finalReport?.content_json?.status === 'failure') {
+if (result.finalReport?.content_json?.status === "failure") {
   // Task-level failure
-  console.warn('Task could not be completed:',
-    result.finalReport.content_json.error);
+  console.warn(
+    "Task could not be completed:",
+    result.finalReport.content_json.error,
+  );
 }
 ```
 
 ### Streaming Output
 
 ```typescript
-let streamedOutput = '';
+let streamedOutput = "";
 
 const sessionConfig = {
   // ...
   stream: true,
   callbacks: {
     onEvent: (event, meta) => {
-      if (event.type === 'output') {
+      if (event.type === "output") {
         // Stream during execution
-        if (meta.source !== 'finalize') {
+        if (meta.source !== "finalize") {
           process.stdout.write(event.text);
           streamedOutput += event.text;
         }
       }
-    }
-  }
+    },
+  },
 };
 ```
 
@@ -536,7 +562,7 @@ const controller = new AbortController();
 
 const sessionConfig = {
   // ...
-  abortSignal: controller.signal
+  abortSignal: controller.signal,
 };
 
 // Later, cancel the session
@@ -550,7 +576,7 @@ const stopRef = { stopping: false };
 
 const sessionConfig = {
   // ...
-  stopRef
+  stopRef,
 };
 
 // Later, request graceful stop (agent finishes current work)

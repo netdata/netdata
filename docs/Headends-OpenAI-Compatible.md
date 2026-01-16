@@ -23,12 +23,14 @@ Expose agents via the OpenAI Chat Completions API for drop-in compatibility with
 ## Overview
 
 The OpenAI-compatible headend provides a drop-in replacement for OpenAI's Chat Completions API. Use it when:
+
 - You have existing code using OpenAI SDKs
 - You want to use tools like Open WebUI with your agents
 - You need streaming chat completions
 - You want reasoning/thinking content in responses
 
 **Key features**:
+
 - Full `/v1/chat/completions` compatibility
 - Streaming via Server-Sent Events (SSE)
 - `reasoning_content` field for thinking output
@@ -55,30 +57,32 @@ curl http://localhost:8082/v1/chat/completions \
 
 ### --openai-completions
 
-| Property | Value |
-|----------|-------|
-| Type | `number` |
-| Required | Yes (to enable this headend) |
-| Repeatable | Yes |
+| Property   | Value                        |
+| ---------- | ---------------------------- |
+| Type       | `number`                     |
+| Required   | Yes (to enable this headend) |
+| Repeatable | Yes                          |
 
 **Description**: HTTP port for OpenAI-compatible API. Can be specified multiple times.
 
 **Example**:
+
 ```bash
 ai-agent --agent chat.ai --openai-completions 8082
 ```
 
 ### --openai-completions-concurrency
 
-| Property | Value |
-|----------|-------|
-| Type | `number` |
-| Default | `4` |
-| Valid values | `1` to `100` |
+| Property     | Value                |
+| ------------ | -------------------- |
+| Type         | `number`             |
+| Default      | `10`                 |
+| Valid values | Any positive integer |
 
 **Description**: Maximum concurrent chat completion requests.
 
 **Example**:
+
 ```bash
 ai-agent --agent chat.ai --openai-completions 8082 --openai-completions-concurrency 10
 ```
@@ -92,6 +96,7 @@ ai-agent --agent chat.ai --openai-completions 8082 --openai-completions-concurre
 Health check endpoint.
 
 **Response**: `200 OK`
+
 ```json
 {
   "status": "ok"
@@ -103,6 +108,7 @@ Health check endpoint.
 List available models (agents).
 
 **Response**:
+
 ```json
 {
   "object": "list",
@@ -133,27 +139,25 @@ Create a chat completion.
 {
   "model": "chat",
   "messages": [
-    {"role": "system", "content": "You are a helpful assistant."},
-    {"role": "user", "content": "Hello!"}
+    { "role": "system", "content": "You are a helpful assistant." },
+    { "role": "user", "content": "Hello!" }
   ],
-  "stream": false,
-  "temperature": 0.7,
-  "max_tokens": 1024
+  "stream": false
 }
 ```
 
 ### Request Fields
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `model` | `string` | Yes | Agent name (filename without `.ai`) |
-| `messages` | `array` | Yes | Conversation messages |
-| `stream` | `boolean` | No | Enable SSE streaming (default: `false`) |
-| `temperature` | `number` | No | Sampling temperature (0-2) |
-| `top_p` | `number` | No | Nucleus sampling |
-| `max_tokens` | `number` | No | Maximum tokens to generate |
-| `format` | `string` | No | Output format override (`markdown`, `json`, `text`) |
-| `response_format` | `object` | No | Structured output format |
+| Field             | Type      | Required | Description                                         |
+| ----------------- | --------- | -------- | --------------------------------------------------- |
+| `model`           | `string`  | Yes      | Agent name (filename without `.ai`)                 |
+| `messages`        | `array`   | Yes      | Conversation messages                               |
+| `stream`          | `boolean` | No       | Enable SSE streaming (default: `false`)             |
+| `format`          | `string`  | No       | Output format override (`markdown`, `json`, `text`) |
+| `response_format` | `object`  | No       | Structured output format                            |
+| `payload`         | `object`  | No       | Additional data passed to agent                     |
+
+> **Note**: OpenAI parameters like `temperature`, `top_p`, and `max_tokens` are not directly supported but can be passed via the `payload` field. Your agent must be configured to accept and use these values.
 
 ### Message Format
 
@@ -164,10 +168,10 @@ Create a chat completion.
 }
 ```
 
-| Field | Type | Values | Description |
-|-------|------|--------|-------------|
-| `role` | `string` | `system`, `user`, `assistant` | Message author role |
-| `content` | `string` | Any | Message content |
+| Field     | Type     | Values                        | Description         |
+| --------- | -------- | ----------------------------- | ------------------- |
+| `role`    | `string` | `system`, `user`, `assistant` | Message author role |
+| `content` | `string` | Any                           | Message content     |
 
 > **Note**: Messages with `tool_calls` are rejected. Tool calling happens internally within agents.
 
@@ -178,14 +182,14 @@ For structured JSON output:
 ```json
 {
   "model": "analyzer",
-  "messages": [{"role": "user", "content": "Analyze this"}],
+  "messages": [{ "role": "user", "content": "Analyze this" }],
   "response_format": {
     "type": "json_object",
     "json_schema": {
       "type": "object",
       "properties": {
-        "sentiment": {"type": "string"},
-        "score": {"type": "number"}
+        "sentiment": { "type": "string" },
+        "score": { "type": "number" }
       }
     }
   }
@@ -227,13 +231,13 @@ For structured JSON output:
 When `stream: true`:
 
 ```
-data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"delta":{"role":"assistant"}}]}
+data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1705432891,"model":"chat","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"delta":{"content":"Hello"}}]}
+data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1705432891,"model":"chat","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"delta":{"content":"!"}}]}
+data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1705432891,"model":"chat","choices":[{"index":0,"delta":{"content":"!"},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"delta":{}}],"finish_reason":"stop","usage":{"prompt_tokens":10,"completion_tokens":2,"total_tokens":12}}
+data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1705432891,"model":"chat","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":2,"total_tokens":12}}
 
 data: [DONE]
 ```
@@ -291,30 +295,28 @@ for chunk in stream:
 ### JavaScript (OpenAI SDK)
 
 ```javascript
-import OpenAI from 'openai';
+import OpenAI from "openai";
 
 const client = new OpenAI({
-  baseURL: 'http://localhost:8082/v1',
-  apiKey: 'not-needed'
+  baseURL: "http://localhost:8082/v1",
+  apiKey: "not-needed",
 });
 
 // Non-streaming
 const response = await client.chat.completions.create({
-  model: 'chat',
-  messages: [
-    { role: 'user', content: 'Hello!' }
-  ]
+  model: "chat",
+  messages: [{ role: "user", content: "Hello!" }],
 });
 console.log(response.choices[0].message.content);
 
 // Streaming
 const stream = await client.chat.completions.create({
-  model: 'chat',
-  messages: [{ role: 'user', content: 'Tell me a story' }],
-  stream: true
+  model: "chat",
+  messages: [{ role: "user", content: "Tell me a story" }],
+  stream: true,
 });
 for await (const chunk of stream) {
-  process.stdout.write(chunk.choices[0]?.delta?.content || '');
+  process.stdout.write(chunk.choices[0]?.delta?.content || "");
 }
 ```
 
@@ -349,6 +351,7 @@ curl http://localhost:8082/v1/models
 Connect [Open WebUI](https://github.com/open-webui/open-webui) to your agents:
 
 1. **Start ai-agent**:
+
    ```bash
    ai-agent --agent chat.ai --agent researcher.ai --openai-completions 8082
    ```
@@ -367,10 +370,10 @@ Connect [Open WebUI](https://github.com/open-webui/open-webui) to your agents:
 
 The `model` field maps to agent filenames:
 
-| Agent File | Model Name |
-|------------|------------|
-| `chat.ai` | `chat` |
-| `researcher.ai` | `researcher` |
+| Agent File       | Model Name    |
+| ---------------- | ------------- |
+| `chat.ai`        | `chat`        |
+| `researcher.ai`  | `researcher`  |
 | `code-review.ai` | `code-review` |
 
 If an agent has `toolName` in frontmatter, that name is used instead:
@@ -394,6 +397,7 @@ Duplicate names get numeric suffixes: `chat`, `chat-2`, `chat-3`.
 **Cause**: The `model` field doesn't match any registered agent.
 
 **Solutions**:
+
 1. List available models: `curl http://localhost:8082/v1/models`
 2. Check agent filename (without `.ai` extension)
 3. Verify agent was loaded with `--agent`
@@ -405,13 +409,14 @@ Duplicate names get numeric suffixes: `chat`, `chat-2`, `chat-3`.
 **Cause**: Using `response_format.type: "json_object"` without a schema.
 
 **Solution**: Include `json_schema`:
+
 ```json
 {
   "response_format": {
     "type": "json_object",
     "json_schema": {
       "type": "object",
-      "properties": {"result": {"type": "string"}}
+      "properties": { "result": { "type": "string" } }
     }
   }
 }
@@ -419,7 +424,7 @@ Duplicate names get numeric suffixes: `chat`, `chat-2`, `chat-3`.
 
 ### tool_calls not supported
 
-**Symptom**: `{"error": "tool_calls_not_supported"}`
+**Symptom**: `{"error": "tool_calls_unsupported"}`
 
 **Cause**: Messages contain `tool_calls` field.
 
@@ -438,6 +443,7 @@ Duplicate names get numeric suffixes: `chat`, `chat-2`, `chat-3`.
 **Symptom**: SDK requires API key but you don't have one.
 
 **Solution**: Use any non-empty string:
+
 ```python
 client = OpenAI(base_url="...", api_key="not-needed")
 ```

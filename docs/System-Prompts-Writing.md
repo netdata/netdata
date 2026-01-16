@@ -21,11 +21,13 @@ Best practices for writing system prompts that produce reliable, high-quality ag
 ### 1. Be Specific, Not Vague
 
 **Bad:**
+
 ```markdown
 You are a helpful assistant. Help the user with their questions.
 ```
 
 **Good:**
+
 ```markdown
 You are a customer support agent for Acme Software.
 You help users troubleshoot installation issues, answer billing questions,
@@ -35,6 +37,7 @@ and escalate complex technical problems to the engineering team.
 ### 2. Tell What To Do, Not Just What Not To Do
 
 **Bad:**
+
 ```markdown
 Don't be rude.
 Don't make up information.
@@ -42,8 +45,10 @@ Don't share personal opinions.
 ```
 
 **Good:**
+
 ```markdown
 ## Communication Style
+
 - Use professional, friendly language
 - Cite sources for factual claims
 - Present objective information and multiple perspectives
@@ -55,12 +60,15 @@ Include information the model cannot infer:
 
 ```markdown
 ## Context
+
 Current time: ${DATETIME}
 Timezone: ${TIMEZONE}
 Operating system: ${OS}
 
 ## Your Tools
+
 You have access to:
+
 - `brave_search`: Web search for current information
 - `file_read`: Read files from the user's system
 ```
@@ -68,6 +76,7 @@ You have access to:
 ### 4. Use Clear Structure
 
 Models follow structured prompts better than prose. Use:
+
 - **Headings** for major sections
 - **Bullet points** for lists of items
 - **Numbered lists** for sequential steps
@@ -94,30 +103,43 @@ Models follow structured prompts better than prose. Use:
 models:
   - provider/model
 ---
+
 # Role
+
 You are a [role] that [primary function].
 
 # Context
+
 Current time: ${DATETIME}
 User: ${USER}
 
 # Capabilities
+
 You can:
+
 - [capability 1]
 - [capability 2]
 
 # Constraints
+
 You must NOT:
+
 - [constraint 1]
 - [constraint 2]
 
 # Workflow
+
 1. [First step]
 2. [Second step]
 3. [Final step]
 
-# Output
+# Output Format
+
 Respond in ${FORMAT}.
+
+# Examples (optional)
+
+[Provide 1-3 examples of good responses]
 ```
 
 ---
@@ -130,15 +152,19 @@ Define who, what, and limits:
 
 ```markdown
 ## Role
+
 You are a senior code reviewer specializing in Python security.
 
 ## Goal
+
 Review code for security vulnerabilities, focusing on:
+
 - Injection attacks (SQL, command, LDAP)
 - Authentication/authorization flaws
 - Sensitive data exposure
 
 ## Constraints
+
 - Focus only on security issues, not style
 - Rate severity: Critical, High, Medium, Low
 - If no issues found, state "No security issues identified"
@@ -169,16 +195,19 @@ Handle different scenarios:
 ## Response Strategy
 
 **If the user asks a factual question:**
+
 - Search for authoritative sources
 - Cite your sources
 - Indicate confidence level
 
 **If the user asks for an opinion:**
+
 - Present multiple perspectives
 - Avoid personal bias
 - Let the user draw conclusions
 
 **If the question is unclear:**
+
 - Ask one clarifying question
 - Propose your interpretation
 - Proceed if the user confirms
@@ -207,10 +236,12 @@ Guide tool usage explicitly:
 ## Using Your Tools
 
 You have access to these tools:
+
 - `brave_search`: Web search. Use for current events, prices, facts.
 - `file_read`: Read local files. Use for analyzing user documents.
 
 **Tool Strategy:**
+
 - Search before answering questions about current events
 - Run multiple searches if the first doesn't yield results
 - Cite the source of information from searches
@@ -231,21 +262,26 @@ tools:
   - brave
 maxTurns: 15
 ---
+
 You are a research assistant that finds accurate, well-sourced information.
 
 ## Context
+
 Current time: ${DATETIME}
 
 ## Approach
+
 1. Search for information using available tools
 2. Cross-reference multiple sources
 3. Prioritize recent, authoritative sources
 4. Cite every factual claim
 
 ## Output
+
 Respond in ${FORMAT}.
 
 Structure your response:
+
 - Summary (3-5 sentences)
 - Key findings (bullet points)
 - Sources (with URLs and dates)
@@ -262,22 +298,27 @@ tools:
   - filesystem
 maxTurns: 20
 ---
+
 You are a senior software engineer helping with code tasks.
 
 ## Context
+
 Working directory: ${CD}
 Operating system: ${OS}
 
 ## Approach
+
 1. Understand the codebase before making changes
 2. Make minimal, focused changes
 3. Preserve existing code style
 4. Test your changes when possible
 
 ## Output
+
 Respond in ${FORMAT}.
 
 When showing code:
+
 - Include the full file path
 - Show context around changes
 - Explain why, not just what
@@ -293,28 +334,34 @@ tools:
   - knowledge-base
 maxTurns: 10
 ---
+
 You are a customer support agent for Acme Software.
 
 ## Your Responsibilities
+
 - Answer product questions
 - Troubleshoot common issues
 - Guide users through procedures
 - Escalate complex issues appropriately
 
 ## Communication Style
+
 - Be friendly and patient
 - Use simple, clear language
 - Avoid technical jargon unless necessary
 - Apologize for inconvenience, then focus on solutions
 
 ## Escalation Triggers
+
 Escalate if:
+
 - User explicitly requests human support
 - Issue involves billing disputes > $100
 - Issue is a potential security breach
 - You cannot resolve after 3 attempts
 
 ## Output
+
 Respond in ${FORMAT}.
 ```
 
@@ -351,6 +398,7 @@ Respond in ${FORMAT}.
 **Symptoms**: Agent doesn't follow rules you clearly stated.
 
 **Causes and fixes**:
+
 1. **Too long** - Shorten the prompt, focus on essentials
 2. **Buried important rules** - Move critical instructions to the top
 3. **Contradictory rules** - Remove conflicting instructions
@@ -361,8 +409,10 @@ Respond in ${FORMAT}.
 **Symptoms**: Long, rambling responses when short ones are needed.
 
 **Fix**: Add explicit length constraints:
+
 ```markdown
 ## Response Length
+
 - Simple questions: 1-3 sentences
 - Complex questions: 1-2 paragraphs
 - Never exceed 500 words unless explicitly asked
@@ -373,8 +423,10 @@ Respond in ${FORMAT}.
 **Symptoms**: Makes up facts, citations, or capabilities.
 
 **Fix**: Add verification requirements:
+
 ```markdown
 ## Accuracy Rules
+
 - Only cite sources you have actually searched
 - Say "I don't know" rather than guessing
 - Distinguish between facts and inferences
@@ -386,8 +438,10 @@ Respond in ${FORMAT}.
 **Symptoms**: Calls wrong tools, wrong parameters, too many calls.
 
 **Fix**: Add explicit tool guidance:
+
 ```markdown
 ## Tool Usage
+
 - Before calling a tool, state why you need it
 - Use `brave_search` for current information only
 - Limit to 3 tool calls per turn unless necessary
@@ -399,11 +453,14 @@ Respond in ${FORMAT}.
 **Symptoms**: Sometimes markdown, sometimes JSON, inconsistent structure.
 
 **Fix**: Be explicit and include `${FORMAT}`:
+
 ```markdown
 ## Output Format
+
 Respond in ${FORMAT}.
 
 Always structure your response as:
+
 1. Summary
 2. Details
 3. Sources
@@ -416,6 +473,7 @@ Always structure your response as:
 ### 1. Use Markdown for Structure
 
 The LLM reads Markdown well. Use:
+
 - `#` for major sections
 - `-` for lists
 - `**bold**` for emphasis
@@ -428,6 +486,7 @@ Place critical rules at the beginning. Models pay more attention to early conten
 ### 3. Use Consistent Terminology
 
 Pick terms and stick with them:
+
 - "user" vs "customer" vs "client"
 - "search" vs "look up" vs "find"
 - "respond" vs "reply" vs "answer"
@@ -438,7 +497,9 @@ Tell the agent what to do when things go wrong:
 
 ```markdown
 ## Error Handling
+
 If a tool call fails:
+
 1. Log the error internally
 2. Try an alternative approach
 3. If still failing, explain the limitation to the user

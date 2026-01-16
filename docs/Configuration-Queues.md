@@ -24,12 +24,12 @@ Control concurrency with tool queues.
 
 Queues limit concurrent tool executions:
 
-| Purpose | Benefit |
-|---------|---------|
+| Purpose           | Benefit                                |
+| ----------------- | -------------------------------------- |
 | API rate limiting | Prevent overwhelming external services |
-| Resource control | Limit CPU/memory usage |
-| Fair access | Ensure equitable resource sharing |
-| Cost control | Throttle expensive operations |
+| Resource control  | Limit CPU/memory usage                 |
+| Fair access       | Ensure equitable resource sharing      |
+| Cost control      | Throttle expensive operations          |
 
 Without queues, parallel tool calls may exceed API rate limits or exhaust system resources.
 
@@ -52,8 +52,8 @@ Configure queues in `.ai-agent.json`:
 
 ### Queue Properties
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
+| Property     | Type     | Default  | Description                     |
+| ------------ | -------- | -------- | ------------------------------- |
 | `concurrent` | `number` | Required | Maximum simultaneous executions |
 
 ---
@@ -131,11 +131,11 @@ Assign a queue to a REST tool:
 
 ### Assignment Reference
 
-| Tool Source | Configuration |
-|-------------|---------------|
-| MCP Server | `mcpServers.<name>.queue` |
-| REST Tool | `restTools.<name>.queue` |
-| Default | `"default"` if not specified |
+| Tool Source | Configuration                |
+| ----------- | ---------------------------- |
+| MCP Server  | `mcpServers.<name>.queue`    |
+| REST Tool   | `restTools.<name>.queue`     |
+| Default     | `"default"` if not specified |
 
 ---
 
@@ -163,13 +163,11 @@ Waiting requests are processed in order (first-in, first-out).
 
 ### Queue Bypass
 
-Internal tools bypass queues to prevent deadlocks:
+The `agent__batch` tool bypasses queue concurrency to enable parallel tool execution within a batch. Other internal tools (`agent__final_report`, `agent__task_status`) use normal queue behavior.
 
-| Tool | Purpose |
-|------|---------|
-| `agent__final_report` | Session completion |
-| `agent__task_status` | Status reporting |
-| `agent__batch` | Batch tool execution |
+| Tool           | Purpose                                                         |
+| -------------- | --------------------------------------------------------------- |
+| `agent__batch` | Batch tool execution (bypasses queues for parallel inner tools) |
 
 ---
 
@@ -213,11 +211,11 @@ Internal tools bypass queues to prevent deadlocks:
 
 ### All Queue Properties
 
-| Location | Property | Type | Default | Description |
-|----------|----------|------|---------|-------------|
-| Queue | `concurrent` | `number` | Required | Max simultaneous executions |
-| MCP Server | `queue` | `string` | `"default"` | Queue assignment |
-| REST Tool | `queue` | `string` | `"default"` | Queue assignment |
+| Location   | Property     | Type     | Default     | Description                 |
+| ---------- | ------------ | -------- | ----------- | --------------------------- |
+| Queue      | `concurrent` | `number` | Required    | Max simultaneous executions |
+| MCP Server | `queue`      | `string` | `"default"` | Queue assignment            |
+| REST Tool  | `queue`      | `string` | `"default"` | Queue assignment            |
 
 ---
 
@@ -328,24 +326,24 @@ Limit concurrent sub-agent invocations:
 
 ## Sizing Recommendations
 
-| Use Case | Concurrent | Rationale |
-|----------|------------|-----------|
-| Local filesystem | 32+ | Fast, no external limits |
-| Database queries | 10-20 | Connection pool limits |
-| Public APIs | 2-5 | Rate limit compliance |
-| Rate-limited APIs | 1 | Strict rate limits |
-| Heavy computation | 2-4 | CPU/memory constraints |
-| Sub-agents | 2-4 | LLM API limits |
+| Use Case          | Concurrent | Rationale                |
+| ----------------- | ---------- | ------------------------ |
+| Local filesystem  | 32+        | Fast, no external limits |
+| Database queries  | 10-20      | Connection pool limits   |
+| Public APIs       | 2-5        | Rate limit compliance    |
+| Rate-limited APIs | 1          | Strict rate limits       |
+| Heavy computation | 2-4        | CPU/memory constraints   |
+| Sub-agents        | 2-4        | LLM API limits           |
 
 ### Factors to Consider
 
-| Factor | Lower Concurrency | Higher Concurrency |
-|--------|-------------------|-------------------|
-| API rate limits | Yes | No |
-| Expensive operations | Yes | No |
-| Shared resources | Yes | No |
-| Fast local operations | No | Yes |
-| Independent operations | No | Yes |
+| Factor                 | Lower Concurrency | Higher Concurrency |
+| ---------------------- | ----------------- | ------------------ |
+| API rate limits        | Yes               | No                 |
+| Expensive operations   | Yes               | No                 |
+| Shared resources       | Yes               | No                 |
+| Fast local operations  | No                | Yes                |
+| Independent operations | No                | Yes                |
 
 ---
 
@@ -353,16 +351,18 @@ Limit concurrent sub-agent invocations:
 
 Queue metrics are exported for monitoring:
 
-| Metric | Description |
-|--------|-------------|
-| `ai_agent_queue_depth` | Current in-use + waiting slots |
-| `ai_agent_queue_wait_duration_ms` | Time spent waiting for slot |
+| Metric                            | Description                                                                      |
+| --------------------------------- | -------------------------------------------------------------------------------- |
+| `ai_agent_queue_depth`            | Number of queued tool executions awaiting a slot                                 |
+| `ai_agent_queue_in_use`           | Number of active tool executions consuming queue capacity                        |
+| `ai_agent_queue_wait_duration_ms` | Latency between enqueue and start time for queued tool executions (milliseconds) |
+| `ai_agent_queue_last_wait_ms`     | Most recent observed wait duration per queue (milliseconds)                      |
 
 ### Labels
 
-| Label | Description |
-|-------|-------------|
-| `queue` | Queue name |
+| Label   | Description |
+| ------- | ----------- |
+| `queue` | Queue name  |
 
 ### Example Query
 
@@ -370,8 +370,8 @@ Queue metrics are exported for monitoring:
 # Average wait time per queue
 avg(ai_agent_queue_wait_duration_ms) by (queue)
 
-# Queue utilization
-ai_agent_queue_depth / on(queue) ai_agent_queue_concurrent
+# Queue utilization (waiting + in-use) / capacity
+(ai_agent_queue_depth + ai_agent_queue_in_use) / on(queue) group_left() (avg(ai_agent_queue_in_use) by (queue) / sum(quantile_over_time(ai_agent_queue_in_use[5m], 0.5)))
 ```
 
 ---
@@ -403,16 +403,19 @@ curl localhost:9090/metrics | grep ai_agent_queue
 ### Common Issues
 
 **Tools waiting too long:**
+
 - Increase `concurrent` for the queue
 - Check if one tool is blocking others
 - Consider separate queues for slow tools
 
 **Rate limit errors despite queue:**
+
 - `concurrent` may still be too high
 - API may have burst limits
 - Consider adding delays between calls
 
 **Deadlock symptoms:**
+
 - Internal tools should bypass queues
 - Check for circular dependencies
 - Verify queue assignments

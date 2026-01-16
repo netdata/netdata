@@ -36,6 +36,7 @@ Context management affects you when:
 - **Provider errors**: Context window overflow at the API level
 
 Understanding these mechanisms helps you:
+
 - Configure appropriate limits for your use case
 - Debug "unexpected final turn" scenarios
 - Optimize token usage for longer conversations
@@ -74,19 +75,19 @@ graph LR
     Schema --> Projected
 ```
 
-| Counter | Description | Updated When |
-|---------|-------------|--------------|
-| `currentCtxTokens` | Tokens in committed conversation | After turn completes |
-| `pendingCtxTokens` | Tokens pending commit (tool outputs, retry notices) | During turn |
-| `newCtxTokens` | New tokens added this turn | During turn |
-| `schemaCtxTokens` | Tool schema token estimate | When tools change |
+| Counter            | Description                                         | Updated When         |
+| ------------------ | --------------------------------------------------- | -------------------- |
+| `currentCtxTokens` | Tokens in committed conversation                    | After turn completes |
+| `pendingCtxTokens` | Tokens pending commit (tool outputs, retry notices) | During turn          |
+| `newCtxTokens`     | New tokens added this turn                          | During turn          |
+| `schemaCtxTokens`  | Tool schema token estimate                          | When tools change    |
 
 ### Guard Triggers
 
-| Trigger | When Checked | Action if Exceeded |
-|---------|--------------|-------------------|
-| `turn_preflight` | Before each LLM request | Force final turn |
-| `tool_preflight` | Before committing tool output | Block tool output |
+| Trigger          | When Checked                  | Action if Exceeded |
+| ---------------- | ----------------------------- | ------------------ |
+| `turn_preflight` | Before each LLM request       | Force final turn   |
+| `tool_preflight` | Before committing tool output | Block tool output  |
 
 ---
 
@@ -113,24 +114,26 @@ flowchart TD
 ### Projection Formula
 
 ```
-projected = currentCtxTokens + pendingCtxTokens + newCtxTokens + schemaCtxTokens
+projected = currentCtxTokens + pendingCtxTokens + newCtxTokens + extraTokens
 limit = contextWindow - bufferTokens - maxOutputTokens
 
 if projected > limit:
     trigger guard enforcement
 ```
 
+**Note**: `schemaCtxTokens` is tracked separately but is already included in `currentCtxTokens` after the first turn (via cache_write/cache_read). On the first turn, projection is slightly underestimated; subsequent turns are accurate.
+
 ### Enforcement Actions
 
 When the guard triggers:
 
-| Step | Action |
-|------|--------|
-| 1 | Set `forcedFinalTurnReason = 'context'` |
-| 2 | Log context guard enforcement |
-| 3 | Restrict tools to `agent__final_report` only |
-| 4 | Emit telemetry event |
-| 5 | Recompute schema tokens (only final_report) |
+| Step | Action                                       |
+| ---- | -------------------------------------------- |
+| 1    | Set `forcedFinalTurnReason = 'context'`      |
+| 2    | Log context guard enforcement                |
+| 3    | Restrict tools to `agent__final_report` only |
+| 4    | Emit telemetry event                         |
+| 5    | Recompute schema tokens (only final_report)  |
 
 ---
 
@@ -144,31 +147,31 @@ effectiveLimit = contextWindow - bufferTokens - maxOutputTokens
 
 **Example Calculation**:
 
-| Setting | Value |
-|---------|-------|
-| contextWindow | 128,000 |
-| bufferTokens | 256 |
-| maxOutputTokens | 16,384 |
-| **effectiveLimit** | **111,360** |
+| Setting            | Value       |
+| ------------------ | ----------- |
+| contextWindow      | 128,000     |
+| bufferTokens       | 8,192       |
+| maxOutputTokens    | 16,384      |
+| **effectiveLimit** | **103,424** |
 
 ### Context Window Resolution
 
 The context window value is resolved from multiple sources (first defined wins):
 
-| Priority | Source | Example |
-|----------|--------|---------|
-| 1 | `modelConfig.contextWindow` | Per-model override |
-| 2 | `providerConfig.contextWindow` | Provider default |
-| 3 | `DEFAULT_CONTEXT_WINDOW_TOKENS` | 131,072 (fallback) |
+| Priority | Source                          | Example            |
+| -------- | ------------------------------- | ------------------ |
+| 1        | `modelConfig.contextWindow`     | Per-model override |
+| 2        | `providerConfig.contextWindow`  | Provider default   |
+| 3        | `DEFAULT_CONTEXT_WINDOW_TOKENS` | 131,072 (fallback) |
 
 ### Buffer Resolution
 
-| Priority | Source | Default |
-|----------|--------|---------|
-| 1 | `modelConfig.contextWindowBufferTokens` | - |
-| 2 | `providerConfig.contextWindowBufferTokens` | - |
-| 3 | `defaults.contextWindowBufferTokens` | - |
-| 4 | `DEFAULT_CONTEXT_BUFFER_TOKENS` | 256 |
+| Priority | Source                                     | Default |
+| -------- | ------------------------------------------ | ------- |
+| 1        | `modelConfig.contextWindowBufferTokens`    | -       |
+| 2        | `providerConfig.contextWindowBufferTokens` | -       |
+| 3        | `defaults.contextWindowBufferTokens`       | -       |
+| 4        | `DEFAULT_CONTEXT_BUFFER_TOKENS`            | 8192    |
 
 ---
 
@@ -176,10 +179,10 @@ The context window value is resolved from multiple sources (first defined wins):
 
 ### Estimation Methods
 
-| Method | Accuracy | Speed | Used When |
-|--------|----------|-------|-----------|
-| Tokenizer-based | High | Slower | Tokenizer configured |
-| Character-based | Low | Fast | No tokenizer (fallback) |
+| Method          | Accuracy | Speed  | Used When               |
+| --------------- | -------- | ------ | ----------------------- |
+| Tokenizer-based | High     | Slower | Tokenizer configured    |
+| Character-based | Low      | Fast   | No tokenizer (fallback) |
 
 **Character-based fallback**: `tokens ≈ characters / 4`
 
@@ -195,13 +198,13 @@ providers:
 
 ### What Gets Estimated
 
-| Content | Estimation |
-|---------|------------|
-| System prompt | At session start |
-| User message | At session start |
+| Content            | Estimation         |
+| ------------------ | ------------------ |
+| System prompt      | At session start   |
+| User message       | At session start   |
 | Assistant messages | After LLM response |
-| Tool results | Before commit |
-| Tool schemas | When tools change |
+| Tool results       | Before commit      |
+| Tool schemas       | When tools change  |
 
 ---
 
@@ -230,12 +233,12 @@ flowchart TD
 
 When output exceeds `toolResponseMaxBytes`:
 
-| Step | Action |
-|------|--------|
-| 1 | Write output to disk |
-| 2 | Generate unique handle |
-| 3 | Replace output with handle message |
-| 4 | Log warning with bytes/lines/tokens |
+| Step | Action                              |
+| ---- | ----------------------------------- |
+| 1    | Write output to disk                |
+| 2    | Generate unique handle              |
+| 3    | Replace output with handle message  |
+| 4    | Log warning with bytes/lines/tokens |
 
 **Handle Format**: `session-<uuid>/<file-uuid>`
 
@@ -245,20 +248,20 @@ When output exceeds `toolResponseMaxBytes`:
 
 ```typescript
 toolBudgetCallbacks = {
-    reserveToolOutput: async (output) => {
-        const tokens = estimateTokens(output);
-        const guard = evaluateContextGuard(tokens);
+  reserveToolOutput: async (output) => {
+    const tokens = estimateTokens(output);
+    const guard = evaluateContextGuard(tokens);
 
-        if (guard.blocked.length > 0) {
-            this.toolBudgetExceeded = true;
-            enforceContextFinalTurn();
-            return { ok: false, reason: 'token_budget_exceeded' };
-        }
+    if (guard.blocked.length > 0) {
+      this.toolBudgetExceeded = true;
+      enforceContextFinalTurn();
+      return { ok: false, reason: "token_budget_exceeded" };
+    }
 
-        return { ok: true, tokens };
-    },
+    return { ok: true, tokens };
+  },
 
-    canExecuteTool: () => !this.toolBudgetExceeded
+  canExecuteTool: () => !this.toolBudgetExceeded,
 };
 ```
 
@@ -268,13 +271,13 @@ Once `toolBudgetExceeded` is set, `canExecuteTool()` returns `false` and the orc
 
 ## Configuration Options
 
-| Setting | Type | Default | Effect |
-|---------|------|---------|--------|
-| `contextWindow` | number | 131,072 | Total token capacity |
-| `contextWindowBufferTokens` | number | 256 | Safety margin |
-| `maxOutputTokens` | number | varies | Reserved for LLM response |
-| `tokenizer` | string | - | Estimation accuracy |
-| `toolResponseMaxBytes` | number | varies | Triggers disk storage |
+| Setting                     | Type   | Default | Effect                    |
+| --------------------------- | ------ | ------- | ------------------------- |
+| `contextWindow`             | number | 131,072 | Total token capacity      |
+| `contextWindowBufferTokens` | number | 8,192   | Safety margin             |
+| `maxOutputTokens`           | number | 4,096   | Reserved for LLM response |
+| `tokenizer`                 | string | -       | Estimation accuracy       |
+| `toolResponseMaxBytes`      | number | 12,288  | Triggers disk storage     |
 
 ### Example Configuration
 
@@ -282,14 +285,13 @@ Once `toolBudgetExceeded` is set, `canExecuteTool()` returns `false` and the orc
 providers:
   openai:
     contextWindow: 128000
-    contextWindowBufferTokens: 512
     models:
       gpt-4-turbo:
         maxOutputTokens: 4096
         contextWindow: 128000
 
 defaults:
-  toolResponseMaxBytes: 100000
+  toolResponseMaxBytes: 12288
 ```
 
 ---
@@ -302,15 +304,15 @@ Enable detailed context guard logging with environment variable.
 
 ### Debug Topics
 
-| Topic | Information |
-|-------|-------------|
-| `context-guard/init-counters` | Initial token counts |
-| `context-guard/loop-init` | Per-turn initialization |
+| Topic                           | Information                |
+| ------------------------------- | -------------------------- |
+| `context-guard/init-counters`   | Initial token counts       |
+| `context-guard/loop-init`       | Per-turn initialization    |
 | `context-guard/schema-estimate` | Tool schema token estimate |
-| `context-guard/provider-eval` | Per-provider evaluation |
-| `context-guard/enforce` | Guard enforcement events |
-| `context-guard/tool-eval` | Tool output evaluation |
-| `context-guard/request-metrics` | LLM request token metrics |
+| `context-guard/provider-eval`   | Per-provider evaluation    |
+| `context-guard/enforce`         | Guard enforcement events   |
+| `context-guard/tool-eval`       | Tool output evaluation     |
+| `context-guard/request-metrics` | LLM request token metrics  |
 
 ### Example Debug Output
 
@@ -333,12 +335,14 @@ Enable detailed context guard logging with environment variable.
 **Symptom**: Session ends with "context guard enforced" message.
 
 **Causes**:
+
 - Context window setting too low
 - Buffer tokens too large
 - Tool schemas consuming budget
 - Large tool outputs accumulated
 
 **Solutions**:
+
 1. Check `contextWindow` matches your model's actual limit
 2. Reduce `contextWindowBufferTokens` (carefully)
 3. Use `toolsAllowed`/`toolsDenied` to limit tools
@@ -349,11 +353,13 @@ Enable detailed context guard logging with environment variable.
 **Symptom**: Estimated tokens differ significantly from provider-reported.
 
 **Causes**:
+
 - No tokenizer configured (using character fallback)
 - Wrong tokenizer for model
 - Provider counts differently
 
 **Solutions**:
+
 1. Configure correct tokenizer for your model
 2. Compare with actual provider token counts
 3. Adjust buffer tokens to account for variance
@@ -363,11 +369,13 @@ Enable detailed context guard logging with environment variable.
 **Symptom**: Tools stop executing mid-turn.
 
 **Causes**:
+
 - Large tool outputs consuming context
 - Many tool calls in single turn
 - Accumulated conversation history
 
 **Solutions**:
+
 1. Lower `toolResponseMaxBytes` to store large outputs
 2. Increase `contextWindow` if model supports it
 3. Review tool output sizes
@@ -382,6 +390,7 @@ Enable detailed context guard logging with environment variable.
 **Behavior**: Session proceeds best-effort (may fail at API level).
 
 **Solutions**:
+
 1. Increase context window
 2. Review conversation history size
 3. Use more aggressive context management earlier

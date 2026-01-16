@@ -28,6 +28,7 @@ Configure thinking blocks and reasoning modes for models that support extended t
 - Tasks requiring careful analysis
 
 Supported providers:
+
 - **Anthropic**: Claude models with extended thinking (cryptographically signed thinking blocks)
 - **OpenAI-compatible**: Models with reasoning capabilities (o1, etc.)
 
@@ -58,25 +59,27 @@ ai-agent --agent my-agent.ai --reasoning medium "complex query"
 
 ### reasoning
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Default | `unset` (provider decides) |
-| Valid values | `none`, `unset`, `default`, `minimal`, `low`, `medium`, `high` |
-| Required | No |
+| Property     | Value                                                                             |
+| ------------ | --------------------------------------------------------------------------------- |
+| Type         | `string`                                                                          |
+| Default      | `unset` (provider decides)                                                        |
+| Valid values | `none`, `minimal`, `low`, `medium`, `high`                                        |
+| Note         | `unset`, `default`, and `inherit` are treated as "use default" (same as omitting) |
+| Required     | No                                                                                |
 
 **Description**: Sets the reasoning effort level. Higher levels use more tokens for thinking.
 
 **Where to configure**:
 
-| Location | Syntax | Priority |
-|----------|--------|----------|
-| Frontmatter | `reasoning: medium` | 3 |
-| CLI flag | `--reasoning medium` | 2 |
-| CLI override | `--override reasoning=medium` | 1 (highest) |
-| Config file | `defaults.reasoning: "medium"` | 4 |
+| Location     | Syntax                         | Priority    |
+| ------------ | ------------------------------ | ----------- |
+| Frontmatter  | `reasoning: medium`            | 3           |
+| CLI flag     | `--reasoning medium`           | 2           |
+| CLI override | `--override reasoning=medium`  | 1 (highest) |
+| Config file  | `defaults.reasoning: "medium"` | 4           |
 
 **Frontmatter example**:
+
 ```yaml
 ---
 models:
@@ -86,6 +89,7 @@ reasoning: high
 ```
 
 **CLI example**:
+
 ```bash
 # Set reasoning for this run
 ai-agent --agent test.ai --reasoning medium "query"
@@ -98,6 +102,7 @@ ai-agent --agent test.ai --override reasoning=high "query"
 ```
 
 **Config file example**:
+
 ```json
 {
   "defaults": {
@@ -106,20 +111,23 @@ ai-agent --agent test.ai --override reasoning=high "query"
 }
 ```
 
+Note: `reasoningTokens` cannot be set via config file. Use frontmatter (`reasoningTokens: 16000`) or CLI flag (`--reasoning-tokens 16000`).
+
 ---
 
 ### reasoningTokens
 
-| Property | Value |
-|----------|-------|
-| Type | `number` or `string` |
-| Default | Computed from reasoning level |
+| Property     | Value                                       |
+| ------------ | ------------------------------------------- |
+| Type         | `number` or `string`                        |
+| Default      | Computed from reasoning level               |
 | Valid values | Positive integer, `disabled`, `off`, `none` |
-| Required | No |
+| Required     | No                                          |
 
 **Description**: Explicit token budget for reasoning. Overrides the automatic calculation from reasoning level.
 
 **Frontmatter example**:
+
 ```yaml
 ---
 models:
@@ -129,6 +137,7 @@ reasoningTokens: 16000
 ```
 
 **CLI example**:
+
 ```bash
 # Set explicit token budget
 ai-agent --agent test.ai --reasoning-tokens 16000 "query"
@@ -141,23 +150,23 @@ ai-agent --agent test.ai --override reasoningTokens=disabled "query"
 
 ## Reasoning Levels
 
-| Level | Description | Approximate Tokens |
-|-------|-------------|-------------------|
-| `none` / `unset` | Disable reasoning entirely | 0 |
-| `default` | Use configured defaults | Varies |
-| `minimal` | Quick thinking, simple tasks | ~1,024 |
-| `low` | 30% of max output tokens | Varies by model |
-| `medium` | 60% of max output tokens | Varies by model |
-| `high` | 80% to max output tokens | Maximum budget |
+| Level     | Description                  | Approximate Tokens |
+| --------- | ---------------------------- | ------------------ |
+| `none`    | Disable reasoning entirely   | 0                  |
+| `default` | Use configured defaults      | Varies             |
+| `minimal` | Quick thinking, simple tasks | ~1,024             |
+| `low`     | 20% of max output tokens     | Varies by model    |
+| `medium`  | 50% of max output tokens     | Varies by model    |
+| `high`    | 80% to max output tokens     | Maximum budget     |
 
 **Example token budgets** (assuming 4096 max output tokens):
 
-| Level | Calculated Budget |
-|-------|-------------------|
-| `minimal` | 1,024 tokens |
-| `low` | ~1,229 tokens (30%) |
-| `medium` | ~2,458 tokens (60%) |
-| `high` | ~3,277 tokens (80%) |
+| Level     | Calculated Budget   |
+| --------- | ------------------- |
+| `minimal` | 1,024 tokens        |
+| `low`     | ~819 tokens (20%)   |
+| `medium`  | ~2,048 tokens (50%) |
+| `high`    | ~3,277 tokens (80%) |
 
 > **Note**: Actual budgets depend on model's max output token limit and provider constraints.
 
@@ -167,27 +176,29 @@ ai-agent --agent test.ai --override reasoningTokens=disabled "query"
 
 ### Anthropic
 
-| Aspect | Behavior |
-|--------|----------|
-| Signatures | Reasoning blocks have cryptographic signatures |
-| Preservation | Signatures must survive serialization for replay |
+| Aspect        | Behavior                                                  |
+| ------------- | --------------------------------------------------------- |
+| Signatures    | Reasoning blocks have cryptographic signatures            |
+| Preservation  | Signatures must survive serialization for replay          |
 | First request | If no signatures returned, reasoning disabled for session |
-| Streaming | Required when max output tokens >= 21,333 |
+| Streaming     | Required when max output tokens >= 21,333                 |
 
 **Signature handling**:
+
 - Anthropic signs thinking blocks cryptographically
 - Invalid or missing signatures disable reasoning for that turn
 - Sessions with invalid signatures continue without reasoning
 
 ### OpenAI-Compatible
 
-| Aspect | Behavior |
-|--------|----------|
-| Injection | Reasoning via `providerOptions.openaiCompatible.<field>` |
-| Default field | `reasoning_content` |
-| Interleaved | Per-model `interleaved` config controls injection |
+| Aspect        | Behavior                                                 |
+| ------------- | -------------------------------------------------------- |
+| Injection     | Reasoning via `providerOptions.openaiCompatible.<field>` |
+| Default field | `reasoning_content`                                      |
+| Interleaved   | Per-model `interleaved` config controls injection        |
 
 **Provider configuration for interleaved reasoning**:
+
 ```json
 {
   "providers": {
@@ -211,6 +222,7 @@ ai-agent --agent test.ai --override reasoningTokens=disabled "query"
 ### CLI
 
 Thinking is displayed with `THK` prefix:
+
 ```
 THK: Let me analyze this problem...
 THK: First, I need to understand the constraints...
@@ -222,21 +234,21 @@ THK: The key insight here is...
 ```typescript
 callbacks: {
   onEvent: (event, meta) => {
-    if (event.type === 'thinking') {
-      console.log('Thinking:', event.text);
+    if (event.type === "thinking") {
+      console.log("Thinking:", event.text);
     }
-  }
+  };
 }
 ```
 
 ### Headend Output
 
-| Headend | Format |
-|---------|--------|
-| OpenAI-compatible | Thinking in SSE reasoning deltas |
+| Headend              | Format                              |
+| -------------------- | ----------------------------------- |
+| OpenAI-compatible    | Thinking in SSE reasoning deltas    |
 | Anthropic-compatible | Thinking as `thinking_delta` blocks |
-| REST/CLI | Thinking in logs and responses |
-| Slack | Latest thinking in status block |
+| REST/CLI             | Thinking in logs and responses      |
+| Slack                | Latest thinking in status block     |
 
 ---
 
@@ -258,6 +270,7 @@ Multi-turn conversations require special handling for reasoning blocks.
 - Sessions with invalid signatures gracefully continue without reasoning
 
 **Example conversation message with reasoning**:
+
 ```typescript
 {
   role: 'assistant',
@@ -276,10 +289,10 @@ Multi-turn conversations require special handling for reasoning blocks.
 
 ## Sub-Agent Inheritance
 
-| Setting | Inheritance |
-|---------|-------------|
-| Frontmatter `reasoning` | NOT copied to sub-agents |
-| CLI `--reasoning` | Propagates to sub-agents |
+| Setting                  | Inheritance                  |
+| ------------------------ | ---------------------------- |
+| Frontmatter `reasoning`  | NOT copied to sub-agents     |
+| CLI `--reasoning`        | Propagates to sub-agents     |
 | `--override reasoning=X` | Propagates to all sub-agents |
 
 **Why**: Prevents master agents from forcing expensive reasoning on every sub-agent.
@@ -289,6 +302,7 @@ Multi-turn conversations require special handling for reasoning blocks.
 ## Logging
 
 Request/response logs include reasoning status:
+
 ```
 reasoning=unset|disabled|minimal|low|medium|high
 ```
@@ -308,10 +322,12 @@ CONTEXT_DEBUG=true ai-agent --agent test.ai "query" 2>&1 | grep reasoning
 **Symptoms**: No thinking output despite `reasoning: medium`
 
 **Check logs for**:
+
 - `disableReasoningForTurn` - Invalid signatures found
 - Missing `providerMetadata.anthropic.signature`
 
 **Solutions**:
+
 1. Verify provider supports reasoning
 2. Check conversation history for corrupted signatures
 3. Start fresh session if replay fails
@@ -325,6 +341,7 @@ CONTEXT_DEBUG=true ai-agent --agent test.ai "query" 2>&1 | grep reasoning
 **Cause**: Thinking block required but missing/invalid
 
 **Solutions**:
+
 1. Check signature preservation in persistence layer
 2. Verify serialization/deserialization preserves all metadata
 3. Clear conversation history and start fresh
@@ -336,12 +353,14 @@ CONTEXT_DEBUG=true ai-agent --agent test.ai "query" 2>&1 | grep reasoning
 **Diagnostic steps**:
 
 1. **Verify provider supports reasoning**:
+
    ```bash
    # Anthropic Claude models support extended thinking
    ai-agent --agent test.ai --models anthropic/claude-sonnet-4 --reasoning high "test"
    ```
 
 2. **Check reasoning level is not disabled**:
+
    ```yaml
    # This disables reasoning:
    reasoning: none
@@ -358,6 +377,7 @@ CONTEXT_DEBUG=true ai-agent --agent test.ai "query" 2>&1 | grep reasoning
 **Symptoms**: Reasoning truncated or model times out
 
 **Solutions**:
+
 1. Reduce reasoning level: `high` -> `medium` -> `low`
 2. Set explicit budget: `reasoningTokens: 8000`
 3. Increase LLM timeout: `--llm-timeout-ms 300000`

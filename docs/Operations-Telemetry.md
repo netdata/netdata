@@ -22,11 +22,11 @@ Monitor AI Agent with Prometheus metrics, OpenTelemetry traces, and OTLP log exp
 
 AI Agent provides three telemetry signals:
 
-| Signal | Protocol | Purpose |
-|--------|----------|---------|
+| Signal      | Protocol   | Purpose                      |
+| ----------- | ---------- | ---------------------------- |
 | **Metrics** | Prometheus | Counters, gauges, histograms |
-| **Traces** | OTLP | Distributed request tracing |
-| **Logs** | OTLP | Structured log forwarding |
+| **Traces**  | OTLP       | Distributed request tracing  |
+| **Logs**    | OTLP       | Structured log forwarding    |
 
 ### Architecture
 
@@ -64,73 +64,77 @@ ai-agent --agent test.ai \
 ```
 
 Access metrics:
+
 ```bash
 curl http://localhost:9464/metrics
 ```
 
 ### LLM Metrics
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `ai_agent_llm_requests_total` | Counter | Total LLM requests |
-| `ai_agent_llm_latency_ms` | Histogram | LLM request latency |
-| `ai_agent_llm_prompt_tokens_total` | Counter | Total input tokens |
-| `ai_agent_llm_completion_tokens_total` | Counter | Total output tokens |
-| `ai_agent_llm_cache_read_tokens_total` | Counter | Cached input tokens (read) |
-| `ai_agent_llm_cache_write_tokens_total` | Counter | Cached input tokens (write) |
-| `ai_agent_llm_bytes_in_total` | Counter | Request bytes |
-| `ai_agent_llm_bytes_out_total` | Counter | Response bytes |
-| `ai_agent_llm_errors_total` | Counter | LLM errors (with `error_type` label) |
-| `ai_agent_llm_retries_total` | Counter | Retry attempts |
-| `ai_agent_llm_cost_usd_total` | Counter | Total cost in USD |
+| Metric                                  | Type      | Description                          |
+| --------------------------------------- | --------- | ------------------------------------ |
+| `ai_agent_llm_requests_total`           | Counter   | Total LLM requests                   |
+| `ai_agent_llm_latency_ms`               | Histogram | LLM request latency                  |
+| `ai_agent_llm_prompt_tokens_total`      | Counter   | Total input tokens                   |
+| `ai_agent_llm_completion_tokens_total`  | Counter   | Total output tokens                  |
+| `ai_agent_llm_cache_read_tokens_total`  | Counter   | Cached input tokens (read)           |
+| `ai_agent_llm_cache_write_tokens_total` | Counter   | Cached input tokens (write)          |
+| `ai_agent_llm_bytes_in_total`           | Counter   | Request bytes                        |
+| `ai_agent_llm_bytes_out_total`          | Counter   | Response bytes                       |
+| `ai_agent_llm_errors_total`             | Counter   | LLM errors (with `error_type` label) |
+| `ai_agent_llm_retries_total`            | Counter   | Retry attempts                       |
+| `ai_agent_llm_cost_usd_total`           | Counter   | Total cost in USD                    |
 
 **Labels**: `agent`, `call_path`, `provider`, `model`, `headend`, `status`, `reasoning_level`
 
 ### Tool Metrics
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `ai_agent_tool_invocations_total` | Counter | Total tool calls |
-| `ai_agent_tool_latency_ms` | Histogram | Tool execution latency |
-| `ai_agent_tool_bytes_in_total` | Counter | Tool request bytes |
-| `ai_agent_tool_bytes_out_total` | Counter | Tool response bytes |
-| `ai_agent_tool_errors_total` | Counter | Tool errors (with `error_type` label) |
+| Metric                            | Type      | Description                           |
+| --------------------------------- | --------- | ------------------------------------- |
+| `ai_agent_tool_invocations_total` | Counter   | Total tool calls                      |
+| `ai_agent_tool_latency_ms`        | Histogram | Tool execution latency                |
+| `ai_agent_tool_bytes_in_total`    | Counter   | Tool request bytes                    |
+| `ai_agent_tool_bytes_out_total`   | Counter   | Tool response bytes                   |
+| `ai_agent_tool_errors_total`      | Counter   | Tool errors (with `error_type` label) |
 
 **Labels**: `agent`, `call_path`, `tool_name`, `tool_kind`, `provider`, `headend`, `status`
 
 ### Queue Metrics
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `ai_agent_queue_depth` | Gauge | Current queue depth (in-use + waiting) |
-| `ai_agent_queue_in_use` | Gauge | Currently executing slots |
-| `ai_agent_queue_last_wait_ms` | Gauge | Most recent wait time |
-| `ai_agent_queue_wait_duration_ms` | Histogram | Queue wait time distribution |
+| Metric                            | Type      | Description                            |
+| --------------------------------- | --------- | -------------------------------------- |
+| `ai_agent_queue_depth`            | Gauge     | Current queue depth (in-use + waiting) |
+| `ai_agent_queue_in_use`           | Gauge     | Currently executing slots              |
+| `ai_agent_queue_last_wait_ms`     | Gauge     | Most recent wait time                  |
+| `ai_agent_queue_wait_duration_ms` | Histogram | Queue wait time distribution           |
 
 **Labels**: `queue`
 
 ### Context Guard Metrics
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `ai_agent_context_guard_events_total` | Counter | Context guard activations |
-| `ai_agent_context_guard_remaining_tokens` | Gauge | Tokens remaining when guard triggered |
+| Metric                                    | Type    | Description                           |
+| ----------------------------------------- | ------- | ------------------------------------- |
+| `ai_agent_context_guard_events_total`     | Counter | Context guard activations             |
+| `ai_agent_context_guard_remaining_tokens` | Gauge   | Tokens remaining when guard triggered |
 
 **Labels**: `agent`, `provider`, `model`, `trigger`, `outcome`
 
 ### Final Report Metrics
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `ai_agent_final_report_attempts_total` | Counter | Final report extraction attempts |
-| `ai_agent_final_report_success_total` | Counter | Successful final reports |
+| Metric                                 | Type      | Description                                      |
+| -------------------------------------- | --------- | ------------------------------------------------ |
+| `ai_agent_final_report_total`          | Counter   | Final reports emitted grouped by source          |
+| `ai_agent_final_report_attempts_total` | Counter   | Final-report attempts observed before acceptance |
+| `ai_agent_final_report_turns`          | Histogram | Turn index when final report was accepted        |
+
+**Labels**: `agent`, `call_path`, `headend`, `source`, `forced_final_reason`, `synthetic_reason`
 
 ### Retry Metrics
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `ai_agent_retry_collapse_total` | Counter | maxTurns collapse events |
-| `ai_agent_retry_exhausted_total` | Counter | All retries exhausted |
+| Metric                           | Type    | Description              |
+| -------------------------------- | ------- | ------------------------ |
+| `ai_agent_retry_collapse_total`  | Counter | maxTurns collapse events |
+| `ai_agent_retry_exhausted_total` | Counter | All retries exhausted    |
 
 ---
 
@@ -164,40 +168,42 @@ Session (root span)
 
 ### Trace Attributes
 
-| Attribute | Description |
-|-----------|-------------|
+| Attribute             | Description            |
+| --------------------- | ---------------------- |
 | `ai_agent.session_id` | Session transaction ID |
-| `ai_agent.agent_id` | Agent name |
-| `ai_agent.agent_path` | Agent file path |
-| `ai_agent.provider` | LLM provider |
-| `ai_agent.model` | Model name |
-| `ai_agent.turn` | Turn number |
-| `ai_agent.call_path` | Hierarchical call path |
+| `ai_agent.agent_id`   | Agent name             |
+| `ai_agent.agent_path` | Agent file path        |
+| `ai_agent.provider`   | LLM provider           |
+| `ai_agent.model`      | Model name             |
+| `ai_agent.turn`       | Turn number            |
+| `ai_agent.call_path`  | Hierarchical call path |
 
 ### Sampling
 
 Configure trace sampling:
 
 ```bash
-# Sample all traces (default for CLI)
+# Sample all traces
 ai-agent --telemetry-trace-sampler always_on "query"
 
 # Sample 10% of traces
 ai-agent --telemetry-trace-sampler ratio:0.1 "query"
+# Or with separate ratio option:
+ai-agent --telemetry-trace-sampler ratio --telemetry-trace-ratio 0.1 "query"
 
 # Never sample (metrics only)
 ai-agent --telemetry-trace-sampler always_off "query"
 
-# Follow parent span decision
+# Follow parent span decision (default)
 ai-agent --telemetry-trace-sampler parent "query"
 ```
 
-| Sampler | Description |
-|---------|-------------|
-| `always_on` | Sample all traces |
-| `always_off` | Sample no traces |
-| `ratio:N` | Sample N proportion (0.0-1.0) |
-| `parent` | Use parent span's decision |
+| Sampler      | Description                                         |
+| ------------ | --------------------------------------------------- |
+| `always_on`  | Sample all traces                                   |
+| `always_off` | Sample no traces                                    |
+| `ratio`      | Sample proportion defined by ratio option (0.0-1.0) |
+| `parent`     | Use parent span's decision (default)                |
 
 ---
 
@@ -214,29 +220,29 @@ ai-agent --agent test.ai \
 ### Severity Mapping
 
 | AI Agent Level | OTLP Severity |
-|----------------|---------------|
-| `ERR` | ERROR |
-| `WRN` | WARN |
-| `FIN` | INFO |
-| `TRC` | TRACE |
-| `VRB` | DEBUG |
-| `THK` | DEBUG |
+| -------------- | ------------- |
+| `ERR`          | ERROR         |
+| `WRN`          | WARN          |
+| `FIN`          | INFO          |
+| `TRC`          | TRACE         |
+| `VRB`          | DEBUG         |
+| `THK`          | DEBUG         |
 
 ### Log Attributes
 
 Exported logs include:
 
-| Attribute | Description |
-|-----------|-------------|
-| `type` | Log type (llm/tool) |
-| `direction` | request/response |
-| `turn` | Turn number |
-| `subturn` | Tool call index |
-| `agent` | Agent ID |
-| `call_path` | Call hierarchy |
-| `remote` | Remote identifier |
-| `provider` | Provider name |
-| `model` | Model name |
+| Attribute   | Description         |
+| ----------- | ------------------- |
+| `type`      | Log type (llm/tool) |
+| `direction` | request/response    |
+| `turn`      | Turn number         |
+| `subturn`   | Tool call index     |
+| `agent`     | Agent ID            |
+| `call_path` | Call hierarchy      |
+| `remote`    | Remote identifier   |
+| `provider`  | Provider name       |
+| `model`     | Model name          |
 
 ---
 
@@ -244,14 +250,21 @@ Exported logs include:
 
 ### CLI Flags
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--telemetry-prometheus-host` | Prometheus bind host | `127.0.0.1` |
-| `--telemetry-prometheus-port` | Prometheus bind port | `9464` |
-| `--telemetry-otlp-endpoint` | OTLP collector endpoint | None |
-| `--telemetry-otlp-timeout` | OTLP timeout (ms) | `2000` |
-| `--telemetry-trace-sampler` | Trace sampler | `always_on` |
-| `--telemetry-logging-otlp-endpoint` | OTLP logging endpoint | None |
+| Flag                                  | Description                                                   | Default                                    |
+| ------------------------------------- | ------------------------------------------------------------- | ------------------------------------------ |
+| `--telemetry-prometheus-enabled`      | Enable Prometheus /metrics endpoint                           | `false`                                    |
+| `--telemetry-prometheus-host`         | Prometheus bind host                                          | `127.0.0.1` (used when host not specified) |
+| `--telemetry-prometheus-port`         | Prometheus bind port                                          | `9464` (used when port not specified)      |
+| `--telemetry-otlp-endpoint`           | OTLP collector endpoint                                       | None                                       |
+| `--telemetry-otlp-timeout-ms`         | OTLP timeout (ms or duration like 5s/2m)                      | `2000` (used when timeout not specified)   |
+| `--telemetry-traces-enabled`          | Enable OTLP tracing                                           | `false`                                    |
+| `--telemetry-trace-sampler`           | Trace sampler                                                 | `parent`                                   |
+| `--telemetry-trace-ratio`             | Sampling ratio (0-1) when sampler=ratio                       | `0.1`                                      |
+| `--telemetry-label`                   | Additional labels (key=value, can specify multiple times)     | None                                       |
+| `--telemetry-log-format`              | Preferred logging format(s): journald, logfmt, json, none     | None                                       |
+| `--telemetry-log-extra`               | Additional log sinks (e.g., otlp, can specify multiple times) | None                                       |
+| `--telemetry-logging-otlp-endpoint`   | Override OTLP endpoint for log exports                        | None                                       |
+| `--telemetry-logging-otlp-timeout-ms` | Override OTLP timeout for log exports                         | None                                       |
 
 ### Config File
 
@@ -259,9 +272,10 @@ Exported logs include:
 {
   "telemetry": {
     "enabled": true,
-    "mode": "server",
-    "otlpEndpoint": "http://collector:4317",
-    "otlpTimeoutMs": 2000,
+    "otlp": {
+      "endpoint": "http://collector:4317",
+      "timeoutMs": 2000
+    },
     "prometheus": {
       "enabled": true,
       "host": "0.0.0.0",
@@ -273,9 +287,11 @@ Exported logs include:
       "ratio": 0.1
     },
     "logging": {
-      "formats": ["console", "logfmt"],
+      "formats": ["journald", "logfmt"],
       "extra": ["otlp"],
-      "otlpEndpoint": "http://collector:4317"
+      "otlp": {
+        "endpoint": "http://collector:4317"
+      }
     },
     "labels": {
       "environment": "production",
@@ -287,8 +303,8 @@ Exported logs include:
 
 ### Environment Variables
 
-| Variable | Description |
-|----------|-------------|
+| Variable               | Description                                   |
+| ---------------------- | --------------------------------------------- |
 | `AI_TELEMETRY_DISABLE` | Set to `1`, `true`, `yes`, or `on` to disable |
 
 ---
@@ -395,49 +411,49 @@ groups:
 ### Queue Saturation
 
 ```yaml
-      - alert: QueueSaturation
-        expr: ai_agent_queue_depth > 0.8 * ai_agent_queue_capacity
-        for: 2m
-        labels:
-          severity: warning
-        annotations:
-          summary: AI Agent queue near capacity
+- alert: QueueSaturation
+  expr: ai_agent_queue_depth > 0.8 * ai_agent_queue_capacity
+  for: 2m
+  labels:
+    severity: warning
+  annotations:
+    summary: AI Agent queue near capacity
 ```
 
 ### High Latency
 
 ```yaml
-      - alert: HighLLMLatency
-        expr: histogram_quantile(0.95, rate(ai_agent_llm_latency_ms_bucket[5m])) > 30000
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: LLM P95 latency above 30 seconds
+- alert: HighLLMLatency
+  expr: histogram_quantile(0.95, rate(ai_agent_llm_latency_ms_bucket[5m])) > 30000
+  for: 5m
+  labels:
+    severity: warning
+  annotations:
+    summary: LLM P95 latency above 30 seconds
 ```
 
 ### Budget Alert
 
 ```yaml
-      - alert: HighHourlyCost
-        expr: rate(ai_agent_llm_cost_usd_total[1h]) * 3600 > 10
-        for: 15m
-        labels:
-          severity: warning
-        annotations:
-          summary: AI Agent cost exceeding $10/hour
+- alert: HighHourlyCost
+  expr: rate(ai_agent_llm_cost_usd_total[1h]) * 3600 > 10
+  for: 15m
+  labels:
+    severity: warning
+  annotations:
+    summary: AI Agent cost exceeding $10/hour
 ```
 
 ### Context Guard Frequent
 
 ```yaml
-      - alert: FrequentContextGuard
-        expr: rate(ai_agent_context_guard_events_total[5m]) > 0.5
-        for: 5m
-        labels:
-          severity: info
-        annotations:
-          summary: Context guard triggering frequently
+- alert: FrequentContextGuard
+  expr: rate(ai_agent_context_guard_events_total[5m]) > 0.5
+  for: 5m
+  labels:
+    severity: info
+  annotations:
+    summary: Context guard triggering frequently
 ```
 
 ---
@@ -449,6 +465,7 @@ groups:
 **Cause**: Prometheus exporter not enabled or wrong port.
 
 **Solution**:
+
 1. Verify flags: `--telemetry-prometheus-port 9464`
 2. Check binding: `--telemetry-prometheus-host 0.0.0.0`
 3. Test: `curl http://localhost:9464/metrics`
@@ -460,6 +477,7 @@ groups:
 **Cause**: Collector unreachable or wrong protocol.
 
 **Solution**:
+
 1. Verify collector is running: `curl http://collector:4317`
 2. Check endpoint protocol (gRPC vs HTTP)
 3. Check timeout: `--telemetry-otlp-timeout 5000`
@@ -472,6 +490,7 @@ groups:
 **Cause**: Labels not configured or not propagated.
 
 **Solution**: Add custom labels in config:
+
 ```json
 {
   "telemetry": {
@@ -490,6 +509,7 @@ groups:
 **Cause**: Too many unique label combinations (many agents/models).
 
 **Solution**:
+
 1. Reduce label cardinality
 2. Use recording rules to aggregate
 3. Drop high-cardinality labels at collector
@@ -501,6 +521,7 @@ groups:
 **Cause**: Sampling or export issue.
 
 **Solution**:
+
 1. Verify sampler: `--telemetry-trace-sampler always_on`
 2. Check OTLP endpoint
 3. Verify collector routing to trace backend

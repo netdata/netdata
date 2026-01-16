@@ -23,6 +23,7 @@ Structured logging system for monitoring and debugging AI Agent sessions.
 ## Overview
 
 AI Agent uses structured logging with:
+
 - **Severity levels**: VRB, WRN, ERR, TRC, THK, FIN
 - **Typed entries**: Each log includes turn, subturn, direction, type
 - **Multiple sinks**: Console, journald, OTLP export
@@ -39,14 +40,14 @@ ai-agent --agent test.ai "query" > response.txt 2> logs.txt
 
 ## Log Levels
 
-| Level | Code | Purpose | When Emitted |
-|-------|------|---------|--------------|
-| `VRB` | Verbose | Normal operations | With `--verbose` flag |
-| `WRN` | Warning | Recoverable issues | Non-fatal problems |
-| `ERR` | Error | Fatal failures | Session-stopping errors |
-| `TRC` | Trace | Debug data | With `--trace-*` flags |
-| `THK` | Thinking | Reasoning output | Extended thinking models |
-| `FIN` | Final | Session summary | End of every session |
+| Level | Code     | Purpose            | When Emitted             |
+| ----- | -------- | ------------------ | ------------------------ |
+| `VRB` | Verbose  | Normal operations  | With `--verbose` flag    |
+| `WRN` | Warning  | Recoverable issues | Non-fatal problems       |
+| `ERR` | Error    | Fatal failures     | Session-stopping errors  |
+| `TRC` | Trace    | Debug data         | With `--trace-*` flags   |
+| `THK` | Thinking | Reasoning output   | Extended thinking models |
+| `FIN` | Final    | Session summary    | End of every session     |
 
 ### Severity Examples
 
@@ -66,6 +67,7 @@ ai-agent --agent test.ai "query" > response.txt 2> logs.txt
 ### Console (stderr)
 
 Default output with TTY detection:
+
 - **TTY mode**: Colored output with ANSI codes
 - **Non-TTY mode**: Plain text (for piping/files)
 
@@ -106,10 +108,22 @@ ai-agent --agent test.ai \
 Interactive terminals show colored, formatted output:
 
 ```
-[VRB] [llm] res: openai/gpt-4o, 1523→456 tokens, 2341ms
-[WRN] ⚠ Tool timeout: mcp__github__search_code
-[ERR] ✗ LLM request failed: 429 rate limited
+VRB 0.0 → LLM main: openai/gpt-4o [tokens: in 1523, out 456, 2341ms]
+WRN 0.1 ← MCP main: github:search_code [523ms, timeout]
+ERR 0.0 → LLM main: 429 rate limited
 ```
+
+**Format**: `{severity} {turn}.{subturn} {direction} {kind} {agent}: {message}`
+
+Where:
+
+- `severity`: VRB/WRN/ERR/TRC/THK/FIN
+- `turn`: Turn number (0-indexed)
+- `subturn`: Tool call index within turn (0-indexed)
+- `direction`: → (request) or ← (response)
+- `kind`: LLM/MCP/RST/AGN/INT
+- `agent`: Agent identifier (main for top-level)
+- `message`: Log message with optional context
 
 **Color scheme**:
 | Severity | Color |
@@ -120,6 +134,8 @@ Interactive terminals show colored, formatted output:
 | TRC | Cyan |
 | THK | Purple |
 | FIN | Green |
+| LLM context (highlighting) | Blue |
+| Tool context (highlighting) | Green |
 
 ### Logfmt Format
 
@@ -164,29 +180,25 @@ ai-agent --agent test.ai --verbose "query"
 ### Verbose Output Includes
 
 **LLM Operations**:
+
 ```
-[llm] req: openai, gpt-4o, messages 3, 1523 chars
-[llm] res: input 1523, output 456, cached 0 tokens, tools 2, latency 2341 ms
+VRB 0.0 → LLM main: LLM response received [$0.003456, 2341ms, tokens: in 1523, out 456]
 ```
 
 **Tool Operations**:
+
 ```
-[mcp] req: 001 github, search_code
-[mcp] res: 001 github, search_code, latency 523 ms, size 12456 chars
+VRB 0.1 → MCP main: github:search_code [523ms, 12456 bytes]
 ```
 
 **Session Summary**:
+
 ```
-[fin] finally: llm requests 2 (tokens: 3046 in, 912 out), mcp requests 3
+FIN 0.0 → INT main: agent:fin
 ```
 
 **Turn Progress**:
-```
-[turn 1] starting
-[turn 1] llm: gpt-4o, 1523 input, 456 output tokens
-[turn 1] tools: 2 calls (search_code, get_file_contents)
-[turn 1] completed in 3452ms
-```
+Turns are indicated by the turn.subturn notation in the log prefix (e.g., `1.0`, `1.1`, `2.0`).
 
 ---
 
@@ -199,6 +211,7 @@ ai-agent --agent test.ai --trace-llm "query"
 ```
 
 Shows complete LLM protocol:
+
 - Request headers (Authorization redacted)
 - Request body (full JSON)
 - Response body (pretty-printed JSON)
@@ -211,6 +224,7 @@ ai-agent --agent test.ai --trace-mcp "query"
 ```
 
 Shows MCP protocol details:
+
 - Server initialization
 - `tools/list` discovery
 - `prompts/list` discovery
@@ -229,35 +243,51 @@ ai-agent --agent test.ai --trace-llm --trace-mcp "query"
 
 ### Session Lifecycle Events
 
-| Event ID | Description |
-|----------|-------------|
-| `agent:init` | Session initialized |
+| Event ID         | Description                     |
+| ---------------- | ------------------------------- |
+| `agent:init`     | Session initialized             |
 | `agent:settings` | Configuration summary (verbose) |
-| `agent:tools` | Available tools banner |
-| `agent:pricing` | Missing pricing warning |
-| `agent:start` | User prompt received |
-| `agent:fin` | Session finalized |
-| `agent:error` | Uncaught exception |
+| `agent:tools`    | Available tools banner          |
+| `agent:pricing`  | Missing pricing warning         |
+| `agent:start`    | User prompt received            |
+| `agent:fin`      | Session finalized               |
+| `agent:error`    | Uncaught exception              |
 
 ### Turn Events
 
-| Event ID | Description |
-|----------|-------------|
-| `agent:turn-start` | New LLM turn begins |
-| `agent:final-turn` | Final turn detected |
-| `agent:context` | Context guard triggered |
-| `{provider}:{model}` | LLM request/response |
+| Event ID             | Description             |
+| -------------------- | ----------------------- |
+| `agent:turn-start`   | New LLM turn begins     |
+| `agent:final-turn`   | Final turn detected     |
+| `agent:context`      | Context guard triggered |
+| `{provider}:{model}` | LLM request/response    |
 
 ### Exit Events
 
-| Event ID | Description |
-|----------|-------------|
-| `agent:EXIT-FINAL-ANSWER` | Normal completion |
-| `agent:EXIT-MAX-TURNS-WITH-RESPONSE` | Turn limit with output |
-| `agent:EXIT-TOKEN-LIMIT` | Context window exhausted |
-| `agent:EXIT-AUTH-FAILURE` | Authentication error |
-| `agent:EXIT-QUOTA-EXCEEDED` | Rate/quota limit |
-| `agent:EXIT-TOOL-TIMEOUT` | Tool execution timeout |
+| Event ID                             | Description                        |
+| ------------------------------------ | ---------------------------------- |
+| `agent:EXIT-FINAL-ANSWER`            | Normal completion                  |
+| `agent:EXIT-MAX-TURNS-WITH-RESPONSE` | Turn limit with output             |
+| `agent:EXIT-USER-STOP`               | User initiated stop                |
+| `agent:EXIT-TOKEN-LIMIT`             | Context window exhausted           |
+| `agent:EXIT-AUTH-FAILURE`            | Authentication error               |
+| `agent:EXIT-QUOTA-EXCEEDED`          | Rate/quota limit                   |
+| `agent:EXIT-MODEL-ERROR`             | Model error                        |
+| `agent:EXIT-NO-LLM-RESPONSE`         | No response from LLM               |
+| `agent:EXIT-EMPTY-RESPONSE`          | Empty LLM response                 |
+| `agent:EXIT-TOOL-FAILURE`            | Tool execution failure             |
+| `agent:EXIT-MCP-CONNECTION-LOST`     | MCP server connection lost         |
+| `agent:EXIT-TOOL-NOT-AVAILABLE`      | Tool not available                 |
+| `agent:EXIT-TOOL-TIMEOUT`            | Tool execution timeout             |
+| `agent:EXIT-NO-PROVIDERS`            | No providers configured            |
+| `agent:EXIT-INVALID-MODEL`           | Invalid model configuration        |
+| `agent:EXIT-MCP-INIT-FAILED`         | MCP initialization failed          |
+| `agent:EXIT-INACTIVITY-TIMEOUT`      | Inactivity timeout                 |
+| `agent:EXIT-MAX-RETRIES`             | Maximum retries exceeded           |
+| `agent:EXIT-MAX-TURNS-NO-RESPONSE`   | Max turns reached without response |
+| `agent:EXIT-UNCAUGHT-EXCEPTION`      | Uncaught exception                 |
+| `agent:EXIT-SIGNAL-RECEIVED`         | Process signal received            |
+| `agent:EXIT-UNKNOWN`                 | Unknown error                      |
 
 ---
 
@@ -267,34 +297,34 @@ ai-agent --agent test.ai --trace-llm --trace-mcp "query"
 
 ```bash
 # Count errors
-grep -c '\[ERR\]' logs.txt
+grep -c '^ERR ' logs.txt
 
 # Count warnings
-grep -c '\[WRN\]' logs.txt
+grep -c '^WRN ' logs.txt
 ```
 
 ### Extract Unique Warnings
 
 ```bash
-grep '\[WRN\]' logs.txt | sort | uniq -c | sort -rn
+grep '^WRN ' logs.txt | sort | uniq -c | sort -rn
 ```
 
 ### Find Slow Operations
 
 ```bash
-grep 'latency' logs.txt | awk -F'latency ' '{print $2}' | sort -rn | head -10
+grep -E '\d+ms' logs.txt | awk '{for(i=1;i<=NF;i++) if($i ~ /ms$/) print $i}' | sort -V | head -10
 ```
 
 ### Extract Turn Summaries
 
 ```bash
-grep '\[turn' logs.txt | grep 'completed'
+grep 'agent:fin' logs.txt
 ```
 
-### Filter by Session ID
+### Filter by Transaction ID
 
 ```bash
-grep 'txnId=abc123' logs.txt
+grep 'txn_id=abc123' logs.txt
 ```
 
 ---
@@ -303,37 +333,52 @@ grep 'txnId=abc123' logs.txt
 
 ### CLI Flags
 
-| Flag | Description |
-|------|-------------|
-| `--verbose` | Enable verbose logging |
-| `--trace-llm` | Enable LLM protocol tracing |
-| `--trace-mcp` | Enable MCP protocol tracing |
-| `--telemetry-logging-otlp-endpoint URL` | OTLP log export endpoint |
+| Flag                                    | Description                 |
+| --------------------------------------- | --------------------------- |
+| `--verbose`                             | Enable verbose logging      |
+| `--trace-llm`                           | Enable LLM protocol tracing |
+| `--trace-mcp`                           | Enable MCP protocol tracing |
+| `--telemetry-logging-otlp-endpoint URL` | OTLP log export endpoint    |
 
 ### Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `DEBUG=true` | Enable AI SDK debug output |
+| Variable             | Description                    |
+| -------------------- | ------------------------------ |
+| `DEBUG=true`         | Enable AI SDK debug output     |
 | `CONTEXT_DEBUG=true` | Enable context guard debugging |
 
 ### LogEntry Structure
 
 ```typescript
 interface LogEntry {
-  timestamp: number;              // Unix timestamp (ms)
-  severity: 'VRB' | 'WRN' | 'ERR' | 'TRC' | 'THK' | 'FIN';
-  turn: number;                   // Turn index
-  subturn: number;                // Tool call index within turn
-  path?: string;                  // Hierarchical path (e.g., "1.2.1")
-  direction: 'request' | 'response';
-  type: 'llm' | 'tool';
-  toolKind?: 'mcp' | 'rest' | 'agent' | 'command';
-  remoteIdentifier: string;       // "provider:model" or "namespace:tool"
-  fatal: boolean;                 // Caused agent stop
-  message: string;                // Human readable
-  details?: Record<string, any>;  // Structured metadata
-  stack?: string;                 // Stack trace (WRN/ERR only)
+  timestamp: number; // Unix timestamp (ms)
+  severity: "VRB" | "WRN" | "ERR" | "TRC" | "THK" | "FIN";
+  turn: number; // Sequential turn ID
+  subturn: number; // Sequential tool ID within turn
+  path?: string; // Stable hierarchical path label (e.g., "1.2.1")
+  direction: "request" | "response";
+  type: "llm" | "tool";
+  toolKind?: "mcp" | "rest" | "agent" | "command" | "internal" | "subagent";
+  remoteIdentifier: string; // "provider:model" or "protocol:namespace:tool"
+  fatal: boolean; // True if this caused agent to stop
+  message: string; // Human readable message
+  bold?: boolean; // Optional emphasis hint for TTY renderers
+  headendId?: string; // Optional headend identifier for multi-headend logging
+  agentId?: string; // Optional tracing field (multi-agent)
+  callPath?: string; // Optional tracing field (multi-agent)
+  txnId?: string; // Optional tracing field (multi-agent)
+  parentTxnId?: string; // Optional tracing field (multi-agent)
+  originTxnId?: string; // Optional tracing field (multi-agent)
+  agentPath?: string; // Optional tracing field (multi-agent)
+  turnPath?: string; // Optional tracing field (multi-agent)
+  max_turns?: number; // Optional planning field for UIs
+  max_subturns?: number; // Optional planning field for UIs
+  details?: Record<string, LogDetailValue>; // Optional structured details
+  stack?: string; // Optional captured stack trace (WRN/ERR only)
+  llmRequestPayload?: LogPayload; // Optional raw payload captured
+  llmResponsePayload?: LogPayload; // Optional raw payload captured
+  toolRequestPayload?: LogPayload; // Optional raw payload captured
+  toolResponsePayload?: LogPayload; // Optional raw payload captured
 }
 ```
 
@@ -346,6 +391,7 @@ interface LogEntry {
 **Cause**: Logs go to stderr, not stdout.
 
 **Solution**:
+
 ```bash
 # View stderr in terminal
 ai-agent --agent test.ai "query"
@@ -361,6 +407,7 @@ ai-agent --agent test.ai "query" 2>&1 | tee output.log
 **Cause**: `--verbose` flag not set.
 
 **Solution**:
+
 ```bash
 ai-agent --agent test.ai --verbose "query"
 ```
@@ -372,6 +419,7 @@ ai-agent --agent test.ai --verbose "query"
 **Cause**: Output is not a TTY (piped or redirected).
 
 **Solution**: Colors are intentionally disabled for non-TTY output. Use `less -R` to view colored output:
+
 ```bash
 ai-agent --agent test.ai --verbose "query" 2>&1 | less -R
 ```
@@ -383,6 +431,7 @@ ai-agent --agent test.ai --verbose "query" 2>&1 | less -R
 **Cause**: Long messages are truncated for readability.
 
 **Solution**: Full content is preserved in session snapshots:
+
 ```bash
 zcat ~/.ai-agent/sessions/SESSION_ID.json.gz | jq '.opTree.turns[].ops[].logs[]'
 ```
@@ -402,6 +451,7 @@ zcat ~/.ai-agent/sessions/SESSION_ID.json.gz | jq '.opTree.turns[].ops[].logs[]'
 **Cause**: systemd socket not available or permissions issue.
 
 **Solution**:
+
 1. Verify systemd is running: `systemctl status`
 2. Check journal socket: `ls -la /run/systemd/journal/`
 3. Verify permissions: `journalctl --verify`

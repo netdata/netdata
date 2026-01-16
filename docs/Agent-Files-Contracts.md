@@ -21,6 +21,7 @@ Configure structured input and output for agents using JSON schemas. Essential f
 ## Overview
 
 Contracts define:
+
 - **Output format**: What format the agent returns (`json`, `markdown`, `text`)
 - **Output schema**: JSON Schema for structured JSON output
 - **Input schema**: JSON Schema for sub-agent input validation
@@ -28,6 +29,7 @@ Contracts define:
 **User questions answered**: "How do I get structured output?" / "How do I validate input?"
 
 **Why use contracts?**
+
 - Predictable, parseable output
 - Type-safe integration with other systems
 - Clear API for sub-agents
@@ -59,7 +61,6 @@ output:
       - name
       - summary
 ---
-
 Analyze the company and return structured data.
 ```
 
@@ -102,20 +103,20 @@ output:
 
 ### output
 
-| Property | Value |
-|----------|-------|
-| Type | `object` |
-| Default | Undefined (markdown) |
+| Property | Value     |
+| -------- | --------- |
+| Type     | `object`  |
+| Default  | Undefined |
 
 **Description**: Output specification. Defines the expected output format and schema.
 
 **Sub-keys**:
 
-| Sub-key | Type | Required | Description |
-|---------|------|----------|-------------|
-| `format` | `'json'`, `'markdown'`, or `'text'` | Yes | Output format |
-| `schema` | `object` | For `json` | Inline JSON Schema |
-| `schemaRef` | `string` | Alternative | Path to external schema file |
+| Sub-key     | Type                                | Required    | Description                  |
+| ----------- | ----------------------------------- | ----------- | ---------------------------- |
+| `format`    | `'json'`, `'markdown'`, or `'text'` | Yes         | Output format                |
+| `schema`    | `object`                            | Optional    | Inline JSON Schema           |
+| `schemaRef` | `string`                            | Alternative | Path to external schema file |
 
 ---
 
@@ -123,32 +124,33 @@ output:
 
 **Valid values**: `json`, `markdown`, `text`
 
-| Format | Description | Use Case |
-|--------|-------------|----------|
-| `json` | Structured JSON output | APIs, data processing |
-| `markdown` | Formatted markdown | Human-readable reports |
-| `text` | Plain text | Simple responses |
+| Format     | Description            | Use Case               |
+| ---------- | ---------------------- | ---------------------- |
+| `json`     | Structured JSON output | APIs, data processing  |
+| `markdown` | Formatted markdown     | Human-readable reports |
+| `text`     | Plain text             | Simple responses       |
 
 **Example**:
+
 ```yaml
 ---
 output:
-  format: json      # Structured data
+  format: json # Structured data
 ---
-
----
-output:
-  format: markdown  # Formatted text
----
-
 ---
 output:
-  format: text      # Plain text
+  format: markdown # Formatted text
+---
+---
+output:
+  format: text # Plain text
 ---
 ```
 
 **Notes**:
-- `format: json` requires a schema (inline or via `schemaRef`)
+
+- `format: json` can optionally include a schema (inline or via `schemaRef`) for validation and tool documentation
+- Schema is required when format is `json` when calling via MCP headend
 - The format affects the `${FORMAT}` variable in prompts
 - Headends use format to determine response type
 
@@ -161,6 +163,7 @@ output:
 **Description**: Inline JSON Schema defining the structure of JSON output.
 
 **Example**:
+
 ```yaml
 ---
 output:
@@ -191,6 +194,7 @@ output:
 ```
 
 **Notes**:
+
 - Schema is used for validation
 - Schema is shown in tool documentation for sub-agents
 - Agent is instructed to match the schema
@@ -204,6 +208,7 @@ output:
 **Description**: Path to an external JSON or YAML schema file.
 
 **Example**:
+
 ```yaml
 ---
 output:
@@ -213,6 +218,7 @@ output:
 ```
 
 **Schema file** (`./schemas/report.json`):
+
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -229,6 +235,7 @@ output:
 ```
 
 **Path resolution**:
+
 - Relative paths resolve from the agent file's directory
 - Absolute paths are used as-is
 - Supports `.json` and `.yaml`/`.yml` files
@@ -239,20 +246,20 @@ output:
 
 ### input
 
-| Property | Value |
-|----------|-------|
-| Type | `object` |
-| Default | `{ format: 'text' }` |
+| Property | Value                                                   |
+| -------- | ------------------------------------------------------- |
+| Type     | `object`                                                |
+| Default  | `{ format: 'json', schema: DEFAULT_TOOL_INPUT_SCHEMA }` |
 
 **Description**: Input specification for sub-agent tools. Defines how parent agents should provide input.
 
 **Sub-keys**:
 
-| Sub-key | Type | Required | Description |
-|---------|------|----------|-------------|
-| `format` | `'text'` or `'json'` | No | Input format |
-| `schema` | `object` | For `json` | Inline JSON Schema |
-| `schemaRef` | `string` | Alternative | Path to external schema file |
+| Sub-key     | Type                 | Required    | Description                  |
+| ----------- | -------------------- | ----------- | ---------------------------- |
+| `format`    | `'text'` or `'json'` | No          | Input format                 |
+| `schema`    | `object`             | Optional    | Inline JSON Schema           |
+| `schemaRef` | `string`             | Alternative | Path to external schema file |
 
 ---
 
@@ -260,19 +267,19 @@ output:
 
 **Valid values**: `text`, `json`
 
-| Format | Description | Parent Call |
-|--------|-------------|-------------|
+| Format | Description           | Parent Call           |
+| ------ | --------------------- | --------------------- |
 | `text` | Free-form text prompt | `{ "prompt": "..." }` |
 | `json` | Structured JSON input | Schema-defined fields |
 
 **Example**:
+
 ```yaml
 ---
-# Text input (default)
+# Text input
 input:
   format: text
 ---
-
 ---
 # JSON input with schema
 input:
@@ -296,6 +303,7 @@ input:
 **Description**: Inline JSON Schema defining expected input structure.
 
 **Example**:
+
 ```yaml
 ---
 description: Search tool
@@ -325,6 +333,7 @@ input:
 ```
 
 **Parent agent calls with**:
+
 ```json
 {
   "tool": "agent__searcher",
@@ -339,6 +348,7 @@ input:
 ```
 
 **Notes**:
+
 - Invalid inputs return as tool errors to parent
 - Schema generates tool input schema for parent
 - Descriptions help parent understand usage
@@ -352,6 +362,7 @@ input:
 **Description**: Path to an external JSON or YAML schema file for input.
 
 **Example**:
+
 ```yaml
 ---
 input:
@@ -496,7 +507,7 @@ properties:
   optional_field:
     type: string
 required:
-  - required_field   # Only this is required
+  - required_field # Only this is required
 ```
 
 ---
@@ -506,6 +517,7 @@ required:
 ### JSON Schema File
 
 `schemas/report.json`:
+
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -539,6 +551,7 @@ required:
 ```
 
 **Usage**:
+
 ```yaml
 ---
 output:
@@ -550,6 +563,7 @@ output:
 ### YAML Schema File
 
 `schemas/report.yaml`:
+
 ```yaml
 $schema: https://json-schema.org/draft/2020-12/schema
 type: object
@@ -575,6 +589,7 @@ required:
 ```
 
 **Usage**:
+
 ```yaml
 ---
 output:
@@ -588,6 +603,7 @@ output:
 Multiple agents can use the same schema:
 
 **Agent A**:
+
 ```yaml
 ---
 output:
@@ -597,6 +613,7 @@ output:
 ```
 
 **Agent B**:
+
 ```yaml
 ---
 output:
@@ -630,7 +647,6 @@ output:
     required:
       - name
 ---
-
 Look up the company and return basic information.
 ```
 
@@ -674,7 +690,6 @@ output:
       - analysis_type
       - results
 ---
-
 Analyze the provided data and return insights.
 ```
 
@@ -757,7 +772,6 @@ output:
   format: json
   schemaRef: ./schemas/research-report.json
 ---
-
 Research the topic and generate a comprehensive report.
 ```
 
@@ -771,7 +785,6 @@ models:
 output:
   format: markdown
 ---
-
 Write a blog post on the given topic.
 ```
 
@@ -784,11 +797,13 @@ Write a blog post on the given topic.
 **Problem**: Agent output fails schema validation.
 
 **Causes**:
+
 - Agent doesn't follow schema
 - Schema too strict
 - Missing required fields
 
 **Solutions**:
+
 1. Improve prompt to emphasize schema:
    ```
    You MUST return JSON matching this exact schema:
@@ -805,6 +820,7 @@ Write a blog post on the given topic.
 **Cause**: Input doesn't match sub-agent's `input.schema`.
 
 **Solution**: Check schema requirements:
+
 ```yaml
 # Sub-agent expects:
 input:
@@ -827,6 +843,7 @@ input:
 **Cause**: Path incorrect or file missing.
 
 **Solution**: Check path resolution:
+
 ```yaml
 # Relative to agent file directory
 schemaRef: ./schemas/my-schema.json
@@ -840,11 +857,13 @@ schemaRef: /path/to/schemas/my-schema.json
 **Problem**: Schema itself is malformed.
 
 **Causes**:
+
 - YAML/JSON syntax error
 - Invalid schema keyword
 - Missing required schema fields
 
 **Solution**: Validate schema:
+
 1. Check YAML/JSON syntax
 2. Verify `type` is specified
 3. Check property definitions
@@ -856,6 +875,7 @@ schemaRef: /path/to/schemas/my-schema.json
 **Cause**: Agent returned JSON as escaped string.
 
 **Solution**: Ensure prompt is clear:
+
 ```
 Return a JSON object (not a string containing JSON):
 {
@@ -870,6 +890,7 @@ Return a JSON object (not a string containing JSON):
 **Cause**: Parent doesn't see input schema.
 
 **Solution**: Document in parent prompt:
+
 ```yaml
 ---
 description: Coordinator

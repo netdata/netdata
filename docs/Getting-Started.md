@@ -31,12 +31,12 @@ This chapter covers everything you need to start using ai-agent:
 
 ## Minimum Requirements
 
-| Requirement | Minimum | Recommended |
-|-------------|---------|-------------|
-| **Node.js** | 20+ | 22 LTS |
-| **npm** | 10+ | Latest |
-| **OS** | Linux, macOS, Windows (WSL) | Linux or macOS |
-| **Memory** | 512 MB | 1 GB+ |
+| Requirement | Minimum                     | Recommended    |
+| ----------- | --------------------------- | -------------- |
+| **Node.js** | 20+                         | 22 LTS         |
+| **npm**     | 10+                         | Latest         |
+| **OS**      | Linux, macOS, Windows (WSL) | Linux or macOS |
+| **Memory**  | 512 MB                      | 1 GB+          |
 
 > **Note:** Windows native support works but WSL is recommended for better compatibility with MCP servers.
 
@@ -76,7 +76,7 @@ ai-agent --version
 **Expected output:**
 
 ```
-ai-agent v1.0.0
+ai-agent v0.0.0.698
 ```
 
 ```bash
@@ -87,16 +87,16 @@ ai-agent --help
 **Expected output:**
 
 ```
-Usage: ai-agent [options] [prompt]
+Usage: ai-agent [options] <system-prompt> <user-prompt>
 
 AI Agent - Run intelligent agents powered by LLMs
 
 Options:
-  -a, --agent <file>     Agent definition file (.ai)
-  -c, --config <file>    Configuration file path
+  --agent <path>          Agent definition file (.ai)
+  --config               Configuration file path
   --dry-run              Validate without calling LLM
   --verbose              Enable verbose logging
-  --version              Show version number
+  -V, --version         Show version number
   -h, --help             Show this help message
   ...
 ```
@@ -156,12 +156,12 @@ and have a pleasant conversation. How can I assist you today?
 
 ## Chapter Pages
 
-| Page | Description | Time |
-|------|-------------|------|
-| [Installation](Getting-Started-Installation) | Prerequisites, installation methods, verification | 5 min |
-| [Quick Start](Getting-Started-Quick-Start) | Your first agent in 5 minutes | 5 min |
-| [First Agent Tutorial](Getting-Started-First-Agent) | Build a real-world research agent with tools | 15 min |
-| [Environment Variables](Getting-Started-Environment-Variables) | All environment configuration options | Reference |
+| Page                                                           | Description                                       | Time      |
+| -------------------------------------------------------------- | ------------------------------------------------- | --------- |
+| [Installation](Getting-Started-Installation)                   | Prerequisites, installation methods, verification | 5 min     |
+| [Quick Start](Getting-Started-Quick-Start)                     | Your first agent in 5 minutes                     | 5 min     |
+| [First Agent Tutorial](Getting-Started-First-Agent)            | Build a real-world research agent with tools      | 15 min    |
+| [Environment Variables](Getting-Started-Environment-Variables) | All environment configuration options             | Reference |
 
 **Recommended path for new users:**
 

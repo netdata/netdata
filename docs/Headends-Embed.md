@@ -26,12 +26,14 @@ Deploy agents as embeddable chat widgets for public websites with SSE streaming 
 ## Overview
 
 The Embed headend provides a public HTTP API designed for website chat widgets. Use it when:
+
 - Building customer support chat on your website
 - Creating public-facing Q&A systems
 - Embedding AI assistance in web applications
 - Need stateless multi-turn conversations
 
 **Key features**:
+
 - Server-Sent Events (SSE) streaming
 - Public JavaScript client library
 - Stable client UUIDs for follow-up questions
@@ -59,8 +61,8 @@ curl -X POST http://localhost:8090/v1/chat \
 <script src="http://localhost:8090/ai-agent-public.js"></script>
 <script>
   AIAgent.init({
-    endpoint: 'http://localhost:8090',
-    agent: 'chat'
+    endpoint: "http://localhost:8090",
+    agent: "chat",
   });
 </script>
 ```
@@ -71,30 +73,32 @@ curl -X POST http://localhost:8090/v1/chat \
 
 ### --embed
 
-| Property | Value |
-|----------|-------|
-| Type | `number` |
-| Required | Yes (to enable this headend) |
-| Repeatable | Yes |
+| Property   | Value                        |
+| ---------- | ---------------------------- |
+| Type       | `number`                     |
+| Required   | Yes (to enable this headend) |
+| Repeatable | Yes                          |
 
 **Description**: HTTP port for embed API. Can be specified multiple times.
 
 **Example**:
+
 ```bash
 ai-agent --agent chat.ai --embed 8090
 ```
 
 ### --embed-concurrency
 
-| Property | Value |
-|----------|-------|
-| Type | `number` |
-| Default | `10` |
+| Property     | Value        |
+| ------------ | ------------ |
+| Type         | `number`     |
+| Default      | `10`         |
 | Valid values | `1` to `100` |
 
 **Description**: Maximum concurrent chat sessions.
 
 **Example**:
+
 ```bash
 ai-agent --agent chat.ai --embed 8090 --embed-concurrency 20
 ```
@@ -108,6 +112,7 @@ ai-agent --agent chat.ai --embed 8090 --embed-concurrency 20
 Health check endpoint.
 
 **Response**: `200 OK`
+
 ```json
 {
   "status": "ok"
@@ -136,8 +141,8 @@ Prometheus-format metrics when enabled.
   "agentId": "support",
   "clientId": "optional-uuid",
   "history": [
-    {"role": "user", "content": "Previous question"},
-    {"role": "assistant", "content": "Previous answer"}
+    { "role": "user", "content": "Previous question" },
+    { "role": "assistant", "content": "Previous answer" }
   ],
   "format": "markdown"
 }
@@ -145,21 +150,21 @@ Prometheus-format metrics when enabled.
 
 ### Request Fields
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `message` | `string` | Yes | User's message |
-| `agentId` | `string` | No | Agent to use (default from config) |
-| `clientId` | `string` | No | Stable client identifier |
-| `history` | `array` | No | Previous conversation turns |
-| `format` | `string` | No | Output format: `markdown`, `json`, `text` |
+| Field      | Type     | Required | Description                                                                                          |
+| ---------- | -------- | -------- | ---------------------------------------------------------------------------------------------------- |
+| `message`  | `string` | Yes      | User's message                                                                                       |
+| `agentId`  | `string` | No       | Agent to use (default from config)                                                                   |
+| `clientId` | `string` | No       | Stable client identifier                                                                             |
+| `history`  | `array`  | No       | Previous conversation turns                                                                          |
+| `format`   | `string` | No       | Output format: `markdown`, `markdown+mermaid`, `slack-block-kit`, `json`, `tty`, `pipe`, `sub-agent` |
 
 ### History Format
 
 ```json
 [
-  {"role": "user", "content": "What is X?"},
-  {"role": "assistant", "content": "X is..."},
-  {"role": "user", "content": "Tell me more"}
+  { "role": "user", "content": "What is X?" },
+  { "role": "assistant", "content": "X is..." },
+  { "role": "user", "content": "Tell me more" }
 ]
 ```
 
@@ -254,9 +259,9 @@ The public client is served at `/ai-agent-public.js`.
 <script src="http://localhost:8090/ai-agent-public.js"></script>
 <script>
   AIAgent.create({
-    endpoint: 'http://localhost:8090',
-    agent: 'support',
-    container: '#chat-widget'
+    endpoint: "http://localhost:8090",
+    agent: "support",
+    container: "#chat-widget",
   });
 </script>
 ```
@@ -265,20 +270,20 @@ The public client is served at `/ai-agent-public.js`.
 
 ```javascript
 const chat = AIAgent.init({
-  endpoint: 'http://localhost:8090',
-  agent: 'support',
+  endpoint: "http://localhost:8090",
+  agent: "support",
   onStatus: (status) => {
-    console.log('Status:', status.message);
+    console.log("Status:", status.message);
   },
   onChunk: (chunk) => {
-    document.getElementById('output').append(chunk);
+    document.getElementById("output").append(chunk);
   },
   onDone: (result) => {
-    console.log('Complete:', result);
+    console.log("Complete:", result);
   },
   onError: (error) => {
-    console.error('Error:', error.message);
-  }
+    console.error("Error:", error.message);
+  },
 });
 ```
 
@@ -286,31 +291,31 @@ const chat = AIAgent.init({
 
 ```javascript
 async function chat(message) {
-  const response = await fetch('http://localhost:8090/v1/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  const response = await fetch("http://localhost:8090/v1/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      agentId: 'support',
-      message: message
-    })
+      agentId: "support",
+      message: message,
+    }),
   });
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = '';
+  let buffer = "";
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
 
     buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n\n');
-    buffer = lines.pop() || '';
+    const lines = buffer.split("\n\n");
+    buffer = lines.pop() || "";
 
     for (const line of lines) {
-      if (line.startsWith('event:')) {
-        const eventType = line.split(':')[1].trim();
-        const dataLine = lines.find(l => l.startsWith('data:'));
+      if (line.startsWith("event:")) {
+        const eventType = line.split(":")[1].trim();
+        const dataLine = lines.find((l) => l.startsWith("data:"));
         if (dataLine) {
           const data = JSON.parse(dataLine.substring(5));
           console.log(eventType, data);
@@ -369,15 +374,15 @@ In `.ai-agent.json`:
 
 ### Configuration Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `defaultAgent` | `string` | First registered | Default agent when not specified |
-| `corsOrigins` | `array` | `[]` | Allowed origins (glob patterns) |
-| `rateLimit.enabled` | `boolean` | `true` | Enable rate limiting |
-| `rateLimit.requestsPerMinute` | `number` | `10` | Default rate limit |
-| `rateLimit.burstSize` | `number` | `5` | Burst allowance |
-| `metrics.enabled` | `boolean` | `false` | Enable metrics endpoint |
-| `metrics.path` | `string` | `/metrics` | Metrics endpoint path |
+| Option                        | Type      | Default                       | Description                                         |
+| ----------------------------- | --------- | ----------------------------- | --------------------------------------------------- |
+| `defaultAgent`                | `string`  | First registered              | Default agent when not specified                    |
+| `corsOrigins`                 | `array`   | `[]`                          | Allowed origins (glob patterns)                     |
+| `rateLimit.enabled`           | `boolean` | `false` (disabled by default) | Enable rate limiting (requires `requestsPerMinute`) |
+| `rateLimit.requestsPerMinute` | `number`  | `10`                          | Default rate limit                                  |
+| `rateLimit.burstSize`         | `number`  | `0`                           | Burst allowance                                     |
+| `metrics.enabled`             | `boolean` | `true`                        | Enable metrics endpoint                             |
+| `metrics.path`                | `string`  | `/metrics`                    | Metrics endpoint path                               |
 
 ---
 
@@ -497,9 +502,9 @@ Conversations are persisted under `sessionsDir/embed-conversations/`:
       "turn": 1,
       "ts": "2026-01-16T12:30:00.000Z",
       "entries": [
-        {"role": "user", "content": "How do I..."},
-        {"role": "status", "content": "in-progress | Searching..."},
-        {"role": "assistant", "content": "Here is how..."}
+        { "role": "user", "content": "How do I..." },
+        { "role": "status", "content": "in-progress | Searching..." },
+        { "role": "assistant", "content": "Here is how..." }
       ]
     }
   ]
@@ -515,11 +520,7 @@ Control which domains can access the embed API:
 ```json
 {
   "embed": {
-    "corsOrigins": [
-      "*.example.com",
-      "localhost:*",
-      "https://specific-site.com"
-    ]
+    "corsOrigins": ["*.example.com", "localhost:*", "https://specific-site.com"]
   }
 }
 ```
@@ -549,6 +550,7 @@ Access-Control-Allow-Headers: Content-Type, Authorization, X-Netdata-Agent-GUID
 **Cause**: Origin not in `corsOrigins` list.
 
 **Solution**: Add your domain to `embed.corsOrigins`:
+
 ```json
 {
   "embed": {
@@ -564,6 +566,7 @@ Access-Control-Allow-Headers: Content-Type, Authorization, X-Netdata-Agent-GUID
 **Cause**: Too many requests from same origin/IP/GUID.
 
 **Solutions**:
+
 1. Increase rate limits in config
 2. Configure higher tier for your origin
 3. Add authentication tokens for higher limits
@@ -575,6 +578,7 @@ Access-Control-Allow-Headers: Content-Type, Authorization, X-Netdata-Agent-GUID
 **Cause**: `agentId` doesn't match registered agent.
 
 **Solutions**:
+
 1. Check agent filename (without `.ai`)
 2. Configure `defaultAgent` in embed config
 3. Verify agent was loaded with `--agent`
@@ -584,11 +588,13 @@ Access-Control-Allow-Headers: Content-Type, Authorization, X-Netdata-Agent-GUID
 **Symptom**: Stream ends unexpectedly.
 
 **Possible causes**:
+
 1. Proxy/load balancer timeout
 2. Client disconnect
 3. Server error
 
 **Solutions**:
+
 1. Configure proxy for long-lived connections
 2. Check browser network tab for details
 3. Review server logs for errors
@@ -600,6 +606,7 @@ Access-Control-Allow-Headers: Content-Type, Authorization, X-Netdata-Agent-GUID
 **Cause**: Script not loaded.
 
 **Solution**: Verify script URL is correct and accessible:
+
 ```html
 <script src="http://your-server:8090/ai-agent-public.js"></script>
 ```

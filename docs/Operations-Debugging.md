@@ -42,12 +42,14 @@ ai-agent --agent myagent.ai --dry-run
 ```
 
 **What to check**:
+
 - Frontmatter parses without errors
 - Model chain resolves correctly
 - Tools are discovered and listed
 - No missing environment variables
 
 **Example output**:
+
 ```
 Configuration valid.
 Models: openai/gpt-4o -> anthropic/claude-3-haiku (fallback)
@@ -65,12 +67,14 @@ ai-agent --agent myagent.ai --verbose "your query here"
 ```
 
 **Verbose output shows**:
+
 - LLM request/response summaries
 - Tool call timing and sizes
 - Token counts per turn
 - Turn progression
 
 **Example verbose output**:
+
 ```
 [llm] req: openai, gpt-4o, messages 3, 1523 chars
 [llm] res: input 1523, output 456, cached 0 tokens, tools 2, latency 2341 ms
@@ -90,13 +94,13 @@ ai-agent --agent myagent.ai "query"
 echo "Exit code: $?"
 ```
 
-| Code | Meaning | Action |
-|------|---------|--------|
-| 0 | Success | Agent completed normally |
-| 1 | Configuration Error | Check config file and frontmatter |
-| 2 | LLM Error | Check provider credentials and status |
-| 3 | Tool Error | Check MCP server configuration |
-| 4 | CLI Error | Check command line arguments |
+| Code | Meaning             | Action                                |
+| ---- | ------------------- | ------------------------------------- |
+| 0    | Success             | Agent completed normally              |
+| 1    | Configuration Error | Check config file and frontmatter     |
+| 2    | LLM Error           | Check provider credentials and status |
+| 3    | Tool Error          | Check MCP server configuration        |
+| 4    | CLI Error           | Check command line arguments          |
 
 See [Exit Codes](Operations-Exit-Codes) for detailed reference.
 
@@ -125,12 +129,12 @@ grep -o '\[WRN\]\|\[ERR\]' debug.log | sort | uniq -c
 
 ### Log Levels
 
-| Level | Meaning | Action |
-|-------|---------|--------|
-| `VRB` | Verbose info | Normal operation (with --verbose) |
-| `WRN` | Warning | Review but may not be fatal |
-| `ERR` | Error | Investigate immediately |
-| `TRC` | Trace | Protocol details (with --trace-*) |
+| Level | Meaning      | Action                             |
+| ----- | ------------ | ---------------------------------- |
+| `VRB` | Verbose info | Normal operation (with --verbose)  |
+| `WRN` | Warning      | Review but may not be fatal        |
+| `ERR` | Error        | Investigate immediately            |
+| `TRC` | Trace        | Protocol details (with --trace-\*) |
 
 ---
 
@@ -187,6 +191,7 @@ ai-agent --agent myagent.ai --trace-llm "query"
 ```
 
 Shows:
+
 - Full request headers (auth redacted)
 - Complete request body JSON
 - Response body (pretty-printed)
@@ -199,6 +204,7 @@ ai-agent --agent myagent.ai --trace-mcp "query"
 ```
 
 Shows:
+
 - MCP server initialization
 - Tool discovery (`tools/list`)
 - Tool call payloads and responses
@@ -219,18 +225,21 @@ ai-agent --agent myagent.ai --trace-llm --trace-mcp "query" 2> full-trace.log
 **Symptoms**: Agent runs but produces no output and doesn't complete.
 
 **Debug**:
+
 ```bash
 timeout 60 ai-agent --agent myagent.ai --verbose "query"
 ```
 
 **Common causes**:
+
 - Tool waiting for input (interactive tool)
 - Infinite loop (check maxTurns setting)
 - Network timeout to provider
 
 **Solutions**:
-- Add `--llm-timeout 60000` to limit LLM call time
-- Add `--tool-timeout 30000` to limit tool execution
+
+- Add `--llm-timeout-ms 60000` to limit LLM call time
+- Add `--tool-timeout-ms 30000` to limit tool execution
 - Set `maxTurns: 10` in frontmatter
 
 ---
@@ -240,17 +249,20 @@ timeout 60 ai-agent --agent myagent.ai --verbose "query"
 **Symptoms**: Exit code 0 but stdout is empty.
 
 **Debug**:
+
 ```bash
 # Check for final report in snapshot
 zcat "$SNAPSHOT" | jq '.opTree.turns[-1].ops[] | select(.kind == "final" or .attributes.name | test("final_report"))'
 ```
 
 **Common causes**:
+
 - LLM returned empty content
 - Output format mismatch (expecting JSON, got text)
 - Schema validation failure
 
 **Solutions**:
+
 - Check `output` schema in frontmatter
 - Verify expected output format
 - Review LLM response in snapshot
@@ -259,19 +271,22 @@ zcat "$SNAPSHOT" | jq '.opTree.turns[-1].ops[] | select(.kind == "final" or .att
 
 ### Tool Not Found
 
-**Error**: `ERR: Tool not found: mcp__server__toolname`
+**Error**: `unknown_tool: mcp__server__toolname`
 
 **Debug**:
+
 ```bash
 ai-agent --agent myagent.ai --dry-run --verbose
 ```
 
 **Common causes**:
+
 - MCP server not configured in `.ai-agent.json`
 - Tool name mismatch (case sensitivity)
 - Server failed to start
 
 **Solutions**:
+
 - Verify `mcpServers` configuration
 - Check tool name in server output
 - Test MCP server independently
@@ -283,16 +298,19 @@ ai-agent --agent myagent.ai --dry-run --verbose
 **Error**: `tool failed: context window budget exceeded`
 
 **Debug**:
+
 ```bash
 CONTEXT_DEBUG=true ai-agent --agent myagent.ai "query"
 ```
 
 **Common causes**:
+
 - Too many tool responses accumulating
 - Large responses not being stored to disk
 - Insufficient context window for model
 
 **Solutions**:
+
 - Increase `contextWindow` in frontmatter
 - Lower `toolResponseMaxBytes` to store large responses
 - Reduce conversation length
@@ -301,20 +319,23 @@ CONTEXT_DEBUG=true ai-agent --agent myagent.ai "query"
 
 ### Provider Errors (401, 429, 500)
 
-**Error**: `LLM communication error: 401 Unauthorized`
+**Error**: `Authentication error: <provider message>. Skipping provider <provider>.`
 
 **Debug**:
+
 ```bash
 ai-agent --agent myagent.ai --trace-llm "query"
 ```
 
 **Common causes**:
+
 - Invalid or expired API key
 - Rate limiting (429)
 - Model not available in your plan
 - Provider outage
 
 **Solutions**:
+
 - Verify API key: `echo $OPENAI_API_KEY | head -c 10`
 - Check provider status page
 - Add fallback models
@@ -324,19 +345,22 @@ ai-agent --agent myagent.ai --trace-llm "query"
 
 ### MCP Server Won't Start
 
-**Error**: `Failed to initialize MCP server: xyz`
+**Error**: `failed to initialize MCP server: xyz`
 
 **Debug**:
+
 ```bash
 ai-agent --agent myagent.ai --trace-mcp "query"
 ```
 
 **Common causes**:
+
 - Command not found (`npx` not in PATH)
 - Package not installed
 - Missing environment variables
 
 **Solutions**:
+
 1. Test server independently:
    ```bash
    npx -y @package/server --help
@@ -348,20 +372,23 @@ ai-agent --agent myagent.ai --trace-mcp "query"
 
 ### Tool Timeout
 
-**Error**: `Tool timeout after 30000 ms`
+**Error**: `Tool execution timed out`
 
 **Debug**:
+
 ```bash
 ai-agent --agent myagent.ai --verbose --trace-mcp "query"
 ```
 
 **Common causes**:
+
 - Tool operation takes too long
 - Network issues to external service
 - Tool deadlock
 
 **Solutions**:
-- Increase timeout: `--tool-timeout 120000`
+
+- Increase timeout: `--tool-timeout-ms 120000`
 - Configure queue with longer timeout
 - Check tool service health
 
@@ -369,9 +396,9 @@ ai-agent --agent myagent.ai --verbose --trace-mcp "query"
 
 ## Debug Environment Variables
 
-| Variable | Purpose | Example |
-|----------|---------|---------|
-| `DEBUG=true` | AI SDK debug mode | Shows SDK internals |
+| Variable             | Purpose                 | Example                     |
+| -------------------- | ----------------------- | --------------------------- |
+| `DEBUG=true`         | AI SDK debug mode       | Shows SDK internals         |
 | `CONTEXT_DEBUG=true` | Context guard debugging | Shows token budget tracking |
 
 ### Full Debug Session

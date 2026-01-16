@@ -30,6 +30,7 @@ When tool responses exceed configured size limits, AI Agent:
 This prevents context window overflow while preserving all data for retrieval.
 
 **Why this matters**:
+
 - Large tool responses (code search results, API data) can consume most of the context window
 - Token limits force truncation, losing important information
 - Chunked extraction lets the LLM retrieve only what it needs
@@ -42,14 +43,15 @@ This prevents context window overflow while preserving all data for retrieval.
 
 The threshold for triggering storage:
 
-| Property | Value |
-|----------|-------|
-| Type | `number` |
-| Default | `12288` (12 KB) |
-| Valid values | `1024` to `1000000` |
-| Required | No |
+| Property     | Value                               |
+| ------------ | ----------------------------------- |
+| Type         | `number`                            |
+| Default      | `12288` (12 KB)                     |
+| Valid values | `0` (no lower bound) to `1,000,000` |
+| Required     | No                                  |
 
 **Frontmatter**:
+
 ```yaml
 ---
 toolResponseMaxBytes: 12288
@@ -57,6 +59,7 @@ toolResponseMaxBytes: 12288
 ```
 
 **CLI override**:
+
 ```bash
 ai-agent --agent test.ai --tool-response-max-bytes 25000 "query"
 ```
@@ -68,17 +71,17 @@ Fine-tune extraction behavior:
 ```yaml
 ---
 toolOutput:
-  enabled: true        # Enable/disable storage (default: true)
-  maxChunks: 10        # Max chunks per extraction
-  overlapPercent: 5    # Chunk overlap percentage
+  enabled: true # Enable/disable storage (default: true)
+  maxChunks: 1 # Max chunks per extraction
+  overlapPercent: 10 # Chunk overlap percentage
 ---
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `enabled` | boolean | `true` | Enable tool output storage |
-| `maxChunks` | number | `10` | Maximum chunks for extraction |
-| `overlapPercent` | number | `5` | Overlap between chunks (0-20) |
+| Option           | Type    | Default | Description                   |
+| ---------------- | ------- | ------- | ----------------------------- |
+| `enabled`        | boolean | `true`  | Enable tool output storage    |
+| `maxChunks`      | number  | `1`     | Maximum chunks for extraction |
+| `overlapPercent` | number  | `10`    | Overlap between chunks (0-50) |
 
 ---
 
@@ -88,11 +91,11 @@ toolOutput:
 
 Tool output storage triggers when any of these conditions are met:
 
-| Trigger | Condition | Description |
-|---------|-----------|-------------|
-| `size_cap` | Response exceeds `toolResponseMaxBytes` | Hard size limit |
-| `token_budget` | Response would overflow context window | Dynamic budget |
-| `reserve_failed` | Cannot reserve tokens for response | Budget exhausted |
+| Trigger          | Condition                               | Description      |
+| ---------------- | --------------------------------------- | ---------------- |
+| `size_cap`       | Response exceeds `toolResponseMaxBytes` | Hard size limit  |
+| `token_budget`   | Response would overflow context window  | Dynamic budget   |
+| `reserve_failed` | Cannot reserve tokens for response      | Budget exhausted |
 
 ### Flow
 
@@ -117,25 +120,13 @@ LLM calls tool_output to retrieve content
 When a response is stored, the LLM receives a handle message:
 
 ```
-Tool response stored.
-Handle: session-abc123/file-xyz789
-
-Response metadata:
-- Original size: 45678 bytes
-- Estimated tokens: ~8900
-- Line count: 1234
-
-To extract specific content, call tool_output with:
-- handle: "session-abc123/file-xyz789"
-- extract: Choose one of:
-  - "lines 1-100" (specific line range)
-  - "first 50 lines" (from start)
-  - "last 50 lines" (from end)
-  - "grep pattern" (matching lines)
-  - "summary" (AI-generated overview)
+Tool output is too large (45678 bytes, 1234 lines, 8900 tokens).
+Call tool_output(handle = "session-abc123/file-xyz789", extract = "what to extract").
+The handle is a relative path under the tool_output root.
+Provide precise and detailed instructions in `extract` about what you are looking for.
 ```
 
-The LLM can then decide what content to extract based on the task.
+The LLM should provide specific, detailed instructions in the `extract` parameter describing exactly what content it needs from the stored output.
 
 ---
 
@@ -148,15 +139,20 @@ The `tool_output` tool allows targeted content retrieval:
 ```json
 {
   "name": "tool_output",
-  "description": "Extract content from a stored tool response",
+  "description": "Extract information from a stored oversized tool output by handle",
   "parameters": {
     "handle": {
       "type": "string",
-      "description": "The handle from the stored response message"
+      "description": "Handle of the stored tool output (relative path under the tool_output root, e.g. session-<uuid>/<file-uuid>; provided in the tool-result message)"
     },
     "extract": {
       "type": "string",
-      "description": "What to extract from the response"
+      "description": "Provide precise, detailed instructions about what you need from the stored output (be specific, include keys/fields/sections if known)"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["auto", "full-chunked", "read-grep", "truncate"],
+      "description": "Optional override. auto=module decides; full-chunked=LLM chunk+reduce; read-grep=dynamic sub-agent with Read/Grep; truncate=keeps top and bottom, truncates in the middle"
     }
   }
 }
@@ -164,17 +160,18 @@ The `tool_output` tool allows targeted content retrieval:
 
 ### Extract Options
 
-| Extract Command | Description | Example |
-|-----------------|-------------|---------|
-| `lines N-M` | Specific line range | `lines 1-100` |
-| `first N lines` | First N lines | `first 50 lines` |
-| `last N lines` | Last N lines | `last 50 lines` |
-| `grep PATTERN` | Lines matching regex | `grep "function.*export"` |
-| `summary` | AI-generated summary | `summary` |
+| Extract Command | Description          | Example                   |
+| --------------- | -------------------- | ------------------------- |
+| `lines N-M`     | Specific line range  | `lines 1-100`             |
+| `first N lines` | First N lines        | `first 50 lines`          |
+| `last N lines`  | Last N lines         | `last 50 lines`           |
+| `grep PATTERN`  | Lines matching regex | `grep "function.*export"` |
+| `summary`       | AI-generated summary | `summary`                 |
 
 ### Example Usage
 
 **LLM request**:
+
 ```json
 {
   "tool": "tool_output",
@@ -186,6 +183,7 @@ The `tool_output` tool allows targeted content retrieval:
 ```
 
 **Response**:
+
 ```
 [Lines 1-100 of 1234]
 
@@ -208,13 +206,14 @@ Tool output files are stored in a temporary directory:
     └── <file-uuid>
 ```
 
-| Component | Description |
-|-----------|-------------|
-| `run-hash` | Hash of process start time |
-| `session-uuid` | Session transaction ID |
-| `file-uuid` | Unique file identifier |
+| Component      | Description                |
+| -------------- | -------------------------- |
+| `run-hash`     | Hash of process start time |
+| `session-uuid` | Session transaction ID     |
+| `file-uuid`    | Unique file identifier     |
 
 **Lifecycle**:
+
 - Created at process start
 - Cleaned up on process exit
 - Survives session end within same process (for headend mode)
@@ -228,8 +227,18 @@ Tool output files are stored in a temporary directory:
 Storage events are logged:
 
 ```
-[WRN] Tool output stored: handle=session-abc/file-xyz, reason=size_cap, bytes=45678, lines=1234, tokens=~8900
+[WRN] Tool 'tool_name' output stored for tool_output (size_cap).
 ```
+
+**Log details** include:
+
+- `tool`: Tool name
+- `handle`: Storage handle (e.g. `session-abc/file-xyz`)
+- `reason`: Trigger reason (`size_cap`, `token_budget`, or `reserve_failed`)
+- `bytes`: Original response size in bytes
+- `lines`: Line count
+- `tokens`: Estimated token count
+- `tool_output`: Always `true` for stored outputs
 
 ### Accounting Entry
 
@@ -238,23 +247,29 @@ Tool accounting includes storage info:
 ```json
 {
   "type": "tool",
-  "tool": "search_code",
+  "timestamp": 1737012800000,
   "status": "ok",
-  "stored": true,
-  "handle": "session-abc/file-xyz",
-  "reason": "size_cap",
-  "originalBytes": 45678,
-  "charactersOut": 256
+  "latency": 150,
+  "mcpServer": "mcp:filesystem",
+  "command": "read_file",
+  "charactersIn": 256,
+  "charactersOut": 512
 }
 ```
 
-| Field | Description |
-|-------|-------------|
-| `stored` | Whether response was stored |
-| `handle` | Storage handle |
-| `reason` | Trigger reason |
-| `originalBytes` | Original response size |
-| `charactersOut` | Handle message size sent to LLM |
+**Tool response details** (in `details` object) include:
+
+- `tool_output_handle`: Storage handle (e.g. `session-abc/file-xyz`)
+- `tool_output_reason`: Trigger reason (`size_cap`, `token_budget`, or `reserve_failed`)
+- `truncated`: `true` when output was stored
+
+| Field                | Description                                     |
+| -------------------- | ----------------------------------------------- |
+| `tool_output_handle` | Storage handle                                  |
+| `tool_output_reason` | Trigger reason                                  |
+| `truncated`          | Whether response was stored/truncated           |
+| `charactersIn`       | Tool request size (parameters)                  |
+| `charactersOut`      | Response size (handle message or actual output) |
 
 ---
 
@@ -314,9 +329,9 @@ models:
 toolResponseMaxBytes: 15000
 ---
 For code search results:
-- If stored, use grep to find relevant patterns first
-- Then extract specific line ranges
-- Focus on the most relevant matches
+  - If stored, use grep to find relevant patterns first
+  - Then extract specific line ranges
+  - Focus on the most relevant matches
 ```
 
 ---
@@ -328,6 +343,7 @@ For code search results:
 **Cause**: LLM not instructed to use tool_output.
 
 **Solution**: Add explicit guidance in system prompt:
+
 ```yaml
 ---
 When you see "Tool response stored", use the tool_output tool to extract
@@ -342,6 +358,7 @@ the content you need. Start with a summary or grep for relevant patterns.
 **Cause**: Handle expired (process restarted) or typo.
 
 **Solution**:
+
 1. Check handle format matches exactly
 2. For long-running sessions, handles may expire on process restart
 3. Verify storage directory exists: `ls /tmp/ai-agent-*/`
@@ -353,6 +370,7 @@ the content you need. Start with a summary or grep for relevant patterns.
 **Cause**: LLM extracting small chunks repeatedly.
 
 **Solution**:
+
 1. Increase `toolResponseMaxBytes` for this agent
 2. Guide LLM to extract larger chunks
 3. Use `summary` extraction first to understand content
@@ -364,6 +382,7 @@ the content you need. Start with a summary or grep for relevant patterns.
 **Cause**: Even handle messages can accumulate.
 
 **Solution**:
+
 1. Lower `toolResponseMaxBytes` further
 2. Reduce `maxTurns` to limit accumulation
 3. Use more aggressive context management
@@ -375,6 +394,7 @@ the content you need. Start with a summary or grep for relevant patterns.
 **Cause**: Process exited before extraction.
 
 **Solution**: Original content is preserved in session snapshots:
+
 ```bash
 zcat "$SNAPSHOT" | jq '.opTree.turns[].ops[] | select(.kind == "tool") | {name: .attributes.name, response: .response}'
 ```

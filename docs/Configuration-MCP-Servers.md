@@ -39,12 +39,12 @@ MCP servers provide tools that agents can call. AI Agent manages:
 
 ## Transport Types
 
-| Transport | Description | Use Case |
-|-----------|-------------|----------|
-| `stdio` | Local process (stdin/stdout) | NPM packages, local scripts |
-| `http` | HTTP (streamable) | Remote HTTP MCP servers |
-| `sse` | Server-sent events | Legacy SSE MCP servers |
-| `websocket` | WebSocket | Real-time bidirectional servers |
+| Transport   | Description                  | Use Case                        |
+| ----------- | ---------------------------- | ------------------------------- |
+| `stdio`     | Local process (stdin/stdout) | NPM packages, local scripts     |
+| `http`      | HTTP (streamable)            | Remote HTTP MCP servers         |
+| `sse`       | Server-sent events           | Legacy SSE MCP servers          |
+| `websocket` | WebSocket                    | Real-time bidirectional servers |
 
 ---
 
@@ -85,12 +85,12 @@ Run MCP server as a local process, communicating via stdin/stdout.
 
 ### Stdio Configuration Reference
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `type` | `string` | Required | Must be `"stdio"` |
-| `command` | `string` | Required | Command to run |
-| `args` | `string[]` | `[]` | Command arguments |
-| `env` | `object` | `{}` | Environment variables for process |
+| Property  | Type       | Default  | Description                       |
+| --------- | ---------- | -------- | --------------------------------- |
+| `type`    | `string`   | Required | Must be `"stdio"`                 |
+| `command` | `string`   | Required | Command to run                    |
+| `args`    | `string[]` | `[]`     | Command arguments                 |
+| `env`     | `object`   | `{}`     | Environment variables for process |
 
 ### Environment Scoping
 
@@ -117,6 +117,7 @@ Only explicitly configured environment variables are passed to the process:
 ### Common Stdio Servers
 
 **Filesystem:**
+
 ```json
 {
   "mcpServers": {
@@ -130,6 +131,7 @@ Only explicitly configured environment variables are passed to the process:
 ```
 
 **GitHub:**
+
 ```json
 {
   "mcpServers": {
@@ -146,6 +148,7 @@ Only explicitly configured environment variables are passed to the process:
 ```
 
 **Brave Search:**
+
 ```json
 {
   "mcpServers": {
@@ -186,11 +189,11 @@ Connect to HTTP MCP server with streamable responses.
 
 ### HTTP Configuration Reference
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `type` | `string` | Required | Must be `"http"` |
-| `url` | `string` | Required | Server URL |
-| `headers` | `object` | `{}` | HTTP headers |
+| Property  | Type     | Default  | Description      |
+| --------- | -------- | -------- | ---------------- |
+| `type`    | `string` | Required | Must be `"http"` |
+| `url`     | `string` | Required | Server URL       |
+| `headers` | `object` | `{}`     | HTTP headers     |
 
 ### Example: Jina Fetcher
 
@@ -230,11 +233,11 @@ Connect via Server-Sent Events (legacy transport).
 
 ### SSE Configuration Reference
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `type` | `string` | Required | Must be `"sse"` |
-| `url` | `string` | Required | SSE endpoint URL |
-| `headers` | `object` | `{}` | HTTP headers |
+| Property  | Type     | Default  | Description      |
+| --------- | -------- | -------- | ---------------- |
+| `type`    | `string` | Required | Must be `"sse"`  |
+| `url`     | `string` | Required | SSE endpoint URL |
+| `headers` | `object` | `{}`     | HTTP headers     |
 
 ---
 
@@ -260,11 +263,11 @@ Connect via WebSocket for real-time bidirectional communication.
 
 ### WebSocket Configuration Reference
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `type` | `string` | Required | Must be `"websocket"` |
-| `url` | `string` | Required | WebSocket URL (`ws://` or `wss://`) |
-| `headers` | `object` | `{}` | HTTP headers for upgrade |
+| Property  | Type     | Default  | Description                         |
+| --------- | -------- | -------- | ----------------------------------- |
+| `type`    | `string` | Required | Must be `"websocket"`               |
+| `url`     | `string` | Required | WebSocket URL (`ws://` or `wss://`) |
+| `headers` | `object` | `{}`     | HTTP headers for upgrade            |
 
 ---
 
@@ -297,32 +300,32 @@ Complete MCP server configuration schema:
 
 ### All Options
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `type` | `string` | Required | Transport type |
-| `command` | `string` | - | Command to run (stdio only) |
-| `args` | `string[]` | `[]` | Command arguments (stdio only) |
-| `url` | `string` | - | Server URL (http/sse/websocket) |
-| `headers` | `object` | `{}` | HTTP headers |
-| `env` | `object` | `{}` | Environment variables (stdio only) |
-| `queue` | `string` | `"default"` | Concurrency queue name |
-| `cache` | `string \| number` | `"off"` | Response cache TTL |
-| `toolsCache` | `object` | `{}` | Per-tool cache TTL overrides |
-| `shared` | `boolean` | `true` | Share server across sessions |
-| `healthProbe` | `string` | `"listTools"` | Health check method |
-| `requestTimeoutMs` | `number \| string` | `60000` | Per-request timeout |
-| `toolsAllowed` | `string[]` | `["*"]` | Tool allowlist |
-| `toolsDenied` | `string[]` | `[]` | Tool denylist |
+| Property           | Type               | Default     | Description                                |
+| ------------------ | ------------------ | ----------- | ------------------------------------------ |
+| `type`             | `string`           | Required    | Transport type                             |
+| `command`          | `string`           | -           | Command to run (stdio only)                |
+| `args`             | `string[]`         | `[]`        | Command arguments (stdio only)             |
+| `url`              | `string`           | -           | Server URL (http/sse/websocket)            |
+| `headers`          | `object`           | `{}`        | HTTP headers                               |
+| `env`              | `object`           | `{}`        | Environment variables (stdio only)         |
+| `queue`            | `string`           | `"default"` | Concurrency queue name                     |
+| `cache`            | `string \| number` | -           | Response cache TTL (no caching by default) |
+| `toolsCache`       | `object`           | `{}`        | Per-tool cache TTL overrides               |
+| `shared`           | `boolean`          | `true`      | Share server across sessions               |
+| `healthProbe`      | `string`           | `"ping"`    | Health check method                        |
+| `requestTimeoutMs` | `number \| string` | -           | Per-request timeout                        |
+| `toolsAllowed`     | `string[]`         | `["*"]`     | Tool allowlist                             |
+| `toolsDenied`      | `string[]`         | `[]`        | Tool denylist                              |
 
 ### Duration Formats
 
 The following properties accept duration strings:
 
-| Property | Formats | Examples |
-|----------|---------|----------|
-| `cache` | `off`, milliseconds, duration | `"off"`, `60000`, `"5m"`, `"1h"` |
-| `toolsCache.*` | `off`, milliseconds, duration | `"off"`, `60000`, `"5m"`, `"1h"` |
-| `requestTimeoutMs` | milliseconds, duration | `60000`, `"30s"`, `"2m"` |
+| Property           | Formats                       | Examples                         |
+| ------------------ | ----------------------------- | -------------------------------- |
+| `cache`            | `off`, milliseconds, duration | `"off"`, `60000`, `"5m"`, `"1h"` |
+| `toolsCache.*`     | `off`, milliseconds, duration | `"off"`, `60000`, `"5m"`, `"1h"` |
+| `requestTimeoutMs` | milliseconds, duration        | `60000`, `"30s"`, `"2m"`         |
 
 Duration units: `ms`, `s`, `m`, `h`, `d`, `w`
 
@@ -341,11 +344,7 @@ Only expose specific tools from a server:
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@anthropic/mcp-server-github"],
-      "toolsAllowed": [
-        "search_code",
-        "get_file_contents",
-        "list_issues"
-      ]
+      "toolsAllowed": ["search_code", "get_file_contents", "list_issues"]
     }
   }
 }
@@ -362,11 +361,7 @@ Block specific tools (allow all others):
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@anthropic/mcp-server-github"],
-      "toolsDenied": [
-        "create_or_update_file",
-        "push_files",
-        "delete_branch"
-      ]
+      "toolsDenied": ["create_or_update_file", "push_files", "delete_branch"]
     }
   }
 }
@@ -375,6 +370,7 @@ Block specific tools (allow all others):
 ### Precedence
 
 If both `toolsAllowed` and `toolsDenied` are specified:
+
 1. Tool must be in `toolsAllowed`
 2. Tool must NOT be in `toolsDenied`
 
@@ -423,15 +419,15 @@ Override cache TTL for specific tools:
 
 ### Cache TTL Formats
 
-| Format | Example | Duration |
-|--------|---------|----------|
-| `"off"` | `"off"` | Disabled |
+| Format       | Example | Duration   |
+| ------------ | ------- | ---------- |
+| `"off"`      | `"off"` | Disabled   |
 | Milliseconds | `60000` | 60 seconds |
-| Seconds | `"30s"` | 30 seconds |
-| Minutes | `"5m"` | 5 minutes |
-| Hours | `"1h"` | 1 hour |
-| Days | `"1d"` | 1 day |
-| Weeks | `"1w"` | 1 week |
+| Seconds      | `"30s"` | 30 seconds |
+| Minutes      | `"5m"`  | 5 minutes  |
+| Hours        | `"1h"`  | 1 hour     |
+| Days         | `"1d"`  | 1 day      |
+| Weeks        | `"1w"`  | 1 week     |
 
 ---
 
@@ -479,6 +475,7 @@ One server instance shared across all sessions:
 ```
 
 **Benefits:**
+
 - More resource efficient
 - Automatic restart on failure (exponential backoff)
 - Shared state across sessions
@@ -500,6 +497,7 @@ New server instance per session:
 ```
 
 **Benefits:**
+
 - Isolated state per session
 - Single retry on failure
 - No cross-session interference
@@ -510,10 +508,10 @@ New server instance per session:
 
 ### Probe Methods
 
-| Method | Description |
-|--------|-------------|
-| `ping` | MCP ping request (if supported) |
-| `listTools` | List tools request (default) |
+| Method      | Description                       |
+| ----------- | --------------------------------- |
+| `ping`      | MCP ping request (default)        |
+| `listTools` | List tools request (if supported) |
 
 ### Configuration
 
@@ -562,6 +560,7 @@ Every restart decision is logged with `ERR` severity:
 ### Stopping Restarts
 
 To stop restart attempts:
+
 1. Remove or disable the server in configuration
 2. Restart ai-agent
 
@@ -586,8 +585,8 @@ You have access to filesystem and GitHub tools.
 
 Tools are exposed with namespaced names:
 
-| Format | Example |
-|--------|---------|
+| Format                  | Example                    |
+| ----------------------- | -------------------------- |
 | `mcp__<server>__<tool>` | `mcp__github__search_code` |
 
 ### Accessing Specific Tools
@@ -617,11 +616,13 @@ Error: MCP server 'name' failed to initialize
 ```
 
 **Causes:**
+
 - Command not found
 - Missing environment variables
 - Network unreachable (for HTTP/WS)
 
 **Solutions:**
+
 1. Verify command exists: `which npx`
 2. Check environment variables are set
 3. Test command manually: `npx -y @anthropic/mcp-server-filesystem /tmp`
@@ -634,11 +635,13 @@ Error: Tool 'mcp__server__tool' not found
 ```
 
 **Causes:**
+
 - Server not initialized
 - Tool filtered by allowlist/denylist
 - Tool name typo
 
 **Solutions:**
+
 1. Check server initialized successfully
 2. Verify tool is not in `toolsDenied`
 3. Check `toolsAllowed` includes the tool
@@ -651,10 +654,12 @@ Error: MCP server 'name' initialization timed out
 ```
 
 **Causes:**
+
 - Server unavailable (404, network error)
 - Slow server startup
 
 **Solutions:**
+
 1. Check server is reachable
 2. Verify URL/command is correct
 3. Check server logs
@@ -667,12 +672,15 @@ Error: Tool 'mcp__server__tool' timed out
 ```
 
 **Causes:**
+
 - `requestTimeoutMs` too low
 - Server slow to respond
 - Network issues
 
 **Solutions:**
+
 1. Increase `requestTimeoutMs`:
+
 ```json
 {
   "mcpServers": {
@@ -682,6 +690,7 @@ Error: Tool 'mcp__server__tool' timed out
   }
 }
 ```
+
 2. Check server health
 3. Review server logs
 
@@ -690,11 +699,13 @@ Error: Tool 'mcp__server__tool' timed out
 **Symptoms:** Server repeatedly restarting
 
 **Causes:**
+
 - Server crashes immediately after start
 - Configuration error
 - Resource exhaustion
 
 **Solutions:**
+
 1. Check server stderr for errors
 2. Test server manually
 3. Review backoff timing in logs
@@ -705,6 +716,7 @@ Error: Tool 'mcp__server__tool' timed out
 **Symptoms:** Growing memory usage, orphan processes
 
 **Solutions:**
+
 1. Ensure `cleanup()` is called on shutdown
 2. Check process tree termination
 3. Review PID tracking logs

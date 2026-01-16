@@ -7,6 +7,7 @@ Welcome to **ai-agent** - a framework for building autonomous AI agents. Write a
 ## What is ai-agent?
 
 ai-agent is a TypeScript framework that turns simple text files (`.ai` files) into powerful autonomous agents. Each agent gets:
+
 - A system prompt that defines its behavior
 - Access to tools (MCP servers, REST APIs, other agents)
 - Automatic orchestration with retries, context management, and error recovery
@@ -17,8 +18,8 @@ ai-agent is a TypeScript framework that turns simple text files (`.ai` files) in
 
 ## Quick Start
 
-1. **Install**: `npm install -g @anthropic/ai-agent`
-2. **Configure**: Create `~/.ai-agent/config.toml` with your API keys
+1. **Install**: `npm install -g ai-agent-claude`
+2. **Configure**: Create `~/.ai-agent/ai-agent.json` with your API keys
 3. **Run**: `ai-agent --agent my-agent.ai "Hello, world!"`
 
 See [Getting Started](Getting-Started) for the complete walkthrough.
@@ -29,24 +30,24 @@ See [Getting Started](Getting-Started) for the complete walkthrough.
 
 ### For Building Agents
 
-| Section | What You'll Find |
-|---------|------------------|
-| [Agent Files](Agent-Files) | Configure `.ai` files - models, tools, sub-agents, schemas |
-| [System Prompts](System-Prompts) | Write effective prompts with includes and variables |
-| [CLI Reference](CLI) | Run agents, debug, override settings, script automation |
+| Section                          | What You'll Find                                           |
+| -------------------------------- | ---------------------------------------------------------- |
+| [Agent Files](Agent-Files)       | Configure `.ai` files - models, tools, sub-agents, schemas |
+| [System Prompts](System-Prompts) | Write effective prompts with includes and variables        |
+| [CLI Reference](CLI)             | Run agents, debug, override settings, script automation    |
 
 ### For Configuration
 
-| Section | What You'll Find |
-|---------|------------------|
-| [Configuration](Configuration) | Providers, MCP servers, REST tools, caching |
-| [Headends](Headends) | Deploy as REST API, MCP server, Slack bot, embedded widget |
+| Section                        | What You'll Find                                           |
+| ------------------------------ | ---------------------------------------------------------- |
+| [Configuration](Configuration) | Providers, MCP servers, REST tools, caching                |
+| [Headends](Headends)           | Deploy as REST API, MCP server, Slack bot, embedded widget |
 
 ### For Operations
 
-| Section | What You'll Find |
-|---------|------------------|
-| [Operations](Operations) | Logging, debugging, snapshots, telemetry |
+| Section                            | What You'll Find                             |
+| ---------------------------------- | -------------------------------------------- |
+| [Operations](Operations)           | Logging, debugging, snapshots, telemetry     |
 | [Technical Specs](Technical-Specs) | Architecture, session lifecycle, tool system |
 
 ---

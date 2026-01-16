@@ -41,12 +41,14 @@ ${VARIABLE_NAME}
 Variables are case-sensitive and use `UPPER_SNAKE_CASE`.
 
 **Example**:
+
 ```markdown
 Current time: ${DATETIME}
 Current time: {{DATETIME}}
 ```
 
 Both produce:
+
 ```markdown
 Current time: 2025-08-31T14:30:00+03:00
 ```
@@ -57,61 +59,64 @@ Current time: 2025-08-31T14:30:00+03:00
 
 ### Date and Time Variables
 
-| Variable | Description | Example Value |
-|----------|-------------|---------------|
-| `DATETIME` | RFC 3339 timestamp with timezone | `2025-08-31T14:30:00+03:00` |
-| `TIMESTAMP` | Unix epoch (seconds) | `1733437845` |
-| `DAY` | Full weekday name | `Monday` |
-| `TIMEZONE` | IANA timezone identifier | `Europe/Athens` |
+| Variable    | Description                      | Example Value               |
+| ----------- | -------------------------------- | --------------------------- |
+| `DATETIME`  | RFC 3339 timestamp with timezone | `2025-08-31T14:30:00+03:00` |
+| `TIMESTAMP` | Unix epoch (seconds)             | `1733437845`                |
+| `DAY`       | Full weekday name                | `Monday`                    |
+| `TIMEZONE`  | IANA timezone identifier         | `Europe/Athens`             |
 
 **Notes**:
+
 - `DATETIME` includes timezone offset for unambiguous time references
 - `TIMEZONE` comes from system detection or `TZ` environment variable
 - All time values are computed at prompt load time
 
 ### System Information Variables
 
-| Variable | Description | Example Value |
-|----------|-------------|---------------|
-| `OS` | Operating system with version | `Ubuntu 24.04.1 LTS (kernel 6.8.0)` |
-| `ARCH` | CPU architecture | `x64`, `arm64` |
-| `KERNEL` | Kernel type and version | `Linux 6.8.0-41-generic` |
-| `HOSTNAME` | Machine hostname | `workstation` |
-| `USER` | Current username | `costa` |
-| `CD` | Current working directory | `/home/costa/project` |
+| Variable   | Description                   | Example Value                       |
+| ---------- | ----------------------------- | ----------------------------------- |
+| `OS`       | Operating system with version | `Ubuntu 24.04.1 LTS (kernel 6.8.0)` |
+| `ARCH`     | CPU architecture              | `x64`, `arm64`                      |
+| `KERNEL`   | Kernel type and version       | `Linux 6.8.0-41-generic`            |
+| `HOSTNAME` | Machine hostname              | `workstation`                       |
+| `USER`     | Current username              | `costa`                             |
+| `CD`       | Current working directory     | `/home/costa/project`               |
 
 **Notes**:
+
 - `OS` attempts to read `/etc/os-release` on Linux for a friendly name
 - `USER` falls back to `USER` or `USERNAME` environment variables if `os.userInfo()` fails
 
 ### Agent Configuration Variables
 
-| Variable | Description | Example Value |
-|----------|-------------|---------------|
-| `MAX_TURNS` | Configured maximum turns | `10` |
-| `MAX_TOOLS` | Maximum tool calls per turn | `20` |
+| Variable    | Description                 | Example Value |
+| ----------- | --------------------------- | ------------- |
+| `MAX_TURNS` | Configured maximum turns    | `10`          |
+| `MAX_TOOLS` | Maximum tool calls per turn | `10`          |
 
 **Notes**:
+
 - Values come from frontmatter or defaults
 - Useful for self-aware agents that plan within constraints
 
 ### Output Format Variable
 
-| Variable | Description |
-|----------|-------------|
+| Variable | Description                                        |
+| -------- | -------------------------------------------------- |
 | `FORMAT` | Output format instructions for the current context |
 
 **FORMAT values by context**:
 
-| Context | `${FORMAT}` expands to |
-|---------|------------------------|
-| Terminal (TTY) | `a TTY-compatible plain monospaced text response. Use literal "\x1b[...m" sequences for ANSI colours...` |
-| Piped output | `Plain text without any formatting or markdown. Do not wrap long lines.` |
-| JSON expected | `json` |
-| Slack headend | `Slack Block Kit JSON array of messages (not raw text or GitHub markdown)...` |
-| Markdown | `GitHub Markdown` |
-| Markdown+Mermaid | `GitHub Markdown with Mermaid diagrams` |
-| Sub-agent | `Internal agent-to-agent exchange format (not user-facing).` |
+| Context          | `${FORMAT}` expands to                                                                                   |
+| ---------------- | -------------------------------------------------------------------------------------------------------- |
+| Terminal (TTY)   | `a TTY-compatible plain monospaced text response. Use literal "\x1b[...m" sequences for ANSI colours...` |
+| Piped output     | `Plain text without any formatting or markdown. Do not wrap long lines.`                                 |
+| JSON expected    | `json`                                                                                                   |
+| Slack headend    | `Slack Block Kit JSON array of messages (not raw text or GitHub markdown)...`                            |
+| Markdown         | `GitHub Markdown`                                                                                        |
+| Markdown+Mermaid | `GiHub Markdown with Mermaid diagrams`                                                                   |
+| Sub-agent        | `Internal agent-to-agent exchange format (not user-facing).`                                             |
 
 **Important**: Always include `${FORMAT}` in your prompts to ensure consistent output across all invocation contexts.
 
@@ -259,19 +264,23 @@ Processing happens in this order:
 3. **Prompt sent to LLM**: Final text is used as the system prompt
 
 This means:
+
 - Included files can contain variables (they'll be substituted)
 - Variable names cannot be dynamic (no `${${OTHER_VAR}}`)
 
 **Example**:
 
 `shared/context.md`:
+
 ```markdown
 ## Context
+
 Time: ${DATETIME}
 User: ${USER}
 ```
 
 `agent.ai`:
+
 ```yaml
 ---
 models:
@@ -283,19 +292,23 @@ ${include:shared/context.md}
 ```
 
 **Step 1** - Include resolved:
+
 ```markdown
 You are an assistant.
 
 ## Context
+
 Time: ${DATETIME}
 User: ${USER}
 ```
 
 **Step 2** - Variables substituted:
+
 ```markdown
 You are an assistant.
 
 ## Context
+
 Time: 2025-08-31T14:30:00+03:00
 User: costa
 ```
@@ -311,11 +324,13 @@ Hello ${UNKNOWN_VARIABLE}!
 ```
 
 Becomes:
+
 ```markdown
 Hello ${UNKNOWN_VARIABLE}!
 ```
 
 This behavior:
+
 - Prevents accidental data leakage from environment
 - Lets you catch typos (variable appears literally in output)
 - Allows literal `${}` syntax if needed (though rare)
@@ -329,6 +344,7 @@ This behavior:
 The available variables are a fixed set (listed above). If you need environment values:
 
 1. **For API keys and secrets**: Use `.ai-agent.json` configuration:
+
    ```json
    {
      "providers": {
@@ -352,17 +368,19 @@ The available variables are a fixed set (listed above). If you need environment 
 **Causes and fixes**:
 
 1. **Typo in variable name**: Check spelling and case
+
    ```markdown
    ${DATETIME}     # Correct
-   ${datetime}     # Wrong - lowercase
-   ${DATE_TIME}    # Wrong - extra underscore
+   ${datetime} # Wrong - lowercase
+   ${DATE_TIME} # Wrong - extra underscore
    ```
 
 2. **Syntax error**: Check for spaces or typos
+
    ```markdown
    ${DATETIME}     # Correct
-   ${ DATETIME}    # Wrong - space after {
-   ${DATETIME }    # Wrong - space before }
+   ${ DATETIME} # Wrong - space after {
+   ${DATETIME } # Wrong - space before }
    ```
 
 3. **Variable doesn't exist**: Only the documented variables are available
@@ -384,17 +402,21 @@ This shows the fully resolved system prompt with all variables substituted.
 **Causes and fixes**:
 
 1. **Missing ${FORMAT}**: Add it to your prompt
+
    ```markdown
    Respond in ${FORMAT}.
    ```
 
 2. **Conflicting instructions**: Don't override FORMAT with specific format instructions
+
    ```markdown
    # Bad - conflicts with FORMAT
+
    Respond in ${FORMAT}.
    Always use JSON format.
 
    # Good - relies on FORMAT
+
    Respond in ${FORMAT}.
    ```
 
@@ -409,6 +431,7 @@ This shows the fully resolved system prompt with all variables substituted.
 **Symptom**: `${DATETIME}` shows wrong timezone.
 
 **Fix**: Set the `TZ` environment variable:
+
 ```bash
 TZ=America/New_York ai-agent --agent my-agent.ai "What time is it?"
 ```
@@ -422,6 +445,7 @@ Or ensure your system timezone is configured correctly.
 ### 1. Always Include FORMAT
 
 Every prompt should specify output format:
+
 ```markdown
 Respond in ${FORMAT}.
 ```
@@ -429,6 +453,7 @@ Respond in ${FORMAT}.
 ### 2. Use Context Variables When Relevant
 
 If the task benefits from time/environment awareness, include them:
+
 ```markdown
 Current time: ${DATETIME}
 Working directory: ${CD}
@@ -437,6 +462,7 @@ Working directory: ${CD}
 ### 3. Help Agents Self-Limit
 
 For complex agents, expose their limits:
+
 ```markdown
 You have ${MAX_TURNS} turns and ${MAX_TOOLS} tools per turn.
 Plan accordingly.
@@ -445,8 +471,10 @@ Plan accordingly.
 ### 4. Don't Rely on Variables for Security
 
 Variables are informational. Don't use them for access control:
+
 ```markdown
 # Bad - user could be spoofed
+
 User: ${USER}
 Only allow admin if user is 'admin'
 ```

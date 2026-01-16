@@ -102,6 +102,7 @@ ai-agent --agent assistant.ai "Your question here"
 ```
 
 **Input sources:**
+
 - Command line arguments
 - Standard input (stdin) with `-` placeholder
 - Piped content
@@ -119,8 +120,9 @@ ai-agent --agent api.ai --api 8080
 ```
 
 Triggered when any headend flag is present:
+
 - `--api <port>` - REST API
-- `--mcp <transport>` - Model Context Protocol
+- `--mcp <transport>` - Model Context Protocol transport (stdio|http:port|sse:port|ws:port)
 - `--openai-completions <port>` - OpenAI-compatible API
 - `--anthropic-completions <port>` - Anthropic-compatible API
 - `--embed <port>` - Embeddable chat widget
@@ -143,6 +145,7 @@ ai-agent --help
 ```
 
 The help output includes:
+
 - Frontmatter template for creating agents
 - Configuration file resolution order
 - All CLI options grouped by category
@@ -164,12 +167,12 @@ ai-agent --list-tools github
 
 Detailed documentation organized by use case:
 
-| Page | Description |
-|------|-------------|
-| [CLI-Running-Agents](CLI-Running-Agents) | Running agents: `--agent`, prompts, stdin, piping, output formats |
-| [CLI-Debugging](CLI-Debugging) | Debugging: `--verbose`, `--trace-*`, `--dry-run`, diagnostics |
-| [CLI-Overrides](CLI-Overrides) | Runtime overrides: `--model`, `--temperature`, all override options |
-| [CLI-Scripting](CLI-Scripting) | Scripting: exit codes, JSON output, error handling, automation |
+| Page                                     | Description                                                         |
+| ---------------------------------------- | ------------------------------------------------------------------- |
+| [CLI-Running-Agents](CLI-Running-Agents) | Running agents: `--agent`, prompts, stdin, piping, output formats   |
+| [CLI-Debugging](CLI-Debugging)           | Debugging: `--verbose`, `--trace-*`, `--dry-run`, diagnostics       |
+| [CLI-Overrides](CLI-Overrides)           | Runtime overrides: `--model`, `--temperature`, all override options |
+| [CLI-Scripting](CLI-Scripting)           | Scripting: exit codes, JSON output, error handling, automation      |
 
 ---
 
@@ -180,6 +183,7 @@ CLI options are grouped into four scopes:
 ### Master Agent Overrides
 
 Apply only to the top-level agent (not inherited by sub-agents):
+
 - `--models` - LLM model selection
 - `--tools` - Tool access
 - `--agents` - Sub-agent composition
@@ -188,6 +192,7 @@ Apply only to the top-level agent (not inherited by sub-agents):
 ### Master Defaults
 
 Apply to master agent and inherited by sub-agents when unset:
+
 - `--temperature` - Response creativity
 - `--max-turns` - Turn limit
 - `--max-retries` - Retry count
@@ -196,6 +201,7 @@ Apply to master agent and inherited by sub-agents when unset:
 ### All Models Overrides
 
 Apply to every agent including sub-agents:
+
 - `--override` - Key=value overrides
 - `--verbose` - Logging level
 - `--trace-*` - Tracing flags
@@ -204,6 +210,7 @@ Apply to every agent including sub-agents:
 ### Global Controls
 
 Application-level settings:
+
 - `--config` - Configuration file path
 - `--dry-run` - Validation mode
 - `--quiet` - Suppress output

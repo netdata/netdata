@@ -35,14 +35,14 @@ AI Agent uses a layered configuration system:
 
 Configuration files are searched in this order:
 
-| Priority | Location | Description |
-|----------|----------|-------------|
-| 1 | `--config <path>` | Explicit CLI option |
-| 2 | `./.ai-agent.json` | Current working directory |
-| 3 | `<agent-dir>/.ai-agent.json` | Agent file's directory |
-| 4 | `<binary-dir>/.ai-agent.json` | Directory containing ai-agent executable |
-| 5 | `~/.ai-agent.json` | Home directory |
-| 6 | `/etc/ai-agent/ai-agent.json` | System-wide |
+| Priority | Location                      | Description                              |
+| -------- | ----------------------------- | ---------------------------------------- |
+| 1        | `--config <path>`             | Explicit CLI option                      |
+| 2        | `./.ai-agent.json`            | Current working directory                |
+| 3        | `<agent-dir>/.ai-agent.json`  | Agent file's directory                   |
+| 4        | `<binary-dir>/.ai-agent.json` | Directory containing ai-agent executable |
+| 5        | `~/.ai-agent/ai-agent.json`   | Home directory                           |
+| 6        | `/etc/ai-agent/ai-agent.json` | System-wide                              |
 
 ### Resolution Behavior
 
@@ -144,12 +144,12 @@ If `OPENAI_BASE_URL` is unset or empty, uses the default value.
 
 These values are **NOT** expanded at config load time:
 
-| Field | Reason |
-|-------|--------|
-| `mcpServers.*.env` | Passed to child processes for runtime resolution |
-| `mcpServers.*.headers` | May contain secrets resolved at spawn time |
+| Field                      | Reason                                            |
+| -------------------------- | ------------------------------------------------- |
+| `mcpServers.*.env`         | Passed to child processes for runtime resolution  |
+| `mcpServers.*.headers`     | May contain secrets resolved at spawn time        |
 | `restTools.*.bodyTemplate` | `${parameters.foo}` tokens for request templating |
-| `restTools.*.url` | `${parameters.foo}` tokens for URL templating |
+| `restTools.*.url`          | `${parameters.foo}` tokens for URL templating     |
 
 ### MCP_ROOT Handling
 
@@ -163,12 +163,12 @@ Settings are merged from multiple sources with clear priority.
 
 ### Priority (highest to lowest)
 
-| Priority | Source | Example |
-|----------|--------|---------|
-| 1 | CLI options | `--temperature 0.2` |
-| 2 | Per-agent frontmatter | `temperature: 0.3` in `.ai` file |
-| 3 | Config file defaults | `defaults.temperature: 0.7` |
-| 4 | Built-in defaults | Hardcoded fallbacks |
+| Priority | Source                | Example                          |
+| -------- | --------------------- | -------------------------------- |
+| 1        | CLI options           | `--temperature 0.2`              |
+| 2        | Per-agent frontmatter | `temperature: 0.3` in `.ai` file |
+| 3        | Config file defaults  | `defaults.temperature: 0.7`      |
+| 4        | Built-in defaults     | Hardcoded fallbacks              |
 
 ### Merge Behavior
 
@@ -176,7 +176,8 @@ For most settings, **first defined wins** (higher priority overrides lower).
 
 ### Example
 
-**Config file** (`~/.ai-agent.json`):
+**Config file** (`~/.ai-agent/ai-agent.json`):
+
 ```json
 {
   "defaults": {
@@ -187,6 +188,7 @@ For most settings, **first defined wins** (higher priority overrides lower).
 ```
 
 **Agent frontmatter** (`myagent.ai`):
+
 ```yaml
 ---
 temperature: 0.3
@@ -194,6 +196,7 @@ temperature: 0.3
 ```
 
 **CLI**:
+
 ```bash
 ai-agent --agent myagent.ai --temperature 0.2
 ```
@@ -231,16 +234,18 @@ Provider settings can be overridden per-model:
 
 ### Merge Strategy
 
-Default merge is **overlay** (model settings extend provider settings):
+Provider configuration supports three merge strategies:
 
-| Strategy | Behavior |
-|----------|----------|
-| `overlay` (default) | Model settings add to/override provider settings |
-| `replace` | Model settings completely replace provider settings |
+| Strategy            | Behavior                                            |
+| ------------------- | --------------------------------------------------- |
+| `overlay` (default) | Model settings add to/override provider settings    |
+| `override`          | Model settings completely replace provider settings |
+| `deep`              | Deep merge of model settings into provider settings |
 
 ### Resolution Order
 
 For model-specific settings:
+
 1. `models.<model>.<setting>` (model-specific)
 2. `<setting>` at provider level
 3. Built-in default
@@ -258,6 +263,7 @@ ai-agent --agent test.ai --dry-run
 ```
 
 **Shows**:
+
 - Configuration resolution
 - Provider validation
 - MCP server discovery
@@ -272,6 +278,7 @@ ai-agent --agent test.ai --verbose
 ```
 
 **Shows**:
+
 - Which config files were loaded
 - Environment variable sources
 - Placeholder expansion results
@@ -281,12 +288,11 @@ ai-agent --agent test.ai --verbose
 
 AI Agent validates:
 
-| Check | Error on Failure |
-|-------|------------------|
-| JSON syntax | `Invalid JSON in config file` |
-| Unresolved placeholders | `MissingVariableError: provider 'X' at Y` |
-| Unknown queues | `Unknown queue 'X'` |
-| Missing required fields | `Provider 'X' missing 'apiKey'` |
+| Check                   | Error on Failure                                                     |
+| ----------------------- | -------------------------------------------------------------------- |
+| JSON syntax             | `Invalid JSON in config file`                                        |
+| Unresolved placeholders | `Unresolved variable ${VAR} for provider 'X' at Y`                   |
+| Unknown queues          | `X references unknown queue 'Y'. Add it under configuration.queues.` |
 
 ---
 
@@ -377,11 +383,13 @@ Error: Configuration file not found
 ```
 
 **Causes**:
+
 - No `.ai-agent.json` in any expected location
 - File permissions prevent reading
 - Typo in filename
 
 **Solutions**:
+
 1. Create `.ai-agent.json` in current directory
 2. Use `--config <path>` to specify exact location
 3. Check file permissions: `ls -la .ai-agent.json`
@@ -393,11 +401,13 @@ Error: API key invalid: ${OPENAI_API_KEY}
 ```
 
 **Causes**:
+
 - Environment variable not set
 - `.ai-agent.env` not in correct location
 - Typo in variable name
 
 **Solutions**:
+
 1. Set variable: `export OPENAI_API_KEY=sk-...`
 2. Check `.ai-agent.env` location (same directory as config)
 3. Verify variable name matches exactly (case-sensitive)
@@ -405,28 +415,32 @@ Error: API key invalid: ${OPENAI_API_KEY}
 ### MissingVariableError
 
 ```
-MissingVariableError: provider 'openai' at home: OPENAI_API_KEY
+Unresolved variable ${OPENAI_API_KEY} for provider 'openai' at home. Define it in .ai-agent.env or environment.
 ```
 
-**Meaning**: Variable `OPENAI_API_KEY` is missing in the config from `~/.ai-agent.json`.
+**Meaning**: Variable `OPENAI_API_KEY` is missing in the config from `~/.ai-agent/ai-agent.json`.
 
 **Solutions**:
-1. Add to `~/.ai-agent.env`: `OPENAI_API_KEY=sk-...`
+
+1. Add to `~/.ai-agent/ai-agent.env`: `OPENAI_API_KEY=sk-...`
 2. Export in shell: `export OPENAI_API_KEY=sk-...`
 3. Use default syntax: `${OPENAI_API_KEY:-sk-default}`
 
 ### Unknown queue error
 
 ```
-Unknown queue 'playwright'
+mcp:myserver references unknown queue 'playwright'. Add it under configuration.queues.
 ```
 
 **Causes**:
+
 - MCP server or REST tool references undefined queue
 - Typo in queue name
 
 **Solutions**:
+
 1. Define the queue in config:
+
 ```json
 {
   "queues": {
@@ -434,17 +448,19 @@ Unknown queue 'playwright'
   }
 }
 ```
+
 2. Change tool to use `"queue": "default"`
 
 ### Provider missing type warning
 
 ```
-Warning: Provider 'custom' missing 'type' field
+provider 'custom' at /path/to/.ai-agent.json missing "type"; defaulting to 'openai'. Update configuration to include "type" explicitly.
 ```
 
 **Cause**: Legacy config omitted the `type` field.
 
 **Solution**: Add explicit type:
+
 ```json
 {
   "providers": {
@@ -455,6 +471,25 @@ Warning: Provider 'custom' missing 'type' field
   }
 }
 ```
+
+Warning: Provider 'custom' missing 'type' field
+
+````
+
+**Cause**: Legacy config omitted the `type` field.
+
+**Solution**: Add explicit type:
+
+```json
+{
+  "providers": {
+    "custom": {
+      "type": "openai-compatible",
+      "apiKey": "..."
+    }
+  }
+}
+````
 
 ---
 

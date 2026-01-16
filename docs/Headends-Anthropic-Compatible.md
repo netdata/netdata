@@ -23,12 +23,14 @@ Expose agents via the Anthropic Messages API for drop-in compatibility with Anth
 ## Overview
 
 The Anthropic-compatible headend provides a drop-in replacement for Anthropic's Messages API. Use it when:
+
 - You have existing code using Anthropic SDKs
 - You want explicit thinking/text content blocks
 - You need Anthropic-style streaming events
 - You prefer the Anthropic API structure
 
 **Key features**:
+
 - Full `/v1/messages` compatibility
 - Streaming via Server-Sent Events (SSE)
 - Explicit `thinking` and `text` content blocks
@@ -47,7 +49,7 @@ ai-agent --agent chat.ai --anthropic-completions 8083
 curl http://localhost:8083/v1/messages \
   -H "Content-Type: application/json" \
   -H "x-api-key: not-needed" \
-  -d '{"model":"chat","messages":[{"role":"user","content":"Hello"}],"max_tokens":1024}'
+  -d '{"model":"chat","messages":[{"role":"user","content":"Hello"}]}'
 ```
 
 ---
@@ -56,30 +58,32 @@ curl http://localhost:8083/v1/messages \
 
 ### --anthropic-completions
 
-| Property | Value |
-|----------|-------|
-| Type | `number` |
-| Required | Yes (to enable this headend) |
-| Repeatable | Yes |
+| Property   | Value                        |
+| ---------- | ---------------------------- |
+| Type       | `number`                     |
+| Required   | Yes (to enable this headend) |
+| Repeatable | Yes                          |
 
 **Description**: HTTP port for Anthropic-compatible API. Can be specified multiple times.
 
 **Example**:
+
 ```bash
 ai-agent --agent chat.ai --anthropic-completions 8083
 ```
 
 ### --anthropic-completions-concurrency
 
-| Property | Value |
-|----------|-------|
-| Type | `number` |
-| Default | `4` |
-| Valid values | `1` to `100` |
+| Property     | Value         |
+| ------------ | ------------- |
+| Type         | `number`      |
+| Default      | `10`          |
+| Valid values | `1` or higher |
 
 **Description**: Maximum concurrent message requests.
 
 **Example**:
+
 ```bash
 ai-agent --agent chat.ai --anthropic-completions 8083 --anthropic-completions-concurrency 10
 ```
@@ -93,6 +97,7 @@ ai-agent --agent chat.ai --anthropic-completions 8083 --anthropic-completions-co
 Health check endpoint.
 
 **Response**: `200 OK`
+
 ```json
 {
   "status": "ok"
@@ -104,6 +109,7 @@ Health check endpoint.
 List available models (agents).
 
 **Response**:
+
 ```json
 {
   "data": [
@@ -127,26 +133,22 @@ Create a message.
 ```json
 {
   "model": "chat",
-  "messages": [
-    {"role": "user", "content": "Hello!"}
-  ],
+  "messages": [{ "role": "user", "content": "Hello!" }],
   "system": "You are a helpful assistant.",
-  "max_tokens": 1024,
   "stream": false
 }
 ```
 
 ### Request Fields
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `model` | `string` | Yes | Agent name (filename without `.ai`) |
-| `messages` | `array` | Yes | Conversation messages |
-| `system` | `string` or `array` | No | System prompt(s) |
-| `max_tokens` | `number` | No | Maximum tokens to generate |
-| `stream` | `boolean` | No | Enable SSE streaming (default: `false`) |
-| `format` | `string` | No | Output format override (`markdown`, `json`, `text`) |
-| `payload` | `object` | No | Additional parameters including `schema` |
+| Field      | Type                | Required | Description                                         |
+| ---------- | ------------------- | -------- | --------------------------------------------------- |
+| `model`    | `string`            | Yes      | Agent name (filename without `.ai`)                 |
+| `messages` | `array`             | Yes      | Conversation messages                               |
+| `system`   | `string` or `array` | No       | System prompt(s)                                    |
+| `stream`   | `boolean`           | No       | Enable SSE streaming (default: `false`)             |
+| `format`   | `string`            | No       | Output format override (`markdown`, `json`, `text`) |
+| `payload`  | `object`            | No       | Additional parameters including `schema`            |
 
 ### Message Format
 
@@ -162,16 +164,14 @@ Or with content array:
 ```json
 {
   "role": "user",
-  "content": [
-    {"type": "text", "text": "Hello!"}
-  ]
+  "content": [{ "type": "text", "text": "Hello!" }]
 }
 ```
 
-| Field | Type | Values | Description |
-|-------|------|--------|-------------|
-| `role` | `string` | `user`, `assistant` | Message author role |
-| `content` | `string` or `array` | Any | Message content |
+| Field     | Type                | Values              | Description         |
+| --------- | ------------------- | ------------------- | ------------------- |
+| `role`    | `string`            | `user`, `assistant` | Message author role |
+| `content` | `string` or `array` | Any                 | Message content     |
 
 > **Note**: Messages with `tool_use` or `tool_result` blocks are rejected. Tool calling happens internally within agents.
 
@@ -182,14 +182,14 @@ For structured JSON output:
 ```json
 {
   "model": "analyzer",
-  "messages": [{"role": "user", "content": "Analyze this"}],
+  "messages": [{ "role": "user", "content": "Analyze this" }],
   "format": "json",
   "payload": {
     "schema": {
       "type": "object",
       "properties": {
-        "sentiment": {"type": "string"},
-        "score": {"type": "number"}
+        "sentiment": { "type": "string" },
+        "score": { "type": "number" }
       }
     }
   }
@@ -217,7 +217,8 @@ For structured JSON output:
   "stop_reason": "end_turn",
   "usage": {
     "input_tokens": 10,
-    "output_tokens": 15
+    "output_tokens": 15,
+    "total_tokens": 25
   }
 }
 ```
@@ -245,7 +246,8 @@ When agents emit reasoning:
   "stop_reason": "end_turn",
   "usage": {
     "input_tokens": 10,
-    "output_tokens": 50
+    "output_tokens": 50,
+    "total_tokens": 60
   }
 }
 ```
@@ -317,31 +319,32 @@ with client.messages.stream(
 ### JavaScript (Anthropic SDK)
 
 ```javascript
-import Anthropic from '@anthropic-ai/sdk';
+import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic({
-  baseURL: 'http://localhost:8083',
-  apiKey: 'not-needed'
+  baseURL: "http://localhost:8083",
+  apiKey: "not-needed",
 });
 
 // Non-streaming
 const message = await client.messages.create({
-  model: 'chat',
+  model: "chat",
   max_tokens: 1024,
-  messages: [
-    { role: 'user', content: 'Hello!' }
-  ]
+  messages: [{ role: "user", content: "Hello!" }],
 });
 console.log(message.content[0].text);
 
 // Streaming
 const stream = await client.messages.stream({
-  model: 'chat',
+  model: "chat",
   max_tokens: 1024,
-  messages: [{ role: 'user', content: 'Tell me a story' }]
+  messages: [{ role: "user", content: "Tell me a story" }],
 });
 for await (const event of stream) {
-  if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+  if (
+    event.type === "content_block_delta" &&
+    event.delta.type === "text_delta"
+  ) {
     process.stdout.write(event.delta.text);
   }
 }
@@ -356,8 +359,7 @@ curl http://localhost:8083/v1/messages \
   -H "x-api-key: not-needed" \
   -d '{
     "model": "chat",
-    "messages": [{"role": "user", "content": "Hello!"}],
-    "max_tokens": 1024
+    "messages": [{"role": "user", "content": "Hello!"}]
   }'
 
 # Streaming
@@ -367,7 +369,6 @@ curl -N http://localhost:8083/v1/messages \
   -d '{
     "model": "chat",
     "messages": [{"role": "user", "content": "Hello!"}],
-    "max_tokens": 1024,
     "stream": true
   }'
 
@@ -381,10 +382,10 @@ curl http://localhost:8083/v1/models
 
 The `model` field maps to agent filenames:
 
-| Agent File | Model Name |
-|------------|------------|
-| `chat.ai` | `chat` |
-| `researcher.ai` | `researcher` |
+| Agent File       | Model Name    |
+| ---------------- | ------------- |
+| `chat.ai`        | `chat`        |
+| `researcher.ai`  | `researcher`  |
 | `code_review.ai` | `code_review` |
 
 If an agent has `toolName` in frontmatter, that name is used instead.
@@ -395,15 +396,15 @@ If an agent has `toolName` in frontmatter, that name is used instead.
 
 ## Differences from OpenAI Headend
 
-| Feature | OpenAI Headend | Anthropic Headend |
-|---------|---------------|-------------------|
-| Endpoint | `/v1/chat/completions` | `/v1/messages` |
-| Model deduplication | Dash (`chat-2`) | Underscore (`chat_2`) |
-| System prompt | In messages array | Separate `system` field |
-| Token fields | `prompt_tokens`, `completion_tokens` | `input_tokens`, `output_tokens` |
-| Thinking content | `reasoning_content` delta | Explicit `thinking` block |
-| Stop reason | `stop`, `error` | `end_turn`, `error` |
-| Streaming | Delta-based chunks | Explicit block start/stop events |
+| Feature             | OpenAI Headend                       | Anthropic Headend                |
+| ------------------- | ------------------------------------ | -------------------------------- |
+| Endpoint            | `/v1/chat/completions`               | `/v1/messages`                   |
+| Model deduplication | Dash (`chat-2`)                      | Underscore (`chat_2`)            |
+| System prompt       | In messages array                    | Separate `system` field          |
+| Token fields        | `prompt_tokens`, `completion_tokens` | `input_tokens`, `output_tokens`  |
+| Thinking content    | `reasoning_content` delta            | Explicit `thinking` block        |
+| Stop reason         | `stop`, `error`                      | `end_turn`, `error`              |
+| Streaming           | Delta-based chunks                   | Explicit block start/stop events |
 
 ---
 
@@ -416,6 +417,7 @@ If an agent has `toolName` in frontmatter, that name is used instead.
 **Cause**: The `model` field doesn't match any registered agent.
 
 **Solutions**:
+
 1. List available models: `curl http://localhost:8083/v1/models`
 2. Check agent filename (without `.ai` extension)
 3. Note: uses underscores for deduplication (`chat_2` not `chat-2`)
@@ -427,31 +429,25 @@ If an agent has `toolName` in frontmatter, that name is used instead.
 **Cause**: Using `format: "json"` without providing a schema.
 
 **Solution**: Include schema in payload:
+
 ```json
 {
   "format": "json",
   "payload": {
     "schema": {
       "type": "object",
-      "properties": {"result": {"type": "string"}}
+      "properties": { "result": { "type": "string" } }
     }
   }
 }
 ```
-
-### Tool use not supported
-
-**Symptom**: `{"error": "tool_use_not_supported"}`
-
-**Cause**: Messages contain `tool_use` or `tool_result` blocks.
-
-**Solution**: Remove tool-related content. Tool calling is handled internally by agents.
 
 ### Missing x-api-key header
 
 **Symptom**: SDK requires API key.
 
 **Solution**: Use any non-empty string:
+
 ```python
 client = anthropic.Anthropic(base_url="...", api_key="not-needed")
 ```

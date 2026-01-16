@@ -30,6 +30,7 @@ Accounting tracks every LLM request and tool execution:
 - **Trace context**: Session and agent IDs for correlation
 
 **Use cases**:
+
 - Cost monitoring and budgeting
 - Usage analysis and optimization
 - Billing reconciliation
@@ -52,12 +53,13 @@ Accounting tracks every LLM request and tool execution:
 ### CLI Override
 
 ```bash
-ai-agent --agent test.ai --accounting ./accounting.jsonl "query"
+ai-agent --agent test.ai --billing-file ./accounting.jsonl "query"
 ```
 
 ### Default Location
 
 When not configured, accounting writes to:
+
 ```
 ~/.ai-agent/accounting.jsonl
 ```
@@ -74,18 +76,29 @@ Created for every LLM request (including retries):
 {
   "type": "llm",
   "status": "ok",
-  "timestamp": "2025-01-15T10:30:00.000Z",
+  "timestamp": 1736944200000,
   "provider": "openai",
   "model": "gpt-4o",
-  "inputTokens": 1523,
-  "outputTokens": 456,
-  "cacheReadTokens": 0,
-  "cacheWriteTokens": 1523,
-  "cost": 0.0084,
-  "latencyMs": 2341,
-  "sessionId": "abc123",
-  "agentPath": "chat.ai",
-  "turn": 1
+  "actualProvider": "actual-provider",
+  "actualModel": "actual-model",
+  "costUsd": 0.0084,
+  "upstreamInferenceCostUsd": 0.005,
+  "stopReason": "stop",
+  "latency": 2341,
+  "tokens": {
+    "inputTokens": 1523,
+    "outputTokens": 456,
+    "totalTokens": 1979,
+    "cacheReadInputTokens": 0,
+    "cacheWriteInputTokens": 1523
+  },
+  "error": "error message",
+  "agentId": "agent-id",
+  "callPath": "path",
+  "txnId": "abc123",
+  "parentTxnId": "parent-id",
+  "originTxnId": "root-id",
+  "details": {}
 }
 ```
 
@@ -97,15 +110,19 @@ Created for every tool execution:
 {
   "type": "tool",
   "status": "ok",
-  "timestamp": "2025-01-15T10:30:01.000Z",
-  "server": "github",
-  "tool": "search_code",
-  "latencyMs": 523,
-  "requestBytes": 45,
-  "responseBytes": 12456,
-  "sessionId": "abc123",
-  "agentPath": "chat.ai",
-  "turn": 1
+  "timestamp": 1736944201000,
+  "mcpServer": "github",
+  "command": "search_code",
+  "latency": 523,
+  "charactersIn": 45,
+  "charactersOut": 12456,
+  "error": "error message",
+  "agentId": "agent-id",
+  "callPath": "path",
+  "txnId": "abc123",
+  "parentTxnId": "parent-id",
+  "originTxnId": "root-id",
+  "details": {}
 }
 ```
 
@@ -115,54 +132,56 @@ Created for every tool execution:
 
 ### LLM Entry Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `type` | string | Always `"llm"` |
-| `status` | string | `"ok"` or `"failed"` |
-| `timestamp` | number | Unix timestamp (ms) |
-| `provider` | string | Provider name (e.g., "openai") |
-| `model` | string | Model name (e.g., "gpt-4o") |
-| `actualProvider` | string | Actual provider (for routers) |
-| `actualModel` | string | Actual model (for routers) |
-| `latency` | number | Request latency (ms) |
-| `costUsd` | number | Cost in USD |
-| `upstreamInferenceCostUsd` | number | Upstream cost (routers) |
-| `stopReason` | string | Why generation stopped |
-| `error` | string | Error message if failed |
+| Field                      | Type   | Description                    |
+| -------------------------- | ------ | ------------------------------ |
+| `type`                     | string | Always `"llm"`                 |
+| `status`                   | string | `"ok"` or `"failed"`           |
+| `timestamp`                | number | Unix timestamp (ms)            |
+| `provider`                 | string | Provider name (e.g., "openai") |
+| `model`                    | string | Model name (e.g., "gpt-4o")    |
+| `actualProvider`           | string | Actual provider (for routers)  |
+| `actualModel`              | string | Actual model (for routers)     |
+| `latency`                  | number | Request latency (ms)           |
+| `costUsd`                  | number | Cost in USD                    |
+| `upstreamInferenceCostUsd` | number | Upstream cost (routers)        |
+| `stopReason`               | string | Why generation stopped         |
+| `error`                    | string | Error message if failed        |
+| `details`                  | object | Optional structured details    |
 
 **Token Fields**:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `tokens.inputTokens` | number | Input token count |
-| `tokens.outputTokens` | number | Output token count |
-| `tokens.totalTokens` | number | Total (includes cache) |
-| `tokens.cacheReadInputTokens` | number | Cached tokens read |
-| `tokens.cacheWriteInputTokens` | number | Cached tokens written |
+| Field                          | Type   | Description            |
+| ------------------------------ | ------ | ---------------------- |
+| `tokens.inputTokens`           | number | Input token count      |
+| `tokens.outputTokens`          | number | Output token count     |
+| `tokens.totalTokens`           | number | Total (includes cache) |
+| `tokens.cacheReadInputTokens`  | number | Cached tokens read     |
+| `tokens.cacheWriteInputTokens` | number | Cached tokens written  |
 
 **Trace Context**:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `agentId` | string | Agent identifier |
-| `callPath` | string | Hierarchical call path |
-| `txnId` | string | Session transaction ID |
-| `parentTxnId` | string | Parent session ID |
-| `originTxnId` | string | Root session ID |
+| Field         | Type   | Description            |
+| ------------- | ------ | ---------------------- |
+| `agentId`     | string | Agent identifier       |
+| `callPath`    | string | Hierarchical call path |
+| `txnId`       | string | Session transaction ID |
+| `parentTxnId` | string | Parent session ID      |
+| `originTxnId` | string | Root session ID        |
 
 ### Tool Entry Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `type` | string | Always `"tool"` |
-| `status` | string | `"ok"` or `"failed"` |
-| `timestamp` | number | Unix timestamp (ms) |
-| `mcpServer` | string | MCP server name |
-| `command` | string | Tool name |
-| `latency` | number | Execution latency (ms) |
-| `charactersIn` | number | Request character count |
-| `charactersOut` | number | Response character count |
-| `error` | string | Error message if failed |
+| Field           | Type   | Description                 |
+| --------------- | ------ | --------------------------- |
+| `type`          | string | Always `"tool"`             |
+| `status`        | string | `"ok"` or `"failed"`        |
+| `timestamp`     | number | Unix timestamp (ms)         |
+| `mcpServer`     | string | MCP server name             |
+| `command`       | string | Tool name                   |
+| `latency`       | number | Execution latency (ms)      |
+| `charactersIn`  | number | Request character count     |
+| `charactersOut` | number | Response character count    |
+| `error`         | string | Error message if failed     |
+| `details`       | object | Optional structured details |
 
 Plus same trace context fields as LLM entries.
 
@@ -310,24 +329,24 @@ When using ai-agent as a library, accounting is delivered via callbacks:
 ```typescript
 const callbacks = {
   onEvent: (event) => {
-    if (event.type === 'accounting') {
+    if (event.type === "accounting") {
       // Single entry (real-time)
       myDatabase.insert(event.entry);
     }
-    if (event.type === 'accounting_flush') {
+    if (event.type === "accounting_flush") {
       // Batch of entries (at session end)
       myDatabase.insertBatch(event.payload.entries);
     }
-  }
+  },
 };
 ```
 
 ### Event Types
 
-| Event Type | When | Payload |
-|------------|------|---------|
-| `accounting` | Each LLM/tool call | Single `AccountingEntry` |
-| `accounting_flush` | Session end | Array of all entries |
+| Event Type         | When               | Payload                  |
+| ------------------ | ------------------ | ------------------------ |
+| `accounting`       | Each LLM/tool call | Single `AccountingEntry` |
+| `accounting_flush` | Session end        | Array of all entries     |
 
 File writing is skipped when custom callbacks handle accounting.
 
@@ -381,6 +400,7 @@ zcat accounting-2025*.jsonl.gz | jq -s '
 **Cause**: File path not configured or directory doesn't exist.
 
 **Solution**:
+
 1. Check configuration: `cat .ai-agent.json | jq '.persistence'`
 2. Create directory: `mkdir -p ~/.ai-agent/`
 3. Verify permissions: `ls -la ~/.ai-agent/`
@@ -392,9 +412,10 @@ zcat accounting-2025*.jsonl.gz | jq -s '
 **Cause**: Pricing table doesn't include the model.
 
 **Solution**:
+
 1. Check pricing configuration
 2. Verify provider/model names match exactly
-3. Cost defaults to `null` when pricing unknown
+3. Cost defaults to `undefined` when pricing unknown
 
 ---
 
@@ -403,6 +424,7 @@ zcat accounting-2025*.jsonl.gz | jq -s '
 **Cause**: Token normalization includes cache tokens.
 
 **Solution**: AI Agent normalizes `totalTokens` to include cache:
+
 ```
 totalTokens = inputTokens + outputTokens + cacheRead + cacheWrite
 ```
@@ -416,6 +438,7 @@ Compare individual fields, not totals.
 **Cause**: Entries are buffered until session end.
 
 **Solution**:
+
 - Use `onEvent(type='accounting')` for real-time entries
 - `accounting_flush` delivers all entries at once
 
@@ -426,6 +449,7 @@ Compare individual fields, not totals.
 **Cause**: Session configuration not propagating IDs.
 
 **Solution**: Verify session configuration includes:
+
 - `agentId`
 - `txnId`
 - `parentTxnId`
@@ -438,6 +462,7 @@ Compare individual fields, not totals.
 **Cause**: Pricing table outdated or router costs different.
 
 **Solution**:
+
 1. Update pricing configuration
 2. For routers (OpenRouter), check `upstreamInferenceCostUsd`
 3. Compare `actualProvider`/`actualModel` for routing decisions

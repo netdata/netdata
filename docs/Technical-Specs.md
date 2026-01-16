@@ -30,13 +30,13 @@ Deep-dive technical documentation for contributors, maintainers, and advanced us
 
 ### What You'll Find
 
-| Spec Type | Purpose | Example |
-|-----------|---------|---------|
+| Spec Type        | Purpose                     | Example                         |
+| ---------------- | --------------------------- | ------------------------------- |
 | **Architecture** | How components fit together | Session → LLM Client → Provider |
-| **Lifecycle** | Sequence of operations | Turn execution order |
-| **Algorithms** | Decision logic | Context guard projection |
-| **Contracts** | Guaranteed behaviors | "Never exceed maxTurns" |
-| **ADRs** | Why decisions were made | "Sub-agent as tool" rationale |
+| **Lifecycle**    | Sequence of operations      | Turn execution order            |
+| **Algorithms**   | Decision logic              | Context guard projection        |
+| **Contracts**    | Guaranteed behaviors        | "Never exceed maxTurns"         |
+| **ADRs**         | Why decisions were made     | "Sub-agent as tool" rationale   |
 
 ---
 
@@ -44,14 +44,14 @@ Deep-dive technical documentation for contributors, maintainers, and advanced us
 
 **Most Common Questions**:
 
-| Question | Document |
-|----------|----------|
-| "How does a session work?" | [Session Lifecycle](Technical-Specs-Session-Lifecycle) |
-| "Why did my session stop early?" | [Context Management](Technical-Specs-Context-Management) |
-| "What happens when an LLM fails?" | [Retry Strategy](Technical-Specs-Retry-Strategy) |
-| "How are tools executed?" | [Tool System](Technical-Specs-Tool-System) |
-| "What guarantees can I rely on?" | [User Contract](Technical-Specs-User-Contract) |
-| "Why is it designed this way?" | [Design History](Technical-Specs-Design-History) |
+| Question                          | Document                                                 |
+| --------------------------------- | -------------------------------------------------------- |
+| "How does a session work?"        | [Session Lifecycle](Technical-Specs-Session-Lifecycle)   |
+| "Why did my session stop early?"  | [Context Management](Technical-Specs-Context-Management) |
+| "What happens when an LLM fails?" | [Retry Strategy](Technical-Specs-Retry-Strategy)         |
+| "How are tools executed?"         | [Tool System](Technical-Specs-Tool-System)               |
+| "What guarantees can I rely on?"  | [User Contract](Technical-Specs-User-Contract)           |
+| "Why is it designed this way?"    | [Design History](Technical-Specs-Design-History)         |
 
 ---
 
@@ -59,11 +59,11 @@ Deep-dive technical documentation for contributors, maintainers, and advanced us
 
 System design and component structure.
 
-| Document | Description |
-|----------|-------------|
-| [Architecture](Technical-Specs-Architecture) | Layered component design: CLI → Session → LLM Client → Providers |
-| [Session Lifecycle](Technical-Specs-Session-Lifecycle) | Creation → Execution → Finalization flow |
-| [Design History](Technical-Specs-Design-History) | Architectural Decision Records (ADRs) |
+| Document                                               | Description                                                      |
+| ------------------------------------------------------ | ---------------------------------------------------------------- |
+| [Architecture](Technical-Specs-Architecture)           | Layered component design: CLI → Session → LLM Client → Providers |
+| [Session Lifecycle](Technical-Specs-Session-Lifecycle) | Creation → Execution → Finalization flow                         |
+| [Design History](Technical-Specs-Design-History)       | Architectural Decision Records (ADRs)                            |
 
 ```mermaid
 graph LR
@@ -82,11 +82,11 @@ graph LR
 
 How sessions execute at runtime.
 
-| Document | Description |
-|----------|-------------|
-| [Context Management](Technical-Specs-Context-Management) | Token budgets, context guard, overflow handling |
-| [Retry Strategy](Technical-Specs-Retry-Strategy) | Error classification, provider cycling, backoff |
-| [Tool System](Technical-Specs-Tool-System) | Tool providers, execution routing, queue management |
+| Document                                                 | Description                                         |
+| -------------------------------------------------------- | --------------------------------------------------- |
+| [Context Management](Technical-Specs-Context-Management) | Token budgets, context guard, overflow handling     |
+| [Retry Strategy](Technical-Specs-Retry-Strategy)         | Error classification, provider cycling, backoff     |
+| [Tool System](Technical-Specs-Tool-System)               | Tool providers, execution routing, queue management |
 
 ---
 
@@ -94,10 +94,10 @@ How sessions execute at runtime.
 
 User-facing promises that implementations MUST honor.
 
-| Document | Description |
-|----------|-------------|
+| Document                                       | Description                                          |
+| ---------------------------------------------- | ---------------------------------------------------- |
 | [User Contract](Technical-Specs-User-Contract) | End-user guarantees (limits, error handling, output) |
-| [Specifications Index](Technical-Specs-Index) | Complete index of all spec documents |
+| [Specifications Index](Technical-Specs-Index)  | Complete index of all spec documents                 |
 
 ---
 
@@ -105,15 +105,15 @@ User-facing promises that implementations MUST honor.
 
 Key implementation files for each subsystem.
 
-| Component | File | Description |
-|-----------|------|-------------|
-| Session Orchestration | `src/ai-agent.ts` | Main session loop and orchestration |
-| LLM Client | `src/llm-client.ts` | Provider interface and request execution |
-| Tool System | `src/tools/tools.ts` | Tool orchestration and routing |
-| MCP Provider | `src/tools/mcp-provider.ts` | MCP protocol implementation |
-| Context Guard | `src/ai-agent.ts` | Token budget enforcement |
-| Types | `src/types.ts` | Core type definitions |
-| OpTree | `src/session-tree.ts` | Hierarchical operation tracking |
+| Component             | File                        | Description                              |
+| --------------------- | --------------------------- | ---------------------------------------- |
+| Session Orchestration | `src/ai-agent.ts`           | Main session loop and orchestration      |
+| LLM Client            | `src/llm-client.ts`         | Provider interface and request execution |
+| Tool System           | `src/tools/tools.ts`        | Tool orchestration and routing           |
+| MCP Provider          | `src/tools/mcp-provider.ts` | MCP protocol implementation              |
+| Context Guard         | `src/context-guard.ts`      | Token budget enforcement                 |
+| Types                 | `src/types.ts`              | Core type definitions                    |
+| OpTree                | `src/session-tree.ts`       | Hierarchical operation tracking          |
 
 ---
 

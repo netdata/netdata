@@ -178,6 +178,7 @@ Headers support `${VAR}` expansion from environment:
 ### Content-Type Default
 
 When `bodyTemplate` is defined:
+
 - If `Content-Type` not set, defaults to `application/json`
 - To override, explicitly set `Content-Type` in headers
 
@@ -264,14 +265,14 @@ JSON Schema for validating tool inputs.
 
 ### Type Reference
 
-| Type | Description | Example |
-|------|-------------|---------|
-| `string` | Text value | `"hello"` |
-| `integer` | Whole number | `42` |
-| `number` | Any number | `3.14` |
-| `boolean` | True/false | `true` |
-| `array` | List of values | `[1, 2, 3]` |
-| `object` | Nested object | `{"key": "value"}` |
+| Type      | Description    | Example            |
+| --------- | -------------- | ------------------ |
+| `string`  | Text value     | `"hello"`          |
+| `integer` | Whole number   | `42`               |
+| `number`  | Any number     | `3.14`             |
+| `boolean` | True/false     | `true`             |
+| `array`   | List of values | `[1, 2, 3]`        |
+| `object`  | Nested object  | `{"key": "value"}` |
 
 ### Enum Constraint
 
@@ -363,17 +364,17 @@ For APIs requiring nested query parameters (arrays, objects).
 
 ### Serialization Format
 
-| Input | Serialized |
-|-------|------------|
+| Input                                                      | Serialized                                                     |
+| ---------------------------------------------------------- | -------------------------------------------------------------- |
 | `filters: [{ field: "email", value: "test@example.com" }]` | `filters[0][field]=email&filters[0][value]=test%40example.com` |
-| `sort: { field: "date", order: "desc" }` | `sort[field]=date&sort[order]=desc` |
+| `sort: { field: "date", order: "desc" }`                   | `sort[field]=date&sort[order]=desc`                            |
 
 ### hasComplexQueryParams Behavior
 
-| Setting | Behavior |
-|---------|----------|
-| `false` (default) | Standard URL encoding |
-| `true` | Nested bracket serialization for `queryParamNames` only |
+| Setting           | Behavior                                                |
+| ----------------- | ------------------------------------------------------- |
+| `false` (default) | Standard URL encoding                                   |
+| `true`            | Nested bracket serialization for `queryParamNames` only |
 
 ---
 
@@ -416,20 +417,20 @@ Parse streaming JSON responses (SSE-style).
 
 ### Streaming Configuration Reference
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `mode` | `string` | Required | Must be `"json-stream"` |
-| `linePrefix` | `string` | `""` | Prefix to strip from each line |
-| `discriminatorField` | `string` | `"type"` | Field name for event type |
-| `doneValue` | `string` | `"done"` | Value indicating stream end |
-| `tokenField` | `string` | `"content"` | Field containing token content |
-| `tokenValue` | `string` | `"token"` | Discriminator value for tokens |
-| `answerField` | `string` | `"answer"` | Field containing final answer |
-| `timeoutMs` | `number \| string` | `60000` | Stream read timeout |
+| Property             | Type     | Default     | Description                    |
+| -------------------- | -------- | ----------- | ------------------------------ |
+| `mode`               | `string` | Required    | Must be `"json-stream"`        |
+| `linePrefix`         | `string` | `""`        | Prefix to strip from each line |
+| `discriminatorField` | `string` | `"type"`    | Field name for event type      |
+| `doneValue`          | `string` | `"done"`    | Value indicating stream end    |
+| `tokenField`         | `string` | `"content"` | Field containing token content |
+| `tokenValue`         | `string` | `"token"`   | Discriminator value for tokens |
+| `answerField`        | `string` | `"answer"`  | Field containing final answer  |
 
 ### Stream Processing
 
 Example stream input:
+
 ```
 data: {"type": "token", "content": "Hello"}
 data: {"type": "token", "content": " world"}
@@ -480,19 +481,19 @@ Complete REST tool schema:
 
 ### All Options
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `description` | `string` | Required | Tool description for the LLM |
-| `method` | `string` | Required | HTTP method |
-| `url` | `string` | Required | URL template |
-| `headers` | `object` | `{}` | HTTP headers |
-| `parametersSchema` | `object` | Required | JSON Schema for inputs |
-| `bodyTemplate` | `any` | - | Request body template |
-| `queue` | `string` | `"default"` | Concurrency queue name |
-| `cache` | `string \| number` | `"off"` | Response cache TTL |
-| `streaming` | `object` | - | JSON streaming config |
-| `hasComplexQueryParams` | `boolean` | `false` | Enable nested query params |
-| `queryParamNames` | `string[]` | `[]` | Params to serialize complexly |
+| Property                | Type               | Default     | Description                                                    |
+| ----------------------- | ------------------ | ----------- | -------------------------------------------------------------- |
+| `description`           | `string`           | Required    | Tool description for the LLM                                   |
+| `method`                | `string`           | Required    | HTTP method                                                    |
+| `url`                   | `string`           | Required    | URL template                                                   |
+| `headers`               | `object`           | `{}`        | HTTP headers                                                   |
+| `parametersSchema`      | `object`           | Required    | JSON Schema for inputs                                         |
+| `bodyTemplate`          | `any`              | -           | Request body template                                          |
+| `queue`                 | `string`           | `"default"` | Concurrency queue name                                         |
+| `cache`                 | `string \| number` | -           | Response cache TTL (supports `"off"`, ms, or duration strings) |
+| `streaming`             | `object`           | -           | JSON streaming config                                          |
+| `hasComplexQueryParams` | `boolean`          | `false`     | Enable nested query params                                     |
+| `queryParamNames`       | `string[]`         | `[]`        | Params to serialize complexly                                  |
 
 ---
 
@@ -521,18 +522,19 @@ Complete REST tool schema:
 
 ### Cache TTL Formats
 
-| Format | Example | Duration |
-|--------|---------|----------|
-| `"off"` | `"off"` | Disabled |
+| Format       | Example | Duration   |
+| ------------ | ------- | ---------- |
+| `"off"`      | `"off"` | Disabled   |
 | Milliseconds | `60000` | 60 seconds |
-| Seconds | `"30s"` | 30 seconds |
-| Minutes | `"5m"` | 5 minutes |
-| Hours | `"1h"` | 1 hour |
-| Days | `"1d"` | 1 day |
+| Seconds      | `"30s"` | 30 seconds |
+| Minutes      | `"5m"`  | 5 minutes  |
+| Hours        | `"1h"`  | 1 hour     |
+| Days         | `"1d"`  | 1 day      |
 
 ### Cache Key
 
 Cache key is computed from:
+
 - Tool name
 - All parameter values
 
@@ -590,11 +592,11 @@ tools:
 
 ### Tool Naming
 
-| Config Key | Tool Name |
-|------------|-----------|
-| `weather` | `rest__weather` |
+| Config Key      | Tool Name             |
+| --------------- | --------------------- |
+| `weather`       | `rest__weather`       |
 | `create_ticket` | `rest__create_ticket` |
-| `search_api` | `rest__search_api` |
+| `search_api`    | `rest__search_api`    |
 
 ---
 
@@ -607,11 +609,13 @@ Error: Invalid arguments: ...
 ```
 
 **Causes:**
+
 - Parameter doesn't match schema
 - Missing required parameter
 - Wrong type
 
 **Solutions:**
+
 1. Check `parametersSchema` definition
 2. Verify required fields
 3. Check type constraints (string vs number)
@@ -623,10 +627,12 @@ Error: Missing parameter 'name' for URL substitution
 ```
 
 **Causes:**
+
 - Parameter referenced in URL but not in schema
 - Typo in `${parameters.name}`
 
 **Solutions:**
+
 1. Add parameter to `parametersSchema`
 2. Check placeholder spelling
 
@@ -637,19 +643,23 @@ Error: Request timeout
 ```
 
 **Causes:**
+
 - API slow to respond
 - Network issues
 - Large response
 
 **Solutions:**
-1. Increase timeout via streaming config:
+
+1. Increase global tool timeout via configuration:
+
 ```json
 {
-  "streaming": {
-    "timeoutMs": 120000
+  "defaults": {
+    "toolTimeout": 120000
   }
 }
 ```
+
 2. Check API status
 3. Use `--verbose` to see timing
 
@@ -660,11 +670,13 @@ Error: Failed to parse streaming response
 ```
 
 **Causes:**
+
 - Incorrect `linePrefix`
 - Wrong `discriminatorField`
 - Invalid JSON in stream
 
 **Solutions:**
+
 1. Verify line prefix matches exactly
 2. Check discriminator field name
 3. Test API response manually
@@ -675,6 +687,7 @@ Error: Failed to parse streaming response
 **Symptoms:** API returns error about missing body
 
 **Solutions:**
+
 1. Define `bodyTemplate`
 2. Verify template syntax
 3. Check method is POST/PUT/PATCH
@@ -684,6 +697,7 @@ Error: Failed to parse streaming response
 **Symptoms:** API authentication fails
 
 **Solutions:**
+
 1. Check headers object syntax
 2. Verify environment variables are set
 3. Check header name spelling
@@ -704,6 +718,7 @@ export TRACE_REST=true
 ```
 
 Logs:
+
 - Method and URL
 - Headers (authorization redacted)
 - Body (truncated to 500 chars)

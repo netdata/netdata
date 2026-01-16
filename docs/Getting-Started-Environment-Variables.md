@@ -29,11 +29,11 @@ ai-agent uses environment variables for:
 
 **Variable sources (in priority order):**
 
-| Priority | Source | Description |
-|----------|--------|-------------|
-| 1 | Shell environment | `export VAR=value` |
-| 2 | `.ai-agent.env` in current directory | Project-specific |
-| 3 | `~/.ai-agent/ai-agent.env` | User-wide defaults |
+| Priority | Source                               | Description        |
+| -------- | ------------------------------------ | ------------------ |
+| 1        | Shell environment                    | `export VAR=value` |
+| 2        | `.ai-agent.env` in current directory | Project-specific   |
+| 3        | `~/.ai-agent/ai-agent.env`           | User-wide defaults |
 
 ---
 
@@ -43,14 +43,12 @@ Set provider API keys as environment variables. Never hardcode keys in configura
 
 ### Provider Keys
 
-| Variable | Provider | Format | How to Get |
-|----------|----------|--------|------------|
-| `OPENAI_API_KEY` | OpenAI | `sk-...` | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
-| `ANTHROPIC_API_KEY` | Anthropic | `sk-ant-...` | [console.anthropic.com](https://console.anthropic.com/) |
-| `GOOGLE_API_KEY` | Google AI | `AIza...` | [aistudio.google.com](https://aistudio.google.com/) |
-| `OPENROUTER_API_KEY` | OpenRouter | `sk-or-...` | [openrouter.ai/keys](https://openrouter.ai/keys) |
-| `GROQ_API_KEY` | Groq | `gsk_...` | [console.groq.com](https://console.groq.com/) |
-| `MISTRAL_API_KEY` | Mistral | `...` | [console.mistral.ai](https://console.mistral.ai/) |
+| Variable             | Provider   | Format       | How to Get                                                           |
+| -------------------- | ---------- | ------------ | -------------------------------------------------------------------- |
+| `OPENAI_API_KEY`     | OpenAI     | `sk-...`     | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+| `ANTHROPIC_API_KEY`  | Anthropic  | `sk-ant-...` | [console.anthropic.com](https://console.anthropic.com/)              |
+| `GOOGLE_API_KEY`     | Google AI  | `AIza...`    | [aistudio.google.com](https://aistudio.google.com/)                  |
+| `OPENROUTER_API_KEY` | OpenRouter | `sk-or-...`  | [openrouter.ai/keys](https://openrouter.ai/keys)                     |
 
 ### Setting API Keys
 
@@ -105,10 +103,10 @@ Store environment variables in a file for persistent configuration.
 
 ### File Locations
 
-| Location | Scope | Priority |
-|----------|-------|----------|
-| `.ai-agent.env` | Current directory (project) | Higher |
-| `~/.ai-agent/ai-agent.env` | User home (global) | Lower |
+| Location                   | Scope                       | Priority |
+| -------------------------- | --------------------------- | -------- |
+| `.ai-agent.env`            | Current directory (project) | Higher   |
+| `~/.ai-agent/ai-agent.env` | User home (global)          | Lower    |
 
 ### File Format
 
@@ -162,9 +160,9 @@ echo ".ai-agent.env" >> .gitignore
 
 Enable debugging output for troubleshooting.
 
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `DEBUG` | boolean | `false` | Enable AI SDK debug mode; dumps raw LLM payloads to stderr |
+| Variable        | Type    | Default | Description                                                   |
+| --------------- | ------- | ------- | ------------------------------------------------------------- |
+| `DEBUG`         | boolean | `false` | Enable AI SDK debug mode; dumps raw LLM payloads to stderr    |
 | `CONTEXT_DEBUG` | boolean | `false` | Enable detailed context guard debugging; shows token counting |
 
 ### Usage
@@ -216,10 +214,10 @@ Some providers support additional configuration via environment variables.
 
 ### OpenRouter
 
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
+| Variable             | Type   | Default                  | Description                            |
+| -------------------- | ------ | ------------------------ | -------------------------------------- |
 | `OPENROUTER_REFERER` | string | `https://ai-agent.local` | HTTP-Referer header sent to OpenRouter |
-| `OPENROUTER_TITLE` | string | `ai-agent` | X-OpenRouter-Title header |
+| `OPENROUTER_TITLE`   | string | `ai-agent`               | X-OpenRouter-Title header              |
 
 **Example:**
 
@@ -230,9 +228,9 @@ export OPENROUTER_TITLE="My Application"
 
 ### Timezone
 
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `TZ` | string | System default | Timezone for `${DATETIME}` and `${TIMEZONE}` prompt variables |
+| Variable | Type   | Default        | Description                                                   |
+| -------- | ------ | -------------- | ------------------------------------------------------------- |
+| `TZ`     | string | System default | Timezone for `${DATETIME}` and `${TIMEZONE}` prompt variables |
 
 **Example:**
 
@@ -247,13 +245,13 @@ ai-agent --agent my-agent.ai "What time is it?"
 
 System information variables used internally and available for prompt substitution.
 
-| Variable | Source | Description | Example Value |
-|----------|--------|-------------|---------------|
-| `USER` | System | Current username | `costa` |
-| `USERNAME` | System (Windows) | Fallback for USER | `costa` |
-| `HOME` | System | Home directory path | `/home/costa` |
-| `USERPROFILE` | System (Windows) | Fallback for HOME | `C:\Users\costa` |
-| `PWD` | System | Current working directory | `/home/costa/project` |
+| Variable      | Source           | Description               | Example Value         |
+| ------------- | ---------------- | ------------------------- | --------------------- |
+| `USER`        | System           | Current username          | `costa`               |
+| `USERNAME`    | System (Windows) | Fallback for USER         | `costa`               |
+| `HOME`        | System           | Home directory path       | `/home/costa`         |
+| `USERPROFILE` | System (Windows) | Fallback for HOME         | `C:\Users\costa`      |
+| `PWD`         | System           | Current working directory | `/home/costa/project` |
 
 These are read-only and come from the operating system.
 
@@ -265,20 +263,20 @@ These variables can be used in `.ai` file system prompts with `${VAR}` or `{{VAR
 
 ### Available Variables
 
-| Variable | Description | Example Value |
-|----------|-------------|---------------|
-| `DATETIME` | Current date/time (RFC 3339) | `2025-08-31T02:05:07+03:00` |
-| `TIMESTAMP` | Unix epoch seconds | `1733437845` |
-| `DAY` | Weekday name | `Monday` |
-| `TIMEZONE` | IANA timezone | `Europe/Athens` |
-| `MAX_TURNS` | Configured max turns | `10` |
-| `MAX_TOOLS` | Max tool calls per turn | `20` |
-| `OS` | Operating system | `Ubuntu 24.04.1 LTS (kernel 6.8.0)` |
-| `ARCH` | CPU architecture | `x64`, `arm64` |
-| `KERNEL` | Kernel string | `Linux 6.8.0-41-generic` |
-| `CD` | Current working directory | `/home/user/project` |
-| `HOSTNAME` | Host name | `workstation` |
-| `USER` | Username | `costa` |
+| Variable    | Description                  | Example Value                       |
+| ----------- | ---------------------------- | ----------------------------------- |
+| `DATETIME`  | Current date/time (RFC 3339) | `2025-08-31T02:05:07+03:00`         |
+| `TIMESTAMP` | Unix epoch seconds           | `1733437845`                        |
+| `DAY`       | Weekday name                 | `Monday`                            |
+| `TIMEZONE`  | IANA timezone                | `Europe/Athens`                     |
+| `MAX_TURNS` | Configured max turns         | `10`                                |
+| `MAX_TOOLS` | Max tool calls per turn      | `10`                                |
+| `OS`        | Operating system             | `Ubuntu 24.04.1 LTS (kernel 6.8.0)` |
+| `ARCH`      | CPU architecture             | `x64`, `arm64`                      |
+| `KERNEL`    | Kernel string                | `Linux 6.8.0-41-generic`            |
+| `CD`        | Current working directory    | `/home/user/project`                |
+| `HOSTNAME`  | Host name                    | `workstation`                       |
+| `USER`      | Username                     | `costa`                             |
 
 ### Usage in .ai Files
 
@@ -329,7 +327,7 @@ You have 5 turns and can make up to 20 tool calls per turn.
 
 ## Variable Expansion in Config
 
-All string values in `.ai-agent.json` support `${VAR}` expansion with optional defaults.
+All string values in `.ai-agent.json` support `${VAR}` expansion.
 
 ### Basic Expansion
 
@@ -342,31 +340,6 @@ All string values in `.ai-agent.json` support `${VAR}` expansion with optional d
   }
 }
 ```
-
-### Default Values
-
-Use `${VAR:-default}` syntax for fallback values:
-
-```json
-{
-  "providers": {
-    "openai": {
-      "apiKey": "${OPENAI_API_KEY}",
-      "baseUrl": "${OPENAI_BASE_URL:-https://api.openai.com/v1}"
-    }
-  },
-  "cache": {
-    "sqlite": {
-      "path": "${AI_AGENT_CACHE_PATH:-${HOME}/.ai-agent/cache.db}"
-    }
-  }
-}
-```
-
-**Behavior:**
-
-- If `OPENAI_BASE_URL` is set, uses that value
-- If `OPENAI_BASE_URL` is not set, uses `https://api.openai.com/v1`
 
 ### Nested Expansion
 
@@ -382,27 +355,33 @@ Variables can reference other variables:
 }
 ```
 
+### Behavior
+
+- Variables are expanded from environment variables and the layer's `.ai-agent.env` file
+- Missing variables cause a clear error at startup indicating which file needs the value
+- Variables are expanded per layer, not globally
+
+```
+
 ---
 
 ## Quick Reference
 
 All environment variables in one table:
 
-| Variable | Category | Type | Default | Description |
-|----------|----------|------|---------|-------------|
+| Variable             | Category | Type    | Default                  | Description                     |
+| -------------------- | -------- | ------- | ------------------------ | ------------------------------- |
 | `OPENAI_API_KEY` | API Key | string | Required | OpenAI API key |
 | `ANTHROPIC_API_KEY` | API Key | string | Required | Anthropic API key |
 | `GOOGLE_API_KEY` | API Key | string | Required | Google AI API key |
 | `OPENROUTER_API_KEY` | API Key | string | Required | OpenRouter API key |
-| `GROQ_API_KEY` | API Key | string | Required | Groq API key |
-| `MISTRAL_API_KEY` | API Key | string | Required | Mistral API key |
-| `DEBUG` | Debug | boolean | `false` | Enable LLM payload debugging |
-| `CONTEXT_DEBUG` | Debug | boolean | `false` | Enable context window debugging |
-| `OPENROUTER_REFERER` | Provider | string | `https://ai-agent.local` | OpenRouter HTTP-Referer header |
-| `OPENROUTER_TITLE` | Provider | string | `ai-agent` | OpenRouter X-Title header |
-| `TZ` | System | string | System default | Timezone override |
-| `USER` | System | string | System user | Current username |
-| `HOME` | System | string | System home | Home directory path |
+| `DEBUG`              | Debug    | boolean | `false`                  | Enable LLM payload debugging    |
+| `CONTEXT_DEBUG`      | Debug    | boolean | `false`                  | Enable context window debugging |
+| `OPENROUTER_REFERER` | Provider | string  | `https://ai-agent.local` | OpenRouter HTTP-Referer header  |
+| `OPENROUTER_TITLE`   | Provider | string  | `ai-agent`               | OpenRouter X-Title header       |
+| `TZ`                 | System   | string  | System default           | Timezone override               |
+| `USER`               | System   | string  | System user              | Current username                |
+| `HOME`               | System   | string  | System home              | Home directory path             |
 
 ---
 
@@ -414,3 +393,4 @@ All environment variables in one table:
 - [Configuration Files](Configuration-Files) - File resolution and layering
 - [Configuration Providers](Configuration-Providers) - Provider-specific configuration
 - [System Prompts Variables](System-Prompts-Variables) - All prompt variables reference
+```

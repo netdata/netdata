@@ -84,10 +84,10 @@ MCP (Model Context Protocol) servers provide tools for your agents. Add these to
 
 **Explanation:**
 
-| Server | Type | Purpose |
-|--------|------|---------|
-| `brave` | stdio | Runs locally, provides `brave_search` tool |
-| `fetcher` | http | Remote service, provides `fetch` tool for reading web pages |
+| Server    | Type  | Purpose                                                     |
+| --------- | ----- | ----------------------------------------------------------- |
+| `brave`   | stdio | Runs locally, provides `brave_search` tool                  |
+| `fetcher` | http  | Remote service, provides `fetch` tool for reading web pages |
 
 **Set the Brave API key:**
 
@@ -147,16 +147,16 @@ Provide your findings as:
 
 **File structure explained:**
 
-| Section | Purpose |
-|---------|---------|
-| `description` | Human-readable description shown in `--help` |
-| `models` | LLM model(s) to use for this agent |
-| `tools` | MCP servers to enable (must be defined in config) |
-| `maxTurns` | Maximum LLM request-response cycles |
-| `maxToolCallsPerTurn` | Limit tool calls per turn to prevent runaway |
-| `temperature` | Lower = more focused/deterministic |
-| `output.format` | Hint for output formatting |
-| System prompt | Instructions after the closing `---` |
+| Section               | Purpose                                           |
+| --------------------- | ------------------------------------------------- |
+| `description`         | Human-readable description shown in `--help`      |
+| `models`              | LLM model(s) to use for this agent                |
+| `tools`               | MCP servers to enable (must be defined in config) |
+| `maxTurns`            | Maximum LLM request-response cycles               |
+| `maxToolCallsPerTurn` | Limit tool calls per turn to prevent runaway      |
+| `temperature`         | Lower = more focused/deterministic                |
+| `output.format`       | Hint for output formatting                        |
+| System prompt         | Instructions after the closing `---`              |
 
 ---
 
@@ -229,18 +229,18 @@ cache: 1h
 
 **Cache values:**
 
-| Value | Duration |
-|-------|----------|
-| `5m` | 5 minutes |
-| `1h` | 1 hour |
-| `1d` | 1 day |
-| `7d` | 1 week |
+| Value | Duration  |
+| ----- | --------- |
+| `5m`  | 5 minutes |
+| `1h`  | 1 hour    |
+| `1d`  | 1 day     |
+| `1w`  | 1 week    |
 
 **How it works:**
 
 - Same agent + same prompt = cached response returned
 - Reduces costs and latency for repeated queries
-- Cache is stored locally in `~/.ai-agent/cache/`
+- Cache is stored locally in `~/.ai-agent/cache.db`
 
 **Test caching:**
 
@@ -301,7 +301,6 @@ ai-agent --agent researcher.ai --api 8080
 REST API server started on http://localhost:8080
 Available endpoints:
   GET  /v1/researcher?q=<prompt>
-  POST /v1/researcher
 ```
 
 **Call via GET:**
@@ -312,25 +311,16 @@ curl -G "http://localhost:8080/v1/researcher" \
   --data-urlencode "format=markdown"
 ```
 
-**Call via POST:**
-
-```bash
-curl -X POST "http://localhost:8080/v1/researcher" \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "What is quantum computing?", "format": "markdown"}'
-```
-
 **Expected response:**
 
 ```json
 {
-  "response": "## Summary\n\nQuantum computing is...",
-  "model": "openai/gpt-4o",
-  "usage": {
-    "promptTokens": 1234,
-    "completionTokens": 567,
-    "totalTokens": 1801
-  }
+  "success": true,
+  "output": "## Summary\n\nQuantum computing is...",
+  "finalReport": {
+    "answer": "## Summary\n\nQuantum computing is..."
+  },
+  "reasoning": ""
 }
 ```
 
@@ -470,13 +460,13 @@ Expected: Second run is much faster (cached).
 
 Congratulations on building your first practical agent. Continue learning:
 
-| Goal | Page |
-|------|------|
-| Learn all frontmatter options | [Agent Files](Agent-Files) |
-| Write better system prompts | [System Prompts](System-Prompts) |
-| Build multi-agent systems | [Multi-Agent Orchestration](Agent-Development-Multi-Agent) |
-| Deploy to production | [Headends](Headends) |
-| Add more tools | [Configuration MCP Servers](Configuration-MCP-Servers) |
+| Goal                          | Page                                                       |
+| ----------------------------- | ---------------------------------------------------------- |
+| Learn all frontmatter options | [Agent Files](Agent-Files)                                 |
+| Write better system prompts   | [System Prompts](System-Prompts)                           |
+| Build multi-agent systems     | [Multi-Agent Orchestration](Agent-Development-Multi-Agent) |
+| Deploy to production          | [Headends](Headends)                                       |
+| Add more tools                | [Configuration MCP Servers](Configuration-MCP-Servers)     |
 
 ---
 

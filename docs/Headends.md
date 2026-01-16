@@ -21,31 +21,31 @@ Deploy agents through multiple network interfaces. Headends are the entry points
 
 A **headend** is a network service that exposes your agents to external clients. Each headend type serves different use cases:
 
-| Use Case | Recommended Headend |
-|----------|---------------------|
-| Direct execution from scripts | CLI (default) |
-| Building web applications | [REST API](Headends-REST) |
-| Integrating with AI tools (Claude Code, Codex) | [MCP Server](Headends-MCP) |
-| Drop-in replacement for OpenAI API | [OpenAI-Compatible](Headends-OpenAI-Compatible) |
-| Drop-in replacement for Anthropic API | [Anthropic-Compatible](Headends-Anthropic-Compatible) |
-| Team collaboration via Slack | [Slack](Headends-Slack) |
-| Public website chat widget | [Embed](Headends-Embed) |
-| Node.js application integration | [Library](Headends-Library) |
+| Use Case                                       | Recommended Headend                                   |
+| ---------------------------------------------- | ----------------------------------------------------- |
+| Direct execution from scripts                  | CLI (default)                                         |
+| Building web applications                      | [REST API](Headends-REST)                             |
+| Integrating with AI tools (Claude Code, Codex) | [MCP Server](Headends-MCP)                            |
+| Drop-in replacement for OpenAI API             | [OpenAI-Compatible](Headends-OpenAI-Compatible)       |
+| Drop-in replacement for Anthropic API          | [Anthropic-Compatible](Headends-Anthropic-Compatible) |
+| Team collaboration via Slack                   | [Slack](Headends-Slack)                               |
+| Public website chat widget                     | [Embed](Headends-Embed)                               |
+| Node.js application integration                | [Library](Headends-Library)                           |
 
 ---
 
 ## Available Headends
 
-| Page | CLI Flag | Description |
-|------|----------|-------------|
-| CLI | (default) | Direct command-line agent execution |
-| [REST API](Headends-REST) | `--api <port>` | HTTP REST endpoints for agents |
-| [MCP Server](Headends-MCP) | `--mcp <transport>` | Model Context Protocol server |
-| [OpenAI-Compatible](Headends-OpenAI-Compatible) | `--openai-completions <port>` | OpenAI Chat Completions API |
-| [Anthropic-Compatible](Headends-Anthropic-Compatible) | `--anthropic-completions <port>` | Anthropic Messages API |
-| [Slack](Headends-Slack) | `--slack` | Slack Socket Mode integration |
-| [Embed](Headends-Embed) | `--embed <port>` | Public embeddable chat widget |
-| [Library](Headends-Library) | N/A | Programmatic Node.js embedding |
+| Page                                                  | CLI Flag                         | Description                         |
+| ----------------------------------------------------- | -------------------------------- | ----------------------------------- |
+| CLI                                                   | (default)                        | Direct command-line agent execution |
+| [REST API](Headends-REST)                             | `--api <port>`                   | HTTP REST endpoints for agents      |
+| [MCP Server](Headends-MCP)                            | `--mcp <transport>`              | Model Context Protocol server       |
+| [OpenAI-Compatible](Headends-OpenAI-Compatible)       | `--openai-completions <port>`    | OpenAI Chat Completions API         |
+| [Anthropic-Compatible](Headends-Anthropic-Compatible) | `--anthropic-completions <port>` | Anthropic Messages API              |
+| [Slack](Headends-Slack)                               | `--slack`                        | Slack Socket Mode integration       |
+| [Embed](Headends-Embed)                               | `--embed <port>`                 | Public embeddable chat widget       |
+| [Library](Headends-Library)                           | N/A                              | Programmatic Node.js embedding      |
 
 ---
 
@@ -66,6 +66,7 @@ ai-agent \
 ```
 
 **Key behaviors**:
+
 - All headends share the same agent registry
 - Each headend maintains its own concurrency limits
 - Startup is sequential (deterministic port binding order)
@@ -77,17 +78,18 @@ ai-agent \
 
 Each headend type has its own concurrency limit to prevent resource exhaustion:
 
-| CLI Option | Default | Description |
-|------------|---------|-------------|
-| `--api-concurrency <n>` | 4 | REST API concurrent sessions |
-| `--openai-completions-concurrency <n>` | 4 | OpenAI headend sessions |
-| `--anthropic-completions-concurrency <n>` | 4 | Anthropic headend sessions |
-| `--embed-concurrency <n>` | 10 | Embed headend sessions |
+| CLI Option                                | Default | Description                  |
+| ----------------------------------------- | ------- | ---------------------------- |
+| `--api-concurrency <n>`                   | 10      | REST API concurrent sessions |
+| `--openai-completions-concurrency <n>`    | 10      | OpenAI headend sessions      |
+| `--anthropic-completions-concurrency <n>` | 10      | Anthropic headend sessions   |
+| `--embed-concurrency <n>`                 | 10      | Embed headend sessions       |
 
 MCP and Slack headends use internal limits (10 concurrent sessions by default).
 
 **What happens when limit is reached**:
-- REST/OpenAI/Anthropic: Returns `503 Service Unavailable` with `retry_after` header
+
+- REST/OpenAI/Anthropic: Returns `503 Service Unavailable` with JSON error response
 - MCP: Blocks until a slot becomes available
 - Slack: Queues the request
 
@@ -103,14 +105,14 @@ ai-agent --agent agents/main.ai --agent agents/helper.ai --api 8080
 
 **How agents are exposed**:
 
-| Headend | Agent Identifier |
-|---------|------------------|
-| REST API | Filename without `.ai` extension → `/v1/chat` |
-| MCP | Filename or `toolName` from frontmatter |
-| OpenAI | Filename or `toolName` as model name |
-| Anthropic | Filename or `toolName` as model name |
-| Slack | Configured via routing rules |
-| Embed | Filename or default from config |
+| Headend   | Agent Identifier                              |
+| --------- | --------------------------------------------- |
+| REST API  | Filename without `.ai` extension → `/v1/chat` |
+| MCP       | Filename or `toolName` from frontmatter       |
+| OpenAI    | Filename or `toolName` as model name          |
+| Anthropic | Filename or `toolName` as model name          |
+| Slack     | Configured via routing rules                  |
+| Embed     | Filename or default from config               |
 
 **Sub-agent loading**: Agents referenced in frontmatter (via `agents:` or `handoff:`) are auto-loaded.
 
@@ -120,12 +122,12 @@ ai-agent --agent agents/main.ai --agent agents/helper.ai --api 8080
 
 All network headends expose health endpoints for load balancer integration:
 
-| Headend | Endpoint | Response |
-|---------|----------|----------|
-| REST API | `GET /health` | `{"status":"ok"}` |
-| OpenAI | `GET /health` | `{"status":"ok"}` |
+| Headend   | Endpoint      | Response          |
+| --------- | ------------- | ----------------- |
+| REST API  | `GET /health` | `{"status":"ok"}` |
+| OpenAI    | `GET /health` | `{"status":"ok"}` |
 | Anthropic | `GET /health` | `{"status":"ok"}` |
-| Embed | `GET /health` | `{"status":"ok"}` |
+| Embed     | `GET /health` | `{"status":"ok"}` |
 
 ---
 

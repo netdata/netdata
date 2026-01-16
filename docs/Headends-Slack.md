@@ -29,12 +29,14 @@ Deploy agents as Slack bots with Socket Mode integration, channel routing, and s
 ## Overview
 
 The Slack headend connects your agents to Slack workspaces via Socket Mode. Use it when:
+
 - Your team wants to interact with agents in Slack
 - You need channel-specific agent routing
 - You want slash command integration
 - You need progress updates in threads
 
 **Key features**:
+
 - Socket Mode (no public endpoint required)
 - Channel-based routing rules
 - Per-engagement prompt templates
@@ -108,20 +110,20 @@ ai-agent --agent chat.ai --slack
 
 Go to **OAuth & Permissions** → **Scopes** → **Bot Token Scopes** and add:
 
-| Scope | Purpose |
-|-------|---------|
-| `app_mentions:read` | Receive @mentions |
-| `channels:history` | Read public channel messages |
-| `channels:read` | List public channels |
-| `chat:write` | Post messages |
-| `groups:history` | Read private channel messages |
-| `groups:read` | List private channels |
-| `im:history` | Read DM messages |
-| `im:read` | List DMs |
-| `im:write` | Open DMs |
-| `mpim:history` | Read group DM messages |
-| `mpim:read` | List group DMs |
-| `users:read` | Get user info |
+| Scope               | Purpose                       |
+| ------------------- | ----------------------------- |
+| `app_mentions:read` | Receive @mentions             |
+| `channels:history`  | Read public channel messages  |
+| `channels:read`     | List public channels          |
+| `chat:write`        | Post messages                 |
+| `groups:history`    | Read private channel messages |
+| `groups:read`       | List private channels         |
+| `im:history`        | Read DM messages              |
+| `im:read`           | List DMs                      |
+| `im:write`          | Open DMs                      |
+| `mpim:history`      | Read group DM messages        |
+| `mpim:read`         | List group DMs                |
+| `users:read`        | Get user info                 |
 
 ### Step 4: Install App
 
@@ -149,13 +151,14 @@ Go to **Slash Commands**:
 1. Click **Create New Command**
 2. Configure:
    - Command: `/ai-agent`
-   - Request URL: `https://your-server/ai-agent`
+   - Request URL: `https://your-server/slack/commands`
    - Description: "Ask the AI agent"
 3. Click **Save**
 
 ### Step 7: Get Signing Secret
 
 Go to **Basic Information** → **App Credentials**:
+
 - Copy **Signing Secret**
 
 ---
@@ -164,14 +167,15 @@ Go to **Basic Information** → **App Credentials**:
 
 ### --slack
 
-| Property | Value |
-|----------|-------|
-| Type | `boolean` |
-| Default | `false` |
+| Property | Value     |
+| -------- | --------- |
+| Type     | `boolean` |
+| Default  | `false`   |
 
 **Description**: Enable Slack headend. Requires tokens in config or environment.
 
 **Example**:
+
 ```bash
 ai-agent --agent chat.ai --slack
 ```
@@ -184,13 +188,14 @@ Configuration in `.ai-agent.json` under the `slack` key:
 
 ### Authentication Options
 
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `botToken` | `string` | Yes | Bot User OAuth Token (`xoxb-...`) |
-| `appToken` | `string` | Yes | App-level token for Socket Mode (`xapp-...`) |
-| `signingSecret` | `string` | Yes | Signing secret for slash command verification |
+| Option          | Type     | Required | Description                                   |
+| --------------- | -------- | -------- | --------------------------------------------- |
+| `botToken`      | `string` | Yes      | Bot User OAuth Token (`xoxb-...`)             |
+| `appToken`      | `string` | Yes      | App-level token for Socket Mode (`xapp-...`)  |
+| `signingSecret` | `string` | Yes      | Signing secret for slash command verification |
 
 **Example**:
+
 ```json
 {
   "slack": {
@@ -203,16 +208,17 @@ Configuration in `.ai-agent.json` under the `slack` key:
 
 ### Engagement Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `mentions` | `boolean` | `true` | Respond to @mentions |
-| `dms` | `boolean` | `true` | Respond to direct messages |
-| `updateIntervalMs` | `number` or `string` | `5000` | Progress update interval |
-| `historyLimit` | `number` | `10` | Max messages to include as context |
-| `historyCharsCap` | `number` | `4000` | Max characters from history |
-| `openerTone` | `string` | `random` | Initial message tone |
+| Option             | Type                 | Default  | Description                        |
+| ------------------ | -------------------- | -------- | ---------------------------------- |
+| `mentions`         | `boolean`            | `true`   | Respond to @mentions               |
+| `dms`              | `boolean`            | `true`   | Respond to direct messages         |
+| `updateIntervalMs` | `number` or `string` | `2000`   | Progress update interval           |
+| `historyLimit`     | `number`             | `100`    | Max messages to include as context |
+| `historyCharsCap`  | `number`             | `100000` | Max characters from history        |
+| `openerTone`       | `string`             | `random` | Initial message tone               |
 
 **Example**:
+
 ```json
 {
   "slack": {
@@ -229,6 +235,7 @@ Configuration in `.ai-agent.json` under the `slack` key:
 ### Duration Strings
 
 `updateIntervalMs` accepts either:
+
 - Number in milliseconds: `5000`
 - Duration string: `"3s"`, `"500ms"`, `"1m"`
 
@@ -263,20 +270,20 @@ The fallback when no rules match:
       "agent": "./agents/general.ai",
       "engage": ["mentions", "dms"],
       "promptTemplates": {
-        "mention": "User @{user} mentioned you in #{channel}: {message}",
-        "dm": "User @{user} sent you a DM: {message}"
+        "mention": "User {user.label} mentioned you in {channel.name}: {text}",
+        "dm": "User {user.label} sent you a DM: {text}"
       }
     }
   }
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `agent` | `string` | Path to agent file (relative to primary agent) |
-| `engage` | `array` | Engagement types to handle: `mentions`, `dms`, `channel-posts` |
-| `promptTemplates` | `object` | Custom prompts per engagement type |
-| `contextPolicy` | `object` | Thread context handling |
+| Field             | Type     | Description                                                    |
+| ----------------- | -------- | -------------------------------------------------------------- |
+| `agent`           | `string` | Path to agent file (relative to primary agent)                 |
+| `engage`          | `array`  | Engagement types to handle: `mentions`, `dms`, `channel-posts` |
+| `promptTemplates` | `object` | Custom prompts per engagement type                             |
+| `contextPolicy`   | `object` | Thread context handling                                        |
 
 ### Routing Rules
 
@@ -302,18 +309,19 @@ Ordered rules evaluated before the default:
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `channels` | `array` | Channel patterns (names or IDs) |
-| `agent` | `string` | Path to agent file |
-| `engage` | `array` | Engagement types |
-| `enabled` | `boolean` | Enable/disable rule (default: `true`) |
-| `promptTemplates` | `object` | Custom prompts |
-| `contextPolicy` | `object` | Context handling |
+| Field             | Type      | Description                           |
+| ----------------- | --------- | ------------------------------------- |
+| `channels`        | `array`   | Channel patterns (names or IDs)       |
+| `agent`           | `string`  | Path to agent file                    |
+| `engage`          | `array`   | Engagement types                      |
+| `enabled`         | `boolean` | Enable/disable rule (default: `true`) |
+| `promptTemplates` | `object`  | Custom prompts                        |
+| `contextPolicy`   | `object`  | Context handling                      |
 
 ### Channel Patterns
 
 Channels can be specified as:
+
 - **Name**: `#general`, `support` (with or without `#`)
 - **ID**: `C012ABCDE`, `G012ABCDE`
 - **Glob pattern**: `#help-*`, `#team-*-support`
@@ -345,11 +353,11 @@ Deny rules are evaluated **first**. If a deny matches, the message is ignored.
 
 ## Engagement Types
 
-| Type | Trigger | Description |
-|------|---------|-------------|
-| `mentions` | `@YourBot hello` | User mentions the bot in a channel |
-| `dms` | Direct message | User sends a direct message to the bot |
-| `channel-posts` | Any message | Any message in a channel (use carefully) |
+| Type            | Trigger          | Description                              |
+| --------------- | ---------------- | ---------------------------------------- |
+| `mentions`      | `@YourBot hello` | User mentions the bot in a channel       |
+| `dms`           | Direct message   | User sends a direct message to the bot   |
+| `channel-posts` | Any message      | Any message in a channel (use carefully) |
 
 **Warning**: `channel-posts` responds to ALL messages in matched channels. Use with caution and deny rules.
 
@@ -362,23 +370,24 @@ Customize how user messages are presented to agents:
 ```json
 {
   "promptTemplates": {
-    "mention": "User @{user} in #{channel} asks: {message}",
-    "dm": "Direct message from @{user}: {message}",
-    "channelPost": "Message in #{channel} from @{user}: {message}"
+    "mention": "User {user.label} in {channel.name} asks: {text}",
+    "dm": "Direct message from {user.label}: {text}",
+    "channelPost": "Message in {channel.name} from {user.label}: {text}"
   }
 }
 ```
 
 ### Available Variables
 
-| Variable | Description |
-|----------|-------------|
-| `{user}` | User's display name |
-| `{userId}` | User's Slack ID |
-| `{channel}` | Channel name |
-| `{channelId}` | Channel ID |
-| `{message}` | The user's message text |
-| `{thread}` | Thread context (if in thread) |
+| Variable         | Description             |
+| ---------------- | ----------------------- |
+| `{user.label}`   | User's display name     |
+| `{user.id}`      | User's Slack ID         |
+| `{channel.name}` | Channel name            |
+| `{channel.id}`   | Channel ID              |
+| `{text}`         | The user's message text |
+| `{message.url}`  | Message permalink URL   |
+| `{ts}`           | Message timestamp       |
 
 ---
 
@@ -394,11 +403,11 @@ Control how thread context is included:
 }
 ```
 
-| Value | Description |
-|-------|-------------|
-| `selfOnly` | Only include the current message |
-| `previousOnly` | Include previous messages in thread, not current |
-| `selfAndPrevious` | Include both (default) |
+| Value             | Description                                      |
+| ----------------- | ------------------------------------------------ |
+| `selfOnly`        | Only include the current message                 |
+| `previousOnly`    | Include previous messages in thread, not current |
+| `selfAndPrevious` | Include both (default)                           |
 
 ---
 
@@ -414,12 +423,12 @@ Configure the initial response message style:
 }
 ```
 
-| Tone | Example |
-|------|---------|
-| `random` | Randomly selects from the others |
+| Tone       | Example                               |
+| ---------- | ------------------------------------- |
+| `random`   | Randomly selects from the others      |
 | `cheerful` | "On it! Let me help you with that..." |
-| `formal` | "I'm processing your request..." |
-| `busy` | "Working on it..." |
+| `formal`   | "I'm processing your request..."      |
+| `busy`     | "Working on it..."                    |
 
 ---
 
@@ -437,7 +446,7 @@ Or the Slack headend creates a fallback HTTP server if no REST headend is presen
 
 ### Slash Command Endpoint
 
-The endpoint is registered at `/ai-agent` (configurable):
+The endpoint is registered at `/slack/commands` (configurable):
 
 ```json
 {
@@ -458,6 +467,7 @@ The endpoint is registered at `/ai-agent` (configurable):
 ### Signature Verification
 
 Requests are verified using the Slack signing secret:
+
 - `X-Slack-Signature` header
 - `X-Slack-Request-Timestamp` header
 
@@ -487,6 +497,7 @@ Send initial "thinking" message based on `openerTone`.
 ### 5. Run Agent
 
 Execute agent session with:
+
 - User prompt (from template)
 - Thread context (if configured)
 - Output format: `slack-block-kit` or `markdown`
@@ -566,6 +577,7 @@ Socket Mode automatically reconnects on connection failures.
 ### Agent Failures
 
 If an agent fails:
+
 1. Error logged with details
 2. Error message posted to thread
 3. Concurrency slot released
@@ -573,6 +585,7 @@ If an agent fails:
 ### Rate Limiting
 
 Slack has rate limits. The headend:
+
 - Respects `Retry-After` headers
 - Queues messages during rate limiting
 - Logs rate limit events
@@ -586,12 +599,14 @@ Slack has rate limits. The headend:
 **Symptom**: Bot doesn't respond when mentioned.
 
 **Possible causes**:
+
 1. `mentions` set to `false`
 2. Deny rule blocking the channel
 3. Bot not in the channel
 4. Event subscription missing
 
 **Solutions**:
+
 1. Check `"mentions": true` in config
 2. Review deny rules
 3. Invite bot to channel: `/invite @YourBot`
@@ -602,11 +617,13 @@ Slack has rate limits. The headend:
 **Symptom**: No response in direct messages.
 
 **Possible causes**:
+
 1. `dms` set to `false`
 2. Missing `im:*` scopes
 3. Event subscription missing
 
 **Solutions**:
+
 1. Check `"dms": true` in config
 2. Verify OAuth scopes include `im:history`, `im:read`, `im:write`
 3. Verify `message.im` event subscription
@@ -618,6 +635,7 @@ Slack has rate limits. The headend:
 **Cause**: Signing secret mismatch.
 
 **Solution**:
+
 1. Copy signing secret from **Basic Information** → **App Credentials**
 2. Update `signingSecret` in config
 3. Restart ai-agent
@@ -627,11 +645,13 @@ Slack has rate limits. The headend:
 **Symptom**: Bot goes offline frequently.
 
 **Possible causes**:
+
 1. Network instability
 2. Invalid app token
 3. Token expired
 
 **Solutions**:
+
 1. Check network connectivity
 2. Verify `appToken` starts with `xapp-`
 3. Regenerate app-level token in Slack app settings
@@ -643,12 +663,11 @@ Slack has rate limits. The headend:
 **Cause**: `channel-posts` enabled without proper routing.
 
 **Solution**: Add deny rules for channels that shouldn't trigger:
+
 ```json
 {
   "routing": {
-    "deny": [
-      { "channels": ["#general"], "engage": ["channel-posts"] }
-    ]
+    "deny": [{ "channels": ["#general"], "engage": ["channel-posts"] }]
   }
 }
 ```
@@ -658,6 +677,7 @@ Slack has rate limits. The headend:
 **Symptom**: Updates flood the thread or are too slow.
 
 **Solution**: Adjust `updateIntervalMs`:
+
 ```json
 {
   "slack": {
@@ -671,11 +691,13 @@ Slack has rate limits. The headend:
 **Symptom**: `invalid_auth` or `not_authed` errors.
 
 **Possible causes**:
+
 1. Token incorrect
 2. Token revoked
 3. App not installed to workspace
 
 **Solutions**:
+
 1. Verify token starts with `xoxb-`
 2. Check app is installed in Slack app settings
 3. Reinstall app and copy new token
@@ -707,8 +729,8 @@ Slack has rate limits. The headend:
           "agent": "./agents/support.ai",
           "engage": ["mentions", "channel-posts"],
           "promptTemplates": {
-            "mention": "Support request from @{user}: {message}",
-            "channelPost": "Support question in #{channel}: {message}"
+            "mention": "Support request from {user.label}: {text}",
+            "channelPost": "Support question in {channel.name}: {text}"
           }
         },
         {
