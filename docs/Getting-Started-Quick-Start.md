@@ -1,67 +1,62 @@
 # Quick Start
 
-**Goal**: Create and run your first AI agent in under 5 minutes.
+**Goal**: Set up ai-agent from scratch to a working, deployed agent with tools.
+
+**Time**: 15-20 minutes
 
 ---
 
 ## Table of Contents
 
-- [Prerequisites](#prerequisites) - What you need before starting
-- [Step 1: Set Up Your API Key](#step-1-set-up-your-api-key) - Configure LLM provider access
-- [Step 2: Create a Configuration File](#step-2-create-a-configuration-file) - Set up ai-agent.json
-- [Step 3: Create Your First Agent](#step-3-create-your-first-agent) - Write a .ai file
-- [Step 4: Run Your Agent](#step-4-run-your-agent) - Execute and see output
-- [Step 5: Verify It Worked](#step-5-verify-it-worked) - Test different scenarios
-- [Common Issues](#common-issues) - Troubleshooting guide
-- [What You Learned](#what-you-learned) - Summary of skills gained
+- [Prerequisites](#prerequisites) - What you need
+- [Phase 1: Configure Infrastructure](#phase-1-configure-infrastructure) - Providers and tools
+- [Phase 2: Create Your Agent](#phase-2-create-your-agent) - Write your first .ai file
+- [Phase 3: Test and Debug](#phase-3-test-and-debug) - CLI usage, output streams, exit codes
+- [Phase 4: Deploy as a Service](#phase-4-deploy-as-a-service) - Systemd with headends
+- [Phase 5: Integrate with Tools](#phase-5-integrate-with-tools) - Open-WebUI, Claude Code, VS Code
+- [Common Issues](#common-issues) - Troubleshooting
 - [Next Steps](#next-steps) - Where to go from here
 
 ---
 
 ## Prerequisites
 
-Before starting, ensure you have:
+Before starting:
 
 - **ai-agent installed** - See [Installation](Getting-Started-Installation)
-- **At least one LLM provider API key** - OpenAI, Anthropic, or another supported provider
-- **A terminal/command line** - Any Unix shell or Windows PowerShell
+- **An LLM provider API key** - OpenAI (`sk-...`) or Anthropic (`sk-ant-...`)
+- **A terminal** - Unix shell or Windows PowerShell
 
 ---
 
-## Step 1: Set Up Your API Key
+## Phase 1: Configure Infrastructure
 
-Export your API key as an environment variable. Choose the provider you have access to:
+Before creating any agent, you must configure the infrastructure: at least one LLM provider and optionally MCP tools.
 
-**OpenAI:**
-
-```bash
-export OPENAI_API_KEY="sk-..."
-```
-
-**Anthropic:**
+### Step 1.1: Create Configuration Directory
 
 ```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
+mkdir -p ~/.ai-agent
 ```
 
-**Verification**: Confirm the variable is set:
+### Step 1.2: Create Environment File
+
+Store your API keys in `~/.ai-agent/ai-agent.env`:
 
 ```bash
-echo $OPENAI_API_KEY
-# Should print: sk-... (your key, partially hidden for security)
+cat > ~/.ai-agent/ai-agent.env << 'EOF'
+OPENAI_API_KEY=sk-your-key-here
+EOF
+chmod 600 ~/.ai-agent/ai-agent.env
 ```
 
-> **Tip:** For persistent configuration, store keys in `~/.ai-agent/ai-agent.env` instead of exporting. See [Environment Variables](Getting-Started-Environment-Variables).
+For Anthropic, use `ANTHROPIC_API_KEY=sk-ant-...` instead.
 
----
+> **Security**: This file is `chmod 600` (owner-only). Keys are never stored in `.ai-agent.json`.
 
-## Step 2: Create a Configuration File
+### Step 1.3: Create Configuration File
 
-Create a configuration file in your working directory. This tells ai-agent how to connect to your LLM provider.
-
-Create `.ai-agent.json`:
-
-**For OpenAI:**
+Create `~/.ai-agent/ai-agent.json`:
 
 ```json
 {
@@ -70,11 +65,25 @@ Create `.ai-agent.json`:
       "type": "openai",
       "apiKey": "${OPENAI_API_KEY}"
     }
+  },
+  "mcpServers": {
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@context7/mcp-server"]
+    }
   }
 }
 ```
 
-**For Anthropic:**
+**What this configures**:
+
+| Section | Purpose |
+|---------|---------|
+| `providers.openai` | LLM provider with API key from environment |
+| `mcpServers.context7` | Free MCP tool for library documentation (no API key needed) |
+
+For Anthropic, replace the provider:
 
 ```json
 {
@@ -87,99 +96,266 @@ Create `.ai-agent.json`:
 }
 ```
 
-> **Note:** The `${VAR}` syntax expands environment variables at runtime. Your actual API key never appears in the config file.
+### Step 1.4: Verify Configuration
+
+```bash
+ai-agent --list-tools all
+```
+
+Expected output shows available tools:
+
+```
+context7:
+  - resolve-library-id
+  - get-library-docs
+```
+
+If you see errors, check:
+- API key is set correctly in `ai-agent.env`
+- `npx` is available (Node.js installed)
+- JSON syntax is valid
 
 ---
 
-## Step 3: Create Your First Agent
+## Phase 2: Create Your Agent
 
-Create a file named `hello.ai` with this content:
+Now create an agent that uses the configured infrastructure.
 
-**For OpenAI:**
+### Step 2.1: Create Agent Directory
+
+```bash
+mkdir -p ~/agents
+cd ~/agents
+```
+
+### Step 2.2: Create Your First Agent
+
+Create `docs-helper.ai`:
 
 ```yaml
 #!/usr/bin/env ai-agent
 ---
-description: A friendly greeting agent
+description: Answers questions using library documentation
 models:
   - openai/gpt-4o-mini
-maxTurns: 3
+tools:
+  - context7
+maxTurns: 10
 ---
-You are a friendly assistant. Greet the user warmly and answer their questions concisely.
+You are a helpful programming assistant.
+
+When users ask about libraries or frameworks:
+1. Use resolve-library-id to find the library
+2. Use get-library-docs to fetch relevant documentation
+3. Answer based on the documentation
+
+Always cite the documentation source in your answers.
 ```
 
-**For Anthropic:**
+For Anthropic, change `models:` to `- anthropic/claude-sonnet-4-20250514`.
 
-```yaml
-#!/usr/bin/env ai-agent
----
-description: A friendly greeting agent
-models:
-  - anthropic/claude-sonnet-4-20250514
-maxTurns: 3
----
-You are a friendly assistant. Greet the user warmly and answer their questions concisely.
-```
+**File structure explained**:
 
-**File structure explained:**
+| Section | Purpose |
+|---------|---------|
+| `#!/usr/bin/env ai-agent` | Shebang - makes file executable |
+| `---` | YAML frontmatter delimiters |
+| `description` | Human-readable description |
+| `models` | LLM to use (format: `provider/model`) |
+| `tools` | MCP servers this agent can use |
+| `maxTurns` | Maximum conversation turns |
+| Text after `---` | System prompt - agent instructions |
 
-| Section                   | Purpose                                        |
-| ------------------------- | ---------------------------------------------- |
-| `#!/usr/bin/env ai-agent` | Shebang - makes the file executable            |
-| `---`                     | YAML frontmatter delimiters                    |
-| `description`             | Human-readable agent description               |
-| `models`                  | LLM model(s) to use (format: `provider/model`) |
-| `maxTurns`                | Maximum conversation turns before completing   |
-| Text after `---`          | System prompt - instructions for the agent     |
-
----
-
-## Step 4: Run Your Agent
-
-Execute the agent with a user prompt:
+### Step 2.3: Make Executable (Optional)
 
 ```bash
-ai-agent @hello.ai "Hello, who are you?"
+chmod +x docs-helper.ai
 ```
-
-**Expected output:**
-
-```
-Hello! I'm a friendly AI assistant. I'm here to help you with questions, provide
-information, or just have a pleasant conversation. How can I assist you today?
-```
-
-> **Note:** The exact wording varies with each run since LLMs are non-deterministic. The response should be friendly and conversational.
 
 ---
 
-## Step 5: Verify It Worked
+## Phase 3: Test and Debug
 
-Confirm your agent is working correctly by testing these scenarios:
-
-**Test 1: Different question**
+### Step 3.1: Basic Run
 
 ```bash
-ai-agent @hello.ai "What can you help me with?"
+ai-agent @docs-helper.ai "How do I create a React component?"
 ```
 
-Expected: A response listing capabilities or offering assistance.
+**Output streams**:
 
-**Test 2: Dry run (validation only)**
+| Stream | Content |
+|--------|---------|
+| `stdout` | Final agent response only |
+| `stderr` | Progress, tool calls, debugging info |
+
+This separation allows piping: `ai-agent @agent.ai "query" > result.txt`
+
+### Step 3.2: Verbose Mode
 
 ```bash
-ai-agent @hello.ai --dry-run "Test"
+ai-agent @docs-helper.ai --verbose "How do I use useState in React?"
 ```
 
-Expected: Validates configuration and agent file without calling the LLM.
+Verbose output shows:
+- Configuration resolution
+- Model selection
+- Tool calls and responses
+- Token usage
+- Timing information
 
-**Test 3: Verbose mode (for debugging)**
+### Step 3.3: Dry Run (Validation Only)
 
 ```bash
-ai-agent @hello.ai --verbose "Hello"
+ai-agent @docs-helper.ai --dry-run "test"
 ```
 
-Expected: Additional logging showing configuration resolution, model selection, and timing.
+Validates configuration and agent file without calling the LLM. Use this to check for errors before real runs.
+
+### Step 3.4: Understanding Exit Codes
+
+| Code | Meaning | Action |
+|------|---------|--------|
+| 0 | Success | Agent completed with final report |
+| 1 | Configuration error | Check `.ai-agent.json` and agent file |
+| 2 | LLM error | Check API key, rate limits, model name |
+| 3 | Tool error | Check MCP server configuration |
+| 4 | CLI error | Check command-line arguments |
+| 5 | Schema/limit error | Check tool schemas or maxTurns |
+
+**Script usage**:
+
+```bash
+ai-agent @docs-helper.ai "query"
+if [ $? -eq 0 ]; then
+  echo "Success"
+else
+  echo "Failed with exit code $?"
+fi
+```
+
+---
+
+## Phase 4: Deploy as a Service
+
+ai-agent can run as a persistent service exposing multiple headends (APIs).
+
+### Step 4.1: Create Service Configuration
+
+Create `/etc/ai-agent/ai-agent.json` (or use `~/.ai-agent/ai-agent.json`):
+
+```json
+{
+  "providers": {
+    "openai": {
+      "type": "openai",
+      "apiKey": "${OPENAI_API_KEY}"
+    }
+  },
+  "mcpServers": {
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@context7/mcp-server"]
+    }
+  },
+  "api": {
+    "port": 3000
+  }
+}
+```
+
+### Step 4.2: Create Systemd Service
+
+Create `/etc/systemd/system/ai-agent.service`:
+
+```ini
+[Unit]
+Description=AI Agent Service
+After=network.target
+
+[Service]
+Type=simple
+User=ai-agent
+Group=ai-agent
+WorkingDirectory=/opt/ai-agent
+ExecStart=/opt/ai-agent/bin/ai-agent --headend openai --agent /opt/ai-agent/agents/docs-helper.ai
+Restart=always
+RestartSec=5
+EnvironmentFile=/etc/ai-agent/ai-agent.env
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Step 4.3: Start the Service
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable ai-agent
+sudo systemctl start ai-agent
+sudo systemctl status ai-agent
+```
+
+### Step 4.4: Available Headends
+
+| Headend | Flag | Port | Use Case |
+|---------|------|------|----------|
+| OpenAI-compatible | `--headend openai` | 3000 | Open-WebUI, any OpenAI client |
+| Anthropic-compatible | `--headend anthropic` | 3000 | Claude-compatible clients |
+| MCP | `--headend mcp` | stdio | Claude Code, VS Code |
+| REST | `--headend rest` | 3000 | Custom integrations |
+| Slack | `--headend slack` | 3000 | Slack bot |
+
+Multiple headends can run simultaneously:
+
+```bash
+ai-agent --headend openai --headend mcp --agent docs-helper.ai
+```
+
+---
+
+## Phase 5: Integrate with Tools
+
+### Open-WebUI (LLM Headend)
+
+1. Start ai-agent with OpenAI headend:
+   ```bash
+   ai-agent --headend openai --agent docs-helper.ai
+   ```
+
+2. In Open-WebUI settings, add connection:
+   - **URL**: `http://localhost:3000/v1`
+   - **API Key**: (any non-empty string)
+
+3. Select your agent from the model dropdown (appears as `docs-helper`)
+
+### Claude Code (MCP)
+
+1. Add to Claude Code's MCP configuration (`~/.claude/claude_desktop_config.json`):
+   ```json
+   {
+     "mcpServers": {
+       "ai-agent": {
+         "command": "ai-agent",
+         "args": ["--headend", "mcp", "--agent", "/path/to/docs-helper.ai"]
+       }
+     }
+   }
+   ```
+
+2. Restart Claude Code. Your agent's tools appear as MCP tools.
+
+### VS Code (MCP via Extension)
+
+1. Install an MCP-compatible extension
+
+2. Configure the extension to use:
+   ```bash
+   ai-agent --headend mcp --agent /path/to/docs-helper.ai
+   ```
+
+3. Agent tools become available in VS Code
 
 ---
 
@@ -187,63 +363,72 @@ Expected: Additional logging showing configuration resolution, model selection, 
 
 ### "No providers configured"
 
-**Cause:** Configuration file not found or empty.
+**Cause**: Configuration file not found or malformed.
 
-**Solution:** Ensure `.ai-agent.json` exists in the current directory or `~/.ai-agent/ai-agent.json` in your home directory.
+**Solution**:
+1. Check `~/.ai-agent/ai-agent.json` exists
+2. Validate JSON syntax: `jq . ~/.ai-agent/ai-agent.json`
+3. Run `ai-agent --dry-run @agent.ai "test"` to see errors
 
-### "API key not set" or authentication errors
+### "API key not set" / Authentication errors
 
-**Cause:** Environment variable not exported or incorrect key.
+**Cause**: Environment variable not loaded.
 
-**Solution:**
+**Solution**:
+1. Check `ai-agent.env` has the key: `cat ~/.ai-agent/ai-agent.env`
+2. Verify key format (OpenAI: `sk-...`, Anthropic: `sk-ant-...`)
+3. Test key directly with provider's API
 
-1. Verify the variable is set: `echo $OPENAI_API_KEY`
-2. Re-export if needed: `export OPENAI_API_KEY="sk-..."`
-3. Check the key is valid in your provider's dashboard
+### "Unknown model"
 
-### "Unknown model" or model errors
+**Cause**: Model name doesn't match provider.
 
-**Cause:** Model name doesn't match provider's available models.
+**Solution**: Use exact model names:
+- OpenAI: `openai/gpt-4o`, `openai/gpt-4o-mini`
+- Anthropic: `anthropic/claude-sonnet-4-20250514`
 
-**Solution:** Use exact model names. For example:
+### MCP server fails to start
 
-- OpenAI: `openai/gpt-4o`, `openai/gpt-4o-mini`, `openai/gpt-4-turbo`
-- Anthropic: `anthropic/claude-sonnet-4-20250514`, `anthropic/claude-3-5-sonnet-20241022`
+**Cause**: Missing dependencies or wrong command.
 
-### Agent file syntax errors
+**Solution**:
+1. Test manually: `npx -y @context7/mcp-server`
+2. Check `node` and `npx` are installed
+3. Check network access for npm packages
 
-**Cause:** Invalid YAML in frontmatter.
+### Agent runs but no tool calls
 
-**Solution:**
+**Cause**: Agent doesn't have tools configured or prompt doesn't trigger tool use.
 
-1. Ensure exactly three dashes (`---`) on separate lines
-2. Check indentation (use 2 spaces, not tabs)
-3. Ensure quotes around values with special characters
+**Solution**:
+1. Verify `tools:` section lists the MCP server name
+2. Check `--list-tools all` shows the tools
+3. Make prompt explicitly request tool use
 
 ---
 
 ## What You Learned
 
-After completing this quick start, you can:
+After completing this guide:
 
-- Configure ai-agent to connect to an LLM provider
-- Create a basic `.ai` agent file with frontmatter
-- Run an agent from the command line
-- Use `--dry-run` and `--verbose` for debugging
+- Configure providers and MCP servers in `.ai-agent.json`
+- Store API keys securely in `.ai-agent.env`
+- Create agents with tools using `.ai` files
+- Test with `--verbose`, `--dry-run`, and understand exit codes
+- Deploy as systemd service with headends
+- Integrate with Open-WebUI, Claude Code, and VS Code
 
 ---
 
 ## Next Steps
 
-Now that your first agent works, continue learning:
-
-| Goal                                | Page                                                   |
-| ----------------------------------- | ------------------------------------------------------ |
-| Build a real-world agent with tools | [First Agent Tutorial](Getting-Started-First-Agent)    |
-| Understand the `.ai` file format    | [Agent Files](Agent-Development-Agent-Files)           |
-| Learn all frontmatter options       | [Frontmatter Reference](Agent-Development-Frontmatter) |
-| Deploy agents as REST APIs          | [REST Headend](Headends-REST)                          |
-| Complete CLI options                | [CLI Reference](Getting-Started-CLI-Reference)         |
+| Goal | Page |
+|------|------|
+| Add more MCP tools | [MCP Servers](Configuration-MCP-Servers) |
+| Create multi-agent systems | [Sub-Agents](Agent-Files-Sub-Agents) |
+| Build REST API integrations | [REST Tools](Configuration-REST-Tools) |
+| Advanced debugging | [Debugging Guide](Operations-Debugging) |
+| All frontmatter options | [Frontmatter Reference](Agent-Files) |
 
 ---
 
@@ -252,4 +437,5 @@ Now that your first agent works, continue learning:
 - [Installation](Getting-Started-Installation) - Detailed installation options
 - [Environment Variables](Getting-Started-Environment-Variables) - All environment configuration
 - [Configuration](Configuration) - Deep dive into configuration files
-- [Troubleshooting](Operations-Troubleshooting) - Solutions to common problems
+- [Headends](Headends) - All headend types and options
+- [Exit Codes](Operations-Exit-Codes) - Complete exit code reference
