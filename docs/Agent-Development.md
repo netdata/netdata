@@ -1,113 +1,47 @@
 # Agent Development
 
-Learn how to build AI agents with the `.ai` file format.
+This section has been reorganized into focused chapters. Please see:
 
 ---
 
-## Pages in This Section
+## Agent Files ⭐
+
+The most important chapter for building agents. Covers all `.ai` file configuration.
 
 | Page | Description |
 |------|-------------|
-| [Agent Files](Agent-Development-Agent-Files) | The `.ai` file format and structure |
-| [Frontmatter Schema](Agent-Development-Frontmatter) | All available frontmatter keys |
-| [Include Directives](Agent-Development-Includes) | Code reuse with `${include:file}` |
-| [Prompt Variables](Agent-Development-Variables) | Runtime variable substitution |
-| [Input/Output Contracts](Agent-Development-Contracts) | JSON schemas for structured I/O |
-| [Safety Gates](Agent-Development-Safety) | Prompt patterns for safe agents |
-| [Multi-Agent Orchestration](Agent-Development-Multi-Agent) | Advisors, router, handoff, sub-agents |
+| [Overview](Agent-Files) | File structure and anatomy |
+| [Identity](Agent-Files-Identity) | `description`, `usage`, `toolName` |
+| [Models](Agent-Files-Models) | Model selection, fallbacks, caching |
+| [Tools](Agent-Files-Tools) | Tool access and filtering |
+| [Sub-Agents](Agent-Files-Sub-Agents) | Agent delegation and nesting |
+| [Orchestration](Agent-Files-Orchestration) | Advisors, router, handoff |
+| [Behavior](Agent-Files-Behavior) | Turns, retries, temperature |
+| [Contracts](Agent-Files-Contracts) | Input/output schemas |
 
 ---
 
-## Complete Reference
+## System Prompts ⭐
 
-**[AI Agent Configuration Guide](skills/ai-agent-configuration.md)** - The authoritative single-page reference for AI assistants building agents. Covers everything in depth.
+Writing effective prompts for your agents.
 
----
-
-## Quick Overview
-
-### Agent File Structure
-
-```yaml
-#!/usr/bin/env ai-agent
----
-# YAML frontmatter (configuration)
-description: What this agent does
-models:
-  - openai/gpt-4o
-tools:
-  - mcp-server-name
-maxTurns: 10
----
-# System prompt (markdown)
-You are a helpful assistant...
-```
-
-### Minimum Viable Agent
-
-```yaml
----
-models:
-  - openai/gpt-4o-mini
----
-You are a helpful assistant.
-```
-
-### Agent with Tools
-
-```yaml
----
-models:
-  - openai/gpt-4o
-tools:
-  - filesystem
-  - brave
-maxTurns: 15
----
-You are an assistant with access to the filesystem and web search.
-```
-
-### Multi-Agent with Sub-Agents
-
-```yaml
----
-models:
-  - openai/gpt-4o
-agents:
-  - ./specialists/researcher.ai
-  - ./specialists/writer.ai
-maxTurns: 20
----
-You are an orchestrator that delegates tasks to specialist agents.
-```
+| Page | Description |
+|------|-------------|
+| [Overview](System-Prompts) | Prompt structure and anatomy |
+| [Writing Prompts](System-Prompts-Writing) | Best practices and patterns |
+| [Include Directives](System-Prompts-Includes) | Reusing prompt content |
+| [Variables](System-Prompts-Variables) | Available prompt variables |
 
 ---
 
-## Key Concepts
+## Related Sections
 
-### Models
-- Specify as `provider/model` pairs
-- Multiple models = fallback chain
-- First model tried; on failure, next model
-
-### Tools
-- Reference MCP servers by name (from `.ai-agent.json`)
-- Sub-agents automatically become tools
-- Tools can be filtered with `toolsAllowed`/`toolsDenied`
-
-### Turns
-- Each LLM call + tool execution = one turn
-- `maxTurns` prevents infinite loops
-- Final turn forces completion
-
-### Output
-- `format: markdown | json | text`
-- JSON requires `schema` definition
-- Output validated against schema
+- [Safety Gates](Agent-Development-Safety) - Prompt patterns for safe agents
+- [Multi-Agent Orchestration](Agent-Development-Multi-Agent) - High-level orchestration concepts
 
 ---
 
 ## See Also
 
-- [Configuration](Configuration) - Set up providers and tools
-- [AI Agent Configuration Guide](skills/ai-agent-configuration.md) - Complete reference
+- [CLI Reference](CLI) - Running agents from command line
+- [Configuration](Configuration) - Providers and tools setup

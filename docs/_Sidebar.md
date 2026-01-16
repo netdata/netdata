@@ -4,67 +4,74 @@
 - [Installation](Getting-Started-Installation)
 - [Quick Start](Getting-Started-Quick-Start)
 - [First Agent](Getting-Started-First-Agent)
-- [CLI Reference](Getting-Started-CLI-Reference)
 - [Environment Variables](Getting-Started-Environment-Variables)
 
-**Agent Development**
-- [Agent Files](Agent-Development-Agent-Files)
-- [Frontmatter](Agent-Development-Frontmatter)
-- [Include Directives](Agent-Development-Includes)
-- [Variables](Agent-Development-Variables)
-- [Contracts](Agent-Development-Contracts)
-- [Safety Gates](Agent-Development-Safety)
-- [Multi-Agent](Agent-Development-Multi-Agent)
+**Agent Files** ⭐
+- [Overview](Agent-Files)
+- [Identity](Agent-Files-Identity)
+- [Models](Agent-Files-Models)
+- [Tools](Agent-Files-Tools)
+- [Sub-Agents](Agent-Files-Sub-Agents)
+- [Orchestration](Agent-Files-Orchestration)
+- [Behavior](Agent-Files-Behavior)
+- [Contracts](Agent-Files-Contracts)
+
+**System Prompts** ⭐
+- [Overview](System-Prompts)
+- [Writing Prompts](System-Prompts-Writing)
+- [Include Directives](System-Prompts-Includes)
+- [Variables](System-Prompts-Variables)
+
+**CLI Reference** ⭐
+- [Overview](CLI)
+- [Running Agents](CLI-Running-Agents)
+- [Debugging](CLI-Debugging)
+- [Overrides](CLI-Overrides)
+- [Scripting](CLI-Scripting)
 
 **Configuration**
-- [Loading](Configuration-Loading)
+- [Overview](Configuration)
+- [Config Files](Configuration-Files)
 - [Providers](Configuration-Providers)
-- [MCP Tools](Configuration-MCP-Tools)
+- [MCP Servers](Configuration-MCP-Servers)
 - [REST Tools](Configuration-REST-Tools)
-- [Tool Filtering](Configuration-Tool-Filtering)
-- [Caching](Configuration-Caching)
-- [Context Window](Configuration-Context-Window)
 - [Queues](Configuration-Queues)
 - [Pricing](Configuration-Pricing)
-- [Parameters](Configuration-Parameters)
 
 **Headends**
-- [CLI](Headends-CLI)
+- [Overview](Headends)
 - [REST API](Headends-REST)
 - [MCP Server](Headends-MCP)
-- [OpenAI Compatible](Headends-OpenAI)
-- [Anthropic Compatible](Headends-Anthropic)
+- [OpenAI Compatible](Headends-OpenAI-Compatible)
+- [Anthropic Compatible](Headends-Anthropic-Compatible)
 - [Slack](Headends-Slack)
-- [Embed Mode](Headends-Embed)
+- [Embed](Headends-Embed)
 - [Library](Headends-Library)
 
 **Operations**
-- [Debugging](Operations-Debugging)
+- [Overview](Operations)
 - [Logging](Operations-Logging)
+- [Debugging](Operations-Debugging)
 - [Snapshots](Operations-Snapshots)
-- [Tool Output](Operations-Tool-Output)
 - [Telemetry](Operations-Telemetry)
 - [Accounting](Operations-Accounting)
-- [Exit Codes](Operations-Exit-Codes)
 - [Troubleshooting](Operations-Troubleshooting)
 
 **Technical Specs**
+- [Overview](Technical-Specs)
 - [Architecture](Technical-Specs-Architecture)
 - [Session Lifecycle](Technical-Specs-Session-Lifecycle)
-- [Design History](Technical-Specs-Design-History)
 - [Context Management](Technical-Specs-Context-Management)
-- [Retry Strategy](Technical-Specs-Retry-Strategy)
 - [Tool System](Technical-Specs-Tool-System)
-- [User Contract](Technical-Specs-User-Contract)
-- [Specs Index](Technical-Specs-Index)
 
 **Advanced**
-- [Hidden CLI](Advanced-Hidden-CLI)
-- [Override Keys](Advanced-Override-Keys)
+- [Overview](Advanced)
 - [Extended Reasoning](Advanced-Extended-Reasoning)
+- [Hidden CLI](Advanced-Hidden-CLI)
 - [Internal API](Advanced-Internal-API)
 
 **Contributing**
+- [Overview](Contributing)
 - [Testing](Contributing-Testing)
 - [Code Style](Contributing-Code-Style)
 - [Documentation](Contributing-Documentation)

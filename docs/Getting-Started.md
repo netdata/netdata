@@ -11,8 +11,9 @@ Welcome to AI Agent! This section helps you get up and running quickly.
 | [Installation](Getting-Started-Installation) | Prerequisites and installation steps |
 | [Quick Start](Getting-Started-Quick-Start) | Your first agent in 5 minutes |
 | [First Agent Tutorial](Getting-Started-First-Agent) | Step-by-step tutorial building a real agent |
-| [CLI Reference](Getting-Started-CLI-Reference) | Command line options and usage |
 | [Environment Variables](Getting-Started-Environment-Variables) | Configuration via environment |
+
+See also: [CLI Reference](CLI) for complete command line documentation.
 
 ---
 
