@@ -180,3 +180,6 @@ lto = "fat"
 codegen-units = 1
 strip = true
 panic = "abort"
+
+[patch.crates-io]
+fastant = { git = "https://github.com/netdata/fastant.git", branch = "fastant-x86-fix" }
