@@ -7,10 +7,11 @@ A high-performance MCP (Model Context Protocol) server providing comprehensive f
 The `fs-mcp-server` is a production-ready filesystem server that implements the MCP protocol, enabling AI assistants to safely interact with local filesystems. It features:
 
 - **Token-efficient output** - Compact markdown formatting reduces token usage by 60-75%
-- **Strong security** - Path traversal prevention and root directory enforcement for requested paths (symlink targets are not validated)
+- **Strong security** - Path traversal prevention, root directory enforcement, symlink target hiding
 - **Comprehensive operations** - Read, search, list, tree visualization, and grep capabilities
 - **Robust error handling** - Graceful handling of binary files and invalid UTF-8
-- **Rich metadata** - File sizes, timestamps, and operation statistics (symlink targets shown when underlying tools provide them)
+- **Rich metadata** - File sizes, timestamps, and operation statistics
+- **Symlink support** - Transparent symlink handling for isolated environment use cases
 - **Exclusions** - Root-level `.mcpignore` for admin-controlled ignores
 
 ## Installation
@@ -57,8 +58,9 @@ The server enforces strict security boundaries:
 
 1. **Root Directory Confinement** - All operations are restricted to the specified root directory
 2. **Path Traversal Prevention** - Attempts to access parent directories (../) are blocked
-3. **Symlink Note** - Symlink targets are not validated; resolved targets may point outside root depending on OS/tool defaults
-4. **Absolute Path Rejection** - Absolute paths are rejected
+3. **Absolute Path Rejection** - Absolute paths are rejected
+4. **Symlink Target Hiding** - Symlink targets are never exposed; agents see symlinks as regular files/directories
+5. **Relative Paths Only** - All tool outputs use relative paths from root (no leading `/`)
 
 ## Available Tools
 
@@ -77,11 +79,13 @@ List directory contents with optional metadata.
 file1.txt                   1.2K
 file2.md                    456B
 subdir/                        -
-link -> target.txt         1.2K
-broken_link -> target.txt      -
+linked-dir/                    -
+linked-file.txt            1.2K
 
-2 files, 2 directories in docs
+3 files and 2 directories in docs
 ```
+
+Note: Symlinks appear as regular files or directories (symlinks to directories have trailing `/`). Symlink targets are hidden.
 
 ### Tree
 
@@ -114,18 +118,21 @@ Find files and directories matching glob patterns.
 
 **Features:**
 - Supports standard glob patterns (`*`, `?`, `**`)
-- Symlink handling follows `rg --files` defaults (targets are not shown)
-- Includes statistics on files/directories examined
+- Returns relative paths (usable directly with Read)
+- Follows symlinks transparently
+- Includes match statistics
 
 **Output Format:**
 ```
 src/index.js
 src/utils.js
 docs/README.md
-link_to_file -> target.txt
+linked-project/config.json
 
-4 files matched under project, examined 10 files in 3 directories
+4 files matched under project
 ```
+
+Note: All paths are relative to root and can be passed directly to Read/Grep.
 
 ### Read
 
@@ -213,13 +220,46 @@ src/index.js
 
 ### Symlink Handling
 
-Symlink handling is best-effort and delegated to underlying tools (`ls`, `tree`, `rg`):
+Symlinks are fully supported and treated as transparent gateways to their targets:
 
-- Symlink targets may be shown in listings when the tool provides them
-- The server does **not** validate or restrict resolved symlink targets
-- Read/Grep follow OS default symlink behavior
-- Directory traversal behavior depends on `tree`/`rg` defaults
-- No explicit symlink loop detection is performed
+- **Directory symlinks** appear as regular directories (with trailing `/`) in ListDir
+- **File symlinks** appear as regular files in ListDir
+- **Symlink targets are hidden** - the `->` target path is never exposed to the model
+- **All tools follow symlinks** - Read, Grep, Find, RGrep, Tree all work through symlinks
+- **Relative paths preserved** - paths returned by Find/RGrep are relative to root, going through the symlink name
+
+This design enables the **isolated environment use case** described below.
+
+### Isolated Environments via Symlinks
+
+A key use case is creating isolated, limited filesystem views for AI agents using symlinks:
+
+**Setup:**
+1. Create an empty root directory
+2. Add symlinks inside pointing to directories/files outside the root
+3. Start the server with that root directory
+
+**Example:**
+```bash
+mkdir /tmp/agent-workspace
+ln -s /home/user/project-a /tmp/agent-workspace/project-a
+ln -s /home/user/docs /tmp/agent-workspace/docs
+ln -s /etc/config.json /tmp/agent-workspace/config.json
+
+node fs-mcp-server.js /tmp/agent-workspace
+```
+
+**Result:**
+- Agent sees only `project-a/`, `docs/`, and `config.json`
+- All paths are relative: `project-a/src/main.js`, `docs/README.md`
+- External absolute paths (`/home/user/...`) are never exposed
+- Agent cannot discover or access anything outside the symlinked content
+
+**Benefits:**
+- **Reuse existing storage** - no need to copy files
+- **Fine-grained access control** - expose only specific directories/files
+- **Path isolation** - agent has no knowledge of actual filesystem structure
+- **Easy reconfiguration** - add/remove symlinks to change agent's view
 
 ### Hidden Files
 
@@ -265,13 +305,14 @@ Clear, actionable error messages:
 
 ## Testing
 
-Comprehensive test suite with 35+ tests covering:
-- Basic operations
-- Symlink scenarios
+Comprehensive test suite with 58 tests covering:
+- Basic operations (ListDir, Read, Tree, Find, Grep, RGrep)
+- Symlink handling (directory symlinks, file symlinks, target hiding)
+- Integration tests (Find/RGrep paths work directly with Read)
 - Hidden file handling
 - Binary file processing
 - Error conditions
-- Path security
+- Path security (traversal prevention, absolute path rejection)
 - Edge cases
 
 Run tests:
@@ -284,7 +325,7 @@ node test-fs-mcp.js -v     # Verbose with examples
 
 1. **Never run as root** - Use appropriate user permissions
 2. **Validate root directory** - Ensure it contains intended files
-3. **Monitor symlinks** - Review symlink warnings in output
+3. **Symlinks extend access** - Symlinks inside root can point to files outside root; this is intentional for isolated environments but requires admin awareness
 4. **Limit scope** - Use most specific directory possible
 5. **Review operations** - Check file counts in statistics
 
@@ -293,7 +334,8 @@ node test-fs-mcp.js -v     # Verbose with examples
 | Feature | fs-mcp-server | Standard JSON MCP |
 |---------|--------------|-------------------|
 | Token usage | 25-40% | 100% baseline |
-| Symlink info | Always shown | Often hidden |
+| Symlink handling | Transparent (targets hidden) | Often exposes targets |
+| Path format | Always relative | May be absolute |
 | Statistics | All operations | Usually none |
 | Binary files | Hex escapes | May fail |
 | Hidden files | Included | Varies |

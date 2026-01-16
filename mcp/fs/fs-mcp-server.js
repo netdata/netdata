@@ -257,18 +257,32 @@ async function toolListDir(args) {
     );
     if (match) {
       const typeChar = match[1];
-      const perms = match[2];
       const size = parseInt(match[6], 10);
       const date = match[7];
       const time = match[8];
-      const name = match[9];
+      let name = match[9];
       const mtime = `${date} ${time}`;
 
       if (name === "." || name === "..") continue;
 
       let type = "file";
-      if (typeChar === "d") type = "dir";
-      else if (typeChar === "l") type = "symlink";
+      if (typeChar === "d") {
+        type = "dir";
+      } else if (typeChar === "l") {
+        // For symlinks: strip " -> target" and check if target is a directory
+        const arrowIdx = name.indexOf(" -> ");
+        if (arrowIdx !== -1) {
+          name = name.substring(0, arrowIdx);
+        }
+        // Check if symlink points to a directory
+        const symlinkPath = path.join(abs, name);
+        try {
+          const stat = fs.statSync(symlinkPath); // follows symlinks
+          type = stat.isDirectory() ? "dir" : "file";
+        } catch {
+          type = "file"; // broken symlink, treat as file
+        }
+      }
 
       let entry = type === "dir" ? name + "/" : name;
 
@@ -299,8 +313,13 @@ async function toolTree(args) {
   assertWithinRoot(abs);
 
   const cmd = "tree";
-  const cmdArgs = [abs];
-  const output = await execCommand(cmd, cmdArgs);
+  // Use -l to follow symlinks into directories
+  const cmdArgs = ["-l", abs];
+  let output = await execCommand(cmd, cmdArgs);
+
+  // Strip symlink targets " -> /path/to/target" to hide external paths
+  // Matches: "name -> /absolute/path" or "name -> relative/path"
+  output = output.replace(/ -> [^\n]+/g, "");
 
   const fileMatch = output.match(/(\d+)\s+files?/);
   const dirMatch = output.match(/(\d+)\s+director(?:y|ies)?/);
@@ -321,7 +340,9 @@ async function toolFind(args) {
   assertWithinRoot(abs);
 
   const cmd = "rg";
-  const cmdArgs = ["--files", "--glob", glob, abs];
+  // Use relative path (dir) instead of absolute (abs) so rg outputs relative paths
+  // Security validation already done via assertWithinRoot(abs)
+  const cmdArgs = ["--files", "--glob", glob, dir];
   const output = await execCommand(cmd, cmdArgs);
 
   const paths = output.split("\n").filter((p) => p.trim());
@@ -462,7 +483,9 @@ async function toolRGrep(args) {
   const cs = caseSensitive === undefined ? false : caseSensitive;
 
   const cmd = "rg";
-  const cmdArgs = ["--json", ...(cs ? [] : ["-i"]), "--", regex, abs];
+  // Use relative path (dir) instead of absolute (abs) so rg outputs relative paths
+  // Security validation already done via assertWithinRoot(abs)
+  const cmdArgs = ["--json", ...(cs ? [] : ["-i"]), "--", regex, dir];
 
   const output = await execCommand(cmd, cmdArgs, { allowedExitCodes: [0, 1] });
   return parseRgJsonToRGrepFormat(output);

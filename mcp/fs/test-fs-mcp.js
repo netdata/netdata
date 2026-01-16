@@ -32,6 +32,9 @@ if (process.argv.includes("--verbose") || process.argv.includes("-v")) {
   console.log(`${YELLOW}Running in verbose mode${NC}`);
 }
 
+// External directory for symlink tests (outside TEST_DIR)
+const EXTERNAL_DIR = path.join(os.tmpdir(), `fs-mcp-external-${Date.now()}`);
+
 async function setupTestEnvironment() {
   console.log(`${BLUE}Setting up test environment in: ${TEST_DIR}${NC}`);
   await fs.promises.mkdir(TEST_DIR, { recursive: true });
@@ -75,6 +78,24 @@ async function setupTestEnvironment() {
   await fs.promises.writeFile(
     path.join(TEST_DIR, "special.txt"),
     "File with spaces in name",
+  );
+
+  // Setup external directory with symlink pointing to it (for isolated env tests)
+  await fs.promises.mkdir(path.join(EXTERNAL_DIR, "docs"), { recursive: true });
+  await fs.promises.writeFile(
+    path.join(EXTERNAL_DIR, "docs", "external.md"),
+    "External content for symlink test",
+  );
+  await fs.promises.writeFile(
+    path.join(EXTERNAL_DIR, "docs", "code.js"),
+    "console.log('external code');",
+  );
+  // Create symlink inside TEST_DIR pointing to EXTERNAL_DIR
+  await fs.promises.symlink(EXTERNAL_DIR, path.join(TEST_DIR, "linked-project"));
+  // Create symlink to a single file
+  await fs.promises.symlink(
+    path.join(EXTERNAL_DIR, "docs", "external.md"),
+    path.join(TEST_DIR, "linked-file.md")
   );
 }
 
@@ -439,6 +460,31 @@ const tests = [
   },
 
   {
+    name: "Find returns relative paths not absolute",
+    fn: async (client) => {
+      const result = await client.callTool("Find", {
+        dir: "dir1",
+        glob: "*.js",
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: Find relative paths${NC}`);
+        console.log("Output:", result);
+      }
+      // Paths should be relative like "dir1/nested.js", not absolute like "/tmp/.../dir1/nested.js"
+      const lines = result.split("\n").filter((l) => l.trim() && !l.includes("matched"));
+      for (const line of lines) {
+        if (line.startsWith("/")) {
+          throw new Error(`Find returned absolute path: ${line}`);
+        }
+      }
+      // Should contain the relative path
+      if (!result.includes("dir1/nested.js") && !result.includes("dir1\\nested.js")) {
+        throw new Error("Find should return relative path dir1/nested.js");
+      }
+    },
+  },
+
+  {
     name: "Find returns files only",
     fn: async (client) => {
       const result = await client.callTool("Find", { dir: ".", glob: "*" });
@@ -686,6 +732,34 @@ const tests = [
         console.log("Output:", result);
       }
       if (!result.includes("nested.js")) throw new Error("Missing file path");
+    },
+  },
+
+  {
+    name: "RGrep returns relative paths not absolute",
+    fn: async (client) => {
+      const result = await client.callTool("RGrep", {
+        dir: "dir1",
+        regex: "console",
+        caseSensitive: true,
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: RGrep relative paths${NC}`);
+        console.log("Output:", result);
+      }
+      // Paths should be relative like "dir1/nested.js", not absolute like "/tmp/.../dir1/nested.js"
+      const lines = result.split("\n").filter((l) => l.trim());
+      for (const line of lines) {
+        // Skip summary lines
+        if (line.includes("match") || line.includes("Files matched")) continue;
+        if (line.startsWith("/")) {
+          throw new Error(`RGrep returned absolute path: ${line}`);
+        }
+      }
+      // Should contain the relative path
+      if (!result.includes("dir1/nested.js") && !result.includes("dir1\\nested.js")) {
+        throw new Error("RGrep should return relative path dir1/nested.js");
+      }
     },
   },
 
@@ -981,6 +1055,315 @@ const tests = [
         throw new Error("Should show 0 files in empty directory");
     },
   },
+
+  // === Symlink tests for isolated environment support ===
+
+  {
+    name: "ListDir symlink shows as directory without target",
+    fn: async (client) => {
+      const result = await client.callTool("ListDir", { dir: "." });
+      if (verbose) {
+        console.log(`${GRAY}Tool: ListDir symlink${NC}`);
+        console.log("Output:", result);
+      }
+      // Should show linked-project as a directory
+      if (!result.includes("linked-project/"))
+        throw new Error("Symlink should appear as directory with trailing /");
+      // Should NOT expose the symlink target path
+      if (result.includes("->"))
+        throw new Error("Should not expose symlink target (->)");
+      if (result.includes(EXTERNAL_DIR))
+        throw new Error("Should not expose external path");
+    },
+  },
+
+  {
+    name: "Tree follows symlink and hides target",
+    fn: async (client) => {
+      const result = await client.callTool("Tree", { dir: "linked-project" });
+      if (verbose) {
+        console.log(`${GRAY}Tool: Tree symlink${NC}`);
+        console.log("Output:", result);
+      }
+      // Should show contents of the symlinked directory
+      if (!result.includes("docs"))
+        throw new Error("Tree should show docs inside symlink");
+      if (!result.includes("external.md"))
+        throw new Error("Tree should show external.md inside symlink");
+      // Should NOT expose the symlink target path
+      if (result.includes("->"))
+        throw new Error("Tree should not expose symlink target (->)");
+      if (result.includes(EXTERNAL_DIR))
+        throw new Error("Tree should not expose external path");
+    },
+  },
+
+  {
+    name: "Find through symlink returns relative paths",
+    fn: async (client) => {
+      const result = await client.callTool("Find", {
+        dir: "linked-project",
+        glob: "*.md",
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: Find through symlink${NC}`);
+        console.log("Output:", result);
+      }
+      // Should find files through the symlink
+      if (!result.includes("external.md"))
+        throw new Error("Find should find external.md through symlink");
+      // Paths should be relative, not absolute
+      if (result.includes(EXTERNAL_DIR))
+        throw new Error("Find should not expose external absolute path");
+      // Should have relative path through symlink
+      if (!result.includes("linked-project"))
+        throw new Error("Find should return path through symlink");
+    },
+  },
+
+  {
+    name: "RGrep through symlink returns relative paths",
+    fn: async (client) => {
+      // Search case-insensitive to match "External" in external.md
+      const result = await client.callTool("RGrep", {
+        dir: "linked-project",
+        regex: "External",
+        caseSensitive: false,
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: RGrep through symlink${NC}`);
+        console.log("Output:", result);
+      }
+      // Should find matches through the symlink
+      if (!result.includes("external.md"))
+        throw new Error("RGrep should find content through symlink");
+      // Paths should be relative, not absolute
+      if (result.includes(EXTERNAL_DIR))
+        throw new Error("RGrep should not expose external absolute path");
+      // Should have relative path through symlink
+      if (!result.includes("linked-project"))
+        throw new Error("RGrep should return path through symlink");
+    },
+  },
+
+  {
+    name: "Read through symlink works",
+    fn: async (client) => {
+      const result = await client.callTool("Read", {
+        file: "linked-project/docs/external.md",
+        start: 0,
+        lines: 10,
+        headOrTail: "head",
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: Read through symlink${NC}`);
+        console.log("Output:", result);
+      }
+      if (!result.includes("External content for symlink test"))
+        throw new Error("Read should access files through symlink");
+    },
+  },
+
+  // === File symlink tests ===
+
+  {
+    name: "ListDir file symlink shows as file without target",
+    fn: async (client) => {
+      const result = await client.callTool("ListDir", { dir: "." });
+      if (verbose) {
+        console.log(`${GRAY}Tool: ListDir file symlink${NC}`);
+        console.log("Output:", result);
+      }
+      // Should show linked-file.md as a file (no trailing /)
+      if (!result.includes("linked-file.md"))
+        throw new Error("File symlink should appear in listing");
+      // Should NOT have trailing / (it's a file, not directory)
+      if (result.includes("linked-file.md/"))
+        throw new Error("File symlink should not have trailing /");
+      // Should NOT expose the symlink target path
+      if (result.includes("->"))
+        throw new Error("Should not expose symlink target (->)");
+    },
+  },
+
+  {
+    name: "Read file symlink works",
+    fn: async (client) => {
+      const result = await client.callTool("Read", {
+        file: "linked-file.md",
+        start: 0,
+        lines: 10,
+        headOrTail: "head",
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: Read file symlink${NC}`);
+        console.log("Output:", result);
+      }
+      if (!result.includes("External content for symlink test"))
+        throw new Error("Read should access file through symlink");
+    },
+  },
+
+  {
+    name: "Grep file symlink works",
+    fn: async (client) => {
+      const result = await client.callTool("Grep", {
+        file: "linked-file.md",
+        regex: "External",
+        caseSensitive: true,
+        before: 0,
+        after: 0,
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: Grep file symlink${NC}`);
+        console.log("Output:", result);
+      }
+      if (!result.includes("External content"))
+        throw new Error("Grep should work on file symlink");
+    },
+  },
+
+  // === Integration tests: returned paths work with Read ===
+
+  {
+    name: "Find returns paths usable with Read",
+    fn: async (client) => {
+      // Get files from Find
+      const findResult = await client.callTool("Find", {
+        dir: "dir1",
+        glob: "*.js",
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: Find${NC}`);
+        console.log("Output:", findResult);
+      }
+
+      // Extract file paths (skip summary line)
+      const lines = findResult.split("\n").filter(l => l.trim() && !l.includes("matched"));
+      if (lines.length === 0) throw new Error("Find should return at least one file");
+
+      // Each returned path should work directly with Read
+      for (const filePath of lines) {
+        // Paths must be relative (no leading /)
+        if (filePath.startsWith("/")) {
+          throw new Error(`Find returned absolute path: ${filePath}`);
+        }
+
+        // Try to read the file using the exact path returned
+        const readResult = await client.callTool("Read", {
+          file: filePath,
+          start: 0,
+          lines: 5,
+          headOrTail: "head",
+        });
+        if (verbose) {
+          console.log(`${GRAY}Read ${filePath}:${NC}`, readResult.substring(0, 50));
+        }
+
+        // Should not error and should have content
+        if (!readResult || readResult.includes("Error"))
+          throw new Error(`Read failed for path from Find: ${filePath}`);
+      }
+    },
+  },
+
+  {
+    name: "RGrep returns paths usable with Read",
+    fn: async (client) => {
+      // Get files from RGrep
+      const rgrepResult = await client.callTool("RGrep", {
+        dir: ".",
+        regex: "console",
+        caseSensitive: true,
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: RGrep${NC}`);
+        console.log("Output:", rgrepResult);
+      }
+
+      // Extract file paths from "Files matched under .:" section
+      const lines = rgrepResult.split("\n");
+      const filesIdx = lines.findIndex(l => l.includes("Files matched"));
+      if (filesIdx === -1) throw new Error("RGrep should have Files matched section");
+
+      // Get file paths after the "Files matched" line
+      const filePaths = lines.slice(filesIdx + 1)
+        .map(l => l.trim())
+        .filter(l => l && !l.includes("match"));
+
+      if (filePaths.length === 0) throw new Error("RGrep should return at least one file");
+
+      // Each returned path should work directly with Read
+      for (const filePath of filePaths) {
+        // Paths must be relative (no leading /)
+        if (filePath.startsWith("/")) {
+          throw new Error(`RGrep returned absolute path: ${filePath}`);
+        }
+
+        // Try to read the file using the exact path returned
+        const readResult = await client.callTool("Read", {
+          file: filePath,
+          start: 0,
+          lines: 5,
+          headOrTail: "head",
+        });
+        if (verbose) {
+          console.log(`${GRAY}Read ${filePath}:${NC}`, readResult.substring(0, 50));
+        }
+
+        // Should not error and should have content
+        if (!readResult || readResult.includes("Error"))
+          throw new Error(`Read failed for path from RGrep: ${filePath}`);
+      }
+    },
+  },
+
+  {
+    name: "Find through symlink returns paths usable with Read",
+    fn: async (client) => {
+      // Get files from Find through symlink
+      const findResult = await client.callTool("Find", {
+        dir: "linked-project",
+        glob: "*",
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: Find through symlink${NC}`);
+        console.log("Output:", findResult);
+      }
+
+      // Extract file paths
+      const lines = findResult.split("\n").filter(l => l.trim() && !l.includes("matched"));
+      if (lines.length === 0) throw new Error("Find should return files through symlink");
+
+      // Each returned path should work directly with Read
+      for (const filePath of lines) {
+        // Paths must be relative (no leading /)
+        if (filePath.startsWith("/")) {
+          throw new Error(`Find returned absolute path through symlink: ${filePath}`);
+        }
+
+        // Path should go through the symlink name, not external path
+        if (!filePath.startsWith("linked-project")) {
+          throw new Error(`Path should start with symlink name: ${filePath}`);
+        }
+
+        // Try to read the file using the exact path returned
+        const readResult = await client.callTool("Read", {
+          file: filePath,
+          start: 0,
+          lines: 5,
+          headOrTail: "head",
+        });
+        if (verbose) {
+          console.log(`${GRAY}Read ${filePath}:${NC}`, readResult.substring(0, 50));
+        }
+
+        // Should not error
+        if (!readResult || readResult.includes("Error"))
+          throw new Error(`Read failed for symlink path from Find: ${filePath}`);
+      }
+    },
+  },
 ];
 
 async function main() {
@@ -1010,7 +1393,8 @@ async function main() {
     }
 
     await fs.promises.rm(TEST_DIR, { recursive: true, force: true });
-    console.log(`${GRAY}Test directory cleaned up${NC}`);
+    await fs.promises.rm(EXTERNAL_DIR, { recursive: true, force: true });
+    console.log(`${GRAY}Test directories cleaned up${NC}`);
 
     process.exit(testsFailed > 0 ? 1 : 0);
   } catch (error) {
