@@ -61,13 +61,77 @@ Freshdesk UI to API Field Mapping:
 - Premium customers are typically routed to dedicated support groups
 
 Key Tools (read-only)
-- freshdesk__get_tickets: Primary tool for filtering tickets by company_id, requester_id, or email (parameters must be integers or strings as appropriate).
-- freshdesk__search_tickets: Find tickets by query/filters. See "search_tickets API Reference" below for EXACT supported fields.
-- freshdesk__get_ticket: Retrieve a ticket by ID (ticket_id integer).
-- freshdesk__get_ticket_conversation: Fetch ticket threads and recent replies (ticket_id integer).
-- freshdesk__get_ticket_fields: Inspect fields and custom properties for paid-plan indicators.
-- freshdesk__search_contacts / freshdesk__get_contact: Resolve requester and company association.
-- freshdesk__search_companies / freshdesk__view_company: Resolve company profile and attributes.
+- freshdesk__get_tickets: Filter tickets by company_id, requester_id, or email. Max 300 pages.
+- freshdesk__search_tickets: Query-based filtering (status, priority, tags). Max 300 results total.
+- freshdesk__get_ticket: Get single ticket. ⚠️ NEVER use include=conversations (returns only oldest 10!)
+- freshdesk__get_ticket_conversation: ✅ USE THIS to get ALL conversations (auto-paginates).
+- freshdesk__get_ticket_fields: Inspect fields and custom properties.
+- freshdesk__list_contacts / freshdesk__get_contact: Get contacts. Use list_contacts for filtering.
+- freshdesk__list_companies / freshdesk__view_company: Get companies. Use view_company for full details.
+
+---
+
+## ⚠️ CRITICAL WARNING: CONVERSATION HISTORY
+
+**NEVER USE `get_ticket(include="conversations")`** - It returns ONLY the oldest 10 conversations!
+
+This is a Freshdesk API limitation, not a bug. The API endpoint `/api/v2/tickets/{id}?include=conversations`
+is hardcoded to return maximum 10 conversations sorted by created_at ascending (oldest first).
+
+**ALWAYS USE `get_ticket_conversation(ticket_id=X)`** - This auto-paginates and returns ALL conversations.
+
+| Method | What You Get | Use Case |
+|--------|--------------|----------|
+| get_ticket(include="conversations") | ❌ Only oldest 10 | NEVER use for conversation history |
+| get_ticket_conversation(ticket_id) | ✅ ALL conversations | ALWAYS use this |
+
+---
+
+## CRITICAL: Tool Usage Guide - READ THIS CAREFULLY
+
+### Pagination Rules
+
+All list endpoints return 30 items per page by default. To get all results you must paginate:
+
+| Endpoint | Max Results | How to Get All |
+|----------|-------------|----------------|
+| get_tickets | 300 pages (30,000 tickets) | Paginate with page parameter |
+| search_tickets | 10 pages (300 results) | Cannot exceed - API limit |
+| list_contacts | Unlimited (paginated) | Check if count < per_page for last page |
+| list_companies | Unlimited (paginated) | Check if count < per_page for last page |
+| get_agents | Unlimited (paginated) | Check if count < per_page for last page |
+
+**CRITICAL**: get_tickets only returns tickets from the last 30 days by default!
+Use `updated_since` parameter to get older tickets.
+
+### Autocomplete vs List APIs
+
+**Autocomplete APIs** (search_contacts, search_companies, search_agents):
+- Return LIMITED results (~10-20 matches max, NOT paginated)
+- Search by PREFIX only ("John" works, "ohn" does NOT)
+- Return only id and name fields
+- Use only for quick lookups when you have a partial name
+
+**List APIs** (list_contacts, list_companies, get_agents):
+- Return ALL results with pagination
+- Support filtering by exact email, phone, company_id
+- Return complete object data
+- Use when you need comprehensive results
+
+### Tool Selection Guide
+
+| What You Need | Tool to Use | Notes |
+|---------------|-------------|-------|
+| All tickets for a company | get_tickets(company_id=X) | Use updated_since for >30 days |
+| All tickets for a requester | get_tickets(requester_id=X) | Or get_tickets(email=X) |
+| Filter by status/priority/tags | search_tickets(query=...) | Max 300 results |
+| Complete conversation history | get_ticket_conversation(ticket_id=X) | Auto-paginates all pages |
+| Quick company lookup by name | search_companies(query=X) | Limited results, prefix only |
+| Full company details | view_company(company_id=X) | Need company_id first |
+| All contacts in a company | list_contacts(company_id=X) | Paginated |
+| Contact by exact email | list_contacts(email=X) | Returns one contact |
+
+---
 
 Standard Procedure
 0) Safety Gate (Mandatory)
@@ -95,9 +159,13 @@ Standard Procedure
    - CRITICAL: For tickets older than 30 days, you MUST use updated_since parameter in get_tickets
    - Pull recent N (default 20) tickets for the company/requester, filtered by date range/keywords if supplied.
    - For each ticket, collect: id, subject, status, priority, type, group/agent, created/updated, due/SLA (if present), tags.
-   - Fetch conversation threads for the last M (default 3) tickets to surface the latest customer messages and agent responses.
 
-4) Summarize Findings
+4) Fetch Conversation History
+   - For tickets requiring detailed analysis, use freshdesk__get_ticket_conversation(ticket_id=X)
+   - This returns ALL conversations (auto-paginates)
+   - ⚠️ NEVER use get_ticket(include="conversations") - it only returns oldest 10!
+
+5) Summarize Findings
    - Group by status (open, pending, resolved), highlight breaching/at-risk SLAs, blockers, and next actions.
    - Include top customer quotes (short, verbatim) from recent conversations when relevant.
 
@@ -121,8 +189,16 @@ Reject Modification Protocol (Always)
 
 SLA Policies Reference
 
-Netdata operates two SLA policies. Business hours: Mon-Fri, 07:00 - 17:00 UTC.
-All durations below are measured in business hours (not calendar time).
+Netdata operates two SLA policies.
+
+**Business Hours Definition:**
+- Monday to Friday, 07:00 - 17:00 UTC
+- Weekends (Saturday/Sunday) are EXCLUDED from SLA calculations
+- Public holidays: Not automatically excluded (Freshdesk follows business hours only)
+- All durations below are measured in BUSINESS HOURS, not calendar time
+
+**Example**: A 4-hour SLA starting Friday at 16:00 UTC would be due Monday at 10:00 UTC
+(1 hour Friday + 3 hours Monday morning).
 
 Premium Support SLA (paying customers with premium support):
 | Priority | First Response | Every Response | Resolution |
@@ -166,12 +242,23 @@ Supported Fields (ONLY THESE WORK):
 - updated_at: e.g. "updated_at:<'2024-06-01'"
 - Custom fields: e.g. "cf_fieldname:'value'" (use cf_ prefix)
 
-NOT SUPPORTED (will return 400 "Validation failed"):
-- requester_id: Use freshdesk__get_tickets(requester_id=X) instead
-- company_id: Use freshdesk__get_tickets(company_id=X) instead
-- description: Not searchable
-- subject: Not searchable
-- responder_id (agent assignment): Not filterable (use agent_id for agent filter)
+**WHY SOME FIELDS DON'T WORK:**
+
+The search_tickets API is Freshdesk's "Filter Tickets" endpoint, which was designed for
+saved filters in the UI, NOT for arbitrary queries. Freshdesk intentionally limits which
+fields can be queried for performance reasons (they index only certain fields).
+
+NOT SUPPORTED - These will return HTTP 400 with body {"message":"Validation failed"}:
+- requester_id → Use freshdesk__get_tickets(requester_id=X) instead
+- company_id → Use freshdesk__get_tickets(company_id=X) instead
+- description → Not indexed, not searchable
+- subject → Not indexed, not searchable
+- responder_id → Use agent_id instead
+
+**Error Response Example:**
+```json
+{"description":"Validation failed","errors":[{"field":"requester_id","message":"Unexpected/invalid field in query","code":"invalid_field"}]}
+```
 
 Query Syntax Rules:
 - Do NOT wrap query in double quotes - the tool handles this automatically
@@ -207,6 +294,10 @@ Use this endpoint for filtering by requester or company. Parameters:
 CRITICAL - Type Requirements:
 - company_id, requester_id, page, per_page must be INTEGERS, not strings
 - If you pass "202000722789" (string) instead of 202000722789 (integer), you get schema validation error
+
+CRITICAL - 30-day limit:
+- By default, only tickets from the last 30 days are returned
+- Use updated_since parameter to get older tickets
 
 Examples:
 - freshdesk__get_tickets(company_id=202000722789, updated_since='2024-01-01T00:00:00Z')
