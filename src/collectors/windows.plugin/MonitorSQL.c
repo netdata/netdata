@@ -1457,6 +1457,8 @@ static void netdata_read_config_options()
         dbconn->collect_blocked_processes =
             inicfg_get_boolean(&netdata_config, section_name, "collect blocked processes", true);
         dbconn->is_connected = FALSE;
+        dbconn->trust_server_certificate = inicfg_get_boolean(&netdata_config, section_name, "trust server certificate",
+                                                              true);
 
         netdata_mount_mssql_connection_string(dbconn);
     }
