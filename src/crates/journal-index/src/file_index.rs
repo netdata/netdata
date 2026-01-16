@@ -480,7 +480,6 @@ fn entry_matches_regex(
 
         // Cache miss - load the data object and check if it matches
         let data_object = journal_file.data_ref(data_offset)?;
-        // FIXME: we need the decompression bit here as well.
 
         let payload_bytes = if data_object.is_compressed() {
             data_object.decompress(scratch_buffer)?;
