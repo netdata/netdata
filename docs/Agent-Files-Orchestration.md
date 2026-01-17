@@ -28,7 +28,6 @@ Orchestration patterns run **outside** the main session loop:
 
 These differ from `agents` (sub-agents), which are tools called DURING the session.
 
-
 ---
 
 ## Quick Example
@@ -107,7 +106,7 @@ advisors:
 
 ### How Advisors Work
 
-1. All advisors run **in parallel** before the main session
+1. All advisors run **in parallel** before the main session (outside the main session's turn loop)
 2. Each advisor receives the user's prompt
 3. Advisor outputs are collected
 4. Outputs are injected as tagged XML blocks at the start of the user prompt
@@ -178,6 +177,7 @@ If an advisor fails:
 ### Best Practices
 
 **Performance**:
+
 - Keep advisors **fast** (low `maxTurns`, simple tasks)
 - Use cheaper/faster models for advisors
 - Design for parallel execution (no dependencies between advisors)
@@ -256,11 +256,12 @@ router:
 1. Router agent receives the user's request
 2. Router analyzes and decides which destination to use
 3. Router calls `router__handoff-to` tool with the destination to declare intent
-4. Orchestration layer executes the handoff after the router session completes
-5. Destination agent takes over and produces the final response
-6. Destination's response is merged into the overall result
+4. Router session completes (with its response)
+5. Orchestration layer spawns the destination agent (passing router's optional message)
+6. Destination agent runs and produces output
+7. If a handoff is configured, the destination's output is passed to the handoff agent for processing; otherwise the destination's output is the final result
 
-### The router__handoff-to Tool
+### The router\_\_handoff-to Tool
 
 When `router.destinations` is configured, a special tool becomes available:
 
@@ -352,7 +353,7 @@ handoff: ./formatters/report.ai
 1. Main session runs and produces output
 2. Handoff agent receives:
    - Original user request
-   - Main session's response
+   - Main session's response (when no router) or destination's response (when using router)
 3. Handoff agent processes and produces final output
 4. Handoff's output becomes the final response
 
@@ -431,11 +432,13 @@ If the main agent uses router AND handoff:
 
 ```
 Request → Router → Destination → Handoff → Final Response
+(If handoff is configured, handoff processes destination's output; otherwise, destination's output is the final result)
 ```
 
 ### Handoff Best Practices
 
 **General**:
+
 - Keep handoff agents focused and fast
 - Don't add new information in handoff (it has all context)
 - Single handoff only (no chaining via frontmatter)
@@ -458,9 +461,9 @@ Research thoroughly. Don't worry about formatting.
 description: Formats research into executive summary
 ---
 Transform the research into:
-- 3-5 key takeaways
-- Findings organized by theme
-- Action items
+  - 3-5 key takeaways
+  - Findings organized by theme
+  - Action items
 ```
 
 Main agents produce raw output; handoff handles presentation.
@@ -604,7 +607,7 @@ Flow:
 
 | Feature          | Orchestration             | Sub-Agents              |
 | ---------------- | ------------------------- | ----------------------- |
-| **When runs**    | Before/after main session | During main session     |
+| **When runs**    | Outside main session loop | During main session     |
 | **Control**      | Automatic (frontmatter)   | LLM decides (tool call) |
 | **Relationship** | Pipeline stages           | On-demand delegation    |
 | **Use case**     | Pre/post processing       | Task specialization     |
@@ -690,6 +693,166 @@ models:
 ---
 ```
 
+### Handoff Pipeline
+
+Chain handoffs for multi-step processing:
+
+```yaml
+# support-entry.ai
+---
+handoff: ./pipeline/find-docs.ai
+---
+```
+
+```yaml
+# pipeline/find-docs.ai
+---
+tools:
+  - docs-search
+handoff: ./pipeline/search-tickets.ai
+---
+```
+
+```yaml
+# pipeline/search-tickets.ai
+---
+tools:
+  - freshdesk
+handoff: ./pipeline/redact-and-respond.ai
+---
+```
+
+```yaml
+# pipeline/redact-and-respond.ai
+---
+description: Final stage - redact and synthesize
+---
+```
+
+Flow: `Request → Find Docs → Search Tickets → Redact & Respond`
+
+Each stage focuses on one task; handoff chains them into a pipeline.
+
+### Full Support Pipeline (Router + Advisors + Handoff)
+
+The most powerful pattern combines everything:
+
+```
+User Request
+     │
+     ▼
+┌─────────────────────────────────────────────┐
+│  SCREENING ROUTER                           │
+│  (advisors: security-screen.ai)             │
+│                                             │
+│  router.destinations:                       │
+│    - ./handlers/reject.ai    ← blocked      │
+│    - ./handlers/approved.ai  ← approved     │
+└─────────────────────────────────────────────┘
+                    │
+        ┌───────────┴───────────┐
+        │                       │
+        ▼                       ▼
+   [REJECTED]              [APPROVED]
+   "Request denied"             │
+                                ▼
+              ┌─────────────────────────────────────┐
+              │  APPROVED HANDLER                   │
+              │  (parallel advisors)                │
+              │                                     │
+              │  ┌─────────┐ ┌─────────┐ ┌───────┐ │
+              │  │  Docs   │ │ Tickets │ │ Code  │ │
+              │  │ Search  │ │ Search  │ │Analysis│ │
+              │  └────┬────┘ └────┬────┘ └───┬───┘ │
+              │       └───────────┼──────────┘     │
+              │                   ▼                │
+              │          Response Synthesis        │
+              │                                    │
+              │  handoff: ./redactor.ai            │
+              └─────────────────────────────────────┘
+                                │
+                                ▼
+              ┌─────────────────────────────────────┐
+              │  REDACTOR (handoff)                 │
+              │  - Redact PII                       │
+              │  - Classify response                │
+              │  - Add metadata                     │
+              └─────────────────────────────────────┘
+                                │
+                                ▼
+                         Final Response
+```
+
+**Implementation**:
+
+```yaml
+# support.ai (entry point - screening router)
+---
+description: Support request handler
+models:
+  - openai/gpt-4o-mini
+advisors:
+  - ./security/screen.ai
+router:
+  destinations:
+    - ./handlers/reject.ai
+    - ./handlers/approved.ai
+temperature: 0
+maxTurns: 3
+---
+Screen the request. Route to reject.ai if blocked, approved.ai if safe.
+```
+
+```yaml
+# handlers/approved.ai (parallel research + synthesis)
+---
+description: Handles approved support requests
+models:
+  - anthropic/claude-sonnet-4-20250514
+advisors:
+  - ./research/docs-search.ai
+  - ./research/ticket-search.ai
+  - ./research/code-analysis.ai
+handoff: ./security/redactor.ai
+---
+Synthesize a response using the research from advisors.
+```
+
+---
+
+## Orchestration Transparency
+
+**Important**: Orchestration is invisible to the user.
+
+When a user talks to an agent, they don't know:
+- Advisors ran before the conversation started
+- A router decided which agent actually handles their request
+- A handoff agent processed the response after
+
+From the user's perspective, they're talking to **one agent**. The orchestration machinery is hidden.
+
+### What Users See vs What Happens
+
+| User Sees | What Actually Happens |
+|-----------|----------------------|
+| "Talking to support agent" | Screening advisor → Router → Handler with research advisors → Redaction handoff |
+| "Got a response" | 5+ agents collaborated invisibly |
+| "Fast answer" | Advisors ran in parallel |
+
+### Router Has Full Orchestration Access
+
+A router agent can use **all orchestration methods simultaneously**:
+
+| Method | When It Runs | Purpose |
+|--------|--------------|---------|
+| Advisors | Before router | Screen/classify incoming request |
+| Tools | During router | Gather info to make routing decision |
+| Sub-agents | During router | Delegate subtasks |
+| Router handoff | Router decides | Select destination handler |
+| Final handoff | After destination | Post-process the response |
+
+This makes router the most powerful orchestration pattern - it's a complete pipeline coordinator.
+
 ---
 
 ## Troubleshooting
@@ -704,7 +867,7 @@ models:
 If compliance issues were identified, do not proceed.
 ```
 
-### "router__handoff-to not available"
+### "router\_\_handoff-to not available"
 
 **Problem**: Tool not appearing for router agent.
 
