@@ -22,6 +22,8 @@
 
   // CSS class constants
   const CSS_HIDDEN = 'ai-chat-hidden';
+  const CSS_SPINNER = '.ai-chat-spinner';
+  const CSS_SPINNER_STATUS = '.ai-chat-spinner-status';
 
   // ---------------------------------------------------------------------------
   // Configuration
@@ -63,11 +65,15 @@
     chat: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`,
     close: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
     send: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`,
+    // Clipboard icon - board with clip at top
+    clipboard: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>`,
+    // Copy icon - two overlapping documents
     copy: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`,
     check: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
     sun: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`,
     moon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`,
-    trash: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`,
+    // X icon for clear
+    x: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
     maximize: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>`,
     minimize: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>`,
   };
@@ -302,6 +308,14 @@
       this.streamingContent = '';
       this.streamingMessageId = null;
 
+      // Double-buffer rendering state
+      this.renderPending = false;
+      this.lastRenderContent = '';
+      this.activeBuffer = 'a'; // 'a' or 'b'
+
+      // Auto-scroll control
+      this.userScrolledUp = false;
+
       this.storage = new StorageManager(this.config.storageKey);
       this.renderer = new MarkdownRenderer();
       this.chat = null; // AiAgentChat instance
@@ -338,11 +352,15 @@
     }
 
     async initChatClient() {
+      this.updateStatus('Initializing...');
+
       // Wait for AiAgentChat to be available
       const start = Date.now();
       while (!window.AiAgentChat) {
         if (Date.now() - start > 10000) {
+           
           console.error('AiAgentChat not loaded');
+          this.updateStatus('Error: Chat client failed to load. Check console.');
           return;
         }
         await new Promise(r => setTimeout(r, 50));
@@ -354,6 +372,14 @@
         clientId: this.clientId,
         onEvent: (event) => this.handleChatEvent(event),
       });
+
+      this.updateStatus('Ready');
+      // Clear ready status after a moment
+      setTimeout(() => {
+        if (this.statusText.textContent === 'Ready') {
+          this.updateStatus('');
+        }
+      }, 2000);
     }
 
     buildUI() {
@@ -390,9 +416,9 @@
       const statusActions = createElement('div', 'ai-chat-status-actions');
 
       const copyAllBtn = createElement('button', 'ai-chat-copy-all', { title: 'Copy conversation' });
-      copyAllBtn.innerHTML = icons.copy;
+      copyAllBtn.innerHTML = icons.clipboard;
       const clearBtn = createElement('button', 'ai-chat-clear', { title: 'Clear conversation' });
-      clearBtn.innerHTML = icons.trash;
+      clearBtn.innerHTML = icons.x;
       const themeBtn = createElement('button', 'ai-chat-theme', { title: 'Toggle theme' });
       themeBtn.innerHTML = icons.sun;
 
@@ -453,9 +479,9 @@
       const statusActions = createElement('div', 'ai-chat-status-actions');
 
       const copyAllBtn = createElement('button', 'ai-chat-copy-all', { title: 'Copy conversation' });
-      copyAllBtn.innerHTML = icons.copy;
+      copyAllBtn.innerHTML = icons.clipboard;
       const clearBtn = createElement('button', 'ai-chat-clear', { title: 'Clear conversation' });
-      clearBtn.innerHTML = icons.trash;
+      clearBtn.innerHTML = icons.x;
       const themeBtn = createElement('button', 'ai-chat-theme', { title: 'Toggle theme' });
       themeBtn.innerHTML = icons.sun;
 
@@ -545,6 +571,13 @@
           this.handleCopyClick(copyBtn);
         }
       });
+
+      // Auto-scroll control: detect when user scrolls up
+      this.messagesEl.addEventListener('scroll', () => {
+        const el = this.messagesEl;
+        const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+        this.userScrolledUp = !atBottom;
+      });
     }
 
     autoExpandInput() {
@@ -555,6 +588,12 @@
     async sendMessage() {
       const message = this.inputEl.value.trim();
       if (!message || this.isLoading) return;
+
+      // Check if chat client is ready
+      if (!this.chat) {
+        this.updateStatus('Error: Chat not initialized. Please refresh the page.');
+        return;
+      }
 
       // Add user message
       this.addMessage('user', message);
@@ -567,6 +606,9 @@
       this.isLoading = true;
       this.streamingContent = '';
       this.streamingMessageId = null;
+      this.renderPending = false;
+      this.lastRenderContent = '';
+      this.userScrolledUp = false; // Reset scroll on new message
       this.updateStatus('Connecting...');
       this.showSpinner();
 
@@ -587,10 +629,8 @@
           break;
 
         case 'status':
-          this.currentStatus = event.data.message || event.data.status;
-          if (!this.streamingContent) {
-            this.updateStatus(this.currentStatus);
-          }
+          this.currentStatus = event.data.message || event.data.status || '';
+          this.updateSpinnerStatus(this.currentStatus);
           break;
 
         case 'report':
@@ -670,20 +710,30 @@
       // Clear existing content safely
       el.textContent = '';
 
-      // Message content
-      const contentDiv = createElement('div', 'ai-chat-message-content');
       if (msg.role === 'user') {
-        // User messages are plain text - escape and wrap in <p>
+        // User messages: single content div with plain text
+        const contentDiv = createElement('div', 'ai-chat-message-content');
         const p = document.createElement('p');
         p.textContent = msg.content;
         contentDiv.appendChild(p);
+        el.appendChild(contentDiv);
+      } else if (msg.isStreaming) {
+        // Streaming assistant messages: double-buffer with two content divs
+        const contentA = createElement('div', 'ai-chat-message-content ai-chat-buffer-a');
+        const contentB = createElement('div', 'ai-chat-message-content ai-chat-buffer-b ai-chat-buffer-hidden');
+        el.appendChild(contentA);
+        el.appendChild(contentB);
+        this.activeBuffer = 'a';
       } else {
-        // Assistant messages are markdown - rendered with html:false for safety
+        // Completed assistant messages: single content div with rendered markdown
+        const contentDiv = createElement('div', 'ai-chat-message-content');
         contentDiv.innerHTML = this.renderer.render(msg.content);
+        el.appendChild(contentDiv);
+        // Add copy buttons to code blocks
+        this.addCodeBlockCopyButtons(el);
       }
-      el.appendChild(contentDiv);
 
-      // Message actions
+      // Message actions (copy button)
       const actionsDiv = createElement('div', 'ai-chat-message-actions');
       const copyBtn = createElement('button', 'ai-chat-copy-btn', {
         'data-copy-type': 'message',
@@ -693,8 +743,9 @@
       copyBtn.innerHTML = icons.copy;
       actionsDiv.appendChild(copyBtn);
       el.appendChild(actionsDiv);
+    }
 
-      // Add copy buttons to code blocks
+    addCodeBlockCopyButtons(el) {
       el.querySelectorAll('.code-block').forEach(block => {
         const wrapper = createElement('div', 'code-block-wrapper');
         block.parentNode.insertBefore(wrapper, block);
@@ -710,14 +761,47 @@
     }
 
     updateStreamingMessage(content) {
+      // Store the content for rendering
+      this.lastRenderContent = content;
+
+      // Throttle: only schedule render if not already pending
+      if (this.renderPending) return;
+
+      this.renderPending = true;
+
+      // Use requestAnimationFrame for smooth rendering
+      requestAnimationFrame(() => {
+        this.doDoubleBufferRender();
+        this.renderPending = false;
+      });
+    }
+
+    doDoubleBufferRender() {
       const el = this.messagesEl.querySelector(`[data-message-id="${this.streamingMessageId}"]`);
       if (!el) return;
 
-      const contentEl = el.querySelector('.ai-chat-message-content');
-      if (contentEl) {
-        // Rendered markdown with html:false for safety
-        contentEl.innerHTML = this.renderer.render(content);
-      }
+      const content = this.lastRenderContent;
+
+      // Determine which buffer is hidden (will render into it)
+      const hiddenBufferClass = this.activeBuffer === 'a' ? 'ai-chat-buffer-b' : 'ai-chat-buffer-a';
+      const visibleBufferClass = this.activeBuffer === 'a' ? 'ai-chat-buffer-a' : 'ai-chat-buffer-b';
+
+      const hiddenEl = el.querySelector('.' + hiddenBufferClass);
+      const visibleEl = el.querySelector('.' + visibleBufferClass);
+
+      if (!hiddenEl || !visibleEl) return;
+
+      // Render markdown into the hidden buffer
+      hiddenEl.innerHTML = this.renderer.render(content);
+
+      // Swap: show hidden, hide visible
+      hiddenEl.classList.remove('ai-chat-buffer-hidden');
+      visibleEl.classList.add('ai-chat-buffer-hidden');
+
+      // Toggle active buffer
+      this.activeBuffer = this.activeBuffer === 'a' ? 'b' : 'a';
+
+      // Scroll to bottom (respects user scroll)
       this.scrollToBottom();
     }
 
@@ -757,7 +841,7 @@
       if (success) {
         this.copyAllBtn.innerHTML = icons.check;
         setTimeout(() => {
-          this.copyAllBtn.innerHTML = icons.copy;
+          this.copyAllBtn.innerHTML = icons.clipboard;
         }, 2000);
       }
     }
@@ -787,34 +871,45 @@
     }
 
     showSpinner() {
-      let spinner = this.messagesEl.querySelector('.ai-chat-spinner');
+      let spinner = this.messagesEl.querySelector(CSS_SPINNER);
       if (!spinner) {
         spinner = createElement('div', 'ai-chat-spinner');
 
-        const dotsDiv = createElement('div', 'ai-chat-spinner-dots');
-        dotsDiv.appendChild(document.createElement('span'));
-        dotsDiv.appendChild(document.createElement('span'));
-        dotsDiv.appendChild(document.createElement('span'));
+        const workingSpan = createElement('span', 'ai-chat-spinner-working');
+        workingSpan.textContent = 'Working...';
 
-        const textSpan = createElement('span', 'ai-chat-spinner-text');
+        const statusSpan = createElement('span', 'ai-chat-spinner-status');
 
-        spinner.appendChild(dotsDiv);
-        spinner.appendChild(textSpan);
+        spinner.appendChild(workingSpan);
+        spinner.appendChild(statusSpan);
         this.messagesEl.appendChild(spinner);
       }
-      spinner.querySelector('.ai-chat-spinner-text').textContent = this.currentStatus;
+      const statusEl = spinner.querySelector(CSS_SPINNER_STATUS);
+      statusEl.textContent = this.currentStatus || '';
       spinner.classList.remove(CSS_HIDDEN);
       this.scrollToBottom();
     }
 
+    updateSpinnerStatus(status) {
+      const spinner = this.messagesEl.querySelector(CSS_SPINNER);
+      if (spinner) {
+        const statusEl = spinner.querySelector(CSS_SPINNER_STATUS);
+        if (statusEl) {
+          statusEl.textContent = status || '';
+        }
+      }
+    }
+
     hideSpinner() {
-      const spinner = this.messagesEl.querySelector('.ai-chat-spinner');
+      const spinner = this.messagesEl.querySelector(CSS_SPINNER);
       if (spinner) {
         spinner.classList.add(CSS_HIDDEN);
       }
     }
 
-    scrollToBottom() {
+    scrollToBottom(force = false) {
+      // Respect user scroll position unless forced
+      if (!force && this.userScrolledUp) return;
       this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
     }
 

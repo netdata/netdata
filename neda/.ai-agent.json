@@ -1111,6 +1111,12 @@
       "${API_BEARER_TOKEN}"
     ]
   },
+  "embed": {
+    "support": {
+      "allowedAgents": ["support"],
+      "corsOrigins": ["*"]
+    }
+  },
   "pricing": {
     "anthropic": {
       "claude-opus-4-5-20251101": {

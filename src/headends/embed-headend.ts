@@ -468,21 +468,73 @@ export class EmbedHeadend implements Headend {
       };
 
       const handleStatusEvent = (event: ProgressEvent): void => {
-        if (event.type !== 'agent_update') return;
-        if (event.taskStatus === undefined) return;
-        const agentLabel = event.agentName ?? event.agentId;
-        const statusPayload = {
-          agent: agentLabel,
-          agentPath: event.agentPath,
-          status: event.taskStatus.status,
-          message: event.message,
-          done: event.taskStatus.done,
-          pending: event.taskStatus.pending,
-          now: event.taskStatus.now,
-          timestamp: event.timestamp,
-        };
-        statusEntries.push({ role: 'status', content: event.message });
-        writeSseEvent(res, 'status', statusPayload);
+        // Forward all progress events to the client as status updates
+        switch (event.type) {
+          case 'agent_started': {
+            const agentLabel = event.agentName ?? event.agentId;
+            const message = event.reason ?? `Agent ${agentLabel} starting...`;
+            statusEntries.push({ role: 'status', content: message });
+            writeSseEvent(res, 'status', {
+              eventType: 'agent_started',
+              agent: agentLabel,
+              agentPath: event.agentPath,
+              message,
+              timestamp: event.timestamp,
+            });
+            return;
+          }
+          case 'agent_update': {
+            const agentLabel = event.agentName ?? event.agentId;
+            const statusPayload: Record<string, unknown> = {
+              eventType: 'agent_update',
+              agent: agentLabel,
+              agentPath: event.agentPath,
+              message: event.message,
+              timestamp: event.timestamp,
+            };
+            // Include taskStatus fields if present
+            if (event.taskStatus !== undefined) {
+              statusPayload.status = event.taskStatus.status;
+              statusPayload.done = event.taskStatus.done;
+              statusPayload.pending = event.taskStatus.pending;
+              statusPayload.now = event.taskStatus.now;
+            }
+            statusEntries.push({ role: 'status', content: event.message });
+            writeSseEvent(res, 'status', statusPayload);
+            return;
+          }
+          case 'agent_finished': {
+            const agentLabel = event.agentName ?? event.agentId;
+            const message = `Agent ${agentLabel} completed`;
+            statusEntries.push({ role: 'status', content: message });
+            writeSseEvent(res, 'status', {
+              eventType: 'agent_finished',
+              agent: agentLabel,
+              agentPath: event.agentPath,
+              message,
+              timestamp: event.timestamp,
+            });
+            return;
+          }
+          case 'agent_failed': {
+            const agentLabel = event.agentName ?? event.agentId;
+            const message = event.error ?? `Agent ${agentLabel} failed`;
+            statusEntries.push({ role: 'status', content: message });
+            writeSseEvent(res, 'status', {
+              eventType: 'agent_failed',
+              agent: agentLabel,
+              agentPath: event.agentPath,
+              message,
+              error: event.error,
+              timestamp: event.timestamp,
+            });
+            return;
+          }
+          case 'tool_started':
+          case 'tool_finished':
+            // Tool events are not forwarded to the UI - only agent events are visible
+            return;
+        }
       };
 
       const callbacks: AIAgentEventCallbacks = {
@@ -655,7 +707,13 @@ export class EmbedHeadend implements Headend {
       res.end(cached.body);
       return;
     }
-    const body = await fs.promises.readFile(filePath);
+    // Read file and strip ES module artifacts that TypeScript adds
+    // (browsers expect plain script, not ES module syntax)
+    const rawContent = await fs.promises.readFile(filePath, 'utf-8');
+    const browserSafeContent = rawContent
+      .replace(/^export\s*\{\s*\}\s*;?\s*$/gm, '') // Remove empty export statements
+      .replace(/\/\/# sourceMappingURL=.*$/gm, ''); // Remove source map references
+    const body = Buffer.from(browserSafeContent, 'utf-8');
     const etag = crypto.createHash('sha256').update(body).digest('hex');
     this.cachedClientScript = { etag, body, mtimeMs: stat.mtimeMs };
     res.statusCode = 200;
