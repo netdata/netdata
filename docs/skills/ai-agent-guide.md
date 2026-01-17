@@ -41,6 +41,8 @@ cd ai-agent
 ./build-and-install.sh
 ```
 
+**Windows**: Use WSL2 (Windows Subsystem for Linux). Native Windows is not supported.
+
 ---
 
 ## 1. File Structure
@@ -127,13 +129,15 @@ input:
   schemaRef: ./schema.json    # Alternative: file path
 ```
 
-**Output**:
+**Output** (how this agent delivers results):
 ```yaml
 output:
   format: markdown | text | json
   schema: <JSON Schema>       # Required when format=json
   schemaRef: ./schema.json    # Alternative: file path
 ```
+
+**Note**: `output.format` (how this agent returns data) differs from `expectedOutput.format` (what format to request from sub-agents). Parent agents can specify `expectedOutput.format` when calling sub-agents to override their default output format.
 
 ### toolOutput Object
 | Field | Type | Description |
@@ -162,7 +166,9 @@ Note: `storeDir` is ignored; root always `/tmp/ai-agent-<run-hash>`.
 | `${MAX_TURNS}` | Effective `maxTurns` after overrides |
 | `${MAX_TOOLS}` | Effective `maxToolCallsPerTurn` (≥1) |
 
-### CLI-Only Variables (inline prompts only)
+### CLI-Only Variables
+
+Available only in **inline prompts** (command-line strings), NOT in `.ai` files:
 
 | Placeholder | Description |
 |-------------|-------------|
@@ -172,6 +178,13 @@ Note: `storeDir` is ignored; root always `/tmp/ai-agent-<run-hash>`.
 | `${CD}` | Working directory at CLI start |
 | `${HOSTNAME}` | Machine hostname |
 | `${USER}` | Current username |
+
+Example: `ai-agent "Hello from ${USER} on ${HOSTNAME}"`
+
+### Variable Behavior
+- **Unknown variables**: Variables not recognized are left unchanged (literal `${UNKNOWN}` in output)
+- **Environment placeholders**: `${VAR_NAME}` in config resolved from `.ai-agent.env` then `process.env`
+- **Unresolved config placeholders**: Throw error with layer origin information
 
 ### Include Directive
 ```yaml
@@ -184,6 +197,7 @@ ${include:relative/path.md}
 - Cannot include files named exactly `.env` (security protection)
 - Files like `.env.local`, `.env.production` are NOT blocked
 - Resolved before variable substitution
+- **Include errors**: Missing file → error with path; circular → error with chain; depth exceeded → error at level 8
 
 ### FORMAT Values by Context
 
@@ -244,6 +258,8 @@ ${include:shared/safety-rules.md}
 ```
 
 **Provider type inference**: If `type` missing, infers from provider name: `openai`, `anthropic`, `google`, `openrouter`, `ollama`.
+
+**Tokenizer**: Use `tokenizer` at provider or model level for accurate token counting. Common values: `gpt-4o`, `gpt-4`, `cl100k_base`. Defaults to provider-appropriate tokenizer.
 
 **String schema formats**: `stringSchemaFormatsAllowed/Denied` filter JSON Schema string format declarations (e.g., `date-time`, `uri`, `uuid`) for providers that don't support them. NOT for tool filtering.
 
@@ -386,6 +402,19 @@ Note: Pattern matching (e.g., `delete_*`) is NOT supported. Only exact tool name
         "body": "${parameters.body}"
       },
       "parametersSchema": { ... }
+    }
+  }
+}
+```
+
+**REST streaming** (for SSE/streaming responses):
+```json
+{
+  "restTools": {
+    "stream_data": {
+      "method": "GET",
+      "url": "https://api.example.com/stream",
+      "streaming": true
     }
   }
 }
@@ -546,10 +575,16 @@ Default queue: `default`. Default concurrency: `min(64, cpu_cores * 2)`.
 }
 ```
 
-**Accounting**:
+**Persistence** (sessions and billing):
 ```json
-{ "accounting": { "file": "${HOME}/.ai-agent/accounting.jsonl" } }
+{
+  "persistence": {
+    "sessionsDir": "${HOME}/.ai-agent/sessions",
+    "billingFile": "${HOME}/.ai-agent/accounting.jsonl"
+  }
+}
 ```
+Note: `accounting.file` is deprecated; use `persistence.billingFile` instead.
 
 **Pricing**:
 ```json
@@ -634,6 +669,8 @@ agents:
 | `agent__batch` | Parallel tool execution for models without native support | Optional |
 | `tool_output` | Retrieve oversized tool results via handle | When output stored |
 
+**Reserved tool names**: The `agent__` prefix is reserved for internal tools. Do not create MCP servers, REST tools, or sub-agents with `toolName` starting with `agent__`.
+
 **task_status parameters**: `status`, `done`, `pending`, `now`, `ready_for_final_report`, `need_to_run_more_tools`
 - When `status: 'completed'` → signals task completion, forces final turn
 
@@ -678,6 +715,15 @@ ai-agent @system.txt @user.txt
 
 # Stdin for system prompt
 cat context.txt | ai-agent - "summarize this"
+
+# Multi-line prompt with heredoc
+ai-agent @agent.ai "$(cat <<'EOF'
+Analyze this data:
+- Item 1: value
+- Item 2: value
+Provide a summary.
+EOF
+)"
 ```
 
 ### Key Options
@@ -702,6 +748,8 @@ cat context.txt | ai-agent - "summarize this"
 | `--trace-llm` | false | Trace LLM calls |
 | `--trace-sdk` | false | Trace SDK payloads |
 | `--schema <path>` | - | JSON schema for output; forces `output.format=json` |
+| `--reasoning <level>` | - | Set reasoning for master agent only |
+| `--default-reasoning <level>` | - | Set reasoning fallback for agents omitting frontmatter |
 
 ### Tool Inspection
 ```bash
@@ -852,7 +900,8 @@ handoff: ./agents/manager.ai
 ## 9. Operational Behavior
 
 ### LLM Failures & Retry
-- Cycles through configured provider/model pairs round-robin
+- **Model fallback**: Models in `models:` array are tried in order; if first fails, tries second, etc.
+- Cycles through configured provider/model pairs round-robin across retries
 - **`maxRetries` semantics**: Value is total attempts, not retries after initial
   - `maxRetries: 1` = 1 attempt (no retries)
   - `maxRetries: 3` = 3 attempts (2 retries after initial)
@@ -891,8 +940,8 @@ When projected size approaches context limit:
 **Sub-agent reasoning inheritance**:
 - Frontmatter `reasoning` is NOT inherited by sub-agents
 - `--reasoning <level>` sets master agent only, NOT sub-agents
-- `--default-reasoning <level>` sets fallback for sub-agents that omit `reasoning`
-- `--override reasoning=<level>` forces all agents including sub-agents
+- `--default-reasoning <level>` sets fallback for agents that omit `reasoning` in frontmatter (both master and sub-agents)
+- `--override reasoning=<level>` forces reasoning on ALL agents (stomps frontmatter values)
 
 ### Log Severity Levels
 
@@ -981,7 +1030,24 @@ DEBUG=true CONTEXT_DEBUG=true ai-agent --agent myagent.ai "query"
   "opTree": { "turns": [...], "logs": [...] }
 }
 ```
-- Read: `zcat <file> | jq '.opTree.turns'`
+
+**Extraction commands**:
+```bash
+# Read snapshot
+zcat <file> | jq '.opTree.turns'
+
+# Extract LLM requests/responses
+zcat <file> | jq '.opTree.turns[].ops[] | select(.kind == "llm")'
+
+# Extract tool calls
+zcat <file> | jq '.opTree.turns[].ops[] | select(.kind == "tool")'
+
+# Find warnings and errors
+zcat <file> | jq '[.. | objects | select(.severity == "WRN" or .severity == "ERR")]'
+
+# Extract sub-agent sessions
+zcat <file> | jq '.opTree.turns[].ops[] | select(.kind == "session") | .childSession'
+```
 
 ### Accounting
 - Location: `~/.ai-agent/accounting.jsonl` (or `--billing-file`)

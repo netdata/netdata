@@ -135,6 +135,24 @@ The following content was added to `ai-agent-guide.md` based on wiki review:
 12. **Reasoning inheritance rules** - sub-agent behavior
 13. **Override keys for testing** - key override keys section
 
+## Content Added from Parallel Sub-Agent Review (Round 2)
+
+A second review was performed using 15 parallel sub-agents (5 wiki pages each):
+
+14. **Windows WSL note** - Installation section clarification
+15. **Reserved tool names** - agent__ prefix is reserved
+16. **--default-reasoning flag** - CLI options and reasoning section
+17. **persistence.billingFile** - Updated from deprecated accounting.file
+18. **Unknown variables behavior** - Left unchanged, not error
+19. **Include error messages** - Missing file, circular, depth errors
+20. **jq analysis queries** - Snapshot extraction commands
+21. **Tokenizer config** - Provider/model level tokenizer option
+22. **CLI-only variables clarification** - Only in inline prompts
+23. **REST streaming config** - streaming: true option
+24. **Heredoc CLI example** - Multi-line prompt pattern
+25. **Model fallback behavior** - Models tried in order
+26. **output vs expectedOutput** - Clarified difference
+
 ## Status: COMPLETED
 
-All wiki pages have been reviewed. The skill document `docs/skills/ai-agent-guide.md` is now comprehensive and ready for use.
+All 74 wiki pages have been reviewed in two passes. The skill document `docs/skills/ai-agent-guide.md` is now comprehensive and ready for use.
