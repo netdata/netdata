@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { AgentRegistry } from '../agent-registry.js';
 import type { OutputFormatId } from '../formats.js';
-import type { AccountingEntry, AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, ConversationMessage, EmbedAuthConfig, EmbedAuthTierConfig, EmbedHeadendConfig, EmbedTierRateLimitConfig, FinalReportPayload, LogEntry, ProgressEvent } from '../types.js';
+import type { AccountingEntry, AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, ConversationMessage, EmbedAuthConfig, EmbedAuthTierConfig, EmbedProfileConfig, EmbedTierRateLimitConfig, FinalReportPayload, LogEntry, ProgressEvent } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 import type { Socket } from 'node:net';
 
@@ -24,12 +24,24 @@ import { HttpError, readJson, writeJson, writeSseEvent } from './http-utils.js';
 import { createHeadendEventState, markHandoffSeen, shouldAcceptFinalReport, shouldStreamOutput, shouldStreamTurnStarted } from './shared-event-filter.js';
 
 const CONTENT_TYPE_HEADER = 'Content-Type';
+const CACHE_CONTROL_HEADER = 'Cache-Control';
+const CACHE_CONTROL_PUBLIC = 'public, max-age=3600';
 const EVENT_STREAM_CONTENT_TYPE = 'text/event-stream';
 const JS_CONTENT_TYPE = 'application/javascript; charset=utf-8';
+const CSS_CONTENT_TYPE = 'text/css; charset=utf-8';
+const HTML_CONTENT_TYPE = 'text/html; charset=utf-8';
 const METRICS_CONTENT_TYPE = 'text/plain; version=0.0.4; charset=utf-8';
 const OUTPUT_FORMAT_VALUES: readonly OutputFormatId[] = ['markdown', 'markdown+mermaid', 'slack-block-kit', 'tty', 'pipe', 'json', 'sub-agent'] as const;
 
 const isOutputFormatId = (value: string): value is OutputFormatId => OUTPUT_FORMAT_VALUES.includes(value as OutputFormatId);
+
+// Test UI static file routes
+const TEST_UI_FILES: Record<string, { file: string; contentType: string }> = {
+  '/test-div.html': { file: 'test-div.html', contentType: HTML_CONTENT_TYPE },
+  '/test-widget.html': { file: 'test-widget.html', contentType: HTML_CONTENT_TYPE },
+  '/test.css': { file: 'test.css', contentType: CSS_CONTENT_TYPE },
+  '/test.js': { file: 'test.js', contentType: JS_CONTENT_TYPE },
+};
 
 const buildLog = (headendId: string, label: string, message: string, severity: LogEntry['severity'] = 'VRB', fatal = false): LogEntry => ({
   timestamp: Date.now(),
@@ -59,9 +71,10 @@ interface EmbedChatRequest {
 }
 
 interface EmbedHeadendOptions {
+  profileName: string;
   port: number;
   concurrency?: number;
-  config?: EmbedHeadendConfig;
+  config?: EmbedProfileConfig;
 }
 
 interface AuthDecision {
@@ -203,7 +216,7 @@ export class EmbedHeadend implements Headend {
   private readonly limiter: ConcurrencyLimiter;
   private readonly closeDeferred = createDeferred<HeadendClosedEvent>();
   private readonly label: string;
-  private readonly config?: EmbedHeadendConfig;
+  private readonly config?: EmbedProfileConfig;
   private readonly metrics: EmbedMetrics;
   private readonly tierLimiters: Record<AuthDecision['tier'], TierLimiters>;
   private readonly globalLimiter?: SimpleRateLimiter;
@@ -216,14 +229,15 @@ export class EmbedHeadend implements Headend {
   private globalStopRef?: { stopping: boolean };
   private readonly sockets = new Set<Socket>();
   private cachedClientScript?: { etag: string; body: Buffer; mtimeMs: number };
+  private readonly cachedTestFiles = new Map<string, { etag: string; body: Buffer; mtimeMs: number }>();
   private warnedGuidVerification = false;
 
   public constructor(registry: AgentRegistry, options: EmbedHeadendOptions) {
     this.registry = registry;
     this.options = options;
     this.config = options.config;
-    this.id = `embed:${String(options.port)}`;
-    this.label = `Embed headend (port ${String(options.port)})`;
+    this.id = `embed:${options.profileName}:${String(options.port)}`;
+    this.label = `Embed headend ${options.profileName} (port ${String(options.port)})`;
     const limit = typeof options.concurrency === 'number' && Number.isFinite(options.concurrency) && options.concurrency > 0
       ? Math.floor(options.concurrency)
       : (typeof this.config?.concurrency === 'number' && this.config.concurrency > 0 ? Math.floor(this.config.concurrency) : 10);
@@ -350,6 +364,13 @@ export class EmbedHeadend implements Headend {
 
     if (method === 'GET' && path === '/ai-agent-public.js') {
       await this.handleClientScript(req, res);
+      return;
+    }
+
+    // Test UI files
+    if (method === 'GET' && Object.hasOwn(TEST_UI_FILES, path)) {
+      const testFile = TEST_UI_FILES[path];
+      await this.handleTestFile(res, testFile.file, testFile.contentType);
       return;
     }
 
@@ -629,7 +650,7 @@ export class EmbedHeadend implements Headend {
     if (cached?.mtimeMs === stat.mtimeMs) {
       res.statusCode = 200;
       res.setHeader(CONTENT_TYPE_HEADER, JS_CONTENT_TYPE);
-      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader(CACHE_CONTROL_HEADER, CACHE_CONTROL_PUBLIC);
       res.setHeader('ETag', cached.etag);
       res.end(cached.body);
       return;
@@ -639,20 +660,67 @@ export class EmbedHeadend implements Headend {
     this.cachedClientScript = { etag, body, mtimeMs: stat.mtimeMs };
     res.statusCode = 200;
     res.setHeader(CONTENT_TYPE_HEADER, JS_CONTENT_TYPE);
-    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader(CACHE_CONTROL_HEADER, CACHE_CONTROL_PUBLIC);
     res.setHeader('ETag', etag);
     res.end(body);
   }
 
+  private async handleTestFile(res: http.ServerResponse, fileName: string, contentType: string): Promise<void> {
+    const fileUrl = new URL(`./embed-test/${fileName}`, import.meta.url);
+    const filePath = fileURLToPath(fileUrl);
+    try {
+      const stat = await fs.promises.stat(filePath);
+      const cached = this.cachedTestFiles.get(fileName);
+      if (cached?.mtimeMs === stat.mtimeMs) {
+        res.statusCode = 200;
+        res.setHeader(CONTENT_TYPE_HEADER, contentType);
+        res.setHeader(CACHE_CONTROL_HEADER, CACHE_CONTROL_PUBLIC);
+        res.setHeader('ETag', cached.etag);
+        res.end(cached.body);
+        return;
+      }
+      const body = await fs.promises.readFile(filePath);
+      const etag = crypto.createHash('sha256').update(body).digest('hex');
+      this.cachedTestFiles.set(fileName, { etag, body, mtimeMs: stat.mtimeMs });
+      res.statusCode = 200;
+      res.setHeader(CONTENT_TYPE_HEADER, contentType);
+      res.setHeader(CACHE_CONTROL_HEADER, CACHE_CONTROL_PUBLIC);
+      res.setHeader('ETag', etag);
+      res.end(body);
+    } catch {
+      writeJson(res, 404, { error: 'file_not_found' });
+    }
+  }
+
   private resolveAgentId(requested?: string): string | undefined {
-    if (typeof requested === 'string' && requested.length > 0 && this.registry.has(requested)) {
-      return requested;
+    // Build effective allowed list: allowedAgents > [defaultAgent] > first registered
+    const allowedAgents = this.getEffectiveAllowedAgents();
+    if (allowedAgents.length === 0) return undefined;
+
+    // If client requested a specific agent, check if it's allowed
+    if (typeof requested === 'string' && requested.length > 0) {
+      if (allowedAgents.includes(requested) && this.registry.has(requested)) {
+        return requested;
+      }
+      // Requested agent not allowed - fall through to default
     }
-    if (typeof this.config?.defaultAgent === 'string' && this.config.defaultAgent.length > 0 && this.registry.has(this.config.defaultAgent)) {
-      return this.config.defaultAgent;
+
+    // Return first allowed agent that exists in registry
+    // eslint-disable-next-line functional/no-loop-statements -- early return on first match
+    for (const agentId of allowedAgents) {
+      if (this.registry.has(agentId)) return agentId;
     }
+    return undefined;
+  }
+
+  private getEffectiveAllowedAgents(): string[] {
+    // Use allowedAgents from profile config
+    if (Array.isArray(this.config?.allowedAgents) && this.config.allowedAgents.length > 0) {
+      return this.config.allowedAgents;
+    }
+    // Fallback: first registered agent (for minimal config)
     const list = this.registry.list();
-    return list.length > 0 ? list[0].id : undefined;
+    return list.length > 0 ? [list[0].id] : [];
   }
 
   private resolveClientIp(req: http.IncomingMessage): string {

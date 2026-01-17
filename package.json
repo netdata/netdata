@@ -12,6 +12,7 @@
   "scripts": {
     "prebuild": "npm run update-version --silent",
     "build": "tsc",
+    "postbuild": "cp -r src/headends/embed-test dist/headends/",
     "predev": "npm run update-version --silent",
     "dev": "tsc --watch",
     "prelint": "npm run update-version --silent",

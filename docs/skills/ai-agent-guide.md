@@ -562,15 +562,15 @@ Default queue: `default`. Default concurrency: `min(64, cpu_cores * 2)`.
 { "api": { "enabled": true, "port": 8080, "bearerKeys": ["key1"] } }
 ```
 
-**Embed headend**:
+**Embed headend** (named profiles, use `--embed name:port`):
 ```json
 {
   "embed": {
-    "enabled": true,
-    "port": 8081,
-    "concurrency": 10,
-    "defaultAgent": "./agents/chat.ai",
-    "corsOrigins": ["https://example.com"]
+    "chat": {
+      "allowedAgents": ["chat"],
+      "concurrency": 10,
+      "corsOrigins": ["https://example.com"]
+    }
   }
 }
 ```

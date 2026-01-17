@@ -46,13 +46,13 @@ The Embed headend provides a public HTTP API designed for website chat widgets. 
 ## Quick Start
 
 ```bash
-# Start server
-ai-agent --agent chat.ai --embed 8090
+# Start server with profile name and port
+ai-agent --agent chat.ai --embed chat:8090
 
 # Test the endpoint
 curl -X POST http://localhost:8090/v1/chat \
   -H "Content-Type: application/json" \
-  -d '{"message":"Hello!","agentId":"chat"}'
+  -d '{"message":"Hello!"}'
 ```
 
 ### Embed in Website
@@ -62,7 +62,6 @@ curl -X POST http://localhost:8090/v1/chat \
 <script>
   const chat = new AiAgentChat({
     endpoint: "http://localhost:8090",
-    agentId: "chat",
   });
 </script>
 ```
@@ -75,16 +74,20 @@ curl -X POST http://localhost:8090/v1/chat \
 
 | Property   | Value                        |
 | ---------- | ---------------------------- |
-| Type       | `number`                     |
+| Type       | `name:port`                  |
 | Required   | Yes (to enable this headend) |
 | Repeatable | Yes                          |
 
-**Description**: HTTP port for embed API. Can be specified multiple times.
+**Description**: Start embed headend with named profile. Format: `name:port` where `name` matches a profile in the `embed` config section.
 
-**Example**:
+**Examples**:
 
 ```bash
-ai-agent --agent chat.ai --embed 8090
+# Single profile
+ai-agent --agent support.ai --embed support:8090
+
+# Multiple profiles on different ports
+ai-agent --agent support.ai --agent sales.ai --embed support:8090 --embed sales:8091
 ```
 
 ### --embed-concurrency
@@ -334,60 +337,63 @@ async function chat(message) {
 
 ## Configuration
 
-In `.ai-agent.json`:
+In `.ai-agent.json`, define named profiles under `embed`. Each profile name matches the name used in `--embed name:port`:
 
 ```json
 {
   "embed": {
-    "defaultAgent": "support",
-    "corsOrigins": ["*.example.com", "localhost:*"],
-    "rateLimit": {
-      "enabled": true,
-      "requestsPerMinute": 10,
-      "burstSize": 0
-    },
-    "auth": {
-      "tiers": {
-        "netdataProperties": {
-          "origins": ["*.netdata.cloud"],
-          "rateLimit": { "requestsPerMinute": 60 }
-        },
-        "agentDashboards": {
-          "requireGuid": true,
-          "verifyGuidInCloud": false,
-          "rateLimit": { "requestsPerMinutePerGuid": 10 }
-        },
-        "unknown": {
-          "allow": false,
-          "rateLimit": { "requestsPerMinutePerIp": 2 }
-        }
-      },
-      "signedTokens": {
-        "enabled": false,
-        "secret": "shared-secret",
-        "ttlSeconds": 3600
+    "support": {
+      "allowedAgents": ["support"],
+      "corsOrigins": ["*.example.com", "localhost:*"],
+      "rateLimit": {
+        "enabled": true,
+        "requestsPerMinute": 10,
+        "burstSize": 0
       }
     },
-    "metrics": {
-      "enabled": true,
-      "path": "/metrics"
+    "sales": {
+      "allowedAgents": ["sales", "sales-demo"],
+      "corsOrigins": ["*.sales.example.com"],
+      "auth": {
+        "tiers": {
+          "netdataProperties": {
+            "origins": ["*.netdata.cloud"],
+            "rateLimit": { "requestsPerMinute": 60 }
+          },
+          "agentDashboards": {
+            "requireGuid": true,
+            "verifyGuidInCloud": false,
+            "rateLimit": { "requestsPerMinutePerGuid": 10 }
+          },
+          "unknown": {
+            "allow": false,
+            "rateLimit": { "requestsPerMinutePerIp": 2 }
+          }
+        }
+      },
+      "metrics": {
+        "enabled": true,
+        "path": "/metrics"
+      }
     }
   }
 }
 ```
 
-### Configuration Options
+### Profile Configuration Options
 
-| Option                        | Type      | Default                       | Description                                         |
-| ----------------------------- | --------- | ----------------------------- | --------------------------------------------------- |
-| `concurrency`                 | `number`  | `10`                          | Maximum concurrent chat sessions                    |
-| `defaultAgent`                | `string`  | First registered              | Default agent when not specified                    |
-| `corsOrigins`                 | `array`   | `[]`                          | Allowed origins (glob patterns)                     |
-| `rateLimit.enabled`           | `boolean` | `false` (disabled by default) | Enable rate limiting (requires `requestsPerMinute`) |
-| `rateLimit.requestsPerMinute` | `number`  | (required)                    | Rate limit when enabled (no default)                |
-| `rateLimit.burstSize`         | `number`  | `0`                           | Burst allowance                                     |
-| `metrics.enabled`             | `boolean` | `true`                        | Enable metrics endpoint (optional)                  |
-| `metrics.path`                | `string`  | `/metrics`                    | Metrics endpoint path                               |
+Each profile under `embed.<name>` supports these options:
+
+| Option                        | Type      | Default                       | Description                                           |
+| ----------------------------- | --------- | ----------------------------- | ----------------------------------------------------- |
+| `allowedAgents`               | `array`   | First registered              | Agents accessible via this profile. First is default. |
+| `concurrency`                 | `number`  | `10`                          | Maximum concurrent chat sessions for this profile     |
+| `corsOrigins`                 | `array`   | `[]`                          | Allowed origins (glob patterns)                       |
+| `rateLimit.enabled`           | `boolean` | `false` (disabled by default) | Enable rate limiting (requires `requestsPerMinute`)   |
+| `rateLimit.requestsPerMinute` | `number`  | (required)                    | Rate limit when enabled (no default)                  |
+| `rateLimit.burstSize`         | `number`  | `0`                           | Burst allowance                                       |
+| `metrics.enabled`             | `boolean` | `true`                        | Enable metrics endpoint (optional)                    |
+| `metrics.path`                | `string`  | `/metrics`                    | Metrics endpoint path                                 |
 
 ---
 
@@ -587,7 +593,7 @@ Access-Control-Allow-Headers: Content-Type, Authorization, X-Netdata-Agent-GUID
 **Solutions**:
 
 1. Check agent filename (without `.ai`)
-2. Configure `defaultAgent` in embed config
+2. Configure `allowedAgents` in embed config
 3. Verify agent was loaded with `--agent`
 
 ### SSE connection closing

@@ -104,44 +104,49 @@ Stored under `sessionsDir/embed-conversations/{clientId}.json.gz`:
 ```
 
 ## Configuration (`.ai-agent.json`)
+
+Named profiles under `embed`. Profile name matches CLI `--embed name:port`:
+
 ```json
 {
   "embed": {
-    "defaultAgent": "support.ai",
-    "corsOrigins": ["*.netdata.cloud", "localhost:*"],
-    "rateLimit": {
-      "enabled": true,
-      "requestsPerMinute": 10,
-      "burstSize": 5
-    },
-    "auth": {
-      "tiers": {
-        "netdataProperties": {
-          "origins": ["*.netdata.cloud"],
-          "rateLimit": { "requestsPerMinute": 60 }
+    "support": {
+      "allowedAgents": ["support"],
+      "corsOrigins": ["*.netdata.cloud", "localhost:*"],
+      "rateLimit": {
+        "enabled": true,
+        "requestsPerMinute": 10,
+        "burstSize": 5
+      },
+      "auth": {
+        "tiers": {
+          "netdataProperties": {
+            "origins": ["*.netdata.cloud"],
+            "rateLimit": { "requestsPerMinute": 60 }
+          },
+          "agentDashboards": {
+            "requireGuid": true,
+            "verifyGuidInCloud": false,
+            "rateLimit": { "requestsPerMinutePerGuid": 10 }
+          },
+          "unknown": {
+            "allow": false,
+            "rateLimit": { "requestsPerMinutePerIp": 2 }
+          }
         },
-        "agentDashboards": {
-          "requireGuid": true,
-          "verifyGuidInCloud": false,
-          "rateLimit": { "requestsPerMinutePerGuid": 10 }
-        },
-        "unknown": {
-          "allow": false,
-          "rateLimit": { "requestsPerMinutePerIp": 2 }
+        "signedTokens": {
+          "enabled": false,
+          "secret": "shared-secret",
+          "ttlSeconds": 3600
         }
       },
-      "signedTokens": {
-        "enabled": false,
-        "secret": "shared-secret",
-        "ttlSeconds": 3600
+      "metrics": {
+        "enabled": true,
+        "path": "/metrics"
       }
-    },
-    "metrics": {
-      "enabled": true,
-      "path": "/metrics"
     }
   }
 }
 ```
 
-**CLI enablement**: `--embed <port>` (repeatable). Concurrency: `--embed-concurrency <n>`.
+**CLI enablement**: `--embed name:port` (repeatable, e.g., `--embed support:8090`). Concurrency: `--embed-concurrency <n>`.

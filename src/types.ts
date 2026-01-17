@@ -434,11 +434,12 @@ export interface EmbedMetricsConfig {
   path?: string;
 }
 
-export interface EmbedHeadendConfig {
-  enabled?: boolean;
-  port?: number;
+/** Per-profile embed configuration */
+export interface EmbedProfileConfig {
+  /** Agents accessible via this profile. First is default. */
+  allowedAgents?: string[];
+  /** Maximum concurrent chat sessions for this profile */
   concurrency?: number;
-  defaultAgent?: string;
   corsOrigins?: string[];
   rateLimit?: EmbedRateLimitConfig;
   auth?: EmbedAuthConfig;
@@ -549,7 +550,8 @@ export interface Configuration {
     port?: number;             // ${PORT}
     bearerKeys?: string[];     // e.g., ["${API_BEARER_TOKEN}"] or multiple
   };
-  embed?: EmbedHeadendConfig;
+  /** Named embed profiles. Key is profile name, used with --embed name:port */
+  embed?: Record<string, EmbedProfileConfig>;
 }
 
 // REST tool configuration (minimal phase 1)

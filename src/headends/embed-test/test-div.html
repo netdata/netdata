@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Agent Chat - Div Mode Test</title>
+  <link rel="stylesheet" href="/test.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f0f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body {
+        background: #1a1a1a;
+      }
+    }
+
+    .demo-info {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #666;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .demo-info {
+        color: #999;
+      }
+    }
+
+    .demo-info h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #333;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .demo-info h1 {
+        color: #e0e0e0;
+      }
+    }
+
+    .demo-info p {
+      font-size: 14px;
+    }
+
+    /* Container that can be resized - simulates embedding in a div */
+    .chat-container {
+      width: 100%;
+      max-width: 600px;
+      height: 70vh;
+      min-height: 400px;
+      max-height: 800px;
+      resize: both;
+      overflow: hidden;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .chat-container {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-info">
+    <h1>AI Agent Chat - Div Mode</h1>
+    <p>This container is resizable. Drag the bottom-right corner to resize.</p>
+  </div>
+
+  <div id="chat" class="chat-container"></div>
+
+  <!-- Dependencies from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/turndown@7.1.2/dist/turndown.js"></script>
+
+  <!-- AI Agent Chat Client -->
+  <script src="/ai-agent-public.js"></script>
+  <script src="/test.js"></script>
+
+  <script>
+    // Configuration - agentId not set, server uses allowedAgents[0]
+    window.AiAgentChatConfig = {
+      endpoint: window.location.origin,
+    };
+
+    // Initialize chat in div mode
+    document.addEventListener('DOMContentLoaded', function() {
+      new AiAgentChatUI('#chat', { mode: 'div' });
+    });
+  </script>
+</body>
+</html>

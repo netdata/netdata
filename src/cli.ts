@@ -378,6 +378,28 @@ const parsePort = (value: string): number => {
   return port;
 };
 
+interface EmbedTarget {
+  name: string;
+  port: number;
+}
+
+const parseEmbedTarget = (value: string): EmbedTarget => {
+  const colonIndex = value.lastIndexOf(':');
+  if (colonIndex <= 0) {
+    throw new Error(`invalid embed target '${value}': expected name:port format (e.g., support:8090)`);
+  }
+  const name = value.slice(0, colonIndex);
+  const portStr = value.slice(colonIndex + 1);
+  const port = Number.parseInt(portStr, 10);
+  if (!Number.isFinite(port) || port <= 0 || port > 65535) {
+    throw new Error(`invalid port '${portStr}' in embed target '${value}'`);
+  }
+  if (!/^[\w-]+$/.test(name)) {
+    throw new Error(`invalid profile name '${name}' in embed target '${value}': only alphanumeric, underscore, and hyphen allowed`);
+  }
+  return { name, port };
+};
+
 const parsePositive = (value: string): number => {
   const num = Number.parseInt(value, 10);
   if (!Number.isFinite(num) || num <= 0) {
@@ -910,8 +932,8 @@ const anthropicCompletionsHeadendOption = new Option('--anthropic-completions <p
   .argParser((value: string, previous: number[]) => appendValue(parsePort(value), previous))
   .default([], undefined);
 
-const embedHeadendOption = new Option('--embed <port>', 'Start public embed headend on the given port (repeatable)')
-  .argParser((value: string, previous: number[]) => appendValue(parsePort(value), previous))
+const embedHeadendOption = new Option('--embed <name:port>', 'Start public embed headend with profile name:port (e.g., support:8090)')
+  .argParser((value: string, previous: EmbedTarget[]) => appendValue(parseEmbedTarget(value), previous))
   .default([], undefined);
 
 const apiConcurrencyOption = new Option('--api-concurrency <n>', 'Maximum concurrent REST API sessions')
@@ -953,7 +975,7 @@ interface HeadendModeConfig {
   mcpTargets: string[];
   openaiCompletionsPorts: number[];
   anthropicCompletionsPorts: number[];
-  embedPorts: number[];
+  embedTargets: EmbedTarget[];
   enableSlack: boolean;
   options: Record<string, unknown>;
 }
@@ -1242,7 +1264,7 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
     && config.mcpTargets.length === 0
     && config.openaiCompletionsPorts.length === 0
     && config.anthropicCompletionsPorts.length === 0
-    && config.embedPorts.length === 0
+    && config.embedTargets.length === 0
     && !config.enableSlack
   ) {
     exitWith(4, 'no headends specified; add --api/--mcp/--openai-completions/--anthropic-completions/--embed/--slack', 'EXIT-HEADEND-NO-HEADENDS');
@@ -1461,8 +1483,14 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   config.anthropicCompletionsPorts.forEach((port) => {
     headends.push(new AnthropicCompletionsHeadend(registry, { port, concurrency: anthropicCompletionsConcurrency }));
   });
-  config.embedPorts.forEach((port) => {
-    headends.push(new EmbedHeadend(registry, { port, concurrency: embedConcurrency, config: embedConfig }));
+  config.embedTargets.forEach((target) => {
+    const profileConfig = embedConfig?.[target.name];
+    headends.push(new EmbedHeadend(registry, {
+      profileName: target.name,
+      port: target.port,
+      concurrency: embedConcurrency,
+      config: profileConfig,
+    }));
   });
 
   if (slackHeadend !== undefined) {
@@ -1630,7 +1658,7 @@ program
       const mcpTargets = Array.isArray(options.mcp) ? (options.mcp as string[]) : [];
       const openaiCompletionsPorts = Array.isArray(options.openaiCompletions) ? (options.openaiCompletions as number[]) : [];
       const anthropicCompletionsPorts = Array.isArray(options.anthropicCompletions) ? (options.anthropicCompletions as number[]) : [];
-      const embedPorts = Array.isArray(options.embed) ? (options.embed as number[]) : [];
+      const embedTargets = Array.isArray(options.embed) ? (options.embed as EmbedTarget[]) : [];
       const listToolsTargets = Array.isArray(options.listTools) ? (options.listTools as string[]) : [];
 
       if (listToolsTargets.length > 0) {
@@ -1638,14 +1666,14 @@ program
         return;
       }
 
-      if (apiPorts.length > 0 || mcpTargets.length > 0 || openaiCompletionsPorts.length > 0 || anthropicCompletionsPorts.length > 0 || embedPorts.length > 0) {
+      if (apiPorts.length > 0 || mcpTargets.length > 0 || openaiCompletionsPorts.length > 0 || anthropicCompletionsPorts.length > 0 || embedTargets.length > 0) {
         await runHeadendMode({
           agentPaths: agentFlags,
           apiPorts,
           mcpTargets,
           openaiCompletionsPorts,
           anthropicCompletionsPorts,
-          embedPorts,
+          embedTargets,
           enableSlack: options.slack === true,
           options,
         });
