@@ -20,10 +20,10 @@ export class SessionManager {
   private readonly opTrees = new Map<string, unknown>();
   private readonly ingress = new Map<string, Record<string, unknown>>();
   private readonly aborters = new Map<string, AbortController>();
-  private readonly stopRefs = new Map<string, { stopping: boolean }>();
+  private readonly stopRefs = new Map<string, { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' }>();
   private readonly callbacks: Callbacks;
   private readonly treeUpdateListeners = new Set<(runId: string) => void>();
-  private readonly runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentEventCallbacks; renderTarget?: 'slack' | 'api' | 'web' | 'embed'; outputFormat?: string; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; headendId?: string; telemetryLabels?: Record<string, string> }) => Promise<AIAgentResult>;
+  private readonly runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentEventCallbacks; renderTarget?: 'slack' | 'api' | 'web' | 'embed'; outputFormat?: string; abortSignal?: AbortSignal; stopRef?: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' }; initialTitle?: string; headendId?: string; telemetryLabels?: Record<string, string> }) => Promise<AIAgentResult>;
   private readonly headendId?: string;
   private readonly telemetryLabels: Record<string, string>;
 
@@ -75,6 +75,12 @@ export class SessionManager {
       meta.error = reason ?? 'canceled';
       meta.updatedAt = Date.now();
       this.runs.set(runId, meta);
+      // Set stopRef reason to 'abort' AND trigger abort signal
+      const ref = this.stopRefs.get(runId);
+      if (ref) {
+        ref.stopping = true;
+        ref.reason = 'abort';
+      }
       try { this.aborters.get(runId)?.abort(); } catch (e) { warn(`abort failed for run ${runId}: ${e instanceof Error ? e.message : String(e)}`); }
       this.callbacks.onTreeUpdate?.(runId);
       for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch (e) { warn(`treeUpdate listener failed: ${e instanceof Error ? e.message : String(e)}`); } }
@@ -88,8 +94,12 @@ export class SessionManager {
       meta.error = reason ?? 'stopping';
       meta.updatedAt = Date.now();
       this.runs.set(runId, meta);
+      // Set stopRef reason to 'stop' - NO abort signal (allows final turn)
       const ref = this.stopRefs.get(runId);
-      if (ref) ref.stopping = true;
+      if (ref) {
+        ref.stopping = true;
+        ref.reason = 'stop';
+      }
       this.callbacks.onTreeUpdate?.(runId);
       for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch (e) { warn(`treeUpdate listener failed: ${e instanceof Error ? e.message : String(e)}`); } }
     }

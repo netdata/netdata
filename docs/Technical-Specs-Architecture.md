@@ -416,7 +416,7 @@ Key configuration options that affect architecture behavior.
 | `llmTimeout`                  | Number                  | LLM request timeout in ms                         |
 | `toolOutput`                  | Object                  | tool_output module overrides                      |
 | `abortSignal`                 | AbortSignal             | Cancellation signal                               |
-| `stopRef`                     | `{ stopping: boolean }` | Graceful stop reference                           |
+| `stopRef`                     | `{ stopping: boolean; reason?: 'stop' \| 'abort' \| 'shutdown' }` | Stop signal with reason |
 | `callbacks`                   | Object                  | Event callbacks for streaming and accounting      |
 | `temperature`                 | Number                  | null                                              | Sampling temperature            |
 | `topP`                        | Number                  | null                                              | Top-p sampling                  |

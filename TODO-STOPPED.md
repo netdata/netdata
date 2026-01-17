@@ -6,6 +6,23 @@ When users press "Stop" on Slack, the session exits immediately without giving t
 
 **Key insight from code review:** AbortSignal-first approach won't work because once aborted, the signal stays aborted permanently and would block the final turn LLM call. We must keep the dual mechanism (stopRef + abortSignal) with extended stopRef interface.
 
+## REVIEW TASK (2026-01-17)
+
+### Scope
+
+- Verify `user_stop` handling end-to-end, using the plan in this file.
+- Check the specific files the user listed:
+  - `src/session-turn-runner.ts`
+  - `src/headends/shutdown-utils.ts`
+  - `src/server/session-manager.ts`
+  - `src/session-tool-executor.ts`
+  - `src/context-guard.ts`
+  - `src/llm-messages-xml-next.ts`
+
+### Status
+
+- In progress
+
 ---
 
 ## CURRENT STATE ANALYSIS
@@ -778,3 +795,53 @@ const exitCode = forcedFinalReason === 'context' ? 'EXIT-TOKEN-LIMIT'
 | `stop-during-rate-limit` | Stop while rate-limited → final turn after sleep |
 | `final-turn-after-stop-calls-final-report` | Final turn can call `final_report` tool |
 | `mcp-headend-stop-propagation` | MCP headend inherits globalStopRef reason |
+
+---
+
+## REVIEW RESULTS (2026-01-17)
+
+### Verified (User Stop Flow)
+
+- `src/session-turn-runner.ts`:
+  - `FinalTurnLogReason` includes `user_stop`.
+  - Final-turn log mapping sets `logReason = 'user_stop'` when forced reason is `user_stop`.
+- `src/headends/shutdown-utils.ts`:
+  - `StopReason` type includes `stop | abort | shutdown`.
+- `src/server/session-manager.ts`:
+  - `stopRun()` sets `stopRef.reason = 'stop'` without aborting.
+  - `cancelRun()` sets `stopRef.reason = 'abort'` and triggers abort signal.
+- `src/session-tool-executor.ts`:
+  - `stop` allows only `final_report` tools; `abort/shutdown/undefined` blocks all tools.
+- `src/context-guard.ts`:
+  - `setForcedFinalReason()` accepts `user_stop`.
+- `src/llm-messages-xml-next.ts`:
+  - `final_turn_user_stop` slug present and mapped.
+
+### Verified (2026-01-17)
+
+- `src/session-turn-runner.ts` backoff sleep now checks `sleepWithAbort()` return value and handles `aborted_stop` + `aborted_cancel` (lines 1764-1783).
+
+### Bug Found & Fixed (2026-01-18) - Retry exhaustion
+
+**Location**: `src/session-turn-runner.ts:1803-1839`
+
+**Issue**: `user_stop` during retry loop was failing the session instead of triggering a final turn
+- When `stopRef.reason === 'stop'` is detected inside the retry loop, the code sets `forcedFinalReason = 'user_stop'` and `break`s the retry loop.
+- After the loop, `turnSuccessful` is still `false`. Because a forced final reason is now set, the code was treating the current turn as already-final and calling `finalizeSessionFailure(...)`.
+
+**Fix Applied**: Added special case check for `user_stop` before the retry exhaustion logic. When `forcedFinalTurnReason === 'user_stop'`, the code now skips the failure block and continues to the next turn (which will be the final turn with the user_stop reason).
+
+### Bug Found & Fixed (2026-01-18) - Retry loop blocks final turn
+
+**Location**: `src/session-turn-runner.ts:423-436`
+
+**Issue**: The retry loop's `stopRef.stopping` check for `'stop'` reason was breaking out of the retry loop before making any LLM call, even on the final turn.
+- When user presses Stop, `stopRef.stopping = true` and `reason = 'stop'`
+- First detection: retry loop breaks, sets `forcedFinalReason = 'user_stop'`
+- Next turn starts (the final turn), but `stopRef.stopping` is still `true`
+- Retry loop breaks AGAIN before making any LLM call
+- Session falls through to synthetic "max turns exhausted" instead of producing a real final report
+
+**Root cause**: The retry loop was handling `'stop'` reason redundantly. The turn loop already handles it at the start of each turn (lines 313-328).
+
+**Fix Applied**: Removed the `'stop'` handling from the retry loop check entirely. The retry loop now only handles `'abort'` and `'shutdown'` (immediate cancellation). For `'stop'`, the turn completes normally and the turn loop handles it at the start of the next turn.

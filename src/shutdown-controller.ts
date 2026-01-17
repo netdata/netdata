@@ -4,7 +4,7 @@ export type ShutdownTask = () => Promise<void> | void;
 
 export class ShutdownController {
   private readonly abortController = new AbortController();
-  private readonly globalStopRef = { stopping: false };
+  private readonly globalStopRef: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' } = { stopping: false };
   private readonly tasks = new Map<string, ShutdownTask>();
   private stopping = false;
   private shutdownPromise?: Promise<void>;
@@ -13,7 +13,7 @@ export class ShutdownController {
     return this.abortController.signal;
   }
 
-  public get stopRef(): { stopping: boolean } {
+  public get stopRef(): { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' } {
     return this.globalStopRef;
   }
 
@@ -40,7 +40,9 @@ export class ShutdownController {
   private async performShutdown(opts: { logger?: (entry: LogEntry) => void }): Promise<void> {
     if (this.stopping) return;
     this.stopping = true;
+    // Set stopRef reason to 'shutdown' AND trigger abort signal
     this.globalStopRef.stopping = true;
+    this.globalStopRef.reason = 'shutdown';
     try {
       this.abortController.abort();
     } catch { /* ignore */ }

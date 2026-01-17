@@ -129,7 +129,7 @@ export class SlackHeadend implements Headend {
   private fallbackServer?: http.Server;
   private stopping = false;
   private shutdownSignal?: AbortSignal;
-  private globalStopRef?: { stopping: boolean };
+  private globalStopRef?: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' };
   private shutdownListener?: () => void;
 
   public constructor(options: SlackHeadendOptions) {

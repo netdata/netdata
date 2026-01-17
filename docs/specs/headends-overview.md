@@ -53,7 +53,7 @@ type HeadendKind =
 interface HeadendContext {
   log: HeadendLogSink;
   shutdownSignal: AbortSignal;
-  stopRef: { stopping: boolean };
+  stopRef: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' };
 }
 ```
 
@@ -81,7 +81,9 @@ type HeadendClosedEvent =
 - `stopAll()` – marks `stopping=true`, calls `stop()` on each active headend, awaits watchers, then resolves `waitForFatal`
 
 **Graceful Shutdown**:
-- `stopRef.stopping = true` tells headends to reject new requests
+- `stopRef.stopping = true` with `reason` tells headends how to stop
+- `reason='stop'`: Graceful stop - allows final turn for model to summarize
+- `reason='abort'/'shutdown'`: Immediate cancel - no final turn
 - Active requests finish before `stop()` resolves
 - All watcher promises settle to avoid dangling rejections
 

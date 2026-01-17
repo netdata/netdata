@@ -611,7 +611,7 @@ export interface AccountingFlushPayload {
 }
 
 export type EventSource = 'stream' | 'replay' | 'finalize';
-export type ForcedFinalReason = 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion';
+export type ForcedFinalReason = 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion' | 'user_stop';
 
 export interface AIAgentEventMeta {
   agentId?: string;
@@ -674,7 +674,7 @@ export interface AgentRunOptions {
   renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'embed' | 'sub-agent';
   outputFormat: OutputFormatId;
   abortSignal?: AbortSignal;
-  stopRef?: { stopping: boolean };
+  stopRef?: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' };
   initialTitle?: string;
   ancestors?: string[];
   headendId?: string;
@@ -772,7 +772,7 @@ export interface AIAgentSessionConfig {
   // External cancellation signal to abort the session immediately
   abortSignal?: AbortSignal;
   // Graceful stop reference toggled by headend (no abort); agent should avoid starting new work
-  stopRef?: { stopping: boolean };
+  stopRef?: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' };
   // Ancestors chain of sub-agent prompt paths (for recursion prevention across nested sessions)
   ancestors?: string[];
   // Override context window for all targets (applies uniformly regardless of provider/model config)

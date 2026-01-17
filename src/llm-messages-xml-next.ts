@@ -49,6 +49,11 @@ export const XML_NEXT_SLUGS = {
     priority: 1,
     stop: true,
   },
+  final_turn_user_stop: {
+    message: 'The user has requested to stop. You MUST now provide your final report/answer, summarizing your progress so far. If you have not finished the task, state clearly what was completed and what remains. **DO NOT FILL THE GAPS WITH ASSUMPTIONS OR GUESSES**. The user may call you again to complete the task.',
+    priority: 1,
+    stop: true,
+  },
 
   // Wasted turn warning (base message - occurrence count appended dynamically)
   turn_wasted_task_status_only: {
@@ -84,7 +89,7 @@ export const XML_NEXT_SLUGS = {
 } as const satisfies Record<string, XmlNextSlugConfig>;
 
 // Type for final turn reasons - derived from the slug keys
-type FinalTurnReason = 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion';
+type FinalTurnReason = 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion' | 'user_stop';
 
 // Map from reason to slug key
 const FINAL_TURN_SLUG_MAP: Record<FinalTurnReason, keyof typeof XML_NEXT_SLUGS> = {
@@ -93,6 +98,7 @@ const FINAL_TURN_SLUG_MAP: Record<FinalTurnReason, keyof typeof XML_NEXT_SLUGS> 
   task_status_completed: 'final_turn_task_status_completed',
   task_status_only: 'final_turn_task_status_only',
   retry_exhaustion: 'final_turn_retry_exhaustion',
+  user_stop: 'final_turn_user_stop',
 };
 
 // ============================================================================

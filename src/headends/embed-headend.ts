@@ -226,7 +226,7 @@ export class EmbedHeadend implements Headend {
   private closedSignaled = false;
   private shutdownSignal?: AbortSignal;
   private shutdownListener?: () => void;
-  private globalStopRef?: { stopping: boolean };
+  private globalStopRef?: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' };
   private readonly sockets = new Set<Socket>();
   private cachedClientScript?: { etag: string; body: Buffer; mtimeMs: number };
   private readonly cachedTestFiles = new Map<string, { etag: string; body: Buffer; mtimeMs: number }>();
@@ -433,7 +433,7 @@ export class EmbedHeadend implements Headend {
       const history = parseHistoryMessages(body.history);
 
       const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
-      const stopRef = { stopping: this.globalStopRef?.stopping ?? false };
+      const stopRef = { stopping: this.globalStopRef?.stopping ?? false, reason: this.globalStopRef?.reason };
       const abortController = new AbortController();
       req.on('close', () => { abortController.abort(); });
       sessionStartTs = Date.now();

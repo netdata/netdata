@@ -232,11 +232,14 @@ The flow is **procedural**, not state-machine driven. Error handling is inline v
 - Sets `this.canceled = true`
 - Returns `finalizeCanceledSession()`
 
-### Graceful Stop
-- Checked via `stopRef.stopping`
-- Allows current turn to complete
-- Does not start new turns
-- Returns `finalizeGracefulStopSession()`
+### Stop Signal Handling
+- Checked via `stopRef.stopping` and `stopRef.reason`
+- Three stop reasons:
+  - `'stop'`: Graceful stop - triggers final turn with `forcedFinalReason='user_stop'`, allows model to summarize, success=true
+  - `'abort'`: Immediate cancel - no final turn, success=false, abortSignal fired
+  - `'shutdown'`: Global shutdown - no final turn, success=false, abortSignal fired
+- Tool execution during final turn: only `final_report` tool allowed when reason='stop'
+- Exit code: `EXIT-USER-STOP` when reason='stop' and final report received
 
 ## Configuration Effects
 
@@ -246,7 +249,7 @@ The flow is **procedural**, not state-machine driven. Error handling is inline v
 | `maxRetries` | Per-turn retry cap |
 | `targets` | Provider/model cycling order |
 | `abortSignal` | Cancellation trigger |
-| `stopRef` | Graceful stop trigger |
+| `stopRef` | Stop signal with reason: `{ stopping: boolean; reason?: 'stop' \| 'abort' \| 'shutdown' }` |
 | `conversationHistory` | Initial conversation state |
 | `toolTimeout` | Per-tool execution timeout |
 | `toolResponseMaxBytes` | Oversize tool outputs stored + tool_output handle inserted |

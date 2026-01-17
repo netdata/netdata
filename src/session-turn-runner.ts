@@ -87,7 +87,7 @@ export interface TurnRunnerContext {
   readonly taskStatusToolEnabled: boolean;
   readonly finalTurnAllowedTools?: Set<string>;
   readonly abortSignal?: AbortSignal;
-  readonly stopRef?: { stopping: boolean };
+  readonly stopRef?: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' };
   isCanceled: () => boolean;
 }
 
@@ -148,7 +148,7 @@ interface TurnRunnerState {
   pendingCtxTokens?: number;
   newCtxTokens?: number;
   schemaCtxTokens?: number;
-  forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion';
+  forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion' | 'user_stop';
   lastTurnError?: string;
   lastTurnErrorType?: string;
   lastTaskStatusCompleted?: boolean;
@@ -161,6 +161,7 @@ type FinalTurnLogReason =
     | 'task_status_completed'
     | 'task_status_only'
     | 'retry_exhaustion'
+    | 'user_stop'
     | 'incomplete_final_report'
     | 'final_report_attempt'
     | 'xml_wrapper_as_tool';
@@ -310,7 +311,20 @@ export class TurnRunner {
             if (this.ctx.isCanceled())
                 return this.finalizeCanceledSession(conversation, logs, accounting);
             if (this.ctx.stopRef?.stopping === true) {
-                return this.finalizeGracefulStopSession(conversation, logs, accounting);
+                const reason = this.ctx.stopRef.reason;
+                if (reason === 'stop') {
+                    // Graceful stop: trigger final turn, don't exit yet
+                    if (this.ctx.contextGuard.getForcedFinalReason() === undefined) {
+                        this.ctx.contextGuard.setForcedFinalReason('user_stop');
+                    }
+                    // Continue to the turn loop - next turn will be final
+                } else if (reason === 'abort' || reason === 'shutdown') {
+                    // abort or shutdown - immediate exit with failure
+                    return this.finalizeCanceledSession(conversation, logs, accounting);
+                } else {
+                    // undefined (legacy) - immediate exit with success (backward compat)
+                    return this.finalizeGracefulStopSession(conversation, logs, accounting);
+                }
             }
             this.ctx.xmlTransport.beginTurn();
             this.state.turnFailedEvents = [];
@@ -406,8 +420,16 @@ export class TurnRunner {
                 // (e.g., validation failure on attempt 1 should not block success on attempt 2)
                 lastError = undefined;
                 lastErrorType = undefined;
+                // Check for immediate cancellation (abort/shutdown) - these exit immediately
+                // Note: 'stop' reason is NOT handled here - we let the turn complete normally
+                // The turn loop (lines 313-328) handles 'stop' at the start of each turn
                 if (Boolean(this.ctx.stopRef?.stopping)) {
-                    return this.finalizeGracefulStopSession(conversation, logs, accounting);
+                    const reason = this.ctx.stopRef?.reason;
+                    if (reason === 'abort' || reason === 'shutdown') {
+                        return this.finalizeCanceledSession(conversation, logs, accounting);
+                    }
+                    // For 'stop' or undefined: continue with the turn, don't break
+                    // This allows the final turn to make its LLM call
                 }
                 // Emit startup verbose line when master LLM runs (once per session)
                 if (!this.callbacks.isMasterLlmStartLogged() && this.ctx.parentTxnId === undefined) {
@@ -606,6 +628,8 @@ export class TurnRunner {
                             logReason = 'task_status_only';
                         } else if (this.forcedFinalTurnReason === 'retry_exhaustion') {
                             logReason = 'retry_exhaustion';
+                        } else if (this.forcedFinalTurnReason === 'user_stop') {
+                            logReason = 'user_stop';
                         }
                         this.logEnteringFinalTurn(logReason, currentTurn, this.state.maxTurns, maxTurns);
                     }
@@ -1701,7 +1725,18 @@ export class TurnRunner {
                                                 return this.finalizeCanceledSession(conversation, logs, accounting);
                                             }
                                             if (sleepResult === 'aborted_stop') {
-                                                return this.finalizeGracefulStopSession(conversation, logs, accounting);
+                                                const reason = this.ctx.stopRef?.reason;
+                                                if (reason === 'stop') {
+                                                    // Graceful stop: set final turn and continue
+                                                    if (this.ctx.contextGuard.getForcedFinalReason() === undefined) {
+                                                        this.ctx.contextGuard.setForcedFinalReason('user_stop');
+                                                    }
+                                                    break; // Exit rate-limit loop, continue to final turn
+                                                } else if (reason === 'abort' || reason === 'shutdown') {
+                                                    return this.finalizeCanceledSession(conversation, logs, accounting);
+                                                } else {
+                                                    return this.finalizeGracefulStopSession(conversation, logs, accounting);
+                                                }
                                             }
                                         }
                                         rateLimitedInCycle = 0;
@@ -1724,7 +1759,24 @@ export class TurnRunner {
                                 };
                                 this.log(retryEntry);
                                 if (directive.backoffMs !== undefined && directive.backoffMs > 0) {
-                                    await this.sleepWithAbort(directive.backoffMs);
+                                    const sleepResult = await this.sleepWithAbort(directive.backoffMs);
+                                    if (sleepResult === 'aborted_cancel') {
+                                        return this.finalizeCanceledSession(conversation, logs, accounting);
+                                    }
+                                    if (sleepResult === 'aborted_stop') {
+                                        const reason = this.ctx.stopRef?.reason;
+                                        if (reason === 'stop') {
+                                            // Graceful stop: set final turn and break to allow final turn
+                                            if (this.ctx.contextGuard.getForcedFinalReason() === undefined) {
+                                                this.ctx.contextGuard.setForcedFinalReason('user_stop');
+                                            }
+                                            break; // Exit retry loop, continue to final turn
+                                        } else if (reason === 'abort' || reason === 'shutdown') {
+                                            return this.finalizeCanceledSession(conversation, logs, accounting);
+                                        } else {
+                                            return this.finalizeGracefulStopSession(conversation, logs, accounting);
+                                        }
+                                    }
                                 }
                                 logAttemptFailure();
                                 continue;
@@ -1747,13 +1799,20 @@ export class TurnRunner {
             }
             // Check if all attempts failed for this turn (retry exhaustion)
             if (!turnSuccessful) {
+                // Special case: user_stop during retry means we should continue to next (final) turn
+                // Don't treat this as a failure - the next turn will be the final turn
+                if (this.forcedFinalTurnReason === 'user_stop') {
+                    // Continue to next turn - it will be the final turn with user_stop reason
+                    // DO NOT fail here - we want the model to produce a final report
+                }
                 // Calculate if this is a final turn (same logic as in executeSingleTurn)
-                const forcedFinalTurn = this.forcedFinalTurnReason !== undefined;
-                const isCurrentlyFinalTurn = forcedFinalTurn || currentTurn === maxTurns;
-                
-                // Rule 5: Force final turn on retry exhaustion instead of session failure
-                // Exception: If already in final turn, fail normally (prevent infinite loop)
-                if (isCurrentlyFinalTurn) {
+                else {
+                    const forcedFinalTurn = this.forcedFinalTurnReason !== undefined;
+                    const isCurrentlyFinalTurn = forcedFinalTurn || currentTurn === maxTurns;
+
+                    // Rule 5: Force final turn on retry exhaustion instead of session failure
+                    // Exception: If already in final turn, fail normally (prevent infinite loop)
+                    if (isCurrentlyFinalTurn) {
                     // Already in final turn - fail session normally
                     const failureInfo = this.buildTurnFailureInfo({
                         turn: currentTurn,
@@ -1769,10 +1828,11 @@ export class TurnRunner {
                     });
                     this.logTurnFailure(failureInfo);
                     return this.finalizeSessionFailure(conversation, logs, accounting, failureInfo, currentTurn);
+                    }
+                    // Normal case: trigger graceful final turn
+                    this.ctx.contextGuard.setRetryExhaustedReason();
+                    // DO NOT mark turnSuccessful - proceed to next turn with forced final status
                 }
-                // Normal case: trigger graceful final turn
-                this.ctx.contextGuard.setRetryExhaustedReason();
-                // DO NOT mark turnSuccessful - proceed to next turn with forced final status
             }
             // End of retry loop - close turn if successful (turnSuccessful may be true due to retry exhaustion)
             try {
@@ -1956,7 +2016,7 @@ export class TurnRunner {
     private set newCtxTokens(value: number) { this.ctx.contextGuard.setNewTokens(value); }
     private get schemaCtxTokens(): number { return this.ctx.contextGuard.getSchemaTokens(); }
     private set schemaCtxTokens(value: number) { this.ctx.contextGuard.setSchemaTokens(value); }
-    private get forcedFinalTurnReason(): 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion' | undefined { return this.ctx.contextGuard.getForcedFinalReason(); }
+    private get forcedFinalTurnReason(): 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion' | 'user_stop' | undefined { return this.ctx.contextGuard.getForcedFinalReason(); }
     private get finalReport() { return this.ctx.finalReportManager.getReport(); }
     private estimateTokensForCounters(messages: ConversationMessage[]): number {
         return this.ctx.contextGuard.estimateTokens(messages);
@@ -2549,9 +2609,14 @@ export class TurnRunner {
             message: `finalize: source=${source} status_meta=${this.state.lastFinalReportStatus ?? 'none'} attempts=${String(this.ctx.finalReportManager.finalReportAttempts)} toolFailed=${this.state.finalReportToolFailedEver ? 'true' : 'false'} toolLimit=${this.state.toolLimitExceeded ? 'true' : 'false'}`
         });
         this.logFinalReportAccepted(source, currentTurn);
-        const exitCode = this.forcedFinalTurnReason === 'context' ? 'EXIT-TOKEN-LIMIT' : 'EXIT-FINAL-ANSWER';
+        const exitCode = this.forcedFinalTurnReason === 'context' ? 'EXIT-TOKEN-LIMIT'
+            : this.forcedFinalTurnReason === 'retry_exhaustion' ? 'EXIT-MAX-RETRIES'
+            : this.forcedFinalTurnReason === 'user_stop' ? 'EXIT-USER-STOP'
+            : 'EXIT-FINAL-ANSWER';
         const exitMessage = this.forcedFinalTurnReason === 'context'
             ? `Final report received after context guard triggered (${FINAL_REPORT_TOOL}), session complete`
+            : this.forcedFinalTurnReason === 'user_stop'
+            ? `Final report received after user stop request (${FINAL_REPORT_TOOL}), session complete`
             : `Final report received (${FINAL_REPORT_TOOL}), session complete`;
         // Transport-layer success: any model-provided report that passes validation is successful.
         // Content-level failure (model says "I couldn't find data") is semantic, not transport failure.

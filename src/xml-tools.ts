@@ -27,7 +27,7 @@ export interface XmlNextPayload {
   contextPercentUsed: number;
   // Whether external tools (MCP, REST, etc.) are available
   hasExternalTools: boolean;
-  forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion';
+  forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion' | 'user_stop';
   finalTurnTools?: string[];
   // Wasted turn tracking - consecutive task_status-only turns
   consecutiveProgressOnlyTurns?: number;

@@ -84,7 +84,7 @@ export class RestHeadend implements Headend {
   private readonly extraRoutes: { method: RestExtraRoute['method']; path: string; handler: RestExtraRoute['handler']; originalPath: string }[] = [];
   private readonly telemetryLabels: Record<string, string>;
   private shutdownSignal?: AbortSignal;
-  private globalStopRef?: { stopping: boolean };
+  private globalStopRef?: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' };
   private shutdownListener?: () => void;
   private readonly sockets = new Set<Socket>();
 
@@ -245,7 +245,7 @@ export class RestHeadend implements Headend {
     }
 
     const abortController = new AbortController();
-    const stopRef = { stopping: this.globalStopRef?.stopping === true };
+    const stopRef = { stopping: this.globalStopRef?.stopping === true, reason: this.globalStopRef?.reason };
     const onAbort = () => {
       if (abortController.signal.aborted) return;
       stopRef.stopping = true;
@@ -382,7 +382,7 @@ export class RestHeadend implements Headend {
     requestId: string
   ): Promise<void> {
     const abortController = new AbortController();
-    const stopRef = { stopping: this.globalStopRef?.stopping === true };
+    const stopRef = { stopping: this.globalStopRef?.stopping === true, reason: this.globalStopRef?.reason };
     const onAbort = () => {
       if (abortController.signal.aborted) return;
       stopRef.stopping = true;

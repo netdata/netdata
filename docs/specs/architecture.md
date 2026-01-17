@@ -171,7 +171,7 @@ Defined in `src/ai-agent.ts:16-44`:
 3. **Provider Isolation**: Each provider handles its own auth/protocol
 4. **Context Guard**: Token budget checked before each LLM request
 5. **Tool Budget**: Tool output size checked before committing to conversation
-6. **Abort Propagation**: AbortSignal and `stopRef` cancellations propagate to every wait loop
+6. **Stop Signal Propagation**: `stopRef` with reason ('stop'/'abort'/'shutdown') propagates to every wait loop; 'stop' triggers final turn, 'abort'/'shutdown' trigger AbortSignal
 7. **OpTree Consistency**: Every operation has begin/end lifecycle calls
 
 ## Business Logic Coverage (Verified 2025-11-16)
@@ -207,7 +207,7 @@ Defined in `src/ai-agent.ts:16-44`:
 - `toolResponseMaxBytes?: number` - Max tool response size (oversize stored + tool_output handle)
 - `toolOutput?: ToolOutputConfigInput` - tool_output module overrides (storeDir ignored; root is `/tmp/ai-agent-<run-hash>`)
 - `abortSignal?: AbortSignal` - Cancellation signal
-- `stopRef?: { stopping: boolean }` - Graceful stop reference
+- `stopRef?: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' }` - Stop signal with reason
 - `callbacks?: AIAgentEventCallbacks` - Event callbacks
 - `subAgents?: PreloadedSubAgent[]` - Preloaded sub-agent definitions
 - `agentId?: string` - Agent identifier

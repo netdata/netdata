@@ -92,7 +92,7 @@ export interface SessionContext {
   toolTimeout?: number;
   maxToolCallsPerTurn?: number;
   toolResponseMaxBytes?: number;
-  stopRef?: { stopping: boolean };
+  stopRef?: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' };
   // cancel status provided via getter or similar mechanism since primitive boolean is pass-by-value
   isCanceled: () => boolean;
   taskStatusToolEnabled: boolean;
@@ -186,9 +186,6 @@ export class SessionToolExecutor {
       parameters: Record<string, unknown>,
       options?: { toolCallId?: string }
     ): Promise<string> => {
-      if (this.sessionContext.stopRef?.stopping === true) {
-        throw new Error('stop_requested');
-      }
       if (this.sessionContext.isCanceled()) {
         throw new Error('canceled');
       }
@@ -291,6 +288,22 @@ export class SessionToolExecutor {
         effectiveToolName === this.sessionContext.finalReportToolName ||
         effectiveToolName === 'final_report';
       const isProgressTool = effectiveToolName === 'agent__task_status';
+
+      // Stop signal check: allow final_report when reason='stop', block all else
+      if (this.sessionContext.stopRef?.stopping === true) {
+        const stopReason = this.sessionContext.stopRef.reason;
+        if (stopReason === 'stop') {
+          // Graceful stop: allow only final_report tool
+          if (!isFinalReportTool) {
+            throw new Error('stop_requested');
+          }
+          // Let final_report through to give model a chance to summarize
+        } else {
+          // abort/shutdown/undefined: block all tools immediately
+          throw new Error('stop_requested');
+        }
+      }
+
       if (isFinalReportTool) {
         this.finalReportManager.incrementAttempts();
         const nestedCalls = this.parseNestedCallsFromFinalReport(

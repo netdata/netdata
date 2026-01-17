@@ -1987,7 +1987,7 @@ export class AIAgentSession {
   private set newCtxTokens(value: number) { this.contextGuard.setNewTokens(value); }
   private get schemaCtxTokens(): number { return this.contextGuard.getSchemaTokens(); }
   private set schemaCtxTokens(value: number) { this.contextGuard.setSchemaTokens(value); }
-  private get forcedFinalTurnReason(): 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion' | undefined { return this.contextGuard.getForcedFinalReason(); }
+  private get forcedFinalTurnReason(): 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion' | 'user_stop' | undefined { return this.contextGuard.getForcedFinalReason(); }
   private get contextLimitWarningLogged(): boolean { return this.contextGuard.hasLoggedContextWarning(); }
   private set contextLimitWarningLogged(value: boolean) { if (value) this.contextGuard.markContextWarningLogged(); }
 
@@ -2067,7 +2067,7 @@ export class AIAgentSession {
   }
 
 
-  private logEnteringFinalTurn(reason: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion' | 'incomplete_final_report' | 'final_report_attempt' | 'xml_wrapper_as_tool', turn: number): void {
+  private logEnteringFinalTurn(reason: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion' | 'user_stop' | 'incomplete_final_report' | 'final_report_attempt' | 'xml_wrapper_as_tool', turn: number): void {
     if (this.finalTurnEntryLogged) return;
     const severity = reason === 'task_status_completed' ? 'VRB' as const : 'WRN' as const;
     const originalMaxTurns = this.sessionConfig.maxTurns ?? 10;

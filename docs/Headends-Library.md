@@ -346,7 +346,7 @@ export type {
 | Option        | Type                    | Description                   |
 | ------------- | ----------------------- | ----------------------------- |
 | `abortSignal` | `AbortSignal`           | External cancellation control |
-| `stopRef`     | `{ stopping: boolean }` | Graceful stop reference       |
+| `stopRef`     | `{ stopping: boolean; reason?: 'stop' \| 'abort' \| 'shutdown' }` | Stop signal with reason |
 
 ### Example Configuration
 

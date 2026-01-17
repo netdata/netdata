@@ -1,6 +1,7 @@
 import http from 'node:http';
 import net, { type AddressInfo } from 'node:net';
 
+import type { StopRef } from '../headends/shutdown-utils.js';
 import type { HeadendContext } from '../headends/types.js';
 
 import { AgentRegistry } from '../agent-registry.js';
@@ -39,7 +40,7 @@ async function run(): Promise<void> {
   const registry = new AgentRegistry([]);
   const headend = new RestHeadend(registry, { port });
   const shutdownController = new AbortController();
-  const stopRef = { stopping: false };
+  const stopRef: StopRef = { stopping: false };
   const context: HeadendContext = {
     log: () => { /* no-op for smoke test */ },
     shutdownSignal: shutdownController.signal,
@@ -59,6 +60,7 @@ async function run(): Promise<void> {
   }
 
   stopRef.stopping = true;
+  stopRef.reason = 'shutdown';
   shutdownController.abort();
   await headend.stop();
   const closed = await headend.closed;

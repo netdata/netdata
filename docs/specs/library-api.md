@@ -192,7 +192,7 @@ interface AIAgentSessionConfig {
 
   // Optional cancellation
   abortSignal?: AbortSignal;                // Abort signal
-  stopRef?: { stopping: boolean };          // Graceful stop reference
+  stopRef?: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' }; // Stop signal with reason
 
   // Optional miscellaneous
   headendWantsProgressUpdates?: boolean;    // Enable progress updates

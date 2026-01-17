@@ -15,7 +15,7 @@ interface HeadendManagerOptions {
   log?: HeadendLogSink;
   onFatal?: (event: HeadendFatalEvent) => void;
   shutdownSignal: AbortSignal;
-  stopRef: { stopping: boolean };
+  stopRef: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' };
 }
 ```
 
@@ -32,7 +32,7 @@ interface HeadendFatalEvent {
 interface HeadendContext {
   log: (entry: LogEntry) => void;
   shutdownSignal: AbortSignal;
-  stopRef: { stopping: boolean };
+  stopRef: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' };
 }
 ```
 
@@ -46,7 +46,7 @@ class HeadendManager {
   private readonly log: HeadendLogSink;
   private readonly onFatal?: (event) => void;
   private readonly shutdownSignal: AbortSignal;
-  private readonly stopRef: { stopping: boolean };
+  private readonly stopRef: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' };
   private readonly active: Set<Headend>;
   private readonly watchers: Promise<void>[];
   private fatalResolved: boolean;

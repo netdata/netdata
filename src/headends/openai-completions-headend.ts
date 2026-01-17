@@ -111,7 +111,7 @@ export class OpenAICompletionsHeadend implements Headend {
   private stopping = false;
   private closedSignaled = false;
   private shutdownSignal?: AbortSignal;
-  private globalStopRef?: { stopping: boolean };
+  private globalStopRef?: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' };
   private shutdownListener?: () => void;
   private readonly sockets = new Set<Socket>();
 
@@ -258,10 +258,14 @@ export class OpenAICompletionsHeadend implements Headend {
     if (formatInfo.schema !== undefined) agentPayload.schema = formatInfo.schema;
 
     const abortController = new AbortController();
-    const stopRef = { stopping: false };
+    const stopRef: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' } = {
+      stopping: this.globalStopRef?.stopping ?? false,
+      reason: this.globalStopRef?.reason,
+    };
     const onAbort = () => {
       if (abortController.signal.aborted) return;
       stopRef.stopping = true;
+      stopRef.reason ??= 'abort';
       abortController.abort();
       this.log('chat completion aborted', 'WRN', false, { model: agent.id });
     };

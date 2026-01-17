@@ -211,7 +211,7 @@ interface AIAgentSessionConfig {
 
   // Control
   abortSignal?: AbortSignal; // External cancellation
-  stopRef?: { stopping: boolean }; // Graceful stop
+  stopRef?: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' }; // Stop signal with reason
 
   // Context
   contextWindow?: number; // Override context window
@@ -569,7 +569,7 @@ const sessionConfig = {
 controller.abort();
 ```
 
-### Graceful Stop
+### Stop Signal
 
 ```typescript
 const stopRef = { stopping: false };
@@ -579,8 +579,17 @@ const sessionConfig = {
   stopRef,
 };
 
-// Later, request graceful stop (agent finishes current work)
+// Graceful stop: allows model to provide final summary
 stopRef.stopping = true;
+stopRef.reason = 'stop';  // Model gets one final turn to summarize
+
+// Immediate cancel: no final turn
+stopRef.stopping = true;
+stopRef.reason = 'abort'; // Session exits immediately
+
+// Global shutdown: no final turn
+stopRef.stopping = true;
+stopRef.reason = 'shutdown'; // Session exits immediately
 ```
 
 ---

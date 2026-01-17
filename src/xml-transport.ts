@@ -63,7 +63,7 @@ export interface XmlBuildMessagesConfig {
   maxRetries: number;
   // Context window info (for percentage calculation)
   contextPercentUsed: number;
-  forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion';
+  forcedFinalTurnReason?: 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion' | 'user_stop';
   finalTurnTools?: string[];
   noticeContent?: string;
   // Wasted turn tracking - consecutive task_status-only turns

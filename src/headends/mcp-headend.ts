@@ -92,7 +92,7 @@ export class McpHeadend implements Headend {
   private readonly limiter?: ConcurrencyLimiter;
   private readonly verboseLogging: boolean;
   private shutdownSignal?: AbortSignal;
-  private globalStopRef?: { stopping: boolean };
+  private globalStopRef?: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' };
   private shutdownListener?: () => void;
   private readonly httpSockets = new Set<Socket>();
   private readonly sseSockets = new Set<Socket>();
@@ -362,8 +362,20 @@ export class McpHeadend implements Headend {
         const responseSchema = (parsed.data as { schema?: Record<string, unknown> }).schema;
 
         const abortSignal = extra.signal;
-        const stopRef = { stopping: false };
-        abortSignal.addEventListener('abort', () => { stopRef.stopping = true; }, { once: true });
+        // Use getter-based stopRef that always reads from globalStopRef
+        // eslint-disable-next-line @typescript-eslint/no-this-alias -- required for getter closure
+        const self = this;
+        const stopRef = {
+          get stopping(): boolean { return self.globalStopRef?.stopping ?? false; },
+          get reason(): 'stop' | 'abort' | 'shutdown' | undefined { return self.globalStopRef?.reason; },
+        };
+        // When abortSignal fires (MCP client disconnect), set globalStopRef to abort
+        abortSignal.addEventListener('abort', () => {
+          if (self.globalStopRef !== undefined && !self.globalStopRef.stopping) {
+            self.globalStopRef.stopping = true;
+            self.globalStopRef.reason = 'abort';
+          }
+        }, { once: true });
 
         let output = '';
         const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
