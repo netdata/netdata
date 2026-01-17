@@ -105,6 +105,10 @@ void send_node_info_with_wait(RRDHOST *host)
     if (unlikely(!host || !__atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED)))
         return;
 
+    // No node_id means cloud doesn't know about this node - nothing to update
+    if (uuid_is_null(host->node_id.uuid))
+        return;
+
     if (!aclk_online())
         return;
 
@@ -124,6 +128,13 @@ void send_node_info_with_wait(RRDHOST *host)
 void send_node_update_with_wait(RRDHOST *host, int live, int queryable)
 {
     if (unlikely(!host || !__atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED)))
+        return;
+
+    // No node_id means cloud doesn't know about this node - nothing to update
+    if (uuid_is_null(host->node_id.uuid))
+        return;
+
+    if (!aclk_online())
         return;
 
     struct aclk_sync_completion *sc = aclk_sync_completion_create();

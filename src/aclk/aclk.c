@@ -1032,11 +1032,8 @@ void aclk_host_state_update(RRDHOST *host, int live, int queryable, struct aclk_
         return;
     }
 
-    if (uuid_is_null(host->node_id.uuid)) {
+    if (uuid_is_null(host->node_id.uuid))
         aclk_create_node_instance_job(host);
-        if (sync_completion)
-            aclk_sync_completion_signal(sync_completion);
-    }
     else
         aclk_update_node_instance_job(host, live, queryable, sync_completion);
 }
