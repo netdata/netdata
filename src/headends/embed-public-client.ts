@@ -58,7 +58,7 @@ type EmbedClientEvent =
   | { type: 'error'; error: { code: string; message: string } }
   | { type: 'turn'; turn: number; isUser: boolean };
 
-interface NetdataSupportConfig {
+interface AiAgentChatConfig {
   endpoint: string;
   agentId?: string;
   statusFields?: ('status' | 'now' | 'done' | 'pending')[];
@@ -75,15 +75,15 @@ interface NetdataSupportConfig {
   onEvent?: (event: EmbedClientEvent) => void;
 }
 
-class NetdataSupport {
-  private readonly config: NetdataSupportConfig;
+class AiAgentChat {
+  private readonly config: AiAgentChatConfig;
   private history: EmbedHistoryEntry[] = [];
   private clientId: string | null;
   private sessionId: string | null = null;
   private loading = false;
   private abortController: { signal: AbortSignal; abort: () => void } | null = null;
 
-  constructor(config: NetdataSupportConfig) {
+  constructor(config: AiAgentChatConfig) {
     this.config = config;
     this.clientId = typeof config.clientId === 'string' ? config.clientId : null;
   }
@@ -263,4 +263,4 @@ class NetdataSupport {
 }
 
 const globalScope = (typeof globalThis !== 'undefined' ? globalThis : {}) as Record<string, unknown>;
-globalScope.NetdataSupport = NetdataSupport;
+globalScope.AiAgentChat = AiAgentChat;

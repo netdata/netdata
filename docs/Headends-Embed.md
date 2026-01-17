@@ -60,7 +60,7 @@ curl -X POST http://localhost:8090/v1/chat \
 ```html
 <script src="http://localhost:8090/ai-agent-public.js"></script>
 <script>
-  const chat = new NetdataSupport({
+  const chat = new AiAgentChat({
     endpoint: "http://localhost:8090",
     agentId: "chat",
   });
@@ -243,7 +243,7 @@ The public client is served at `/ai-agent-public.js`.
 ```html
 <script src="http://localhost:8090/ai-agent-public.js"></script>
 <script>
-  const chat = new NetdataSupport({
+  const chat = new AiAgentChat({
     endpoint: 'http://localhost:8090',
     agentId: 'support'
   });
@@ -256,7 +256,7 @@ The public client is served at `/ai-agent-public.js`.
 ### Event Handling
 
 ```javascript
-const chat = new NetdataSupport({
+const chat = new AiAgentChat({
   endpoint: "http://localhost:8090",
   agentId: "support",
   onEvent: (event) => {
@@ -608,7 +608,7 @@ Access-Control-Allow-Headers: Content-Type, Authorization, X-Netdata-Agent-GUID
 
 ### JavaScript client not loading
 
-**Symptom**: `NetdataSupport is not defined`
+**Symptom**: `AiAgentChat is not defined`
 
 **Cause**: Script not loaded.
 
