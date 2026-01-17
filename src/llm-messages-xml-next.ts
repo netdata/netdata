@@ -25,12 +25,12 @@ export interface XmlNextSlugConfig {
 export const XML_NEXT_SLUGS = {
   // Final turn warnings (stop: true means session should end)
   final_turn_context: {
-    message: 'You run out of context window. You MUST now provide your final report/answer, even if incomplete. If you have not finished the task, state this limitation in your final report/answer.',
+    message: 'You run out of context window. You MUST now provide your final report/answer, even if incomplete. If you have not finished the task, state this limitation in your final report/answer. **DO NOT FILL THE GAPS WITH ASSUMPTIONS OR GUESSES**. Provide only what you have done so far and clearly state the fact that you have been stopped before completing the task, allowing the user to call you again to complete the task properly.',
     priority: 1,
     stop: true,
   },
   final_turn_max_turns: {
-    message: 'You are not allowed to run more turns. You MUST now provide your final report/answer, even if incomplete. If you have not finished the task, state this limitation in your final report/answer.',
+    message: 'You are not allowed to run more turns. You MUST now provide your final report/answer, even if incomplete. If you have not finished the task, state this limitation in your final report/answer. **DO NOT FILL THE GAPS WITH ASSUMPTIONS OR GUESSES**. Provide only what you have done so far and clearly state the fact that you have been stopped before completing the task, allowing the user to call you again to complete the task properly.',
     priority: 1,
     stop: true,
   },
@@ -40,19 +40,19 @@ export const XML_NEXT_SLUGS = {
     stop: true,
   },
   final_turn_task_status_only: {
-    message: 'You are repeatedly calling task-status without any other tools or a final report/answer and the system stopped you to prevent infinite loops. You MUST now provide your final report/answer, even if incomplete. If you have not finished the task, state this limitation in your final report/answer.',
+    message: 'You are repeatedly calling task-status without any other tools or a final report/answer and the system stopped you to prevent infinite loops. You MUST now provide your final report/answer, even if incomplete. If you have not completed the task, state this limitation in your final report/answer. **DO NOT FILL THE GAPS WITH ASSUMPTIONS OR GUESSES**. Provide only what you have done so far and clearly state the fact that you have been stopped before completing the task, allowing the user to call you again to complete the task properly.',
     priority: 1,
     stop: true,
   },
   final_turn_retry_exhaustion: {
-    message: 'All retry attempts have been exhausted. You MUST now provide your final report/answer, even if incomplete. If you have not finished the task, state this limitation in your final report/answer.',
+    message: 'All retry attempts have been exhausted. You MUST now provide your final report/answer, even if incomplete. If you have not finished the task, state this limitation in your final report/answer. **DO NOT FILL THE GAPS WITH ASSUMPTIONS OR GUESSES**. Provide only what you have done so far and clearly state the fact that you have been stopped before completing the task, allowing the user to call you again to complete the task properly.',
     priority: 1,
     stop: true,
   },
 
   // Wasted turn warning (base message - occurrence count appended dynamically)
   turn_wasted_task_status_only: {
-    message: 'Turn wasted: you called task-status without any other tools and without providing a final report/answer, so a turn has been wasted without any progress on your task.',
+    message: 'Turn wasted: you called task-status without any other tools and without providing a final report/answer, so a turn has been wasted without any progress on your task. CRITICAL: CALL task-status ONLY TOGETHER WITH OTHER TOOLS. Focus on making progress towards your final report/answer. Do not call task-status again.',
     priority: 2,
   },
 
