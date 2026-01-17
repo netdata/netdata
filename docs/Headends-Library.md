@@ -52,8 +52,8 @@ AI Agent is designed library-first. The core performs no I/O and communicates en
 ## Quick Start
 
 ```typescript
-import { AIAgent } from "ai-agent-claude";
-import type { AIAgentSessionConfig, Configuration } from "ai-agent-claude";
+import { AIAgent } from "ai-agent";
+import type { AIAgentSessionConfig, Configuration } from "ai-agent";
 
 // Load your configuration
 const config: Configuration = {
@@ -88,10 +88,22 @@ console.log(`Success: ${result.success}`);
 
 ## Installation
 
-### From npm
+### From Source
 
 ```bash
-npm install ai-agent-claude
+git clone https://github.com/netdata/ai-agent.git
+cd ai-agent
+./build-and-install.sh
+```
+
+For local development, link the package:
+
+```bash
+cd ai-agent
+npm install && npm run build
+npm link
+# In your project:
+npm link ai-agent
 ```
 
 ### Package Entry Points
@@ -832,8 +844,8 @@ if (!result.success) {
 
 ```typescript
 import express from "express";
-import { AIAgent } from "ai-agent-claude";
-import type { AIAgentSessionConfig, Configuration } from "ai-agent-claude";
+import { AIAgent } from "ai-agent";
+import type { AIAgentSessionConfig, Configuration } from "ai-agent";
 
 const app = express();
 app.use(express.json());
@@ -881,7 +893,7 @@ app.listen(3000, () => {
 
 ```typescript
 import express from "express";
-import { AIAgent } from "ai-agent-claude";
+import { AIAgent } from "ai-agent";
 
 const app = express();
 app.use(express.json());
@@ -925,8 +937,8 @@ app.post("/stream", async (req, res) => {
 ### Multi-Turn Conversation
 
 ```typescript
-import { AIAgent } from "ai-agent-claude";
-import type { ConversationMessage } from "ai-agent-claude";
+import { AIAgent } from "ai-agent";
+import type { ConversationMessage } from "ai-agent";
 
 async function chat(
   message: string,
@@ -1004,9 +1016,10 @@ const sessionConfig = {
 
 **Solutions**:
 
-1. Run `npm install ai-agent-claude`
-2. Set `"module": "NodeNext"` in tsconfig.json
-3. Verify `dist/` directory exists in package
+1. Build from source: `git clone ... && ./build-and-install.sh`
+2. For development: `npm link ai-agent` in your project
+3. Set `"module": "NodeNext"` in tsconfig.json
+4. Verify `dist/` directory exists in package
 
 ### Callbacks not firing
 

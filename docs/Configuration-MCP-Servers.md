@@ -59,12 +59,14 @@ Run MCP server as a local process, communicating via stdin/stdout.
   "mcpServers": {
     "filesystem": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@anthropic/mcp-server-filesystem", "/tmp"]
+      "command": "node",
+      "args": ["/opt/ai-agent/mcp/fs/fs-mcp-server.js", "/tmp"]
     }
   }
 }
 ```
+
+> **Note:** ai-agent ships with a high-performance read-only filesystem MCP server. No external packages needed.
 
 ### With Environment Variables
 
@@ -74,9 +76,9 @@ Run MCP server as a local process, communicating via stdin/stdout.
     "github": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-server-github"],
+      "args": ["-y", "@modelcontextprotocol/server-github"],
       "env": {
-        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
       }
     }
   }
@@ -116,18 +118,88 @@ Only explicitly configured environment variables are passed to the process:
 
 ### Common Stdio Servers
 
-**Filesystem:**
+**Filesystem (built-in):**
 
 ```json
 {
   "mcpServers": {
     "filesystem": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@anthropic/mcp-server-filesystem", "/allowed/path"]
+      "command": "node",
+      "args": ["/opt/ai-agent/mcp/fs/fs-mcp-server.js", "/allowed/path"]
     }
   }
 }
+```
+
+> ai-agent includes a high-performance read-only filesystem MCP server at `/opt/ai-agent/mcp/fs/fs-mcp-server.js`.
+
+**Multiple Filesystem Instances:**
+
+You can configure multiple filesystem instances with different root directories by giving each a unique name:
+
+```json
+{
+  "mcpServers": {
+    "fs-data": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/opt/ai-agent/mcp/fs/fs-mcp-server.js", "/data"]
+    },
+    "fs-logs": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/opt/ai-agent/mcp/fs/fs-mcp-server.js", "/var/log"]
+    },
+    "fs-workspace": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/opt/ai-agent/mcp/fs/fs-mcp-server.js", "${MCP_ROOT}"]
+    }
+  }
+}
+```
+
+> **Note:** `${MCP_ROOT}` is a special variable that defaults to the current working directory when empty or unset. This is useful for workspace-relative file access.
+
+**Multiple Namespaces for Same Server:**
+
+A powerful pattern is configuring the same MCP server multiple times with different namespaces and tool filters. Each configuration entry name becomes the namespace prefix for its tools.
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" },
+      "toolsAllowed": ["*"],
+      "toolsDenied": ["create_or_update_file", "push_files", "delete_branch"]
+    },
+    "github-readonly": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" },
+      "toolsAllowed": ["search_code", "get_file_contents", "list_issues", "get_issue"]
+    }
+  }
+}
+```
+
+This creates two namespaces from the same GitHub MCP server:
+- `github__*` tools - All tools except dangerous write operations
+- `github-readonly__*` tools - Only read operations
+
+Agents can then reference specific namespaces:
+
+```yaml
+---
+tools:
+  - github          # Full access (minus denied tools)
+  - github-readonly # Read-only access
+---
 ```
 
 **GitHub:**
@@ -138,9 +210,9 @@ Only explicitly configured environment variables are passed to the process:
     "github": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-server-github"],
+      "args": ["-y", "@modelcontextprotocol/server-github"],
       "env": {
-        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
       }
     }
   }
@@ -155,7 +227,7 @@ Only explicitly configured environment variables are passed to the process:
     "brave": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-server-brave-search"],
+      "args": ["-y", "@brave/brave-search-mcp-server", "--transport", "stdio"],
       "env": {
         "BRAVE_API_KEY": "${BRAVE_API_KEY}"
       },
@@ -200,10 +272,13 @@ Connect to HTTP MCP server with streamable responses.
 ```json
 {
   "mcpServers": {
-    "fetcher": {
+    "jina": {
       "type": "http",
       "url": "https://mcp.jina.ai/v1",
-      "cache": "1h"
+      "headers": {
+        "Authorization": "Bearer ${JINA_API_KEY}"
+      },
+      "cache": "1d"
     }
   }
 }
@@ -348,7 +423,7 @@ Only expose specific tools from a server:
     "github": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-server-github"],
+      "args": ["-y", "@modelcontextprotocol/server-github"],
       "toolsAllowed": ["search_code", "get_file_contents", "list_issues"]
     }
   }
@@ -365,7 +440,7 @@ Block specific tools (allow all others):
     "github": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-server-github"],
+      "args": ["-y", "@modelcontextprotocol/server-github"],
       "toolsDenied": ["create_or_update_file", "push_files", "delete_branch"]
     }
   }
@@ -394,9 +469,12 @@ Cache all tool responses from a server:
 ```json
 {
   "mcpServers": {
-    "fetcher": {
+    "jina": {
       "type": "http",
       "url": "https://mcp.jina.ai/v1",
+      "headers": {
+        "Authorization": "Bearer ${JINA_API_KEY}"
+      },
       "cache": "1h"
     }
   }
@@ -479,8 +557,8 @@ One server instance shared across all sessions:
   "mcpServers": {
     "filesystem": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@anthropic/mcp-server-filesystem", "/tmp"],
+      "command": "node",
+      "args": ["/opt/ai-agent/mcp/fs/fs-mcp-server.js", "/tmp"],
       "shared": true
     }
   }
@@ -605,9 +683,27 @@ Tools are exposed with namespaced names:
 
 ### Accessing Specific Tools
 
-In agent frontmatter, reference tools by server name. All allowed tools from that server become available.
+In agent frontmatter, reference tools by server name (namespace). All allowed tools from that server become available.
 
 To restrict which tools are exposed, use `toolsAllowed` or `toolsDenied` in the MCP server configuration.
+
+### Verify Available Tools
+
+Use `--list-tools` with the namespace (as used in frontmatter) to see tools visible to the model:
+
+```bash
+ai-agent --list-tools github           # Tools from github namespace
+ai-agent --list-tools github-readonly  # Tools from github-readonly namespace
+ai-agent --list-tools all              # All tools from all servers
+```
+
+### Verify Agent Configuration
+
+Run an agent with `--help` to see its flattened frontmatter (resolved values from frontmatter + config defaults) and config files resolution order:
+
+```bash
+./myagent.ai --help
+```
 
 ---
 
@@ -629,7 +725,7 @@ Error: MCP server 'name' failed to initialize
 
 1. Verify command exists: `which npx`
 2. Check environment variables are set
-3. Test command manually: `npx -y @anthropic/mcp-server-filesystem /tmp`
+3. Test command manually: `node /opt/ai-agent/mcp/fs/fs-mcp-server.js /tmp`
 4. Use `--verbose` to see stderr output
 
 ### Tool not found

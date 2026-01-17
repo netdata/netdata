@@ -46,95 +46,46 @@ v20.10.0
 
 ## Installation Methods
 
-### Global Installation (Recommended)
-
-Install ai-agent globally for command-line use anywhere:
-
-```bash
-npm install -g ai-agent-claude
-```
-
-**Expected output:**
-
-```
-added 142 packages in 8s
-```
-
-**Verification:**
-
-```bash
-ai-agent --version
-```
-
-### Local Project Installation
-
-Install as a project dependency:
-
-```bash
-cd your-project
-npm install ai-agent-claude
-```
-
-Run via npx:
-
-```bash
-npx ai-agent-claude --agent hello.ai "Hello"
-```
-
-Or add to `package.json` scripts:
-
-```json
-{
-  "scripts": {
-    "agent": "ai-agent"
-  }
-}
-```
-
-Then run:
-
-```bash
-npm run agent -- --agent hello.ai "Hello"
-```
-
-### From Source (For Development)
+### From Source (Recommended)
 
 Clone and build from source:
 
 ```bash
-# Clone the repository
 git clone https://github.com/netdata/ai-agent.git
 cd ai-agent
-
-# Install dependencies
-npm install
-
-# Build
-npm run build
-
-# Link globally (optional)
-npm link
+./build-and-install.sh
 ```
 
-**Expected output after `npm run build`:**
-
-```
-> ai-agent-claude@1.0.0 prebuild
-> npm run update-version --silent
-
-> ai-agent-claude@1.0.0 build
-> tsc
-
-```
+This script builds the project and installs it to `/opt/ai-agent`. The `ai-agent` command becomes available globally.
 
 **Verification:**
 
 ```bash
-# If you ran npm link:
 ai-agent --version
+```
 
-# Otherwise, run from the dist directory:
+### Development Installation
+
+For development, you can build without installing:
+
+```bash
+git clone https://github.com/netdata/ai-agent.git
+cd ai-agent
+npm install
+npm run build
+```
+
+Run directly from the build directory:
+
+```bash
 node dist/cli.js --version
+```
+
+Or link globally for development:
+
+```bash
+npm link
+ai-agent --version
 ```
 
 ---

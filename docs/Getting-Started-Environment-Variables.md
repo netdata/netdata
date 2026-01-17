@@ -242,14 +242,37 @@ export OPENROUTER_TITLE="My Application"
 
 ## MCP
 
-| Variable   | Type   | Default                   | Description                             |
-| ---------- | ------ | ------------------------- | --------------------------------------- |
-| `MCP_ROOT` | string | Current working directory | Working directory for MCP stdio servers |
+| Variable   | Type   | Default                   | Description                                          |
+| ---------- | ------ | ------------------------- | ---------------------------------------------------- |
+| `MCP_ROOT` | string | Current working directory | Root directory for filesystem MCP server (see below) |
 
-**Example:**
+### MCP_ROOT Special Variable
+
+`MCP_ROOT` is a special environment variable used in MCP server configurations. When `${MCP_ROOT}` is used in config and the variable is empty or unset, ai-agent automatically defaults to the current working directory (`process.cwd()`).
+
+This enables workspace-relative file access:
+
+```json
+{
+  "mcpServers": {
+    "workspace": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/opt/ai-agent/mcp/fs/fs-mcp-server.js", "${MCP_ROOT}"]
+    }
+  }
+}
+```
+
+**Behavior:**
+- If `MCP_ROOT` is set: Uses the configured path
+- If `MCP_ROOT` is empty/unset: Falls back to current working directory
+- A verbose notice is logged when the fallback occurs
+
+**Example - Setting a specific root:**
 
 ```bash
-export MCP_ROOT="/path/to/mcp/servers"
+export MCP_ROOT="/home/user/projects"
 ```
 
 ---
@@ -411,7 +434,7 @@ All environment variables in one table:
 | `OPENROUTER_TITLE`   | Provider | string  | `ai-agent`               | OpenRouter X-Title header       |
 | `AI_TELEMETRY_DISABLE` | Telemetry | string | `false` | Disable OpenTelemetry metrics and tracing (accepts: '1', 'true', 'yes', 'on') |
 | `TZ`                 | System   | string  | System default           | Timezone override               |
-| `MCP_ROOT`           | MCP      | string  | Current working directory | Working directory for MCP stdio servers |
+| `MCP_ROOT`           | MCP      | string  | Current working directory | Root directory for filesystem MCP (falls back to cwd when empty) |
 | `USER`               | System   | string  | Computed from os.userInfo() with env fallback | Current username |
 | `HOME`               | System   | string  | From process.env.HOME or USERPROFILE | Home directory path |
 

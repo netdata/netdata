@@ -100,8 +100,8 @@ Tool servers using Model Context Protocol.
   "mcpServers": {
     "filesystem": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@anthropic/mcp-server-filesystem", "/tmp"]
+      "command": "node",
+      "args": ["/opt/ai-agent/mcp/fs/fs-mcp-server.js", "/tmp"]
     }
   }
 }
@@ -318,14 +318,14 @@ Production-ready configuration:
   "mcpServers": {
     "filesystem": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@anthropic/mcp-server-filesystem", "/tmp"],
+      "command": "node",
+      "args": ["/opt/ai-agent/mcp/fs/fs-mcp-server.js", "/tmp"],
       "queue": "default"
     },
     "brave": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-server-brave-search"],
+      "args": ["-y", "@brave/brave-search-mcp-server", "--transport", "stdio"],
       "env": {
         "BRAVE_API_KEY": "${BRAVE_API_KEY}"
       },

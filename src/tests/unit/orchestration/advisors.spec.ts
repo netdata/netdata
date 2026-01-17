@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AIAgentResult, Configuration, OrchestrationRuntimeAgent } from "../../../types.js";
 
@@ -8,6 +8,10 @@ import { spawnOrchestrationChild } from "../../../orchestration/spawn-child.js";
 vi.mock("../../../orchestration/spawn-child.js", () => ({
   spawnOrchestrationChild: vi.fn(),
 }));
+
+beforeEach(() => {
+  vi.resetAllMocks();
+});
 
 const baseConfig: Configuration = {
   providers: {},
@@ -99,5 +103,6 @@ describe("executeAdvisors", () => {
     expect(result.success).toBe(false);
     expect(result.block).toContain(`Advisor consultation failed for ${ADVISOR_REF}`);
     expect(result.block).toContain("boom");
+    expect(result.result).toBe(mockResult);
   });
 });

@@ -47,9 +47,7 @@ Install from source:
 ```bash
 git clone https://github.com/netdata/ai-agent.git
 cd ai-agent
-npm install
-npm run build
-npm link
+./build-and-install.sh
 ```
 
 For detailed installation options, see [Installation](Getting-Started-Installation).

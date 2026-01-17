@@ -53,7 +53,7 @@ models:
 tools:
   - brave # MCP server: web search
   - fetcher # MCP server: URL fetching
-  - rest__catalog # REST tool: product catalog
+  - catalog # REST tool: product catalog (from restTools config)
 ---
 ```
 
@@ -89,24 +89,45 @@ tools: filesystem
 tools:
   - brave           # MCP server
   - fetcher         # MCP server
-  - rest__catalog   # REST tool
+  - catalog         # REST tool (from restTools config)
   - openapi:github  # All tools from OpenAPI spec
 ---
 ```
 
 **Tool Naming**:
 
-| Source Type | Name Format                       | Example               |
-| ----------- | --------------------------------- | --------------------- |
-| MCP Server  | Server name from `.ai-agent.json` | `brave`, `filesystem` |
-| REST Tool   | `rest__<tool-name>`               | `rest__catalog`       |
-| OpenAPI     | `openapi:<provider-name>`         | `openapi:github`      |
+Internally, ai-agent uses the format `namespace__toolname` (double underscore) for all tools. In frontmatter, you reference tools by their config key name:
+
+| Source Type | Frontmatter Format              | Internal Format              | Example                           |
+| ----------- | ------------------------------- | ---------------------------- | --------------------------------- |
+| MCP Server  | `<server-name>`                 | `<server-name>__<tool>`      | `github` → `github__search_code`  |
+| REST Tool   | `<tool-name>`                   | `rest__<tool-name>`          | `catalog` → `rest__catalog`       |
+| OpenAPI     | `openapi:<provider-name>`       | `openapi__<provider>__<op>`  | `openapi:github`                  |
 
 **Notes**:
 
-- MCP server names must match entries in `.ai-agent.json` `mcpServers` section
-- Listing a server exposes ALL its tools by default
-- Use `toolsAllowed`/`toolsDenied` to filter specific tools
+- MCP server names in `.ai-agent.json` become the namespace prefix
+- Same MCP server can be configured multiple times with different namespaces (see [Configuration-MCP-Servers](Configuration-MCP-Servers#multiple-namespaces-for-same-server))
+- Listing a namespace exposes ALL its tools by default
+- Use `toolsAllowed`/`toolsDenied` in server config to filter specific tools
+
+**Verify Available Tools**:
+
+Use `--list-tools` with the namespace (as used in frontmatter) to see tools visible to the model:
+
+```bash
+ai-agent --list-tools github
+ai-agent --list-tools github-readonly
+ai-agent --list-tools all  # List all tools from all servers
+```
+
+**Verify Agent Configuration**:
+
+Run an agent with `--help` to see its flattened frontmatter (resolved values from frontmatter + config defaults) and config files resolution order:
+
+```bash
+./myagent.ai --help
+```
 
 ---
 
@@ -131,8 +152,8 @@ tools:
 {
   "mcpServers": {
     "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@anthropic/mcp-filesystem"],
+      "command": "node",
+      "args": ["/opt/ai-agent/mcp/fs/fs-mcp-server.js", "/allowed/path"],
       "toolsAllowed": ["read_file", "list_directory"]
     }
   }
@@ -168,8 +189,8 @@ tools:
 {
   "mcpServers": {
     "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@anthropic/mcp-filesystem"],
+      "command": "node",
+      "args": ["/opt/ai-agent/mcp/fs/fs-mcp-server.js", "/allowed/path"],
       "toolsDenied": ["delete_file", "write_file"]
     }
   }
@@ -279,12 +300,12 @@ MCP (Model Context Protocol) servers are the primary way to add tools. They're c
 {
   "mcpServers": {
     "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@anthropic/mcp-filesystem", "/path/to/dir"]
+      "command": "node",
+      "args": ["/opt/ai-agent/mcp/fs/fs-mcp-server.js", "/path/to/dir"]
     },
     "brave": {
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-brave-search"],
+      "args": ["-y", "@brave/brave-search-mcp-server", "--transport", "stdio"],
       "env": {
         "BRAVE_API_KEY": "${BRAVE_API_KEY}"
       }
@@ -305,17 +326,16 @@ tools:
 
 **Common MCP Servers**:
 
-| Server                        | Purpose           |
-| ----------------------------- | ----------------- |
-| `@anthropic/mcp-filesystem`   | File operations   |
-| `@anthropic/mcp-brave-search` | Web search        |
-| `@anthropic/mcp-fetch`        | URL fetching      |
-| `@anthropic/mcp-github`       | GitHub operations |
-| `@anthropic/mcp-slack`        | Slack integration |
+| Server                                        | Purpose           |
+| --------------------------------------------- | ----------------- |
+| `/opt/ai-agent/mcp/fs/fs-mcp-server.js` (built-in) | File operations   |
+| `@brave/brave-search-mcp-server`              | Web search        |
+| `https://mcp.jina.ai/v1` (HTTP)               | URL fetching      |
+| `@modelcontextprotocol/server-github`         | GitHub operations |
 
 ### REST Tools
 
-REST tools are HTTP APIs configured in `.ai-agent.json` and used with the `rest__` prefix.
+REST tools are HTTP APIs configured in `.ai-agent.json`. In frontmatter, use the config key name; internally they are exposed with the `rest__` prefix.
 
 **Configuration** (`.ai-agent.json`):
 
@@ -339,7 +359,7 @@ REST tools are HTTP APIs configured in `.ai-agent.json` and used with the `rest_
 ```yaml
 ---
 tools:
-  - rest__catalog
+  - catalog
 ---
 ```
 
@@ -348,7 +368,7 @@ tools:
 ```yaml
 ---
 tools:
-  - rest__catalog
+  - catalog
 ---
 ```
 
@@ -401,8 +421,8 @@ Use `toolsAllowed` in `.ai-agent.json` to whitelist:
 {
   "mcpServers": {
     "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@anthropic/mcp-filesystem", "/data"],
+      "command": "node",
+      "args": ["/opt/ai-agent/mcp/fs/fs-mcp-server.js", "/data"],
       "toolsAllowed": ["read_file", "list_directory", "search_files"]
     }
   }
@@ -419,8 +439,8 @@ Use `toolsDenied` in `.ai-agent.json` to blacklist:
 {
   "mcpServers": {
     "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@anthropic/mcp-filesystem", "/data"],
+      "command": "node",
+      "args": ["/opt/ai-agent/mcp/fs/fs-mcp-server.js", "/data"],
       "toolsDenied": ["delete_file", "move_file", "write_file"]
     }
   }
@@ -478,7 +498,7 @@ models:
 tools:
   - filesystem # MCP: file operations
   - brave # MCP: web search
-  - rest__catalog # REST: product catalog
+  - catalog # REST: product catalog
   - openapi:github # OpenAPI: GitHub operations
 ---
 ```

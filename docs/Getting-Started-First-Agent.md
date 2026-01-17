@@ -69,14 +69,18 @@ MCP (Model Context Protocol) servers provide tools for your agents. Add these to
     "brave": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-server-brave-search"],
+      "args": ["-y", "@brave/brave-search-mcp-server", "--transport", "stdio"],
       "env": {
         "BRAVE_API_KEY": "${BRAVE_API_KEY}"
       }
     },
-    "fetcher": {
+    "jina": {
       "type": "http",
-      "url": "https://mcp.jina.ai/v1"
+      "url": "https://mcp.jina.ai/v1",
+      "headers": {
+        "Authorization": "Bearer ${JINA_API_KEY}"
+      },
+      "cache": "1d"
     }
   }
 }
@@ -87,18 +91,20 @@ MCP (Model Context Protocol) servers provide tools for your agents. Add these to
 | Server    | Type  | Purpose                                                     |
 | --------- | ----- | ----------------------------------------------------------- |
 | `brave`   | stdio | Runs locally, provides `brave_search` tool                  |
-| `fetcher` | http  | Remote service, provides `fetch` tool for reading web pages |
+| `jina`    | http  | Remote service (requires JINA_API_KEY), provides `read_url` tool for reading web pages |
 
 **Set the Brave API key:**
 
 ```bash
 export BRAVE_API_KEY="your-brave-api-key"
+export JINA_API_KEY="your-jina-api-key"
 ```
 
 Or add to `~/.ai-agent/ai-agent.env`:
 
 ```bash
 BRAVE_API_KEY=your-brave-api-key
+JINA_API_KEY=your-jina-api-key
 ```
 
 ---
@@ -117,7 +123,7 @@ models:
   - openai/gpt-4o
 tools:
   - brave
-  - fetcher
+  - jina
 maxTurns: 15
 maxToolCallsPerTurn: 5
 temperature: 0.3
@@ -127,7 +133,7 @@ You are a thorough web researcher.
 ## Your Process
 
 1. **Search**: Use brave_search to find relevant sources
-2. **Read**: Use fetcher to read the most promising pages
+2. **Read**: Use jina to read the most promising pages
 3. **Synthesize**: Combine findings into a coherent summary
 
 ## Guidelines
@@ -221,7 +227,7 @@ models:
   - openai/gpt-4o
 tools:
   - brave
-  - fetcher
+  - jina
 maxTurns: 15
 cache: 1h
 ---
@@ -356,7 +362,7 @@ models:
   - openai/gpt-4o-mini
 tools:
   - brave
-  - fetcher
+  - jina
 maxTurns: 15
 maxToolCallsPerTurn: 5
 maxRetries: 3
@@ -370,7 +376,7 @@ Current date: ${DATETIME}
 ## Your Process
 
 1. **Search**: Use brave_search to find relevant sources
-2. **Read**: Use fetcher to read the most promising pages
+2. **Read**: Use jina to read the most promising pages
 3. **Synthesize**: Combine findings into a coherent summary
 
 ## Guidelines
@@ -407,14 +413,18 @@ Provide your findings as:
     "brave": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-server-brave-search"],
+      "args": ["-y", "@brave/brave-search-mcp-server", "--transport", "stdio"],
       "env": {
         "BRAVE_API_KEY": "${BRAVE_API_KEY}"
       }
     },
-    "fetcher": {
+    "jina": {
       "type": "http",
-      "url": "https://mcp.jina.ai/v1"
+      "url": "https://mcp.jina.ai/v1",
+      "headers": {
+        "Authorization": "Bearer ${JINA_API_KEY}"
+      },
+      "cache": "1d"
     }
   },
   "defaults": {

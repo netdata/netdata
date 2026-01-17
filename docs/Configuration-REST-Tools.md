@@ -33,7 +33,7 @@ REST tools expose HTTP API endpoints as agent tools. Features:
 - **Caching**: Response caching with configurable TTL
 - **Queue integration**: Concurrency control
 
-Tool naming: `rest__<name>`
+Tools exposed to model as: `rest__<name>` (use config key in frontmatter)
 
 ---
 
@@ -584,23 +584,25 @@ tools:
 You have access to the weather API.
 ```
 
-Or reference specific tools:
+Or reference specific tools by their config key name:
 
 ```yaml
 ---
 tools:
-  - rest__weather
-  - rest__create_ticket
+  - weather
+  - create_ticket
 ---
 ```
 
 ### Tool Naming
 
-| Config Key      | Tool Name             |
-| --------------- | --------------------- |
-| `weather`       | `rest__weather`       |
-| `create_ticket` | `rest__create_ticket` |
-| `search_api`    | `rest__search_api`    |
+In frontmatter, use the config key name. Internally, tools are exposed with the `rest__` prefix:
+
+| Config Key      | Frontmatter   | Exposed to Model      |
+| --------------- | ------------- | --------------------- |
+| `weather`       | `weather`     | `rest__weather`       |
+| `create_ticket` | `create_ticket` | `rest__create_ticket` |
+| `search_api`    | `search_api`  | `rest__search_api`    |
 
 ---
 

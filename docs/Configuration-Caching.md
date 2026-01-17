@@ -134,9 +134,12 @@ Apply cache TTL to all tools from a server:
 ```json
 {
   "mcpServers": {
-    "fetcher": {
+    "jina": {
       "type": "http",
       "url": "https://mcp.jina.ai/v1",
+      "headers": {
+        "Authorization": "Bearer ${JINA_API_KEY}"
+      },
       "cache": "1h"
     }
   }

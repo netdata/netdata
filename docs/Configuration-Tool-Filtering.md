@@ -61,7 +61,7 @@ Filter tools at MCP server level in `.ai-agent.json`. Use **local tool names** (
     "github": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-server-github"],
+      "args": ["-y", "@modelcontextprotocol/server-github"],
       "toolsAllowed": [
         "search_code",
         "get_file_contents",
@@ -83,7 +83,7 @@ Only listed tools are available. All others are hidden.
     "github": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-server-github"],
+      "args": ["-y", "@modelcontextprotocol/server-github"],
       "toolsDenied": [
         "create_or_update_file",
         "push_files",
@@ -246,7 +246,12 @@ See [Providers](Configuration-Providers) for more details on provider configurat
   "mcpServers": {
     "freshdesk": {
       "type": "stdio",
-      "command": "npx -y @anthropic/mcp-server-freshdesk",
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/ktsaou/freshdesk_mcp.git", "freshdesk-mcp"],
+      "env": {
+        "FRESHDESK_API_KEY": "${FRESHDESK_API_KEY}",
+        "FRESHDESK_DOMAIN": "${FRESHDESK_DOMAIN}"
+      },
       "toolsDenied": [
         "create_ticket",
         "update_ticket",
@@ -312,6 +317,36 @@ If asked to write code, provide it in your response but DO NOT commit it.
   }
 }
 ```
+
+### Multiple Namespaces for Different Access Levels
+
+Configure the same MCP server multiple times with different namespaces and filters. Each configuration entry name becomes the namespace prefix:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "toolsAllowed": ["*"],
+      "toolsDenied": ["create_or_update_file", "push_files", "delete_branch"]
+    },
+    "github-readonly": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "toolsAllowed": ["search_code", "get_file_contents", "list_issues", "get_issue"]
+    }
+  }
+}
+```
+
+This exposes two namespaces:
+- `github__*` - Full access minus dangerous write operations
+- `github-readonly__*` - Read-only access
+
+Agents can then reference specific namespaces in frontmatter based on their access needs.
 
 ---
 

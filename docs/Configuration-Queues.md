@@ -340,9 +340,12 @@ For APIs with strict rate limits:
       "command": "brave-mcp",
       "queue": "web"
     },
-    "fetcher": {
+    "jina": {
       "type": "http",
       "url": "https://mcp.jina.ai/v1",
+      "headers": {
+        "Authorization": "Bearer ${JINA_API_KEY}"
+      },
       "queue": "web"
     },
     "postgres": {

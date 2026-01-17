@@ -73,7 +73,7 @@ export type {
 **Location**: `src/ai-agent.ts:770-837`
 
 ```typescript
-import { AIAgent, type AIAgentSessionConfig } from 'ai-agent-claude';
+import { AIAgent, type AIAgentSessionConfig } from 'ai-agent';
 
 const session = AIAgent.create(config);
 const result = await AIAgent.run(session);
@@ -288,8 +288,8 @@ interface AIAgentResult {
 ## Usage Example
 
 ```typescript
-import { AIAgent } from 'ai-agent-claude';
-import type { AIAgentSessionConfig, Configuration } from 'ai-agent-claude';
+import { AIAgent } from 'ai-agent';
+import type { AIAgentSessionConfig, Configuration } from 'ai-agent';
 import { loadConfiguration } from './config.js';
 
 async function main() {

@@ -260,7 +260,7 @@ models:
 
 ```bash
 # Test server independently
-npx -y @modelcontextprotocol/server-filesystem --help
+node /opt/ai-agent/mcp/fs/fs-mcp-server.js --help
 
 # Check command in config
 jq '.mcpServers.servername.command' .ai-agent.json

@@ -430,7 +430,7 @@ curl https://api.openai.com/v1/models \
 ai-agent --agent myagent.ai --verbose --trace-mcp "test"
 
 # Test MCP server independently
-npx -y @modelcontextprotocol/server-filesystem --help
+node /opt/ai-agent/mcp/fs/fs-mcp-server.js --help
 
 # Check MCP server configuration
 jq '.mcpServers' .ai-agent.json

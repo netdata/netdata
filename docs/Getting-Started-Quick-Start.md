@@ -46,11 +46,12 @@ Store your API keys in `~/.ai-agent/ai-agent.env`:
 ```bash
 cat > ~/.ai-agent/ai-agent.env << 'EOF'
 OPENAI_API_KEY=sk-your-key-here
+CONTEXT7_API_KEY=your-context7-key
 EOF
 chmod 600 ~/.ai-agent/ai-agent.env
 ```
 
-For Anthropic, use `ANTHROPIC_API_KEY=sk-ant-...` instead.
+For Anthropic, use `ANTHROPIC_API_KEY=sk-ant-...` instead of `OPENAI_API_KEY`.
 
 > **Security**: This file is `chmod 600` (owner-only). Keys are never stored in `.ai-agent.json`.
 
@@ -68,9 +69,12 @@ Create `~/.ai-agent/ai-agent.json`:
   },
   "mcpServers": {
     "context7": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@context7/mcp-server"]
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
+      },
+      "cache": "1d"
     }
   }
 }
@@ -81,7 +85,7 @@ Create `~/.ai-agent/ai-agent.json`:
 | Section               | Purpose                                                     |
 | --------------------- | ----------------------------------------------------------- |
 | `providers.openai`    | LLM provider with API key from environment                  |
-| `mcpServers.context7` | Free MCP tool for library documentation (no API key needed) |
+| `mcpServers.context7` | MCP tool for library documentation (requires CONTEXT7_API_KEY) |
 
 For Anthropic, replace the provider:
 
@@ -256,9 +260,12 @@ Create `/etc/ai-agent/ai-agent.json` (or use `~/.ai-agent/ai-agent.json`):
   },
   "mcpServers": {
     "context7": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@context7/mcp-server"]
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
+      },
+      "cache": "1d"
     }
   }
 }
@@ -412,7 +419,7 @@ Check your provider's documentation for the exact model identifier.
 
 **Solution**:
 
-1. Test manually: `npx -y @context7/mcp-server`
+1. Test Context7 API key is set in environment
 2. Check `node` and `npx` are installed
 3. Check network access for npm packages
 
