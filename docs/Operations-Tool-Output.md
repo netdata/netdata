@@ -122,6 +122,24 @@ Replace in conversation:
 LLM calls tool_output to retrieve content
 ```
 
+### Content Formatting
+
+When tool output is stored, it is automatically formatted to be grep-friendly for the `read-grep` extraction mode. This formatting happens at store time:
+
+| Step | Action                   | Description                                             |
+| ---- | ------------------------ | ------------------------------------------------------- |
+| 1a   | Pretty-print JSON        | Minified JSON is expanded with indentation              |
+| 1b   | Split XML tags           | `>\s*<` patterns become `>\n<` for line-based searching |
+| 2    | Unescape newlines        | Literal `\n` in strings become actual newlines          |
+| 3    | Soft break at 1000 chars | Long lines break at nearest space or symbol             |
+| 4    | Hard break at 2000 bytes | Force break at UTF-8 boundary if no symbols found       |
+
+**Why this matters**:
+
+- The `read-grep` mode uses grep to find content, which is line-based
+- Without formatting, minified JSON or long single-line content would be un-searchable
+- JSON validity is sacrificed for readability - the LLM doesn't need valid JSON
+
 ---
 
 ## Handle Messages
@@ -219,11 +237,11 @@ Tool output files are stored in a temporary directory:
     └── <file-uuid>
 ```
 
-| Component      | Description                                                                |
-| -------------- | -------------------------------------------------------------------------- |
-| `run-hash`     | 12-character hash of process identifier (PID), start time, and random UUID |
-| `session-uuid` | Session transaction ID                                                     |
-| `file-uuid`    | Unique file identifier                                                     |
+| Component      | Description                                                     |
+| -------------- | --------------------------------------------------------------- |
+| `run-hash`     | 12-character slice of SHA-256 hash of 'PID:DateNow:UUID' string |
+| `session-uuid` | Session transaction ID                                          |
+| `file-uuid`    | Unique file identifier                                          |
 
 **Lifecycle**:
 

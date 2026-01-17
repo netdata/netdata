@@ -4,6 +4,8 @@ import path from 'node:path';
 
 import type { ToolOutputEntry, ToolOutputStats, ToolOutputTarget } from './types.js';
 
+import { formatForGrep } from './formatter.js';
+
 export class ToolOutputStore {
   private readonly entries = new Map<string, ToolOutputEntry>();
   private readonly runRootDir: string;
@@ -62,7 +64,9 @@ export class ToolOutputStore {
     const fileId = crypto.randomUUID();
     const handle = path.posix.join(this.sessionDirName, fileId);
     const outPath = path.join(this.runRootDir, ...handle.split('/'));
-    await fs.promises.writeFile(outPath, args.content, 'utf8');
+    // Format content for grep-friendly line breaks (pretty-print JSON/XML, break long lines)
+    const formattedContent = formatForGrep(args.content);
+    await fs.promises.writeFile(outPath, formattedContent, 'utf8');
     const entry: ToolOutputEntry = {
       handle,
       toolName: args.toolName,

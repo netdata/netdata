@@ -69,6 +69,7 @@ const WHAT_TO_EXTRACT_LABEL = 'WHAT TO EXTRACT';
 const OUTPUT_FORMAT_LABEL = 'OUTPUT FORMAT (required)';
 const OUTPUT_WRAPPER_LABEL = '- Emit exactly one XML final-report wrapper:';
 const NO_RELEVANT_LABEL = '- If no relevant data exists your XML final report must contain:';
+const EXTRACTOR_PREAMBLE = 'You are a helpful information extractor and summarizer. ';
 const MODE_AUTO: ToolOutputMode = 'auto';
 const MODE_FULL_CHUNKED: Exclude<ToolOutputMode, 'auto'> = 'full-chunked';
 const MODE_READ_GREP: Exclude<ToolOutputMode, 'auto'> = 'read-grep';
@@ -86,7 +87,7 @@ const buildMapSystemPrompt = (args: {
   nonce: string;
 }): string => {
   return [
-    'You are a helpful information extractor and summarizer. ' +
+    EXTRACTOR_PREAMBLE +
     'Your mission is to find relevant information from a document chunk you receive from the user.' +
     'CRITICAL: DO NOT CALL ANY TOOLS. YOU DONT HAVE ANY TOOLS. Read the information the user provided and extract the relevant data.' +
     'Think step by step and make sure you extract all relevant information',
@@ -125,7 +126,7 @@ const buildReduceSystemPrompt = (args: {
   nonce: string;
 }): string => {
   return [
-    'You are a helpful information extractor and summarizer. ' +
+    EXTRACTOR_PREAMBLE +
     'Your mission is to synthesize multiple chunks of information from the document chunks you receive from the user.' +
     'CRITICAL: DO NOT CALL ANY TOOLS. Read the information the user provided and extract the relevant data.' +
     'Think step by step and make sure you extract all relevant information',
@@ -158,7 +159,7 @@ const buildReadGrepSystemPrompt = (args: {
   nonce: string;
 }): string => {
   return [
-    'You are a helpful information extractor and summarizer. ' +
+    EXTRACTOR_PREAMBLE +
     'Your mission is to extract information from a document chunk you receive from the user. ' + 
     'You can only use Read and Grep tools, to find the relevant data on the given file.' +
     'Think step by step and make sure you extract all relevant information. Do not give up on the first match.' +

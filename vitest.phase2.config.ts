@@ -4,11 +4,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    maxWorkers: 1,
+    isolate: false,
     testTimeout: 300000,
     hookTimeout: 300000,
     sequence: {

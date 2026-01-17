@@ -10,6 +10,7 @@ import type { ToolOutputConfig, ToolOutputTarget } from '../../tool-output/types
 import type { Configuration, TurnRequest, TurnResult } from '../../types.js';
 
 import { ToolOutputExtractor } from '../../tool-output/extractor.js';
+import { formatForGrep } from '../../tool-output/formatter.js';
 import { ToolOutputHandler } from '../../tool-output/handler.js';
 import { ToolOutputProvider } from '../../tool-output/provider.js';
 import { ToolOutputStore } from '../../tool-output/store.js';
@@ -144,11 +145,14 @@ describe('ToolOutputExtractor', () => {
     const nonce = 'TESTNONCE';
     const llm = createStubLlmClient([
       `<ai-agent-${nonce}-FINAL format="text">chunk found</ai-agent-${nonce}-FINAL>`,
+      `<ai-agent-${nonce}-FINAL format="text">chunk found 2</ai-agent-${nonce}-FINAL>`,
       `<ai-agent-${nonce}-FINAL format="text">final answer</ai-agent-${nonce}-FINAL>`,
     ]);
 
+    // Need maxChunks > 1 to test map/reduce path
+    const multiChunkConfig: ToolOutputConfig = { ...buildConfig(root), maxChunks: 10 };
     const extractor = new ToolOutputExtractor({
-      config: buildConfig(root),
+      config: multiChunkConfig,
       llmClient: llm as unknown as LLMClient,
       targets: baseTargets,
       computeMaxOutputTokens: () => 256,
@@ -177,12 +181,16 @@ describe('ToolOutputExtractor', () => {
       buildFsServerConfig: (rootDir) => ({ name: 'tool_output_fs', config: { ...baseConfiguration, mcpServers: { tool_output_fs: { type: 'stdio', command: process.execPath, args: [rootDir] } } } }),
     });
 
+    // Content must be large enough to require multiple chunks to trigger reduce step
+    // With contextWindow=2048, maxOutputTokens=256, we need content > ~1500 tokens
+    // countTokens returns length/4, so we need ~6000+ bytes for 2 chunks
+    const largeContent = 'X'.repeat(8000);
     const result = await extractor.extract({
       handle: 'handle-full',
       toolName: 'test__tool',
       toolArgsJson: '{}',
-      content: 'line-1\nline-2',
-      stats: { bytes: 12, lines: 2, tokens: 6, avgLineBytes: 6 },
+      content: largeContent,
+      stats: { bytes: 8000, lines: 1, tokens: 2000, avgLineBytes: 8000 },
     }, 'find data', 'full-chunked', sessionTargets);
 
     expect(result.ok).toBe(true);
@@ -281,5 +289,114 @@ describe('ToolOutputProvider', () => {
     expect(result.result).toContain('No stored tool output found');
     await store.cleanup();
     cleanupTempRoot(root);
+  });
+});
+
+describe('formatForGrep', () => {
+  it('pretty-prints minified JSON', () => {
+    const minified = '{"key1":"value1","key2":"value2"}';
+    const result = formatForGrep(minified);
+    expect(result).toContain('\n');
+    expect(result).toContain('"key1":');
+    expect(result).toContain('"key2":');
+  });
+
+  it('pretty-prints JSON arrays', () => {
+    const minified = '[{"a":1},{"b":2}]';
+    const result = formatForGrep(minified);
+    expect(result).toContain('\n');
+  });
+
+  it('splits XML tags with >< pattern', () => {
+    const xml = '<root><item>value</item><item>value2</item></root>';
+    const result = formatForGrep(xml);
+    expect(result).toContain('>\n<');
+    expect(result.split('\n').length).toBeGreaterThan(1);
+  });
+
+  it('normalizes whitespace between XML tags', () => {
+    const xml = '<root>   <item>test</item>  <other/></root>';
+    const result = formatForGrep(xml);
+    expect(result).not.toContain('>   <');
+    expect(result).toContain('>\n<');
+  });
+
+  it('replaces escaped \\n with actual newlines', () => {
+    const content = 'line1\\nline2\\nline3';
+    const result = formatForGrep(content);
+    expect(result).toBe('line1\nline2\nline3');
+  });
+
+  it('replaces escaped \\n in JSON strings after pretty-print', () => {
+    const json = '{"msg":"hello\\nworld"}';
+    const result = formatForGrep(json);
+    expect(result).toContain('hello\nworld');
+  });
+
+  it('breaks long lines at word boundaries', () => {
+    // 250 words * 5 chars = 1250 chars, well over 1000 threshold
+    const words = Array(250).fill('word').join(' ');
+    const result = formatForGrep(words);
+    const lines = result.split('\n');
+    expect(lines.length).toBeGreaterThan(1);
+    lines.forEach(line => {
+      expect(line.length).toBeLessThanOrEqual(1200); // 1000 + some tolerance
+    });
+  });
+
+  it('breaks long lines at symbols', () => {
+    const urls = Array(50).fill('https://example.com/path/to/resource?query=value').join('');
+    const result = formatForGrep(urls);
+    const lines = result.split('\n');
+    expect(lines.length).toBeGreaterThan(1);
+  });
+
+  it('force-breaks very long lines at UTF-8 boundaries', () => {
+    // Create a line with no break characters
+    const noBreaks = 'a'.repeat(3000);
+    const result = formatForGrep(noBreaks);
+    const lines = result.split('\n');
+    expect(lines.length).toBeGreaterThan(1);
+    lines.forEach(line => {
+      expect(Buffer.byteLength(line, 'utf8')).toBeLessThanOrEqual(2000);
+    });
+  });
+
+  it('preserves multi-byte UTF-8 characters without splitting them', () => {
+    // Japanese characters (3 bytes each in UTF-8)
+    const japanese = 'あ'.repeat(800); // 2400 bytes
+    const result = formatForGrep(japanese);
+    const lines = result.split('\n');
+    expect(lines.length).toBeGreaterThan(1);
+    // Each line should be valid UTF-8 (no split characters)
+    lines.forEach(line => {
+      expect(() => Buffer.from(line, 'utf8').toString()).not.toThrow();
+    });
+  });
+
+  it('handles mixed JSON with long strings', () => {
+    const longValue = 'x'.repeat(1500);
+    const json = `{"data":"${longValue}"}`;
+    const result = formatForGrep(json);
+    const lines = result.split('\n');
+    // Should be broken into multiple lines
+    expect(lines.length).toBeGreaterThan(1);
+  });
+
+  it('leaves short content unchanged', () => {
+    const short = 'hello world';
+    const result = formatForGrep(short);
+    expect(result).toBe('hello world');
+  });
+
+  it('handles empty content', () => {
+    const result = formatForGrep('');
+    expect(result).toBe('');
+  });
+
+  it('handles non-JSON content that looks like JSON but is invalid', () => {
+    const invalid = '{not valid json';
+    const result = formatForGrep(invalid);
+    expect(result).toBe('{not valid json');
   });
 });
