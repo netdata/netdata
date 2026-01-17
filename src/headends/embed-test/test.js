@@ -882,8 +882,9 @@
 
         spinner.appendChild(workingSpan);
         spinner.appendChild(statusSpan);
-        this.messagesEl.appendChild(spinner);
       }
+      // Always move spinner to the end (after the last message)
+      this.messagesEl.appendChild(spinner);
       const statusEl = spinner.querySelector(CSS_SPINNER_STATUS);
       statusEl.textContent = this.currentStatus || '';
       spinner.classList.remove(CSS_HIDDEN);
