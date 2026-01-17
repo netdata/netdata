@@ -41,7 +41,7 @@ cd ai-agent
 ./build-and-install.sh
 ```
 
-**Windows**: Use WSL2 (Windows Subsystem for Linux). Native Windows is not supported.
+**Windows**: Native support works, but WSL2 is recommended for better MCP server compatibility.
 
 ---
 
