@@ -183,8 +183,13 @@ impl NetdataChart {
             }
 
             if self.last_collection_interval.is_none() {
-                self.emit_chart_definition(buffer);
-                self.last_collection_interval = CollectionInterval::from_secs(target_slot_nano / 1_000_000_000, interval / 1_000_000_000);
+                let interval_secs = interval / 1_000_000_000;
+                if interval_secs > 0 {
+                    self.emit_chart_definition(buffer);
+                    self.last_collection_interval = CollectionInterval::from_secs(target_slot_nano / 1_000_000_000, interval_secs);
+                } else {
+                    return;
+                }
             }
 
             let mut samples_to_emit = Vec::new();
@@ -263,9 +268,16 @@ impl NetdataChart {
         let mut dimension_names: Vec<String> = self.samples_table.iter_dimensions().cloned().collect();
         if self.is_histogram() {
             dimension_names.sort_by(|a, b| {
-                let a_val = if a == "+Inf" { f64::INFINITY } else { a.parse::<f64>().unwrap_or(0.0) };
-                let b_val = if b == "+Inf" { f64::INFINITY } else { b.parse::<f64>().unwrap_or(0.0) };
-                a_val.partial_cmp(&b_val).unwrap_or(std::cmp::Ordering::Equal)
+                let a_val = if a == "+Inf" { Some(f64::INFINITY) } else { a.parse::<f64>().ok() };
+                let b_val = if b == "+Inf" { Some(f64::INFINITY) } else { b.parse::<f64>().ok() };
+                match (a_val, b_val) {
+                    (Some(a_num), Some(b_num)) => {
+                        a_num.partial_cmp(&b_num).unwrap_or(std::cmp::Ordering::Equal)
+                    }
+                    (Some(_), None) => std::cmp::Ordering::Less,
+                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                    (None, None) => a.cmp(b),
+                }
             });
         }
 

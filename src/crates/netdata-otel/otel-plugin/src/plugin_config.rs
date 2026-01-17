@@ -65,7 +65,7 @@ pub struct MetricsConfig {
         default_value = "10s",
         value_parser = parse_duration
     )]
-    #[serde(with = "humantime_serde")]
+    #[serde(default = "default_collection_interval", with = "humantime_serde")]
     pub collection_interval: Duration,
 
     /// Grace period for accepting late data (accepts durations like "60s", "1m")
@@ -74,7 +74,7 @@ pub struct MetricsConfig {
         default_value = "60s",
         value_parser = parse_duration
     )]
-    #[serde(with = "humantime_serde")]
+    #[serde(default = "default_grace_period", with = "humantime_serde")]
     pub grace_period: Duration,
 
     /// Time before archiving inactive dimensions (accepts durations like "15m", "900s")
@@ -83,13 +83,25 @@ pub struct MetricsConfig {
         default_value = "15m",
         value_parser = parse_duration
     )]
-    #[serde(with = "humantime_serde")]
+    #[serde(default = "default_archive_timeout", with = "humantime_serde")]
     pub dimension_archive_timeout: Duration,
 
     /// Per-metric configuration overrides
     #[arg(skip)]
     #[serde(default)]
     pub metric_configs: HashMap<String, MetricConfig>,
+}
+
+fn default_collection_interval() -> Duration {
+    Duration::from_secs(10)
+}
+
+fn default_grace_period() -> Duration {
+    Duration::from_secs(60)
+}
+
+fn default_archive_timeout() -> Duration {
+    Duration::from_secs(900)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -106,9 +118,9 @@ impl Default for MetricsConfig {
             buffer_samples: 10,
             throttle_charts: 100,
             chart_configs_dir: None,
-            collection_interval: Duration::from_secs(10),
-            grace_period: Duration::from_secs(60),
-            dimension_archive_timeout: Duration::from_secs(900), // 15 minutes
+            collection_interval: default_collection_interval(),
+            grace_period: default_grace_period(),
+            dimension_archive_timeout: default_archive_timeout(),
             metric_configs: HashMap::new(),
         }
     }

@@ -1,5 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 use std::num::NonZeroU64;
+use tracing::debug;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SlotState {
@@ -11,6 +12,7 @@ pub enum SlotState {
 pub struct TimeSlot {
     pub slot_start_nano: u64,
     pub value: Option<f64>,
+    pub last_update_nano: u64,
     pub state: SlotState,
 }
 
@@ -19,15 +21,22 @@ impl TimeSlot {
         Self {
             slot_start_nano,
             value: None,
+            last_update_nano: 0,
             state: SlotState::Accepting,
         }
     }
 
-    pub fn insert(&mut self, value: f64, aggregation_type: AggregationType) {
+    pub fn insert(&mut self, unix_time_nano: u64, value: f64, aggregation_type: AggregationType) {
         match aggregation_type {
-            AggregationType::LastValue => self.value = Some(value),
+            AggregationType::LastValue => {
+                if unix_time_nano >= self.last_update_nano {
+                    self.value = Some(value);
+                    self.last_update_nano = unix_time_nano;
+                }
+            }
             AggregationType::Sum => {
                 self.value = Some(self.value.unwrap_or(0.0) + value);
+                self.last_update_nano = self.last_update_nano.max(unix_time_nano);
             }
         }
     }
@@ -83,6 +92,9 @@ impl DimensionBuffer {
     }
 
     pub fn insert(&mut self, unix_time_nano: u64, value: f64, interval_nano: u64, aggregation_type: AggregationType) -> Result<(), &'static str> {
+        if interval_nano == 0 {
+            return Err("Collection interval cannot be zero");
+        }
         let slot_start_nano = (unix_time_nano / interval_nano) * interval_nano;
         
         let slot = self.get_or_create_slot(slot_start_nano);
@@ -90,7 +102,7 @@ impl DimensionBuffer {
             return Err("Data arrived after slot was finalized");
         }
 
-        slot.insert(value, aggregation_type);
+        slot.insert(unix_time_nano, value, aggregation_type);
         self.last_seen_nano = self.last_seen_nano.max(unix_time_nano);
         Ok(())
     }
@@ -129,8 +141,10 @@ impl SamplesTable {
             DimensionBuffer::new(dimension.to_string())
         });
 
-        // We can ignore the error for late data for now, or log it
-        let _ = db.insert(unix_time_nano, value, interval_nano, aggregation_type);
+        // For late data, we log it at debug level
+        if let Err(e) = db.insert(unix_time_nano, value, interval_nano, aggregation_type) {
+            debug!(dimension = dimension, error = e, "OTLP metric data dropped");
+        }
         
         is_new_dimension
     }
@@ -214,3 +228,85 @@ impl CollectionInterval {
     }
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_slot_creation_and_aggregation() {
+        let mut db = DimensionBuffer::new("test".to_string());
+        let interval = 10_000_000_000; // 10s
+        
+        // Point at 5s (Slot 0)
+        db.insert(5_000_000_000, 10.0, interval, AggregationType::Sum).unwrap();
+        // Point at 6s (Slot 0)
+        db.insert(6_000_000_000, 20.0, interval, AggregationType::Sum).unwrap();
+        
+        assert_eq!(db.slots.len(), 1);
+        assert_eq!(db.slots[0].value, Some(30.0));
+        assert_eq!(db.slots[0].slot_start_nano, 0);
+
+        // Point at 15s (Slot 10)
+        db.insert(15_000_000_000, 5.0, interval, AggregationType::Sum).unwrap();
+        assert_eq!(db.slots.len(), 2);
+        assert_eq!(db.slots[1].slot_start_nano, 10_000_000_000);
+        assert_eq!(db.slots[1].value, Some(5.0));
+    }
+
+    #[test]
+    fn test_last_value_out_of_order() {
+        let mut db = DimensionBuffer::new("test".to_string());
+        let interval = 10_000_000_000;
+        
+        // Point at 6s
+        db.insert(6_000_000_000, 20.0, interval, AggregationType::LastValue).unwrap();
+        // Point at 5s (arrived late, but within same slot)
+        db.insert(5_000_000_000, 10.0, interval, AggregationType::LastValue).unwrap();
+        
+        // Should keep 20.0 because 6s > 5s
+        assert_eq!(db.slots[0].value, Some(20.0));
+
+        // Point at 7s
+        db.insert(7_000_000_000, 30.0, interval, AggregationType::LastValue).unwrap();
+        assert_eq!(db.slots[0].value, Some(30.0));
+    }
+
+    #[test]
+    fn test_slot_finalization() {
+        let mut db = DimensionBuffer::new("test".to_string());
+        let interval = 10_000_000_000;
+        let grace = 5_000_000_000;
+        
+        db.insert(5_000_000_000, 10.0, interval, AggregationType::Sum).unwrap();
+        
+        // At 14s, slot is still accepting (10s interval + 5s grace = 15s threshold)
+        db.finalize_slots(14_000_000_000, grace, interval);
+        assert_eq!(db.slots[0].state, SlotState::Accepting);
+        
+        // At 16s, pulse slot is finalized
+        db.finalize_slots(16_000_000_000, grace, interval);
+        assert_eq!(db.slots[0].state, SlotState::Finalized);
+        
+        // New data for finalized slot should be rejected
+        let res = db.insert(7_000_000_000, 20.0, interval, AggregationType::Sum);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_archive_stale_dimensions() {
+        let mut table = SamplesTable::default();
+        let interval = 10_000_000_000;
+        
+        table.insert("dim1", 5_000_000_000, 10.0, interval, AggregationType::Sum);
+        table.insert("dim2", 6_000_000_000, 20.0, interval, AggregationType::Sum);
+        
+        // At 100s, both are fresh (timeout 1000s)
+        table.archive_stale_dimensions(100_000_000_000, 1000_000_000_000);
+        assert_eq!(table.dimensions.len(), 2);
+        
+        // At 100s, with 10s timeout, both are stale
+        table.archive_stale_dimensions(100_000_000_000, 10_000_000_000);
+        assert_eq!(table.dimensions.len(), 0);
+    }
+}
