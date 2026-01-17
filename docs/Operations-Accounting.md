@@ -50,6 +50,8 @@ Accounting tracks every LLM request and tool execution:
 }
 ```
 
+**Note**: The deprecated `accounting.file` configuration option is still supported for backward compatibility but may be removed in a future version. Use `persistence.billingFile` instead.
+
 ### CLI Override
 
 ```bash
@@ -416,7 +418,7 @@ zcat accounting-2025*.jsonl.gz | jq -s '
 
 1. Check pricing configuration
 2. Verify provider/model names match exactly
-3. Cost defaults to `undefined` when pricing unknown
+3. The `costUsd` field is omitted when pricing is unknown
 
 ---
 

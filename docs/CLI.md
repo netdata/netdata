@@ -207,19 +207,20 @@ Apply only to the top-level agent (not inherited by sub-agents):
 
 Apply to master agent and inherited by sub-agents when unset:
 
-- `--temperature` - Response creativity
-- `--top-p` - Token selection diversity (0.0-1.0)
-- `--top-k` - Limits token selection to K most probable tokens
-- `--max-turns` - Turn limit
-- `--max-retries` - Retry count
-- `--max-output-tokens` - Maximum response length per turn
-- `--repeat-penalty` - Reduces repetitive text (1.0=off, higher=stronger)
-- `--max-tool-calls-per-turn` - Maximum parallel tool calls per turn
+- `--temperature` - Response creativity/variance (0.0-2.0; 0=focused, 1=balanced, 2=wild); use none/off/unset/default/null to let provider decide
+- `--top-p` - Token selection diversity (0.0-1.0); use none/off/unset/default/null to let provider decide (default: not sent)
+- `--top-k` - Limits token selection to K most probable tokens (minimum 1, integer); use none/off/unset/default/null to let provider decide (default: not sent)
+- `--max-turns` - Turn limit (minimum 1, integer)
+- `--max-retries` - Retry count (minimum 0, integer)
+- `--max-output-tokens` - Maximum response length per turn (minimum 1, integer)
+- `--repeat-penalty` - Reduces repetitive text (1.0=off, higher=stronger); use none/off/unset/default/null to let provider decide
+- `--tool-response-max-bytes` - Maximum tool output size kept in conversation; larger outputs are stored and replaced with a tool_output handle (minimum 0, integer)
+- `--max-tool-calls-per-turn` - Maximum parallel tool calls per turn (minimum 1, integer)
 - `--reasoning` - Reasoning effort level (none, minimal, low, medium, high)
 - `--default-reasoning` - Default reasoning for agents that omit it
 - `--reasoning-tokens` - Reasoning token budget for Anthropic thinking mode
-- `--caching` - Anthropic caching mode (full or none)
-- `--cache` - Response cache TTL (off or duration like 5s/2m)
+- `--caching` - Anthropic caching mode: full (default) or none to disable cache reuse
+- `--cache` - Response cache TTL (off, milliseconds, or duration like 5s/2m; units: ms,s,m,h,d,w,mo,y)
 - Timeout settings
 
 ### All Models Overrides
@@ -228,6 +229,7 @@ Apply to every agent including sub-agents:
 
 - `--override` - Key=value overrides
 - `--verbose` - Logging level
+- `--stream` - Show response as it's generated (streaming) instead of waiting for complete answer (default: true; use `--no-stream` to disable)
 - `--trace-llm` - Show detailed logs of all LLM API calls
 - `--trace-mcp` - Show detailed logs of all tool calls (MCP protocol)
 - `--trace-slack` - Show detailed logs of Slack bot communication
@@ -258,7 +260,7 @@ Application-level settings:
   - `--telemetry-trace-sampler` - Tracing sampler (always_on, always_off, parent, ratio)
   - `--telemetry-trace-ratio` - Sampling ratio (0-1) when sampler=ratio
   - `--telemetry-label` - Additional telemetry labels (key=value)
-  - `--telemetry-log-format` - Logging format (journald, logfmt, json, none)
+  - `--telemetry-log-format` - Preferred logging format(s) (journald, logfmt, json, none; repeatable; first valid entry wins)
   - `--telemetry-log-extra` - Additional log sinks (e.g., otlp)
   - `--telemetry-logging-otlp-endpoint` - OTLP endpoint for log exports
   - `--telemetry-logging-otlp-timeout-ms` - OTLP timeout for log exports

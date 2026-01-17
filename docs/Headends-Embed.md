@@ -229,7 +229,7 @@ Error event.
 
 ```
 event: error
-data: {"code":"rate_limited","message":"Too many requests","recoverable":true}
+data: {"code":"rate_limited","message":"Too many requests","recoverable":false}
 ```
 
 ---
@@ -384,7 +384,7 @@ In `.ai-agent.json`:
 | `defaultAgent`                | `string`  | First registered              | Default agent when not specified                    |
 | `corsOrigins`                 | `array`   | `[]`                          | Allowed origins (glob patterns)                     |
 | `rateLimit.enabled`           | `boolean` | `false` (disabled by default) | Enable rate limiting (requires `requestsPerMinute`) |
-| `rateLimit.requestsPerMinute` | `number`  | `10`                          | Default rate limit when enabled                     |
+| `rateLimit.requestsPerMinute` | `number`  | (required)                    | Rate limit when enabled (no default)                |
 | `rateLimit.burstSize`         | `number`  | `0`                           | Burst allowance                                     |
 | `metrics.enabled`             | `boolean` | `true`                        | Enable metrics endpoint                             |
 | `metrics.path`                | `string`  | `/metrics`                    | Metrics endpoint path                               |

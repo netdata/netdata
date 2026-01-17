@@ -44,14 +44,14 @@ Deep-dive technical documentation for contributors, maintainers, and advanced us
 
 **Most Common Questions**:
 
-| Question                          | Document                                                  |
-| --------------------------------- | --------------------------------------------------------- |
-| "How does a session work?"        | [Session Lifecycle](Technical-Specs-Session-Lifecycle.md) |
-| "Why did my session stop early?"  | [Context Management](context-management.md)               |
-| "What happens when an LLM fails?" | [Retry Strategy](retry-strategy.md)                       |
-| "How are tools executed?"         | [Tool System](tools-overview.md)                          |
-| "What guarantees can I rely on?"  | [User Contract](CONTRACT.md)                              |
-| "Why is it designed this way?"    | [Design History](ADR-001-sub-agent-as-tool.md)            |
+| Question                          | Document                                                    |
+| --------------------------------- | ----------------------------------------------------------- |
+| "How does a session work?"        | [Session Lifecycle](Technical-Specs-Session-Lifecycle.md)   |
+| "Why did my session stop early?"  | [Context Management](Technical-Specs-Context-Management.md) |
+| "What happens when an LLM fails?" | [Retry Strategy](Technical-Specs-Retry-Strategy.md)         |
+| "How are tools executed?"         | [Tool System](Technical-Specs-Tool-System.md)               |
+| "What guarantees can I rely on?"  | [User Contract](Technical-Specs-User-Contract.md)           |
+| "Why is it designed this way?"    | [Design History](Technical-Specs-Design-History.md)         |
 
 ---
 
@@ -83,11 +83,11 @@ graph LR
 
 How sessions execute at runtime.
 
-| Document                                                 | Description                                         |
-| -------------------------------------------------------- | --------------------------------------------------- |
-| [Context Management](Technical-Specs-Context-Management) | Token budgets, context guard, overflow handling     |
-| [Retry Strategy](Technical-Specs-Retry-Strategy)         | Error classification, provider cycling, backoff     |
-| [Tool System](tools-overview.md)                         | Tool providers, execution routing, queue management |
+| Document                                                    | Description                                         |
+| ----------------------------------------------------------- | --------------------------------------------------- |
+| [Context Management](Technical-Specs-Context-Management.md) | Token budgets, context guard, overflow handling     |
+| [Retry Strategy](Technical-Specs-Retry-Strategy.md)         | Error classification, provider cycling, backoff     |
+| [Tool System](Technical-Specs-Tool-System.md)               | Tool providers, execution routing, queue management |
 
 ---
 
@@ -95,10 +95,10 @@ How sessions execute at runtime.
 
 User-facing promises that implementations MUST honor.
 
-| Document                                       | Description                                          |
-| ---------------------------------------------- | ---------------------------------------------------- |
-| [User Contract](Technical-Specs-User-Contract) | End-user guarantees (limits, error handling, output) |
-| [Specifications Index](index.md)  | Complete index of all spec documents                 |
+| Document                                          | Description                                          |
+| ------------------------------------------------- | ---------------------------------------------------- |
+| [User Contract](Technical-Specs-User-Contract.md) | End-user guarantees (limits, error handling, output) |
+| [Specifications Index](Technical-Specs-Index.md)  | Complete index of all spec documents                 |
 
 ---
 
@@ -149,8 +149,8 @@ These rules MUST hold under all conditions. Violations are critical bugs.
 
 1. **Start**: [Architecture](Technical-Specs-Architecture.md) - Understand the layers
 2. **Then**: [Session Lifecycle](Technical-Specs-Session-Lifecycle.md) - Follow a request through
-3. **Deep Dive**: [Context Management](Technical-Specs-Context-Management) or [Tool System](tools-overview.md)
-4. **Why**: [Design History](Technical-Specs-Design-History) - Understand decisions
+3. **Deep Dive**: [Context Management](Technical-Specs-Context-Management.md) or [Tool System](Technical-Specs-Tool-System.md)
+4. **Why**: [Design History](Technical-Specs-Design-History.md) - Understand decisions
 5. **Reference**: [Specifications Index](Technical-Specs-Index.md) - Find detailed specs
 
 ---

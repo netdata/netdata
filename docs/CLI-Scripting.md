@@ -45,14 +45,14 @@ fi
 
 ai-agent uses consistent exit codes:
 
-| Code | Meaning                                | Common Causes                                                    |
-| ---- | -------------------------------------- | ---------------------------------------------------------------- |
-| `0`  | Success                                | Agent completed normally                                         |
-| `1`  | General error                          | Runtime failures, tool errors, preflight checks, headend errors  |
-| `2`  | Agent failure                          | Session failure without specific categorization                  |
-| `3`  | Configuration error                    | Missing or failed MCP servers                                    |
-| `4`  | Invalid arguments or validation errors | Bad CLI flags, missing required args, option validation failures |
-| `5`  | Validation error                       | Schema validation failures (tool listing, final report)          |
+| Code | Meaning                                | Common Causes                                                                    |
+| ---- | -------------------------------------- | -------------------------------------------------------------------------------- |
+| `0`  | Success                                | Agent completed normally                                                         |
+| `1`  | General error                          | Runtime failures, tool output preflight errors, preflight checks, headend errors |
+| `2`  | Agent failure                          | Session failure without specific categorization                                  |
+| `3`  | Tool/MCP error                         | MCP server failures, tool execution errors, tool-related failures                |
+| `4`  | Invalid arguments or validation errors | Bad CLI flags, missing required args, option validation failures                 |
+| `5`  | Validation error                       | Schema validation failures (tool listing, final report)                          |
 
 ### Checking Exit Codes
 
@@ -69,7 +69,7 @@ ai-agent --agent task.ai "Query"
 exit_code=$?
 case $exit_code in
   0) echo "Success" ;;
-  3) echo "Config error - check MCP servers" ;;
+  3) echo "Tool/MCP error - check MCP servers or tool execution" ;;
   4) echo "Invalid arguments" ;;
   *) echo "Unknown error: $exit_code" ;;
 esac
@@ -114,7 +114,7 @@ Line 3"
 
 ### Standard Input
 
-Use `-` placeholder to read from stdin:
+Use `-` placeholder to read from stdin (can be used for either system-prompt or user-prompt, but not both):
 
 ```bash
 # Pipe content

@@ -137,21 +137,34 @@ Imports must follow this order, with blank lines between groups:
 
 1. Node builtins (with `node:` protocol)
 2. External packages
-3. Type and value imports (grouped together by module)
+3. Type imports (`import type`)
+4. Internal imports (from project source)
+5. Parent imports (`../`)
+6. Sibling imports (`./`)
+7. Index imports (`index.js`)
+8. Object imports (for dynamic imports)
+
+Within each group, imports are sorted alphabetically (case-insensitive).
 
 ### Example
 
 ```typescript
+// 1. Node builtins
 import fs from "node:fs";
 import path from "node:path";
 
+// 2. External packages
 import Ajv from "ajv";
 import { z } from "zod";
 
+// 3. Type imports
 import type { Configuration, ToolDefinition } from "./types.js";
-import { formatError } from "../utils/errors.js";
-import { Logger } from "../utils/logger.js";
 
+// 4. Internal/sibling imports
+import { formatError } from "./errors.js";
+import { Logger } from "./logger.js";
+
+// 4. Internal/sibling imports (more)
 import { parseConfig } from "./config.js";
 import { validateSchema } from "./validation.js";
 ```

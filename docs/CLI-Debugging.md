@@ -148,7 +148,7 @@ ai-agent --agent debug.ai --trace-sdk "Test"
 | Type     | Boolean         |
 | Default  | `false`         |
 
-**Description**: Show detailed logs of Slack bot communication.
+**Description**: Show detailed logs of Slack bot communication (headend mode only).
 
 ```bash
 ai-agent --agent slackbot.ai --slack --trace-slack
@@ -193,10 +193,10 @@ ai-agent --agent test.ai --dry-run "Test query"
 **Validates**
 
 - Configuration parsing and agent file syntax
-- Model availability
 - MCP server connectivity
 
 Note: Tool schema validation occurs during normal agent loading, not during dry-run.
+Note: Model availability is validated when the agent runs, not during dry-run.
 
 **Use for:**
 

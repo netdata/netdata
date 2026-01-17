@@ -205,10 +205,11 @@ For structured JSON output:
 
 The `json_schema` field is optional if:
 
-- The agent has an `outputSchema` defined in frontmatter, OR
-- A schema is provided via `payload.schema`
+- The agent has an `outputSchema` defined in frontmatter
 
-If no schema is available from any source, a `missing_schema` error is returned.
+If `json_schema` is not provided and the agent has no `outputSchema`, a `missing_schema` error is returned.
+
+A schema can also be provided via `payload.schema` instead of `response_format.json_schema`.
 
 ---
 

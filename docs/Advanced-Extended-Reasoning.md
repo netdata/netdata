@@ -106,9 +106,6 @@ ai-agent --agent test.ai --override reasoning=high "query"
 
 ```json
 {
-  "options": {
-    "reasoning": "medium"
-  },
   "defaults": {
     "reasoning": "medium",
     "reasoningValue": 16000
@@ -116,7 +113,7 @@ ai-agent --agent test.ai --override reasoning=high "query"
 }
 ```
 
-> **Note**: In config files, use `options.reasoning` to set reasoning for master agent, and `defaults.reasoning` as the fallback for sub-agents.
+> **Note**: Config files only support setting defaults via `defaults.reasoning`. Master agent reasoning must be set via CLI flag (`--reasoning`) or frontmatter. Config defaults act as fallback for sub-agents.
 
 Note: `reasoningTokens` maps to `defaults.reasoningValue` in the config file. Use frontmatter (`reasoningTokens: 16000`), CLI flag (`--reasoning-tokens 16000`), or config file (`defaults.reasoningValue: 16000`).
 
@@ -182,7 +179,7 @@ Use `--override reasoning=<level>` when you want to force reasoning on every age
 | `minimal` | 1,024 tokens       |
 | `low`     | 819 tokens (20%)   |
 | `medium`  | 2,048 tokens (50%) |
-| `high`    | 3,277 tokens (80%) |
+| `high`    | 3,276 tokens (80%) |
 
 > **Note**: Actual budgets are computed dynamically from `maxOutputTokens`. Providers have different limits (Anthropic: min 1024, max 128,000).
 
@@ -192,12 +189,12 @@ Use `--override reasoning=<level>` when you want to force reasoning on every age
 
 ### Anthropic
 
-| Aspect           | Behavior                                                                  |
-| ---------------- | ------------------------------------------------------------------------- |
-| Signatures       | Reasoning blocks have cryptographic signatures                            |
-| Preservation     | Signatures must survive serialization for replay                          |
-| Subsequent turns | Prior assistant tool calls require valid signatures to continue reasoning |
-| Streaming        | Auto-enabled when reasoning active AND max output tokens >= 21,333        |
+| Aspect           | Behavior                                                                                            |
+| ---------------- | --------------------------------------------------------------------------------------------------- |
+| Signatures       | Reasoning blocks have cryptographic signatures                                                      |
+| Preservation     | Signatures must survive serialization for replay                                                    |
+| Subsequent turns | Prior assistant tool calls with reasoning require valid signatures to enable reasoning on next turn |
+| Streaming        | Auto-enabled when reasoning active AND max output tokens >= 21,333                                  |
 
 **Signature handling**:
 
@@ -308,13 +305,13 @@ Multi-turn conversations require special handling for reasoning blocks.
 
 ## Sub-Agent Inheritance
 
-| Setting                          | Inheritance                          |
-| -------------------------------- | ------------------------------------ |
-| Frontmatter `reasoning`          | NOT copied to sub-agents             |
-| Frontmatter `reasoning: default` | Sub-agents use default flag (if set) |
-| CLI `--reasoning`                | NOT inherited by sub-agents          |
-| CLI `--default-reasoning`        | Propagates as fallback to sub-agents |
-| `--override reasoning=X`         | Propagates to all sub-agents         |
+| Setting                          | Inheritance                                              |
+| -------------------------------- | -------------------------------------------------------- |
+| Frontmatter `reasoning`          | NOT copied to sub-agents                                 |
+| Frontmatter `reasoning: default` | Treated as omitted; sub-agents use default flag (if set) |
+| CLI `--reasoning`                | NOT inherited by sub-agents                              |
+| CLI `--default-reasoning`        | Propagates as fallback to sub-agents                     |
+| `--override reasoning=X`         | Propagates to all sub-agents                             |
 
 **Why**: Prevents master agents from forcing expensive reasoning on every sub-agent. Use `--default-reasoning` to set a fallback for sub-agents, and sub-agents can override by explicitly setting `reasoning` in their frontmatter.
 

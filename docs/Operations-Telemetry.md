@@ -72,21 +72,21 @@ curl http://localhost:9464/metrics
 
 ### LLM Metrics
 
-| Metric                                  | Type      | Description                          |
-| --------------------------------------- | --------- | ------------------------------------ |
-| `ai_agent_llm_requests_total`           | Counter   | Total LLM requests                   |
-| `ai_agent_llm_latency_ms`               | Histogram | LLM request latency                  |
-| `ai_agent_llm_prompt_tokens_total`      | Counter   | Total input tokens                   |
-| `ai_agent_llm_completion_tokens_total`  | Counter   | Total output tokens                  |
-| `ai_agent_llm_cache_read_tokens_total`  | Counter   | Cached input tokens (read)           |
-| `ai_agent_llm_cache_write_tokens_total` | Counter   | Cached input tokens (write)          |
-| `ai_agent_llm_bytes_in_total`           | Counter   | Request bytes                        |
-| `ai_agent_llm_bytes_out_total`          | Counter   | Response bytes                       |
-| `ai_agent_llm_errors_total`             | Counter   | LLM errors (with `error_type` label) |
-| `ai_agent_llm_retries_total`            | Counter   | Retry attempts                       |
-| `ai_agent_llm_cost_usd_total`           | Counter   | Total cost in USD                    |
+| Metric                                  | Type      | Description                              |
+| --------------------------------------- | --------- | ---------------------------------------- |
+| `ai_agent_llm_requests_total`           | Counter   | Total LLM requests                       |
+| `ai_agent_llm_latency_ms`               | Histogram | LLM request latency                      |
+| `ai_agent_llm_prompt_tokens_total`      | Counter   | Total input tokens                       |
+| `ai_agent_llm_completion_tokens_total`  | Counter   | Total output tokens                      |
+| `ai_agent_llm_cache_read_tokens_total`  | Counter   | Cache read tokens used by LLM calls      |
+| `ai_agent_llm_cache_write_tokens_total` | Counter   | Cache write tokens produced by LLM calls |
+| `ai_agent_llm_bytes_in_total`           | Counter   | Request bytes                            |
+| `ai_agent_llm_bytes_out_total`          | Counter   | Response bytes                           |
+| `ai_agent_llm_errors_total`             | Counter   | LLM errors (with `error_type` label)     |
+| `ai_agent_llm_retries_total`            | Counter   | Retry attempts                           |
+| `ai_agent_llm_cost_usd_total`           | Counter   | Total cost in USD                        |
 
-**Labels**: `agent`, `call_path`, `provider`, `model`, `headend`, `status`, `reasoning_level`
+**Labels**: `agent`, `call_path`, `provider`, `model`, `headend`, `status`, `reasoning_level` (when set)
 
 ### Tool Metrics
 
@@ -118,7 +118,7 @@ curl http://localhost:9464/metrics
 | `ai_agent_context_guard_events_total`     | Counter | Context guard activations             |
 | `ai_agent_context_guard_remaining_tokens` | Gauge   | Tokens remaining when guard triggered |
 
-**Labels**: `agent`, `provider`, `model`, `trigger`, `outcome`
+**Labels**: `agent`, `provider`, `model`, `trigger`, `outcome`, `headend`
 
 ### Final Report Metrics
 
@@ -136,7 +136,7 @@ curl http://localhost:9464/metrics
 | ------------------------------- | ------- | ------------------------ |
 | `ai_agent_retry_collapse_total` | Counter | maxTurns collapse events |
 
----
+## **Labels**: `agent`, `call_path`, `headend`, `reason`
 
 ## OpenTelemetry Traces
 
@@ -170,24 +170,59 @@ Session (root span)
 
 ### Trace Attributes
 
-| Attribute                   | Description            |
-| --------------------------- | ---------------------- |
-| `ai.session.run_id`         | Session run ID         |
-| `ai.session.source`         | Session source         |
-| `ai.session.headend_id`     | Headend identifier     |
-| `ai.session.thread_id`      | Thread/conversation ID |
-| `ai.llm.provider`           | LLM provider           |
-| `ai.llm.model`              | Model name             |
-| `ai.llm.is_final_turn`      | Whether turn is final  |
-| `ai.llm.status`             | LLM request status     |
-| `ai.llm.latency_ms`         | Request latency (ms)   |
-| `ai.llm.prompt_tokens`      | Input token count      |
-| `ai.llm.completion_tokens`  | Output token count     |
-| `ai.llm.cache_read_tokens`  | Cached input tokens    |
-| `ai.llm.cache_write_tokens` | Cached output tokens   |
-| `ai.llm.reasoning.level`    | Reasoning mode         |
-| `ai.context.trigger`        | Context guard trigger  |
-| `ai.context.outcome`        | Context guard outcome  |
+| Attribute                          | Description                                     |
+| ---------------------------------- | ----------------------------------------------- |
+| `ai.session.run_id`                | Session run ID (server mode only)               |
+| `ai.session.source`                | Session source (server mode only)               |
+| `ai.session.headend_id`            | Headend identifier                              |
+| `ai.session.thread_id`             | Thread/conversation ID (server mode only)       |
+| `ai.session.txn_id`                | Transaction ID (CLI mode)                       |
+| `ai.session.parent_txn_id`         | Parent transaction ID (CLI mode)                |
+| `ai.session.origin_txn_id`         | Origin transaction ID (CLI mode)                |
+| `ai.session.success`               | Session success status (server mode)            |
+| `ai.session.error`                 | Session error message (server mode, on failure) |
+| `ai.agent.id`                      | Agent ID (CLI mode)                             |
+| `ai.agent.call_path`               | Agent call path (CLI mode)                      |
+| `ai.agent.success`                 | Agent success status                            |
+| `ai.agent.turn_count`              | Total turns executed                            |
+| `ai.llm.provider`                  | LLM provider                                    |
+| `ai.llm.model`                     | Model name                                      |
+| `ai.llm.is_final_turn`             | Whether turn is final                           |
+| `ai.llm.status`                    | LLM request status (on error only)              |
+| `ai.llm.latency_ms`                | Request latency (ms)                            |
+| `ai.llm.prompt_tokens`             | Input token count                               |
+| `ai.llm.completion_tokens`         | Output token count                              |
+| `ai.llm.cache_read_tokens`         | Cached input tokens                             |
+| `ai.llm.cache_write_tokens`        | Cache write tokens produced by LLM calls        |
+| `ai.llm.retry_count`               | Retry count                                     |
+| `ai.llm.request_bytes`             | Request bytes                                   |
+| `ai.llm.response_bytes`            | Response bytes                                  |
+| `ai.llm.stop_reason`               | Stop reason (when available)                    |
+| `ai.llm.reasoning.level`           | Reasoning mode (when set)                       |
+| `ai.llm.reasoning.value`           | Reasoning value (when set)                      |
+| `ai.llm.reasoning.disabled`        | Whether reasoning was disabled for this turn    |
+| `ai.llm.reasoning.level_effective` | Effective reasoning level after guard           |
+| `ai.llm.reasoning.value_effective` | Effective reasoning value after guard           |
+| `ai.tool.requested_name`           | Originally requested tool name                  |
+| `ai.tool.name`                     | Actual tool name invoked                        |
+| `ai.tool.call_path`                | Tool call path                                  |
+| `ai.tool.provider`                 | Tool provider namespace                         |
+| `ai.tool.provider_label`           | Tool provider label                             |
+| `ai.tool.kind`                     | Tool kind                                       |
+| `ai.tool.status`                   | Tool execution status                           |
+| `ai.tool.latency_ms`               | Tool execution latency (ms)                     |
+| `ai.tool.input_bytes`              | Tool input bytes                                |
+| `ai.tool.output_bytes`             | Tool output bytes                               |
+| `ai.tool.error`                    | Tool error message (on failure)                 |
+| `ai.tool.failure.reason`           | Tool failure reason (when applicable)           |
+| `ai.tool.tokens`                   | Tool tokens (when applicable)                   |
+| `ai.context.trigger`               | Context guard trigger                           |
+| `ai.context.outcome`               | Context guard outcome                           |
+| `ai.context.provider`              | Context guard provider                          |
+| `ai.context.model`                 | Context guard model                             |
+| `ai.context.projected_tokens`      | Projected token count                           |
+| `ai.context.limit_tokens`          | Token limit (when set)                          |
+| `ai.context.remaining_tokens`      | Remaining tokens (when set)                     |
 
 ### Sampling
 
@@ -408,7 +443,7 @@ rate(ai_agent_context_guard_events_total[5m])
 ### Tool Latency by Tool
 
 ```promql
-histogram_quantile(0.95, sum by (tool_name, le) (rate(ai_agent_tool_latency_ms_bucket[5m])))
+histogram_quantile(0.95, sum by (tool, le) (rate(ai_agent_tool_latency_ms_bucket[5m])))
 ```
 
 ---

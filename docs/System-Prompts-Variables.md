@@ -85,8 +85,8 @@ Current time: 2025-08-31T14:30:00+03:00
 
 **Notes**:
 
-- These variables are **only available in CLI inline prompt mode** (`ai-agent "sys" "user"`)
-- They are **not injected when running `.ai` files via headends** or the agent registry
+- These variables are **only available when running from CLI** (not via headends)
+- They are **not injected when running via headends** (Slack, API, MCP, etc.) or the agent registry
 - `OS` attempts to read `/etc/os-release` on Linux for a friendly name
 - `USER` falls back to `USER` or `USERNAME` environment variables if `os.userInfo()` fails
 
@@ -177,7 +177,7 @@ Do not assume sudo access unless the user confirms.
 Respond in ${FORMAT}.
 ```
 
-**Note**: `${OS}`, `${ARCH}`, `${KERNEL}`, `${HOSTNAME}`, `${CD}`, and `${USER}` variables are **only available when running via CLI inline mode** (`ai-agent "sys" "user"`). They are not available when running `.ai` files via headends.
+**Note**: `${OS}`, `${ARCH}`, `${KERNEL}`, `${HOSTNAME}`, `${CD}`, and `${USER}` variables are **only available when running from CLI** (not via headends). They are not available when running via headends (Slack, API, MCP, etc.).
 
 ### Self-Limiting Agent
 
@@ -462,7 +462,7 @@ If the task benefits from time/environment awareness, include them:
 Current time: ${DATETIME}
 ```
 
-**Note**: Time variables (`${DATETIME}`, `${TIMESTAMP}`, `${DAY}`, `${TIMEZONE}`) are available in all contexts. System variables (`${OS}`, `${ARCH}`, `${KERNEL}`, `${HOSTNAME}`, `${CD}`, `${USER}`) are **only available in CLI inline mode**.
+**Note**: Time variables (`${DATETIME}`, `${TIMESTAMP}`, `${DAY}`, `${TIMEZONE}`) are available in all contexts. System variables (`${OS}`, `${ARCH}`, `${KERNEL}`, `${HOSTNAME}`, `${CD}`, `${USER}`) are **only available when running from CLI** (not via headends).
 
 ### 3. Help Agents Self-Limit
 

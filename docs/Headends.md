@@ -78,23 +78,23 @@ ai-agent \
 
 Each headend type has its own concurrency limit to prevent resource exhaustion:
 
-| CLI Option                                | Default | Description                                                             |
-| ----------------------------------------- | ------- | ----------------------------------------------------------------------- |
-| `--api-concurrency <n>`                   | 10      | REST API concurrent sessions                                            |
-| `--openai-completions-concurrency <n>`    | 10      | OpenAI headend sessions                                                 |
-| `--anthropic-completions-concurrency <n>` | 10      | Anthropic headend sessions                                              |
-| `--embed-concurrency <n>`                 | 10      | Embed headend sessions (also configurable via embed.config.concurrency) |
+| CLI Option                                | Default | Description                                              |
+| ----------------------------------------- | ------- | -------------------------------------------------------- |
+| `--api-concurrency <n>`                   | 10      | REST API concurrent sessions                             |
+| `--openai-completions-concurrency <n>`    | 10      | OpenAI headend sessions                                  |
+| `--anthropic-completions-concurrency <n>` | 10      | Anthropic headend sessions                               |
+| `--embed-concurrency <n>`                 | 10      | Embed headend sessions (CLI or embed.config.concurrency) |
 
-MCP and Slack headends use internal limits (10 concurrent sessions by default).
+**Note**: MCP and Slack headends have hardcoded internal limits (10 concurrent sessions).
 
-**Note**: MCP stdio transport has no concurrency limit (only HTTP/SSE/WS transports respect the limit).
+**Note**: MCP stdio transport has no concurrency limit (unlimited concurrent sessions). HTTP/SSE/WS transports default to 10 concurrent sessions.
 
 **What happens when limit is reached**:
 
 - REST/OpenAI/Anthropic/Embed: Returns `503 Service Unavailable` with JSON error response
-- MCP HTTP/SSE: Returns `503 Service Unavailable`
-- MCP stdio: No concurrency limit (unlimited concurrent sessions)
-- Slack: Queues the request
+- MCP HTTP/SSE/WS: Returns `503 Service Unavailable`
+- MCP stdio: No limit (unlimited concurrent sessions)
+- Slack: Waits/queues the request
 
 ---
 
@@ -108,14 +108,14 @@ ai-agent --agent agents/main.ai --agent agents/helper.ai --api 8080
 
 **How agents are exposed**:
 
-| Headend   | Agent Identifier                              |
-| --------- | --------------------------------------------- |
-| REST API  | Filename without `.ai` extension → `/v1/chat` |
-| MCP       | Filename or `toolName` from frontmatter       |
-| OpenAI    | Filename or `toolName` as model name          |
-| Anthropic | Filename or `toolName` as model name          |
-| Slack     | Configured via routing rules                  |
-| Embed     | Filename or default from config               |
+| Headend   | Agent Identifier                                       |
+| --------- | ------------------------------------------------------ |
+| REST API  | Filename without `.ai` extension → `/v1/{agentId}`     |
+| MCP       | Filename or `toolName` from frontmatter                |
+| OpenAI    | Filename or `toolName` as model name                   |
+| Anthropic | Filename or `toolName` as model name                   |
+| Slack     | Configured via routing rules                           |
+| Embed     | Requested agent ID, config default, or first available |
 
 **Sub-agent loading**: Agents referenced in frontmatter (via `agents:` or `handoff:`) are auto-loaded.
 

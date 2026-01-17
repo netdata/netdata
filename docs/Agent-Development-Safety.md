@@ -118,7 +118,7 @@ Respond with:
 
 Combine prompt-level and code-level safety for maximum protection:
 
-**Configuration-level filtering** (in `.ai-agent.json` or provider/MCP server config):
+**Configuration-level filtering** (in `.ai-agent.json` - MCP server config):
 
 ```json
 {

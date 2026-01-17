@@ -194,37 +194,38 @@ ai-agent --agent test.ai --billing-file ./accounting.jsonl "query"
 
 #### Base Fields (All Entries)
 
-| Field         | Type     | Description                     |
-| ------------- | -------- | ------------------------------- |
-| `type`        | `string` | Entry type: `llm` or `tool`     |
-| `status`      | `string` | Result status: `ok` or `failed` |
-| `latency`     | `number` | Request duration (milliseconds) |
-| `timestamp`   | `number` | Unix timestamp (ms)             |
-| `agentId`     | `string` | Agent identifier                |
-| `callPath`    | `string` | Hierarchical call path          |
-| `txnId`       | `string` | Transaction ID                  |
-| `parentTxnId` | `string` | Parent transaction ID           |
-| `originTxnId` | `string` | Origin transaction ID           |
+| Field         | Type     | Description                       |
+| ------------- | -------- | --------------------------------- |
+| `type`        | `string` | Entry type: `llm` or `tool`       |
+| `status`      | `string` | Result status: `ok` or `failed`   |
+| `latency`     | `number` | Request duration (milliseconds)   |
+| `timestamp`   | `number` | Unix timestamp (ms)               |
+| `agentId`     | `string` | Agent identifier                  |
+| `callPath`    | `string` | Hierarchical call path            |
+| `txnId`       | `string` | Transaction ID                    |
+| `parentTxnId` | `string` | Parent transaction ID             |
+| `originTxnId` | `string` | Origin transaction ID             |
+| `details`     | `object` | Optional structured detail values |
 
 #### LLM Entry Fields
 
-| Field                          | Type     | Description                      |
-| ------------------------------ | -------- | -------------------------------- |
-| `provider`                     | `string` | LLM provider name                |
-| `model`                        | `string` | Model identifier                 |
-| `actualProvider`               | `string` | Actual provider used (routers)   |
-| `actualModel`                  | `string` | Actual model used (routers)      |
-| `tokens`                       | `object` | Token usage object               |
-| `tokens.inputTokens`           | `number` | Input token count                |
-| `tokens.outputTokens`          | `number` | Output token count               |
-| `tokens.cachedTokens`          | `number` | Back-compat aggregate cache      |
-| `tokens.cacheReadInputTokens`  | `number` | Cache read token count           |
-| `tokens.cacheWriteInputTokens` | `number` | Cache write token count          |
-| `tokens.totalTokens`           | `number` | Total token count                |
-| `costUsd`                      | `number` | Calculated cost in USD           |
-| `upstreamInferenceCostUsd`     | `number` | Provider-reported cost (routers) |
-| `stopReason`                   | `string` | Reason for completion            |
-| `error`                        | `string` | Error message (if failed)        |
+| Field                          | Type     | Description                                                |
+| ------------------------------ | -------- | ---------------------------------------------------------- |
+| `provider`                     | `string` | LLM provider name                                          |
+| `model`                        | `string` | Model identifier                                           |
+| `actualProvider`               | `string` | Actual provider used (routers)                             |
+| `actualModel`                  | `string` | Actual model used (routers)                                |
+| `tokens`                       | `object` | Token usage object                                         |
+| `tokens.inputTokens`           | `number` | Input token count                                          |
+| `tokens.outputTokens`          | `number` | Output token count                                         |
+| `tokens.cachedTokens`          | `number` | Back-compat aggregate cache                                |
+| `tokens.cacheReadInputTokens`  | `number` | Cache read token count                                     |
+| `tokens.cacheWriteInputTokens` | `number` | Cache write token count                                    |
+| `tokens.totalTokens`           | `number` | Total token count                                          |
+| `costUsd`                      | `number` | Calculated cost in USD (or provider-reported if available) |
+| `upstreamInferenceCostUsd`     | `number` | Provider-reported cost from routers (when available)       |
+| `stopReason`                   | `string` | Reason for completion                                      |
+| `error`                        | `string` | Error message (if failed)                                  |
 
 #### Tool Entry Fields
 
@@ -242,11 +243,15 @@ ai-agent --agent test.ai --billing-file ./accounting.jsonl "query"
 
 ### Formula
 
+Prices are configured with a `unit` field (`per_1k` or `per_1m`):
+
 ```
-cost = (inputTokens * promptPrice / 1,000,000)
-     + (outputTokens * completionPrice / 1,000,000)
-     + (cacheReadTokens * cacheReadPrice / 1,000,000)
-     + (cacheWriteTokens * cacheWritePrice / 1,000,000)
+denom = (unit === 'per_1k' ? 1,000 : 1,000,000)
+
+cost = ((inputTokens * promptPrice)
+     + (outputTokens * completionPrice)
+     + (cacheReadTokens * cacheReadPrice)
+     + (cacheWriteTokens * cacheWritePrice)) / denom
 ```
 
 ### Example: GPT-4o
@@ -315,10 +320,10 @@ Reference prices as of 2025. Update your config when prices change.
       "<model>": {
         "unit": "per_1k" | "per_1m",
         "currency": "USD",
-        "prompt": "number",
-        "completion": "number",
-        "cacheRead": "number",
-        "cacheWrite": "number"
+        "prompt": number,
+        "completion": number,
+        "cacheRead": number,
+        "cacheWrite": number
       }
     }
   }
@@ -435,21 +440,46 @@ cat accounting.jsonl | jq -s '
 
 Cost and token metrics are exported:
 
-| Metric                                  | Description              |
-| --------------------------------------- | ------------------------ |
-| `ai_agent_llm_prompt_tokens_total`      | Total input tokens       |
-| `ai_agent_llm_completion_tokens_total`  | Total output tokens      |
-| `ai_agent_llm_cache_read_tokens_total`  | Total cache read tokens  |
-| `ai_agent_llm_cache_write_tokens_total` | Total cache write tokens |
-| `ai_agent_llm_cost_usd_total`           | Total cost in USD        |
+### LLM Metrics
+
+| Metric                                  | Description                              | Type      |
+| --------------------------------------- | ---------------------------------------- | --------- |
+| `ai_agent_llm_prompt_tokens_total`      | Total input tokens                       | Counter   |
+| `ai_agent_llm_completion_tokens_total`  | Total output tokens                      | Counter   |
+| `ai_agent_llm_cache_read_tokens_total`  | Total cache read tokens                  | Counter   |
+| `ai_agent_llm_cache_write_tokens_total` | Total cache write tokens                 | Counter   |
+| `ai_agent_llm_cost_usd_total`           | Total reported LLM cost in USD           | Counter   |
+| `ai_agent_llm_requests_total`           | Total number of LLM requests             | Counter   |
+| `ai_agent_llm_bytes_in_total`           | Input bytes sent to LLM providers        | Counter   |
+| `ai_agent_llm_bytes_out_total`          | Output bytes received from LLM providers | Counter   |
+| `ai_agent_llm_errors_total`             | Total number of LLM errors               | Counter   |
+| `ai_agent_llm_retries_total`            | Total number of LLM retries              | Counter   |
+| `ai_agent_llm_latency_ms`               | Latency of LLM calls (milliseconds)      | Histogram |
+
+### Tool Metrics
+
+| Metric                            | Description                               | Type      |
+| --------------------------------- | ----------------------------------------- | --------- |
+| `ai_agent_tool_invocations_total` | Total number of tool executions           | Counter   |
+| `ai_agent_tool_bytes_in_total`    | Input bytes passed to tools               | Counter   |
+| `ai_agent_tool_bytes_out_total`   | Output bytes produced by tools            | Counter   |
+| `ai_agent_tool_errors_total`      | Total number of tool execution errors     | Counter   |
+| `ai_agent_tool_latency_ms`        | Latency of tool executions (milliseconds) | Histogram |
 
 ### Labels
 
-| Label      | Description      |
-| ---------- | ---------------- |
-| `provider` | LLM provider     |
-| `model`    | Model identifier |
-| `agent`    | Agent path       |
+| Label             | Description                       |
+| ----------------- | --------------------------------- |
+| `provider`        | LLM provider / tool provider      |
+| `model`           | Model identifier (LLM only)       |
+| `agent`           | Agent path                        |
+| `call_path`       | Hierarchical call path            |
+| `headend`         | Headend identifier (e.g., cli)    |
+| `status`          | Success or error status           |
+| `error_type`      | Error type (when applicable)      |
+| `reasoning_level` | Reasoning level (when applicable) |
+| `tool`            | Tool name (tool metrics only)     |
+| `tool_kind`       | Tool kind (tool metrics only)     |
 
 ### Example Queries
 
@@ -463,6 +493,12 @@ rate(ai_agent_llm_prompt_tokens_total[1h])
 # Cache efficiency
 sum(ai_agent_llm_cache_read_tokens_total) /
 sum(ai_agent_llm_prompt_tokens_total)
+
+# Total tool executions by tool
+sum(ai_agent_tool_invocations_total) by (tool)
+
+# LLM latency distribution
+histogram_quantile(0.95, sum(rate(ai_agent_llm_latency_ms_bucket[5m])) by (le, provider))
 ```
 
 ---

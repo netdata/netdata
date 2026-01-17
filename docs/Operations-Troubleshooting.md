@@ -23,9 +23,9 @@ Problem/Cause/Solution reference for AI Agent issues.
 
 ### Config File Not Found
 
-**Problem**: `Configuration file not found`
+**Problem**: `Configuration file not found. Create .ai-agent.json or pass --config`
 
-**Cause**: Configuration file not found. Searches for `.ai-agent.json` in current/prompt directories or `ai-agent.json` in `~/.ai-agent/`.
+**Cause**: Configuration file not found. Searches for `.ai-agent.json` in current directory or `ai-agent.json` in `~/.ai-agent/`.
 
 **Solution**:
 
@@ -44,7 +44,7 @@ pwd
 
 ### Invalid JSON in Config
 
-**Problem**: `SyntaxError: Unexpected token in JSON`
+**Problem**: `Invalid JSON in configuration file <path>: <error message>`
 
 **Cause**: Malformed JSON in configuration file.
 
@@ -64,7 +64,7 @@ jq . .ai-agent.json
 
 ### Invalid YAML in Frontmatter
 
-**Problem**: `Failed to parse agent frontmatter`
+**Problem**: `YAMLException: <error details>` (from js-yaml library)
 
 **Cause**: YAML syntax error in agent file frontmatter.
 
@@ -84,7 +84,7 @@ head -50 myagent.ai | sed -n '/^---$/,/^---$/p'
 
 ### Unknown Frontmatter Key
 
-**Problem**: `Unknown frontmatter key: unknownKey`
+**Problem**: `Invalid frontmatter key(s): <key1>, <key2>. These are runtime application options; use CLI flags instead.` or `Unsupported frontmatter key(s): <keys>. Remove these or move them to CLI/config. See README for valid keys.`
 
 **Cause**: Typo or invalid property name in frontmatter.
 
@@ -119,13 +119,15 @@ ls -la ~/.ai-agent/ai-agent.env
 "apiKey": "$OPENAI_API_KEY"    # Wrong - missing braces
 ```
 
+**Error format**: `Unresolved variable ${VARIABLE_NAME} for <scope> '<id>' at <origin>. Define it in <location>.`
+
 ---
 
 ## Provider Issues
 
 ### Invalid API Key (401)
 
-**Problem**: `LLM communication error: 401 Unauthorized`
+**Problem**: `AuthError` or authentication errors from LLM provider (HTTP 401/403)
 
 **Cause**: API key is invalid, expired, or missing.
 
@@ -147,7 +149,7 @@ printf '%q\n' "$OPENAI_API_KEY" | head -c 20
 
 ### Rate Limited (429)
 
-**Problem**: `LLM request failed: 429 Too Many Requests`
+**Problem**: `RateLimitError` or rate limiting from LLM provider (HTTP 429)
 
 **Cause**: Provider rate limit exceeded.
 
@@ -225,7 +227,7 @@ ai-agent --agent myagent.ai --llm-timeout-ms 180000 "query"
 
 ### All Retries Exhausted
 
-**Problem**: `All retries exhausted`
+**Problem**: Session failing after exhausting retry attempts across all providers
 
 **Cause**: Provider consistently failing despite retries.
 
@@ -250,9 +252,9 @@ models:
 
 ### MCP Server Won't Start
 
-**Problem**: `Failed to initialize MCP server: servername`
+**Problem**: `MCP server '<servername>' initialization timed out after 60s` or connection errors
 
-**Cause**: Server command not found or execution failed.
+**Cause**: Server command not found, execution failed, or initialization timeout.
 
 **Solution**:
 
@@ -306,7 +308,7 @@ ai-agent --agent myagent.ai --tool-timeout-ms 120000 "query"
 
 ### Tool Not Found
 
-**Problem**: `Unknown tool: toolname` or `Requested MCP tools not found in configuration`
+**Problem**: `Unknown tool: toolname` or `Requested MCP tools not found in configuration: <tools>. Check tool names in frontmatter or CLI arguments.`
 
 **Cause**: Tool not available or filtered out.
 
@@ -344,8 +346,6 @@ zcat "$SNAPSHOT" | jq '[.opTree.turns[].ops[] | select(.kind == "tool" and .stat
 ---
 
 ### MCP Server Disconnect
-
-**Problem**: `MCP server disconnected unexpectedly`
 
 **Cause**: Server process crashed or was killed.
 
@@ -446,7 +446,7 @@ toolsAllowed:
 
 ```bash
 # Verify sub-agent tools available
-ai-agent --agent parent.ai --dry-run --verbose
+ai-agent parent.ai --dry-run --verbose
 
 # Check if agent tool is properly configured
 # Sub-agent calls appear as kind="session" in snapshot
@@ -525,7 +525,7 @@ cache: 1h
 
 2. Check provider supports caching (Anthropic does, some don't)
 
-3. Verify in accounting (check `cacheReadInputTokens` nested under `tokens`):
+3. Verify in accounting (check `cacheReadInputTokens` or `cachedTokens` nested under `tokens`):
 
 ```bash
 tail -10 ~/.ai-agent/accounting.jsonl | jq '.tokens'
@@ -712,7 +712,7 @@ zcat "$SNAPSHOT" | jq '{
   success: .opTree.success,
   error: .opTree.error,
   turns: (.opTree.turns | length),
-  errors: ([.. | objects | select(.severity == "ERR")] | length)
+  errors: ([.. | objects | select(.severity == "ERR" or .severity == "WRN")] | length)
 }'
 
 # Extract errors

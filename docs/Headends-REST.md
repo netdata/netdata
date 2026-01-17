@@ -101,11 +101,11 @@ Health check for load balancer integration.
 
 Execute an agent and return the response.
 
-| Parameter | Location | Required | Description                                                                                                  |
-| --------- | -------- | -------- | ------------------------------------------------------------------------------------------------------------ |
-| `agentId` | Path     | Yes      | Agent filename without `.ai` extension                                                                       |
-| `q`       | Query    | Yes      | User prompt (URL-encoded)                                                                                    |
-| `format`  | Query    | No       | Output format: `json`, `markdown`, `markdown+mermaid`, `pipe`, `slack-block-kit`, `tty`, `text`, `sub-agent` |
+| Parameter | Location | Required | Description                                                                                          |
+| --------- | -------- | -------- | ---------------------------------------------------------------------------------------------------- |
+| `agentId` | Path     | Yes      | Agent filename without `.ai` extension                                                               |
+| `q`       | Query    | Yes      | User prompt (URL-encoded)                                                                            |
+| `format`  | Query    | No       | Output format: `json`, `markdown`, `markdown+mermaid`, `pipe`, `slack-block-kit`, `tty`, `sub-agent` |
 
 **Example**:
 
@@ -139,13 +139,13 @@ curl "http://localhost:8080/v1/chat?q=What%20is%20the%20weather%20in%20Paris%3F"
 
 ### format (optional)
 
-| Property     | Value                                                                                         |
-| ------------ | --------------------------------------------------------------------------------------------- |
-| Type         | `string`                                                                                      |
-| Default      | `markdown`                                                                                    |
-| Valid values | `json`, `markdown`, `markdown+mermaid`, `pipe`, `slack-block-kit`, `tty`, `text`, `sub-agent` |
+| Property     | Value                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------- |
+| Type         | `string`                                                                              |
+| Default      | `markdown`                                                                            |
+| Valid values | `json`, `markdown`, `markdown+mermaid`, `pipe`, `slack-block-kit`, `tty`, `sub-agent` |
 
-**Description**: Desired output format. When `json` is specified, the agent must have an output schema defined in frontmatter, or validation will fail.
+**Description**: Desired output format. When `json` is specified, the agent should have an output schema defined in frontmatter. Without a schema, validation defaults to allowing any JSON object.
 
 **Example**:
 
@@ -153,7 +153,7 @@ curl "http://localhost:8080/v1/chat?q=What%20is%20the%20weather%20in%20Paris%3F"
 # Markdown output (default)
 curl "http://localhost:8080/v1/chat?q=Hello"
 
-# JSON output (requires agent with output schema)
+ # JSON output (agent should have output schema defined)
 curl "http://localhost:8080/v1/analyzer?q=Analyze%20this&format=json"
 
 # Plain text output
@@ -394,9 +394,9 @@ ai-agent --agent chat.ai --api 8081
 
 **Symptom**: Session fails with an error related to JSON output schema.
 
-**Cause**: Using `format=json` with an agent that has no output schema defined.
+**Cause**: Model produces invalid JSON or JSON that doesn't match the defined output schema.
 
-**Solution**: Add an output schema to the agent frontmatter:
+**Solution**: Add an output schema to the agent frontmatter for proper validation:
 
 ```yaml
 ---

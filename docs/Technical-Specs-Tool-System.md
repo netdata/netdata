@@ -80,16 +80,6 @@ classDiagram
 
     class RouterToolProvider {
         +kind: "agent"
-        +namespace: "agent"
-    }
-
-    class AgentProvider {
-        +kind: "agent"
-        +namespace: "subagent"
-    }
-
-    class RouterToolProvider {
-        +kind: "agent"
         +namespace: "router"
     }
 
@@ -113,7 +103,11 @@ interface ToolExecuteResult {
     | {
         taskStatusCompleted?: boolean;
         taskStatusData?: TaskStatusData;
-      }; // Additional metadata (task_status-specific fields possible)
+        childAccounting?: readonly unknown[];
+        childConversation?: unknown;
+        childOpTree?: unknown;
+        rawResponse?: string;
+      }; // Additional metadata (task_status, sub-agent, and tool_output-specific fields possible)
 }
 ```
 
@@ -150,8 +144,10 @@ Example: `github__search_code`, `slack__send_message`
   "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" },
   "toolsAllowed": ["search_code", "get_file"],
   "toolsDenied": ["delete_repo"],
-  "cache": 300000,
-  "queue": "github-queue"
+  "queue": "github-queue",
+  "requestTimeoutMs": 60000,
+  "healthProbe": "ping",
+  "shared": true
 }
 ```
 
@@ -190,7 +186,8 @@ REST API tools defined inline or via OpenAPI specs.
       "city": { "type": "string", "description": "City name" }
     },
     "required": ["city"]
-  }
+  },
+  "queue": "weather-queue"
 }
 ```
 
@@ -199,8 +196,10 @@ REST API tools defined inline or via OpenAPI specs.
 - URL template expansion with `${parameters.x}`
 - Query parameter handling
 - Request body construction
-- JSON streaming support
-- OpenAPI schema import
+- JSON streaming support (`streaming.mode`)
+- Header template expansion
+- Per-tool queue assignment
+- Per-tool cache TTL (via `toolsCache` config)
 
 ---
 
@@ -221,14 +220,13 @@ Built-in tools provided by ai-agent itself.
 
 **final_report Parameters**:
 
-| Parameter      | Type                                      | Description                                 |
-| -------------- | ----------------------------------------- | ------------------------------------------- |
-| `status`       | `'success'` \| `'failure'` \| `'partial'` | Completion status                           |
-| `format`       | string                                    | Output format identifier (varies by format) |
-| `content_json` | object                                    | JSON content (for JSON formats)             |
-| `content`      | string                                    | Text content (for text formats)             |
-| `messages`     | array                                     | Messages array (for slack-block-kit)        |
-| `metadata`     | object                                    | Optional metadata                           |
+| Parameter       | Type                                      | Description                          |
+| --------------- | ----------------------------------------- | ------------------------------------ |
+| `report_format` | `'success'` \| `'failure'` \| `'partial'` | Completion status                    |
+| `content_json`  | object                                    | JSON content (for JSON formats)      |
+| `content`       | string                                    | Text content (for text formats)      |
+| `messages`      | array                                     | Messages array (for slack-block-kit) |
+| `metadata`      | object                                    | Optional metadata                    |
 
 **task_status Parameters**:
 
@@ -296,7 +294,7 @@ Dynamic agent routing.
 ```typescript
 {
     agent: string;      // Must be in router.destinations
-    message?: string;   // Optional advisory text
+    message?: string;   // Optional context for destination agent (plain text)
 }
 ```
 
@@ -323,10 +321,10 @@ All tools follow the pattern: `{provider}__{toolname}`
 Tool names are sanitized for safe usage:
 
 | Rule                                | Example               |
-| ----------------------------------- | --------------------- | ----------- | --- | ------ | ------------------------------------- |
-| Remove `<                           | prefix                | >` wrappers | `<  | github | search_code>`→`github\_\_search_code` |
+| ----------------------------------- | --------------------- | ------------------ | -------- | ------------------------------------- |
+| Remove `<                           | ...                   | >` wrapper markers | `<github | search_code>`→`github\_\_search_code` |
 | Replace invalid characters with `_` | `my-tool` → `my_tool` |
-| Truncate to max length (200 chars)  | Long names shortened  |
+| Remove invalid prefix characters    | `123tool` → `tool`    |
 
 ### Resolution
 
@@ -411,11 +409,10 @@ Queues control concurrency to:
 
 ### Queue Types
 
-| Type             | Scope                         | Use Case             |
-| ---------------- | ----------------------------- | -------------------- |
-| Per-server queue | All tools from one MCP server | Server rate limits   |
-| Per-tool queue   | Individual tool               | Tool-specific limits |
-| No queue         | Immediate execution           | Low-traffic tools    |
+| Type          | Scope                          | Use Case                    |
+| ------------- | ------------------------------ | --------------------------- |
+| Named queue   | Tools assigned to a queue name | Server-specific rate limits |
+| Default queue | Tools without explicit queue   | Default concurrency (10)    |
 
 ### Configuration
 
@@ -426,8 +423,8 @@ Queues control concurrency to:
     "slow-api": { "concurrent": 1 }
   },
   "mcpServers": {
-    "github": { "queue": "github" },
-    "slow-service": { "queue": "slow-api" }
+    "github": { "queue": "github", "type": "stdio", ... },
+    "slow-service": { "queue": "slow-api", ... }
   }
 }
 ```
@@ -489,29 +486,36 @@ When output exceeds `toolResponseMaxBytes`:
 
 **Handle Message**:
 
-```json
-{
-  "tool_output": {
-    "handle": "session-abc123/file-xyz789",
-    "reason": "size_limit_exceeded",
-    "bytes": 1048576,
-    "lines": 25000,
-    "tokens": 250000
-  }
-}
+When a tool's stored output is successfully extracted, the response contains the extracted content.
+
+When extraction fails or the handle is not found, the response contains an error message.
+
+Example success (extracted content):
+
+```
+<file content here>
 ```
 
-**Storage Location**: `/tmp/ai-agent-<run-hash>/session-<uuid>/<file-uuid>`
+Example error (handle not found):
+
+```
+No stored tool output found for handle session-abc123/file-xyz789. It may have expired or been cleaned up.
+```
+
+**Storage Location**: Stored via ToolOutputProvider, typically in session directory as `<session-dir>/tool-output/<handle>`
 
 ### Output Outcomes
 
-| Outcome         | Conversation Message                            |
-| --------------- | ----------------------------------------------- |
-| Success         | Tool result content                             |
-| Timeout         | `(tool failed: timeout)`                        |
-| Error           | `(tool failed: <error message>)`                |
-| Size exceeded   | `tool_output` handle reference                  |
-| Budget exceeded | `(tool failed: context window budget exceeded)` |
+| Outcome         | Conversation Message                                                   |
+| --------------- | ---------------------------------------------------------------------- |
+| Success         | Tool result content                                                    |
+| Timeout         | `(tool failed: timeout)`                                               |
+| Error           | `(tool failed: <error message>)`                                       |
+| Size exceeded   | `tool_output` handle message with extraction instructions or reference |
+| Budget exceeded | `(tool failed: context window budget exceeded)`                        |
+| Not permitted   | `(tool failed: tool not permitted for provider '<provider>')`          |
+| Unknown tool    | `(tool failed: Unknown tool: <tool name>)`                             |
+| Per-turn limit  | `(tool failed: per-turn tool limit exceeded)`                          |
 
 ---
 
@@ -523,18 +527,19 @@ When output exceeds `toolResponseMaxBytes`:
 | ---------------------- | ------- | ------- | ----------------------------------- |
 | `toolTimeout`          | number  | 300000  | Global timeout per tool (5 minutes) |
 | `toolResponseMaxBytes` | number  | 12288   | Triggers disk storage               |
-| `traceMCP`             | boolean | false   | Enable MCP tracing logs             |
-| `mcpInitConcurrency`   | number  | varies  | Parallel MCP initialization         |
+| `traceTools`           | boolean | false   | Enable detailed tool execution logs |
 
 ### Per-Server Settings
 
-| Setting            | Type   | Description             |
-| ------------------ | ------ | ----------------------- |
-| `toolsAllowed`     | array  | Whitelist of tool names |
-| `toolsDenied`      | array  | Blacklist of tool names |
-| `queue`            | string | Queue name to use       |
-| `cache`            | number | Cache duration in ms    |
-| `requestTimeoutMs` | number | Server-specific timeout |
+| Setting            | Type    | Description             |
+| ------------------ | ------- | ----------------------- |
+| `toolsAllowed`     | array   | Whitelist of tool names |
+| `toolsDenied`      | array   | Blacklist of tool names |
+| `toolsCache`       | object  | Per-tool cache TTL (ms) |
+| `queue`            | string  | Queue name to use       |
+| `requestTimeoutMs` | number  | Server-specific timeout |
+| `healthProbe`      | string  | Health check method     |
+| `shared`           | boolean | Use shared registry     |
 
 ### Example Configuration
 
@@ -542,6 +547,7 @@ When output exceeds `toolResponseMaxBytes`:
 defaults:
   toolTimeout: 300000
   toolResponseMaxBytes: 12288
+  traceTools: false
 
 mcpServers:
   github:
@@ -550,10 +556,13 @@ mcpServers:
     args: ["-y", "@mcp/github"]
     toolsAllowed: ["search_code", "get_file_contents"]
     queue: github-queue
+    requestTimeoutMs: 60000
 
 queues:
   github-queue:
     concurrent: 5
+  default:
+    concurrent: 10
 ```
 
 ---
@@ -562,13 +571,13 @@ queues:
 
 ### Metrics Per Tool Execution
 
-| Metric          | Description          |
-| --------------- | -------------------- |
-| `latencyMs`     | Execution duration   |
-| `charactersIn`  | Input parameter size |
-| `charactersOut` | Output size          |
-| `status`        | `ok` or `failed`     |
-| `namespace`     | Provider namespace   |
+| Metric          | Description           |
+| --------------- | --------------------- |
+| `latencyMs`     | Execution duration    |
+| `charactersIn`  | Input parameter size  |
+| `charactersOut` | Output size           |
+| `status`        | `success` or `failed` |
+| `namespace`     | Provider namespace    |
 
 ### Log Events
 
@@ -587,14 +596,21 @@ queues:
 
 [WRN] tool response ← github__search_code
     latency: 5000ms, status: failed, error: timeout
+
+[WRN] tool response ← github__search_code
+    latency: 100ms, output: 0 chars, status: failed, error: context_budget_exceeded
 ```
 
 ### Events
 
-| Event           | Description                                    |
-| --------------- | ---------------------------------------------- |
-| `tool_started`  | Execution began                                |
-| `tool_finished` | Execution completed (status: 'ok' or 'failed') |
+| Event                 | Description                                  |
+| --------------------- | -------------------------------------------- |
+| `tool.call.requested` | Tool execution began                         |
+| `tool.call.success`   | Execution completed successfully             |
+| `tool.call.failure`   | Execution failed                             |
+| `tool.call.unknown`   | Unknown tool requested                       |
+| `tool.call.error`     | Execution error occurred                     |
+| `tool.manage.error`   | Tool management error (budget/size exceeded) |
 
 ---
 

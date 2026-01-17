@@ -268,7 +268,8 @@ AI Agent validates:
 | Check                   | Error on Failure                                                     |
 | ----------------------- | -------------------------------------------------------------------- |
 | JSON syntax             | `Invalid JSON in config file`                                        |
-| Unresolved placeholders | `Unresolved variable ${VAR} for provider 'X' at Y`                   |
+| Unresolved variables    | `Unresolved variable ${VAR} for provider 'X' at Y`                   |
+| Unresolved placeholders | `Unresolved placeholders remain in provider 'X'`                     |
 | Unknown queues          | `X references unknown queue 'Y'. Add it under configuration.queues.` |
 
 ---
@@ -371,24 +372,6 @@ Error: Configuration file not found
 2. Use `--config <path>` to specify exact location
 3. Check file permissions: `ls -la .ai-agent.json`
 
-### Variable not expanded
-
-```
-Error: API key invalid: ${OPENAI_API_KEY}
-```
-
-**Causes**:
-
-- Environment variable not set
-- `.ai-agent.env` not in correct location
-- Typo in variable name
-
-**Solutions**:
-
-1. Set variable: `export OPENAI_API_KEY=sk-...`
-2. Check `.ai-agent.env` location (same directory as config)
-3. Verify variable name matches exactly (case-sensitive)
-
 ### MissingVariableError
 
 ```
@@ -405,7 +388,7 @@ Unresolved variable ${OPENAI_API_KEY} for provider 'openai' at home. Define it i
 ### Unknown queue error
 
 ```
-mcp:myserver references unknown queue 'playwright'. Add it under configuration.queues.
+MCP server 'myserver' references unknown queue 'playwright'. Add it under configuration.queues.
 ```
 
 **Causes**:
@@ -430,7 +413,7 @@ mcp:myserver references unknown queue 'playwright'. Add it under configuration.q
 ### Provider missing type warning
 
 ```
-provider 'custom' at /path/to/.ai-agent.json missing "type"; defaulting to 'openai'. Update configuration to include "type" explicitly.
+provider 'openai' at /path/to/.ai-agent.json missing "type"; defaulting to 'openai'. Update configuration to include "type" explicitly.
 ```
 
 **Cause**: Legacy config omitted the `type` field.
@@ -440,8 +423,8 @@ provider 'custom' at /path/to/.ai-agent.json missing "type"; defaulting to 'open
 ```json
 {
   "providers": {
-    "custom": {
-      "type": "openai-compatible",
+    "openai": {
+      "type": "openai",
       "apiKey": "..."
     }
   }

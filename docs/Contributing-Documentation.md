@@ -113,7 +113,7 @@ Test files follow these patterns:
 - Phase 3 integration: `src/tests/phase3/phase3-suite.spec.ts`
 - Other test files: `src/tests/<feature>.spec.ts`
 
-Test reference pattern for Phase 2: scenario names use `run-test-XX` format (e.g., `run-test-11`, `run-test-21`) within the harness file.
+Test reference pattern for Phase 2: scenario names use `run-test-*` format within the harness file. Examples: `run-test-1`, `run-test-11`, `run-test-queue-cancel`.
 
 ---
 
@@ -174,10 +174,10 @@ Test reference pattern for Phase 2: scenario names use `run-test-XX` format (e.g
 
 ### Verification Requirements
 
-Spec documents follow actual file structure, not a template pattern. Each spec includes:
+Spec documents follow actual file structure, not a template pattern. Most specs include:
 
-- **TL;DR**: Brief feature description
-- **Source Files**: Specific file and line references
+- **TL;DR**: Brief feature description (not present in overview/architecture docs like DESIGN.md, IMPLEMENTATION.md)
+- **Source Files**: Specific file and line references (not present in overview/architecture docs)
 - **Verification status**: Spec verification dates are tracked in `docs/specs/index.md` (e.g., "Verified 2025-11-16")
 
 ---
@@ -189,9 +189,9 @@ When updating specs that affect runtime behavior, also update:
 | If You Change         | Also Update                             |
 | --------------------- | --------------------------------------- |
 | Configuration options | `docs/skills/ai-agent-configuration.md` |
-| Default values        | `docs/specs/CONTRACT.md`                |
+| Default values        | `docs/skills/ai-agent-configuration.md` |
 | User-visible behavior | Relevant wiki page                      |
-| API contracts         | `docs/specs/index.md`                   |
+| API contracts         | `docs/specs/library-api.md`             |
 
 ### Traceable Evidence
 

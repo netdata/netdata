@@ -45,14 +45,14 @@ Understanding the session lifecycle helps you:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Creating: create()
+    [*] --> Creating: AIAgentSession.create()
     Creating --> Initializing: constructor
     Initializing --> Ready: init complete
 
     Ready --> Orchestrating: AIAgent.run()
-    Orchestrating --> Running: run advisors, start session
+    Orchestrating --> Running: run advisors (optional), start session
 
-    Running --> Executing: executeAgentLoop()
+    Running --> Executing: TurnRunner.execute()
     Executing --> Turn: begin turn
 
     Turn --> LLMRequest: select provider
@@ -71,6 +71,8 @@ stateDiagram-v2
     Cleanup --> [*]: return result
 ```
 
+> **Note**: States (Creating, Initializing, Ready, etc.) are conceptual stages for documentation. The session does NOT track an explicit state field.
+
 ---
 
 ## Phase 1: Creation
@@ -81,15 +83,15 @@ The static factory method validates configuration and creates the session instan
 
 **Steps**:
 
-| Step | Description                                       |
-| ---- | ------------------------------------------------- |
-| 1    | Validate config (providers, MCP servers, prompts) |
-| 2    | Generate unique session transaction ID            |
-| 3    | Infer agent path from config                      |
-| 4    | Enrich config with trace fields                   |
-| 5    | Create LLMClient with provider configurations     |
-| 6    | Instantiate AIAgentSession                        |
-| 7    | Bind external log relay                           |
+| Step | Description                                                          |
+| ---- | -------------------------------------------------------------------- |
+| 1    | Validate config (providers, MCP servers, prompts, tool output paths) |
+| 2    | Generate unique session transaction ID                               |
+| 3    | Infer agent path from config                                         |
+| 4    | Enrich config with trace fields                                      |
+| 5    | Create LLMClient with provider configurations                        |
+| 6    | Instantiate AIAgentSession                                           |
+| 7    | Bind external log relay                                              |
 
 **Invariants**:
 
@@ -110,28 +112,41 @@ Sub-agent:     txnId=def456, originTxnId=abc123
 
 **Entry Point**: Constructor (`new AIAgentSession()`)
 
-Sets up all session state before execution begins.
+Sets up core session state. Components that need initialization with external resources (ToolsOrchestrator, SessionToolExecutor, XmlToolTransport) are created by the caller and passed to the constructor.
 
-**Steps**:
+**Constructor initialization**:
 
-| Step | Action                                           |
-| ---- | ------------------------------------------------ |
-| 1    | Store config references                          |
-| 2    | Set up abort signal listener                     |
-| 3    | Initialize target context configs                |
-| 4    | Initialize SubAgentRegistry (if configured)      |
-| 5    | Set trace IDs                                    |
-| 6    | Initialize opTree (SessionTreeBuilder)           |
-| 7    | Initialize progressReporter                      |
-| 8    | Initialize finalReportManager                    |
-| 9    | Begin system turn (turn 0)                       |
-| 10   | Initialize ToolsOrchestrator                     |
-| 11   | Initialize sessionExecutor (SessionToolExecutor) |
-| 12   | Initialize xmlTransport (XmlToolTransport)       |
-| 13   | Initialize toolNameCorrections                   |
-| 14   | Apply initial session title                      |
+| Component          | Purpose                                                      |
+| ------------------ | ------------------------------------------------------------ |
+| config             | Session configuration (providers, MCP servers, etc.)         |
+| llmClient          | LLM provider client for making requests                      |
+| abortSignal        | External cancellation signal listener                        |
+| stopRef            | External graceful stop signal listener                       |
+| traceIds           | Transaction IDs (txnId, originTxnId, parentTxnId, callPath)  |
+| telemetryLabels    | OpenTelemetry and other metrics labels                       |
+| opTree             | Session tree for tracking all operations                     |
+| progressReporter   | Progress tracking and events (agent_started/finished/failed) |
+| finalReportManager | Final report capture and validation                          |
+| contextGuard       | Context budget guard and enforcement                         |
+| responseCache      | Optional response caching layer                              |
+| toolCacheResolver  | Optional tool result caching resolver                        |
+| subAgents          | Sub-agent registry (if configured)                           |
 
-Note: Initial context token count is computed in Phase 5 (agent loop execution), not during constructor. |
+**External components passed to constructor** (created in AIAgentSession.create()):
+
+| Component           | Created in AIAgentSession.create()                  |
+| ------------------- | --------------------------------------------------- |
+| ToolsOrchestrator   | Created from config.tools and sessionConfig.targets |
+| SessionToolExecutor | Created from config.tools                           |
+| XmlToolTransport    | Created from config.outputFormat                    |
+| LLMClient           | Created from config.providers                       |
+
+Note:
+
+- System turn (turn 0) begins in `AIAgentSession.run()`, not in constructor
+- Initial context token count is computed in Phase 5 (agent loop execution)
+- toolNameCorrections is initialized lazily via Map, not explicitly in constructor
+- conversation, logs, accounting are initialized from create() parameters
 
 **Key Initializations**:
 
@@ -141,8 +156,6 @@ currentTurn = 0; // System turn (action turns start at 1)
 currentCtxTokens = 0; // Will be computed
 accounting = []; // Empty entries array
 ```
-
----
 
 ## Phase 3: Orchestration
 
@@ -251,13 +264,13 @@ for turn = 1 to maxTurns:
 | State                       | Purpose                                       |
 | --------------------------- | --------------------------------------------- |
 | `currentTurn`               | Current turn number (1-based)                 |
-| `pairCursor`                | Provider cycling index                        |
-| `attempts`                  | Retry counter for current turn                |
 | `forcedFinalTurnReason`     | Why tools are restricted                      |
 | `turnFailedEvents`          | Accumulated turn failure events               |
 | `finalReportToolFailedEver` | Whether final_report tool ever failed         |
 | `finalReportInvalidFormat`  | Whether final report format was invalid       |
 | `finalReportSchemaFailed`   | Whether final report schema validation failed |
+
+> **Note**: `pairCursor` (provider cycling index) and `attempts` (retry counter) are local variables within the turn execution loop, not stored state fields. |
 
 ---
 
@@ -275,16 +288,15 @@ sequenceDiagram
     participant Provider
     participant LLM
 
-    Session->>OpTree: beginLLMOp()
+    Session->>OpTree: beginOp(currentTurn, 'llm', ...)
     Session->>Session: resolveReasoningValue()
-    Session->>Session: buildTurnRequest()
     Session->>LLMClient: executeTurn(request)
     LLMClient->>Provider: executeTurn(request)
     Provider->>LLM: HTTP POST
     LLM-->>Provider: Response (streaming or full)
     Provider-->>LLMClient: TurnResult
     LLMClient-->>Session: TurnResult
-    Session->>OpTree: endLLMOp(result)
+    Session->>OpTree: endOp(llmOpId, status, ...)
 ```
 
 **TurnRequest Structure**:
@@ -360,6 +372,18 @@ sequenceDiagram
 
 Executes tool calls after a successful LLM turn. The executor wraps each tool call with context budget checking, timeout handling, and response sanitization.
 
+**Note**: The flowchart above is a simplified view. Actual implementation includes additional steps:
+
+- Tool name auto-correction via `resolveAutoCorrectedToolName()`
+- Special handling for `agent__final_report` tool (increment attempts, parse nested calls)
+- Progress tool detection (`agent__task_status`)
+- Queue slot acquisition via `orchestrator.executeWithManagement()`
+- Size cap application (central and per-tool)
+- Context budget checking
+- Tool execution with timeout
+- Multiple result capture paths (success, timeout, error, size exceeded, budget exceeded)
+- Accounting and XML transport recording
+
 ```mermaid
 flowchart TD
     Start[Tool Calls Received] --> Loop[For Each Tool Call]
@@ -414,17 +438,16 @@ flowchart TD
 
 **Steps**:
 
-| Step | Action                                                             |
-| ---- | ------------------------------------------------------------------ |
-| 1    | Capture final report (format, content, content_json, metadata, ts) |
-| 2    | Validate JSON schema (if applicable, during commit)                |
-| 3    | Log finalization event                                             |
-| 4    | End system turn and session in opTree                              |
-| 5    | Flatten opTree                                                     |
-| 6    | Emit completion event                                              |
-| 7    | Persist final snapshot                                             |
-| 8    | Flush accounting                                                   |
-| 9    | Build and return AIAgentResult                                     |
+| Step | Action                                                 |
+| ---- | ------------------------------------------------------ |
+| 1    | End system turn and session in opTree (with final log) |
+| 2    | Flatten opTree                                         |
+| 3    | Merge logs and accounting                              |
+| 4    | Persist final snapshot and flush accounting            |
+| 5    | Emit completion event                                  |
+| 6    | Build and return AIAgentResult                         |
+
+> **Note**: Step 1 logs finalization and ends the session; steps 2-4 happen inside `persistFinalArtifacts()`. Step order differs from conceptual flow: logs/accounting are persisted first, then completion event is emitted. |
 
 **AIAgentResult Structure**:
 

@@ -47,7 +47,7 @@ Create `.ai-agent.json` in your working directory:
   },
   "mcpServers": {},
   "defaults": {
-    "temperature": 0.2,
+    "temperature": 0.0,
     "llmTimeout": 600000,
     "toolTimeout": 300000
   }
@@ -172,10 +172,11 @@ Global default settings for all agents.
 ```json
 {
   "defaults": {
-    "temperature": 0.2,
+    "temperature": 0.0,
     "llmTimeout": 600000,
     "toolTimeout": 300000,
     "stream": false,
+    "maxOutputTokens": 4096,
     "contextWindowBufferTokens": 8192
   }
 }
@@ -259,7 +260,7 @@ Settings merge from multiple sources with this priority (highest to lowest):
 | 1        | CLI options       | `--temperature 0.2`         |
 | 2        | Agent frontmatter | `temperature: 0.3`          |
 | 3        | Config defaults   | `defaults.temperature: 0.7` |
-| 4        | Built-in defaults | Hardcoded fallbacks         |
+| 4        | Built-in defaults | See defaults section        |
 
 ### Example
 
@@ -362,6 +363,7 @@ Production-ready configuration:
     "temperature": 0.2,
     "llmTimeout": 600000,
     "toolTimeout": 300000,
+    "maxRetries": 5,
     "toolResponseMaxBytes": 12288,
     "contextWindowBufferTokens": 8192
   },

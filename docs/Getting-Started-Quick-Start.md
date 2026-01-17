@@ -78,9 +78,9 @@ Create `~/.ai-agent/ai-agent.json`:
 
 **What this configures**:
 
-| Section | Purpose |
-|---------|---------|
-| `providers.openai` | LLM provider with API key from environment |
+| Section               | Purpose                                                     |
+| --------------------- | ----------------------------------------------------------- |
+| `providers.openai`    | LLM provider with API key from environment                  |
 | `mcpServers.context7` | Free MCP tool for library documentation (no API key needed) |
 
 For Anthropic, replace the provider:
@@ -111,6 +111,7 @@ context7:
 ```
 
 If you see errors, check:
+
 - API key is set correctly in `ai-agent.env`
 - `npx` is available (Node.js installed)
 - JSON syntax is valid
@@ -156,15 +157,15 @@ For Anthropic, change `models:` to `- anthropic/claude-sonnet-4-20250514`.
 
 **File structure explained**:
 
-| Section | Purpose |
-|---------|---------|
-| `#!/usr/bin/env ai-agent` | Shebang - makes file executable |
-| `---` | YAML frontmatter delimiters |
-| `description` | Human-readable description |
-| `models` | LLM to use (format: `provider/model`) |
-| `tools` | MCP servers this agent can use |
-| `maxTurns` | Maximum conversation turns |
-| Text after `---` | System prompt - agent instructions |
+| Section                   | Purpose                               |
+| ------------------------- | ------------------------------------- |
+| `#!/usr/bin/env ai-agent` | Shebang - makes file executable       |
+| `---`                     | YAML frontmatter delimiters           |
+| `description`             | Human-readable description            |
+| `models`                  | LLM to use (format: `provider/model`) |
+| `tools`                   | MCP servers this agent can use        |
+| `maxTurns`                | Maximum conversation turns            |
+| Text after `---`          | System prompt - agent instructions    |
 
 ### Step 2.3: Make Executable
 
@@ -192,9 +193,9 @@ Both are equivalent. Direct execution is shorter; explicit invocation works on a
 
 **Output streams**:
 
-| Stream | Content |
-|--------|---------|
-| `stdout` | Final agent response only |
+| Stream   | Content                              |
+| -------- | ------------------------------------ |
+| `stdout` | Final agent response only            |
 | `stderr` | Progress, tool calls, debugging info |
 
 This separation allows piping: `./docs-helper.ai "query" > result.txt`
@@ -206,6 +207,7 @@ This separation allows piping: `./docs-helper.ai "query" > result.txt`
 ```
 
 Verbose output shows:
+
 - Configuration resolution
 - Model selection
 - Tool calls and responses
@@ -222,14 +224,14 @@ Validates configuration and agent file without calling the LLM. Use this to chec
 
 ### Step 3.4: Understanding Exit Codes
 
-| Code | Meaning | Action |
-|------|---------|--------|
-| 0 | Success | Agent completed with final report |
-| 1 | Configuration error | Check `.ai-agent.json` and agent file |
-| 2 | LLM error | Check API key, rate limits, model name |
-| 3 | Tool error | Check MCP server configuration |
-| 4 | CLI error | Check command-line arguments |
-| 5 | Schema/limit error | Check tool schemas or maxTurns |
+| Code | Meaning                      | Action                                                      |
+| ---- | ---------------------------- | ----------------------------------------------------------- |
+| 0    | Success                      | Agent completed with final report                           |
+| 1    | Configuration or fatal error | Check `.ai-agent.json`, agent file, or system configuration |
+| 2    | LLM error                    | Check API key, rate limits, model name                      |
+| 3    | MCP server error             | Check MCP server configuration                              |
+| 4    | CLI or argument error        | Check command-line arguments                                |
+| 5    | Schema/limit error           | Check tool schemas or maxTurns                              |
 
 **Script usage**:
 
@@ -270,6 +272,15 @@ Create `/etc/ai-agent/ai-agent.json` (or use `~/.ai-agent/ai-agent.json`):
 }
 ```
 
+**Note**: The systemd service assumes the `ai-agent` user and `/opt/ai-agent` directory exist. Create them:
+
+```bash
+sudo useradd -r -s /bin/false ai-agent
+sudo mkdir -p /opt/ai-agent/agents
+sudo chown -R ai-agent:ai-agent /opt/ai-agent
+sudo cp ~/agents/docs-helper.ai /opt/ai-agent/agents/
+```
+
 ### Step 4.2: Create Systemd Service
 
 Create `/etc/systemd/system/ai-agent.service`:
@@ -304,14 +315,16 @@ sudo systemctl status ai-agent
 
 ### Step 4.4: Available Headends
 
-| Headend | Flag | Use Case |
-|---------|------|----------|
-| OpenAI-compatible | `--openai-completions <port>` | Open-WebUI, any OpenAI client |
-| Anthropic-compatible | `--anthropic-completions <port>` | Claude-compatible clients |
-| MCP | `--mcp stdio` | Claude Code, VS Code (stdio) |
-| MCP HTTP | `--mcp http:<port>` | HTTP-based MCP clients |
-| REST | `--api <port>` | Custom integrations |
-| Slack | `--slack` | Slack bot (Socket Mode, no port) |
+| Headend              | Flag                             | Use Case                         |
+| -------------------- | -------------------------------- | -------------------------------- |
+| OpenAI-compatible    | `--openai-completions <port>`    | Open-WebUI, any OpenAI client    |
+| Anthropic-compatible | `--anthropic-completions <port>` | Claude-compatible clients        |
+| MCP                  | `--mcp stdio`                    | Claude Code, VS Code (stdio)     |
+| MCP HTTP             | `--mcp http:<port>`              | HTTP-based MCP clients           |
+| MCP SSE              | `--mcp sse:<port>`               | SSE-based MCP clients            |
+| MCP WebSocket        | `--mcp ws:<port>`                | WebSocket-based MCP clients      |
+| REST                 | `--api <port>`                   | Custom integrations              |
+| Slack                | `--slack`                        | Slack bot (Socket Mode, no port) |
 
 Multiple headends can run simultaneously on different ports:
 
@@ -326,6 +339,7 @@ ai-agent --openai-completions 3000 --api 3001 --mcp stdio --agent docs-helper.ai
 ### Open-WebUI (LLM Headend)
 
 1. Start ai-agent with OpenAI-compatible headend:
+
    ```bash
    ai-agent --openai-completions 3000 --agent docs-helper.ai
    ```
@@ -339,6 +353,7 @@ ai-agent --openai-completions 3000 --api 3001 --mcp stdio --agent docs-helper.ai
 ### Claude Code (MCP)
 
 1. Add to Claude Code's MCP configuration (`~/.claude/claude_desktop_config.json`):
+
    ```json
    {
      "mcpServers": {
@@ -357,6 +372,7 @@ ai-agent --openai-completions 3000 --api 3001 --mcp stdio --agent docs-helper.ai
 1. Install an MCP-compatible extension
 
 2. Configure the extension to use:
+
    ```bash
    ai-agent --mcp stdio --agent /path/to/docs-helper.ai
    ```
@@ -372,6 +388,7 @@ ai-agent --openai-completions 3000 --api 3001 --mcp stdio --agent docs-helper.ai
 **Cause**: Configuration file not found or malformed.
 
 **Solution**:
+
 1. Check `~/.ai-agent/ai-agent.json` exists
 2. Validate JSON syntax: `jq . ~/.ai-agent/ai-agent.json`
 3. Run `ai-agent --dry-run @agent.ai "test"` to see errors
@@ -381,6 +398,7 @@ ai-agent --openai-completions 3000 --api 3001 --mcp stdio --agent docs-helper.ai
 **Cause**: Environment variable not loaded.
 
 **Solution**:
+
 1. Check `ai-agent.env` has the key: `cat ~/.ai-agent/ai-agent.env`
 2. Verify key format (OpenAI: `sk-...`, Anthropic: `sk-ant-...`)
 3. Test key directly with provider's API
@@ -390,6 +408,7 @@ ai-agent --openai-completions 3000 --api 3001 --mcp stdio --agent docs-helper.ai
 **Cause**: Model name doesn't match provider.
 
 **Solution**: Use exact model names:
+
 - OpenAI: `openai/gpt-4o`, `openai/gpt-4o-mini`
 - Anthropic: `anthropic/claude-sonnet-4-20250514`
 
@@ -398,6 +417,7 @@ ai-agent --openai-completions 3000 --api 3001 --mcp stdio --agent docs-helper.ai
 **Cause**: Missing dependencies or wrong command.
 
 **Solution**:
+
 1. Test manually: `npx -y @context7/mcp-server`
 2. Check `node` and `npx` are installed
 3. Check network access for npm packages
@@ -407,6 +427,7 @@ ai-agent --openai-completions 3000 --api 3001 --mcp stdio --agent docs-helper.ai
 **Cause**: Agent doesn't have tools configured or prompt doesn't trigger tool use.
 
 **Solution**:
+
 1. Verify `tools:` section lists the MCP server name
 2. Check `--list-tools all` shows the tools
 3. Make prompt explicitly request tool use
@@ -428,13 +449,13 @@ After completing this guide:
 
 ## Next Steps
 
-| Goal | Page |
-|------|------|
-| Add more MCP tools | [MCP Servers](Configuration-MCP-Servers) |
-| Create multi-agent systems | [Sub-Agents](Agent-Files-Sub-Agents) |
-| Build REST API integrations | [REST Tools](Configuration-REST-Tools) |
-| Advanced debugging | [Debugging Guide](Operations-Debugging) |
-| All frontmatter options | [Frontmatter Reference](Agent-Files) |
+| Goal                        | Page                                     |
+| --------------------------- | ---------------------------------------- |
+| Add more MCP tools          | [MCP Servers](Configuration-MCP-Servers) |
+| Create multi-agent systems  | [Sub-Agents](Agent-Files-Sub-Agents)     |
+| Build REST API integrations | [REST Tools](Configuration-REST-Tools)   |
+| Advanced debugging          | [Debugging Guide](Operations-Debugging)  |
+| All frontmatter options     | [Frontmatter Reference](Agent-Files)     |
 
 ---
 

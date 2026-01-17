@@ -11,6 +11,9 @@
 - [Environment File](#environment-file) - Persistent configuration
 - [Debug Variables](#debug-variables) - Debugging and logging
 - [Provider-Specific Variables](#provider-specific-variables) - Provider customization
+- [Telemetry](#telemetry) - OpenTelemetry configuration
+- [MCP](#mcp) - MCP server configuration
+- [Timezone](#timezone) - Timezone settings
 - [Runtime Variables](#runtime-variables) - System information variables
 - [Prompt Variables](#prompt-variables) - Variables available in .ai files
 - [Variable Expansion in Config](#variable-expansion-in-config) - Using variables in configuration
@@ -43,7 +46,7 @@ ai-agent uses environment variables for:
 
 ## API Keys
 
-Set provider API keys as environment variables. Never hardcode keys in configuration files.
+Set provider API keys as environment variables (optional per provider). Never hardcode keys in configuration files.
 
 ### Provider Keys
 
@@ -123,18 +126,21 @@ Environment files are searched in this priority order:
 Plain text, one variable per line:
 
 ```bash
-# API Keys (required)
+# API Keys (optional)
 OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
 
-# MCP Server Keys (optional, for specific tools)
-BRAVE_API_KEY=BSA...
-GITHUB_TOKEN=ghp_...
-SLACK_BOT_TOKEN=xoxb-...
+# MCP Server Keys (optional, for specific MCP servers)
+# These are only used by MCP servers configured via mcpServers.*.env
+# BRAVE_API_KEY=BSA...
+# GITHUB_TOKEN=ghp_...
+# SLACK_BOT_TOKEN=xoxb-...
 
 # Debug settings (optional)
 # DEBUG=true
 # CONTEXT_DEBUG=true
+# DEBUG_REST_CALLS=true
+# TRACE_REST=true
 ```
 
 ### Creating the File
@@ -170,10 +176,12 @@ echo ".ai-agent.env" >> .gitignore
 
 Enable debugging output for troubleshooting.
 
-| Variable        | Type    | Default | Description                                                   |
-| --------------- | ------- | ------- | ------------------------------------------------------------- |
-| `DEBUG`         | boolean | `false` | Enable AI SDK logging warnings                                |
-| `CONTEXT_DEBUG` | boolean | `false` | Enable detailed context guard debugging; shows token counting |
+| Variable           | Type    | Default | Description                                                   |
+| ------------------ | ------- | ------- | ------------------------------------------------------------- |
+| `DEBUG`            | boolean | `false` | Enable AI SDK logging warnings                                |
+| `CONTEXT_DEBUG`    | boolean | `false` | Enable detailed context guard debugging; shows token counting |
+| `DEBUG_REST_CALLS` | boolean | `false` | Enable REST tool request/response debugging                   |
+| `TRACE_REST`       | boolean | `false` | Enable REST tool tracing                                      |
 
 ### Usage
 
@@ -222,7 +230,31 @@ export OPENROUTER_REFERER="https://myapp.example.com"
 export OPENROUTER_TITLE="My Application"
 ```
 
-### Timezone
+---
+
+## Telemetry
+
+| Variable               | Type    | Default | Description                               |
+| ---------------------- | ------- | ------- | ----------------------------------------- |
+| `AI_TELEMETRY_DISABLE` | boolean | `false` | Disable OpenTelemetry metrics and tracing |
+
+---
+
+## MCP
+
+| Variable   | Type   | Default                   | Description                             |
+| ---------- | ------ | ------------------------- | --------------------------------------- |
+| `MCP_ROOT` | string | Current working directory | Working directory for MCP stdio servers |
+
+**Example:**
+
+```bash
+export MCP_ROOT="/path/to/mcp/servers"
+```
+
+---
+
+## Timezone
 
 | Variable | Type   | Default        | Description                                                   |
 | -------- | ------ | -------------- | ------------------------------------------------------------- |
@@ -367,15 +399,19 @@ All environment variables in one table:
 
 | Variable             | Category | Type    | Default                  | Description                     |
 | -------------------- | -------- | ------- | ------------------------ | ------------------------------- |
-| `OPENAI_API_KEY` | API Key | string | Required | OpenAI API key |
-| `ANTHROPIC_API_KEY` | API Key | string | Required | Anthropic API key |
-| `GOOGLE_API_KEY` | API Key | string | Required | Google AI API key |
-| `OPENROUTER_API_KEY` | API Key | string | Required | OpenRouter API key |
+| `OPENAI_API_KEY` | API Key | string | Optional | OpenAI API key |
+| `ANTHROPIC_API_KEY` | API Key | string | Optional | Anthropic API key |
+| `GOOGLE_API_KEY` | API Key | string | Optional | Google AI API key |
+| `OPENROUTER_API_KEY` | API Key | string | Optional | OpenRouter API key |
 | `DEBUG`              | Debug    | boolean | `false`                  | Enable AI SDK logging warnings    |
 | `CONTEXT_DEBUG`      | Debug    | boolean | `false`                  | Enable context window debugging |
+| `DEBUG_REST_CALLS`    | Debug    | boolean | `false`                  | Enable REST tool request/response debugging |
+| `TRACE_REST`          | Debug    | boolean | `false`                  | Enable REST tool tracing |
 | `OPENROUTER_REFERER` | Provider | string  | `https://ai-agent.local` | OpenRouter HTTP-Referer header  |
 | `OPENROUTER_TITLE`   | Provider | string  | `ai-agent`               | OpenRouter X-Title header       |
+| `AI_TELEMETRY_DISABLE` | Telemetry | boolean | `false` | Disable OpenTelemetry metrics and tracing |
 | `TZ`                 | System   | string  | System default           | Timezone override               |
+| `MCP_ROOT`           | MCP      | string  | Current working directory | Working directory for MCP stdio servers |
 | `USER`               | System   | string  | Computed from os.userInfo() with env fallback | Current username |
 | `HOME`               | System   | string  | From process.env.HOME or USERPROFILE | Home directory path |
 

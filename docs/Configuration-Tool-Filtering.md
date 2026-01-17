@@ -47,7 +47,7 @@ Understanding this convention is essential for writing filter patterns. When con
 
 ## Config-Level Filtering
 
-Filter tools at the MCP server level in `.ai-agent.json`. Use **local tool names** (not the full `mcp__<server>__<tool>` format).
+Filter tools at MCP server level in `.ai-agent.json`. Use **local tool names** (not the full `<server>__<tool>` format).
 
 ### Allow Specific Tools
 
@@ -96,10 +96,10 @@ All tools are available except those listed.
 
 ### MCP Server Filtering Reference
 
-| Property       | Type       | Default            | Description                   |
-| -------------- | ---------- | ------------------ | ----------------------------- |
-| `toolsAllowed` | `string[]` | `[]` (all allowed) | Tools to expose (empty = all) |
-| `toolsDenied`  | `string[]` | `[]`               | Tools to hide                 |
+| Property       | Type       | Default               | Description                              |
+| -------------- | ---------- | --------------------- | ---------------------------------------- |
+| `toolsAllowed` | `string[]` | `['*']` (all allowed) | Tools to expose (empty or omitted = all) |
+| `toolsDenied`  | `string[]` | `[]`                  | Tools to hide                            |
 
 ---
 

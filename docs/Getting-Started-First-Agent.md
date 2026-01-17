@@ -275,12 +275,14 @@ maxRetries: 3
 
 **How fallbacks work:**
 
-For each turn, the agent iterates through the provider/model list:
+For each turn, the agent uses round-robin rotation through the provider/model list:
 
 1. First, tries `openai/gpt-4o`
-2. If that fails (rate limit, timeout, error), tries the next model `openai/gpt-4o-mini`
-3. If that fails, tries `anthropic/claude-sonnet-4-20250514`
-4. Each **attempt** counts toward `maxRetries` (not each model - the entire turn fails after exhausting all provider/model combinations)
+2. If that fails (rate limit, timeout, error), uses next model in rotation `openai/gpt-4o-mini`
+3. If that fails, uses next model in rotation `anthropic/claude-sonnet-4-20250514`
+4. The turn continues until successful or `attempts >= maxRetries`
+
+**Important**: The system doesn't try all of one model before moving to the next. Each attempt uses the next provider/model pair in the rotation. With 3 models and `maxRetries: 3`, you get up to 3 total attempts (not 9).
 
 **Requirements:**
 
@@ -330,7 +332,7 @@ curl -G "http://localhost:8080/v1/researcher" \
 }
 ```
 
-Note: `ts` is a dynamic Unix timestamp in milliseconds (this example value is illustrative). When `format=json`, the response uses a `content_json` field instead of `content`.
+Note: `ts` is a dynamic Unix timestamp in milliseconds (this example value is illustrative). When `format=json`, the `finalReport` object contains both `content` (stringified JSON) and `content_json` (parsed object) fields.
 
 For production deployment options, see [Headends REST](Headends-REST).
 

@@ -22,7 +22,7 @@ An agent file is a plain text file with a `.ai` extension that contains:
 1. **Frontmatter** (YAML) - Configuration at the top, between `---` markers
 2. **System Prompt** - Instructions for the agent after the frontmatter
 
-When you run `ai-agent my-agent.ai`, the system:
+When you run `ai-agent --agent my-agent.ai`, the system:
 
 1. Parses the frontmatter for configuration
 2. Extracts the system prompt
@@ -64,7 +64,7 @@ Respond in ${FORMAT}.
 
 - Plain text instructions for the agent
 - Supports [variable substitution](System-Prompts-Variables) (e.g., `${FORMAT}`)
-- Supports [@include directives](System-Prompts-Includes) for reusable content
+- Supports include directives (`${include:filename}` or `{{include:filename}}`) for reusable content
 - Can be as simple or complex as needed
 
 ---
@@ -89,7 +89,7 @@ Respond in ${FORMAT}.
 Save as `assistant.ai` and run:
 
 ```bash
-ai-agent assistant.ai "What is the capital of France?"
+ai-agent --agent assistant.ai "What is the capital of France?"
 ```
 
 ### Agent with Tools
@@ -170,10 +170,10 @@ Agent files can be anywhere on the filesystem. Reference them with:
 
 ```bash
 # Relative path
-ai-agent ./agents/my-agent.ai
+ai-agent --agent ./agents/my-agent.ai
 
 # Absolute path
-ai-agent /path/to/my-agent.ai
+ai-agent --agent /path/to/my-agent.ai
 ```
 
 ### Recommended Organization
@@ -189,12 +189,12 @@ project/
 │   └── schemas/
 │       └── report.json     # Shared JSON schemas
 └── prompts/
-    └── shared.md           # Shared prompt content (@include)
+    └── shared.md           # Shared prompt content (include directives)
 ```
 
 ### Path Resolution
 
-- **Relative paths** in frontmatter (`agents:`, `schemaRef:`, `@include`) resolve relative to the agent file's directory
+- **Relative paths** in frontmatter (`agents:`, `schemaRef:`, include directives) resolve relative to the agent file's directory
 - **Absolute paths** are used as-is
 
 ---
@@ -264,7 +264,7 @@ You coordinate research tasks. Delegate to specialists as needed.
 **Solution**: Remove these keys. Use CLI flags instead:
 
 ```bash
-ai-agent --stream --verbose my-agent.ai
+ai-agent --agent my-agent.ai --stream --verbose
 ```
 
 ### "Invalid provider/model pair '${token}'. Expected format provider/model."

@@ -53,18 +53,6 @@ graph TB
         end
 
     subgraph "LLM Layer"
-        LLMClient[LLMClient<br/>Request Execution]
-        OpenAI[OpenAI Provider]
-        OpenAICompat[OpenAI-Compatible Provider]
-        Anthropic[Anthropic Provider]
-        Google[Google Provider]
-        Ollama[Ollama Provider]
-        OpenRouter[OpenRouter Provider]
-        TestLLM[Test LLM Provider]
-        end
-
-    subgraph "LLM Layer"
-        LLMClient[LLMClient<br/>Request Execution]
         OpenAI[OpenAI Provider]
         OpenAICompat[OpenAI-Compatible Provider]
         Anthropic[Anthropic Provider]
@@ -81,6 +69,7 @@ graph TB
         InternalProv[Internal Tools]
         AgentProv[Agent Provider]
         RouterProv[Router Tool Provider]
+        ToolOutputProv[Tool Output Provider]
         end
 
     CLI --> AIAgent
@@ -93,7 +82,7 @@ graph TB
     Session --> ToolsOrch
 
     LLMClient --> OpenAI
-    LLMClient --> OpenAI
+    LLMClient --> OpenAICompat
     LLMClient --> Anthropic
     LLMClient --> Google
     LLMClient --> Ollama
@@ -104,6 +93,7 @@ graph TB
     ToolsOrch --> InternalProv
     ToolsOrch --> AgentProv
     ToolsOrch --> RouterProv
+    ToolsOrch --> ToolOutputProv
 ```
 
 ---
@@ -205,13 +195,14 @@ The core loop is implemented in `TurnRunner.execute()` and invoked by `AIAgentSe
 
 **Provider Types**:
 
-| Provider             | Kind    | Description                                                                      |
-| -------------------- | ------- | -------------------------------------------------------------------------------- |
-| MCPProvider          | `mcp`   | Model Context Protocol tools                                                     |
-| RestProvider         | `rest`  | REST/OpenAPI tools                                                               |
-| InternalToolProvider | `agent` | Built-in tools (final_report, task_status, batch, progress updates)              |
-| AgentProvider        | `agent` | Sub-agent invocation                                                             |
-| RouterToolProvider   | `agent` | Router delegation tool (registered only when router destinations are configured) |
+| Provider             | Kind    | Description                                                                       |
+| -------------------- | ------- | --------------------------------------------------------------------------------- |
+| MCPProvider          | `mcp`   | Model Context Protocol tools                                                      |
+| RestProvider         | `rest`  | REST/OpenAPI tools                                                                |
+| InternalToolProvider | `agent` | Built-in tools (final_report, task_status, batch, progress updates)               |
+| AgentProvider        | `agent` | Sub-agent invocation                                                              |
+| RouterToolProvider   | `agent` | Router delegation tool (registered only when router destinations are configured)  |
+| ToolOutputProvider   | `agent` | Tool output storage and retrieval (registered when tool output config is enabled) |
 
 **Execution Flow**:
 
@@ -301,7 +292,7 @@ flowchart TD
     Result --> TurnRunner[TurnRunner processes]
     TurnRunner --> Check{Has Tool Calls?}
 
-    Check -->|Yes| Execute[Execute Tools via SessionToolExecutor]
+    Check -->|Yes| Execute[Execute Tools via ToolsOrchestrator]
     Execute --> AddResults[Add Tool Results]
     AddResults --> NextTurn[Continue to Next Turn]
 

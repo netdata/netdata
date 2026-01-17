@@ -30,7 +30,7 @@ The AI Agent library can be embedded in Node.js applications without using the C
 - **Custom UI integration**: Build web interfaces, bots, or custom applications
 - **Batch processing**: Run agents programmatically at scale
 
-**Entry Point**: `src/ai-agent.ts` (exported as `AIAgent`)
+**Entry Point**: `src/index.ts` (exports `AIAgent` from `src/ai-agent.ts`)
 
 ---
 
@@ -158,11 +158,11 @@ interface AIAgentSessionConfig {
   temperature?: number | null; // Default: 0.0
   topP?: number | null; // Default: not sent
   topK?: number | null; // Default: not sent
-  maxOutputTokens?: number; // Computed as contextWindow/4 if not specified
+  maxOutputTokens?: number; // Default: 4096
   repeatPenalty?: number | null; // Default: not sent
 
   // Execution limits
-  maxRetries?: number; // Default: 3
+  maxRetries?: number; // Default: 5
   maxTurns?: number; // Default: 10
   maxToolCallsPerTurn?: number; // Default: 10
   llmTimeout?: number; // Default: 600000 (10 min)
@@ -242,7 +242,7 @@ interface AIAgentEventCallbacks {
 | --------------------- | -------------- | ------------------------------------- |
 | `agentId`             | `string?`      | Agent identifier                      |
 | `callPath`            | `string?`      | Hierarchical call path                |
-| `sessionId`           | `string?`      | Session identifier                    |
+| `sessionId`           | `string`       | Session identifier                    |
 | `parentId`            | `string?`      | Parent session ID                     |
 | `originId`            | `string?`      | Root session ID                       |
 | `headendId`           | `string?`      | Headend identifier                    |
@@ -415,7 +415,6 @@ interface ToolAccountingEntry {
   txnId?: string;
   parentTxnId?: string;
   originTxnId?: string;
-  details?: Record<string, unknown>; // Additional details
 }
 ```
 

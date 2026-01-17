@@ -332,18 +332,11 @@ toolName: market_researcher
 - `agent__company_researcher`
 - `agent__market_researcher`
 
-**Note**: When calling a sub-agent, use the `prompt` parameter (required) and optionally `format`:
+**Note**: When calling a sub-agent, use these required parameters: `prompt`, `reason`, and `format`:
 
 ```
 Tool: agent__company_researcher
-Input: { "prompt": "Research Apple Inc." }
-```
-
-With explicit format:
-
-```
-Tool: agent__company_researcher
-Input: { "prompt": "Research Apple Inc.", "format": "json" }
+Input: { "prompt": "Research Apple Inc.", "reason": "Need company information for analysis", "format": "sub-agent" }
 ```
 
 ---

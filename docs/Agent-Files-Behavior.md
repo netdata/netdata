@@ -29,7 +29,6 @@ Behavior configuration controls:
 - **Output**: Response length and repetition handling
 - **Caching**: Response cache for cost optimization
 
-
 ---
 
 ## Quick Example
@@ -157,7 +156,7 @@ maxToolCallsPerTurn: 5 # Limit parallel execution
 | Property     | Value          |
 | ------------ | -------------- |
 | Type         | `integer`      |
-| Default      | `5`            |
+| Default      | `3`            |
 | Valid values | `0` or greater |
 
 **Description**: How many times to retry when LLM calls fail. Goes through all fallback models before giving up.
@@ -293,7 +292,7 @@ toolTimeout: 30s # 30 seconds for fast tools
 | Property     | Value                                                    |
 | ------------ | -------------------------------------------------------- |
 | Type         | `number` or `null`                                       |
-| Default      | `0.0`                                                    |
+| Default      | `0.2`                                                    |
 | Valid values | `0.0` to `2.0`, or `null`/`none`/`off`/`unset`/`default` |
 
 **Description**: Controls response creativity/randomness. Lower values produce more focused, deterministic outputs.
@@ -423,7 +422,7 @@ topK: null # Don't send (use provider default)
 | Property     | Value          |
 | ------------ | -------------- |
 | Type         | `integer`      |
-| Default      | `4096`         |
+| Default      | `16384`        |
 | Valid values | `1` or greater |
 
 **Description**: Maximum number of tokens the model can generate per turn.

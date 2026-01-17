@@ -194,6 +194,8 @@ For structured JSON output:
 }
 ```
 
+Additional `payload` fields are merged into the agent's input payload (e.g., `maxTokens`, `temperature`). Schema can also be defined in agent frontmatter (`outputSchema`), which takes precedence over `payload.schema`.
+
 ---
 
 ## Response Format
@@ -225,7 +227,7 @@ For structured JSON output:
 
 ### With Thinking Content
 
-When agents emit reasoning:
+When agents emit reasoning, the thinking block includes rendered Markdown with turn headers, progress updates, and transaction summary:
 
 ```json
 {
@@ -235,7 +237,7 @@ When agents emit reasoning:
   "content": [
     {
       "type": "thinking",
-      "thinking": "Let me analyze this step by step..."
+      "thinking": "## Agent Label: txnId\n\n### Turn 1\n- **path**: started reason\n- **path**: update message\n- **path**: finished\n\nSUMMARY: Agent Label, duration **5s**, cost **$0.001**, agents 1, tools 2, tokens →100 ←50\n\n---\n\nLet me analyze this step by step..."
     },
     {
       "type": "text",
@@ -258,13 +260,13 @@ When `stream: true`:
 
 ```
 event: message_start
-data: {"type":"message_start","message":{"id":"msg_abc","role":"assistant"}}
+data: {"type":"message_start","message":{"id":"msg_abc","type":"message","role":"assistant","model":"chat","content":[]}}
 
 event: content_block_start
 data: {"type":"content_block_start","content_block":{"type":"thinking"}}
 
 event: content_block_delta
-data: {"type":"content_block_delta","content_block":{"type":"thinking","thinking_delta":"Let me think..."}}
+data: {"type":"content_block_delta","content_block":{"type":"thinking","thinking_delta":"## Agent Label: txnId\n\n### Turn 1\n- **path**: update message\n\n---\n\nLet me think..."}}
 
 event: content_block_stop
 data: {"type":"content_block_stop"}
@@ -274,6 +276,9 @@ data: {"type":"content_block_start","content_block":{"type":"text"}}
 
 event: content_block_delta
 data: {"type":"content_block_delta","content_block":{"type":"text","text_delta":"Hello!"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","content_block":{"type":"text","text_delta":"\nSUMMARY: Agent Label, duration **3s**, cost **$0.001**, agents 1, tools 2, tokens →50 ←30\n"}}
 
 event: content_block_stop
 data: {"type":"content_block_stop"}
@@ -382,16 +387,19 @@ curl http://localhost:8083/v1/models
 
 The `model` field maps to agents. The model ID is determined by:
 
-1. `toolName` from frontmatter (if specified)
-2. Filename without `.ai` extension (as fallback)
+1. `toolName` from frontmatter (if specified and non-empty)
+2. Prompt filename (without `.ai` extension)
+3. Agent ID basename (last path segment)
+4. `agent` as ultimate fallback
 
-| Agent File       | Model Name    |
-| ---------------- | ------------- |
-| `chat.ai`        | `chat`        |
-| `researcher.ai`  | `researcher`  |
-| `code_review.ai` | `code_review` |
+| Agent File       | toolName (if set) | Model Name    |
+| ---------------- | ----------------- | ------------- |
+| `chat.ai`        | (not set)         | `chat`        |
+| `researcher.ai`  | (not set)         | `researcher`  |
+| `code_review.ai` | `code_review`     | `code_review` |
+| `my-chat.ai`     | (not set)         | `my-chat`     |
 
-> **Note**: Anthropic model names use underscores for deduplication (`chat`, `chat_2`), unlike OpenAI which uses dashes.
+Deduplication appends underscore and counter: `chat`, `chat_2`, `chat_3`, etc.
 
 ---
 
@@ -413,23 +421,23 @@ The `model` field maps to agents. The model ID is determined by:
 
 ### Model not found
 
-**Symptom**: `{"error": "unknown_model"}`
+**Symptom**: `{"error": "unknown_model"}` (HTTP 404)
 
 **Cause**: The `model` field doesn't match any registered agent.
 
 **Solutions**:
 
 1. List available models: `curl http://localhost:8083/v1/models`
-2. Check agent filename (without `.ai` extension)
+2. Check agent model ID (based on toolName, filename, or agent ID)
 3. Note: uses underscores for deduplication (`chat_2` not `chat-2`)
 
 ### JSON format errors
 
-**Symptom**: `{"error": "missing_schema"}`
+**Symptom**: `{"error": "missing_schema", "message": "JSON format requires schema"}` (HTTP 400)
 
 **Cause**: Using `format: "json"` without providing a schema.
 
-**Solution**: Include schema in payload:
+**Solution**: Include schema in payload or agent configuration:
 
 ```json
 {
@@ -440,6 +448,23 @@ The `model` field maps to agents. The model ID is determined by:
       "properties": { "result": { "type": "string" } }
     }
   }
+}
+```
+
+### Missing user message
+
+**Symptom**: `{"error": "missing_user_prompt", "message": "Final user message is required"}` (HTTP 400)
+
+**Cause**: The last message in the `messages` array is not a user message or has empty content.
+
+**Solution**: Ensure final message is user role with content:
+
+```json
+{
+  "messages": [
+    { "role": "assistant", "content": "Hello!" },
+    { "role": "user", "content": "What can you do?" }
+  ]
 }
 ```
 

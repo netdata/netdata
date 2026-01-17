@@ -105,11 +105,13 @@ Research the given topic thoroughly.
 
 1. Parent loads sub-agent configurations at startup
 2. Each sub-agent becomes a tool (named by filename without `.ai`, prefixed with `agent__`)
-3. Parent calls them like any other tool: `{"name": "agent__researcher", "arguments": {"topic": "..."}}`
+3. Parent calls them like any other tool: `{"name": "agent__researcher", "arguments": {"topic": "...", "reason": "Need market research data"}}`
 4. Sub-agent runs in a completely isolated session
 5. Result returns to parent as tool response
 
 **Key point:** Sub-agents have zero shared state with the parent. Each invocation is independent.
+
+**Note:** All sub-agent tool calls include an automatically injected `reason` parameter (required string up to 15 words) that explains why the tool is being invoked. This helps with debugging and observability.
 
 ---
 
@@ -142,32 +144,32 @@ Consider all perspectives before deciding.
 Advisors run with the same user prompt. Their outputs are injected as XML blocks:
 
 ```xml
-<advisory__XXXXXXXXXX agent="technical">
+<advisory__XXXXXXXXXXXX agent="technical">
 Technical analysis: The proposed solution uses a microservices architecture
 which requires Kubernetes expertise...
-</advisory__XXXXXXXXXX>
+</advisory__XXXXXXXXXXXX>
 
-<advisory__XXXXXXXXXX agent="business">
+<advisory__XXXXXXXXXXXX agent="business">
 Business impact: This would affect revenue by approximately 15% in Q3...
-</advisory__XXXXXXXXXX>
+</advisory__XXXXXXXXXXXX>
 
-<advisory__XXXXXXXXXX agent="legal">
+<advisory__XXXXXXXXXXXX agent="legal">
 Legal considerations: GDPR compliance requires explicit consent...
-</advisory__XXXXXXXXXX>
+</advisory__XXXXXXXXXXXX>
 ```
 
 The main agent sees all advisory blocks before processing.
 
-**Note:** Tag names include a random nonce suffix (`__XXXXXXXXXX`) for uniqueness and security.
+**Note:** Tag names include a random nonce suffix (`__XXXXXXXXXXXX`) for uniqueness and security.
 
 ### Handling Advisor Failures
 
 If an advisor fails (timeout, error), a synthetic advisory is created:
 
 ```xml
-<advisory__XXXXXXXXXX agent="legal">
-Advisor consultation failed for legal: timeout after 60000ms
-</advisory__XXXXXXXXXX>
+<advisory__XXXXXXXXXXXX agent="legal">
+Advisor consultation failed for legal: timeout
+</advisory__XXXXXXXXXXXX>
 ```
 
 The main agent continues regardless - advisory failures don't block execution.
@@ -225,9 +227,9 @@ The router pattern exposes a special `router__handoff-to` tool:
 The optional `message` becomes an advisory for the destination:
 
 ```xml
-<advisory__XXXXXXXXXX agent="router">
+<advisory__XXXXXXXXXXXX agent="router">
 User is experiencing login issues on mobile
-</advisory__XXXXXXXXXX>
+</advisory__XXXXXXXXXXXX>
 ```
 
 The advisory agent is the name of the agent that made the routing decision. This helps the destination agent understand why it was invoked.
@@ -274,9 +276,9 @@ Produce the final polished version.
 The previous agent's output is wrapped in XML:
 
 ```xml
-<response__XXXXXXXXXX agent="draft">
+<response__XXXXXXXXXXXX agent="draft">
 Here is the draft content I created...
-</response__XXXXXXXXXX>
+</response__XXXXXXXXXXXX>
 ```
 
 The receiving agent processes this wrapped content.

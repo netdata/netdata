@@ -180,7 +180,7 @@ This chapter contains four pages:
 | -------------------------------------------------------- | --------------------------------------------------- |
 | **[System-Prompts](System-Prompts)**                     | This page - overview and anatomy                    |
 | **[System-Prompts-Writing](System-Prompts-Writing)**     | Best practices, structure, patterns, dos and don'ts |
-| **[System-Prompts-Includes](System-Prompts-Includes)**   | `@include` syntax, resolution, nesting              |
+| **[System-Prompts-Includes](System-Prompts-Includes)**   | Include directive syntax, resolution, nesting       |
 | **[System-Prompts-Variables](System-Prompts-Variables)** | All variables, when available, examples             |
 
 ---

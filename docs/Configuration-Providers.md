@@ -26,15 +26,15 @@ Configure LLM providers for AI Agent.
 
 ## Supported Providers
 
-| Type                | Provider   | Description                           |
-| ------------------- | ---------- | ------------------------------------- |
-| `openai`            | OpenAI     | GPT-4o, GPT-4o-mini, o1, o3 models    |
-| `anthropic`         | Anthropic  | Claude 4, Claude 3.5, Claude 3 models |
-| `google`            | Google     | Gemini Pro, Gemini Flash models       |
-| `openrouter`        | OpenRouter | Multi-provider gateway                |
-| `ollama`            | Ollama     | Local self-hosted models              |
-| `openai-compatible` | Custom     | Any OpenAI-compatible API             |
-| `test-llm`          | Testing    | Deterministic test provider           |
+| Type                | Provider   | Description                                  |
+| ------------------- | ---------- | -------------------------------------------- |
+| `openai`            | OpenAI     | GPT-4o, GPT-4o-mini, o1, o3 models           |
+| `anthropic`         | Anthropic  | Claude Sonnet 4, Claude 3.5, Claude 3 models |
+| `google`            | Google     | Gemini Pro, Gemini Flash models              |
+| `openrouter`        | OpenRouter | Multi-provider gateway                       |
+| `ollama`            | Ollama     | Local self-hosted models                     |
+| `openai-compatible` | Custom     | Any OpenAI-compatible API                    |
+| `test-llm`          | Testing    | Deterministic test provider                  |
 
 ---
 

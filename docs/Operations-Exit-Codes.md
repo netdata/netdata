@@ -209,7 +209,7 @@ zcat "$SNAPSHOT" | jq '[.. | objects | select(.remoteIdentifier | test("agent:EX
 ### Exit Reason in Logs
 
 ```
-[VRB] EXIT-FINAL-ANSWER: Agent completed with final report (fatal=false)
+EXIT-FINAL-ANSWER: Final report received (final_report), session complete (fatal=false)
 ```
 
 ---

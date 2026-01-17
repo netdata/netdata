@@ -62,15 +62,14 @@ Fundamental architecture and runtime behavior.
 
 LLM provider integrations and protocol handling.
 
-| Document | Location | Description |
-| -------- | -------- | ----------- |
-
-| OpenAI Provider | [specs/providers-openai.md](specs/providers-openai.md) | OpenAI API integration |
-| Anthropic Provider | [specs/providers-anthropic.md](specs/providers-anthropic.md) | Anthropic API integration |
-| Google Provider | [specs/providers-google.md](specs/providers-google.md) | Google AI API integration |
-| OpenRouter Provider | [specs/providers-openrouter.md](specs/providers-openrouter.md) | OpenRouter API integration |
-| Ollama Provider | [specs/providers-ollama.md](specs/providers-ollama.md) | Ollama local API integration |
-| Test Provider | [specs/providers-test.md](specs/providers-test.md) | Mock provider for testing |
+| Document            | Location                                                       | Description                  |
+| ------------------- | -------------------------------------------------------------- | ---------------------------- |
+| OpenAI Provider     | [specs/providers-openai.md](specs/providers-openai.md)         | OpenAI API integration       |
+| Anthropic Provider  | [specs/providers-anthropic.md](specs/providers-anthropic.md)   | Anthropic API integration    |
+| Google Provider     | [specs/providers-google.md](specs/providers-google.md)         | Google AI API integration    |
+| OpenRouter Provider | [specs/providers-openrouter.md](specs/providers-openrouter.md) | OpenRouter API integration   |
+| Ollama Provider     | [specs/providers-ollama.md](specs/providers-ollama.md)         | Ollama local API integration |
+| Test Provider       | [specs/providers-test.md](specs/providers-test.md)             | Mock provider for testing    |
 
 ---
 

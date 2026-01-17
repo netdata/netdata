@@ -26,7 +26,6 @@ Contracts define:
 - **Output schema**: JSON Schema for structured JSON output
 - **Input schema**: JSON Schema for sub-agent input validation
 
-
 **Why use contracts?**
 
 - Predictable, parseable output
@@ -157,11 +156,16 @@ output:
 
 ### output.schema
 
-**Type**: JSON Schema object
+**Type**: JSON Schema object (as inline object, or embedded JSON/YAML string)
 
-**Description**: Inline JSON Schema defining the structure of JSON output.
+**Description**: Defines the structure of JSON output. Can be provided as:
 
-**Example**:
+- Inline object in YAML
+- Embedded JSON string
+- Embedded YAML string
+- External file reference via `schemaRef`
+
+**Example** (inline object):
 
 ```yaml
 ---
@@ -194,6 +198,7 @@ output:
 
 **Notes**:
 
+- Schema is only processed when `format` is `json`
 - For `json` format: Schema is used for validation and shown in tool documentation for sub-agents
 - Schema is ignored for `markdown` and `text` formats
 - Agent is instructed to match the schema (for `json` format only)
@@ -245,10 +250,10 @@ output:
 
 ### input
 
-| Property | Value                          |
-| -------- | ------------------------------ |
-| Type     | `object`                       |
-| Default  | Undefined (schema is optional) |
+| Property | Value     |
+| -------- | --------- |
+| Type     | `object`  |
+| Default  | Undefined |
 
 **Description**: Input specification for sub-agent tools. Defines how parent agents should provide input.
 
@@ -256,7 +261,7 @@ output:
 
 | Sub-key     | Type                 | Required    | Description                  |
 | ----------- | -------------------- | ----------- | ---------------------------- |
-| `format`    | `'text'` or `'json'` | No          | Input format                 |
+| `format`    | `'text'` or `'json'` | Yes         | Input format                 |
 | `schema`    | `object`             | Optional    | Inline JSON Schema           |
 | `schemaRef` | `string`             | Alternative | Path to external schema file |
 
@@ -270,6 +275,11 @@ output:
 | ------ | --------------------- | --------------------- |
 | `text` | Free-form text prompt | `{ "prompt": "..." }` |
 | `json` | Structured JSON input | Schema-defined fields |
+
+**Behavior**:
+
+- `text`: Input is provided as a `prompt` string. No schema validation is applied.
+- `json`: Input must match the defined `schema`. If `schema` is not provided, uses the default input schema with a `prompt` string field.
 
 **Example**:
 
@@ -297,11 +307,16 @@ input:
 
 ### input.schema
 
-**Type**: JSON Schema object
+**Type**: JSON Schema object (as inline object, or embedded JSON/YAML string)
 
-**Description**: Inline JSON Schema defining expected input structure.
+**Description**: Defines expected input structure. Can be provided as:
 
-**Example**:
+- Inline object in YAML
+- Embedded JSON string
+- Embedded YAML string
+- External file reference via `schemaRef`
+
+**Example** (inline object):
 
 ```yaml
 ---
@@ -351,7 +366,8 @@ input:
 - Invalid inputs return as tool errors to parent
 - Schema generates tool input schema for parent
 - Descriptions help parent understand usage
-- Schema is optional; if not provided, parent can call with simple text prompt
+- If `input.format` is `text`, schema is ignored
+- If `input.format` is `json` without schema, uses default input schema with `prompt` and optional `format` fields
 
 ---
 
@@ -513,6 +529,12 @@ required:
 ---
 
 ## Schema Files
+
+Schemas can be provided in three ways:
+
+1. **Inline object**: JSON Schema directly in the YAML frontmatter
+2. **Embedded string**: JSON or YAML as a string value
+3. **External file**: Reference via `schemaRef` path
 
 ### JSON Schema File
 
@@ -817,7 +839,7 @@ Write a blog post on the given topic.
 
 **Problem**: Parent's input rejected by sub-agent.
 
-**Cause**: Input doesn't match sub-agent's `input.schema`.
+**Cause**: Input doesn't match sub-agent's `input.format` and `input.schema`.
 
 **Solution**: Check schema requirements:
 

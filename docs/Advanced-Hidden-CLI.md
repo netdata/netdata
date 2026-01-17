@@ -142,7 +142,7 @@ handoff: reporter.ai
 ### Behavior
 
 1. Main session runs to completion
-2. If successful, handoff agent receives:
+2. Handoff agent receives:
    - `<original_user_request__HEX>` block with the original query
    - `<response__HEX agent="agent-name">` block with main agent's output
 3. Handoff agent produces the final output

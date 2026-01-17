@@ -25,7 +25,6 @@ Sub-agents are other `.ai` agent files that your agent can call as tools. This e
 - **Reusability**: Same sub-agent used by multiple parents
 - **Composition**: Build complex systems from simple parts
 
-
 **Key concept**: When you list an agent in `agents:`, it becomes a tool the parent can call. The tool name is `agent__<toolName>`.
 
 ---
@@ -200,9 +199,9 @@ When parent calls a sub-agent:
 }
 ```
 
-**Note**: When using the default text format (no explicit `input` schema), you must include `"format": "sub-agent"` and `"reason"` is required.
+**Note**: When using the default text format (no explicit `input` schema), you must include `"format": "sub-agent"`. The `"reason"` field is always required regardless of input format.
 
-If sub-agent has explicit `input` schema with `format: json`, the `reason` field is automatically added to the schema and must be included in all calls. The input must match the schema:
+If sub-agent has explicit `input` schema with `format: json`, the `reason` field is automatically added to the schema. The input must match the schema and include the required `reason` field:
 
 ```json
 {

@@ -116,12 +116,12 @@ Requires `"module": "NodeNext"` in your tsconfig.json.
 Creates a new session instance with validated configuration.
 
 ```typescript
-static create(config: AIAgentSessionConfig): AIAgentSession
+static create(sessionConfig: AIAgentSessionConfig): AIAgentSession
 ```
 
-| Parameter | Type                   | Description                |
-| --------- | ---------------------- | -------------------------- |
-| `config`  | `AIAgentSessionConfig` | Full session configuration |
+| Parameter       | Type                   | Description                |
+| --------------- | ---------------------- | -------------------------- |
+| `sessionConfig` | `AIAgentSessionConfig` | Full session configuration |
 
 **Returns**: `AIAgentSession` instance.
 
@@ -192,13 +192,13 @@ export type {
 ### Required Fields
 
 | Option         | Type                                    | Description                    |
-| -------------- | --------------------------------------- | ------------------------------ |
+| -------------- | --------------------------------------- | ------------------------------ | ----------------- | ----- | ------ | ------ | ------------ | ------------------------ |
 | `config`       | `Configuration`                         | Full application configuration |
 | `targets`      | `{ provider: string; model: string }[]` | LLM provider/model pairs       |
 | `tools`        | `string[]`                              | MCP server names to enable     |
 | `systemPrompt` | `string`                                | System prompt text             |
 | `userPrompt`   | `string`                                | User prompt text               |
-| `outputFormat` | `OutputFormatId`                        | Output format identifier       |
+| `outputFormat` | `'markdown'                             | 'markdown+mermaid'             | 'slack-block-kit' | 'tty' | 'pipe' | 'json' | 'sub-agent'` | Output format identifier |
 
 ### Optional Identity
 
@@ -246,16 +246,17 @@ export type {
 
 ### Optional Behavior
 
-| Option                        | Type      | Default | Description                    |
-| ----------------------------- | --------- | ------- | ------------------------------ |
-| `stream`                      | `boolean` | -       | Enable streaming output        |
-| `verbose`                     | `boolean` | -       | Verbose logging                |
-| `traceLLM`                    | `boolean` | -       | Trace LLM calls                |
-| `traceMCP`                    | `boolean` | -       | Trace MCP calls                |
-| `traceSdk`                    | `boolean` | -       | Trace SDK calls                |
-| `headendWantsProgressUpdates` | `boolean` | -       | Enable progress update tool    |
-| `isMaster`                    | `boolean` | -       | Whether this is a master agent |
-| `pendingHandoffCount`         | `number`  | -       | Count of pending handoffs      |
+| Option                        | Type      | Default | Description                     |
+| ----------------------------- | --------- | ------- | ------------------------------- |
+| `stream`                      | `boolean` | -       | Enable streaming output         |
+| `verbose`                     | `boolean` | -       | Verbose logging                 |
+| `traceLLM`                    | `boolean` | -       | Trace LLM calls                 |
+| `traceMCP`                    | `boolean` | -       | Trace MCP calls                 |
+| `traceSdk`                    | `boolean` | -       | Trace SDK calls                 |
+| `headendWantsProgressUpdates` | `boolean` | -       | Enable progress update tool     |
+| `isMaster`                    | `boolean` | -       | Whether this is a master agent  |
+| `pendingHandoffCount`         | `number`  | -       | Count of pending handoffs       |
+| `toolResponseMaxBytes`        | `number`  | -       | Max tool response size in bytes |
 
 ### Optional Callbacks
 
@@ -314,6 +315,13 @@ export type {
 | `turnPathPrefix` | `string`   | -       | Turn path prefix                         |
 | `ancestors`      | `string[]` | -       | Ancestors chain for recursion prevention |
 | `contextWindow`  | `number`   | -       | Override context window for all targets  |
+
+### Optional Orchestration
+
+| Option                 | Type                         | Default | Description                  |
+| ---------------------- | ---------------------------- | ------- | ---------------------------- |
+| `orchestration`        | `OrchestrationConfig`        | -       | Orchestration configuration  |
+| `orchestrationRuntime` | `OrchestrationRuntimeConfig` | -       | Runtime orchestration config |
 
 ### Optional MCP
 
@@ -535,8 +543,7 @@ interface AIAgentResult {
       | "slack-block-kit"
       | "tty"
       | "pipe"
-      | "sub-agent"
-      | "text";
+      | "sub-agent";
     content?: string;
     content_json?: Record<string, unknown>;
     metadata?: Record<string, unknown>;

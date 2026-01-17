@@ -70,23 +70,28 @@ flowchart TD
     Check -->|Yes| Select[Select Provider<br/>targets[pairCursor % length]]
     Check -->|No| Exit[Exit Retry Loop]
 
-    Select --> Increment[pairCursor++<br/>attempts++]
-    Increment --> Execute[Execute LLM Turn]
-
+    Select --> Execute[Execute LLM Turn]
     Execute --> Result{Result Status?}
 
     Result -->|Success + Tools| Done[turnSuccessful = true]
     Result -->|Success + Final| Done
     Result -->|Success, No Tools| Synthetic[Synthetic Retry]
-    Result -->|Rate Limit| Backoff[Wait + Continue]
-    Result -->|Auth Error| Abort[Abort Session]
-    Result -->|Model Error| Skip[Skip to Next Provider]
+    Result -->|Rate Limit| Rate[Rate Limit Processing]
+    Result -->|Auth Error| Skip[Skip to Next Provider]
+    Result -->|Quota Exceeded| Skip
+    Result -->|Model Error| Model[Model Error Check]
+
+    Model -->|Retryable| Execute[Continue to next attempt]
+    Model -->|Not Retryable| Skip[Skip to Next Provider]
+
+    Rate --> LimitedAll{All Providers<br/>Rate Limited?}
+    LimitedAll -->|Yes| Backoff[Wait + Continue<br/>pairCursor++<br/>attempts++]
+    LimitedAll -->|No| ContinueNoSleep[Continue Immediately<br/>attempts++]
 
     Synthetic --> Check
     Backoff --> Check
-    Skip --> Check
+    Skip --> CheckPairCursor[Skip to Next Provider<br/>pairCursor++<br/>Continue Loop]
     Done --> Exit
-    Abort --> Exit
 ```
 
 ---
@@ -118,6 +123,8 @@ These errors skip the current provider but continue with others.
 | `quota_exceeded` | Account quota hit                 | Skip to next provider |
 | `model_error`    | Model unavailable (non-retryable) | Skip to next provider |
 
+Note: `auth_error` and `quota_exceeded` trigger skip-provider action to try next available provider. The `abort` action exists in the type definition but is not used in current implementation.
+
 Note: `model_error` with `retryable: true` continues with same provider (immediate retry).
 
 ### Round-Robin Selection
@@ -147,14 +154,14 @@ graph LR
 
 ```
 target = targets[pairCursor % targets.length]
-pairCursor++
+// pairCursor incremented when skip-provider action triggered
 ```
 
 **Behavior**:
 
 - Cycles through all configured targets
 - Wraps around when array exhausted
-- Each attempt increments cursor
+- Each attempt increments cursor for skip-provider, not for normal retries
 - Continues until `maxRetries` exhausted
 
 ### Rate Limit Tracking
@@ -183,10 +190,12 @@ flowchart TD
     HasHeader -->|Yes| UseProvided[Use Provider Value<br/>Clamped 1s-60s]
     HasHeader -->|No| Calculate[Calculate Fallback]
 
-    Calculate --> Formula[wait = min(attempts * 1000, 60000)<br/>Minimum 1000ms]
+    Calculate --> FormulaRateLimit[wait = min(max(attempts * 1000, 1000), 60000)<br/>Minimum 1000ms]
+    Calculate --> FormulaNetwork[wait = min(max(attempts * 1000, 1000), 30000)<br/>Minimum 1000ms]
 
     UseProvided --> Track[Track Max Wait]
-    Formula --> Track
+    FormulaRateLimit --> Track
+    FormulaNetwork --> Track
 
     Track --> AllLimited{All Providers<br/>Rate Limited?}
     AllLimited -->|Yes| Sleep[Sleep Max Wait]
@@ -198,21 +207,30 @@ flowchart TD
 
 ### Backoff Values
 
-| Constant                 | Value  | Purpose           |
-| ------------------------ | ------ | ----------------- |
-| `RATE_LIMIT_MIN_WAIT_MS` | 1,000  | Minimum wait time |
-| `RATE_LIMIT_MAX_WAIT_MS` | 60,000 | Maximum wait time |
+| Error Type                | Constant                         | Max Wait | Purpose           |
+| ------------------------- | -------------------------------- | -------- | ----------------- |
+| `rate_limit`              | `RATE_LIMIT_MAX_WAIT_MS`: 60,000 | 60,000   | Maximum wait time |
+| `network_error`/`timeout` | Hardcoded: 30,000                | 30,000   | Maximum wait time |
 
-**Fallback Formula**:
+**Fallback Formulas**:
+
+For `rate_limit` errors:
 
 ```
 fallbackWait = min(max(attempts * 1000, 1000), 60000)
+```
+
+For `network_error` and `timeout` errors:
+
+```
+fallbackWait = min(max(attempts * 1000, 1000), 30000)
 ```
 
 ### Sleep Behavior
 
 - Uses `sleepWithAbort()` for cancellation support
 - Sleeps only after full rotation when ALL providers rate-limited
+- Condition: `attempts < maxRetries || hasStopRef` (don't sleep if retries exhausted)
 - Logs `agent:retry` event with selected wait time
 
 ---
@@ -262,6 +280,8 @@ flowchart TD
 
 **Trigger**: Context guard detects token budget exceeded.
 
+**Location**: `src/session-turn-runner.ts` (via `ContextGuard.enforceFinalTurn()`)
+
 ```mermaid
 stateDiagram-v2
     [*] --> Normal: Turn executing
@@ -288,9 +308,11 @@ stateDiagram-v2
 
 **Trigger**: `currentTurn === maxTurns`
 
+**Location**: `src/session-turn-runner.ts` (retry loop exit condition)
+
 **Actions**:
 
-1. Set `forcedFinalTurnReason = 'maxTurns'`
+1. Set `isFinalTurn = true` (forced turn detected)
 2. Inject instruction message
 3. Restrict tools to `agent__final_report`
 4. Log warning

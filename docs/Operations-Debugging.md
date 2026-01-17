@@ -91,14 +91,14 @@ ai-agent --agent myagent.ai "query"
 echo "Exit code: $?"
 ```
 
-| Code | Meaning                 | Action                                |
-| ---- | ----------------------- | ------------------------------------- |
-| 0    | Success                 | Agent completed normally              |
-| 1    | Configuration Error     | Check config file and frontmatter     |
-| 2    | LLM Error               | Check provider credentials and status |
-| 3    | Tool Error              | Check MCP server configuration        |
-| 4    | CLI Error               | Check command line arguments          |
-| 5    | Max Tool Turns Exceeded | Reduce tool complexity or limit       |
+| Code | Meaning                         | Action                                       |
+| ---- | ------------------------------- | -------------------------------------------- |
+| 0    | Success                         | Agent completed normally                     |
+| 1    | Configuration Error             | Check config file and frontmatter            |
+| 2    | LLM Error                       | Check provider credentials and status        |
+| 3    | Tool Error                      | Check MCP server configuration               |
+| 4    | CLI Error                       | Check command line arguments                 |
+| 5    | Schema Validation or Tool Limit | Schema validation or max tool turns exceeded |
 
 See [Exit Codes](Operations-Exit-Codes) for detailed reference.
 
@@ -133,6 +133,8 @@ grep -o '\[WRN\]\|\[ERR\]' debug.log | sort | uniq -c
 | `WRN` | Warning      | Review but may not be fatal        |
 | `ERR` | Error        | Investigate immediately            |
 | `TRC` | Trace        | Protocol details (with --trace-\*) |
+| `THK` | Thinking     | Model reasoning content            |
+| `FIN` | Finish       | End-of-run summary                 |
 
 ---
 
@@ -250,7 +252,7 @@ timeout 60 ai-agent --agent myagent.ai --verbose "query"
 
 ```bash
 # Check for final report in snapshot
-zcat "$SNAPSHOT" | jq '.opTree.turns[-1].ops[] | select(.kind == "final" or .attributes.name | test("final_report"))'
+zcat "$SNAPSHOT" | jq '.opTree.turns[-1].ops[] | select(.kind == "tool" and (.attributes.name // "" | test("final_report")))'
 ```
 
 **Common causes**:

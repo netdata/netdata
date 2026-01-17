@@ -83,14 +83,14 @@ The master agent is unaware of a tool's origin. Whether it's an MCP server, sub-
 
 These rules MUST hold to preserve the design:
 
-| Invariant                       | Description                                                                                                   |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **Opaque Origin**               | No branching on tool origin type in core loop                                                                 |
-| **No Global Mutable State**     | No `process.chdir`, no direct `process.env` reads during session execution (startup/config reads are allowed) |
-| **Per-Session Isolation**       | Tools receive only explicit inputs                                                                            |
-| **Uniform Budgets**             | Depth caps and resource limits apply uniformly                                                                |
-| **Unified Observability**       | Consistent logging independent of origin                                                                      |
-| **Semantics over Optimization** | Pooling must not change isolation                                                                             |
+| Invariant                       | Description                                                                                                                                                                                        |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Opaque Origin**               | No branching on tool origin type in core loop                                                                                                                                                      |
+| **No Global Mutable State**     | No `process.chdir` during execution. `process.env` reads for debug flags (`DEBUG`, `CONTEXT_DEBUG`) during session execution are allowed for observability; startup/config reads are also allowed. |
+| **Per-Session Isolation**       | Tools receive only explicit inputs                                                                                                                                                                 |
+| **Uniform Budgets**             | Depth caps and resource limits apply uniformly                                                                                                                                                     |
+| **Unified Observability**       | Consistent logging independent of origin                                                                                                                                                           |
+| **Semantics over Optimization** | Pooling must not change isolation                                                                                                                                                                  |
 
 ### Consequences
 

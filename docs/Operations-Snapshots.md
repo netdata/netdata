@@ -27,7 +27,7 @@ Capture and analyze complete session state for debugging and post-mortem analysi
 Session snapshots capture **complete session state** including:
 
 - **opTree hierarchy**: Turns and operations
-- **LLM request/response payloads**: Full HTTP bodies (base64 encoded, stored as `{format, encoding: 'base64', value}`)
+- **LLM request/response payloads**: Stored under `.request.payload.raw` and `.response.payload.raw` as base64-encoded `{format, encoding: 'base64', value}`. Additionally, SDK-serialized payloads are available under `.payload.sdk`.
 - **Tool request/response payloads**: Arguments and results
 - **All logs**: VRB, WRN, ERR, TRC, THK, FIN entries
 - **Accounting entries**: Token counts and costs
@@ -158,7 +158,7 @@ snapshot.json.gz
             ├── accounting[]     # AccountingEntry array
             ├── request?         # {kind, payload, size}
             ├── response?        # {payload, size, truncated}
-            ├── reasoning?       # {chunks, final} for thinking models
+            ├── reasoning?       # {chunks: [{text, ts}], final?: string} for thinking models
             └── childSession?   # Nested SessionNode for sub-agents
 ```
 

@@ -159,7 +159,9 @@ Each agent becomes an MCP tool. The tool definition is derived from the agent co
 
 ### Default Input Schema
 
-When an agent has no custom input schema:
+The tool schema depends on the agent's input configuration:
+
+**For agents with simple text input:**
 
 ```json
 {
@@ -192,6 +194,38 @@ When an agent has no custom input schema:
     }
   },
   "required": ["format", "prompt"]
+}
+```
+
+**For agents with custom input schema:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "format": {
+      "type": "string",
+      "enum": [
+        "markdown",
+        "markdown+mermaid",
+        "slack-block-kit",
+        "tty",
+        "pipe",
+        "json",
+        "sub-agent"
+      ],
+      "description": "Output format to request from agent. Choose one of:\nmarkdown: GitHub Markdown.\nmarkdown+mermaid: GitHub Markdown with Mermaid diagrams.\nslack-block-kit: Slack Block Kit payload.\ntty: TTY-compatible monospaced text with ANSI colours.\npipe: Plain text (no formatting).\njson: JSON object.\nsub-agent: Internal agent-to-agent exchange format."
+    },
+    "payload": {
+      "type": "object",
+      "description": "JSON payload matching the agent's input schema"
+    },
+    "schema": {
+      "type": "object",
+      "description": "Optional JSON schema describing the expected JSON response format"
+    }
+  },
+  "required": ["format", "payload"]
 }
 ```
 

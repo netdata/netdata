@@ -188,11 +188,11 @@ Configuration in `.ai-agent.json` under the `slack` key:
 
 ### Authentication Options
 
-| Option          | Type     | Required | Description                                   |
-| --------------- | -------- | -------- | --------------------------------------------- |
-| `botToken`      | `string` | Yes      | Bot User OAuth Token (`xoxb-...`)             |
-| `appToken`      | `string` | Yes      | App-level token for Socket Mode (`xapp-...`)  |
-| `signingSecret` | `string` | Yes      | Signing secret for slash command verification |
+| Option          | Type     | Required | Description                                                                                |
+| --------------- | -------- | -------- | ------------------------------------------------------------------------------------------ |
+| `botToken`      | `string` | Yes      | Bot User OAuth Token (`xoxb-...`)                                                          |
+| `appToken`      | `string` | Yes      | App-level token for Socket Mode (`xapp-...`)                                               |
+| `signingSecret` | `string` | No       | Signing secret for slash command verification (optional, required only for slash commands) |
 
 **Example**:
 
@@ -208,14 +208,14 @@ Configuration in `.ai-agent.json` under the `slack` key:
 
 ### Engagement Options
 
-| Option             | Type                 | Default  | Description                        |
-| ------------------ | -------------------- | -------- | ---------------------------------- |
-| `mentions`         | `boolean`            | `true`   | Respond to @mentions               |
-| `dms`              | `boolean`            | `true`   | Respond to direct messages         |
-| `updateIntervalMs` | `number` or `string` | `2000`   | Progress update interval           |
-| `historyLimit`     | `number`             | `100`    | Max messages to include as context |
-| `historyCharsCap`  | `number`             | `100000` | Max characters from history        |
-| `openerTone`       | `string`             | `random` | Initial message tone               |
+| Option             | Type                 | Default  | Description                                                                |
+| ------------------ | -------------------- | -------- | -------------------------------------------------------------------------- |
+| `mentions`         | `boolean`            | `true`   | Respond to @mentions                                                       |
+| `dms`              | `boolean`            | `true`   | Respond to direct messages                                                 |
+| `updateIntervalMs` | `number` or `string` | `2000`   | Progress update interval (accepts ms or duration like "3s", "500ms", "1m") |
+| `historyLimit`     | `number`             | `100`    | Max messages to include as context                                         |
+| `historyCharsCap`  | `number`             | `100000` | Max characters from history                                                |
+| `openerTone`       | `string`             | `random` | Initial message tone                                                       |
 
 **Example**:
 
@@ -474,7 +474,7 @@ Or the Slack headend creates a fallback HTTP server if no REST headend is presen
 
 ### Slash Command Endpoint
 
-The endpoint is registered at `/slack/commands` (configurable):
+The endpoint is registered at `/slack/commands`:
 
 ```json
 {
@@ -762,10 +762,17 @@ Slack has rate limits. Messages that hit rate limits will fail with API errors.
           "agent": "./agents/technical.ai",
           "engage": ["mentions"]
         },
-  "api": {
-    "port": 8080
+        {
+          "channels": ["#marketing"],
+          "agent": "./agents/marketing.ai",
+          "engage": ["mentions"]
+        }
+      ]
+    }
   }
 }
+```
+
 ```
 
 ---
@@ -776,3 +783,4 @@ Slack has rate limits. Messages that hit rate limits will fail with API errors.
 - [Configuration](Configuration) - General configuration
 - [Agent Files](Agent-Files) - Agent configuration
 - [specs/headend-slack.md](specs/headend-slack.md) - Technical specification
+```

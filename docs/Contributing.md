@@ -72,13 +72,13 @@ npm run lint
 
 ### Step 5: Run Tests
 
-**Quick test (Phase 1 only)**:
+**Quick test (Vitest spec tests)**:
 
 ```bash
 npm test
 ```
 
-**Expected output**: Phase 1 unit tests pass.
+**Expected output**: All spec tests in `src/tests/**/*.spec.ts` pass (Phase 1 unit tests).
 
 **Full test suite (all phases)**:
 

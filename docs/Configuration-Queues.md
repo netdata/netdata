@@ -56,6 +56,29 @@ Configure queues in `.ai-agent.json`:
 | ------------ | -------- | -------- | ------------------------------- |
 | `concurrent` | `number` | Required | Maximum simultaneous executions |
 
+### Environment Variables
+
+Queue configurations support environment variable expansion:
+
+```json
+{
+  "queues": {
+    "external": { "concurrent": "${MAX_CONCURRENT}" },
+    "database": { "concurrent": "${DB_POOL_SIZE}" }
+  }
+}
+```
+
+Variables are resolved from `.ai-agent.env` or process environment.
+
+### Multiple Config Layers
+
+When multiple config layers define the same queue:
+
+- The **highest** `concurrent` value is used (not last-wins)
+- Queue capacity can only **increase** when merging layers, never decrease
+- This applies to all layers: `--config`, `cwd`, `prompt`, `binary`, `home`, `system`
+
 ---
 
 ## Default Queue
@@ -414,7 +437,7 @@ A `queued` log entry is emitted only when a tool waits for a slot. The log inclu
 ### Monitor Metrics
 
 ```bash
-curl localhost:9090/metrics | grep ai_agent_queue
+curl localhost:9464/metrics | grep ai_agent_queue
 ```
 
 ### Common Issues

@@ -69,16 +69,16 @@ Configure where cached data is stored.
 
 ### Backend Configuration Reference
 
-| Property          | Type     | Default                  | Description                                                    |
-| ----------------- | -------- | ------------------------ | -------------------------------------------------------------- |
-| `backend`         | `string` | `"sqlite"`               | Cache backend: `sqlite` or `redis`                             |
-| `sqlite.path`     | `string` | `"~/.ai-agent/cache.db"` | SQLite database path                                           |
-| `redis.url`       | `string` | -                        | Redis connection URL                                           |
-| `redis.username`  | `string` | -                        | Redis username                                                 |
-| `redis.password`  | `string` | -                        | Redis password                                                 |
-| `redis.database`  | `number` | -                        | Redis database number                                          |
-| `redis.keyPrefix` | `string` | `"ai-agent:cache:"`      | Redis key prefix                                               |
-| `maxEntries`      | `number` | `5000`                   | Maximum cache entries (SQLite: LRU eviction, Redis: TTL-based) |
+| Property          | Type     | Default                  | Description                                                       |
+| ----------------- | -------- | ------------------------ | ----------------------------------------------------------------- |
+| `backend`         | `string` | `"sqlite"`               | Cache backend: `sqlite` or `redis`                                |
+| `sqlite.path`     | `string` | `"~/.ai-agent/cache.db"` | SQLite database path                                              |
+| `redis.url`       | `string` | -                        | Redis connection URL                                              |
+| `redis.username`  | `string` | -                        | Redis username                                                    |
+| `redis.password`  | `string` | -                        | Redis password                                                    |
+| `redis.database`  | `number` | -                        | Redis database number                                             |
+| `redis.keyPrefix` | `string` | `"ai-agent:cache:"`      | Redis key prefix                                                  |
+| `maxEntries`      | `number` | `5000`                   | Maximum cache entries (SQLite: LRU eviction, TTL-based for Redis) |
 
 ---
 
@@ -101,9 +101,9 @@ Answer questions about our documentation.
 
 Agent cache keys are computed from:
 
-- **Agent hash**: Expanded system prompt + configuration
+- **Agent hash**: Expanded system prompt + agent configuration (targets, tools, sub-agents, expected output format, input/output schemas, effective options)
 - **User prompt**: The input query
-- **Output format**: Expected format and schema (if any)
+- **Output format**: Expected output format and schema (if any)
 
 Same inputs produce the same cache key.
 
@@ -190,8 +190,10 @@ Override cache TTL for specific tools:
 
 Tool cache keys are computed from:
 
-- **Tool identity**: Namespace + tool name
+- **Tool identity**: Tool kind, namespace, and name
 - **Request payload**: All parameters serialized
+
+Note: `agentHash` is stored in cache entry metadata for debugging but is not part of the cache key computation.
 
 ---
 
@@ -212,7 +214,7 @@ caching: full
 Or via CLI:
 
 ```bash
-ai-agent --caching full --agent my.ai "query"
+ai-agent --caching full my.ai "query"
 ```
 
 ### Cache Modes
@@ -226,7 +228,7 @@ ai-agent --caching full --agent my.ai "query"
 
 When `caching: "full"`:
 
-1. Applies `cacheControl: { type: 'ephemeral' }` to the last valid user message per turn
+1. Applies `cacheControl: { type: 'ephemeral' }` to the last message that isn't an ephemeral system notice (messages starting with `# System Notice`)
 2. Anthropic caches the prompt prefix server-side
 3. Subsequent requests with the same prefix use cached tokens
 
@@ -291,19 +293,21 @@ cache: 60000    # 60 seconds (milliseconds)
 ### Agent Cache Key
 
 ```
-hash(agent_hash + user_prompt + output_format)
+hash({ v: 1, kind: 'agent', agentHash, request: { userPrompt, format, schema } })
 ```
 
-Where `agent_hash` is computed from:
+Where `agentHash` is computed from:
 
 - Expanded system prompt (after variable substitution)
-- All frontmatter configuration
-- Model selection
+- Agent configuration (targets, tools, sub-agents)
+- Expected output format and schema
+- Input/output schemas
+- Effective options (temperature, cache, caching, etc.)
 
 ### Tool Cache Key
 
 ```
-hash(tool_namespace + tool_name + serialized_parameters)
+hash({ v: 1, kind: 'tool', tool: { kind, namespace, name }, parameters: <serialized> })
 ```
 
 All parameters are included, so different parameter values produce different keys.
@@ -339,10 +343,10 @@ When a cache miss occurs:
 
 Caches are invalidated when:
 
-- **TTL expires**: Expired entries skipped on access and removed during writes
-- **Agent modified**: New agent hash = new cache key
+- **TTL expires**: Expired entries are skipped on lookup and removed during writes (SQLite) or by Redis TTL
+- **Agent modified**: New agent hash produces a different cache key
 - **Max entries exceeded** (SQLite only): LRU eviction removes oldest entries
-- **Manual clear**: Database deleted or entry removed
+- **Manual clear**: Database deleted or Redis key removed
 
 ### Stale Data
 
@@ -377,6 +381,8 @@ Cached responses may become stale:
 }
 ```
 
+Note: All fields are optional. If omitted, sensible defaults are used (`sqlite` backend, `~/.ai-agent/cache.db` path, `ai-agent:cache:` Redis prefix).
+
 ### Provider Cache Options
 
 Cache mode is controlled via frontmatter or CLI, not provider configuration:
@@ -390,7 +396,7 @@ caching: full | none
 Or via CLI:
 
 ```bash
-ai-agent --caching full --agent my.ai "query"
+ai-agent --caching full my.ai "query"
 ```
 
 ### MCP Server Cache Options
@@ -439,7 +445,7 @@ cache: string | number # string values (e.g., "5m", "1h") are parsed to millisec
 | Global      | `cache.redis.password`  | `string` | -                        | Redis password                                         |
 | Global      | `cache.redis.database`  | `number` | -                        | Redis database number                                  |
 | Global      | `cache.redis.keyPrefix` | `string` | `"ai-agent:cache:"`      | Redis key prefix                                       |
-| Global      | `cache.maxEntries`      | `number` | `5000`                   | Max entries (SQLite LRU eviction, Redis uses TTL only) |
+| Global      | `cache.maxEntries`      | `number` | `5000`                   | Max entries (SQLite LRU eviction, TTL-based for Redis) |
 | Frontmatter | `caching`               | `string` | `"full"`                 | Anthropic cache mode                                   |
 | MCP Server  | `cache`                 | `number` | `"off"`                  | Server-wide TTL                                        |
 | MCP Server  | `toolsCache.<tool>`     | `number` | Server default           | Per-tool TTL                                           |
@@ -480,7 +486,7 @@ rm ~/.ai-agent/cache.db
 ### Verbose Cache Logging
 
 ```bash
-ai-agent --agent test.ai --verbose "query"
+ai-agent test.ai --verbose "query"
 ```
 
 Shows cache hit/miss decisions.
@@ -491,10 +497,10 @@ Modify the query slightly to generate a new cache key:
 
 ```bash
 # Original
-ai-agent --agent test.ai "What is the weather?"
+ai-agent test.ai "What is the weather?"
 
 # Force miss
-ai-agent --agent test.ai "What is the weather? (fresh)"
+ai-agent test.ai "What is the weather? (fresh)"
 ```
 
 ---

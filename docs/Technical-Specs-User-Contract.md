@@ -109,10 +109,12 @@ expectedTokens = ctxTokens + newTokens + schemaCtxTokens
 
 ```
 
-projected = currentCtxTokens + pendingCtxTokens + newCtxTokens + schemaCtxTokens
+projected = currentCtxTokens + pendingCtxTokens + newCtxTokens
 limit = contextWindow - contextWindowBufferTokens - maxOutputTokens
 
 ```
+
+**Note:** Schema tokens are included in `ctxTokens` values reported by providers (input + output + cache_read + cache_write), so `currentCtxTokens + pendingCtxTokens + newCtxTokens` accurately reflects total context including schema overhead. Schema tokens are tracked separately (`schemaCtxTokens`) for budget planning and added to context via cache_write (first turn) and cache_read (subsequent turns).
 
 ### Enforcement Guarantees
 
@@ -227,11 +229,12 @@ Attempt N: targets[(N-1) % targets.length]
 
 ## Final Report Contract
 
-### Every Session Produces EITHER
+### Every Session Produces ONE OF
 
-1. **Tool-provided**: LLM calls `final_report` successfully
-2. **Text extraction**: Final turn text without `final_report` call
-3. **Synthetic failure**: Max turns exhausted without valid report
+1. **Tool-provided**: LLM calls `final_report` successfully (source: `tool-call`)
+2. **Text extraction**: Final turn text without `final_report` call (source: `text-fallback`)
+3. **Tool-message adoption**: Tool message containing valid final report payload (source: `tool-message`)
+4. **Synthetic failure**: Max turns exhausted without valid report (source: `synthetic`)
 
 ### Final Report Structure
 
@@ -244,6 +247,12 @@ Attempt N: targets[(N-1) % targets.length]
 | `content`      | string                                                                                                                      | Text formats                    |
 | `metadata`     | object                                                                                                                      | Optional                        |
 | `ts`           | number                                                                                                                      | Unix timestamp (always present) |
+
+**Final report sources** (tracked via `FinalReportSource`):
+- `tool-call`: LLM successfully called `final_report` tool
+- `text-fallback`: Extracted from assistant text on final turn without tool call
+- `tool-message`: Tool message containing valid final report payload
+- `synthetic`: Generated on max turns exhaustion or retry failure
 
 **Session-level status**: The `success` field in `AIAgentResult` indicates overall session success/failure. This is distinct from the final report payload itself.
 
@@ -263,7 +272,7 @@ Every LLM request produces an accounting entry with:
 | `latency`                      | Request duration            |
 | `tokens`                       | Token counts (if available) |
 | `timestamp`                    | When request was made       |
-| `agentId`, `callPath`, `txnId` | Tracing context             |
+| `agentId`, `callPath`, `txnId`, `parentTxnId`, `originTxnId` | Tracing context             |
 
 ### Tool Entry Guarantees
 
@@ -277,6 +286,7 @@ Every tool execution produces an accounting entry with:
 | `latency`                       | Execution duration   |
 | `timestamp`                     | When executed        |
 | `charactersIn`, `charactersOut` | I/O sizes            |
+| `agentId`, `callPath`, `txnId`, `parentTxnId`, `originTxnId` | Tracing context             |
 
 ### Observable Guarantees
 
@@ -295,7 +305,9 @@ Every tool execution produces an accounting entry with:
 1. System messages (initial)
 2. User message (task prompt)
 3. Alternating: assistant → tool → assistant → tool
-4. Final: assistant with `final_report` or text
+4. Final: assistant with `final_report` (or text extraction fallback)
+
+Note: Conversation order may include internal system notices (e.g., `xml-next`, `xml-past`, `agent:final-turn`) and retry messages. These are implementation details used for orchestration and are not guaranteed to maintain a fixed order across implementations.
 
 ### Tool Message Formats
 

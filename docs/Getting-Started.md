@@ -69,7 +69,7 @@ ai-agent --version
 **Expected output:**
 
 ```
-0.0.0.702
+0.0.0.713
 ```
 
 ```bash
@@ -155,10 +155,10 @@ and have a pleasant conversation. How can I assist you today?
 
 **Common tasks:**
 
-- [How do I set up OpenAI?](Getting-Started-Quick-Start#step-2-create-a-configuration-file) - Quick Start step 2
-- [How do I set up Anthropic?](Getting-Started-Quick-Start#step-2-create-a-configuration-file) - Quick Start step 2
-- [What's a `.ai` file?](Getting-Started-Quick-Start#step-3-create-your-first-agent) - Quick Start step 3
-- [How do I add tools?](Getting-Started-First-Agent#step-2-create-the-agent) - First Agent tutorial
+- [How do I set up OpenAI?](Getting-Started-Quick-Start#step-13-create-configuration-file) - Quick Start step 1.3
+- [How do I set up Anthropic?](Getting-Started-Quick-Start#step-13-create-configuration-file) - Quick Start step 1.3
+- [What's a `.ai` file?](Getting-Started-Quick-Start#step-22-create-your-first-agent) - Quick Start step 2.2
+- [How do I add tools?](Getting-Started-First-Agent#step-2-create-the-agent) - First Agent step 2
 
 **Troubleshooting:**
 

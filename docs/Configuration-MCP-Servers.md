@@ -31,7 +31,7 @@ MCP servers provide tools that agents can call. AI Agent manages:
 
 - **Connection lifecycle**: Startup, health checks, restarts
 - **Tool discovery**: Automatic tool enumeration and schema extraction
-- **Namespacing**: Tools are prefixed with server name (`mcp__server__tool`)
+- **Namespacing**: Tools are prefixed with server name (`server__tool`)
 - **Concurrency**: Queue-based rate limiting
 - **Caching**: Optional response caching
 
@@ -112,7 +112,7 @@ Only explicitly configured environment variables are passed to the process:
 }
 ```
 
-> **Note:** `env` values are NOT expanded at config load time. They pass through to child processes for runtime resolution.
+> **Note:** `env` values are expanded at config load time from the layer's environment file or process environment.
 
 ### Common Stdio Servers
 
@@ -501,7 +501,7 @@ New server instance per session:
 **Benefits:**
 
 - Isolated state per session
-- Single retry on failure
+- Restart on timeout (stdio only)
 - No cross-session interference
 
 ---
@@ -588,9 +588,9 @@ You have access to filesystem and GitHub tools.
 
 Tools are exposed with namespaced names:
 
-| Format                  | Example                    |
-| ----------------------- | -------------------------- |
-| `mcp__<server>__<tool>` | `mcp__github__search_code` |
+| Format             | Example               |
+| ------------------ | --------------------- |
+| `<server>__<tool>` | `github__search_code` |
 
 ### Accessing Specific Tools
 

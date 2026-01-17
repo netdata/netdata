@@ -73,7 +73,8 @@ Example tools include web search providers (brave, serper, jina), file readers (
 
 **Note**: Available variables depend on invocation context:
 
-- **Always available**: DATETIME, TIMESTAMP, DAY, TIMEZONE, MAX_TURNS, MAX_TOOLS, FORMAT
+- **Always available**: DATETIME, TIMESTAMP, DAY, TIMEZONE, FORMAT
+- **Agent contexts**: MAX_TURNS, MAX_TOOLS (available in CLI, sub-agents, REST, embed, and Slack headends)
 - **CLI only**: OS, ARCH, KERNEL, HOSTNAME, USER, CD (not available in REST, embed, Slack, or sub-agent contexts)
 - See [System-Prompts-Variables](System-Prompts-Variables) for complete reference
 
@@ -332,7 +333,7 @@ When showing code:
 models:
   - openai/gpt-4o
 tools:
-  - knowledge-base
+  - filesystem
 maxTurns: 10
 ---
 

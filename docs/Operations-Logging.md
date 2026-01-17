@@ -52,12 +52,12 @@ ai-agent --agent test.ai "query" > response.txt 2> logs.txt
 ### Severity Examples
 
 ```
-[VRB] [llm] res: input 1523, output 456, cached 0 tokens, latency 2341 ms
-[WRN] Tool timeout exceeded: mcp__api__slow_query
-[ERR] LLM request failed: timeout after 120000ms
-[TRC] MCP request: {"method":"tools/call","params":{"name":"search"}}
-[THK] <thinking> Let me analyze this step by step...
-[FIN] Session complete: 5 turns, 4523 tokens, $0.12
+VRB 0.0 → LLM main: res: input 1523, output 456, cached 0 tokens, latency 2341 ms
+WRN 0.1 ← MCP main: Tool timeout exceeded: mcp__api__slow_query
+ERR 0.0 → LLM main: LLM request failed: timeout after 120000ms
+TRC 0.1 ← MCP main: {"method":"tools/call","params":{"name":"search"}}
+THK 0.0 → INT main: <thinking> Let me analyze this step by step...
+FIN 0.0 → INT main: Session complete: 5 turns, 4523 tokens, $0.12
 ```
 
 ---
@@ -263,7 +263,7 @@ ai-agent --agent test.ai --trace-llm --trace-mcp "query"
 | Event ID                      | Description                               |
 | ----------------------------- | ----------------------------------------- |
 | `agent:turn-start`            | New LLM turn begins                       |
-| `agent:final-turn`            | Final turn detected                       |
+| `agent:final-turn`            | Final turn detected (VRB/WRN)             |
 | `agent:context`               | Context guard triggered                   |
 | `agent:text-extraction`       | Parsed a final report candidate from text |
 | `agent:fallback-report`       | Fallback accepted after retries exhausted |
@@ -276,6 +276,7 @@ ai-agent --agent test.ai --trace-llm --trace-mcp "query"
 | Event ID                             | Description                        |
 | ------------------------------------ | ---------------------------------- |
 | `agent:EXIT-FINAL-ANSWER`            | Normal completion                  |
+| `agent:EXIT-ROUTER-HANDOFF`          | Router handoff initiated           |
 | `agent:EXIT-MAX-TURNS-WITH-RESPONSE` | Turn limit with output             |
 | `agent:EXIT-USER-STOP`               | User initiated stop                |
 | `agent:EXIT-TOKEN-LIMIT`             | Context window exhausted           |

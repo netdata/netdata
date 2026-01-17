@@ -162,19 +162,6 @@ Headers support `${parameters.name}` substitution:
 }
 ```
 
-### Environment Variables
-
-Headers support `${VAR}` expansion from environment:
-
-```json
-{
-  "headers": {
-    "Authorization": "Bearer ${API_KEY}",
-    "X-Org-ID": "${ORG_ID}"
-  }
-}
-```
-
 ### Content-Type Default
 
 When `bodyTemplate` is defined:
@@ -551,10 +538,10 @@ Complete REST tool schema:
 
 Cache key is computed from:
 
-- Tool name
+- Tool identity (kind, namespace, name)
 - All parameter values
 
-Same parameters = same cache key.
+Same tool name and parameters = same cache key.
 
 ---
 
@@ -677,7 +664,12 @@ Error: Request timeout
 ```
 
 2. Check API status
-3. Use `--verbose` to see timing
+3. Enable debug tracing:
+   ```bash
+   export DEBUG_REST_CALLS=true
+   # or
+   export TRACE_REST=true
+   ```
 
 ### Streaming parse failure
 
@@ -715,7 +707,7 @@ Error: Failed to parse streaming response
 **Solutions:**
 
 1. Check headers object syntax
-2. Verify environment variables are set
+2. Verify header substitution works correctly
 3. Check header name spelling
 
 ### Debug Tracing

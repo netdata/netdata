@@ -211,7 +211,7 @@ REST API tool configuration.
       "parametersSchema": {},
       "bodyTemplate": {},
       "queue": "string",
-      "cache": "string",
+      "cache": "string|number",
       "streaming": {
         "mode": "json-stream",
         "linePrefix": "string",
@@ -220,7 +220,8 @@ REST API tool configuration.
         "tokenField": "string",
         "tokenValue": "string",
         "answerField": "string",
-        "timeoutMs": "number"
+        "timeoutMs": "number",
+        "maxBytes": "number"
       }
     }
   }
@@ -230,7 +231,7 @@ REST API tool configuration.
 ### REST Tool Properties
 
 | Property           | Type     | Default     | Description             |
-| ------------------ | -------- | ----------- | ----------------------- |
+| ------------------ | -------- | ----------- | ----------------------- | ------------------ |
 | `description`      | `string` | Required    | Tool description        |
 | `method`           | `string` | Required    | HTTP method             |
 | `url`              | `string` | Required    | URL template            |
@@ -238,21 +239,22 @@ REST API tool configuration.
 | `parametersSchema` | `object` | Required    | JSON Schema for inputs  |
 | `bodyTemplate`     | `any`    | -           | Request body template   |
 | `queue`            | `string` | `"default"` | Concurrency queue       |
-| `cache`            | `string` | `"off"`     | Response cache TTL      |
+| `cache`            | `string  | number`     | -                       | Response cache TTL |
 | `streaming`        | `object` | -           | Streaming configuration |
 
 ### Streaming Properties
 
-| Property             | Type     | Default     | Description                |
-| -------------------- | -------- | ----------- | -------------------------- |
-| `mode`               | `string` | Required    | Must be `"json-stream"`    |
-| `linePrefix`         | `string` | `""`        | Prefix to strip            |
-| `discriminatorField` | `string` | `"type"`    | Event type field           |
-| `doneValue`          | `string` | `"done"`    | End indicator              |
-| `tokenField`         | `string` | `"content"` | Token content field        |
-| `tokenValue`         | `string` | `"token"`   | Token event type           |
-| `answerField`        | `string` | `"answer"`  | Final answer field         |
-| `timeoutMs`          | `number` | `60000`     | Stream timeout (REST only) |
+| Property             | Type     | Default     | Description             |
+| -------------------- | -------- | ----------- | ----------------------- |
+| `mode`               | `string` | Required    | Must be `"json-stream"` |
+| `linePrefix`         | `string` | `""`        | Prefix to strip         |
+| `discriminatorField` | `string` | `"type"`    | Event type field        |
+| `doneValue`          | `string` | `"done"`    | End indicator           |
+| `tokenField`         | `string` | `"content"` | Token content field     |
+| `tokenValue`         | `string` | `"token"`   | Token event type        |
+| `answerField`        | `string` | `"answer"`  | Final answer field      |
+| `timeoutMs`          | `number` | -           | Stream timeout (ms)     |
+| `maxBytes`           | `number` | -           | Maximum bytes to read   |
 
 ---
 
@@ -399,7 +401,7 @@ Default parameter values.
 
 | Property                    | Type      | Default  | Description            |
 | --------------------------- | --------- | -------- | ---------------------- |
-| `temperature`               | `number`  | `0.0`    | LLM temperature        |
+| `temperature`               | `number`  | `0.2`    | LLM temperature        |
 | `topP`                      | `number`  | `null`   | Top-p sampling         |
 | `topK`                      | `number`  | `null`   | Top-k sampling         |
 | `repeatPenalty`             | `number`  | `null`   | Repetition penalty     |
@@ -407,12 +409,12 @@ Default parameter values.
 | `toolTimeout`               | `number`  | `300000` | Tool timeout (ms)      |
 | `maxTurns`                  | `number`  | `10`     | Max conversation turns |
 | `maxToolCallsPerTurn`       | `number`  | `10`     | Max tools per turn     |
-| `maxRetries`                | `number`  | `5`      | Max retry attempts     |
-| `maxOutputTokens`           | `number`  | `4096`   | Max output tokens      |
+| `maxRetries`                | `number`  | `3`      | Max retry attempts     |
+| `maxOutputTokens`           | `number`  | `16384`  | Max output tokens      |
 | `toolResponseMaxBytes`      | `number`  | `12288`  | Max tool response size |
 | `mcpInitConcurrency`        | `number`  | -        | MCP init concurrency   |
 | `contextWindowBufferTokens` | `number`  | -        | Context buffer         |
-| `stream`                    | `boolean` | `true`   | Enable streaming       |
+| `stream`                    | `boolean` | `false`  | Enable streaming       |
 
 ---
 
@@ -435,14 +437,14 @@ Tool output handling configuration.
 
 ### Tool Output Properties
 
-| Property                | Type              | Default | Description                     |
-| ----------------------- | ----------------- | ------- | ------------------------------- |
-| `enabled`               | `boolean`         | `true`  | Enable tool output storage      |
-| `storeDir`              | `string`          | -       | Storage directory path          |
-| `maxChunks`             | `number`          | `1`     | Max stored chunks               |
-| `overlapPercent`        | `number`          | `10`    | Chunk overlap percentage        |
-| `avgLineBytesThreshold` | `number`          | `1000`  | Line size threshold             |
-| `models`                | `string/string[]` | `[]`    | Models that support tool output |
+| Property                | Type                               | Default | Description                     |
+| ----------------------- | ---------------------------------- | ------- | ------------------------------- |
+| `enabled`               | `boolean`                          | `true`  | Enable tool output storage      |
+| `storeDir`              | `string`                           | `/tmp`  | Storage directory path          |
+| `maxChunks`             | `number`                           | `1`     | Max stored chunks               |
+| `overlapPercent`        | `number`                           | `10`    | Chunk overlap percentage        |
+| `avgLineBytesThreshold` | `number`                           | `1000`  | Line size threshold             |
+| `models`                | `{provider:string;model:string}[]` | `-`     | Models that support tool output |
 
 ---
 
@@ -500,13 +502,13 @@ Slack integration configuration.
 
 | Parameter                       | Config Path                     | Default          | Description        |
 | ------------------------------- | ------------------------------- | ---------------- | ------------------ |
-| `--temperature <n>`             | `defaults.temperature`          | `0.0`            | LLM temperature    |
+| `--temperature <n>`             | `defaults.temperature`          | `0.2`            | LLM temperature    |
 | `--top-p <n>`                   | `defaults.topP`                 | `null`           | Top-p sampling     |
 | `--llm-timeout <ms>`            | `defaults.llmTimeout`           | `600000`         | LLM timeout        |
 | `--tool-timeout <ms>`           | `defaults.toolTimeout`          | `300000`         | Tool timeout       |
-| `--max-output-tokens <n>`       | `defaults.maxOutputTokens`      | `4096`           | Max output         |
+| `--max-output-tokens <n>`       | `defaults.maxOutputTokens`      | `16384`          | Max output         |
 | `--tool-response-max-bytes <n>` | `defaults.toolResponseMaxBytes` | `12288`          | Max tool response  |
-| `--stream / --no-stream`        | `defaults.stream`               | `true`           | Enable streaming   |
+| `--stream / --no-stream`        | `defaults.stream`               | `false`          | Enable streaming   |
 | `--accounting <path>`           | `accounting.file`               | -                | Accounting file    |
 | `--config <path>`               | -                               | `.ai-agent.json` | Config file        |
 | `--verbose`                     | -                               | `false`          | Verbose output     |
@@ -519,7 +521,7 @@ Slack integration configuration.
 ## Frontmatter Parameters
 
 | Parameter              | Type       | Default          | Description        |
-| ---------------------- | ---------- | ---------------- | ------------------ |
+| ---------------------- | ---------- | ---------------- | ------------------ | ------------------ |
 | `description`          | `string`   | -                | Agent description  |
 | `usage`                | `string`   | -                | Usage instructions |
 | `models`               | `string[]` | **Required**     | Model list         |
@@ -529,18 +531,18 @@ Slack integration configuration.
 | `toolsDenied`          | `string[]` | -                | Tools to hide      |
 | `maxTurns`             | `number`   | `10`             | Max turns          |
 | `maxToolCallsPerTurn`  | `number`   | `10`             | Max tools per turn |
-| `maxRetries`           | `number`   | `5`              | Max retries        |
-| `temperature`          | `number`   | `0.0`            | Temperature        |
+| `maxRetries`           | `number`   | `3`              | Max retries        |
+| `temperature`          | `number`   | `0.2`            | Temperature        |
 | `topP`                 | `number`   | `null`           | Top-p              |
 | `topK`                 | `number`   | `null`           | Top-k              |
-| `maxOutputTokens`      | `number`   | `4096`           | Max output         |
+| `maxOutputTokens`      | `number`   | `16384`          | Max output         |
 | `repeatPenalty`        | `number`   | `null`           | Repetition penalty |
 | `reasoning`            | `string`   | -                | Reasoning mode     |
-| `reasoningTokens`      | `number`   | -                | Reasoning budget   |
+| `reasoningValue`       | `string`   | -                | Reasoning budget   |
 | `caching`              | `string`   | -                | Caching mode       |
 | `llmTimeout`           | `number`   | `600000`         | LLM timeout (ms)   |
 | `toolTimeout`          | `number`   | `300000`         | Tool timeout (ms)  |
-| `cache`                | `string`   | `"off"`          | Response cache TTL |
+| `cache`                | `string    | number`          | -                  | Response cache TTL |
 | `toolResponseMaxBytes` | `number`   | `12288`          | Max tool response  |
 | `contextWindow`        | `number`   | Provider default | Token limit        |
 | `advisors`             | `string[]` | -                | Advisor agents     |

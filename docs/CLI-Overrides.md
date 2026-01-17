@@ -453,14 +453,15 @@ ai-agent --config ./config/development.json --agent api.ai --api 8080
 
 ### Global
 
-| Flag                    | Default                 | Description     |
-| ----------------------- | ----------------------- | --------------- |
-| `--config <path>`       | Auto-discovered         | Config file     |
-| `--dry-run`             | `false`                 | Validation only |
-| `--quiet`               | `false`                 | Suppress logs   |
-| `--sessions-dir <path>` | `~/.ai-agent/sessions/` | Session storage |
-| `--billing-file <path>` | -                       | Cost tracking   |
-| `--resume <id>`         | -                       | Resume session  |
+| Flag                         | Default                 | Description                                                  |
+| ---------------------------- | ----------------------- | ------------------------------------------------------------ |
+| `--config <path>`            | Auto-discovered         | Config file                                                  |
+| `--dry-run`                  | `false`                 | Validation only                                              |
+| `--quiet`                    | `false`                 | Suppress logs                                                |
+| `--sessions-dir <path>`      | `~/.ai-agent/sessions/` | Session storage                                              |
+| `--billing-file <path>`      | -                       | Cost tracking                                                |
+| `--resume <id>`              | -                       | Resume session                                               |
+| `--mcp-init-concurrency <n>` | -                       | MCP servers to initialize in parallel (reduces startup load) |
 
 ---
 

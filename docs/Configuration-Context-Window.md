@@ -177,7 +177,11 @@ The buffer ensures:
 ### How It Works
 
 ```
-available_budget = contextWindow - maxOutputTokens - buffer
+available_budget = contextWindow - contextWindowBufferTokens - maxOutputTokens
+```
+
+available_budget = contextWindow - contextWindowBufferTokens - maxOutputTokens
+
 ```
 
 ### Buffer Reference
@@ -218,8 +222,10 @@ When the guard activates:
 When a tool response would overflow:
 
 ```
+
 (tool failed: context window budget exceeded)
-```
+
+````
 
 The tool call is rejected, and the session enters forced-final-turn.
 
@@ -235,7 +241,7 @@ Handle large tool responses that would overflow context.
 ---
 toolResponseMaxBytes: 12288 # 12 KB default
 ---
-```
+````
 
 Responses exceeding this size are stored and replaced with handles.
 

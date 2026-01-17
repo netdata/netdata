@@ -75,17 +75,19 @@ toolOutput:
   maxChunks: 1 # Max chunks per extraction
   overlapPercent: 10 # Chunk overlap percentage (0-50)
   avgLineBytesThreshold: 1000 # Threshold for choosing full-chunked mode
-  models: ["openai/gpt-4o"] # Target models for extraction
+  models: # Target models for extraction
+    - provider: openai
+      model: gpt-4o
 ---
 ```
 
-| Option                  | Type             | Default   | Description                                     |
-| ----------------------- | ---------------- | --------- | ----------------------------------------------- |
-| `enabled`               | boolean          | `true`    | Enable tool output storage                      |
-| `maxChunks`             | number           | `1`       | Maximum chunks for extraction                   |
-| `overlapPercent`        | number           | `10`      | Overlap between chunks (0-50)                   |
-| `avgLineBytesThreshold` | number           | `1000`    | Threshold for choosing full-chunked mode        |
-| `models`                | string\|string[] | undefined | Target models for extraction (provider/modelId) |
+| Option                  | Type                                  | Default   | Description                                                                    |
+| ----------------------- | ------------------------------------- | --------- | ------------------------------------------------------------------------------ |
+| `enabled`               | boolean                               | `true`    | Enable tool output storage                                                     |
+| `maxChunks`             | number                                | `1`       | Maximum chunks for extraction                                                  |
+| `overlapPercent`        | number                                | `10`      | Overlap between chunks (0-50)                                                  |
+| `avgLineBytesThreshold` | number                                | `1000`    | Threshold for choosing full-chunked mode                                       |
+| `models`                | { provider: string; model: string }[] | undefined | Target models for extraction (e.g., `{ provider: "openai", model: "gpt-4o" }`) |
 
 **Note**: The `storeDir` option is accepted but ignored. Storage root is always `/tmp/ai-agent-<run-hash>`.
 
@@ -107,15 +109,16 @@ Tool output storage triggers when any of these conditions are met:
 
 ```
 Tool Response (50KB)
-       ↓
+        ↓
 Check Size: 50KB > 12KB limit
-       ↓
+        ↓
 Store to disk: /tmp/ai-agent-xxx/session-yyy/file-zzz
-       ↓
+        ↓
 Replace in conversation:
-  "Tool response stored. Handle: session-yyy/file-zzz
-   To extract, call tool_output..."
-       ↓
+   "Tool output is too large (45000 bytes, 1200 lines, 10000 tokens).
+    Call tool_output(handle = "session-yyy/file-zzz", extract = "what to extract").
+    The handle is a relative path under the tool_output root."
+        ↓
 LLM calls tool_output to retrieve content
 ```
 
@@ -158,7 +161,7 @@ The `tool_output` tool allows targeted content retrieval:
     "mode": {
       "type": "string",
       "enum": ["auto", "full-chunked", "read-grep", "truncate"],
-      "description": "Optional override. auto=module decides; full-chunked=LLM chunk+reduce; read-grep=dynamic sub-agent with Read/Grep; truncate=keeps top and bottom, truncates in the middle"
+      "description": "Use auto for optimal extraction strategy."
     }
   }
 }
