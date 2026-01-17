@@ -177,6 +177,15 @@
 - Add On-Prem Release Notes to map.csv ([#21571](https://github.com/netdata/netdata/issues/21571))
 - Use host-prefixed log directories under containers. ([#21568](https://github.com/netdata/netdata/issues/21568))
 - Bring back systemd-journal.plugin setcap (from source install) ([#21569](https://github.com/netdata/netdata/issues/21569))
+- Fix(go.d/proxysql): use timeout when pinging proxysql instance ([#21573](https://github.com/netdata/netdata/issues/21573))
+- Fix race condition on shutdown ([#21563](https://github.com/netdata/netdata/issues/21563))
+- Additional checks during metric page list retrieval ([#21575](https://github.com/netdata/netdata/issues/21575))
+- Fix incorrect macro definition for netdata_mutex_destroy ([#21579](https://github.com/netdata/netdata/issues/21579))
+- Proper decompression of data object payloads. ([#21578](https://github.com/netdata/netdata/issues/21578))
+- Fix response when no log entries have been found. ([#21581](https://github.com/netdata/netdata/issues/21581))
+- Fix 32-bit builds of journal-viewer plugin. ([#21580](https://github.com/netdata/netdata/issues/21580))
+- Enable ARM package builds in PR CI runs. ([#21570](https://github.com/netdata/netdata/issues/21570))
+- SQL Chain (Windows.plugin) ([#21582](https://github.com/netdata/netdata/issues/21582))
 
 ## [2.8.0] - 2025-11-19
 
