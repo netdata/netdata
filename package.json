@@ -98,7 +98,10 @@
     "eslint-plugin-sonarjs": "^3.0.5",
     "eslint-plugin-unicorn": "^62.0.0",
     "knip": "^5.81.0",
+    "markdown-it": "^14.1.0",
+    "mermaid": "^11.12.2",
     "prettier": "^3.8.0",
+    "turndown": "^7.2.2",
     "typescript": "^5.9.3",
     "vitest": "^4.0.17"
   },

@@ -7,6 +7,16 @@ Sub-sessions (advisors, router, handoff) have two critical issues:
 Tool-output extraction is different: its child opTree is attached, but verbose logs are not forwarded for read-grep.
 
 ---
+## Decisions (Made by Costa)
+1) Tool_output must behave exactly like subagents (same rules for opTree, logs, task-status/progress).
+2) Advisors must follow the same rules as subagents (opTree, logs, progress).
+3) tool_output full-chunked: Option C — keep internal SessionTreeBuilder; only ensure LLM requests/responses are captured (no progress/task_status).
+
+---
+## Decisions (Pending)
+- None
+
+---
 
 ## Issue 1: Orchestration Sub-Session LLM Requests Missing from OpTree
 

@@ -29,7 +29,7 @@
   --ai-bg-assistant-message: transparent;
   --ai-text-primary: #1a1a1a;
   --ai-text-secondary: #666666;
-  --ai-text-user-message: #ffffff;
+  --ai-text-user-message: #000000;
   --ai-text-assistant-message: #1a1a1a;
   --ai-border-color: #e0e0e0;
   --ai-border-focus: #00ab44;
@@ -52,7 +52,7 @@
   --ai-bg-assistant-message: transparent;
   --ai-text-primary: #e0e0e0;
   --ai-text-secondary: #a0a0a0;
-  --ai-text-user-message: #ffffff;
+  --ai-text-user-message: #000000;
   --ai-text-assistant-message: #e0e0e0;
   --ai-border-color: #404040;
   --ai-border-focus: #00ab44;
@@ -407,7 +407,7 @@
     border-collapse: collapse;
     width: 100%;
     margin: 0.5em 0;
-    font-size: 0.875em;
+    font-size: 1em;
   }
 
   .ai-agent-message-content th,
@@ -420,6 +420,13 @@
   .ai-agent-message-content th {
     background: var(--ai-bg-secondary);
     font-weight: 600;
+  }
+
+  /* Horizontal Rule */
+  .ai-agent-message-content hr {
+    border: none;
+    border-top: 1px solid var(--ai-border-color);
+    margin: 1em 0;
   }
 
   /* Inline Code */
