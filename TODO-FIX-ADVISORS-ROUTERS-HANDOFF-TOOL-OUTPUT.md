@@ -40,6 +40,12 @@ Advisors/router/handoff run via `spawnOrchestrationChild()` which creates a new 
 - Conclusion: advisors ran, but no child opTree was attached to the parent.
 - No tool_output evidence in this snapshot (no tool ops, no `tool_output` strings).
 
+### Snapshot Evidence (6eff7054-ef43-465d-90db-b4c42495db0b)
+- tool_output **is present** as a `session` op (not a `tool` op): `attributes.name == "tool_output"` with provider `tool-output`.
+- tool_output has a child session: `agentId = "tool_output.read_grep"` with 4 turns.
+- Child session includes LLM ops and tool_output_fs reads (`tool_output_fs__Read`).
+- Conclusion: read-grep tool_output **does attach** its child opTree in this snapshot; missing verbose logs is a separate issue.
+
 ### Files to Investigate
 - `src/orchestration/advisors.ts` - advisor execution
 - `src/orchestration/spawn-child.ts` - child session spawning

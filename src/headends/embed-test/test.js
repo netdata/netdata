@@ -21,9 +21,9 @@
   'use strict';
 
   // CSS class constants
-  const CSS_HIDDEN = 'ai-chat-hidden';
-  const CSS_SPINNER = '.ai-chat-spinner';
-  const CSS_SPINNER_STATUS = '.ai-chat-spinner-status';
+  const CSS_HIDDEN = 'ai-agent-hidden';
+  const CSS_SPINNER = '.ai-agent-spinner';
+  const CSS_SPINNER_STATUS = '.ai-agent-spinner-status';
 
   // ---------------------------------------------------------------------------
   // Configuration
@@ -193,7 +193,7 @@
           // Use escapeHtml to prevent XSS in code blocks
           const escapedCode = escapeHtml(str);
           const escapedLang = escapeHtml(lang || 'text');
-          return `<pre class="code-block" data-lang="${escapedLang}"><code>${escapedCode}</code></pre>`;
+          return `<pre class="ai-agent-code-block" data-lang="${escapedLang}"><code>${escapedCode}</code></pre>`;
         },
       });
     }
@@ -227,14 +227,14 @@
         this.mermaidInitialized = true;
       }
 
-      const mermaidBlocks = container.querySelectorAll('pre.code-block[data-lang="mermaid"]');
+      const mermaidBlocks = container.querySelectorAll('pre.ai-agent-code-block[data-lang="mermaid"]');
       for (const block of mermaidBlocks) {
         const code = block.textContent;
         const id = 'mermaid-' + generateId();
         try {
           const { svg } = await window.mermaid.render(id, code);
           const wrapper = document.createElement('div');
-          wrapper.className = 'mermaid-diagram';
+          wrapper.className = 'ai-agent-mermaid-diagram';
           // Mermaid SVG is from trusted mermaid.js library
           wrapper.innerHTML = svg;
           block.replaceWith(wrapper);
@@ -394,32 +394,32 @@
     }
 
     buildDivUI() {
-      this.wrapper = createElement('div', 'ai-chat-wrapper ai-chat-div-mode');
+      this.wrapper = createElement('div', 'ai-agent-wrapper ai-agent-div-mode');
 
       // Messages container
-      const messagesEl = createElement('div', 'ai-chat-messages');
+      const messagesEl = createElement('div', 'ai-agent-messages');
 
       // Input area
-      const inputArea = createElement('div', 'ai-chat-input-area');
-      const textarea = createElement('textarea', 'ai-chat-input', {
+      const inputArea = createElement('div', 'ai-agent-input-area');
+      const textarea = createElement('textarea', 'ai-agent-input', {
         placeholder: 'Type your message...',
         rows: '1'
       });
-      const sendBtn = createElement('button', 'ai-chat-send', { title: 'Send' });
+      const sendBtn = createElement('button', 'ai-agent-send', { title: 'Send' });
       sendBtn.innerHTML = icons.send; // Static trusted SVG
       inputArea.appendChild(textarea);
       inputArea.appendChild(sendBtn);
 
       // Status bar
-      const statusBar = createElement('div', 'ai-chat-status-bar');
-      const statusText = createElement('span', 'ai-chat-status-text');
-      const statusActions = createElement('div', 'ai-chat-status-actions');
+      const statusBar = createElement('div', 'ai-agent-status-bar');
+      const statusText = createElement('span', 'ai-agent-status-text');
+      const statusActions = createElement('div', 'ai-agent-status-actions');
 
-      const copyAllBtn = createElement('button', 'ai-chat-copy-all', { title: 'Copy conversation' });
+      const copyAllBtn = createElement('button', 'ai-agent-copy-all', { title: 'Copy conversation' });
       copyAllBtn.innerHTML = icons.clipboard;
-      const clearBtn = createElement('button', 'ai-chat-clear', { title: 'Clear conversation' });
+      const clearBtn = createElement('button', 'ai-agent-clear', { title: 'Clear conversation' });
       clearBtn.innerHTML = icons.x;
-      const themeBtn = createElement('button', 'ai-chat-theme', { title: 'Toggle theme' });
+      const themeBtn = createElement('button', 'ai-agent-theme', { title: 'Toggle theme' });
       themeBtn.innerHTML = icons.sun;
 
       statusActions.appendChild(copyAllBtn);
@@ -438,21 +438,21 @@
 
     buildWidgetUI() {
       // Floating button
-      this.floatButton = createElement('button', 'ai-chat-float-button', { title: 'Open chat' });
+      this.floatButton = createElement('button', 'ai-agent-float-button', { title: 'Open chat' });
       this.floatButton.innerHTML = this.config.icon || icons.chat;
       this.container.appendChild(this.floatButton);
 
       // Chat panel wrapper
-      this.wrapper = createElement('div', 'ai-chat-wrapper ai-chat-widget-mode ai-chat-hidden');
+      this.wrapper = createElement('div', 'ai-agent-wrapper ai-agent-widget-mode ai-agent-hidden');
 
       // Widget header
-      const header = createElement('div', 'ai-chat-widget-header');
-      const title = createElement('span', 'ai-chat-widget-title');
+      const header = createElement('div', 'ai-agent-widget-header');
+      const title = createElement('span', 'ai-agent-widget-title');
       title.textContent = 'AI Assistant';
-      const controls = createElement('div', 'ai-chat-widget-controls');
-      const maximizeBtn = createElement('button', 'ai-chat-maximize', { title: 'Maximize' });
+      const controls = createElement('div', 'ai-agent-widget-controls');
+      const maximizeBtn = createElement('button', 'ai-agent-maximize', { title: 'Maximize' });
       maximizeBtn.innerHTML = icons.maximize;
-      const closeBtn = createElement('button', 'ai-chat-close', { title: 'Close' });
+      const closeBtn = createElement('button', 'ai-agent-close', { title: 'Close' });
       closeBtn.innerHTML = icons.close;
       controls.appendChild(maximizeBtn);
       controls.appendChild(closeBtn);
@@ -460,29 +460,29 @@
       header.appendChild(controls);
 
       // Messages container
-      const messagesEl = createElement('div', 'ai-chat-messages');
+      const messagesEl = createElement('div', 'ai-agent-messages');
 
       // Input area
-      const inputArea = createElement('div', 'ai-chat-input-area');
-      const textarea = createElement('textarea', 'ai-chat-input', {
+      const inputArea = createElement('div', 'ai-agent-input-area');
+      const textarea = createElement('textarea', 'ai-agent-input', {
         placeholder: 'Type your message...',
         rows: '1'
       });
-      const sendBtn = createElement('button', 'ai-chat-send', { title: 'Send' });
+      const sendBtn = createElement('button', 'ai-agent-send', { title: 'Send' });
       sendBtn.innerHTML = icons.send;
       inputArea.appendChild(textarea);
       inputArea.appendChild(sendBtn);
 
       // Status bar
-      const statusBar = createElement('div', 'ai-chat-status-bar');
-      const statusText = createElement('span', 'ai-chat-status-text');
-      const statusActions = createElement('div', 'ai-chat-status-actions');
+      const statusBar = createElement('div', 'ai-agent-status-bar');
+      const statusText = createElement('span', 'ai-agent-status-text');
+      const statusActions = createElement('div', 'ai-agent-status-actions');
 
-      const copyAllBtn = createElement('button', 'ai-chat-copy-all', { title: 'Copy conversation' });
+      const copyAllBtn = createElement('button', 'ai-agent-copy-all', { title: 'Copy conversation' });
       copyAllBtn.innerHTML = icons.clipboard;
-      const clearBtn = createElement('button', 'ai-chat-clear', { title: 'Clear conversation' });
+      const clearBtn = createElement('button', 'ai-agent-clear', { title: 'Clear conversation' });
       clearBtn.innerHTML = icons.x;
-      const themeBtn = createElement('button', 'ai-chat-theme', { title: 'Toggle theme' });
+      const themeBtn = createElement('button', 'ai-agent-theme', { title: 'Toggle theme' });
       themeBtn.innerHTML = icons.sun;
 
       statusActions.appendChild(copyAllBtn);
@@ -501,17 +501,17 @@
     }
 
     cacheElements() {
-      this.messagesEl = this.wrapper.querySelector('.ai-chat-messages');
-      this.inputEl = this.wrapper.querySelector('.ai-chat-input');
-      this.sendBtn = this.wrapper.querySelector('.ai-chat-send');
-      this.statusText = this.wrapper.querySelector('.ai-chat-status-text');
-      this.clearBtn = this.wrapper.querySelector('.ai-chat-clear');
-      this.themeBtn = this.wrapper.querySelector('.ai-chat-theme');
-      this.copyAllBtn = this.wrapper.querySelector('.ai-chat-copy-all');
+      this.messagesEl = this.wrapper.querySelector('.ai-agent-messages');
+      this.inputEl = this.wrapper.querySelector('.ai-agent-input');
+      this.sendBtn = this.wrapper.querySelector('.ai-agent-send');
+      this.statusText = this.wrapper.querySelector('.ai-agent-status-text');
+      this.clearBtn = this.wrapper.querySelector('.ai-agent-clear');
+      this.themeBtn = this.wrapper.querySelector('.ai-agent-theme');
+      this.copyAllBtn = this.wrapper.querySelector('.ai-agent-copy-all');
 
       if (this.mode === 'widget') {
-        this.closeBtn = this.wrapper.querySelector('.ai-chat-close');
-        this.maximizeBtn = this.wrapper.querySelector('.ai-chat-maximize');
+        this.closeBtn = this.wrapper.querySelector('.ai-agent-close');
+        this.maximizeBtn = this.wrapper.querySelector('.ai-agent-maximize');
       }
     }
 
@@ -566,7 +566,7 @@
 
       // Message copy buttons (delegated)
       this.messagesEl.addEventListener('click', (e) => {
-        const copyBtn = e.target.closest('.ai-chat-copy-btn');
+        const copyBtn = e.target.closest('.ai-agent-copy-btn');
         if (copyBtn) {
           this.handleCopyClick(copyBtn);
         }
@@ -701,7 +701,7 @@
 
       let el = this.messagesEl.querySelector(`[data-message-id="${id}"]`);
       if (!el) {
-        el = createElement('div', `ai-chat-message ai-chat-message-${msg.role}`, {
+        el = createElement('div', `ai-agent-message ai-agent-message-${msg.role}`, {
           'data-message-id': id
         });
         this.messagesEl.appendChild(el);
@@ -712,21 +712,21 @@
 
       if (msg.role === 'user') {
         // User messages: single content div with plain text
-        const contentDiv = createElement('div', 'ai-chat-message-content');
+        const contentDiv = createElement('div', 'ai-agent-message-content');
         const p = document.createElement('p');
         p.textContent = msg.content;
         contentDiv.appendChild(p);
         el.appendChild(contentDiv);
       } else if (msg.isStreaming) {
         // Streaming assistant messages: double-buffer with two content divs
-        const contentA = createElement('div', 'ai-chat-message-content ai-chat-buffer-a');
-        const contentB = createElement('div', 'ai-chat-message-content ai-chat-buffer-b ai-chat-buffer-hidden');
+        const contentA = createElement('div', 'ai-agent-message-content ai-agent-buffer-a');
+        const contentB = createElement('div', 'ai-agent-message-content ai-agent-buffer-b ai-agent-buffer-hidden');
         el.appendChild(contentA);
         el.appendChild(contentB);
         this.activeBuffer = 'a';
       } else {
         // Completed assistant messages: single content div with rendered markdown
-        const contentDiv = createElement('div', 'ai-chat-message-content');
+        const contentDiv = createElement('div', 'ai-agent-message-content');
         contentDiv.innerHTML = this.renderer.render(msg.content);
         el.appendChild(contentDiv);
         // Add copy buttons to code blocks
@@ -734,8 +734,8 @@
       }
 
       // Message actions (copy button)
-      const actionsDiv = createElement('div', 'ai-chat-message-actions');
-      const copyBtn = createElement('button', 'ai-chat-copy-btn', {
+      const actionsDiv = createElement('div', 'ai-agent-message-actions');
+      const copyBtn = createElement('button', 'ai-agent-copy-btn', {
         'data-copy-type': 'message',
         'data-message-id': id,
         title: 'Copy'
@@ -746,12 +746,12 @@
     }
 
     addCodeBlockCopyButtons(el) {
-      el.querySelectorAll('.code-block').forEach(block => {
-        const wrapper = createElement('div', 'code-block-wrapper');
+      el.querySelectorAll('.ai-agent-code-block').forEach(block => {
+        const wrapper = createElement('div', 'ai-agent-code-block-wrapper');
         block.parentNode.insertBefore(wrapper, block);
         wrapper.appendChild(block);
 
-        const codeCopyBtn = createElement('button', 'ai-chat-copy-btn code-copy-btn', {
+        const codeCopyBtn = createElement('button', 'ai-agent-copy-btn ai-agent-code-copy-btn', {
           'data-copy-type': 'code',
           title: 'Copy code'
         });
@@ -783,8 +783,8 @@
       const content = this.lastRenderContent;
 
       // Determine which buffer is hidden (will render into it)
-      const hiddenBufferClass = this.activeBuffer === 'a' ? 'ai-chat-buffer-b' : 'ai-chat-buffer-a';
-      const visibleBufferClass = this.activeBuffer === 'a' ? 'ai-chat-buffer-a' : 'ai-chat-buffer-b';
+      const hiddenBufferClass = this.activeBuffer === 'a' ? 'ai-agent-buffer-b' : 'ai-agent-buffer-a';
+      const visibleBufferClass = this.activeBuffer === 'a' ? 'ai-agent-buffer-a' : 'ai-agent-buffer-b';
 
       const hiddenEl = el.querySelector('.' + hiddenBufferClass);
       const visibleEl = el.querySelector('.' + visibleBufferClass);
@@ -795,8 +795,8 @@
       hiddenEl.innerHTML = this.renderer.render(content);
 
       // Swap: show hidden, hide visible
-      hiddenEl.classList.remove('ai-chat-buffer-hidden');
-      visibleEl.classList.add('ai-chat-buffer-hidden');
+      hiddenEl.classList.remove('ai-agent-buffer-hidden');
+      visibleEl.classList.add('ai-agent-buffer-hidden');
 
       // Toggle active buffer
       this.activeBuffer = this.activeBuffer === 'a' ? 'b' : 'a';
@@ -814,7 +814,7 @@
         const msg = this.messages.find(m => m.id === id);
         if (msg) text = msg.content;
       } else if (type === 'code') {
-        const wrapper = btn.closest('.code-block-wrapper');
+        const wrapper = btn.closest('.ai-agent-code-block-wrapper');
         const code = wrapper?.querySelector('code');
         if (code) text = code.textContent;
       }
@@ -873,12 +873,12 @@
     showSpinner() {
       let spinner = this.messagesEl.querySelector(CSS_SPINNER);
       if (!spinner) {
-        spinner = createElement('div', 'ai-chat-spinner');
+        spinner = createElement('div', 'ai-agent-spinner');
 
-        const workingSpan = createElement('span', 'ai-chat-spinner-working');
+        const workingSpan = createElement('span', 'ai-agent-spinner-working');
         workingSpan.textContent = 'Working...';
 
-        const statusSpan = createElement('span', 'ai-chat-spinner-status');
+        const statusSpan = createElement('span', 'ai-agent-spinner-status');
 
         spinner.appendChild(workingSpan);
         spinner.appendChild(statusSpan);
@@ -929,7 +929,7 @@
 
     toggleMaximize() {
       this.isMaximized = !this.isMaximized;
-      this.wrapper.classList.toggle('ai-chat-maximized', this.isMaximized);
+      this.wrapper.classList.toggle('ai-agent-maximized', this.isMaximized);
       this.maximizeBtn.innerHTML = this.isMaximized ? icons.minimize : icons.maximize;
       this.maximizeBtn.title = this.isMaximized ? 'Restore' : 'Maximize';
     }
