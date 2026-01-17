@@ -109,7 +109,7 @@ curl http://localhost:9464/metrics
 | `ai_agent_queue_last_wait_ms`     | Gauge     | Most recent observed wait duration per queue (milliseconds)                      |
 | `ai_agent_queue_wait_duration_ms` | Histogram | Latency between enqueue and start time for queued tool executions (milliseconds) |
 
-**Labels**: `queue`, `capacity`
+**Labels**: `queue`, `capacity` (depth and inUse gauges only); wait metrics use only `queue`
 
 ### Context Guard Metrics
 
@@ -136,7 +136,9 @@ curl http://localhost:9464/metrics
 | ------------------------------- | ------- | ------------------------ |
 | `ai_agent_retry_collapse_total` | Counter | maxTurns collapse events |
 
-## **Labels**: `agent`, `call_path`, `headend`, `reason`
+**Labels**: `agent`, `call_path`, `headend`, `reason`
+
+---
 
 ## OpenTelemetry Traces
 
@@ -179,10 +181,13 @@ Session (root span)
 | `ai.session.txn_id`                | Transaction ID (CLI mode)                       |
 | `ai.session.parent_txn_id`         | Parent transaction ID (CLI mode)                |
 | `ai.session.origin_txn_id`         | Origin transaction ID (CLI mode)                |
-| `ai.session.success`               | Session success status (server mode)            |
+| `ai.session.success`               | Session success status (server mode only)       |
 | `ai.session.error`                 | Session error message (server mode, on failure) |
-| `ai.agent.id`                      | Agent ID (CLI mode)                             |
-| `ai.agent.call_path`               | Agent call path (CLI mode)                      |
+| `ai.session.slack.team_id`         | Slack team ID (server mode, Slack only)         |
+| `ai.session.slack.channel_id`      | Slack channel ID (server mode, Slack only)      |
+| `ai.session.api.request_id`        | API request ID (server mode, API only)          |
+| `ai.agent.id`                      | Agent ID                                        |
+| `ai.agent.call_path`               | Agent call path                                 |
 | `ai.agent.success`                 | Agent success status                            |
 | `ai.agent.turn_count`              | Total turns executed                            |
 | `ai.llm.provider`                  | LLM provider                                    |
@@ -539,7 +544,7 @@ groups:
 
 1. Verify collector is running: `curl http://collector:4317`
 2. Check endpoint protocol (gRPC vs HTTP)
-3. Check timeout: `--telemetry-otlp-timeout 5000`
+3. Check timeout: `--telemetry-otlp-timeout-ms 5000`
 4. Look for errors in stderr
 
 ---

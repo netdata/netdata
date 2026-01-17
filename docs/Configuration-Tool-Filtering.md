@@ -2,7 +2,11 @@
 
 Control which tools agents can access with allowlists and denylists.
 
-**Note:** Provider-level tool filtering (`providers.<name>.toolsAllowed/toolsDenied`) and agent-level tool filtering (`toolsAllowed/toolsDenied` in frontmatter) are not implemented. Use MCP server-level filtering for tool access control.
+**Note:**
+
+- Provider-level tool filtering (`providers.<name>.toolsAllowed/toolsDenied`) is defined in the configuration schema but **not implemented**.
+- Agent-level tool filtering (`toolsAllowed/toolsDenied` in frontmatter) is **not supported**.
+- Use MCP server-level filtering (`mcpServers.<name>.toolsAllowed/toolsDenied`) for tool access control.
 
 ---
 
@@ -191,7 +195,7 @@ Result: `read_file` allowed, `write_file` allowed, `delete_file` denied, `sensit
 
 ## String Schema Format Filtering
 
-Some LLM providers don't support certain JSON Schema string formats. Configure this in the provider configuration:
+Some LLM providers don't support certain JSON Schema string formats (e.g., `date-time`, `uri`, `uuid`). Configure this in the provider configuration to strip unsupported formats from tool schemas:
 
 ```json
 {
@@ -205,6 +209,8 @@ Some LLM providers don't support certain JSON Schema string formats. Configure t
   }
 }
 ```
+
+**Note:** `stringSchemaFormatsAllowed/Denied` filter JSON Schema string format declarations, NOT tools. For tool access control, use MCP server-level `toolsAllowed/toolsDenied`.
 
 See [Providers](Configuration-Providers) for more details on provider configuration.
 
@@ -344,8 +350,8 @@ The `tools` array controls which tool sources are loaded (servers, `restTools`, 
 
 | Location    | Property                     | Type       | Description                                        |
 | ----------- | ---------------------------- | ---------- | -------------------------------------------------- |
-| Provider    | `stringSchemaFormatsAllowed` | `string[]` | JSON Schema formats to allow                       |
-| Provider    | `stringSchemaFormatsDenied`  | `string[]` | JSON Schema formats to strip                       |
+| Provider    | `stringSchemaFormatsAllowed` | `string[]` | JSON Schema string formats to allow                |
+| Provider    | `stringSchemaFormatsDenied`  | `string[]` | JSON Schema string formats to strip                |
 | MCP Server  | `toolsAllowed`               | `string[]` | Tools to expose (local names)                      |
 | MCP Server  | `toolsDenied`                | `string[]` | Tools to hide (local names)                        |
 | Frontmatter | `tools`                      | `string[]` | Tool sources to include (servers, restTools, etc.) |
@@ -354,8 +360,8 @@ The `tools` array controls which tool sources are loaded (servers, `restTools`, 
 
 - Provider-level `toolsAllowed` and `toolsDenied` are defined in the configuration schema but **not implemented**.
 - Frontmatter `toolsAllowed` and `toolsDenied` are **not supported**.
-- Use MCP server-level filtering for tool access control.
-- Provider `stringSchemaFormatsAllowed/Denied` filters JSON Schema string formats, not tools.
+- Use MCP server-level filtering (`mcpServers.<name>.toolsAllowed/toolsDenied`) for tool access control.
+- Provider `stringSchemaFormatsAllowed/Denied` are **implemented** and filter JSON Schema string format declarations (e.g., `date-time`, `uri`, `uuid`), not tools.
 
 ---
 
@@ -364,10 +370,10 @@ The `tools` array controls which tool sources are loaded (servers, `restTools`, 
 ### List Available Tools
 
 ```bash
-ai-agent --list-tools <server>
+ai-agent --list-tools <server>...
 ```
 
-List tools from a specific MCP server (use `all` to list all servers).
+List tools from one or more MCP servers. Use `all` to list tools from every server.
 
 ### Trace Tool Discovery
 

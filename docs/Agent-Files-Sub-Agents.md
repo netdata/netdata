@@ -208,7 +208,7 @@ If sub-agent has explicit `input` schema with `format: json`, the `reason` field
   "tool": "agent__researcher",
   "input": {
     "query": "AI trends",
-    "maxResults": 10,
+    "limit": 10,
     "reason": "Get recent AI research findings"
   }
 }
@@ -572,7 +572,7 @@ agents:
 **Solution**: Check schema and parent's call format:
 
 ```yaml
-# Sub-agent expects:
+# Sub-agent expects this:
 input:
   format: json
   schema:
@@ -580,11 +580,10 @@ input:
     properties:
       query:
         type: string
+      limit:
+        type: integer
     required:
       - query
-
-# Parent must call with:
-# { "query": "search term", "reason": "Need to search for specific term" }
 ```
 
 ---

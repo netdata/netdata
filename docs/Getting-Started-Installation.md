@@ -119,10 +119,12 @@ npm link
 **Expected output after `npm run build`:**
 
 ```
-> ai-agent@1.0.0 build
+> ai-agent-claude@1.0.0 prebuild
+> npm run update-version --silent
+
+> ai-agent-claude@1.0.0 build
 > tsc
 
-Build complete
 ```
 
 **Verification:**

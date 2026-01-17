@@ -50,7 +50,7 @@ Snapshots are saved automatically at session end and can be used for:
 | Default     | `~/.ai-agent/sessions/{originId}.json.gz`         |
 | Production  | `/opt/neda/.ai-agent/sessions/{originId}.json.gz` |
 
-**Filename format**: `{UUID}.json.gz` where UUID is the origin transaction ID.
+**Filename format**: `{originId}.json.gz` where originId is the origin transaction ID.
 
 ### Find Latest Snapshot
 
@@ -122,7 +122,7 @@ snapshot.json.gz
 ├── reason: "final"               # Optional trigger (e.g., "final", "subagent_finish")
 └── opTree
     ├── id                        # Internal session ID
-    ├── traceId?                  # Public transaction ID (matches filename)
+    ├── traceId?                  # Public transaction ID (matches filename for root session, differs for sub-agents)
     ├── agentId?                  # Agent name
     ├── callPath?                 # Hierarchical path for sub-agents
     ├── sessionTitle              # Session title
@@ -137,7 +137,7 @@ snapshot.json.gz
     │   ├── tokensOut
     │   ├── tokensCacheRead
     │   ├── tokensCacheWrite
-    │   ├── costUsd
+    │   ├── costUsd?
     │   ├── toolsRun
     │   └── agentsRun
     └── turns[]                   # Array of TurnNode
@@ -149,15 +149,15 @@ snapshot.json.gz
         │   └── prompts          # {system, user}
         └── ops[]                # Array of OperationNode
             ├── opId
-            ├── kind             # "llm" | "tool" | "system" | "session"
+            ├── kind             # "llm" | "tool" | "session" | "system"
             ├── startedAt
             ├── endedAt?
             ├── status?          # "ok" | "failed"
             ├── attributes?      # {provider, model, name, toolKind}
             ├── logs[]           # LogEntry array
             ├── accounting[]     # AccountingEntry array
-            ├── request?         # {kind, payload, size}
-            ├── response?        # {payload, size, truncated}
+            ├── request?         # {kind, payload, size?}
+            ├── response?        # {payload, size?, truncated?}
             ├── reasoning?       # {chunks: [{text, ts}], final?: string} for thinking models
             └── childSession?   # Nested SessionNode for sub-agents
 ```

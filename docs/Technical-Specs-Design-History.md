@@ -85,12 +85,13 @@ These rules MUST hold to preserve the design:
 
 | Invariant                       | Description                                                                                                                                                                                        |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Opaque Origin**               | No branching on tool origin type in core loop                                                                                                                                                      |
 | **No Global Mutable State**     | No `process.chdir` during execution. `process.env` reads for debug flags (`DEBUG`, `CONTEXT_DEBUG`) during session execution are allowed for observability; startup/config reads are also allowed. |
 | **Per-Session Isolation**       | Tools receive only explicit inputs                                                                                                                                                                 |
 | **Uniform Budgets**             | Depth caps and resource limits apply uniformly                                                                                                                                                     |
 | **Unified Observability**       | Consistent logging independent of origin                                                                                                                                                           |
 | **Semantics over Optimization** | Pooling must not change isolation                                                                                                                                                                  |
+
+**Note**: The core orchestration uses `ToolsOrchestrator.executeWithManagement()` which provides a unified execution interface. While implementation details may branch on tool kind or provider namespace (e.g., for caching, queue management, or special handling of sub-agents vs MCP servers), all tool execution flows through this single orchestration point, maintaining the abstraction at the orchestration boundary.
 
 ### Consequences
 
@@ -157,12 +158,14 @@ graph TD
 
 Under this model:
 
-| Rule                            | Implication                      |
-| ------------------------------- | -------------------------------- |
-| Sub-agents as foreign services  | No special internal handling     |
-| No implicit retries on failure  | Parent decides retry policy      |
-| Explicit context in request     | No hidden state transfer         |
-| Session state as tokens/handles | Explicit serialization if needed |
+| Rule                            | Implication                       |
+| ------------------------------- | --------------------------------- |
+| Sub-agents as tools             | Executed through tool abstraction |
+| No implicit retries on failure  | Parent decides retry policy       |
+| Explicit context in request     | No hidden state transfer          |
+| Session state as tokens/handles | Explicit serialization if needed  |
+
+**Note**: Sub-agents are exposed as tools with `agent__` prefix and execute through the unified `ToolsOrchestrator.executeWithManagement()` interface. Implementation distinguishes sub-agent tools from MCP/REST tools for operational concerns like queue management and timeout behavior, but the orchestration interface remains unified.
 
 ### Invariants
 
@@ -207,7 +210,7 @@ graph TB
     Tools --> Int[Internal Tools]
 ```
 
-No special cases. No branching on tool type in core logic.
+**Note**: While all capabilities are exposed through the tool abstraction, implementation details may distinguish between tool types for operational reasons (e.g., caching applies to MCP/REST but not internal tools, sub-agents manage their own timeouts, queue management varies by provider). The core orchestration boundary (`ToolsOrchestrator.executeWithManagement()`) provides a unified execution interface.
 
 ### 2. Session Isolation
 
@@ -247,13 +250,15 @@ Good: `"Tool call failed: parameter 'limit' must be number, received string 'ten
 
 ### 5. Thin Orchestration Loops
 
-**Keep main loops lean.**
+**Keep orchestration logic focused.**
 
 | Principle                              | Implementation          |
 | -------------------------------------- | ----------------------- |
-| Move complexity to specialized modules | Not inline in loop      |
+| Move complexity to specialized modules | Isolate concerns        |
 | Separation of concerns paramount       | Each module has one job |
 | Gradual improvement over time          | Refactor continually    |
+
+**Note**: The `AIAgentSession` constructor handles initialization of multiple collaborating components (tools orchestrator, sub-agents registry, context guard, progress reporter, opTree, etc.). Turn-specific orchestration has been extracted to `TurnRunner` (src/session-turn-runner.ts) and tool execution management to `SessionToolExecutor` (src/session-tool-executor.ts) and `ToolsOrchestrator` (src/tools/tools.ts). Ongoing refactoring continues to further simplify initialization.
 
 ---
 
@@ -275,15 +280,17 @@ const session = new Session({ cwd: newDir, config: settings });
 ### Tool Type Branching
 
 ```typescript
-// BAD: Branching on tool type
-if (tool.type === "subagent") {
-  // special handling
-} else if (tool.type === "mcp") {
-  // different handling
+// BAD: Direct tool type switching in orchestration logic
+if (kind === "agent" && namespace === "subagent") {
+  // special sub-agent handling
+} else if (kind === "mcp") {
+  // special MCP handling
+} else if (kind === "rest") {
+  // special REST handling
 }
 
-// GOOD: Uniform interface
-const result = await toolsOrchestrator.execute(toolName, params);
+// GOOD: Unified orchestration interface
+const result = await toolsOrchestrator.executeWithManagement(name, params, ctx);
 ```
 
 ### Silent Failures

@@ -19,7 +19,7 @@ Layered architecture with strict separation of concerns between orchestration, L
 
 ## TL;DR
 
-ai-agent uses a layered architecture: **CLI/Headend** → **AIAgent** → **AIAgentSession** → **LLMClient** → **Providers**. The session orchestrates multi-turn conversations, the LLM client executes single requests, and providers handle protocol-specific communication. Tools are abstracted through the **ToolsOrchestrator** with multiple provider types (MCP, REST, internal, sub-agent).
+ai-agent uses a layered architecture: **Entry Points** (CLI/Headends) → **AIAgent** (Orchestration Wrapper) → **AIAgentSession** (Multi-turn Loop with TurnRunner) → **LLMClient** → **Providers**. The session orchestrates multi-turn conversations via TurnRunner.execute(), the LLM client executes single requests, and providers handle protocol-specific communication. Tools are abstracted through the **ToolsOrchestrator** with multiple provider types (MCP, REST, internal, sub-agent, router, tool-output).
 
 ---
 
@@ -43,12 +43,14 @@ graph TB
         REST[REST Headend]
         MCP[MCP Headend]
         Slack[Slack Headend]
+        Embed[Embed Headend]
+        OpenAIHeadend[OpenAI Headend]
+        AnthropicHeadend[Anthropic Headend]
     end
 
     subgraph "Orchestration Layer"
         AIAgent[AIAgent<br/>Advisors/Router/Handoff]
-        Session[AIAgentSession<br/>Multi-turn Loop]
-        TurnRunner[TurnRunner<br/>Turn Iteration]
+        Session[AIAgentSession<br/>Multi-turn Loop<br/>TurnRunner.execute()]
         LLMClient[LLMClient<br/>Request Execution]
         end
 
@@ -67,7 +69,7 @@ graph TB
         MCPProv[MCP Provider]
         RESTProv[REST Provider]
         InternalProv[Internal Tools]
-        AgentProv[Agent Provider]
+        AgentProv[Sub-Agent Provider]
         RouterProv[Router Tool Provider]
         ToolOutputProv[Tool Output Provider]
         end
@@ -76,6 +78,9 @@ graph TB
     REST --> AIAgent
     MCP --> AIAgent
     Slack --> AIAgent
+    Embed --> AIAgent
+    OpenAIHeadend --> AIAgent
+    AnthropicHeadend --> AIAgent
 
     AIAgent --> Session
     Session --> LLMClient
@@ -87,6 +92,7 @@ graph TB
     LLMClient --> Google
     LLMClient --> Ollama
     LLMClient --> OpenRouter
+    LLMClient --> TestLLM
 
     ToolsOrch --> MCPProv
     ToolsOrch --> RESTProv
@@ -131,16 +137,19 @@ graph TB
 
 **Key State**:
 
-| Property            | Purpose                                       |
-| ------------------- | --------------------------------------------- |
-| `conversation`      | Full conversation history (messages array)    |
-| `logs`              | Structured log entries for debugging          |
-| `accounting`        | Token and cost tracking                       |
-| `currentTurn`       | Current turn index (1-based for action turns) |
-| `opTree`            | Hierarchical operation tracking for snapshots |
-| `toolsOrchestrator` | Tool execution engine                         |
-| `llmClient`         | LLM request executor                          |
-| `finalReport`       | Captured `final_report` tool result           |
+| Property                | Purpose                                                              |
+| ----------------------- | -------------------------------------------------------------------- |
+| `conversation`          | Full conversation history (messages array)                           |
+| `logs`                  | Structured log entries for debugging                                 |
+| `accounting`            | Token and cost tracking                                              |
+| `currentTurn`           | Current turn index (1-based for action turns)                        |
+| `opTree`                | Hierarchical operation tracking for snapshots                        |
+| `toolsOrchestrator`     | Tool execution engine                                                |
+| `llmClient`             | LLM request executor                                                 |
+| `finalReport`           | Captured `final_report` tool result (via FinalReportManager)         |
+| `targetContextConfigs`  | Per-model context window and buffer settings                         |
+| `forcedFinalTurnReason` | Context guard enforcement state (context/max_turns/task_status/etc.) |
+| `pendingToolSelection`  | Cached tool selection for current turn (planned subturns tracking)   |
 
 **Core Loop**:
 
@@ -185,13 +194,24 @@ The core loop is implemented in `TurnRunner.execute()` and invoked by `AIAgentSe
 | `ollama`            | OllamaProvider           | Ollama local API      |
 | `test-llm`          | TestLLMProvider          | Test/mock provider    |
 
+**Key Operations**:
+
+| Method                     | Purpose                                   |
+| -------------------------- | ----------------------------------------- |
+| `executeTurn(TurnRequest)` | Execute one LLM request/response cycle    |
+| `setTurn(turn, subturn)`   | Set current turn/subturn for logging      |
+| `waitForMetadataCapture()` | Await all async metadata collection tasks |
+| Provider selection         | Route to correct provider by name         |
+| Metadata collection        | Gather cost, routing, cache statistics    |
+| Pricing computation        | Calculate token costs                     |
+
 ---
 
 ### 4. ToolsOrchestrator
 
 **File**: `src/tools/tools.ts`
 
-**Responsibility**: Tool discovery, schema management, execution routing, and queue management.
+**Responsibility**: Tool discovery, schema management, execution routing, queue management, and execution lifecycle management.
 
 **Provider Types**:
 
@@ -204,29 +224,34 @@ The core loop is implemented in `TurnRunner.execute()` and invoked by `AIAgentSe
 | RouterToolProvider   | `agent` | Router delegation tool (registered only when router destinations are configured)  |
 | ToolOutputProvider   | `agent` | Tool output storage and retrieval (registered when tool output config is enabled) |
 
+**Registered Tool Providers**:
+
+| Provider             | Namespace     | Tools Managed                                                               |
+| -------------------- | ------------- | --------------------------------------------------------------------------- |
+| MCPProvider          | `mcp`         | Model Context Protocol servers (stdio/websocket/http/sse)                   |
+| RestProvider         | `rest`        | REST/OpenAPI endpoints (frontmatter-selected)                               |
+| InternalToolProvider | `agent`       | Built-in: final_report, task_status, batch, progress, title                 |
+| AgentProvider        | `subagent`    | Sub-agent tool invocations (registered via SubAgentRegistry)                |
+| RouterToolProvider   | `agent`       | router\_\_handoff-to (registered only when router.destinations configured)  |
+| ToolOutputProvider   | `tool-output` | tool_output tool for storage/retrieval (registered when toolOutput.enabled) |
+
 **Execution Flow**:
 
-1. Validate tool exists in registry
-2. Check tool response cache
-3. Acquire queue slot (if queued)
-4. Begin opTree operation
-5. Apply timeout wrapper
+1. Validate tool exists in registry (with alias resolution)
+2. Check tool response cache (for MCP/REST tools)
+3. Acquire queue slot (if queued for tool kind)
+4. Begin opTree operation (kind='tool' or kind='session' for sub-agents)
+5. Apply timeout wrapper (skipped for session-type tools)
 6. Call `provider.execute()`
-7. Record accounting
-8. End opTree operation
-9. Apply response size cap (via tool_output storage or truncation)
+7. Handle cache hits and store new entries
+8. Apply response size cap (via tool_output storage or truncation)
+9. Reserve token budget for output
+10. Record accounting and metrics
+11. End opTree operation
 
 ---
 
-### 5. TurnRunner
-
-**File**: `src/session-turn-runner.ts`
-
-**Responsibility**: Turn iteration and retry logic, provider/model cycling, context guard evaluation, LLM call orchestration, message sanitization, final report extraction/adoption.
-
----
-
-### 6. SessionTreeBuilder (OpTree)
+### 5. SessionTreeBuilder (OpTree)
 
 **File**: `src/session-tree.ts`
 
@@ -289,20 +314,29 @@ sequenceDiagram
 flowchart TD
     Response[LLM API Response] --> Parse[Provider Parses]
     Parse --> Result[TurnResult]
-    Result --> TurnRunner[TurnRunner processes]
+    Result --> Status{Status Type?}
+
+    Status -->|Success| TurnRunner[TurnRunner processes]
     TurnRunner --> Check{Has Tool Calls?}
 
     Check -->|Yes| Execute[Execute Tools via ToolsOrchestrator]
-    Execute --> AddResults[Add Tool Results]
+    Execute --> AddResults[Add Tool Results to Conversation]
     AddResults --> NextTurn[Continue to Next Turn]
 
-    Check -->|No| Final{Has Final Report?}
+    Check -->|No| Final{Has Final Report or Content?}
     Final -->|Yes| Finalize[Finalize Session]
-    Final -->|No| Retry[Synthetic Retry]
+    Final -->|No| Retry[Synthetic Retry with Guidance]
 
     Retry --> NextTurn
     TurnRunner --> FinalResult[Return AIAgentResult]
     FinalResult --> Session[Session completes]
+
+    Status -->|Error| HandleError[Handle Error Status]
+    HandleError --> RetryCheck{Retryable?}
+    RetryCheck -->|Yes| NextProvider[Try Next Provider/Model]
+    RetryCheck -->|No| FinalError[Finalize with Error]
+    NextProvider --> NextTurn
+    FinalError --> Session
 ```
 
 ---
@@ -369,16 +403,49 @@ Session termination states returned in `AIAgentResult.exitCode`.
 
 Key configuration options that affect architecture behavior.
 
-| Setting                | Type        | Description                                 |
-| ---------------------- | ----------- | ------------------------------------------- |
-| `targets`              | Array       | Model fallback chain (provider/model pairs) |
-| `systemPrompt`         | String      | System prompt template                      |
-| `maxTurns`             | Number      | Maximum action turns (default: 10)          |
-| `maxRetries`           | Number      | Max retries per turn (default: 3)           |
-| `toolTimeout`          | Number      | Tool execution timeout in ms                |
-| `toolResponseMaxBytes` | Number      | Max tool response size before storage       |
-| `abortSignal`          | AbortSignal | Cancellation signal                         |
-| `callbacks`            | Object      | Event callbacks for streaming               |
+| Setting                       | Type                    | Description                                       |
+| ----------------------------- | ----------------------- | ------------------------------------------------- | ------------------------------- | ----- | ------- | ------------ | ------------- |
+| `targets`                     | Array                   | Model fallback chain (provider/model pairs)       |
+| `systemPrompt`                | String                  | System prompt template                            |
+| `userPrompt`                  | String                  | User prompt                                       |
+| `maxTurns`                    | Number                  | Maximum action turns (default: 10)                |
+| `maxRetries`                  | Number                  | Max retries per turn (default: 3)                 |
+| `maxToolCallsPerTurn`         | Number                  | Max tool calls per turn                           |
+| `toolTimeout`                 | Number                  | Tool execution timeout in ms                      |
+| `toolResponseMaxBytes`        | Number                  | Max tool response size before storage             |
+| `llmTimeout`                  | Number                  | LLM request timeout in ms                         |
+| `toolOutput`                  | Object                  | tool_output module overrides                      |
+| `abortSignal`                 | AbortSignal             | Cancellation signal                               |
+| `stopRef`                     | `{ stopping: boolean }` | Graceful stop reference                           |
+| `callbacks`                   | Object                  | Event callbacks for streaming and accounting      |
+| `temperature`                 | Number                  | null                                              | Sampling temperature            |
+| `topP`                        | Number                  | null                                              | Top-p sampling                  |
+| `topK`                        | Number                  | null                                              | Top-k sampling                  |
+| `repeatPenalty`               | Number                  | null                                              | Repeat penalty                  |
+| `maxOutputTokens`             | Number                  | Max output tokens                                 |
+| `reasoning`                   | ReasoningLevel          | Extended thinking level (minimal/low/medium/high) |
+| `reasoningValue`              | ProviderReasoningValue  | null                                              | Direct reasoning value override |
+| `stream`                      | Boolean                 | Enable streaming                                  |
+| `traceLLM`                    | Boolean                 | Enable LLM request/response tracing               |
+| `traceMCP`                    | Boolean                 | Enable MCP tool tracing                           |
+| `traceSdk`                    | Boolean                 | Enable Vercel AI SDK tracing                      |
+| `verbose`                     | Boolean                 | Verbose logging                                   |
+| `caching`                     | CachingMode             | Cache mode                                        |
+| `outputFormat`                | OutputFormatId          | Output format identifier                          |
+| `renderTarget`                | `'cli'                  | 'slack'                                           | 'api'                           | 'web' | 'embed' | 'sub-agent'` | Render target |
+| `agentId`                     | String                  | Agent identifier                                  |
+| `agentPath`                   | String                  | Agent path in hierarchy                           |
+| `callPath` (in trace)         | String                  | Call path for tracing                             |
+| `headendId`                   | String                  | Headend identifier                                |
+| `headendWantsProgressUpdates` | Boolean                 | Enable progress updates for headends              |
+| `telemetryLabels`             | Record<string, string>  | Custom telemetry labels                           |
+| `conversationHistory`         | Array                   | Initial conversation history                      |
+| `expectedOutput`              | Object                  | Expected output spec (format, schema)             |
+| `initialTitle`                | String                  | Pre-set session title                             |
+| `mcpInitConcurrency`          | Number                  | MCP initialization concurrency override           |
+| `contextWindow`               | Number                  | Override context window for all targets           |
+| `cacheTtlMs`                  | Number                  | Cache TTL in milliseconds                         |
+| `ancestors`                   | Array                   | Ancestor agent paths for recursion prevention     |
 
 ---
 
@@ -386,16 +453,17 @@ Key configuration options that affect architecture behavior.
 
 1. **Layered Isolation**: Each layer only knows about its immediate dependencies
 2. **Provider Abstraction**: LLM providers share a common interface
-3. **Tool Abstraction**: All tools (MCP, REST, sub-agent) share a common interface
+3. **Tool Abstraction**: All tools (MCP, REST, sub-agent, router, tool-output) share a common interface via `ToolProvider`
 4. **Stateless Providers**: Providers hold no session state
 5. **Session Owns State**: All session state lives in `AIAgentSession`
+6. **Complete Session Autonomy**: Each session is completely independent with zero shared state - orchestration (advisors/router/handoff) is layered outside the session loop so session itself stays pure and isolated
 
 ---
 
 ## See Also
 
-- [Session Lifecycle](Technical-Specs-Session-Lifecycle) - Detailed session execution flow
-- [Tool System](Technical-Specs-Tool-System) - Tool provider internals
-- [Context Management](Technical-Specs-Context-Management) - Token budget management
-- [Design History](Technical-Specs-Design-History) - Why these decisions were made
-- [specs/architecture.md](specs/architecture.md) - Full specification
+- [specs/architecture.md](specs/architecture.md) - Full architecture specification
+- [specs/DESIGN.md](specs/DESIGN.md) - Core design principles and separation of concerns
+- [specs/session-lifecycle.md](specs/session-lifecycle.md) - Session execution flow
+- [specs/tools-overview.md](specs/tools-overview.md) - Tool system internals
+- [specs/context-management.md](specs/context-management.md) - Token budget management

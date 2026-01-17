@@ -337,7 +337,6 @@ ai-agent --agent api.ai --cache 15m "API call"
 - `llmTimeout`, `toolTimeout` - Timeouts
 - `maxRetries`, `maxTurns`, `maxToolCallsPerTurn` - Limits
 - `toolResponseMaxBytes` - Response size
-- `mcpInitConcurrency` - MCP startup
 - `cache` - Response cache TTL (time-to-live)
 - `stream` - Streaming mode
 - `interleaved` - Interleaved reasoning
@@ -453,15 +452,14 @@ ai-agent --config ./config/development.json --agent api.ai --api 8080
 
 ### Global
 
-| Flag                         | Default                 | Description                                                  |
-| ---------------------------- | ----------------------- | ------------------------------------------------------------ |
-| `--config <path>`            | Auto-discovered         | Config file                                                  |
-| `--dry-run`                  | `false`                 | Validation only                                              |
-| `--quiet`                    | `false`                 | Suppress logs                                                |
-| `--sessions-dir <path>`      | `~/.ai-agent/sessions/` | Session storage                                              |
-| `--billing-file <path>`      | -                       | Cost tracking                                                |
-| `--resume <id>`              | -                       | Resume session                                               |
-| `--mcp-init-concurrency <n>` | -                       | MCP servers to initialize in parallel (reduces startup load) |
+| Flag                    | Default         | Description     |
+| ----------------------- | --------------- | --------------- |
+| `--config <path>`       | Auto-discovered | Config file     |
+| `--dry-run`             | `false`         | Validation only |
+| `--quiet`               | `false`         | Suppress logs   |
+| `--sessions-dir <path>` | -               | Session storage |
+| `--billing-file <path>` | -               | Cost tracking   |
+| `--resume <id>`         | -               | Resume session  |
 
 ---
 

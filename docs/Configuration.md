@@ -175,7 +175,7 @@ Global default settings for all agents.
     "temperature": 0.0,
     "llmTimeout": 600000,
     "toolTimeout": 300000,
-    "stream": false,
+    "stream": true,
     "maxOutputTokens": 4096,
     "contextWindowBufferTokens": 8192
   }

@@ -223,7 +223,7 @@ Additional `payload` fields are merged into the agent's input payload (e.g., `ma
 }
 ```
 
-**Note**: Returns HTTP 200 on success, HTTP 500 on execution failure, or other 4xx status codes on request validation errors.
+**Note**: Returns HTTP 200 on success, HTTP 400 for validation errors, HTTP 404 for unknown models, HTTP 503 for concurrency limit, or HTTP 500 for execution failures.
 
 ### With Thinking Content
 
@@ -479,6 +479,14 @@ client = anthropic.Anthropic(base_url="...", api_key="not-needed")
 ```
 
 The headend does not validate API keys.
+
+### Concurrency limit reached
+
+**Symptom**: `{"error": "concurrency_unavailable", "message": "Concurrency limit reached"}` (HTTP 503)
+
+**Cause**: Too many concurrent requests for the configured limit.
+
+**Solution**: Wait for current requests to complete or increase the limit using `--anthropic-completions-concurrency`.
 
 ### Streaming events out of order
 

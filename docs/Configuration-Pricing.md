@@ -517,17 +517,20 @@ Set up alerts for:
 
 ### Optimize Caching
 
-Reduce costs with response caching:
+Enable Anthropic prompt caching (default is `full`):
 
 ```yaml
 ---
 models:
   - anthropic/claude-sonnet-4-20250514
-cache: 1h
+caching: full
 ---
 ```
 
-Anthropic cache savings can be significant for repeated prompts.
+Anthropic cache savings can be significant for repeated prompts. The `caching` option can be set to:
+
+- `full` (default): Enable cache reuse
+- `none`: Disable cache reuse
 
 ### Use Appropriate Models
 
@@ -559,7 +562,7 @@ Track costs per agent/session:
 export DAILY_BUDGET=100
 
 # Check current spend
-SPENT=$(cat accounting.jsonl | jq -s '[.[].cost // 0] | add')
+SPENT=$(cat accounting.jsonl | jq -s '[.[].costUsd // 0] | add')
 echo "Today's spend: $SPENT"
 ```
 

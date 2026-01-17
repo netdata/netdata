@@ -105,12 +105,13 @@ ai-agent --agent chat.ai --mcp stdio
 
 ### HTTP (Streamable)
 
-| Property    | Value                                |
-| ----------- | ------------------------------------ |
-| Protocol    | HTTP POST with streaming responses   |
-| Sessions    | Multiple via `mcp-session-id` header |
-| Concurrency | Default 10 concurrent sessions       |
-| Endpoint    | `POST /mcp`                          |
+| Property        | Value                                |
+| --------------- | ------------------------------------ |
+| Protocol        | HTTP POST with streaming responses   |
+| Sessions        | Multiple via `mcp-session-id` header |
+| Concurrency     | Default 10 concurrent sessions       |
+| Endpoint        | `POST /mcp`                          |
+| Request Timeout | Disabled (client-controlled)         |
 
 ```bash
 ai-agent --agent chat.ai --mcp http:8081

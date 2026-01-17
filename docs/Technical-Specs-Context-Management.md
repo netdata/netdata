@@ -138,7 +138,6 @@ When the guard triggers:
 | 4    | Reset new tokens counter                     |
 | 5    | Restrict tools to `agent__final_report` only |
 | 6    | Emit telemetry event                         |
-| 7    | Recompute schema tokens (only final_report)  |
 
 ---
 
@@ -246,121 +245,12 @@ Tool outputs exceeding size limits are handled through the ToolOutputExtractor w
 
 The `toolResponseMaxBytes` setting controls the size threshold for tool output handling. When outputs exceed this limit, the ToolOutputExtractor determines the appropriate strategy to manage the content.
 
-### Tool Budget Callback Interface
+Tool budget callbacks provide an interface for the tools orchestrator to:
 
-```typescript
-toolBudgetCallbacks = {
-  reserveToolOutput: async (output) => {
-    const tokens = estimateTokens(output);
-    const guard = evaluateContextGuard(tokens);
-
-    if (guard.blocked.length > 0) {
-      this.toolBudgetExceeded = true;
-      enforceContextFinalTurn();
-      return {
-        ok: false,
-        tokens,
-        reason: "token_budget_exceeded",
-        availableTokens,
-      };
-    }
-
-    // Accumulate tokens so subsequent tool reservations see the updated context
-    this.newCtxTokens += tokens;
-    return { ok: true, tokens };
-  },
-
-  previewToolOutput: async (output) => {
-    const tokens = estimateTokens(output);
-    const guard = evaluateContextGuard(tokens);
-    if (guard.blocked.length > 0) {
-      return {
-        ok: false,
-        tokens,
-        reason: "token_budget_exceeded",
-        availableTokens,
-      };
-    }
-    return { ok: true, tokens };
-  },
-
-  canExecuteTool: () => !this.toolBudgetExceeded,
-
-  countTokens: (text: string): number => {
-    // Use the same tokenizer logic as estimateTokens for consistency
-    let maxTokens = 0;
-    const targets = this.getTargets();
-    for (const target of targets) {
-      const tokenizer = resolveTokenizer(target.tokenizerId);
-      const tokens = tokenizer.countText(text);
-      if (tokens > maxTokens) {
-        maxTokens = tokens;
-      }
-    }
-    const approxTokens = Math.ceil(text.length / 4);
-    return Math.max(maxTokens, approxTokens);
-  },
-};
-```
-
-Once `toolBudgetExceeded` is set, `canExecuteTool()` returns `false` and the orchestrator skips remaining tool calls.
-
-### Budget Callback Interface
-
-```typescript
-toolBudgetCallbacks = {
-  reserveToolOutput: async (output) => {
-    const tokens = estimateTokens(output);
-    const guard = evaluateContextGuard(tokens);
-
-    if (guard.blocked.length > 0) {
-      this.toolBudgetExceeded = true;
-      enforceContextFinalTurn();
-      return {
-        ok: false,
-        tokens,
-        reason: "token_budget_exceeded",
-        availableTokens,
-      };
-    }
-
-    // Accumulate tokens so subsequent tool reservations see the updated context
-    this.newCtxTokens += tokens;
-    return { ok: true, tokens };
-  },
-
-  previewToolOutput: async (output) => {
-    const tokens = estimateTokens(output);
-    const guard = evaluateContextGuard(tokens);
-    if (guard.blocked.length > 0) {
-      return {
-        ok: false,
-        tokens,
-        reason: "token_budget_exceeded",
-        availableTokens,
-      };
-    }
-    return { ok: true, tokens };
-  },
-
-  canExecuteTool: () => !this.toolBudgetExceeded,
-
-  countTokens: (text: string): number => {
-    // Use the same tokenizer logic as estimateTokens for consistency
-    let maxTokens = 0;
-    const targets = this.getTargets();
-    for (const target of targets) {
-      const tokenizer = resolveTokenizer(target.tokenizerId);
-      const tokens = tokenizer.countText(text);
-      if (tokens > maxTokens) {
-        maxTokens = tokens;
-      }
-    }
-    const approxTokens = Math.ceil(text.length / 4);
-    return Math.max(maxTokens, approxTokens);
-  },
-};
-```
+- `reserveToolOutput`: Reserve tokens for tool output before execution
+- `previewToolOutput`: Preview token cost without reserving
+- `canExecuteTool`: Check if more tools can execute
+- `countTokens`: Estimate tokens for arbitrary text
 
 Once `toolBudgetExceeded` is set, `canExecuteTool()` returns `false` and the orchestrator skips remaining tool calls.
 
@@ -368,14 +258,14 @@ Once `toolBudgetExceeded` is set, `canExecuteTool()` returns `false` and the orc
 
 ## Configuration Options
 
-| Setting                     | Type   | Default         | Effect                                       |
-| --------------------------- | ------ | --------------- | -------------------------------------------- |
-| `contextWindow`             | number | 131,072         | Total token capacity (fallback if not set)   |
-| `contextWindowBufferTokens` | number | 8,192           | Safety margin from context window            |
-| `maxOutputTokens`           | number | contextWindow/4 | Reserved for LLM response (or default)       |
-| `tokenizer`                 | string | -               | Tokenizer ID for estimation accuracy         |
-| `toolResponseMaxBytes`      | number | -               | Size threshold for tool output handling      |
-| `reasoning`                 | enum   | -               | Enables extended thinking for capable models |
+| Setting                     | Type   | Default | Effect                                                                       |
+| --------------------------- | ------ | ------- | ---------------------------------------------------------------------------- |
+| `contextWindow`             | number | 131,072 | Total token capacity (fallback if not set)                                   |
+| `contextWindowBufferTokens` | number | 8,192   | Safety margin from context window                                            |
+| `maxOutputTokens`           | number | 4,096   | Reserved for LLM response (or defaults to floor(contextWindow/4) if not set) |
+| `tokenizer`                 | string | -       | Tokenizer ID for estimation accuracy                                         |
+| `toolResponseMaxBytes`      | number | 12,288  | Size threshold for tool output handling                                      |
+| `reasoning`                 | enum   | -       | Enables extended thinking for capable models                                 |
 
 ### Example Configuration
 

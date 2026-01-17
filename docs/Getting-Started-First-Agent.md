@@ -304,12 +304,12 @@ ai-agent --agent researcher.ai --api 8080
 **Expected output:**
 
 ```
-REST API server started on http://localhost:8080
-Available endpoints:
-  GET  /v1/researcher?q=<prompt>
+starting headends: REST API 8080
 ```
 
 **Call via GET:**
+
+The endpoint uses your agent's registered ID (derived from the filename without extension).
 
 ```bash
 curl -G "http://localhost:8080/v1/researcher" \

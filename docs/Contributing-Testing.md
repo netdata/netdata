@@ -154,13 +154,10 @@ Tests assert the **observable contract**, not internal implementation.
 
 #### Deterministic Harness (`npm run test:phase2`)
 
-| Variable                      | Purpose                          | Example/Default                   |
-| ----------------------------- | -------------------------------- | --------------------------------- |
-| `PHASE1_ONLY_SCENARIO`        | Filter to specific scenarios     | `PHASE1_ONLY_SCENARIO=retry`      |
-| `PHASE1_DUMP_SCENARIO`        | Dump scenario results to console | `PHASE1_DUMP_SCENARIO=run-test-1` |
-| `PHASE2_MODE`                 | Test mode                        | `all`, `parallel`, `sequential`   |
-| `PHASE2_PARALLEL_CONCURRENCY` | Concurrency limit                | `4`                               |
-| `PHASE2_FORCE_SEQUENTIAL`     | Force sequential execution       | `1`                               |
+| Variable                     | Purpose                          | Example/Default                   |
+| ---------------------------- | -------------------------------- | --------------------------------- |
+| `PHASE1_DUMP_SCENARIO`       | Dump scenario results to console | `PHASE1_DUMP_SCENARIO=run-test-1` |
+| `PHASE1_SCENARIO_TIMEOUT_MS` | Override scenario timeout        | `10000` (ms)                      |
 
 #### Live Provider Tests (`node dist/tests/phase2-runner.js`)
 
@@ -302,10 +299,11 @@ The test MCP server (`src/tests/mcp/test-stdio-server.ts`) provides deterministi
 
 ### Available Tools
 
-| Tool           | Purpose              |
-| -------------- | -------------------- |
-| `test`         | Basic test responses |
-| `test-summary` | Summary responses    |
+| Tool           | Purpose                                      |
+| -------------- | -------------------------------------------- |
+| `test`         | Basic test responses                         |
+| `test-summary` | Summary responses                            |
+| `required`     | Validation coverage (requires `start` param) |
 
 ### Supported Behaviors
 

@@ -76,7 +76,7 @@ ai-agent --agent my-agent.ai --reasoning medium "complex query"
 | Global/CLI override  | `--override reasoning=medium`  | 1 (highest, stomps everything)                            |
 | CLI flag             | `--reasoning medium`           | 2                                                         |
 | Frontmatter          | `reasoning: medium`            | 3                                                         |
-| CLI default flag     | `--default-reasoning medium`   | 4 (only when agent has `reasoning: default` or omits key) |
+| CLI default flag     | `--default-reasoning medium`   | 4 (only when agent has `reasoning: default` or omitted key) |
 | Config file defaults | `defaults.reasoning: "medium"` | 5 (lowest)                                                |
 
 **Frontmatter example**:
@@ -173,13 +173,12 @@ Use `--override reasoning=<level>` when you want to force reasoning on every age
 | `high`    | 80% of max output tokens                    | 80% × maxOutputTokens                       |
 
 **Example token budgets** (assuming 4096 max output tokens, Anthropic provider):
-
 | Level     | Calculated Budget  |
 | --------- | ------------------ |
 | `minimal` | 1,024 tokens       |
 | `low`     | 819 tokens (20%)   |
 | `medium`  | 2,048 tokens (50%) |
-| `high`    | 3,276 tokens (80%) |
+| `high`    | 3,277 tokens (80%) |
 
 > **Note**: Actual budgets are computed dynamically from `maxOutputTokens`. Providers have different limits (Anthropic: min 1024, max 128,000).
 
@@ -189,12 +188,12 @@ Use `--override reasoning=<level>` when you want to force reasoning on every age
 
 ### Anthropic
 
-| Aspect           | Behavior                                                                                            |
-| ---------------- | --------------------------------------------------------------------------------------------------- |
-| Signatures       | Reasoning blocks have cryptographic signatures                                                      |
-| Preservation     | Signatures must survive serialization for replay                                                    |
-| Subsequent turns | Prior assistant tool calls with reasoning require valid signatures to enable reasoning on next turn |
-| Streaming        | Auto-enabled when reasoning active AND max output tokens >= 21,333                                  |
+| Aspect           | Behavior                                                                                                                                 |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Signatures       | Reasoning blocks have cryptographic signatures                                                                                           |
+| Preservation     | Signatures must survive serialization for replay                                                                                         |
+| Subsequent turns | Prior assistant tool calls with reasoning require valid signatures to enable reasoning on next turn                                      |
+| Streaming        | Auto-enabled when reasoning is configured (via level or value) AND max output tokens >= 21,333, and provider-specific conditions are met |
 
 **Signature handling**:
 

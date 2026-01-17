@@ -36,16 +36,14 @@ Hidden options exist for features that:
 
 ## --advisors
 
-| Property | Value                         |
-| -------- | ----------------------------- |
-| Type     | `string[]` (frontmatter only) |
-| Default  | Empty (no advisors)           |
-| Hidden   | Yes                           |
-| Scope    | Master agent only             |
+| Property | Value               |
+| -------- | ------------------- |
+| Type     | `string[]`          |
+| Default  | Empty (no advisors) |
+| Hidden   | Yes                 |
+| Scope    | Master agent only   |
 
 **Description**: Run parallel pre-run agents whose outputs inject as `<advisory>` blocks into the main agent's prompt.
-
-> **Note**: This option is only configurable via agent frontmatter. CLI argument is not supported.
 
 ### Configuration
 
@@ -118,16 +116,14 @@ Analyze the customer complaint about slow performance
 
 ## --handoff
 
-| Property | Value                       |
-| -------- | --------------------------- |
-| Type     | `string` (frontmatter only) |
-| Default  | None                        |
-| Hidden   | Yes                         |
-| Scope    | Master agent only           |
+| Property | Value             |
+| -------- | ----------------- |
+| Type     | `string`          |
+| Default  | None              |
+| Hidden   | Yes               |
+| Scope    | Master agent only |
 
 **Description**: Post-run execution chain for multi-stage workflows. The handoff agent receives the main agent's output and produces the final response.
-
-> **Note**: This option is only configurable via agent frontmatter. CLI argument is not supported.
 
 ### Configuration
 
@@ -186,7 +182,7 @@ What's our Q4 revenue trend?
 ### Notes
 
 - Handoff result becomes the final output to the user
-- Can chain multiple stages via frontmatter
+- Pipeline chaining (multiple handoffs) is not supported
 - Handoff agent has full tool access
 - XML tags include random nonce suffixes (`__HEX`) for prompt uniqueness and security
 
@@ -208,7 +204,7 @@ handoff: final-reporter.ai
 Your task prompt here.
 ```
 
-> **Note**: Orchestration options (`advisors`, `handoff`, `router`) are only available via frontmatter configuration. CLI arguments for these options are not supported.
+> **Note**: Orchestration options (`advisors`, `handoff`, `router`) are only available via frontmatter configuration.
 
 ---
 
@@ -277,17 +273,17 @@ ERR [agent:orchestrator] handoff_failed: timeout
 ### Find All Hidden Options
 
 ```bash
-grep -r "showInHelp: false" src/options-registry.ts
+grep "showInHelp: false" src/options-registry.ts
 ```
 
 ### Current Hidden Options
 
 | Option       | Purpose                  | Configuration Method |
 | ------------ | ------------------------ | -------------------- |
-| `--advisors` | Parallel pre-run agents  | Frontmatter only     |
-| `--handoff`  | Post-run execution chain | Frontmatter only     |
+| `--advisors` | Parallel pre-run agents  | Frontmatter          |
+| `--handoff`  | Post-run execution chain | Frontmatter          |
 
-> **Note**: These options are hidden from help and are only configurable via agent frontmatter. CLI arguments are not supported.
+> **Note**: These options are hidden from help and are only configurable via agent frontmatter.
 
 ### Source Reference
 

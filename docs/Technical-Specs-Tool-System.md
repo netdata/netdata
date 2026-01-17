@@ -55,7 +55,11 @@ classDiagram
         +hasTool(name) boolean
         +execute(name, parameters, opts) ToolExecuteResult
         +warmup() void
+        +cancelTool(name, opts) void
         +getInstructions() string
+        +resolveLogProvider(name) string
+        +resolveToolIdentity(name) { namespace, tool }
+        +resolveQueueName(name) string | undefined
     }
 
     class MCPProvider {
@@ -80,7 +84,7 @@ classDiagram
 
     class RouterToolProvider {
         +kind: "agent"
-        +namespace: "router"
+        +namespace: "agent"
     }
 
     ToolProvider <|-- RouterToolProvider
@@ -103,11 +107,7 @@ interface ToolExecuteResult {
     | {
         taskStatusCompleted?: boolean;
         taskStatusData?: TaskStatusData;
-        childAccounting?: readonly unknown[];
-        childConversation?: unknown;
-        childOpTree?: unknown;
-        rawResponse?: string;
-      }; // Additional metadata (task_status, sub-agent, and tool_output-specific fields possible)
+      }; // Additional metadata (task_status-specific fields possible)
 }
 ```
 
@@ -220,13 +220,13 @@ Built-in tools provided by ai-agent itself.
 
 **final_report Parameters**:
 
-| Parameter       | Type                                      | Description                          |
-| --------------- | ----------------------------------------- | ------------------------------------ |
-| `report_format` | `'success'` \| `'failure'` \| `'partial'` | Completion status                    |
-| `content_json`  | object                                    | JSON content (for JSON formats)      |
-| `content`       | string                                    | Text content (for text formats)      |
-| `messages`      | array                                     | Messages array (for slack-block-kit) |
-| `metadata`      | object                                    | Optional metadata                    |
+| Parameter        | Type   | Description                                                         |
+| ---------------- | ------ | ------------------------------------------------------------------- |
+| `report_format`  | string | Output format (e.g., 'json', 'markdown', 'slack-block-kit', 'text') |
+| `content_json`   | object | JSON content (required for JSON format)                             |
+| `report_content` | string | Text content (required for text formats)                            |
+| `messages`       | array  | Messages array (required for slack-block-kit)                       |
+| `metadata`       | object | Optional metadata                                                   |
 
 **task_status Parameters**:
 
@@ -287,6 +287,7 @@ sequenceDiagram
 Dynamic agent routing.
 
 **Kind**: `agent`
+**Namespace**: `agent`
 **Tool**: `router__handoff-to`
 
 **Parameters**:
@@ -314,15 +315,15 @@ All tools follow the pattern: `{provider}__{toolname}`
 | REST          | `rest`      | `rest__weather_api`   |
 | Sub-Agent     | `agent`     | `agent__researcher`   |
 | Internal      | `agent`     | `agent__final_report` |
-| Router        | `router`    | `router__handoff-to`  |
+| Router        | `agent`     | `router__handoff-to`  |
 
 ### Sanitization Rules
 
 Tool names are sanitized for safe usage:
 
 | Rule                                | Example               |
-| ----------------------------------- | --------------------- | ------------------ | -------- | ------------------------------------- |
-| Remove `<                           | ...                   | >` wrapper markers | `<github | search_code>`→`github\_\_search_code` |
+| ----------------------------------- | --------------------- | -------- | ------------------------------------- |
+| Remove `<                           | >` wrapper markers    | `<github | search_code>`→`github\_\_search_code` |
 | Replace invalid characters with `_` | `my-tool` → `my_tool` |
 | Remove invalid prefix characters    | `123tool` → `tool`    |
 
@@ -409,10 +410,10 @@ Queues control concurrency to:
 
 ### Queue Types
 
-| Type          | Scope                          | Use Case                    |
-| ------------- | ------------------------------ | --------------------------- |
-| Named queue   | Tools assigned to a queue name | Server-specific rate limits |
-| Default queue | Tools without explicit queue   | Default concurrency (10)    |
+| Type          | Scope                          | Use Case                                |
+| ------------- | ------------------------------ | --------------------------------------- |
+| Named queue   | Tools assigned to a queue name | Server-specific rate limits             |
+| Default queue | Tools without explicit queue   | Dynamic default (CPU cores × 2, max 64) |
 
 ### Configuration
 
@@ -486,36 +487,39 @@ When output exceeds `toolResponseMaxBytes`:
 
 **Handle Message**:
 
-When a tool's stored output is successfully extracted, the response contains the extracted content.
+The `tool_output` tool is available to retrieve stored content. It returns a JSON object with `handle` and `reason` fields.
 
-When extraction fails or the handle is not found, the response contains an error message.
+Example success:
 
-Example success (extracted content):
-
-```
-<file content here>
+```json
+{
+  "handle": "session-abc123/file-xyz789",
+  "reason": "size_cap"
+}
 ```
 
 Example error (handle not found):
 
-```
-No stored tool output found for handle session-abc123/file-xyz789. It may have expired or been cleaned up.
+```json
+{
+  "error": "No stored tool output found for handle session-abc123/file-xyz789. It may have expired or been cleaned up."
+}
 ```
 
-**Storage Location**: Stored via ToolOutputProvider, typically in session directory as `<session-dir>/tool-output/<handle>`
+**Storage Location**: Stored via ToolOutputHandler, typically in session directory as `<session-dir>/tool-output/<handle>`
 
 ### Output Outcomes
 
-| Outcome         | Conversation Message                                                   |
-| --------------- | ---------------------------------------------------------------------- |
-| Success         | Tool result content                                                    |
-| Timeout         | `(tool failed: timeout)`                                               |
-| Error           | `(tool failed: <error message>)`                                       |
-| Size exceeded   | `tool_output` handle message with extraction instructions or reference |
-| Budget exceeded | `(tool failed: context window budget exceeded)`                        |
-| Not permitted   | `(tool failed: tool not permitted for provider '<provider>')`          |
-| Unknown tool    | `(tool failed: Unknown tool: <tool name>)`                             |
-| Per-turn limit  | `(tool failed: per-turn tool limit exceeded)`                          |
+| Outcome         | Conversation Message                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------- |
+| Success         | Tool result content                                                                         |
+| Timeout         | `(tool failed: timeout)`                                                                    |
+| Error           | `(tool failed: <error message>)`                                                            |
+| Size exceeded   | `Tool 'xxx' output stored for tool_output (size_cap)` (or similar message for token budget) |
+| Budget exceeded | `(tool failed: context window budget exceeded)`                                             |
+| Not permitted   | `(tool failed: tool not permitted for provider '<provider>')`                               |
+| Unknown tool    | `(tool failed: Unknown tool: <tool name>)`                                                  |
+| Per-turn limit  | `(tool failed: per-turn tool limit exceeded)`                                               |
 
 ---
 
@@ -523,11 +527,11 @@ No stored tool output found for handle session-abc123/file-xyz789. It may have e
 
 ### Global Settings
 
-| Setting                | Type    | Default | Effect                              |
-| ---------------------- | ------- | ------- | ----------------------------------- |
-| `toolTimeout`          | number  | 300000  | Global timeout per tool (5 minutes) |
-| `toolResponseMaxBytes` | number  | 12288   | Triggers disk storage               |
-| `traceTools`           | boolean | false   | Enable detailed tool execution logs |
+| Setting                | Type    | Default    | Effect                              |
+| ---------------------- | ------- | ---------- | ----------------------------------- |
+| `toolTimeout`          | number  | (optional) | Global timeout per tool (5 minutes) |
+| `toolResponseMaxBytes` | number  | (optional) | Triggers disk storage               |
+| `traceTools`           | boolean | false      | Enable detailed tool execution logs |
 
 ### Per-Server Settings
 

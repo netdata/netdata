@@ -163,8 +163,8 @@ MCP server configuration.
       "url": "string",
       "headers": { "string": "string" },
       "queue": "string",
-      "cache": "string",
-      "toolsCache": { "<tool>": "string" },
+      "cache": "number",
+      "toolsCache": { "<tool>": "number" },
       "shared": "boolean",
       "healthProbe": "ping | listTools",
       "requestTimeoutMs": "number",
@@ -177,22 +177,22 @@ MCP server configuration.
 
 ### MCP Server Properties
 
-| Property           | Type       | Default     | Description                |
-| ------------------ | ---------- | ----------- | -------------------------- |
-| `type`             | `string`   | Required    | Transport type             |
-| `command`          | `string`   | -           | Stdio command              |
-| `args`             | `string[]` | `[]`        | Stdio command arguments    |
-| `env`              | `object`   | `{}`        | Environment variables      |
-| `url`              | `string`   | -           | HTTP/SSE/WebSocket URL     |
-| `headers`          | `object`   | `{}`        | HTTP headers               |
-| `queue`            | `string`   | `"default"` | Concurrency queue          |
-| `cache`            | `string`   | `"off"`     | Response cache TTL         |
-| `toolsCache`       | `object`   | `{}`        | Per-tool cache TTL         |
-| `shared`           | `boolean`  | `true`      | Share across sessions      |
-| `healthProbe`      | `string`   | `"ping"`    | Health check method        |
-| `requestTimeoutMs` | `number`   | -           | Request timeout (optional) |
-| `toolsAllowed`     | `string[]` | `[]`        | Tools to expose            |
-| `toolsDenied`      | `string[]` | `[]`        | Tools to hide              |
+| Property           | Type       | Default     | Description                         |
+| ------------------ | ---------- | ----------- | ----------------------------------- |
+| `type`             | `string`   | Required    | Transport type                      |
+| `command`          | `string`   | -           | Stdio command                       |
+| `args`             | `string[]` | `[]`        | Stdio command arguments             |
+| `env`              | `object`   | `{}`        | Environment variables               |
+| `url`              | `string`   | -           | HTTP/SSE/WebSocket URL              |
+| `headers`          | `object`   | `{}`        | HTTP headers                        |
+| `queue`            | `string`   | `"default"` | Concurrency queue                   |
+| `cache`            | `number`   | -           | Response cache TTL (ms or duration) |
+| `toolsCache`       | `object`   | `{}`        | Per-tool cache TTL (number)         |
+| `shared`           | `boolean`  | `true`      | Share across sessions               |
+| `healthProbe`      | `string`   | `"ping"`    | Health check method                 |
+| `requestTimeoutMs` | `number`   | -           | Request timeout (optional)          |
+| `toolsAllowed`     | `string[]` | `[]`        | Tools to expose                     |
+| `toolsDenied`      | `string[]` | `[]`        | Tools to hide                       |
 
 ---
 
@@ -211,7 +211,7 @@ REST API tool configuration.
       "parametersSchema": {},
       "bodyTemplate": {},
       "queue": "string",
-      "cache": "string|number",
+      "cache": "string | number",
       "streaming": {
         "mode": "json-stream",
         "linePrefix": "string",
@@ -347,7 +347,7 @@ Token pricing configuration.
   "pricing": {
     "<provider>": {
       "<model>": {
-        "unit": "per_1m",
+        "unit": "per_1k | per_1m",
         "prompt": "number",
         "completion": "number",
         "cacheRead": "number",
@@ -360,13 +360,13 @@ Token pricing configuration.
 
 ### Pricing Properties
 
-| Property     | Type     | Default    | Description        |
-| ------------ | -------- | ---------- | ------------------ |
-| `unit`       | `string` | `"per_1m"` | Price unit         |
-| `prompt`     | `number` | `0`        | Input token price  |
-| `completion` | `number` | `0`        | Output token price |
-| `cacheRead`  | `number` | `0`        | Cache read price   |
-| `cacheWrite` | `number` | `0`        | Cache write price  |
+| Property     | Type     | Default    | Description                   |
+| ------------ | -------- | ---------- | ----------------------------- |
+| `unit`       | `string` | `"per_1m"` | Price unit (per_1k or per_1m) |
+| `prompt`     | `number` | `0`        | Input token price             |
+| `completion` | `number` | `0`        | Output token price            |
+| `cacheRead`  | `number` | `0`        | Cache read price              |
+| `cacheWrite` | `number` | `0`        | Cache write price             |
 
 ---
 
@@ -401,7 +401,7 @@ Default parameter values.
 
 | Property                    | Type      | Default  | Description            |
 | --------------------------- | --------- | -------- | ---------------------- |
-| `temperature`               | `number`  | `0.2`    | LLM temperature        |
+| `temperature`               | `number`  | `0`      | LLM temperature        |
 | `topP`                      | `number`  | `null`   | Top-p sampling         |
 | `topK`                      | `number`  | `null`   | Top-k sampling         |
 | `repeatPenalty`             | `number`  | `null`   | Repetition penalty     |
@@ -409,12 +409,12 @@ Default parameter values.
 | `toolTimeout`               | `number`  | `300000` | Tool timeout (ms)      |
 | `maxTurns`                  | `number`  | `10`     | Max conversation turns |
 | `maxToolCallsPerTurn`       | `number`  | `10`     | Max tools per turn     |
-| `maxRetries`                | `number`  | `3`      | Max retry attempts     |
-| `maxOutputTokens`           | `number`  | `16384`  | Max output tokens      |
+| `maxRetries`                | `number`  | `5`      | Max retry attempts     |
+| `maxOutputTokens`           | `number`  | `4096`   | Max output tokens      |
 | `toolResponseMaxBytes`      | `number`  | `12288`  | Max tool response size |
 | `mcpInitConcurrency`        | `number`  | -        | MCP init concurrency   |
 | `contextWindowBufferTokens` | `number`  | -        | Context buffer         |
-| `stream`                    | `boolean` | `false`  | Enable streaming       |
+| `stream`                    | `boolean` | `true`   | Enable streaming       |
 
 ---
 
@@ -437,14 +437,14 @@ Tool output handling configuration.
 
 ### Tool Output Properties
 
-| Property                | Type                               | Default | Description                     |
-| ----------------------- | ---------------------------------- | ------- | ------------------------------- |
-| `enabled`               | `boolean`                          | `true`  | Enable tool output storage      |
-| `storeDir`              | `string`                           | `/tmp`  | Storage directory path          |
-| `maxChunks`             | `number`                           | `1`     | Max stored chunks               |
-| `overlapPercent`        | `number`                           | `10`    | Chunk overlap percentage        |
-| `avgLineBytesThreshold` | `number`                           | `1000`  | Line size threshold             |
-| `models`                | `{provider:string;model:string}[]` | `-`     | Models that support tool output |
+| Property                | Type                                  | Default | Description                     |
+| ----------------------- | ------------------------------------- | ------- | ------------------------------- |
+| `enabled`               | `boolean`                             | `true`  | Enable tool output storage      |
+| `storeDir`              | `string`                              | `/tmp`  | Storage directory path          |
+| `maxChunks`             | `number`                              | `1`     | Max stored chunks               |
+| `overlapPercent`        | `number`                              | `10`    | Chunk overlap percentage        |
+| `avgLineBytesThreshold` | `number`                              | `1000`  | Line size threshold             |
+| `models`                | `{provider: string; model: string}[]` | `-`     | Models that support tool output |
 
 ---
 
@@ -456,10 +456,28 @@ Slack integration configuration.
 {
   "slack": {
     "enabled": "boolean",
-    "appToken": "string",
+    "mentions": "boolean",
+    "dms": "boolean",
+    "updateIntervalMs": "number",
+    "historyLimit": "number",
+    "historyCharsCap": "number",
     "botToken": "string",
+    "appToken": "string",
     "signingSecret": "string",
+    "openerTone": "random | cheerful | formal | busy",
     "routing": {
+      "default": {
+        "agent": "string",
+        "engage": ["mentions", "channel-posts", "dms"],
+        "promptTemplates": {
+          "mention": "string",
+          "dm": "string",
+          "channelPost": "string"
+        },
+        "contextPolicy": {
+          "channelPost": "selfOnly | previousOnly | selfAndPrevious"
+        }
+      },
       "rules": [
         {
           "channels": ["string"],
@@ -469,7 +487,16 @@ Slack integration configuration.
             "mention": "string",
             "dm": "string",
             "channelPost": "string"
+          },
+          "contextPolicy": {
+            "channelPost": "selfOnly | previousOnly | selfAndPrevious"
           }
+        }
+      ],
+      "deny": [
+        {
+          "channels": ["string"],
+          "engage": ["mentions", "channel-posts", "dms"]
         }
       ]
     }
@@ -479,22 +506,36 @@ Slack integration configuration.
 
 ### Slack Properties
 
-| Property        | Type      | Default | Description          |
-| --------------- | --------- | ------- | -------------------- |
-| `enabled`       | `boolean` | `false` | Enable Slack         |
-| `appToken`      | `string`  | -       | Slack app token      |
-| `botToken`      | `string`  | -       | Slack bot token      |
-| `signingSecret` | `string`  | -       | Slack signing secret |
-| `routing.rules` | `array`   | `[]`    | Routing rules        |
+| Property           | Type      | Default | Description                               |
+| ------------------ | --------- | ------- | ----------------------------------------- |
+| `enabled`          | `boolean` | `false` | Enable Slack                              |
+| `mentions`         | `boolean` | -       | Handle app mentions in channels           |
+| `dms`              | `boolean` | -       | Handle DM messages                        |
+| `updateIntervalMs` | `number`  | -       | Progress update interval (ms)             |
+| `historyLimit`     | `number`  | -       | Messages to prefetch                      |
+| `historyCharsCap`  | `number`  | -       | Prefetch context character cap            |
+| `botToken`         | `string`  | -       | Slack bot token                           |
+| `appToken`         | `string`  | -       | Slack app token (Socket Mode)             |
+| `signingSecret`    | `string`  | -       | Slack signing secret (slash commands)     |
+| `openerTone`       | `string`  | -       | Opener tone (random/cheerful/formal/busy) |
+| `routing`          | `object`  | -       | Routing configuration                     |
 
 ### Routing Rule Properties
 
-| Property          | Type       | Default | Description      |
-| ----------------- | ---------- | ------- | ---------------- |
-| `channels`        | `string[]` | `[]`    | Channel IDs      |
-| `agent`           | `string`   | -       | Agent path       |
-| `engage`          | `string[]` | `[]`    | Engagement types |
-| `promptTemplates` | `object`   | `{}`    | Custom prompts   |
+| Property          | Type       | Default | Description                      |
+| ----------------- | ---------- | ------- | -------------------------------- |
+| `channels`        | `string[]` | `[]`    | Channel IDs (supports wildcards) |
+| `agent`           | `string`   | -       | Agent path                       |
+| `engage`          | `string[]` | `[]`    | Engagement types                 |
+| `promptTemplates` | `object`   | `{}`    | Custom prompts                   |
+| `contextPolicy`   | `object`   | -       | Context policy                   |
+
+### Deny Rule Properties
+
+| Property   | Type       | Default | Description      |
+| ---------- | ---------- | ------- | ---------------- |
+| `channels` | `string[]` | `[]`    | Channel IDs      |
+| `engage`   | `string[]` | `[]`    | Engagement types |
 
 ---
 
@@ -502,13 +543,13 @@ Slack integration configuration.
 
 | Parameter                       | Config Path                     | Default          | Description        |
 | ------------------------------- | ------------------------------- | ---------------- | ------------------ |
-| `--temperature <n>`             | `defaults.temperature`          | `0.2`            | LLM temperature    |
+| `--temperature <n>`             | `defaults.temperature`          | `0`              | LLM temperature    |
 | `--top-p <n>`                   | `defaults.topP`                 | `null`           | Top-p sampling     |
 | `--llm-timeout <ms>`            | `defaults.llmTimeout`           | `600000`         | LLM timeout        |
 | `--tool-timeout <ms>`           | `defaults.toolTimeout`          | `300000`         | Tool timeout       |
-| `--max-output-tokens <n>`       | `defaults.maxOutputTokens`      | `16384`          | Max output         |
+| `--max-output-tokens <n>`       | `defaults.maxOutputTokens`      | `4096`           | Max output         |
 | `--tool-response-max-bytes <n>` | `defaults.toolResponseMaxBytes` | `12288`          | Max tool response  |
-| `--stream / --no-stream`        | `defaults.stream`               | `false`          | Enable streaming   |
+| `--stream / --no-stream`        | `defaults.stream`               | `true`           | Enable streaming   |
 | `--accounting <path>`           | `accounting.file`               | -                | Accounting file    |
 | `--config <path>`               | -                               | `.ai-agent.json` | Config file        |
 | `--verbose`                     | -                               | `false`          | Verbose output     |
@@ -531,11 +572,11 @@ Slack integration configuration.
 | `toolsDenied`          | `string[]` | -                | Tools to hide      |
 | `maxTurns`             | `number`   | `10`             | Max turns          |
 | `maxToolCallsPerTurn`  | `number`   | `10`             | Max tools per turn |
-| `maxRetries`           | `number`   | `3`              | Max retries        |
-| `temperature`          | `number`   | `0.2`            | Temperature        |
+| `maxRetries`           | `number`   | `5`              | Max retries        |
+| `temperature`          | `number`   | `0`              | Temperature        |
 | `topP`                 | `number`   | `null`           | Top-p              |
 | `topK`                 | `number`   | `null`           | Top-k              |
-| `maxOutputTokens`      | `number`   | `16384`          | Max output         |
+| `maxOutputTokens`      | `number`   | `4096`           | Max output         |
 | `repeatPenalty`        | `number`   | `null`           | Repetition penalty |
 | `reasoning`            | `string`   | -                | Reasoning mode     |
 | `reasoningValue`       | `string`   | -                | Reasoning budget   |
@@ -550,7 +591,7 @@ Slack integration configuration.
 | `handoff`              | `string`   | -                | Handoff agent      |
 | `toolOutput`           | `object`   | -                | Tool output config |
 | `input`                | `object`   | -                | Input schema       |
-| `output.format`        | `string`   | `"markdown"`     | Output format      |
+| `output.format`        | `string`   | -                | Output format      |
 | `output.schema`        | `object`   | -                | Output JSON schema |
 
 ---

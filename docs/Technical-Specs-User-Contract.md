@@ -103,7 +103,7 @@ Every `LLM request prepared` log satisfies:
 expectedTokens = ctxTokens + newTokens + schemaCtxTokens
 ```
 
-**Note:** Schema tokens are tracked separately (`schemaCtxTokens`) and added to context via cache_write (first turn) and cache_read (subsequent turns). They are included in the `ctxTokens` value reported by providers (input + output + cache_read + cache_write), so `expectedTokens = ctxTokens + newTokens + schemaCtxTokens` accurately reflects total context.
+**Note:** Schema tokens are tracked separately (`schemaCtxTokens`) for budget planning and added to context via cache_write (first turn) and cache_read (subsequent turns). They are included in the `ctxTokens` value reported by providers (input + output + cache_read + cache_write), so `ctxTokens` already reflects total context including schema overhead.
 
 ### Guard Projection
 
@@ -231,10 +231,9 @@ Attempt N: targets[(N-1) % targets.length]
 
 ### Every Session Produces ONE OF
 
-1. **Tool-provided**: LLM calls `final_report` successfully (source: `tool-call`)
-2. **Text extraction**: Final turn text without `final_report` call (source: `text-fallback`)
-3. **Tool-message adoption**: Tool message containing valid final report payload (source: `tool-message`)
-4. **Synthetic failure**: Max turns exhausted without valid report (source: `synthetic`)
+1. **Tool-provided**: LLM calls `final_report` tool successfully (source: `tool-call`)
+2. **Tool-message adoption**: Tool message containing valid final report payload (source: `tool-message`)
+3. **Synthetic failure**: Max turns exhausted without valid report (source: `synthetic`)
 
 ### Final Report Structure
 
@@ -250,7 +249,6 @@ Attempt N: targets[(N-1) % targets.length]
 
 **Final report sources** (tracked via `FinalReportSource`):
 - `tool-call`: LLM successfully called `final_report` tool
-- `text-fallback`: Extracted from assistant text on final turn without tool call
 - `tool-message`: Tool message containing valid final report payload
 - `synthetic`: Generated on max turns exhaustion or retry failure
 

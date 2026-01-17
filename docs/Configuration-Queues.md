@@ -79,6 +79,8 @@ When multiple config layers define the same queue:
 - Queue capacity can only **increase** when merging layers, never decrease
 - This applies to all layers: `--config`, `cwd`, `prompt`, `binary`, `home`, `system`
 
+**Note:** Once a queue capacity is increased, it cannot be decreased even if a lower-priority layer with a higher value is removed. Only explicit reconfiguration can reduce capacity.
+
 ---
 
 ## Default Queue
@@ -94,6 +96,8 @@ If no `default` queue is defined, one is injected automatically:
 ```
 
 The injected `default` queue's `concurrent` value is computed from hardware (see [Default Concurrency](#default-concurrency) below).
+
+**Note:** The default queue is injected by the configuration resolver before validation, not by the queue manager at runtime.
 
 ### Default Queue Behavior
 
@@ -314,16 +318,7 @@ For APIs with strict rate limits:
 
 ### Sub-Agent Control
 
-Limit concurrent sub-agent invocations:
-
-```json
-{
-  "queues": {
-    "default": { "concurrent": 32 },
-    "llm-sub-agents": { "concurrent": 4 }
-  }
-}
-```
+**Note:** Queues only apply to MCP and REST tools. Sub-agent tools (`kind: 'agent'`) do not acquire queue slots. Sub-agent concurrency is managed by the LLM provider's request limits and the agent's configuration, not by queue capacity.
 
 ### Production Setup
 
@@ -332,8 +327,7 @@ Limit concurrent sub-agent invocations:
   "queues": {
     "default": { "concurrent": 32 },
     "web": { "concurrent": 8 },
-    "database": { "concurrent": 10 },
-    "llm-sub-agents": { "concurrent": 4 }
+    "database": { "concurrent": 10 }
   },
   "mcpServers": {
     "filesystem": {
@@ -359,6 +353,8 @@ Limit concurrent sub-agent invocations:
   }
 }
 ```
+
+**Note:** This example configures queues for MCP/REST tools only. Sub-agent tools are not queued.
 
 ---
 
@@ -436,9 +432,19 @@ A `queued` log entry is emitted only when a tool waits for a slot. The log inclu
 
 ### Monitor Metrics
 
+By default, metrics are exposed on port 9464 at `/metrics` endpoint:
+
 ```bash
 curl localhost:9464/metrics | grep ai_agent_queue
 ```
+
+Filter for queue metrics:
+
+```bash
+curl localhost:9464/metrics | grep ai_agent_queue
+```
+
+If custom host/port is configured in `telemetry.prometheus`, adjust the URL accordingly.
 
 ### Common Issues
 
@@ -464,7 +470,7 @@ curl localhost:9464/metrics | grep ai_agent_queue
 
 ## See Also
 
-- [Configuration](Configuration) - Configuration overview
-- [MCP Servers](Configuration-MCP-Servers) - MCP server configuration
-- [REST Tools](Configuration-REST-Tools) - REST tool configuration
-- [Parameters](Configuration-Parameters) - All parameters reference
+- [Configuration](Configuration.md) - Configuration overview
+- [MCP Servers](Configuration-MCP-Servers.md) - MCP server configuration
+- [REST Tools](Configuration-REST-Tools.md) - REST tool configuration
+- [Parameters](Configuration-Parameters.md) - All parameters reference

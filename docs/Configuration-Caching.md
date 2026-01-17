@@ -69,16 +69,16 @@ Configure where cached data is stored.
 
 ### Backend Configuration Reference
 
-| Property          | Type     | Default                  | Description                                                       |
-| ----------------- | -------- | ------------------------ | ----------------------------------------------------------------- |
-| `backend`         | `string` | `"sqlite"`               | Cache backend: `sqlite` or `redis`                                |
-| `sqlite.path`     | `string` | `"~/.ai-agent/cache.db"` | SQLite database path                                              |
-| `redis.url`       | `string` | -                        | Redis connection URL                                              |
-| `redis.username`  | `string` | -                        | Redis username                                                    |
-| `redis.password`  | `string` | -                        | Redis password                                                    |
-| `redis.database`  | `number` | -                        | Redis database number                                             |
-| `redis.keyPrefix` | `string` | `"ai-agent:cache:"`      | Redis key prefix                                                  |
-| `maxEntries`      | `number` | `5000`                   | Maximum cache entries (SQLite: LRU eviction, TTL-based for Redis) |
+| Property          | Type     | Default                  | Description                                                         |
+| ----------------- | -------- | ------------------------ | ------------------------------------------------------------------- |
+| `backend`         | `string` | `"sqlite"`               | Cache backend: `sqlite` or `redis`                                  |
+| `sqlite.path`     | `string` | `"~/.ai-agent/cache.db"` | SQLite database path                                                |
+| `redis.url`       | `string` | -                        | Redis connection URL                                                |
+| `redis.username`  | `string` | -                        | Redis username                                                      |
+| `redis.password`  | `string` | -                        | Redis password                                                      |
+| `redis.database`  | `number` | -                        | Redis database number                                               |
+| `redis.keyPrefix` | `string` | `"ai-agent:cache:"`      | Redis key prefix                                                    |
+| `maxEntries`      | `number` | `5000`                   | Maximum cache entries (SQLite: LRU eviction; Redis: TTL-based only) |
 
 ---
 
@@ -381,7 +381,7 @@ Cached responses may become stale:
 }
 ```
 
-Note: All fields are optional. If omitted, sensible defaults are used (`sqlite` backend, `~/.ai-agent/cache.db` path, `ai-agent:cache:` Redis prefix).
+Note: All fields are optional. If omitted, sensible defaults are used. Cache is only enabled when a `cache` section is configured.
 
 ### Provider Cache Options
 
@@ -436,21 +436,21 @@ cache: string | number # string values (e.g., "5m", "1h") are parsed to millisec
 
 ### All Cache Properties
 
-| Location    | Property                | Type     | Default                  | Description                                            |
-| ----------- | ----------------------- | -------- | ------------------------ | ------------------------------------------------------ |
-| Global      | `cache.backend`         | `string` | `"sqlite"`               | Backend type                                           |
-| Global      | `cache.sqlite.path`     | `string` | `"~/.ai-agent/cache.db"` | SQLite path                                            |
-| Global      | `cache.redis.url`       | `string` | -                        | Redis URL                                              |
-| Global      | `cache.redis.username`  | `string` | -                        | Redis username                                         |
-| Global      | `cache.redis.password`  | `string` | -                        | Redis password                                         |
-| Global      | `cache.redis.database`  | `number` | -                        | Redis database number                                  |
-| Global      | `cache.redis.keyPrefix` | `string` | `"ai-agent:cache:"`      | Redis key prefix                                       |
-| Global      | `cache.maxEntries`      | `number` | `5000`                   | Max entries (SQLite LRU eviction, TTL-based for Redis) |
-| Frontmatter | `caching`               | `string` | `"full"`                 | Anthropic cache mode                                   |
-| MCP Server  | `cache`                 | `number` | `"off"`                  | Server-wide TTL                                        |
-| MCP Server  | `toolsCache.<tool>`     | `number` | Server default           | Per-tool TTL                                           |
-| REST Tool   | `cache`                 | `number` | `"off"`                  | Tool TTL                                               |
-| Frontmatter | `cache`                 | `number` | `"off"`                  | Agent response TTL                                     |
+| Location    | Property                | Type     | Default                  | Description                                               |
+| ----------- | ----------------------- | -------- | ------------------------ | --------------------------------------------------------- | ---------------------------------------------- |
+| Global      | `cache.backend`         | `string` | `"sqlite"`               | Backend type                                              |
+| Global      | `cache.sqlite.path`     | `string` | `"~/.ai-agent/cache.db"` | SQLite path                                               |
+| Global      | `cache.redis.url`       | `string` | -                        | Redis URL                                                 |
+| Global      | `cache.redis.username`  | `string` | -                        | Redis username                                            |
+| Global      | `cache.redis.password`  | `string` | -                        | Redis password                                            |
+| Global      | `cache.redis.database`  | `number` | -                        | Redis database number                                     |
+| Global      | `cache.redis.keyPrefix` | `string` | `"ai-agent:cache:"`      | Redis key prefix                                          |
+| Global      | `cache.maxEntries`      | `number` | `5000`                   | Max entries (SQLite: LRU eviction; Redis: TTL-based only) |
+| Frontmatter | `caching`               | `string` | `"full"`                 | Anthropic cache mode                                      |
+| MCP Server  | `cache`                 | `number  | string`                  | -                                                         | Server-wide TTL (default: disabled/off)        |
+| MCP Server  | `toolsCache.<tool>`     | `number  | string`                  | Server default                                            | Per-tool TTL (falls back to server-wide cache) |
+| REST Tool   | `cache`                 | `number  | string`                  | -                                                         | Tool TTL (default: disabled/off)               |
+| Frontmatter | `cache`                 | `number  | string`                  | -                                                         | Agent response TTL (default: disabled/off)     |
 
 ---
 

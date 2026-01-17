@@ -273,15 +273,19 @@ Produce the final polished version.
 
 ### Handoff Payload
 
-The previous agent's output is wrapped in XML:
+The handoff agent receives both the previous agent's output and the original user request:
 
 ```xml
 <response__XXXXXXXXXXXX agent="draft">
 Here is the draft content I created...
 </response__XXXXXXXXXXXX>
+
+<original_user_request__XXXXXXXXXXXX>
+The original user request that started the pipeline
+</original_user_request__XXXXXXXXXXXX>
 ```
 
-The receiving agent processes this wrapped content.
+The receiving agent processes both the upstream response and the original request context.
 
 ### Use Cases
 

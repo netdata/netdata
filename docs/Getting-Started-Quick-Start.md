@@ -102,13 +102,7 @@ For Anthropic, replace the provider:
 ai-agent --list-tools all
 ```
 
-Expected output shows available tools:
-
-```
-context7:
-  - resolve-library-id
-  - get-library-docs
-```
+Expected output shows available tools for each MCP server. The exact tools depend on which MCP servers you have configured.
 
 If you see errors, check:
 
@@ -145,15 +139,10 @@ maxTurns: 10
 ---
 You are a helpful programming assistant.
 
-When users ask about libraries or frameworks:
-1. Use resolve-library-id to find the library
-2. Use get-library-docs to fetch relevant documentation
-3. Answer based on the documentation
-
-Always cite the documentation source in your answers.
+Use available MCP tools to help users with their questions.
 ```
 
-For Anthropic, change `models:` to `- anthropic/claude-sonnet-4-20250514`.
+For Anthropic, change `models:` to `- anthropic/claude-3.5-sonnet`.
 
 **File structure explained**:
 
@@ -224,14 +213,17 @@ Validates configuration and agent file without calling the LLM. Use this to chec
 
 ### Step 3.4: Understanding Exit Codes
 
-| Code | Meaning                      | Action                                                      |
-| ---- | ---------------------------- | ----------------------------------------------------------- |
-| 0    | Success                      | Agent completed with final report                           |
-| 1    | Configuration or fatal error | Check `.ai-agent.json`, agent file, or system configuration |
-| 2    | LLM error                    | Check API key, rate limits, model name                      |
-| 3    | MCP server error             | Check MCP server configuration                              |
-| 4    | CLI or argument error        | Check command-line arguments                                |
-| 5    | Schema/limit error           | Check tool schemas or maxTurns                              |
+The CLI uses specific exit codes to indicate different failure conditions:
+
+| Code | Meaning                                 | Action                                                      |
+| ---- | --------------------------------------- | ----------------------------------------------------------- |
+| 0    | Success                                 | Agent completed successfully                                |
+| 1    | Configuration or fatal error            | Check `.ai-agent.json`, agent file, or system configuration |
+| 3    | MCP server errors (list-tools mode)     | Check MCP server configuration                              |
+| 4    | CLI/headend errors or invalid arguments | Check command-line arguments, headend configuration         |
+| 5    | Schema validation errors (list-tools)   | Check tool schemas                                          |
+
+LLM-related errors and most runtime failures exit with code 1 with detailed error messages in stderr.
 
 **Script usage**:
 
@@ -407,10 +399,12 @@ ai-agent --openai-completions 3000 --api 3001 --mcp stdio --agent docs-helper.ai
 
 **Cause**: Model name doesn't match provider.
 
-**Solution**: Use exact model names:
+**Solution**: Use exact model names in the format `provider/model`:
 
 - OpenAI: `openai/gpt-4o`, `openai/gpt-4o-mini`
-- Anthropic: `anthropic/claude-sonnet-4-20250514`
+- Anthropic: `anthropic/claude-3.5-sonnet`, `anthropic/claude-3-haiku`
+
+Check your provider's documentation for the exact model identifier.
 
 ### MCP server fails to start
 

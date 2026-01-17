@@ -72,13 +72,13 @@ npm run lint
 
 ### Step 5: Run Tests
 
-**Quick test (Vitest spec tests)**:
+**Run Phase 1 unit tests**:
 
 ```bash
-npm test
+npm run test:phase1
 ```
 
-**Expected output**: All spec tests in `src/tests/**/*.spec.ts` pass (Phase 1 unit tests).
+**Expected output**: All unit tests in `src/tests/unit/` pass.
 
 **Full test suite (all phases)**:
 
@@ -130,11 +130,11 @@ See [Code Style](Contributing-Code-Style) for detailed guidelines.
 
 ### Testing
 
-| Phase   | Purpose                                     | Command               |
-| ------- | ------------------------------------------- | --------------------- |
-| Phase 1 | Unit tests (vitest)                         | `npm run test:phase1` |
-| Phase 2 | Deterministic harness + live provider tests | `npm run test:phase2` |
-| Phase 3 | Live provider integration                   | `npm run test:phase3` |
+| Phase   | Purpose                   | Command               |
+| ------- | ------------------------- | --------------------- |
+| Phase 1 | Unit tests (vitest)       | `npm run test:phase1` |
+| Phase 2 | Deterministic harness     | `npm run test:phase2` |
+| Phase 3 | Live provider integration | `npm run test:phase3` |
 
 See [Testing Guide](Contributing-Testing) for detailed instructions.
 

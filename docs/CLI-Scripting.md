@@ -52,7 +52,7 @@ ai-agent uses consistent exit codes:
 | `2`  | Agent failure                          | Session failure without specific categorization                                  |
 | `3`  | Tool/MCP error                         | MCP server failures, tool execution errors, tool-related failures                |
 | `4`  | Invalid arguments or validation errors | Bad CLI flags, missing required args, option validation failures                 |
-| `5`  | Validation error                       | Schema validation failures (tool listing, final report)                          |
+| `5`  | Validation error                       | Schema validation failures (tool listing) or max tool turns exceeded             |
 
 ### Checking Exit Codes
 

@@ -157,18 +157,14 @@ Production operations and observability.
 
 Internal reference and troubleshooting documents.
 
-| Document     | Location                                                         | Description                  |
-| ------------ | ---------------------------------------------------------------- | ---------------------------- |
-| Specs Index  | [specs/index.md](specs/index.md)                                 | Complete specs index         |
-| Specs README | [specs/README.md](specs/README.md)                               | Directory overview           |
-| Internal API | [specs/AI-AGENT-INTERNAL-API.md](specs/AI-AGENT-INTERNAL-API.md) | Internal agent API reference |
-| AGENTS.md    | [specs/AGENTS.md](specs/AGENTS.md)                               | Agent system reference       |
-| CLAUDE.md    | [specs/CLAUDE.md](specs/CLAUDE.md)                               | Meta-specification format    |
-| GEMINI.md    | [specs/GEMINI.md](specs/GEMINI.md)                               | Meta-specification format    |
-| REASONING.md | [specs/REASONING.md](specs/REASONING.md)                         | Reasoning guidance           |
-| SLACK.md     | [specs/SLACK.md](specs/SLACK.md)                                 | Slack integration notes      |
-| CRUSH.md     | [specs/CRUSH.md](specs/CRUSH.md)                                 | CRUSH protocol notes         |
-| WRAP.md      | [specs/WRAP.md](specs/WRAP.md)                                   | WRAP protocol notes          |
+| Document     | Location                                                         | Description                                                    |
+| ------------ | ---------------------------------------------------------------- | -------------------------------------------------------------- |
+| Specs Index  | [specs/index.md](specs/index.md)                                 | Complete specs index                                           |
+| Specs README | [specs/README.md](specs/README.md)                               | Directory overview                                             |
+| Internal API | [specs/AI-AGENT-INTERNAL-API.md](specs/AI-AGENT-INTERNAL-API.md) | Internal agent API reference                                   |
+| AGENTS.md    | [specs/AGENTS.md](specs/AGENTS.md)                               | Agent system reference (CLAUDE/GEMINI/CRUSH/WRAP are symlinks) |
+| REASONING.md | [specs/REASONING.md](specs/REASONING.md)                         | Reasoning guidance                                             |
+| SLACK.md     | [specs/SLACK.md](specs/SLACK.md)                                 | Slack integration notes                                        |
 
 ---
 
@@ -217,9 +213,9 @@ SDK integration and library usage.
 
 Testing approaches and harness usage.
 
-| Document      | Location                                     | Description               |
-| ------------- | -------------------------------------------- | ------------------------- |
-| Testing Guide | [Contributing-Testing](Contributing-Testing) | Test harness and coverage |
+| Document      | Location                                                     | Description               |
+| ------------- | ------------------------------------------------------------ | ------------------------- |
+| Testing Guide | [docs/Contributing-Testing.md](docs/Contributing-Testing.md) | Test harness and coverage |
 
 ---
 

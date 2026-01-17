@@ -31,11 +31,10 @@ This chapter covers everything you need to start using ai-agent:
 
 ## Minimum Requirements
 
-| Requirement | Minimum                     | Recommended    |
-| ----------- | --------------------------- | -------------- |
-| **Node.js** | 20+                         | 22 LTS         |
-| **npm**     | 10+                         | Latest         |
-| **OS**      | Linux, macOS, Windows (WSL) | Linux or macOS |
+| Requirement | Minimum               | Recommended    |
+| ----------- | --------------------- | -------------- |
+| **Node.js** | 20+                   | Latest LTS     |
+| **OS**      | Linux, macOS, Windows | Linux or macOS |
 
 > **Note:** Windows native support works but WSL is recommended for better compatibility with MCP servers.
 
@@ -68,9 +67,7 @@ ai-agent --version
 
 **Expected output:**
 
-```
-0.0.0.713
-```
+Shows current version number (e.g., 0.0.0.714)
 
 ```bash
 # Check help

@@ -256,10 +256,10 @@ router:
 1. Router agent receives the user's request
 2. Router analyzes and decides which destination to use
 3. Router calls `router__handoff-to` tool with the destination to declare intent
-4. Router session completes (with its response)
-5. Orchestration layer spawns the destination agent (passing router's optional message)
+4. Router session completes (its response is discarded if a destination is selected)
+5. Orchestration layer spawns the destination agent (passing router's optional message as an advisory block, plus original user request)
 6. Destination agent runs and produces output
-7. If a handoff is configured, the destination's output is passed to the handoff agent for processing; otherwise the destination's output is the final result
+7. If a handoff is configured, the destination agent's output is passed to the handoff agent for processing; otherwise the destination agent's output is the final result
 
 ### The router\_\_handoff-to Tool
 
@@ -270,12 +270,12 @@ When `router.destinations` is configured, a special tool becomes available:
 
 ```json
 {
-  "agent": "./handlers/billing.ai", // Destination path (exact string from router.destinations)
+  "agent": "./handlers/billing.ai", // Destination path (must match one of router.destinations exactly)
   "message": "..." // Optional message to pass along
 }
 ```
 
-The `agent` parameter is an enum of destination paths (exact strings from the `router.destinations` configuration).
+The `agent` parameter is an enum of destination paths (exact strings from the `router.destinations` configuration). If provided, the `message` is converted to an advisory block and combined with the original user request as the destination agent's prompt.
 
 ### Router Example
 
@@ -432,7 +432,7 @@ If the main agent uses router AND handoff:
 
 ```
 Request → Router → Destination → Handoff → Final Response
-(If handoff is configured, handoff processes destination's output; otherwise, destination's output is the final result)
+(Handoff processes the destination agent's output; router's response is discarded)
 ```
 
 ### Handoff Best Practices
@@ -825,6 +825,7 @@ Synthesize a response using the research from advisors.
 **Important**: Orchestration is invisible to the user.
 
 When a user talks to an agent, they don't know:
+
 - Advisors ran before the conversation started
 - A router decided which agent actually handles their request
 - A handoff agent processed the response after
@@ -833,23 +834,23 @@ From the user's perspective, they're talking to **one agent**. The orchestration
 
 ### What Users See vs What Happens
 
-| User Sees | What Actually Happens |
-|-----------|----------------------|
+| User Sees                  | What Actually Happens                                                           |
+| -------------------------- | ------------------------------------------------------------------------------- |
 | "Talking to support agent" | Screening advisor → Router → Handler with research advisors → Redaction handoff |
-| "Got a response" | 5+ agents collaborated invisibly |
-| "Fast answer" | Advisors ran in parallel |
+| "Got a response"           | 5+ agents collaborated invisibly                                                |
+| "Fast answer"              | Advisors ran in parallel                                                        |
 
 ### Router Has Full Orchestration Access
 
 A router agent can use **all orchestration methods simultaneously**:
 
-| Method | When It Runs | Purpose |
-|--------|--------------|---------|
-| Advisors | Before router | Screen/classify incoming request |
-| Tools | During router | Gather info to make routing decision |
-| Sub-agents | During router | Delegate subtasks |
-| Router handoff | Router decides | Select destination handler |
-| Final handoff | After destination | Post-process the response |
+| Method         | When It Runs      | Purpose                              |
+| -------------- | ----------------- | ------------------------------------ |
+| Advisors       | Before router     | Screen/classify incoming request     |
+| Tools          | During router     | Gather info to make routing decision |
+| Sub-agents     | During router     | Delegate subtasks                    |
+| Router handoff | Router decides    | Select destination handler           |
+| Final handoff  | After destination | Post-process the response            |
 
 This makes router the most powerful orchestration pattern - it's a complete pipeline coordinator.
 

@@ -109,7 +109,9 @@ Refer to `USER-DOCS-STANDARD.md` for detailed templates and quality standards.
 Test files follow these patterns:
 
 - Unit tests: `src/tests/unit/<feature>.spec.ts`
+- Legacy unit tests: `src/tests/unit/<feature>.test.ts`
 - Phase 2 scenarios: `src/tests/phase2/phase2-suite.spec.ts`
+- Phase 2 harness scenarios: `src/tests/phase2-harness-scenarios/phase2-suite.spec.ts`
 - Phase 3 integration: `src/tests/phase3/phase3-suite.spec.ts`
 - Other test files: `src/tests/<feature>.spec.ts`
 

@@ -152,10 +152,11 @@ Settings are merged from multiple sources with clear priority.
 
 | Priority | Source                | Example                          |
 | -------- | --------------------- | -------------------------------- |
-| 1        | CLI options           | `--temperature 0.2`              |
-| 2        | Per-agent frontmatter | `temperature: 0.3` in `.ai` file |
-| 3        | Config file defaults  | `defaults.temperature: 0.7`      |
-| 4        | Built-in defaults     | Hardcoded fallbacks              |
+| 1        | Global overrides      | `--override temperature=0.2`     |
+| 2        | CLI options           | `--temperature 0.2`              |
+| 3        | Per-agent frontmatter | `temperature: 0.3` in `.ai` file |
+| 4        | Config file defaults  | `defaults.temperature: 0.7`      |
+| 5        | Built-in defaults     | Hardcoded fallbacks              |
 
 ### Merge Behavior
 
@@ -185,10 +186,10 @@ temperature: 0.3
 **CLI**:
 
 ```bash
-ai-agent --agent myagent.ai --temperature 0.2
+ai-agent --agent myagent.ai --override temperature=0.2
 ```
 
-**Result**: `temperature = 0.2` (CLI wins), `maxTurns = 10` (config default)
+**Result**: `temperature = 0.2` (global override wins), `maxTurns = 10` (config default)
 
 ---
 

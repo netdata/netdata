@@ -207,7 +207,7 @@ The `json_schema` field is optional if:
 
 - The agent has an `outputSchema` defined in frontmatter
 
-If `json_schema` is not provided and the agent has no `outputSchema`, a `missing_schema` error is returned.
+When `response_format.type === 'json_object'`, if `json_schema` is not provided and the agent has no `outputSchema`, a `missing_schema` error is returned.
 
 A schema can also be provided via `payload.schema` instead of `response_format.json_schema`.
 

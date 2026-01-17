@@ -108,8 +108,8 @@ ai-agent --agent test.ai \
 Interactive terminals show colored, formatted output:
 
 ```
-VRB 0.0 → LLM main: openai/gpt-4o [tokens: in 1523, out 456, 2341ms]
-WRN 0.1 ← MCP main: github:search_code [523ms, timeout]
+VRB 0.0 → LLM main: LLM response received [$0.003456, 2341ms, tokens: in 1523, out 456]
+WRN 0.1 ← MCP main: github:search_code [523ms, 523 bytes]
 ERR 0.0 → LLM main: 429 rate limited
 ```
 
@@ -160,11 +160,16 @@ Full structured output:
   "ts": "2024-11-14T12:34:56.789Z",
   "timestamp": 1699999999999,
   "severity": "VRB",
+  "level": "vrb",
+  "priority": 6,
+  "message_id": "8f8c1c67-7f2f-4a63-a632-0dbdfdd41d39",
   "turn": 1,
   "subturn": 0,
   "direction": "response",
   "type": "llm",
   "remote": "openai:gpt-4",
+  "provider": "openai",
+  "model": "gpt-4",
   "message": "LLM response received",
   "labels": {
     "latency_ms": 1234
@@ -198,9 +203,20 @@ VRB 0.1 → MCP main: github:search_code [523ms, 12456 bytes]
 
 **Session Summary**:
 
+FIN severity logs show detailed session metrics:
+
 ```
-FIN 0.0 → INT main: agent:fin
+FIN 0.0 → LLM main: 1 turns, 1234 tokens, $0.12
 ```
+
+VRB severity logs mark session end:
+
+```
+VRB 0.0 → INT main: session finalized
+```
+
+**Turn Progress**:
+Turns are indicated by the turn.subturn notation in the log prefix (e.g., `1.0`, `1.1`, `2.0`).
 
 **Turn Progress**:
 Turns are indicated by the turn.subturn notation in the log prefix (e.g., `1.0`, `1.1`, `2.0`).
@@ -209,18 +225,19 @@ Turns are indicated by the turn.subturn notation in the log prefix (e.g., `1.0`,
 
 ## Trace Modes
 
+Trace modes enable additional TRC-level diagnostic logs. Note: LLM and tool request/response payloads are always captured (in `llmRequestPayload`, `llmResponsePayload`, `toolRequestPayload`, `toolResponsePayload` fields) regardless of trace flags. Trace flags only control whether TRC severity logs are emitted.
+
 ### LLM Tracing
 
 ```bash
 ai-agent --agent test.ai --trace-llm "query"
 ```
 
-Shows complete LLM protocol:
+Emits TRC-level logs for:
 
-- Request headers (Authorization redacted)
-- Request body (full JSON)
-- Response body (pretty-printed JSON)
-- SSE events for streaming responses
+- SDK request payload (serialized)
+- SDK response payload (serialized)
+- LLM protocol diagnostics
 
 ### MCP Tracing
 
@@ -228,13 +245,10 @@ Shows complete LLM protocol:
 ai-agent --agent test.ai --trace-mcp "query"
 ```
 
-Shows MCP protocol details:
+Emits TRC-level logs for:
 
-- Server initialization
-- `tools/list` discovery
-- `prompts/list` discovery
-- `callTool` requests/responses
-- Server stderr output
+- MCP protocol details
+- Tool request/response diagnostics
 
 ### Combined Tracing
 
@@ -254,6 +268,7 @@ ai-agent --agent test.ai --trace-llm --trace-mcp "query"
 | `agent:settings` | Configuration summary (verbose) |
 | `agent:tools`    | Available tools banner          |
 | `agent:pricing`  | Missing pricing warning         |
+| `agent:limits`   | Limits warning                  |
 | `agent:start`    | User prompt received            |
 | `agent:fin`      | Session finalized               |
 | `agent:error`    | Uncaught exception              |
@@ -269,35 +284,48 @@ ai-agent --agent test.ai --trace-llm --trace-mcp "query"
 | `agent:fallback-report`       | Fallback accepted after retries exhausted |
 | `agent:final-report-accepted` | Final report committed                    |
 | `agent:failure-report`        | Synthetic failure report generated        |
-| `{provider}:{model}`          | LLM request/response                      |
+
+### Tool Events
+
+| Remote Identifier Pattern | Description                                       |
+| ------------------------- | ------------------------------------------------- |
+| `{provider}:{model}`      | LLM request/response logs (e.g., `openai:gpt-4o`) |
+| `{namespace}:{tool}`      | Tool execution logs (e.g., `github:search_code`)  |
+
+### Other Events
+
+| Event ID         | Description     |
+| ---------------- | --------------- |
+| `agent:title`    | Title change    |
+| `agent:progress` | Progress update |
+| `agent:batch`    | Batch execution |
 
 ### Exit Events
 
-| Event ID                             | Description                        |
-| ------------------------------------ | ---------------------------------- |
-| `agent:EXIT-FINAL-ANSWER`            | Normal completion                  |
-| `agent:EXIT-ROUTER-HANDOFF`          | Router handoff initiated           |
-| `agent:EXIT-MAX-TURNS-WITH-RESPONSE` | Turn limit with output             |
-| `agent:EXIT-USER-STOP`               | User initiated stop                |
-| `agent:EXIT-TOKEN-LIMIT`             | Context window exhausted           |
-| `agent:EXIT-AUTH-FAILURE`            | Authentication error               |
-| `agent:EXIT-QUOTA-EXCEEDED`          | Rate/quota limit                   |
-| `agent:EXIT-MODEL-ERROR`             | Model error                        |
-| `agent:EXIT-NO-LLM-RESPONSE`         | No response from LLM               |
-| `agent:EXIT-EMPTY-RESPONSE`          | Empty LLM response                 |
-| `agent:EXIT-TOOL-FAILURE`            | Tool execution failure             |
-| `agent:EXIT-MCP-CONNECTION-LOST`     | MCP server connection lost         |
-| `agent:EXIT-TOOL-NOT-AVAILABLE`      | Tool not available                 |
-| `agent:EXIT-TOOL-TIMEOUT`            | Tool execution timeout             |
-| `agent:EXIT-NO-PROVIDERS`            | No providers configured            |
-| `agent:EXIT-INVALID-MODEL`           | Invalid model configuration        |
-| `agent:EXIT-MCP-INIT-FAILED`         | MCP initialization failed          |
-| `agent:EXIT-INACTIVITY-TIMEOUT`      | Inactivity timeout                 |
-| `agent:EXIT-MAX-RETRIES`             | Maximum retries exceeded           |
-| `agent:EXIT-MAX-TURNS-NO-RESPONSE`   | Max turns reached without response |
-| `agent:EXIT-UNCAUGHT-EXCEPTION`      | Uncaught exception                 |
-| `agent:EXIT-SIGNAL-RECEIVED`         | Process signal received            |
-| `agent:EXIT-UNKNOWN`                 | Unknown error                      |
+| Event ID                       | Description                        |
+| ------------------------------ | ---------------------------------- |
+| `EXIT-FINAL-ANSWER`            | Normal completion                  |
+| `EXIT-MAX-TURNS-WITH-RESPONSE` | Turn limit with output             |
+| `EXIT-USER-STOP`               | User initiated stop                |
+| `EXIT-TOKEN-LIMIT`             | Context window exhausted           |
+| `EXIT-AUTH-FAILURE`            | Authentication error               |
+| `EXIT-QUOTA-EXCEEDED`          | Rate/quota limit                   |
+| `EXIT-MODEL-ERROR`             | Model error                        |
+| `EXIT-NO-LLM-RESPONSE`         | No response from LLM               |
+| `EXIT-EMPTY-RESPONSE`          | Empty LLM response                 |
+| `EXIT-TOOL-FAILURE`            | Tool execution failure             |
+| `EXIT-MCP-CONNECTION-LOST`     | MCP server connection lost         |
+| `EXIT-TOOL-NOT-AVAILABLE`      | Tool not available                 |
+| `EXIT-TOOL-TIMEOUT`            | Tool execution timeout             |
+| `EXIT-NO-PROVIDERS`            | No providers configured            |
+| `EXIT-INVALID-MODEL`           | Invalid model configuration        |
+| `EXIT-MCP-INIT-FAILED`         | MCP initialization failed          |
+| `EXIT-INACTIVITY-TIMEOUT`      | Inactivity timeout                 |
+| `EXIT-MAX-RETRIES`             | Maximum retries exceeded           |
+| `EXIT-MAX-TURNS-NO-RESPONSE`   | Max turns reached without response |
+| `EXIT-UNCAUGHT-EXCEPTION`      | Uncaught exception                 |
+| `EXIT-SIGNAL-RECEIVED`         | Process signal received            |
+| `EXIT-UNKNOWN`                 | Unknown error                      |
 
 ---
 

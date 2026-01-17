@@ -41,26 +41,7 @@ models:
 ---
 ```
 
-Complete identity for a sub-agent:
-
-```yaml
----
-description: Analyzes company financials and returns structured reports
-usage: "Provide a company name or domain. Returns analysis in JSON format."
-toolName: company_analyzer
-models:
-  - openai/gpt-4o
-output:
-  format: json
-  schema:
-    type: object
-    properties:
-      company:
-        type: string
-      analysis:
-        type: string
----
-```
+> **Note**: `models` is a runtime option, not an identity field. Include it in frontmatter to create a working agent, but only `description`, `usage`, and `toolName` are identity keys.
 
 ---
 
@@ -132,9 +113,9 @@ description: Uses Claude 3.5 Sonnet with Brave search MCP
 
 **What it affects**:
 
-- Used as the description for the `prompt` field in the sub-agent's input schema (when no explicit input schema is provided)
-- Shown in MCP and completions headend interfaces
-- Provides usage context for the sub-agent in headend environments
+- Used as the `prompt` field description in MCP headend tool schemas (when no explicit input schema is provided)
+- Used as fallback for agent description in MCP headend when `description` is missing
+- Provides usage context for the agent in headend environments
 
 **Example**:
 
@@ -217,7 +198,7 @@ If `toolName` is omitted, it's derived from the filename:
 **Naming Rules**:
 
 - Use lowercase letters, numbers, underscores, or hyphens
-- No spaces (spaces are converted to underscores)
+- Spaces are automatically converted to underscores
 - Cannot use reserved names: `final_report`, `task_status`, `batch`, `tool_output`
 - Must be unique among sibling sub-agents
 
@@ -243,7 +224,7 @@ toolName: report_generator
 # Reserved name
 toolName: final_report
 
-# Spaces (invalid)
+# Spaces (converted to underscores)
 toolName: web researcher
 
 # Too generic

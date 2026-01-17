@@ -435,8 +435,7 @@ Complete provider configuration schema:
       "stringSchemaFormatsAllowed": ["string"],
       "stringSchemaFormatsDenied": ["string"],
       "reasoning": "string | number | [string, string, string, string] | null",
-      "reasoningAutoStreamLevel": "minimal | low | medium | high",
-      "toolChoice": "auto | required"
+      "reasoningAutoStreamLevel": "minimal | low | medium | high"
     }
   }
 }
@@ -481,7 +480,6 @@ Override settings for specific models within a provider:
 | `overrides`                 | `object`                    | Force or disable LLM parameters                |
 | `contextWindowBufferTokens` | `number`                    | Additional buffer tokens beyond context window |
 | `reasoning`                 | `string \| number \| tuple` | Reasoning budget or configuration              |
-| `toolChoice`                | `auto \| required`          | Tool selection mode (auto or required)         |
 
 ### Tokenizer Options
 

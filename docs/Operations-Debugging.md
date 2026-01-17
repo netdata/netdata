@@ -133,7 +133,7 @@ grep -o '\[WRN\]\|\[ERR\]' debug.log | sort | uniq -c
 | `WRN` | Warning      | Review but may not be fatal        |
 | `ERR` | Error        | Investigate immediately            |
 | `TRC` | Trace        | Protocol details (with --trace-\*) |
-| `THK` | Thinking     | Model reasoning content            |
+| `THK` | Thinking     | Model reasoning output             |
 | `FIN` | Finish       | End-of-run summary                 |
 
 ---

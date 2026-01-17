@@ -25,7 +25,7 @@ Problem/Cause/Solution reference for AI Agent issues.
 
 **Problem**: `Configuration file not found. Create .ai-agent.json or pass --config`
 
-**Cause**: Configuration file not found. Searches for `.ai-agent.json` in current directory or `ai-agent.json` in `~/.ai-agent/`.
+**Cause**: Configuration file not found. Searches for `.ai-agent.json` in current directory or `.ai-agent.json` in `~/.ai-agent/`.
 
 **Solution**:
 
@@ -545,7 +545,7 @@ tail -10 ~/.ai-agent/accounting.jsonl | jq '.tokens'
 
 ```bash
 # Check for final report in snapshot
-zcat "$SNAPSHOT" | jq '.opTree.turns[-1].ops[] | select(.attributes.name | test("final"))'
+zcat "$SNAPSHOT" | jq '.opTree.turns[-1].ops[] | select(.attributes.label == "final-report")'
 
 # Check output schema matches
 # Review LLM response in snapshot

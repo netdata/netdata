@@ -61,15 +61,14 @@ TypeScript strict mode is enabled (target: ES2023). All code must:
 
 Add small, reusable type guards for narrowing `unknown` values:
 
-```typescript
-private isPlainObject(val: unknown): val is Record<string, unknown> {
-  return val !== null && typeof val === 'object' && !Array.isArray(val);
-}
+````typescript
+export const isPlainObject = (value: unknown): value is Record<string, unknown> => (
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+);
 
-private isStringArray(val: unknown): val is string[] {
-  return Array.isArray(val) && val.every(item => typeof item === 'string');
-}
-```
+export const isStringArray = (value: unknown): value is string[] => (
+  Array.isArray(value) && value.every(item => typeof item === 'string')
+);
 
 **Usage**:
 
@@ -82,7 +81,7 @@ function processConfig(input: unknown): Config {
   const maxTurns = typeof input.maxTurns === "number" ? input.maxTurns : 10;
   return { maxTurns };
 }
-```
+````
 
 ### Avoid Unnecessary Assertions
 
@@ -164,7 +163,7 @@ import type { Configuration, ToolDefinition } from "./types.js";
 import { formatError } from "./errors.js";
 import { Logger } from "./logger.js";
 
-// 4. Internal/sibling imports (more)
+// More internal/sibling imports
 import { parseConfig } from "./config.js";
 import { validateSchema } from "./validation.js";
 ```
@@ -185,6 +184,15 @@ The linter enforces this order automatically.
 | No loops (functional) | Prefer map/reduce/filter       | Refactor or add disable comment |
 | No duplicate strings  | Extract to constants           | Create named constant           |
 | Dot notation          | Use `obj.key` not `obj['key']` | Use dot notation                |
+
+### Linting Exceptions
+
+The following directories have relaxed linting rules:
+
+- `src/server/**`: Server headend code has import/order, functional/no-loop-statements, and many @typescript-eslint rules disabled
+- `code-review/**`: Code review scripts have most strict type-checking rules disabled
+
+These exceptions allow for incremental development in these areas without blocking on strict linting.
 
 ### Disabling Rules
 

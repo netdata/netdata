@@ -133,7 +133,9 @@ Running on: ${OS}
 User: ${USER}
 ```
 
-**Available variables (always)**: `DATETIME`, `TIMESTAMP`, `DAY`, `TIMEZONE`, `MAX_TURNS`, `MAX_TOOLS`, `FORMAT`
+**Available variables (always)**: `DATETIME`, `TIMESTAMP`, `DAY`, `TIMEZONE`
+
+**Additional variables (CLI, agent registry, AI agent)**: `MAX_TURNS`, `MAX_TOOLS`, `FORMAT`
 
 **Additional CLI-only variables**: `OS`, `ARCH`, `KERNEL`, `HOSTNAME`, `USER`, `CD`
 
@@ -164,7 +166,7 @@ The `${FORMAT}` variable contains output format instructions based on how the ag
 | Piped output         | `Plain text without any formatting or markdown. Do not wrap long lines.`                                                                                                          |
 | JSON output expected | `json`                                                                                                                                                                            |
 | Markdown             | `GitHub Markdown`                                                                                                                                                                 |
-| Markdown+Mermaid     | `GiHub Markdown with Mermaid diagrams`                                                                                                                                            |
+| Markdown+Mermaid     | `GitHub Markdown with Mermaid diagrams`                                                                                                                                           |
 | Slack headend        | `Slack Block Kit JSON array of messages (not raw text or GitHub markdown).`                                                                                                       |
 | Sub-agent            | `Internal agent-to-agent exchange format (not user-facing).`                                                                                                                      |
 

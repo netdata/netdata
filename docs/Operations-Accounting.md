@@ -134,56 +134,57 @@ Created for every tool execution:
 
 ### LLM Entry Fields
 
-| Field                      | Type   | Description                    |
-| -------------------------- | ------ | ------------------------------ |
-| `type`                     | string | Always `"llm"`                 |
-| `status`                   | string | `"ok"` or `"failed"`           |
-| `timestamp`                | number | Unix timestamp (ms)            |
-| `provider`                 | string | Provider name (e.g., "openai") |
-| `model`                    | string | Model name (e.g., "gpt-4o")    |
-| `actualProvider`           | string | Actual provider (for routers)  |
-| `actualModel`              | string | Actual model (for routers)     |
-| `latency`                  | number | Request latency (ms)           |
-| `costUsd`                  | number | Cost in USD                    |
-| `upstreamInferenceCostUsd` | number | Upstream cost (routers)        |
-| `stopReason`               | string | Why generation stopped         |
-| `error`                    | string | Error message if failed        |
-| `details`                  | object | Optional structured details    |
+| Field                      | Type    | Description                    |
+| -------------------------- | ------- | ------------------------------ |
+| `type`                     | string  | Always `"llm"`                 |
+| `status`                   | string  | `"ok"` or `"failed"`           |
+| `timestamp`                | number  | Unix timestamp (ms)            |
+| `provider`                 | string  | Provider name (e.g., "openai") |
+| `model`                    | string  | Model name (e.g., "gpt-4o")    |
+| `actualProvider`           | string? | Actual provider (for routers)  |
+| `actualModel`              | string? | Actual model (for routers)     |
+| `latency`                  | number  | Request latency (ms)           |
+| `costUsd`                  | number? | Cost in USD                    |
+| `upstreamInferenceCostUsd` | number? | Upstream cost (routers)        |
+| `stopReason`               | string? | Why generation stopped         |
+| `error`                    | string? | Error message if failed        |
+| `details`                  | object? | Optional structured details    |
 
 **Token Fields**:
 
-| Field                          | Type   | Description            |
-| ------------------------------ | ------ | ---------------------- |
-| `tokens.inputTokens`           | number | Input token count      |
-| `tokens.outputTokens`          | number | Output token count     |
-| `tokens.totalTokens`           | number | Total (includes cache) |
-| `tokens.cacheReadInputTokens`  | number | Cached tokens read     |
-| `tokens.cacheWriteInputTokens` | number | Cached tokens written  |
+| Field                          | Type    | Description                   |
+| ------------------------------ | ------- | ----------------------------- |
+| `tokens.inputTokens`           | number  | Input token count             |
+| `tokens.outputTokens`          | number  | Output token count            |
+| `tokens.totalTokens`           | number  | Total (includes cache)        |
+| `tokens.cachedTokens`          | number? | Back-compat cache token field |
+| `tokens.cacheReadInputTokens`  | number? | Cached tokens read            |
+| `tokens.cacheWriteInputTokens` | number? | Cached tokens written         |
 
 **Trace Context**:
 
-| Field         | Type   | Description            |
-| ------------- | ------ | ---------------------- |
-| `agentId`     | string | Agent identifier       |
-| `callPath`    | string | Hierarchical call path |
-| `txnId`       | string | Session transaction ID |
-| `parentTxnId` | string | Parent session ID      |
-| `originTxnId` | string | Root session ID        |
+| Field         | Type    | Description            |
+| ------------- | ------- | ---------------------- |
+| `agentId`     | string? | Agent identifier       |
+| `callPath`    | string? | Hierarchical call path |
+| `txnId`       | string? | Session transaction ID |
+| `parentTxnId` | string? | Parent session ID      |
+| `originTxnId` | string? | Root session ID        |
 
 ### Tool Entry Fields
 
-| Field           | Type   | Description                 |
-| --------------- | ------ | --------------------------- |
-| `type`          | string | Always `"tool"`             |
-| `status`        | string | `"ok"` or `"failed"`        |
-| `timestamp`     | number | Unix timestamp (ms)         |
-| `mcpServer`     | string | MCP server name             |
-| `command`       | string | Tool name                   |
-| `latency`       | number | Execution latency (ms)      |
-| `charactersIn`  | number | Request character count     |
-| `charactersOut` | number | Response character count    |
-| `error`         | string | Error message if failed     |
-| `details`       | object | Optional structured details |
+| Field           | Type    | Description                 |
+| --------------- | ------- | --------------------------- |
+| `type`          | string  | Always `"tool"`             |
+| `status`        | string  | `"ok"` or `"failed"`        |
+| `timestamp`     | number  | Unix timestamp (ms)         |
+| `mcpServer`     | string  | MCP server name             |
+| `command`       | string  | Tool name                   |
+| `latency`       | number  | Execution latency (ms)      |
+| `charactersIn`  | number  | Request character count     |
+| `charactersOut` | number  | Response character count    |
+| `error`         | string? | Error message if failed     |
+| `details`       | object? | Optional structured details |
 
 Plus same trace context fields as LLM entries.
 
@@ -429,7 +430,9 @@ zcat accounting-2025*.jsonl.gz | jq -s '
 **Solution**: AI Agent normalizes `totalTokens` to include cache:
 
 ```
-totalTokens = inputTokens + outputTokens + cacheRead + cacheWrite
+const r = cacheReadInputTokens ?? cachedTokens ?? 0;
+const w = cacheWriteInputTokens ?? 0;
+totalTokens = inputTokens + outputTokens + r + w;
 ```
 
 Compare individual fields, not totals.

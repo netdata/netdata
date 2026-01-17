@@ -404,15 +404,16 @@ Parse streaming JSON responses (SSE-style).
 
 ### Streaming Configuration Reference
 
-| Property             | Type     | Default     | Description                    |
-| -------------------- | -------- | ----------- | ------------------------------ |
-| `mode`               | `string` | Required    | Must be `"json-stream"`        |
-| `linePrefix`         | `string` | `""`        | Prefix to strip from each line |
-| `discriminatorField` | `string` | `"type"`    | Field name for event type      |
-| `doneValue`          | `string` | `"done"`    | Value indicating stream end    |
-| `tokenField`         | `string` | `"content"` | Field containing token content |
-| `tokenValue`         | `string` | `"token"`   | Discriminator value for tokens |
-| `answerField`        | `string` | `"answer"`  | Field containing final answer  |
+| Property             | Type               | Default                      | Description                    |
+| -------------------- | ------------------ | ---------------------------- | ------------------------------ |
+| `mode`               | `string`           | Required                     | Must be `"json-stream"`        |
+| `linePrefix`         | `string`           | `""`                         | Prefix to strip from each line |
+| `discriminatorField` | `string`           | Required (default: `"type"`) | Field name for event type      |
+| `doneValue`          | `string`           | Required (default: `"done"`) | Value indicating stream end    |
+| `tokenField`         | `string`           | `"content"`                  | Field containing token content |
+| `tokenValue`         | `string`           | `"token"`                    | Discriminator value for tokens |
+| `answerField`        | `string`           | `"answer"`                   | Field containing final answer  |
+| `timeoutMs`          | `number \| string` | -                            | Stream timeout duration        |
 
 ### Stream Processing
 
@@ -484,16 +485,16 @@ Complete REST tool schema:
 
 ### Streaming Options
 
-| Property             | Type               | Default     | Description                    |
-| -------------------- | ------------------ | ----------- | ------------------------------ |
-| `mode`               | `string`           | Required    | Must be `"json-stream"`        |
-| `linePrefix`         | `string`           | `""`        | Prefix to strip from each line |
-| `discriminatorField` | `string`           | `"type"`    | Field name for event type      |
-| `doneValue`          | `string`           | `"done"`    | Value indicating stream end    |
-| `tokenField`         | `string`           | `"content"` | Field containing token content |
-| `tokenValue`         | `string`           | `"token"`   | Discriminator value for tokens |
-| `answerField`        | `string`           | `"answer"`  | Field containing final answer  |
-| `timeoutMs`          | `number \| string` | -           | Stream timeout duration        |
+| Property             | Type               | Default                      | Description                    |
+| -------------------- | ------------------ | ---------------------------- | ------------------------------ |
+| `mode`               | `string`           | Required                     | Must be `"json-stream"`        |
+| `linePrefix`         | `string`           | `""`                         | Prefix to strip from each line |
+| `discriminatorField` | `string`           | Required (default: `"type"`) | Field name for event type      |
+| `doneValue`          | `string`           | Required (default: `"done"`) | Value indicating stream end    |
+| `tokenField`         | `string`           | `"content"`                  | Field containing token content |
+| `tokenValue`         | `string`           | `"token"`                    | Discriminator value for tokens |
+| `answerField`        | `string`           | `"answer"`                   | Field containing final answer  |
+| `timeoutMs`          | `number \| string` | -                            | Stream timeout duration        |
 
 ---
 

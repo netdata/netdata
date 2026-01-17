@@ -234,9 +234,9 @@ export OPENROUTER_TITLE="My Application"
 
 ## Telemetry
 
-| Variable               | Type    | Default | Description                               |
-| ---------------------- | ------- | ------- | ----------------------------------------- |
-| `AI_TELEMETRY_DISABLE` | boolean | `false` | Disable OpenTelemetry metrics and tracing |
+| Variable               | Type   | Default | Description                                                                   |
+| ---------------------- | ------ | ------- | ----------------------------------------------------------------------------- |
+| `AI_TELEMETRY_DISABLE` | string | `false` | Disable OpenTelemetry metrics and tracing (accepts: '1', 'true', 'yes', 'on') |
 
 ---
 
@@ -409,7 +409,7 @@ All environment variables in one table:
 | `TRACE_REST`          | Debug    | boolean | `false`                  | Enable REST tool tracing |
 | `OPENROUTER_REFERER` | Provider | string  | `https://ai-agent.local` | OpenRouter HTTP-Referer header  |
 | `OPENROUTER_TITLE`   | Provider | string  | `ai-agent`               | OpenRouter X-Title header       |
-| `AI_TELEMETRY_DISABLE` | Telemetry | boolean | `false` | Disable OpenTelemetry metrics and tracing |
+| `AI_TELEMETRY_DISABLE` | Telemetry | string | `false` | Disable OpenTelemetry metrics and tracing (accepts: '1', 'true', 'yes', 'on') |
 | `TZ`                 | System   | string  | System default           | Timezone override               |
 | `MCP_ROOT`           | MCP      | string  | Current working directory | Working directory for MCP stdio servers |
 | `USER`               | System   | string  | Computed from os.userInfo() with env fallback | Current username |

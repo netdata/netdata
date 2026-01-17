@@ -155,15 +155,15 @@ interface AIAgentSessionConfig {
   };
 
   // Sampling parameters
-  temperature?: number | null; // Default: 0.0
-  topP?: number | null; // Default: not sent
-  topK?: number | null; // Default: not sent
-  maxOutputTokens?: number; // Default: 4096
-  repeatPenalty?: number | null; // Default: not sent
+  temperature?: number | null; // Default: null
+  topP?: number | null; // Default: null
+  topK?: number | null; // Default: null
+  maxOutputTokens?: number; // No default
+  repeatPenalty?: number | null; // Default: null
 
   // Execution limits
-  maxRetries?: number; // Default: 5
-  maxTurns?: number; // Default: 10
+  maxRetries?: number; // Default: 3
+  maxTurns?: number; // No default
   maxToolCallsPerTurn?: number; // Default: 10
   llmTimeout?: number; // Default: 600000 (10 min)
   toolTimeout?: number; // Default: 300000 (5 min)
@@ -179,7 +179,7 @@ interface AIAgentSessionConfig {
 
   // Reasoning
   reasoning?: ReasoningLevel; // 'minimal' | 'low' | 'medium' | 'high'
-  reasoningValue?: string | number | null; // Explicit token budget
+  reasoningValue?: ProviderReasoningValue | null; // Explicit token budget
   caching?: CachingMode; // 'none' | 'full'
 
   // Streaming and debugging
@@ -239,14 +239,14 @@ interface AIAgentEventCallbacks {
 ### AIAgentEventMeta
 
 | Field                 | Type           | Description                           |
-| --------------------- | -------------- | ------------------------------------- |
+| --------------------- | -------------- | ------------------------------------- | ----- | ----- | ------- | ------------- | -------------------- |
 | `agentId`             | `string?`      | Agent identifier                      |
 | `callPath`            | `string?`      | Hierarchical call path                |
-| `sessionId`           | `string`       | Session identifier                    |
+| `sessionId`           | `string?`      | Session identifier                    |
 | `parentId`            | `string?`      | Parent session ID                     |
 | `originId`            | `string?`      | Root session ID                       |
 | `headendId`           | `string?`      | Headend identifier                    |
-| `renderTarget`        | `string?`      | Target renderer type                  |
+| `renderTarget`        | `'cli'         | 'slack'                               | 'api' | 'web' | 'embed' | 'sub-agent'?` | Target renderer type |
 | `isMaster`            | `boolean`      | Is this the master agent?             |
 | `isFinal`             | `boolean`      | Authoritative only for `final_report` |
 | `pendingHandoffCount` | `number`       | Pending handoffs                      |
@@ -415,6 +415,7 @@ interface ToolAccountingEntry {
   txnId?: string;
   parentTxnId?: string;
   originTxnId?: string;
+  details?: Record<string, LogDetailValue>;
 }
 ```
 
@@ -586,7 +587,7 @@ stopRef.stopping = true;
 
 ## See Also
 
-- [docs/specs/AI-AGENT-INTERNAL-API.md](specs/AI-AGENT-INTERNAL-API.md) - Full API documentation
-- [docs/specs/library-api.md](specs/library-api.md) - Library specification
-- [docs/Headends-Library.md](Headends-Library) - Library headend integration
-- [docs/Technical-Specs-Session-Lifecycle.md](Technical-Specs-Session-Lifecycle) - Session flow
+- [AI-AGENT-INTERNAL-API.md](specs/AI-AGENT-INTERNAL-API.md) - Full API documentation
+- [library-api.md](specs/library-api.md) - Library specification
+- [Headends-Library.md](Headends-Library) - Library headend integration
+- [Technical-Specs-Session-Lifecycle.md](Technical-Specs-Session-Lifecycle) - Session flow

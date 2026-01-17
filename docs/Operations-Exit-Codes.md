@@ -24,7 +24,7 @@ AI Agent uses standardized exit codes:
 | ---- | ------------------------------- | -------------------------------------------- |
 | 0    | Success                         | Agent completed successfully                 |
 | 1    | Configuration Error             | Invalid configuration or agent file          |
-| 2    | LLM Error                       | Provider or model failure                    |
+| 2    | LLM Error (Default)             | Default error for unclassified agent failure |
 | 3    | Tool Error                      | MCP server or tool execution failure         |
 | 4    | CLI Error                       | Invalid command-line arguments               |
 | 5    | Schema Validation or Tool Limit | Schema validation or max tool turns exceeded |
@@ -81,9 +81,9 @@ fi
 
 ---
 
-### Exit Code 2: LLM Error
+### Exit Code 2: LLM Error (Default)
 
-**Meaning**: LLM provider returned an unrecoverable error.
+**Meaning**: Default error code for any unclassified agent failure.
 
 **Common causes**:
 
@@ -92,6 +92,7 @@ fi
 - Model not available
 - Provider timeout
 - All retries exhausted
+- Any other unclassified agent failure
 
 **Examples**:
 
@@ -194,10 +195,10 @@ Internal exit codes logged during session execution (visible in logs and snapsho
 | ---------------------------- | --------------------------------------------------- | ----- |
 | **Success Exits**            |                                                     |       |
 | `EXIT-FINAL-ANSWER`          | Normal completion with final report                 | No    |
-| `EXIT-ROUTER-HANDOFF`        | Router selected destination (orchestration handoff) | No    |
-| `EXIT-TOKEN-LIMIT`           | Context window exhausted, forced final turn         | No    |
+| `EXIT-ROUTER-HANDOFF`        | Router selected destination                         | No    |
+| `EXIT-TOKEN-LIMIT`           | Final report received after context guard triggered | No    |
 | **Limits/Failures**          |                                                     |       |
-| `EXIT-MAX-TURNS-NO-RESPONSE` | Turn limit reached without output                   | Yes   |
+| `EXIT-MAX-TURNS-NO-RESPONSE` | Turn limit reached without final response           | Yes   |
 | `EXIT-UNCAUGHT-EXCEPTION`    | Uncaught exception in agent                         | Yes   |
 
 ### Finding Exit Reason in Snapshot

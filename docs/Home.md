@@ -19,7 +19,7 @@ ai-agent is a TypeScript framework that turns simple text files (`.ai` files) in
 ## Quick Start
 
 1. **Install**: See [Installation](Getting-Started-Installation) (package is private, install from source)
-2. **Configure**: Create `~/.ai-agent/ai-agent.json` with your API keys
+2. **Configure**: Create `~/.ai-agent/ai-agent.json` (configuration) and `~/.ai-agent/ai-agent.env` (API keys)
 3. **Run**: `ai-agent my-agent.ai "Hello, world!"`
 
 See [Getting Started](Getting-Started) for the complete walkthrough.

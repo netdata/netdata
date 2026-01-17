@@ -79,12 +79,12 @@ Enables internal debugging output for:
 
 ## Key Directories and Files
 
-| Path                             | Purpose                                              |
-| -------------------------------- | ---------------------------------------------------- |
-| `~/.ai-agent/sessions/*.json.gz` | Session snapshots (gzipped)                          |
-| `~/.ai-agent/accounting.jsonl`   | Token/cost accounting ledger                         |
-| `~/.ai-agent/cache.db`           | Response cache database                              |
-| `/opt/neda/.ai-agent/sessions/`  | Production session snapshots (conventional location) |
+| Path                             | Purpose                                                   |
+| -------------------------------- | --------------------------------------------------------- |
+| `~/.ai-agent/sessions/*.json.gz` | Session snapshots (gzipped)                               |
+| `~/.ai-agent/accounting.jsonl`   | Token/cost accounting ledger                              |
+| `~/.ai-agent/cache.db`           | Response cache database (SQLite backend, optional)        |
+| `/opt/neda/.ai-agent/sessions/`  | Production session snapshots (custom deployment location) |
 
 ### Session Snapshot Filename
 

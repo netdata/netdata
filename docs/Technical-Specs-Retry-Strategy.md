@@ -102,12 +102,12 @@ flowchart TD
 
 These errors trigger retry with backoff.
 
-| Status             | Condition          | Backoff                                 | Behavior        |
-| ------------------ | ------------------ | --------------------------------------- | --------------- |
-| `rate_limit`       | Too many requests  | Yes (provider-specified or exponential) | Wait then retry |
-| `network_error`    | Connection failed  | Yes (graduated, max 30s)                | Wait then retry |
-| `timeout`          | Request timeout    | Yes (graduated, max 30s)                | Wait then retry |
-| `invalid_response` | Malformed response | No                                      | Immediate retry |
+| Status             | Condition          | Backoff                                     | Behavior        |
+| ------------------ | ------------------ | ------------------------------------------- | --------------- |
+| `rate_limit`       | Too many requests  | Yes (provider-specified or linear fallback) | Wait then retry |
+| `network_error`    | Connection failed  | Yes (linear, max 30s)                       | Wait then retry |
+| `timeout`          | Request timeout    | Yes (linear, max 30s)                       | Wait then retry |
+| `invalid_response` | Malformed response | No                                          | Immediate retry |
 
 ---
 
@@ -191,7 +191,7 @@ flowchart TD
     HasHeader -->|No| Calculate[Calculate Fallback]
 
     Calculate --> FormulaRateLimit[wait = min(max(attempts * 1000, 1000), 60000)<br/>Minimum 1000ms]
-    Calculate --> FormulaNetwork[wait = min(max(attempts * 1000, 1000), 30000)<br/>Minimum 1000ms]
+    Calculate --> FormulaNetwork[wait = min(max((attempt + 1) * 1000, 1000), 30000)<br/>Minimum 1000ms]
 
     UseProvided --> Track[Track Max Wait]
     FormulaRateLimit --> Track
@@ -207,10 +207,10 @@ flowchart TD
 
 ### Backoff Values
 
-| Error Type                | Constant                         | Max Wait | Purpose           |
-| ------------------------- | -------------------------------- | -------- | ----------------- |
-| `rate_limit`              | `RATE_LIMIT_MAX_WAIT_MS`: 60,000 | 60,000   | Maximum wait time |
-| `network_error`/`timeout` | Hardcoded: 30,000                | 30,000   | Maximum wait time |
+| Error Type                | Constant                         | Max Wait | Purpose                      |
+| ------------------------- | -------------------------------- | -------- | ---------------------------- |
+| `rate_limit`              | `RATE_LIMIT_MAX_WAIT_MS`: 60,000 | 60,000   | Maximum wait time            |
+| `network_error`/`timeout` | Hardcoded: 30,000                | 30,000   | Linear backoff, max 30,000ms |
 
 **Fallback Formulas**:
 
@@ -223,15 +223,16 @@ fallbackWait = min(max(attempts * 1000, 1000), 60000)
 For `network_error` and `timeout` errors:
 
 ```
-fallbackWait = min(max(attempts * 1000, 1000), 30000)
+fallbackWait = min(max((attempt + 1) * 1000, 1000), 30000)
 ```
 
 ### Sleep Behavior
 
 - Uses `sleepWithAbort()` for cancellation support
-- Sleeps only after full rotation when ALL providers rate-limited
-- Condition: `attempts < maxRetries || hasStopRef` (don't sleep if retries exhausted)
-- Logs `agent:retry` event with selected wait time
+- Rate-limit sleep only after full rotation when ALL providers rate-limited
+  - Condition: `attempts < maxRetries || hasStopRef` (don't sleep if retries exhausted)
+  - Logs `agent:retry` event with selected wait time
+- Other backoffs (network/timeout): Sleep unconditionally; `sleepWithAbort()` handles cancellation internally
 
 ---
 
@@ -339,23 +340,18 @@ When final report is attempted or incomplete detection triggers:
 | 2    | Log `agent:orchestrator` with old/new limits |
 | 3    | Emit `ai_agent_retry_collapse_total` metric  |
 
-### Pending Cache
+### Final Report Storage
 
-```mermaid
-flowchart TD
-    FinalReport[final_report Call] --> Validate{Valid Payload?}
+When a valid final report is committed:
 
-    Validate -->|Yes| Cache[Store in pendingFinalReport]
-    Validate -->|No| Reject[Reject + Retry]
+| Step | Action                                                                  |
+| ---- | ----------------------------------------------------------------------- | -------------- | ----------- |
+| 1    | Validate against expected schema (if applicable)                        |
+| 2    | Store in `finalReport`                                                  |
+| 3    | Track source: 'tool-call'                                               | 'tool-message' | 'synthetic' |
+| 4    | On forced final turn with existing report: Finalize session immediately |
 
-    Cache --> Forced{Forced Final Turn?}
-    Forced -->|Yes| Accept[Accept Report]
-    Forced -->|No| Continue[Continue Session<br/>Cache Preserved]
-
-    Accept --> Finalize[Finalize Session]
-```
-
-**Purpose**: Ensures retries happen before fallbacks.
+**Purpose**: Preserves final report across retry attempts.
 
 ### Synthetic Failure
 

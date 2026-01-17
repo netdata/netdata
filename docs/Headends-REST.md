@@ -142,7 +142,7 @@ curl "http://localhost:8080/v1/chat?q=What%20is%20the%20weather%20in%20Paris%3F"
 | Property     | Value                                                                                 |
 | ------------ | ------------------------------------------------------------------------------------- |
 | Type         | `string`                                                                              |
-| Default      | `markdown`                                                                            |
+| Default      | (resolved by agent configuration)                                                     |
 | Valid values | `json`, `markdown`, `markdown+mermaid`, `pipe`, `slack-block-kit`, `tty`, `sub-agent` |
 
 **Description**: Desired output format. When `json` is specified, the agent should have an output schema defined in frontmatter. Without a schema, validation defaults to allowing any JSON object.

@@ -246,17 +246,17 @@ export type {
 
 ### Optional Behavior
 
-| Option                        | Type      | Default | Description                     |
-| ----------------------------- | --------- | ------- | ------------------------------- |
-| `stream`                      | `boolean` | -       | Enable streaming output         |
-| `verbose`                     | `boolean` | -       | Verbose logging                 |
-| `traceLLM`                    | `boolean` | -       | Trace LLM calls                 |
-| `traceMCP`                    | `boolean` | -       | Trace MCP calls                 |
-| `traceSdk`                    | `boolean` | -       | Trace SDK calls                 |
-| `headendWantsProgressUpdates` | `boolean` | -       | Enable progress update tool     |
-| `isMaster`                    | `boolean` | -       | Whether this is a master agent  |
-| `pendingHandoffCount`         | `number`  | -       | Count of pending handoffs       |
-| `toolResponseMaxBytes`        | `number`  | -       | Max tool response size in bytes |
+| Option                        | Type      | Default | Description                                                  |
+| ----------------------------- | --------- | ------- | ------------------------------------------------------------ |
+| `stream`                      | `boolean` | -       | Enable streaming output                                      |
+| `verbose`                     | `boolean` | -       | Verbose logging                                              |
+| `traceLLM`                    | `boolean` | -       | Trace LLM calls                                              |
+| `traceMCP`                    | `boolean` | -       | Trace MCP calls                                              |
+| `traceSdk`                    | `boolean` | -       | Trace SDK calls                                              |
+| `headendWantsProgressUpdates` | `boolean` | -       | Enable progress update tool                                  |
+| `isMaster`                    | `boolean` | -       | Whether this is a master agent (propagated by orchestration) |
+| `pendingHandoffCount`         | `number`  | -       | Count of pending handoffs (propagated by orchestration)      |
+| `toolResponseMaxBytes`        | `number`  | -       | Max tool response size in bytes                              |
 
 ### Optional Callbacks
 
@@ -543,7 +543,8 @@ interface AIAgentResult {
       | "slack-block-kit"
       | "tty"
       | "pipe"
-      | "sub-agent";
+      | "sub-agent"
+      | "text";
     content?: string;
     content_json?: Record<string, unknown>;
     metadata?: Record<string, unknown>;

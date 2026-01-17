@@ -386,7 +386,7 @@ In `.ai-agent.json`:
 | `rateLimit.enabled`           | `boolean` | `false` (disabled by default) | Enable rate limiting (requires `requestsPerMinute`) |
 | `rateLimit.requestsPerMinute` | `number`  | (required)                    | Rate limit when enabled (no default)                |
 | `rateLimit.burstSize`         | `number`  | `0`                           | Burst allowance                                     |
-| `metrics.enabled`             | `boolean` | `true`                        | Enable metrics endpoint                             |
+| `metrics.enabled`             | `boolean` | `true`                        | Enable metrics endpoint (optional)                  |
 | `metrics.path`                | `string`  | `/metrics`                    | Metrics endpoint path                               |
 
 ---

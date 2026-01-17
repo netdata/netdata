@@ -285,8 +285,10 @@ Complete MCP server configuration schema:
       "url": "string",
       "headers": { "string": "string" },
       "env": { "string": "string" },
+      "enabled": "boolean",
       "queue": "string",
       "cache": "string | number",
+      "toolSchemas": { "<tool>": "object" },
       "toolsCache": { "<tool>": "string | number" },
       "shared": "boolean",
       "healthProbe": "ping | listTools",
@@ -300,34 +302,37 @@ Complete MCP server configuration schema:
 
 ### All Options
 
-| Property           | Type               | Default     | Description                                   |
-| ------------------ | ------------------ | ----------- | --------------------------------------------- |
-| `type`             | `string`           | Required    | Transport type                                |
-| `command`          | `string`           | -           | Command to run (stdio only)                   |
-| `args`             | `string[]`         | `[]`        | Command arguments (stdio only)                |
-| `url`              | `string`           | -           | Server URL (http/sse/websocket)               |
-| `headers`          | `object`           | `{}`        | HTTP headers                                  |
-| `env`              | `object`           | `{}`        | Environment variables (stdio only)            |
-| `queue`            | `string`           | `"default"` | Concurrency queue name                        |
-| `cache`            | `string \| number` | -           | Response cache TTL (no caching by default)    |
-| `toolsCache`       | `object`           | `{}`        | Per-tool cache TTL overrides                  |
-| `shared`           | `boolean`          | `true`      | Share server across sessions (default `true`) |
-| `healthProbe`      | `string`           | `"ping"`    | Health check method                           |
-| `requestTimeoutMs` | `number \| string` | -           | Per-request timeout                           |
-| `toolsAllowed`     | `string[]`         | `["*"]`     | Tool allowlist (default `["*"]`)              |
-| `toolsDenied`      | `string[]`         | `[]`        | Tool denylist                                 |
+| Property           | Type               | Default     | Description                                           |
+| ------------------ | ------------------ | ----------- | ----------------------------------------------------- |
+| `type`             | `string`           | Required    | Transport type                                        |
+| `command`          | `string`           | -           | Command to run (stdio only)                           |
+| `args`             | `string[]`         | `[]`        | Command arguments (stdio only)                        |
+| `url`              | `string`           | -           | Server URL (http/sse/websocket)                       |
+| `headers`          | `object`           | `{}`        | HTTP headers                                          |
+| `env`              | `object`           | `{}`        | Environment variables (stdio only)                    |
+| `enabled`          | `boolean`          | -           | Enable or disable the server                          |
+| `queue`            | `string`           | `"default"` | Concurrency queue name                                |
+| `cache`            | `string \| number` | -           | Response cache TTL (no caching by default)            |
+| `toolSchemas`      | `object`           | `{}`        | Static tool schemas (for servers without `listTools`) |
+| `toolsCache`       | `object`           | `{}`        | Per-tool cache TTL overrides                          |
+| `shared`           | `boolean`          | `true`      | Share server across sessions (default `true`)         |
+| `healthProbe`      | `string`           | `"ping"`    | Health check method                                   |
+| `requestTimeoutMs` | `number \| string` | -           | Request timeout (provider-level setting)              |
+| `toolsAllowed`     | `string[]`         | `["*"]`     | Tool allowlist (default `["*"]`)                      |
+| `toolsDenied`      | `string[]`         | `[]`        | Tool denylist                                         |
 
 ### Duration Formats
 
 The following properties accept duration strings:
 
-| Property           | Formats                       | Examples                         |
-| ------------------ | ----------------------------- | -------------------------------- |
-| `cache`            | `off`, milliseconds, duration | `"off"`, `60000`, `"5m"`, `"1h"` |
-| `toolsCache.*`     | `off`, milliseconds, duration | `"off"`, `60000`, `"5m"`, `"1h"` |
-| `requestTimeoutMs` | milliseconds, duration        | `60000`, `"30s"`, `"2m"`         |
+| Property       | Formats                       | Examples                         |
+| -------------- | ----------------------------- | -------------------------------- |
+| `cache`        | `off`, milliseconds, duration | `"off"`, `60000`, `"5m"`, `"1h"` |
+| `toolsCache.*` | `off`, milliseconds, duration | `"off"`, `60000`, `"5m"`, `"1h"` |
 
 Duration units: `ms`, `s`, `m`, `h`, `d`, `w`, `mo`, `y`
+
+**Note:** `requestTimeoutMs` is a provider-level setting configured via defaults, not per-server.
 
 ---
 
@@ -380,6 +385,8 @@ See [Tool Filtering](Configuration-Tool-Filtering) for advanced patterns.
 
 ## Caching
 
+Cache TTL controls how long tool responses are cached.
+
 ### Server-Wide Cache
 
 Cache all tool responses from a server:
@@ -417,6 +424,8 @@ Override cache TTL for specific tools:
 }
 ```
 
+Per-tool TTL takes precedence over server-level TTL when configured. Use `"off"` to disable caching for a specific tool.
+
 ### Cache TTL Formats
 
 | Format       | Example | Duration   |
@@ -452,6 +461,8 @@ Limit concurrent tool calls to a server:
   }
 }
 ```
+
+All tools from a server inherit the server's queue assignment.
 
 See [Queues](Configuration-Queues) for complete queue configuration.
 
@@ -666,26 +677,24 @@ Error: Tool execution timed out
 
 **Causes:**
 
-- `requestTimeoutMs` too low
 - Server slow to respond
 - Network issues
 
 **Solutions:**
 
-1. Increase `requestTimeoutMs`:
+1. Check server health
+2. Review server logs
+3. Increase `toolTimeout` in defaults:
 
 ```json
 {
-  "mcpServers": {
-    "slow-server": {
-      "requestTimeoutMs": 120000
-    }
+  "defaults": {
+    "toolTimeout": 120000
   }
 }
 ```
 
-2. Check server health
-3. Review server logs
+**Note:** Tool timeout is controlled via `defaults.toolTimeout`, not per-server `requestTimeoutMs`. The timeout is scaled by 1.5x with a 1s buffer for robustness.
 
 ### Restart loop
 

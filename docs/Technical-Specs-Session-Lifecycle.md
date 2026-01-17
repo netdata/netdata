@@ -112,7 +112,7 @@ Sub-agent:     txnId=def456, originTxnId=abc123
 
 **Entry Point**: Constructor (`new AIAgentSession()`)
 
-Sets up core session state. Components that need initialization with external resources (ToolsOrchestrator, SessionToolExecutor, XmlToolTransport) are created by the caller and passed to the constructor.
+Sets up core session state. Components including ToolsOrchestrator, SessionToolExecutor, and XmlToolTransport are created during construction.
 
 **Constructor initialization**:
 
@@ -134,19 +134,24 @@ Sets up core session state. Components that need initialization with external re
 
 **External components passed to constructor** (created in AIAgentSession.create()):
 
-| Component           | Created in AIAgentSession.create()                  |
-| ------------------- | --------------------------------------------------- |
-| ToolsOrchestrator   | Created from config.tools and sessionConfig.targets |
-| SessionToolExecutor | Created from config.tools                           |
-| XmlToolTransport    | Created from config.outputFormat                    |
-| LLMClient           | Created from config.providers                       |
+| Component | Created in AIAgentSession.create() |
+| --------- | ---------------------------------- |
+| LLMClient | Created from config.providers      |
+
+**Internal components created in constructor**:
+
+| Component           | Created in constructor location                        |
+| ------------------- | ------------------------------------------------------ |
+| ToolsOrchestrator   | Created from config.tools and sessionConfig.targets    |
+| SessionToolExecutor | Created in constructor with orchestrator, contextGuard |
+| XmlToolTransport    | Created in constructor (line 580)                      |
 
 Note:
 
-- System turn (turn 0) begins in `AIAgentSession.run()`, not in constructor
-- Initial context token count is computed in Phase 5 (agent loop execution)
-- toolNameCorrections is initialized lazily via Map, not explicitly in constructor
-- conversation, logs, accounting are initialized from create() parameters
+- System turn (turn 0) begins in constructor (lines 631-635), not in AIAgentSession.run()
+- Initial context token count is computed in Phase 4 (TurnRunner.execute())
+- toolNameCorrections is initialized lazily via Map in TurnRunner
+- conversation, logs, accounting are initialized from create() parameters and then passed to TurnRunner
 
 **Key Initializations**:
 
@@ -197,7 +202,7 @@ flowchart TD
 
 ## Phase 4: Execution
 
-**Entry Point**: `AIAgentSession.run()`
+**Entry Point**: `AIAgentSession.run()` (delegates to TurnRunner.execute() for the actual loop)
 
 Main entry point for session execution.
 
@@ -228,7 +233,7 @@ Main entry point for session execution.
 
 **Entry Point**: `TurnRunner.execute()`
 
-The core multi-turn execution loop. Previously in `AIAgentSession.run()`, now extracted to `TurnRunner.execute()`.
+The core multi-turn execution loop. Previously in `AIAgentSession.run()`, extracted to `TurnRunner.execute()` for better separation of concerns.
 
 ```
 for turn = 1 to maxTurns:
@@ -261,14 +266,18 @@ for turn = 1 to maxTurns:
 
 **Key State During Loop**:
 
-| State                       | Purpose                                       |
-| --------------------------- | --------------------------------------------- |
-| `currentTurn`               | Current turn number (1-based)                 |
-| `forcedFinalTurnReason`     | Why tools are restricted                      |
-| `turnFailedEvents`          | Accumulated turn failure events               |
-| `finalReportToolFailedEver` | Whether final_report tool ever failed         |
-| `finalReportInvalidFormat`  | Whether final report format was invalid       |
-| `finalReportSchemaFailed`   | Whether final report schema validation failed |
+| State                       | Purpose                                                      |
+| --------------------------- | ------------------------------------------------------------ |
+| `currentTurn`               | Current turn number (1-based)                                |
+| `currentCtxTokens`          | Current context tokens (always 0 in current implementation)  |
+| `pendingCtxTokens`          | Pending context tokens (including conversation + schema)     |
+| `newCtxTokens`              | New tokens from current turn (reset after adding to pending) |
+| `schemaCtxTokens`           | Tool schema tokens (computed per turn)                       |
+| `forcedFinalTurnReason`     | Why tools are restricted                                     |
+| `turnFailedEvents`          | Accumulated turn failure events                              |
+| `finalReportToolFailedEver` | Whether final_report tool ever failed                        |
+| `finalReportInvalidFormat`  | Whether final report format was invalid                      |
+| `finalReportSchemaFailed`   | Whether final report schema validation failed                |
 
 > **Note**: `pairCursor` (provider cycling index) and `attempts` (retry counter) are local variables within the turn execution loop, not stored state fields. |
 
@@ -307,7 +316,6 @@ sequenceDiagram
     provider: string,
     model: string,
     tools: MCPTool[],
-    toolExecutor: ToolExecutor,
     temperature?: number | null,
     topP?: number | null,
     topK?: number | null,
@@ -368,7 +376,7 @@ sequenceDiagram
 
 ## Phase 7: Tool Execution
 
-**Entry Point**: `SessionToolExecutor.createExecutor()` and `orchestrator.executeWithManagement()`
+**Entry Point**: `SessionToolExecutor.createExecutor()` creates a per-turn executor, which then calls `ToolsOrchestrator.executeWithManagement()` for actual execution
 
 Executes tool calls after a successful LLM turn. The executor wraps each tool call with context budget checking, timeout handling, and response sanitization.
 
@@ -438,16 +446,15 @@ flowchart TD
 
 **Steps**:
 
-| Step | Action                                                 |
-| ---- | ------------------------------------------------------ |
-| 1    | End system turn and session in opTree (with final log) |
-| 2    | Flatten opTree                                         |
-| 3    | Merge logs and accounting                              |
-| 4    | Persist final snapshot and flush accounting            |
-| 5    | Emit completion event                                  |
-| 6    | Build and return AIAgentResult                         |
+| Step | Action                                      |
+| ---- | ------------------------------------------- |
+| 1    | Flatten opTree                              |
+| 2    | Merge logs and accounting                   |
+| 3    | Persist final snapshot and flush accounting |
+| 4    | Emit completion event                       |
+| 5    | Build and return AIAgentResult              |
 
-> **Note**: Step 1 logs finalization and ends the session; steps 2-4 happen inside `persistFinalArtifacts()`. Step order differs from conceptual flow: logs/accounting are persisted first, then completion event is emitted. |
+> **Note**: The "End system turn and session in opTree" step occurs in Phase 4, not Phase 8. Step order in actual implementation: opTree/event emissions first, then persist snapshot, then flush accounting. |
 
 **AIAgentResult Structure**:
 
@@ -473,6 +480,14 @@ flowchart TD
     finalAgentId?: string
 }
 ```
+
+---
+
+## Context Guard Events
+
+| Event              | Severity | Description                                           |
+| ------------------ | -------- | ----------------------------------------------------- |
+| `agent:final-turn` | WRN      | Final turn enforced (max_turns, context, task_status) |
 
 ---
 
@@ -527,14 +542,14 @@ AbortSignal → Session → LLMClient → Provider
 | `agent:init`                  | VRB      | Session initialized                             |
 | `agent:settings`              | VRB      | Configuration summary                           |
 | `agent:tools`                 | INF      | Tool banner (available tools)                   |
-| `agent:turn-start`            | INF      | Turn begins                                     |
+| `agent:start`                 | VRB      | Master LLM start (verbose)                      |
 | `agent:final-turn`            | WRN      | Final turn detected                             |
 | `agent:context`               | WRN      | Context guard events                            |
-| `agent:final-report-accepted` | INF      | Final report committed                          |
-| `agent:fin`                   | INF      | Session finalized                               |
-| `agent:failure-report`        | ERR      | Synthetic failure final report (context-forced) |
 | `agent:fallback-report`       | WRN      | Cached pending final report accepted            |
 | `agent:text-extraction`       | VRB      | Final report payload extracted from text        |
+| `agent:final-report-accepted` | WRN      | Final report committed                          |
+| `agent:failure-report`        | ERR      | Synthetic failure final report (context-forced) |
+| `agent:fin`                   | INF      | Session finalized                               |
 
 ---
 

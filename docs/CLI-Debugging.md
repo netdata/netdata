@@ -193,9 +193,10 @@ ai-agent --agent test.ai --dry-run "Test query"
 **Validates**
 
 - Configuration parsing and agent file syntax
-- MCP server connectivity
+- MCP server configuration (servers must be defined in config)
 
 Note: Tool schema validation occurs during normal agent loading, not during dry-run.
+Note: MCP server connectivity (warmup) is validated when the agent runs, not during dry-run.
 Note: Model availability is validated when the agent runs, not during dry-run.
 
 **Use for:**

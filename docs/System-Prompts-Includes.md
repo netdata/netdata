@@ -488,19 +488,31 @@ ${include:shared/tone.md} # Wrong - looks in agents/shared/
 2. Flatten the structure (include files directly instead of through intermediaries)
 3. Combine small includes into larger files
 
-### Include content not appearing
+### Unresolved includes after expansion
 
-**Problem**: Include directive shows up literally in output.
+**Problem**: Agent fails to load with error about unresolved include directives.
 
-**Cause**: Syntax error in the directive.
+**Cause**: Circular reference or malformed syntax in include directive.
 
-**Fix**: Check syntax:
+**Error messages**:
+
+- `"Prompt '<path>' still contains include directives after expansion. Check for circular includes or malformed syntax."` - File includes
+- `"Provided prompt content still contains include directives after expansion."` - Programmatic content
+
+**Fix**: Check for circular includes and verify syntax:
 
 ```markdown
 ${include:file.md}     # Correct
 ${include:file.md } # Correct (spaces inside braces are trimmed)
 {{include:file.md}} # Also correct (alternative syntax)
+
+# Incorrect - missing colon or wrong format
+
+${include file.md}     # Wrong
+${include file.md } # Wrong
 ```
+
+For circular references, check that no file includes a file that eventually includes it back (A → B → A).
 
 ### Wrong content included
 
@@ -527,4 +539,4 @@ From `agents/main.ai`, you must go up one level (`..`) to reach `shared/`.
 - [System-Prompts](System-Prompts) - Chapter overview
 - [System-Prompts-Writing](System-Prompts-Writing) - Best practices for prompts
 - [System-Prompts-Variables](System-Prompts-Variables) - Variable reference
-- [Agent-Development-Agent-Files](Agent-Development-Agent-Files) - `.ai` file structure
+- [Agent-Files](Agent-Files) - `.ai` file structure

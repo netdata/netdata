@@ -338,7 +338,7 @@ toolResponseMaxBytes: "number"
 | Model       | `contextWindow`             | `number` | Provider value | Model-specific limit        |
 | Model       | `tokenizer`                 | `string` | Provider value | Model-specific tokenizer    |
 | Defaults    | `contextWindowBufferTokens` | `number` | `8192`         | Safety buffer               |
-| Defaults    | `maxOutputTokens`           | `number` | `4096`         | Max output tokens           |
+| Defaults    | `maxOutputTokens`           | `number` | `16384`        | Max output tokens           |
 | Defaults    | `toolResponseMaxBytes`      | `number` | `12288`        | Max tool response size      |
 | Frontmatter | `contextWindow`             | `number` | Provider value | Agent-specific limit        |
 | Frontmatter | `maxOutputTokens`           | `number` | Defaults value | Agent output limit          |
@@ -370,15 +370,17 @@ Logs context-related decisions.
 
 ### Check Accounting
 
-Accounting entries include context metrics:
+Context metrics are logged in `details` field of VRB log entries:
 
 ```json
 {
   "type": "llm",
   "inputTokens": 15230,
   "outputTokens": 1456,
-  "contextWindow": 128000,
-  "remainingTokens": 111314
+  "details": {
+    "context_window": 128000,
+    "remaining_tokens": 111314
+  }
 }
 ```
 

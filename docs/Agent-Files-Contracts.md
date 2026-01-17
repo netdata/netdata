@@ -346,7 +346,7 @@ input:
 ---
 ```
 
-**Parent agent calls with**:
+**Parent agent calls with** (explicit schema example):
 
 ```json
 {
@@ -356,18 +356,38 @@ input:
     "maxResults": 20,
     "filters": {
       "dateRange": "month"
-    }
+    },
+    "reason": "Search for AI trends information"
   }
 }
 ```
+
+**Parent agent calls with** (fallback schema example):
+
+```json
+{
+  "tool": "agent__data_processor",
+  "input": {
+    "prompt": "Process this data",
+    "format": "sub-agent",
+    "reason": "Need to process this dataset"
+  }
+}
+```
+
+**Notes about sub-agent tool calls**:
+
+- All sub-agent tool calls require a `reason` field (string, 1-15 words) explaining why the tool is being called
+- For explicit schemas: provide schema-defined fields plus `reason` (no `format` or `prompt` field needed)
+- For fallback schema: provide `prompt`, `format: "sub-agent"`, and `reason`
 
 **Notes**:
 
 - Invalid inputs return as tool errors to parent
 - Schema generates tool input schema for parent
 - Descriptions help parent understand usage
-- If `input.format` is `text`, schema is ignored
-- If `input.format` is `json` without schema, uses default input schema with `prompt` and optional `format` fields
+- If `input.format` is `text`, user-provided schema is ignored (system uses default input schema with `prompt` and optional `format` fields)
+- If `input.format` is `json` without user-provided schema, uses default input schema with `prompt` and optional `format` fields
 
 ---
 

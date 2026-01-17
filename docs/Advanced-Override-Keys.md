@@ -367,12 +367,12 @@ ai-agent --agent test.ai --override reasoningTokens=disabled "query"
 
 #### interleaved
 
-| Property     | Value                           |
-| ------------ | ------------------------------- |
-| Type         | `boolean` or `string`           |
-| Default      | From provider config            |
-| Valid values | `true`, `false`, or field name  |
-| Example      | `interleaved=reasoning_content` |
+| Property     | Value                                    |
+| ------------ | ---------------------------------------- |
+| Type         | `boolean` or `string`                    |
+| Default      | `undefined` (provider config)            |
+| Valid values | `true`, `false`, or any non-empty string |
+| Example      | `interleaved=reasoning_content`          |
 
 **Description**: Configure interleaved reasoning injection.
 
@@ -395,7 +395,7 @@ ai-agent --agent test.ai --override interleaved=reasoning_content "query"
 
 | Property     | Value                                      |
 | ------------ | ------------------------------------------ |
-| Type         | `string`                                   |
+| Type         | `string` or `number`                       |
 | Default      | `undefined` (no caching)                   |
 | Valid values | `off`, duration (`5m`, `1h`), milliseconds |
 | Example      | `cache=1h`                                 |
