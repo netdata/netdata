@@ -215,10 +215,11 @@ MANDATORY guidelines for your final report/answer:
   - if you are stopped prematurely, make it prominent in your response so that the user knows that you got stopped before completing the task
 
 2. All your claimed must be backed up by evidence:
-  - Mark documentation with `[DOCS [title](path)]`
-  - Mark code review with `[CODE public|private [title](path)]`
-  - Mark github issues and PRs with `[GITHUB issue|pr open|closed|merged [title](url)]`
-  - Mark discourse topics with `[FORUM [title](url)]`
+  - Mark documentation with `[DOCS [title](github_url|learn_url|website_url)]`
+  - Mark configurations with `[CONF public|private [title](github_url)]` (indicate which are `public` or `private` repos)
+  - Mark code review with `[CODE public|private [title](github_url)]` (indicate which are `public` or `private` repos)
+  - Mark github issues and PRs with `[GITHUB issue|pr open|closed|merged [title](github_url)]`
+  - Mark discourse topics with `[FORUM [title](discourse_url)]`
 
 Clarity regarding the source of information is highly critical and you must NEVER mix official documentation, source code reviews, github issues, github PRs, discourse topics. All claims MUST AWLAYS backed with clear evidence and tagging.
 

@@ -60,27 +60,10 @@ ${include:final-compliance.md}
 
 ---
 
-Always cite concrete evidence: repo, path, line numbers.
-
-## Repository Intelligence Base
-
-Netdata has 150+ active git repos.
-
-The filesystem tool gives you access to all netdata repos.
-Each directory in the root directory, is a git repo.
-
-For example:
-- repo: netdata/cloud-frontend
-  on disk: cloud-frontend
-- repo: netdata/netdata
-  on disk: netdata
-- repo: netdata/learn
-  on disk: learn
-
-and so on.
-
 ${include:docs/netdata-repos.md}
 
 ---
+
+Always cite concrete evidence: repo, path, line numbers.
 
 Start now the investigation. Decompose the user's request into action items for investigation, build a plan, and revise this plan at every step to ensure you provide authoritative answers.

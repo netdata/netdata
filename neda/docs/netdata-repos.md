@@ -93,7 +93,7 @@ Cloud infrastructure and backend microservices (all actively maintained)
 #### Specialized Services
 - netdata/cloud-licenser: License management service (private)
 - netdata/cloud-admin-panel: Administrative panel (private)
-- netdata/cloud-netdata-assistant: AI documentation assistant service - cannot troubleshoot - only for docs and config (private)
+- netdata/cloud-netdata-assistant: AI documentation assistant service - cannot troubleshoot - only for docs and configurations - OBSOLETE (private)
 - netdata/cloud-insights-service: AI investigations/troubleshooting/reporting service - with access to observability data (private)
 - netdata/cloud-api-docs: API documentation (private)
 - netdata/cloud-kit: Cloud development kit (private)
@@ -123,7 +123,11 @@ Publicly available documentation assistant (this appears at the home page of lea
 
 Our CRM agent used internally in slack:
 
-- netdata/ai-agent: AI agent framework powering Neda assistant (public)
+- netdata/ai-agent: AI agent framework powering Neda assistant (private)
+
+Our AI installer for installing opencode, crush and other CLI AI agents:
+
+- netdata/ai-installer: Install CLI AI Assistants on Linux and MacOS (private)
 
 ### DevOps & Infrastructure
 Infrastructure automation and deployment
@@ -216,7 +220,6 @@ Security vulnerability tracking (private)
 - netdata/netdata-ghsa-xfp2-8264-4w82: Security advisory (private)  
 - netdata/netdata-ghsa-xhw4-q8f5-2j4c: Security advisory (private)
 
-
 ## Best Practices For Searching
 
 1. Netdata Agents (children) communicate to Netdata Parents via streaming. This is a single bidirectional socket, initiated from the child to the parent, although there is a small handshake before this is established, using simple http(s) calls, in order to support load balancing parents.
@@ -230,3 +233,45 @@ Security vulnerability tracking (private)
 IMPORTANT: Netdata uses unusual API endpoints and searching for POST/PUT/GET on assumed/expected endpoints may reveal nothing. Before concluding that some API functionality is not supported, you should first trace the functionality backwards: find the code that implements the features, find how it is exposed in the APIs, find which components use these APIs, examine what features these components offer.
 
 IMPORTANT: When searching in the repos, do not make case sensitive searches, unless you know you are looking for something specific that is case sensitive. Do not assume snake case, camel case, etc. Different teams (agent, front-end, cloud backend, SREs) may use different formats.
+
+## Filesystem Access to Repos
+
+The `filesystem_repos` tools (when provided), gives you direct access to all Netdata repos.
+Each directory in the root filesystem of `filesystem_repos`, is a Netdata git repo.
+
+For example:
+
+- repo: netdata/cloud-frontend
+  on disk: cloud-frontend/
+
+- repo: netdata/netdata
+  on disk: netdata/
+
+- repo: netdata/learn
+  on disk: learn/
+
+- repo: netdata/website
+  on disk: website/
+
+and so on.
+
+The files on disk are updated automatically every few hours.
+
+### Mapping relative paths to URLs
+
+When using `filesystem_repos` to access the repos, you MUST rewrite/convert local files to URLs.
+
+Do the conversion/rewrite in this order:
+
+#### 1. Netdata Websites
+
+Always map `learn/docs` and `website/content/` like this:
+
+- documentation: local path `learn/docs/{file_or_path}.mdx` maps to `https://learn.netdata.cloud/docs/{file}/` without extension (convert spaces to hyphens, convert to lowercase)
+- website: local path `website/content/{file_or_path}.md` maps to `https://www.netdata.cloud/{file_or_path}/` without extension, convert to lowercase
+
+#### 2. Netdata Repositories
+
+For all other files (public and private), the top level directory is the repo and the remaining is the relative path inside the repo:
+
+- `{repo}/{file_or_path}` is accessible as `https://github.com/netdata/{repo}/blob/main/{file_or_path}` with extension
