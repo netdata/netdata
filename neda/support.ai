@@ -11,7 +11,7 @@ agents: []
 maxOutputTokens: 16384
 maxTurns: 1
 maxToolCallsPerTurn: 10
-reasoning: high
+reasoning: low
 cache: off
 router:
   destinations:
@@ -77,7 +77,7 @@ Use the information below to decide what to do.
 - `information_about_netdata`:
   This is legitimate information request about Netdata.
   Routing: You MUST handoff-to `support-engineer` (using your `router__handoff-to` tool).
-  When you handoff you MUST provide the `message` field with the following:
+  When you call `router__handoff-to` you MUST provide the `message` field with the following information in plain text:
   ```
     request_type: information_about_netdata
     user_language: the language of the user - use English if you can't determine it
@@ -90,7 +90,7 @@ Use the information below to decide what to do.
 - `netdata_troubleshooting`:
   This is a troubleshooting session, the user is trying to solve a problem they have with Netdata.
   Routing: You MUST handoff-to `support-engineer` (using your `router__handoff-to` tool).
-  When you handoff you MUST provide the `message` field with this:
+  When you call `router__handoff-to` you MUST provide the `message` field with the following information in plain text:
   ```
     request_type: netdata_troubleshooting,
     user_language: the language of the user - 'English' if you can't determine it
@@ -103,7 +103,7 @@ Use the information below to decide what to do.
 - `create_support_ticket`:
   The user wants to create a support ticket.
   Routing: You MUST handoff-to `support-engineer` (using your `router__handoff-to` tool).
-  When you handoff you MUST provide the `message` field with the following:
+  When you call `router__handoff-to` you MUST provide the `message` field with the following information in plain text:
   ```
     request_type: create_support_ticket
     user_language": the language of the user - 'English' if you can't determine it
