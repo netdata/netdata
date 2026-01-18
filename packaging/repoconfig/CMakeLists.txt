@@ -103,6 +103,11 @@ elseif(${DISTRO} STREQUAL "opensuse-tumbleweed")
   set(DISTRO_VERSION "tumbleweed")
 endif()
 
+# Strip version to major version only for RHEL-compatible and Oracle Linux
+if(${DISTRO} STREQUAL "rhel" OR ${DISTRO} STREQUAL "ol")
+  string(REGEX REPLACE "^([0-9]+).*" "\\1" DISTRO_VERSION "${DISTRO_VERSION}")
+endif()
+
 if(${DISTRO} IN_LIST DEB_DISTROS)
   extract_release_item(SUITE VERSION_CODENAME)
 
@@ -219,12 +224,17 @@ elseif(${DISTRO} IN_LIST RPM_DISTROS)
     endif()
   elseif(${DISTRO} STREQUAL "rhel")
     set(DIST_NAME "el")
+    # Use the major version only for RHEL/CentOS-compatible distros
+    set(DIST_VERSION "${DISTRO_VERSION}")
 
     if(${DISTRO_VERSION} VERSION_LESS_EQUAL 8)
       set(CPACK_RPM_PACKAGE_REQUIRES "yum-plugin-priorities, epel-release")
     else()
       set(CPACK_RPM_PACKAGE_REQUIRES "epel-release")
     endif()
+  elseif(${DISTRO} STREQUAL "ol")
+    # Use the major version only for Oracle Linux
+    set(DIST_VERSION "${DISTRO_VERSION}")
   endif()
 
   message(STATUS "Generating stable repository configuration for ${DISTRO} ${DISTRO_VERSION}")
