@@ -921,7 +921,7 @@ When projected size approaches context limit:
 - Must end with `agent__final_report` wrapped in XML tag
 - Plain-text answers NOT accepted
 - Missing/malformed XML → turn fails or retries triggered
-- Turn succeeds only if valid final report OR at least one non-progress tool executed
+- Turn succeeds only if valid final report OR at least one non-progress tool executed. **Executed** means the tool passed validation and execution started; schema/unknown-tool rejections do **not** count, while timeouts/transport errors after execution do.
 
 ### Reasoning
 - `none` or `unset` → disables reasoning

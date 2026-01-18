@@ -6,6 +6,7 @@ import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
 
 import { isPlainObject, warn } from '../utils.js';
 
+import { ToolExecutionError } from './tool-errors.js';
 import { ToolProvider } from './types.js';
 
 type AjvInstance = AjvClass;
@@ -90,7 +91,11 @@ export class RestProvider extends ToolProvider {
     const start = Date.now();
     const id = this.internalName(exposed);
     const cfg = this.tools.get(id);
-    if (cfg === undefined) throw new Error(`REST tool not found: ${exposed}`);
+    if (cfg === undefined) {
+      throw new ToolExecutionError('unknown_tool', `REST tool not found: ${exposed}`, {
+        details: { toolName: exposed },
+      });
+    }
 
     // Validate parameters
     try {
@@ -107,7 +112,9 @@ export class RestProvider extends ToolProvider {
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      throw new Error(`Validation error: ${msg}`);
+      throw new ToolExecutionError('invalid_parameters', `Validation error: ${msg}`, {
+        details: { toolName: exposed },
+      });
     }
 
     const method = cfg.method.toUpperCase();

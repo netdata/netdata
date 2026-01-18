@@ -16,6 +16,7 @@ import type { LLMClient } from './llm-client.js';
 import type { SessionProgressReporter } from './session-progress-reporter.js';
 import type { SessionTreeBuilder } from './session-tree.js';
 import type { SubAgentRegistry } from './subagent-registry.js';
+import type { ToolErrorKind } from './tools/tool-errors.js';
 import type { ToolsOrchestrator } from './tools/tools.js';
 import type { AIAgentEvent, AIAgentEventMeta, AIAgentResult, AIAgentSessionConfig, AccountingEntry, Configuration, ConversationMessage, EventSource, FinalReportPayload, LogDetailValue, LogEntry, MCPTool, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, RouterSelection, ToolCall, TurnResult, TurnRetryDirective, TurnStatus } from './types.js';
 
@@ -30,7 +31,6 @@ import {
   buildSchemaMismatchFailure,
   formatJsonParseHint,
   formatSchemaMismatchSummary,
-  isUnknownToolFailureMessage,
   isXmlFinalReportTagName,
   TOOL_NO_OUTPUT,
 } from './llm-messages.js';
@@ -119,10 +119,12 @@ interface TurnRunnerState {
   turnFailedEvents: TurnFailedNoticeEvent[];
   turnFailedCounter: number;
   toolFailureMessages: Map<string, string>;
+  toolFailureKinds: Map<string, ToolErrorKind>;
   toolFailureFallbacks: string[];
   toolNameCorrections: Map<string, string>;
   trimmedToolCallIds: Set<string>;
   executedToolCallIds: Set<string>;
+  hadToolFailure: boolean;
   finalReportToolFailedEver: boolean;
   finalReportToolFailedThisTurn: boolean;
   toolLimitExceeded: boolean;
@@ -199,10 +201,12 @@ export class TurnRunner {
             turnFailedEvents: [],
             turnFailedCounter: 0,
             toolFailureMessages: new Map<string, string>(),
+            toolFailureKinds: new Map<string, ToolErrorKind>(),
             toolFailureFallbacks: [],
             toolNameCorrections: new Map<string, string>(),
             trimmedToolCallIds: new Set<string>(),
             executedToolCallIds: new Set<string>(),
+            hadToolFailure: false,
             finalReportToolFailedEver: false,
             finalReportToolFailedThisTurn: false,
             toolLimitExceeded: false,
@@ -1004,53 +1008,56 @@ export class TurnRunner {
                         const textContent = assistantForAdoption !== undefined && typeof assistantForAdoption.content === 'string' ? assistantForAdoption.content : undefined;
                         let sanitizedHasText = textContent !== undefined && textContent.length > 0;
                         let textWithoutToolsFailureAdded = false;
-                        let toolFailureDetected = sanitizedMessages.some((msg) => msg.role === 'tool' && typeof msg.content === 'string' && msg.content.trim().toLowerCase().startsWith(TOOL_FAILED_PREFIX));
+                        let toolFailureDetected = this.state.hadToolFailure
+                            || this.state.toolFailureMessages.size > 0
+                            || this.state.toolFailureFallbacks.length > 0;
                         if (toolFailureDetected) {
-                            const failureToolMessage = sanitizedMessages
-                                .filter((msg) => msg.role === 'tool' && typeof msg.content === 'string')
-                                .find((msg) => {
-                                const trimmed = msg.content.trim().toLowerCase();
-                                return trimmed.startsWith(TOOL_FAILED_PREFIX);
-                            });
-                            if (failureToolMessage !== undefined) {
-                                const failureCallId = failureToolMessage.toolCallId;
-                                if (typeof failureCallId === 'string') {
-                                    const override = this.state.toolFailureMessages.get(failureCallId);
-                                    if (typeof override === 'string' && override.length > 0) {
-                                        failureToolMessage.content = override;
-                                    }
-                                    // Check if failed tool was the final report tool
-                                    const owningAssistant = sanitizedMessages.find((msg) => msg.role === 'assistant' && Array.isArray(msg.toolCalls));
-                                    const owningToolCalls = owningAssistant?.toolCalls;
-                                    if (owningToolCalls !== undefined) {
-                                        const relatedCall = owningToolCalls.find((tc) => tc.id === failureCallId);
-                                        if (relatedCall !== undefined) {
-                                            const failureToolNameNormalized = sanitizeToolName(relatedCall.name);
-                                            if (failureToolNameNormalized === FINAL_REPORT_TOOL) {
-                                                this.state.finalReportToolFailedThisTurn = true;
-                                                this.state.finalReportToolFailedEver = true;
-                                            }
-                                        }
-                                    }
-                                    this.state.toolFailureMessages.delete(failureCallId);
+                            const toolMessageById = new Map<string, ConversationMessage>();
+                            sanitizedMessages.forEach((msg) => {
+                                if (msg.role !== 'tool') return;
+                                const callId = msg.toolCallId;
+                                if (typeof callId === 'string' && callId.length > 0) {
+                                    toolMessageById.set(callId, msg);
                                 }
+                            });
+                            const assistantWithCall = sanitizedMessages.find((msg) => msg.role === 'assistant' && Array.isArray(msg.toolCalls));
+                            const owningToolCalls = assistantWithCall?.toolCalls;
+                            const toolNameById = new Map<string, string>();
+                            if (owningToolCalls !== undefined) {
+                                owningToolCalls.forEach((tc) => {
+                                    if (typeof tc.id === 'string' && tc.id.length > 0) {
+                                        toolNameById.set(tc.id, sanitizeToolName(tc.name));
+                                    }
+                                });
                             }
+                            const failureEntries = [...this.state.toolFailureMessages.entries()];
+                            failureEntries.forEach(([failureCallId, override]) => {
+                                const failureToolMessage = toolMessageById.get(failureCallId);
+                                if (failureToolMessage !== undefined && override.length > 0) {
+                                    failureToolMessage.content = override;
+                                }
+                                const normalized = toolNameById.get(failureCallId);
+                                if (normalized !== undefined && (normalized === FINAL_REPORT_TOOL
+                                    || FINAL_REPORT_TOOL_ALIASES.has(normalized)
+                                    || normalized === 'final_report')) {
+                                    this.state.finalReportToolFailedThisTurn = true;
+                                    this.state.finalReportToolFailedEver = true;
+                                }
+                                this.state.toolFailureMessages.delete(failureCallId);
+                            });
                             // Fallback: if any failed tool call co-exists with an assistant-issued final_report call,
                             // mark the final report tool as failed even if the toolCallId mapping was lost.
                             if (!this.state.finalReportToolFailedEver) {
-                                const assistantWithCall = sanitizedMessages.find((msg) => msg.role === 'assistant' && Array.isArray(msg.toolCalls));
-                                const hasFinalReportCall = assistantWithCall?.toolCalls?.some((tc) => sanitizeToolName(tc.name) === FINAL_REPORT_TOOL) ?? false;
+                                const hasFinalReportCall = owningToolCalls?.some((tc) => {
+                                    const normalized = sanitizeToolName(tc.name);
+                                    return normalized === FINAL_REPORT_TOOL
+                                        || FINAL_REPORT_TOOL_ALIASES.has(normalized)
+                                        || normalized === 'final_report';
+                                }) ?? false;
                                 if (hasFinalReportCall) {
                                     this.state.finalReportToolFailedThisTurn = true;
                                     this.state.finalReportToolFailedEver = true;
                                 }
-                            }
-                            const finalReportFailurePresent = sanitizedMessages.some((msg) => msg.role === 'tool' &&
-                                typeof msg.content === 'string' &&
-                                msg.content.includes(FINAL_REPORT_TOOL));
-                            if (finalReportFailurePresent) {
-                                this.state.finalReportToolFailedThisTurn = true;
-                                this.state.finalReportToolFailedEver = true;
                             }
                         }
                         // FALLBACK: Extract and execute tool calls from leaked XML-like patterns
@@ -1137,8 +1144,7 @@ export class TurnRunner {
                                 const formatParam = typeof formatParamRaw === 'string' && formatParamRaw.trim().length > 0 ? formatParamRaw.trim() : undefined;
                                 const statusParamRaw = params.status;
                                 const statusParam = typeof statusParamRaw === 'string' && statusParamRaw.trim().length > 0 ? statusParamRaw.trim().toLowerCase() : undefined;
-                                const limitFailure = this.state.toolLimitExceeded || [...this.state.toolFailureMessages.values()]
-                                    .some((msg) => typeof msg === 'string' && msg.includes('per-turn tool limit'));
+                                const limitFailure = this.state.toolLimitExceeded;
                                 const commitSource: FinalReportSource = (statusParam === 'failure' && (limitFailure || this.state.finalReportToolFailedEver)) ? 'synthetic' : 'tool-call';
                                 const metadataCandidate = params.metadata;
                                 let commitMetadata: Record<string, unknown> = (metadataCandidate !== null && typeof metadataCandidate === 'object' && !Array.isArray(metadataCandidate))
@@ -1489,10 +1495,16 @@ export class TurnRunner {
                             this.addTurnFailure(reasoningOnlySlug);
                         }
                         if (isFinalTurn && this.finalReport === undefined && turnHadFinalReportAttempt && sanitizedHasToolCalls) {
-                            const toolMessageFallback = sanitizedMessages.find((msg) => msg.role === 'tool' &&
-                                typeof msg.content === 'string' &&
-                                msg.content.trim().length > 0 &&
-                                !msg.content.trim().toLowerCase().startsWith(TOOL_FAILED_PREFIX));
+                            const failureFallbackSet = new Set(this.state.toolFailureFallbacks);
+                            const toolMessageFallback = sanitizedMessages.find((msg) => {
+                                if (msg.role !== 'tool') return false;
+                                if (typeof msg.content !== 'string' || msg.content.trim().length === 0) return false;
+                                const callId = msg.toolCallId;
+                                if (typeof callId === 'string' && callId.length > 0) {
+                                    return !this.state.toolFailureKinds.has(callId);
+                                }
+                                return !failureFallbackSet.has(msg.content);
+                            });
                             if (toolMessageFallback !== undefined) {
                                 const fallbackFormat = this.ctx.resolvedFormat ?? 'text';
                                 const fallbackPayload: PendingFinalReportPayload = {
@@ -2298,7 +2310,7 @@ export class TurnRunner {
     if (lastErrorType === 'model_error') slugs.add('provider_error');
     // Tool error slugs inferred from toolFailureMessages/trimmed ids
     if (this.state.toolFailureMessages.size > 0 || this.state.toolFailureFallbacks.length > 0) slugs.add('tool_exec_failed');
-    const anyUnknown = (lastTurnResult?.executionStats?.unknownToolEncountered === true) || (lastTurnResult?.messages ?? []).some((m) => m.role === 'tool' && typeof m.content === 'string' && isUnknownToolFailureMessage(m.content));
+    const anyUnknown = lastTurnResult?.executionStats?.unknownToolEncountered === true;
     if (anyUnknown) slugs.add('unknown_tool');
     if (this.state.trimmedToolCallIds.size > 0 || this.state.droppedInvalidToolCalls > 0 || (hadToolCalls && stats.executedTools === 0)) slugs.add('malformed_tool_call');
     if (this.state.finalReportToolFailedEver) {
@@ -2902,11 +2914,13 @@ export class TurnRunner {
         // Create execution state for the fallback executor
         const executionState: ToolExecutionState = {
             toolFailureMessages: new Map(),
+            toolFailureKinds: this.state.toolFailureKinds,
             toolFailureFallbacks: [],
             toolNameCorrections: this.state.toolNameCorrections,
             trimmedToolCallIds: new Set(),
             executedToolCallIds: this.state.executedToolCallIds,
             turnHasSuccessfulToolOutput: false,
+            hadToolFailure: false,
             incompleteFinalReportDetected: false,
             toolLimitExceeded: false,
             finalReportToolFailed: false,
@@ -3058,6 +3072,7 @@ export class TurnRunner {
                         const sanitized = buildSanitizationParams(reason, payload);
                         const failureMessage = `(tool failed: ${sanitized.failureDetail})`;
                         this.state.toolFailureMessages.set(id, failureMessage);
+                        this.state.toolFailureKinds.set(id, 'invalid_parameters');
                         syntheticToolMessages.push({ role: 'tool', toolCallId: id, content: failureMessage });
                         calls.push({
                             name: 'unknown_tool',
@@ -3086,6 +3101,7 @@ export class TurnRunner {
                         const sanitized = buildSanitizationParams(reason, payload);
                         const failureMessage = `(tool failed: ${sanitized.failureDetail})`;
                         this.state.toolFailureMessages.set(id, failureMessage);
+                        this.state.toolFailureKinds.set(id, 'invalid_parameters');
                         syntheticToolMessages.push({ role: 'tool', toolCallId: id, content: failureMessage });
                         calls.push({
                             name: 'unknown_tool',
@@ -3125,6 +3141,7 @@ export class TurnRunner {
                         const sanitized = buildSanitizationParams(reason, payload);
                         const failureMessage = `(tool failed: ${sanitized.failureDetail})`;
                         this.state.toolFailureMessages.set(id, failureMessage);
+                        this.state.toolFailureKinds.set(id, 'invalid_parameters');
                         syntheticToolMessages.push({ role: 'tool', toolCallId: id, content: failureMessage });
                         calls.push({
                             name: normalizedName,
@@ -3329,17 +3346,21 @@ export class TurnRunner {
         addSpanAttributes({ 'ai.llm.reasoning.disabled': disableReasoningForTurn });
         let shownThinking = false;
         this.state.toolFailureMessages.clear();
+        this.state.toolFailureKinds.clear();
         this.state.toolFailureFallbacks.length = 0;
         this.state.droppedInvalidToolCalls = 0;
         this.state.toolNameCorrections.clear();
         this.state.executedToolCallIds.clear();
+        this.state.hadToolFailure = false;
         const executionState: ToolExecutionState = {
             toolFailureMessages: this.state.toolFailureMessages,
+            toolFailureKinds: this.state.toolFailureKinds,
             toolFailureFallbacks: this.state.toolFailureFallbacks,
             toolNameCorrections: this.state.toolNameCorrections,
             trimmedToolCallIds: this.state.trimmedToolCallIds,
             executedToolCallIds: this.state.executedToolCallIds,
             turnHasSuccessfulToolOutput: false,
+            hadToolFailure: false,
             incompleteFinalReportDetected: false,
             toolLimitExceeded: this.state.toolLimitExceeded,
             finalReportToolFailed: false,
@@ -3362,6 +3383,7 @@ export class TurnRunner {
                 const result = await baseExecutor(toolName, parameters, options);
                 incompleteFinalReportDetected = executionState.incompleteFinalReportDetected;
                 this.state.toolLimitExceeded = executionState.toolLimitExceeded;
+                this.state.hadToolFailure = executionState.hadToolFailure;
                 // Sync task status state back to main state
                 this.state.lastTaskStatusCompleted = executionState.lastTaskStatusCompleted;
                 this.state.routerSelection = executionState.routerSelection;
@@ -3374,6 +3396,7 @@ export class TurnRunner {
             catch (e) {
                 incompleteFinalReportDetected = executionState.incompleteFinalReportDetected;
                 this.state.toolLimitExceeded = executionState.toolLimitExceeded;
+                this.state.hadToolFailure = executionState.hadToolFailure;
                 // Sync task status state back to main state
                 this.state.lastTaskStatusCompleted = executionState.lastTaskStatusCompleted;
                 this.state.routerSelection = executionState.routerSelection;

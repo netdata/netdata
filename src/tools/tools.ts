@@ -14,6 +14,7 @@ import { computeTruncationPercent, truncateToBytesWithInfo } from '../truncation
 import { appendCallPathSegment, formatToolRequestCompact, normalizeCallPath, sanitizeToolName, warn } from '../utils.js';
 
 import { queueManager, type AcquireResult, QueueAbortError } from './queue-manager.js';
+import { ToolExecutionError, isToolExecutionError } from './tool-errors.js';
 
 queueManager.setListeners({
   onDepthChange: (queue, info) => {
@@ -228,7 +229,9 @@ export class ToolsOrchestrator {
   }
 
   async execute(name: string, parameters: Record<string, unknown>, opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
-    if (this.canceled) throw new Error('canceled');
+    if (this.canceled) {
+      throw new ToolExecutionError('canceled', 'canceled');
+    }
     if (this.mapping.size === 0) this.listTools();
     const effective = this.resolveName(name);
     let entry = this.mapping.get(effective);
@@ -241,9 +244,13 @@ export class ToolsOrchestrator {
     if (entry === undefined) {
       // Fail fast for sub-agent names that are not part of the static registry snapshot
       if (name.startsWith('agent__') || effective.startsWith('agent__')) {
-        throw new Error(`unknown_subagent_tool: '${name}' is not registered in this session's agent registry`);
+        throw new ToolExecutionError(
+          'unknown_tool',
+          `unknown_subagent_tool: '${name}' is not registered in this session's agent registry`,
+          { details: { toolName: name } }
+        );
       }
-      throw new Error(`Unknown tool: ${name}`);
+      throw new ToolExecutionError('unknown_tool', `Unknown tool: ${name}`, { details: { toolName: name } });
     }
     return await entry.provider.execute(effective, parameters, opts);
   }
@@ -270,12 +277,16 @@ export class ToolsOrchestrator {
     ctx: ToolExecutionContext,
     opts?: ToolExecuteOptions
   ): Promise<ManagedToolResult> {
-    if (this.canceled) throw new Error('canceled');
+    if (this.canceled) {
+      throw new ToolExecutionError('canceled', 'canceled');
+    }
     const bypass = opts?.bypassConcurrency === true;
     if (this.mapping.size === 0) { this.listTools(); }
     const effective = this.resolveName(name);
     const entry = this.mapping.get(effective);
-    if (entry === undefined) throw new Error(`Unknown tool: ${name}`);
+    if (entry === undefined) {
+      throw new ToolExecutionError('unknown_tool', `Unknown tool: ${name}`, { details: { toolName: name } });
+    }
 
     const provider = entry.provider;
     const kind = entry.kind;
@@ -302,9 +313,10 @@ export class ToolsOrchestrator {
         }
         if (error instanceof QueueAbortError) {
           this.logQueued(error.queueName, error.info, ctx, kind);
+          throw new ToolExecutionError('canceled', 'canceled');
         }
         if (error instanceof DOMException && error.name === 'AbortError') {
-          throw new Error('canceled');
+          throw new ToolExecutionError('canceled', 'canceled');
         }
         throw error;
       }
@@ -603,6 +615,7 @@ export class ToolsOrchestrator {
 
     let exec: ToolExecuteResult | undefined;
     let errorMessage: string | undefined;
+    let execError: ToolExecutionError | undefined;
     let cacheHitEntry: CacheLookupResult | undefined;
     const cache = this.cacheProvider?.();
     const cacheTtlMs = (kind === 'mcp' || kind === 'rest')
@@ -674,13 +687,13 @@ export class ToolsOrchestrator {
         timer = setTimeout(() => {
           if (settled) return;
           if (onTimeout === undefined) {
-            rejectWith(new Error('Tool execution timed out'));
+            rejectWith(new ToolExecutionError('timeout', 'Tool execution timed out'));
             return;
           }
           try {
             Promise.resolve(onTimeout())
               .then(() => {
-                rejectWith(new Error('Tool execution timed out'));
+                rejectWith(new ToolExecutionError('timeout', 'Tool execution timed out'));
               })
               .catch((err: unknown) => {
                 warn(`provider cancelTool failed: ${toErrorMessage(err)}`);
@@ -730,7 +743,11 @@ export class ToolsOrchestrator {
           }
         }
       } catch (e) {
-        errorMessage = toErrorMessage(e);
+        if (isToolExecutionError(e)) {
+          execError = e;
+        } else {
+          errorMessage = toErrorMessage(e);
+        }
       }
     }
 
@@ -742,6 +759,7 @@ export class ToolsOrchestrator {
     })();
     if (isFailed) {
       const errorMessageDetail = (() => {
+        if (execError !== undefined) return execError.message;
         if (typeof exec?.error === 'string' && exec.error.length > 0) return exec.error;
         if (typeof errorMessage === 'string' && errorMessage.length > 0) return errorMessage;
         return 'execution_failed';
@@ -759,6 +777,9 @@ export class ToolsOrchestrator {
         output_bytes: 0,
         error_message: errorMessageDetail,
       };
+      if (execError !== undefined) {
+        failureDetails.error_kind = execError.kind;
+      }
       if (batchToolSummary !== undefined) {
         failureDetails.batch_tools = batchToolSummary;
       }
@@ -844,10 +865,18 @@ export class ToolsOrchestrator {
           this.opTree.endOp(opId, 'failed', { latency, error: msg });
         }
       } catch (e) { warn(`tools endOp failed: ${toErrorMessage(e)}`); }
-      throw new Error(msg);
+      if (execError !== undefined) {
+        throw execError;
+      }
+      throw new ToolExecutionError('execution_error', msg);
     }
 
-    const safeExec = (() => { if (exec === undefined) { throw new Error('unexpected_undefined_execution_result'); } return exec; })();
+    const safeExec = (() => {
+      if (exec === undefined) {
+        throw new ToolExecutionError('internal_error', 'unexpected_undefined_execution_result');
+      }
+      return exec;
+    })();
     const raw = typeof safeExec.result === 'string' ? safeExec.result : '';
     const rawBytes = Buffer.byteLength(raw, 'utf8');
     // Optional full response trace (raw, before truncation)

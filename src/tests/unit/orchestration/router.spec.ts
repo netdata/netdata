@@ -47,10 +47,9 @@ describe("RouterToolProvider", () => {
       config: { destinations: [DESTINATION_ONE] },
     });
 
-    const result = await provider.execute("unknown-tool", {});
-
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain("Unknown tool");
+    await expect(provider.execute("unknown-tool", {})).rejects.toThrow(
+      "Unknown tool",
+    );
   });
 
   it("errors when agent parameter is missing", async () => {
@@ -58,10 +57,9 @@ describe("RouterToolProvider", () => {
       config: { destinations: [DESTINATION_ONE] },
     });
 
-    const result = await provider.execute(ROUTER_HANDOFF_TOOL, {});
-
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain("agent must be a string");
+    await expect(provider.execute(ROUTER_HANDOFF_TOOL, {})).rejects.toThrow(
+      "agent must be a string",
+    );
   });
 
   it("errors when agent is not in destinations", async () => {
@@ -69,12 +67,11 @@ describe("RouterToolProvider", () => {
       config: { destinations: [DESTINATION_ONE] },
     });
 
-    const result = await provider.execute(ROUTER_HANDOFF_TOOL, {
-      agent: "./unknown.ai",
-    });
-
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain("Unknown agent");
+    await expect(
+      provider.execute(ROUTER_HANDOFF_TOOL, {
+        agent: "./unknown.ai",
+      }),
+    ).rejects.toThrow("Unknown agent");
   });
 
   it("routes successfully with optional message", async () => {

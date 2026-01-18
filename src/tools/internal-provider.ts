@@ -26,6 +26,7 @@ import { normalizeSlackMessages, SLACK_BLOCK_KIT_SCHEMA } from '../slack-block-k
 import { truncateToBytes } from '../truncation.js';
 import { parseJsonRecord, parseJsonValueDetailed } from '../utils.js';
 
+import { ToolExecutionError } from './tool-errors.js';
 import { ToolProvider } from './types.js';
 
 interface InternalToolProviderOptions {
@@ -498,35 +499,38 @@ export class InternalToolProvider extends ToolProvider {
 
   async execute(name: string, parameters: Record<string, unknown>, executionOpts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
     const start = Date.now();
-    if (name === TASK_STATUS_TOOL && this.disableProgressTool) {
-      throw new Error('agent__task_status is disabled for this session');
-    }
-    if (name === TASK_STATUS_TOOL) {
-      const { status, done, pending, now, ready_for_final_report, need_to_run_more_tools, taskStatusCompleted, statusMessage } = this.validateAndProcessTaskStatus(parameters);
+    try {
+      if (name === TASK_STATUS_TOOL && this.disableProgressTool) {
+        throw new ToolExecutionError('not_permitted', 'agent__task_status is disabled for this session', {
+          details: { toolName: name },
+        });
+      }
+      if (name === TASK_STATUS_TOOL) {
+        const { status, done, pending, now, ready_for_final_report, need_to_run_more_tools, taskStatusCompleted, statusMessage } = this.validateAndProcessTaskStatus(parameters);
 
-      const taskStatusPayload = {
-        status,
-        taskStatusCompleted,
-        taskStatusData: {
+        const taskStatusPayload = {
           status,
-          done,
-          pending,
-          now,
-          ready_for_final_report,
-          need_to_run_more_tools,
-        },
-      };
-      this.opts.updateStatus(statusMessage, taskStatusPayload.taskStatusData);
+          taskStatusCompleted,
+          taskStatusData: {
+            status,
+            done,
+            pending,
+            now,
+            ready_for_final_report,
+            need_to_run_more_tools,
+          },
+        };
+        this.opts.updateStatus(statusMessage, taskStatusPayload.taskStatusData);
 
-      return {
-        ok: true,
-        result: 'status shown to user',
-        latencyMs: Date.now() - start,
-        kind: this.kind,
-        namespace: this.namespace,
-        extras: taskStatusPayload,
-      };
-    }
+        return {
+          ok: true,
+          result: 'status shown to user',
+          latencyMs: Date.now() - start,
+          kind: this.kind,
+          namespace: this.namespace,
+          extras: taskStatusPayload,
+        };
+      }
     if (name === 'agent__final_report') {
       const requestedFormat = typeof parameters.report_format === 'string' ? parameters.report_format : (typeof parameters.format === 'string' ? parameters.format : undefined);
       const statusParamRaw = typeof parameters.status === 'string' ? parameters.status : undefined;
@@ -933,7 +937,14 @@ export class InternalToolProvider extends ToolProvider {
       const payload = JSON.stringify({ results });
       return { ok: true, result: payload, latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
     }
-    throw new Error(`Unknown internal tool: ${name}`);
+      throw new ToolExecutionError('unknown_tool', `Unknown internal tool: ${name}`, { details: { toolName: name } });
+    } catch (error) {
+      if (error instanceof ToolExecutionError) {
+        throw error;
+      }
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new ToolExecutionError('invalid_parameters', msg, { details: { toolName: name } });
+    }
   }
 
   private ensureBatchSchemas(): { schemas: Record<string, unknown>[]; summaries: { name: string; required: string[] }[] } {

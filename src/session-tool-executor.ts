@@ -16,6 +16,13 @@ import type { XmlToolTransport } from './xml-transport.js';
 import { ContextGuard } from './context-guard.js';
 import { TOOL_NO_OUTPUT, unknownToolFailureMessage } from './llm-messages.js';
 import { addSpanEvent } from './telemetry/index.js';
+import {
+  type ToolErrorKind,
+  ToolExecutionError,
+  isToolExecutedErrorKind,
+  isToolExecutionError,
+  toToolExecutionError,
+} from './tools/tool-errors.js';
 import { computeTruncationPercent, TRUNCATE_PREVIEW_BYTES, truncateToBytes } from './truncation.js';
 import {
   clampToolName,
@@ -24,7 +31,6 @@ import {
   parseJsonRecord,
   sanitizeTextForLLM,
   sanitizeToolName,
-  UNKNOWN_TOOL_ERROR_PREFIX,
 } from './utils.js';
 
 type AjvInstance = AjvClass;
@@ -63,10 +69,12 @@ export const readSanitizationFailureDetails = (parameters: Record<string, unknow
 export interface ToolExecutionState {
   toolFailureMessages: Map<string, string>;
   toolFailureFallbacks: string[];
+  toolFailureKinds: Map<string, ToolErrorKind>;
   toolNameCorrections: Map<string, string>;
   trimmedToolCallIds: Set<string>;
   executedToolCallIds: Set<string>;
   turnHasSuccessfulToolOutput: boolean;
+  hadToolFailure: boolean;
   incompleteFinalReportDetected: boolean;
   toolLimitExceeded: boolean;
   finalReportToolFailed: boolean;
@@ -187,7 +195,7 @@ export class SessionToolExecutor {
       options?: { toolCallId?: string }
     ): Promise<string> => {
       if (this.sessionContext.isCanceled()) {
-        throw new Error('canceled');
+        throw new ToolExecutionError('canceled', 'canceled');
       }
 
       const callId =
@@ -253,9 +261,11 @@ export class SessionToolExecutor {
         const renderedFailure = `(tool failed: ${buildSanitizationFailureDetail(sanitizationFailure)})`;
         if (callId !== undefined) {
           state.toolFailureMessages.set(callId, renderedFailure);
+          state.toolFailureKinds.set(callId, 'invalid_parameters');
         } else {
           state.toolFailureFallbacks.push(renderedFailure);
         }
+        state.hadToolFailure = true;
         recordXmlEntry('failed', renderedFailure, 0);
         return renderedFailure;
       }
@@ -323,32 +333,47 @@ export class SessionToolExecutor {
         }
       }
 
-      // Advance subturn for each tool call within this turn
-      subturnCounter += 1;
-      if (subturnCounter > maxToolCallsPerTurn) {
-        const msg = `Tool calls per turn exceeded: limit=${String(maxToolCallsPerTurn)}. Switch strategy: avoid further tool calls this turn; either summarize progress or call ${this.sessionContext.finalReportToolName} to conclude.`;
-        const warn: LogEntry = {
-          timestamp: Date.now(),
-          severity: 'WRN',
-          turn,
-          subturn: subturnCounter,
-          direction: 'response',
-          type: 'tool',
-          remoteIdentifier: 'agent:limits',
-          fatal: false,
-          message: msg,
-        };
-        this.log(warn);
-        state.toolLimitExceeded = true;
-        throw new Error('tool_calls_per_turn_limit_exceeded');
-      }
-
       addSpanEvent('tool.call.requested', {
         'ai.tool.name': effectiveToolName,
       });
       const startTime = Date.now();
+      let executedRecorded = false;
+      const recordExecutedTool = (isBatchTool: boolean): void => {
+        if (executedRecorded) return;
+        executedRecorded = true;
+        state.executedTools += 1;
+        if (isProgressTool || isBatchTool) {
+          state.executedProgressBatchTools += 1;
+        } else {
+          state.executedNonProgressBatchTools += 1;
+        }
+        if (callId !== undefined) {
+          state.executedToolCallIds.add(callId);
+        }
+      };
 
       try {
+        // Advance subturn for each tool call within this turn
+        subturnCounter += 1;
+        if (subturnCounter > maxToolCallsPerTurn) {
+          const msg = `Tool calls per turn exceeded: limit=${String(maxToolCallsPerTurn)}. Switch strategy: avoid further tool calls this turn; either summarize progress or call ${this.sessionContext.finalReportToolName} to conclude.`;
+          const warn: LogEntry = {
+            timestamp: Date.now(),
+            severity: 'WRN',
+            turn,
+            subturn: subturnCounter,
+            direction: 'response',
+            type: 'tool',
+            remoteIdentifier: 'agent:limits',
+            fatal: false,
+            message: msg,
+          };
+          this.log(warn);
+          state.toolLimitExceeded = true;
+          throw new ToolExecutionError('limit_exceeded', 'tool_calls_per_turn_limit_exceeded', {
+            details: { maxToolCallsPerTurn },
+          });
+        }
         const skipAllowedCheck = shouldAttemptCorrection && resolvedCorrection === undefined;
         if (
           !skipAllowedCheck
@@ -367,7 +392,9 @@ export class SessionToolExecutor {
             message: `Tool '${effectiveToolName}' is not permitted for provider '${provider}'`,
           };
           this.log(blocked);
-          throw new Error('tool_not_permitted');
+          throw new ToolExecutionError('not_permitted', 'tool_not_permitted', {
+            details: { toolName: effectiveToolName },
+          });
         }
         // Internal tools and sub-agent execution handled by orchestrator/providers
         // We just need to check if the tool is permitted/known if we were filtering per-provider
@@ -376,20 +403,9 @@ export class SessionToolExecutor {
         const orchestrator = this.toolsOrchestrator;
         // eslint-disable-next-line @typescript-eslint/prefer-optional-chain
         if (orchestrator !== undefined && orchestrator.hasTool(effectiveToolName)) {
-          // Count attempts only for known tools
           const isBatchTool = effectiveToolName === 'agent__batch';
-          state.executedTools += 1;
-          if (isProgressTool || isBatchTool) {
-            state.executedProgressBatchTools += 1;
-          }
-          else {
-            state.executedNonProgressBatchTools += 1;
-          }
           const isSubAgentTool = this.subAgents?.hasTool(effectiveToolName) === true;
-          if (callId !== undefined) {
-            state.executedToolCallIds.add(callId);
-          }
-          
+
           const managed = await orchestrator.executeWithManagement(
             effectiveToolName,
             parameters,
@@ -401,6 +417,7 @@ export class SessionToolExecutor {
               sourceTarget: { provider, model },
             }
           );
+          recordExecutedTool(isBatchTool);
 
           if (
             this.sessionContext.routerToolName !== undefined
@@ -474,6 +491,7 @@ export class SessionToolExecutor {
 
             if (callId !== undefined) {
               state.toolFailureMessages.set(callId, toolOutput);
+              state.toolFailureKinds.set(callId, 'execution_error');
               if (
                 !state.turnHasSuccessfulToolOutput &&
                 (failureReason === 'context_budget_exceeded' ||
@@ -484,6 +502,7 @@ export class SessionToolExecutor {
             } else {
               state.toolFailureFallbacks.push(toolOutput);
             }
+            state.hadToolFailure = true;
 
             const failureEntry: AccountingEntry = {
               type: 'tool',
@@ -616,12 +635,14 @@ export class SessionToolExecutor {
 
               if (callId !== undefined) {
                 state.toolFailureMessages.set(callId, renderedFailure);
+                state.toolFailureKinds.set(callId, 'execution_error');
                 if (!state.turnHasSuccessfulToolOutput) {
                   state.trimmedToolCallIds.add(callId);
                 }
               } else {
                 state.toolFailureFallbacks.push(renderedFailure);
               }
+              state.hadToolFailure = true;
 
               const failureEntry: AccountingEntry = {
                 type: 'tool',
@@ -751,15 +772,32 @@ export class SessionToolExecutor {
           addSpanEvent('tool.call.unknown', {
             'ai.tool.name': effectiveToolName,
           });
-          throw new Error(`${UNKNOWN_TOOL_ERROR_PREFIX}${effectiveToolName}`);
+          throw new ToolExecutionError('unknown_tool', msg, {
+            details: { toolName: effectiveToolName },
+          });
         }
       } catch (error) {
         const latency = Date.now() - startTime;
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const toolError = isToolExecutionError(error) ? error : toToolExecutionError(error);
+        const errorMsg = toolError.message;
         addSpanEvent('tool.call.error', {
           'ai.tool.name': effectiveToolName,
           'ai.tool.error': errorMsg,
         });
+
+        if (isToolExecutedErrorKind(toolError.kind)) {
+          const isBatchTool = effectiveToolName === 'agent__batch';
+          recordExecutedTool(isBatchTool);
+        }
+
+        if (toolError.kind === 'unknown_tool') {
+          state.unknownToolEncountered = true;
+        }
+        if (toolError.kind === 'limit_exceeded') {
+          state.toolLimitExceeded = true;
+        }
+
+        state.hadToolFailure = true;
 
         if (isFinalReportTool) {
           state.finalReportToolFailed = true;
@@ -809,17 +847,24 @@ export class SessionToolExecutor {
           state.incompleteFinalReportDetected = true;
         }
 
+        const toolNameFromError = (() => {
+          const details = toolError.details;
+          if (isPlainObject(details)) {
+            const value = details.toolName;
+            if (typeof value === 'string' && value.length > 0) {
+              return value;
+            }
+          }
+          return effectiveToolName;
+        })();
+
         // Return error message instead of throwing
         const limitMessage = `execution not allowed because the per-turn tool limit (${String(maxToolCallsPerTurn)}) was reached; retry this tool on the next turn if available.`;
-        const unknownToolName = errorMsg.startsWith(UNKNOWN_TOOL_ERROR_PREFIX)
-          ? errorMsg.slice(UNKNOWN_TOOL_ERROR_PREFIX.length)
-          : undefined;
-        const failureDetail =
-          errorMsg === 'tool_calls_per_turn_limit_exceeded'
-            ? limitMessage
-            : unknownToolName !== undefined && unknownToolName.length > 0
-              ? unknownToolFailureMessage(unknownToolName)
-              : errorMsg;
+        const failureDetail = (() => {
+          if (toolError.kind === 'limit_exceeded') return limitMessage;
+          if (toolError.kind === 'unknown_tool') return unknownToolFailureMessage(toolNameFromError);
+          return errorMsg;
+        })();
         const renderedFailure = `(tool failed: ${failureDetail})`;
 
         if (
@@ -827,15 +872,7 @@ export class SessionToolExecutor {
           options.toolCallId.length > 0
         ) {
           state.toolFailureMessages.set(options.toolCallId, renderedFailure);
-          if (failureDetail.includes('per-turn tool limit')) {
-            state.toolLimitExceeded = true;
-          }
-          if (
-            !state.turnHasSuccessfulToolOutput &&
-            failureDetail.toLowerCase().includes('context window budget exceeded')
-          ) {
-            state.trimmedToolCallIds.add(options.toolCallId);
-          }
+          state.toolFailureKinds.set(options.toolCallId, toolError.kind);
         } else {
           state.toolFailureFallbacks.push(renderedFailure);
         }

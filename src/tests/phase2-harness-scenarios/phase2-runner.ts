@@ -97,6 +97,10 @@ const TASK_ANALYSIS_COMPLETE = 'Task analysis complete';
 const STATUS_UPDATE_RESPONSE = 'reporting status update';
 const TASK_STATUS_COMPLETED = 'completed';
 const TASK_COMPLETE_REPORT = 'Task complete';
+const ROUTER_HANDOFF_TOOL = 'router__handoff-to';
+const ROUTER_ROUTE_MESSAGE = 'Route to child';
+const ROUTER_CHILD_REPORT_CONTENT = 'Child final report.';
+const ROUTER_PARENT_REPORT_CONTENT = 'Parent final report.';
 const parseDumpList = (raw?: string): string[] => {
   if (typeof raw !== 'string') return [];
   return raw.split(',').map((value) => value.trim()).filter((value) => value.length > 0);
@@ -121,6 +125,7 @@ const SEQUENTIAL_TEST_IDS = new Set([
   'run-test-54',
   'run-test-handoff-event-chain',
   'run-test-router-handoff-event',
+  'run-test-router-handoff-invalid-retry',
   'run-test-advisor-event-meta',
   'run-test-subagent-event-meta',
   // Tests that mutate global queue manager state
@@ -824,6 +829,7 @@ let coverageSessionSnapshot: {
 } | undefined;
 let handoffEventCoverage: { events: { event: AIAgentEvent; meta: AIAgentEventMeta }[] } | undefined;
 let routerHandoffEventCoverage: { events: { event: AIAgentEvent; meta: AIAgentEventMeta }[] } | undefined;
+let routerHandoffRetryCoverage: { parentAttempts: number } | undefined;
 let advisorEventCoverage: { events: { event: AIAgentEvent; meta: AIAgentEventMeta }[] } | undefined;
 let subagentEventCoverage: { events: { event: AIAgentEvent; meta: AIAgentEventMeta }[] } | undefined;
 
@@ -9036,7 +9042,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
       // eslint-disable-next-line @typescript-eslint/unbound-method
       const originalExecuteTurn = LLMClient.prototype.executeTurn;
-      LLMClient.prototype.executeTurn = function(this: LLMClient, _request: TurnRequest): Promise<TurnResult> {
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
         const failureCallId = 'call-final-report-fail';
         const assistantMessage: ConversationMessage = {
           role: 'assistant',
@@ -9047,15 +9053,20 @@ if (process.env.CONTEXT_DEBUG === 'true') {
               name: 'agent__final_report',
               parameters: {
                 report_format: 'markdown',
-                report_content: '# Placeholder\n\nThis should fail.',
+                report_content: '',
               },
             },
           ],
         };
+        const toolOutput = await request.toolExecutor(
+          'agent__final_report',
+          { report_format: 'markdown', report_content: '' },
+          { toolCallId: failureCallId },
+        );
         const toolMessage: ConversationMessage = {
           role: 'tool',
           toolCallId: failureCallId,
-          content: '(tool failed: Schema validation error: report_content missing required section)',
+          content: toolOutput,
         };
         return Promise.resolve({
           status: { type: 'success', hasToolCalls: true, finalAnswer: true },
@@ -12201,7 +12212,7 @@ BASE_TEST_SCENARIOS.push({
         const systemMsg = request.messages.find((message) => message.role === 'system');
         const systemContent = typeof systemMsg?.content === 'string' ? systemMsg.content : '';
         const isChild = systemContent.includes(childToken);
-        const reportContent = isChild ? 'Child final report.' : 'Parent final report.';
+        const reportContent = isChild ? ROUTER_CHILD_REPORT_CONTENT : ROUTER_PARENT_REPORT_CONTENT;
         const payload = { report_format: 'markdown', report_content: reportContent };
         const tagged = `<ai-agent-${nonce}-FINAL status="success" format="markdown">${reportContent}</ai-agent-${nonce}-FINAL>`;
         if (typeof request.onChunk === 'function') {
@@ -12319,7 +12330,7 @@ BASE_TEST_SCENARIOS.push({
         const systemContent = typeof systemMsg?.content === 'string' ? systemMsg.content : '';
         const isChild = systemContent.includes(childToken);
         if (isChild) {
-          const reportContent = 'Child final report.';
+          const reportContent = ROUTER_CHILD_REPORT_CONTENT;
           const payload = { report_format: 'markdown', report_content: reportContent };
           const tagged = `<ai-agent-${nonce}-FINAL status="success" format="markdown">${reportContent}</ai-agent-${nonce}-FINAL>`;
           if (typeof request.onChunk === 'function') {
@@ -12344,13 +12355,13 @@ BASE_TEST_SCENARIOS.push({
           content: '',
           toolCalls: [
             {
-              name: 'router__handoff-to',
+              name: ROUTER_HANDOFF_TOOL,
               id: routerCallId,
-              parameters: { agent: childToolName, message: 'Route to child' },
+              parameters: { agent: childToolName, message: ROUTER_ROUTE_MESSAGE },
             },
           ],
         };
-        await request.toolExecutor('router__handoff-to', { agent: childToolName, message: 'Route to child' }, { toolCallId: routerCallId });
+        await request.toolExecutor(ROUTER_HANDOFF_TOOL, { agent: childToolName, message: ROUTER_ROUTE_MESSAGE }, { toolCallId: routerCallId });
         return {
           status: { type: 'success', hasToolCalls: true, finalAnswer: false },
           latencyMs: 5,
@@ -12397,6 +12408,148 @@ BASE_TEST_SCENARIOS.push({
     invariant(finalMeta.agentId === 'child', 'Final report should come from child agent.');
     invariant(finalMeta.pendingHandoffCount === 0, 'Child final_report should have pendingHandoffCount=0.');
     invariant(finalMeta.isMaster, 'Child final_report should inherit isMaster.');
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-router-handoff-invalid-retry',
+  description: 'Invalid router parameters trigger a retry and succeed on the next attempt.',
+  execute: async () => {
+    routerHandoffRetryCoverage = undefined;
+    const tempDir = makeTempDir('router-handoff-retry');
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original for restoration after interception
+    const originalExecuteTurn = LLMClient.prototype.executeTurn;
+    const parentToken = 'ROUTER_RETRY_PARENT_TOKEN';
+    const childToken = 'ROUTER_RETRY_CHILD_TOKEN';
+    let parentAttempts = 0;
+    try {
+      const configPath = path.join(tempDir, CONFIG_FILE_NAME);
+      const configData = makeBasicConfiguration();
+      fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), 'utf-8');
+
+      const childPath = path.join(tempDir, 'child.ai');
+      const childContent = [
+        '---',
+        'description: Router child agent',
+        `models:`,
+        `  - ${PRIMARY_PROVIDER}/${MODEL_NAME}`,
+        '---',
+        childToken,
+      ].join('\n');
+      fs.writeFileSync(childPath, childContent, 'utf-8');
+
+      const childRef = path.basename(childPath);
+      const childToolName = 'child';
+      const parentPath = path.join(tempDir, 'parent.ai');
+      const parentContent = [
+        '---',
+        'description: Router parent agent',
+        `models:`,
+        `  - ${PRIMARY_PROVIDER}/${MODEL_NAME}`,
+        'maxRetries: 2',
+        'maxTurns: 4',
+        'router:',
+        '  destinations:',
+        `    - ${childRef}`,
+        '---',
+        parentToken,
+      ].join('\n');
+      fs.writeFileSync(parentPath, parentContent, 'utf-8');
+
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        const nonce = extractNonceFromMessages(request.messages, 'run-test-router-handoff-invalid-retry');
+        const systemMsg = request.messages.find((message) => message.role === 'system');
+        const systemContent = typeof systemMsg?.content === 'string' ? systemMsg.content : '';
+        const isChild = systemContent.includes(childToken);
+        if (isChild) {
+          const reportContent = ROUTER_CHILD_REPORT_CONTENT;
+          const payload = { report_format: 'markdown', report_content: reportContent };
+          const tagged = `<ai-agent-${nonce}-FINAL status="success" format="markdown">${reportContent}</ai-agent-${nonce}-FINAL>`;
+          if (typeof request.onChunk === 'function') {
+            request.onChunk(tagged, 'content');
+          }
+          await request.toolExecutor('agent__final_report', payload, { toolCallId: `${nonce}-FINAL` });
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: tagged,
+          };
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+            latencyMs: 5,
+            messages: [assistantMessage],
+            tokens: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+          };
+        }
+
+        parentAttempts += 1;
+        const routerCallId = `${nonce}-ROUTER-${String(parentAttempts)}`;
+        if (parentAttempts === 1) {
+          const invalidMessage = { bad: true };
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: ROUTER_HANDOFF_TOOL,
+                id: routerCallId,
+                parameters: { agent: childToolName, message: invalidMessage },
+              },
+            ],
+          };
+          await request.toolExecutor(ROUTER_HANDOFF_TOOL, { agent: childToolName, message: invalidMessage }, { toolCallId: routerCallId });
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+            latencyMs: 5,
+            messages: [assistantMessage],
+            tokens: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+          };
+        }
+
+        const assistantMessage: ConversationMessage = {
+          role: 'assistant',
+          content: '',
+          toolCalls: [
+            {
+              name: ROUTER_HANDOFF_TOOL,
+              id: routerCallId,
+              parameters: { agent: childToolName, message: ROUTER_ROUTE_MESSAGE },
+            },
+          ],
+        };
+        await request.toolExecutor(ROUTER_HANDOFF_TOOL, { agent: childToolName, message: ROUTER_ROUTE_MESSAGE }, { toolCallId: routerCallId });
+        return {
+          status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+          latencyMs: 5,
+          messages: [assistantMessage],
+          tokens: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+        };
+      };
+
+      const registry = new AgentRegistry([parentPath], { configPath });
+      const session = await registry.spawnSession({
+        agentId: path.basename(parentPath),
+        userPrompt: 'router-handoff-invalid-retry',
+        format: 'markdown',
+        stream: true,
+      });
+      const result = await AIAgent.run(session);
+      routerHandoffRetryCoverage = { parentAttempts };
+      return result;
+    } finally {
+      LLMClient.prototype.executeTurn = originalExecuteTurn;
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(result.success, 'run-test-router-handoff-invalid-retry should succeed after retry.');
+    invariant(routerHandoffRetryCoverage !== undefined, 'Router handoff retry coverage missing.');
+    invariant(routerHandoffRetryCoverage.parentAttempts === 2, 'Parent should retry once after invalid router parameters.');
+    const turnFailureLog = result.logs.find((entry) => {
+      if (entry.remoteIdentifier !== LOG_TURN_FAILURE || entry.severity !== 'WRN') return false;
+      const slugsRaw = typeof entry.details?.slugs === 'string' ? entry.details.slugs : '';
+      return slugsRaw.split(',').includes('malformed_tool_call');
+    });
+    invariant(turnFailureLog !== undefined, 'Expected malformed_tool_call slug for invalid router parameters.');
   },
 } satisfies HarnessTest);
 

@@ -2,6 +2,7 @@ import type { ToolExecuteOptions, ToolExecuteResult, ToolKind } from '../tools/t
 import type { MCPTool } from '../types.js';
 import type { RouterToolConfig } from './types.js';
 
+import { ToolExecutionError } from '../tools/tool-errors.js';
 import { ToolProvider } from '../tools/types.js';
 
 export interface RouterToolProviderOptions {
@@ -83,42 +84,26 @@ export class RouterToolProvider extends ToolProvider {
     _opts?: ToolExecuteOptions,
   ): Promise<ToolExecuteResult> {
     if (name !== RouterToolProvider.FULL_TOOL_NAME) {
-      return {
-        ok: false,
-        error: `Unknown tool: ${name}`,
-        latencyMs: 0,
-        kind: this.kind,
-        namespace: this.namespace,
-      };
+      throw new ToolExecutionError('unknown_tool', `Unknown tool: ${name}`, {
+        details: { toolName: name },
+      });
     }
     const agent = parameters.agent;
     if (typeof agent !== "string") {
-      return {
-        ok: false,
-        error: 'agent must be a string',
-        latencyMs: 0,
-        kind: this.kind,
-        namespace: this.namespace,
-      };
+      throw new ToolExecutionError('invalid_parameters', 'agent must be a string', {
+        details: { toolName: name, field: 'agent' },
+      });
     }
     if (!this.config.destinations.includes(agent)) {
-      return {
-        ok: false,
-        error: `Unknown agent: ${agent}`,
-        latencyMs: 0,
-        kind: this.kind,
-        namespace: this.namespace,
-      };
+      throw new ToolExecutionError('invalid_parameters', `Unknown agent: ${agent}`, {
+        details: { toolName: name, field: 'agent', agent },
+      });
     }
     const message = parameters.message;
     if (message !== undefined && typeof message !== 'string') {
-      return {
-        ok: false,
-        error: 'message must be a string when provided',
-        latencyMs: 0,
-        kind: this.kind,
-        namespace: this.namespace,
-      };
+      throw new ToolExecutionError('invalid_parameters', 'message must be a string when provided', {
+        details: { toolName: name, field: 'message' },
+      });
     }
     await Promise.resolve();
     return {

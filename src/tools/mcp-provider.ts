@@ -13,7 +13,9 @@ import type { ToolCancelOptions, ToolExecuteOptions, ToolExecuteResult } from '.
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 
 import { createWebSocketTransport } from '../websocket-transport.js';
-import { isPlainObject, UNKNOWN_TOOL_ERROR_PREFIX, warn } from '../utils.js';
+import { isPlainObject, warn } from '../utils.js';
+
+import { ToolExecutionError } from './tool-errors.js';
 import { ToolProvider } from './types.js';
 import { killProcessTree } from '../utils/process-tree.js';
 
@@ -900,7 +902,9 @@ export class MCPProvider extends ToolProvider {
     const ok = validator(parameters);
     if (!ok) {
       const detail = this.formatAjvErrors(validator.errors as AjvErrorObject[] | null | undefined);
-      throw new Error(`Validation error: ${detail}`);
+      throw new ToolExecutionError('invalid_parameters', `Validation error: ${detail}`, {
+        details: { serverName, toolName, detail },
+      });
     }
   }
 
@@ -1282,7 +1286,9 @@ export class MCPProvider extends ToolProvider {
   async execute(name: string, parameters: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
     await this.ensureInitialized();
     const mapping = this.toolNameMap.get(name);
-    if (mapping === undefined) throw new Error(`${UNKNOWN_TOOL_ERROR_PREFIX}${name}`);
+    if (mapping === undefined) {
+      throw new ToolExecutionError('unknown_tool', `Unknown tool: ${name}`, { details: { toolName: name } });
+    }
     const { serverName, originalName } = mapping;
     const sanitizedNamespace = name.includes('__') ? name.split('__')[0] : this.sanitizeNamespace(serverName);
     this.validateToolParameters(serverName, originalName, parameters);
@@ -1294,7 +1300,9 @@ export class MCPProvider extends ToolProvider {
         client = this.clients.get(serverName);
       }
       if (client === undefined) {
-        throw new Error(`MCP server not ready: ${serverName}`);
+        throw new ToolExecutionError('transport_error', `MCP server not ready: ${serverName}`, {
+          details: { serverName },
+        });
       }
       const resolvedClient = client;
       const start = Date.now();
