@@ -311,17 +311,6 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | dsn | SQL Server DSN (Data Source Name). See [DSN syntax](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn). | sqlserver://localhost:1433 | yes |
 |  | timeout | Query timeout (seconds). | 5 | no |
-| **Collection Options** | collect_transactions | Collect per-database transaction metrics. | yes | no |
-|  | collect_waits | Collect wait statistics from sys.dm_os_wait_stats. | yes | no |
-|  | collect_locks | Collect lock metrics from sys.dm_tran_locks. | yes | no |
-|  | collect_jobs | Collect SQL Agent job status. | yes | no |
-|  | collect_buffer_stats | Collect buffer manager and memory statistics. | yes | no |
-|  | collect_database_size | Collect data file sizes for each database. | yes | no |
-|  | collect_user_connections | Collect user connection counts. | yes | no |
-|  | collect_blocked_processes | Collect blocked process count. | yes | no |
-|  | collect_sql_errors | Collect SQL error statistics. | yes | no |
-|  | collect_database_status | Collect database state and read-only status. | yes | no |
-|  | collect_replication | Collect replication monitoring metrics (requires distribution database). | yes | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
