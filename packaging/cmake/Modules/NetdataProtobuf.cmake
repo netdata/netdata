@@ -9,10 +9,10 @@ function(netdata_bundle_protobuf)
         set(PROTOBUF_TAG f0dc78d7e6e331b8c6bb2d5283e06aa26883ca7c) # v21.12
         set(NEED_ABSL False)
 
-        if(CMAKE_CXX_STANDARD GREATER_EQUAL 14)
-                set(PROTOBUF_TAG 4a2aef570deb2bfb8927426558701e8bfc26f2a4) # v25.3
+        if(CMAKE_CXX_STANDARD GREATER_EQUAL 17)
+                set(PROTOBUF_TAG edaa823d8b36a8656d7b2b9241b7d0bfe50af878) # v33.4
                 set(NEED_ABSL True)
-                set(ABSL_TAG 2f9e432cce407ce0ae50676696666f33a77d42ac) # 20240116.1
+                set(ABSL_TAG d407ef122a08203648451e0fec77b3f868b71112) # 20260107.0
         endif()
 
         set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
@@ -29,12 +29,13 @@ function(netdata_bundle_protobuf)
                 set(BUILD_SHARED_LIBS Off)
                 set(ABSL_BUILD_TESTING Off)
                 set(absl_SOURCE_DIR "${CMAKE_BINARY_DIR}/_deps/absl-src")
+                set(absl_repo https://github.com/abseil/abseil-cpp)
 
                 message(STATUS "Preparing bundled Abseil (required by bundled Protobuf)")
                 find_program(PATCH patch REQUIRED)
                 if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
                     FetchContent_Declare(absl
-                            GIT_REPOSITORY https://github.com/abseil/abseil-cpp
+                            GIT_REPOSITORY ${absl_repo}
                             GIT_TAG ${ABSL_TAG}
                             SOURCE_DIR ${absl_SOURCE_DIR}
                             PATCH_COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/apply-patches.sh
@@ -45,7 +46,7 @@ function(netdata_bundle_protobuf)
                     )
                 else()
                     FetchContent_Declare(absl
-                            GIT_REPOSITORY https://github.com/abseil/abseil-cpp
+                            GIT_REPOSITORY ${absl_repo}
                             GIT_TAG ${ABSL_TAG}
                             SOURCE_DIR ${absl_SOURCE_DIR}
                             PATCH_COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/apply-patches.sh
@@ -156,7 +157,6 @@ macro(netdata_detect_protobuf)
                 set(HAVE_PROTOBUF True)
         endif()
 endmacro()
-
 
 # Helper function to compile protocol definitions into C++ code.
 function(netdata_protoc_generate_cpp PROTO_ROOT_DIR OUTPUT_ROOT_DIR GENERATED_SOURCES GENERATED_HEADERS)
