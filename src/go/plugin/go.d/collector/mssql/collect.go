@@ -5,7 +5,6 @@ package mssql
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -91,41 +90,39 @@ func (c *Collector) queryVersion() (string, error) {
 }
 
 func (c *Collector) collectInstanceMetrics(mx map[string]int64) error {
-	var errs []error
-
 	if err := c.collectUserConnections(mx); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 	if err := c.collectBlockedProcesses(mx); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 	if err := c.collectBatchRequests(mx); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 	if err := c.collectCompilations(mx); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 	if err := c.collectSQLErrors(mx); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 	if err := c.collectBufferManager(mx); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 	if err := c.collectMemoryManager(mx); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 	if err := c.collectAccessMethods(mx); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 	// Process and OS memory metrics (always collected)
 	if err := c.collectProcessMemory(mx); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 	if err := c.collectOSMemory(mx); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 
-	return errors.Join(errs...)
+	return nil
 }
 
 func (c *Collector) collectUserConnections(mx map[string]int64) error {
@@ -142,6 +139,7 @@ func (c *Collector) collectUserConnections(mx map[string]int64) error {
 	// Session connections: user vs internal (system)
 	mx["session_connections_user"] = userConns
 	mx["session_connections_internal"] = sysConns
+
 	return nil
 }
 
@@ -156,6 +154,7 @@ func (c *Collector) collectBlockedProcesses(mx map[string]int64) error {
 	}
 
 	mx["blocked_processes"] = blocked
+
 	return nil
 }
 
@@ -170,6 +169,7 @@ func (c *Collector) collectBatchRequests(mx map[string]int64) error {
 	}
 
 	mx["batch_requests"] = value
+
 	return nil
 }
 
@@ -300,33 +300,32 @@ func (c *Collector) collectAccessMethods(mx map[string]int64) error {
 	}
 
 	mx["page_splits"] = value
+
 	return nil
 }
 
 func (c *Collector) collectDatabaseMetrics(mx map[string]int64) error {
-	var errs []error
-
 	if err := c.collectDatabaseCounters(mx); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 	if err := c.collectLockStatsByResourceType(mx); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 	if err := c.collectDatabaseSize(mx); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 	if err := c.collectDatabaseStatus(mx); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 	// Collect I/O stall and log growth metrics per database
 	if err := c.collectIOStall(mx); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 	if err := c.collectLogGrowths(mx); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 
-	return errors.Join(errs...)
+	return nil
 }
 
 func (c *Collector) collectDatabaseCounters(mx map[string]int64) error {
@@ -562,6 +561,7 @@ func (c *Collector) collectSQLErrors(mx map[string]int64) error {
 	}
 
 	mx["sql_errors_total"] = value
+
 	return nil
 }
 
@@ -723,6 +723,7 @@ func (c *Collector) collectProcessMemory(mx map[string]int64) error {
 	mx["process_memory_virtual"] = virtual
 	mx["process_memory_utilization"] = utilization
 	mx["process_page_faults"] = pageFaults
+
 	return nil
 }
 
@@ -740,6 +741,7 @@ func (c *Collector) collectOSMemory(mx map[string]int64) error {
 	mx["os_memory_available"] = memAvailable
 	mx["os_pagefile_used"] = pagefileUsed
 	mx["os_pagefile_available"] = pagefileAvailable
+
 	return nil
 }
 
