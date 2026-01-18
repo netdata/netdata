@@ -28,17 +28,6 @@ func TestCollector_Configuration(t *testing.T) {
 
 	// Verify defaults
 	assert.Equal(t, "sqlserver://localhost:1433", c.DSN)
-	assert.True(t, c.CollectTransactions)
-	assert.True(t, c.CollectWaits)
-	assert.True(t, c.CollectLocks)
-	assert.True(t, c.CollectJobs)
-	assert.True(t, c.CollectBufferStats)
-	assert.True(t, c.CollectDatabaseSize)
-	assert.True(t, c.CollectUserConnections)
-	assert.True(t, c.CollectBlockedProcesses)
-	assert.True(t, c.CollectSQLErrors)
-	assert.True(t, c.CollectDatabaseStatus)
-	assert.True(t, c.CollectReplication)
 }
 
 func TestCollector_Charts(t *testing.T) {

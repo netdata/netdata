@@ -34,18 +34,6 @@ func New() *Collector {
 		Config: Config{
 			DSN:     "sqlserver://localhost:1433",
 			Timeout: confopt.Duration(time.Second * 5),
-
-			CollectTransactions:     true,
-			CollectWaits:            true,
-			CollectLocks:            true,
-			CollectJobs:             true,
-			CollectBufferStats:      true,
-			CollectDatabaseSize:     true,
-			CollectUserConnections:  true,
-			CollectBlockedProcesses: true,
-			CollectSQLErrors:        true,
-			CollectDatabaseStatus:   true,
-			CollectReplication:      true,
 		},
 
 		charts: instanceCharts.Copy(),
@@ -64,18 +52,6 @@ type Config struct {
 	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
 	DSN         string           `yaml:"dsn" json:"dsn"`
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-
-	CollectTransactions     bool `yaml:"collect_transactions,omitempty" json:"collect_transactions"`
-	CollectWaits            bool `yaml:"collect_waits,omitempty" json:"collect_waits"`
-	CollectLocks            bool `yaml:"collect_locks,omitempty" json:"collect_locks"`
-	CollectJobs             bool `yaml:"collect_jobs,omitempty" json:"collect_jobs"`
-	CollectBufferStats      bool `yaml:"collect_buffer_stats,omitempty" json:"collect_buffer_stats"`
-	CollectDatabaseSize     bool `yaml:"collect_database_size,omitempty" json:"collect_database_size"`
-	CollectUserConnections  bool `yaml:"collect_user_connections,omitempty" json:"collect_user_connections"`
-	CollectBlockedProcesses bool `yaml:"collect_blocked_processes,omitempty" json:"collect_blocked_processes"`
-	CollectSQLErrors        bool `yaml:"collect_sql_errors,omitempty" json:"collect_sql_errors"`
-	CollectDatabaseStatus   bool `yaml:"collect_database_status,omitempty" json:"collect_database_status"`
-	CollectReplication      bool `yaml:"collect_replication,omitempty" json:"collect_replication"`
 }
 
 type Collector struct {
