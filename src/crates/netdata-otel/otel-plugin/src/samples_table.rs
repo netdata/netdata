@@ -41,6 +41,13 @@ impl TimeSlot {
         }
     }
 
+    /// Returns the aggregated value stored in this time slot.
+    ///
+    /// The `aggregation_type` parameter is currently unused because aggregation
+    /// is applied at insertion time in [`TimeSlot::insert`], and this method
+    /// simply exposes the already-aggregated value. The parameter is kept to
+    /// preserve API consistency and allow for future aggregation strategies
+    /// that might affect retrieval.
     pub fn aggregate(&self, _aggregation_type: AggregationType) -> Option<f64> {
         self.value
     }
@@ -77,17 +84,14 @@ impl DimensionBuffer {
     }
 
     fn get_or_create_slot(&mut self, slot_start_nano: u64) -> &mut TimeSlot {
-        // Find if slot already exists
-        if let Some(pos) = self.slots.iter().position(|s| s.slot_start_nano == slot_start_nano) {
-            return &mut self.slots[pos];
-        }
-
-        // Insert in order
-        let new_slot = TimeSlot::new(slot_start_nano);
+        // Insert in order, or find existing slot
         let insert_pos = self.slots.binary_search_by_key(&slot_start_nano, |s| s.slot_start_nano)
-            .unwrap_or_else(|e| e);
+            .unwrap_or_else(|e| {
+                let new_slot = TimeSlot::new(slot_start_nano);
+                self.slots.insert(e, new_slot);
+                e
+            });
         
-        self.slots.insert(insert_pos, new_slot);
         &mut self.slots[insert_pos]
     }
 
@@ -96,6 +100,13 @@ impl DimensionBuffer {
             return Err("Collection interval cannot be zero");
         }
         let slot_start_nano = (unix_time_nano / interval_nano) * interval_nano;
+        
+        // Reject if trying to insert into a finalized slot (no backfill)
+        if let Some(first_slot) = self.slots.front() {
+            if first_slot.state == SlotState::Finalized && slot_start_nano <= first_slot.slot_start_nano {
+                return Err("Data arrived after slot was finalized");
+            }
+        }
         
         let slot = self.get_or_create_slot(slot_start_nano);
         if slot.state == SlotState::Finalized {

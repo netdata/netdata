@@ -291,8 +291,6 @@ fn flatten_histogram_data_point(hdp: &HistogramDataPoint) -> Vec<JsonMap<String,
     );
     sum_map.insert("sum".to_string(), JsonValue::String("sum".to_string()));
     sum_map.insert("metric.value".to_string(), JsonValue::from(hdp.sum));
-    // Override type to gauge for sum/min/max if we want them as absolute gauges
-    sum_map.insert("metric.type".to_string(), JsonValue::String("gauge".to_string())); 
     results.push(sum_map);
 
     // Add min (if present)
@@ -305,7 +303,6 @@ fn flatten_histogram_data_point(hdp: &HistogramDataPoint) -> Vec<JsonMap<String,
         );
         min_map.insert("min".to_string(), JsonValue::String("min".to_string()));
         min_map.insert("metric.value".to_string(), JsonValue::from(min));
-        min_map.insert("metric.type".to_string(), JsonValue::String("gauge".to_string()));
         results.push(min_map);
     }
 
@@ -319,7 +316,6 @@ fn flatten_histogram_data_point(hdp: &HistogramDataPoint) -> Vec<JsonMap<String,
         );
         max_map.insert("max".to_string(), JsonValue::String("max".to_string()));
         max_map.insert("metric.value".to_string(), JsonValue::from(max));
-        max_map.insert("metric.type".to_string(), JsonValue::String("gauge".to_string()));
         results.push(max_map);
     }
 

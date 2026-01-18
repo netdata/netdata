@@ -133,14 +133,13 @@ impl NetdataChart {
 
     pub fn ingest(&mut self, fp: &FlattenedPoint) {
         let semantics = self.get_semantics();
-        let is_new = self.samples_table.insert(
+        if self.samples_table.insert(
             &fp.nd_dimension_name,
             fp.metric_time_unix_nano,
             fp.metric_value,
             self.collection_interval_nano,
             semantics.aggregation_type,
-        );
-        if is_new {
+        ) {
             self.last_collection_interval = None;
         }
     }
@@ -159,16 +158,18 @@ impl NetdataChart {
             let target_slot_nano = if let Some(start) = self.next_slot_start_nano {
                 start
             } else {
-                let mut earliest_finalized = None;
-                let dimension_names: Vec<String> = self.samples_table.iter_dimensions().cloned().collect();
-                for dim_name in dimension_names {
-                   if let Some(db) = self.samples_table.get_buffer_mut(&dim_name) {
-                       if let Some(slot) = db.slots.front() {
-                           if slot.state == SlotState::Finalized {
-                               earliest_finalized = Some(earliest_finalized.map_or(slot.slot_start_nano, |e: u64| e.min(slot.slot_start_nano)));
-                           }
-                       }
-                   }
+                let mut earliest_finalized: Option<u64> = None;
+                for dim_name in self.samples_table.iter_dimensions() {
+                    if let Some(db) = self.samples_table.get_buffer_mut(dim_name) {
+                        if let Some(slot) = db.slots.front() {
+                            if slot.state == SlotState::Finalized {
+                                earliest_finalized = match earliest_finalized {
+                                    Some(current) => Some(current.min(slot.slot_start_nano)),
+                                    None => Some(slot.slot_start_nano),
+                                };
+                            }
+                        }
+                    }
                 }
                 if let Some(start) = earliest_finalized {
                     self.next_slot_start_nano = Some(start);
@@ -195,37 +196,44 @@ impl NetdataChart {
             let mut samples_to_emit = Vec::new();
             let dimension_names: Vec<String> = self.samples_table.iter_dimensions().cloned().collect();
             for dim_name in dimension_names {
-                let db = self.samples_table.get_buffer_mut(&dim_name).unwrap();
-                let value_opt = if let Some(slot) = db.slots.front() {
-                    if slot.slot_start_nano == target_slot_nano {
-                        let val = slot.aggregate(semantics.aggregation_type);
-                        db.slots.pop_front();
-                        val
-                    } else if slot.slot_start_nano < target_slot_nano {
-                        db.slots.pop_front();
-                        None
+                if let Some(db) = self.samples_table.get_buffer_mut(&dim_name) {
+                    let value_opt = if let Some(slot) = db.slots.front() {
+                        if slot.slot_start_nano == target_slot_nano {
+                            let val = slot.aggregate(semantics.aggregation_type);
+                            db.slots.pop_front();
+                            val
+                        } else if slot.slot_start_nano < target_slot_nano {
+                            tracing::debug!(
+                                "Skipping old slot for dimension '{}' with start {} ns (target {} ns)",
+                                dim_name,
+                                slot.slot_start_nano,
+                                target_slot_nano
+                            );
+                            db.slots.pop_front();
+                            None
+                        } else {
+                            None
+                        }
                     } else {
                         None
-                    }
-                } else {
-                    None
-                };
+                    };
 
-                let emit_val = match value_opt {
-                    Some(v) => {
-                        db.last_value = Some(v);
-                        Some(v)
-                    }
-                    None => {
-                        match semantics.gap_fill_strategy {
-                            GapFillStrategy::RepeatLastValue => db.last_value,
-                            GapFillStrategy::FillWithZero => Some(0.0),
+                    let emit_val = match value_opt {
+                        Some(v) => {
+                            db.last_value = Some(v);
+                            Some(v)
                         }
-                    }
-                };
+                        None => {
+                            match semantics.gap_fill_strategy {
+                                GapFillStrategy::RepeatLastValue => db.last_value,
+                                GapFillStrategy::FillWithZero => Some(0.0),
+                            }
+                        }
+                    };
 
-                if let Some(v) = emit_val {
-                    samples_to_emit.push((dim_name, v));
+                    if let Some(v) = emit_val {
+                        samples_to_emit.push((dim_name, v));
+                    }
                 }
             }
 
@@ -266,20 +274,18 @@ impl NetdataChart {
         buffer.push_str("CLABEL_COMMIT\n");
 
         let mut dimension_names: Vec<String> = self.samples_table.iter_dimensions().cloned().collect();
-        if self.is_histogram() {
-            dimension_names.sort_by(|a, b| {
-                let a_val = if a == "+Inf" { Some(f64::INFINITY) } else { a.parse::<f64>().ok() };
-                let b_val = if b == "+Inf" { Some(f64::INFINITY) } else { b.parse::<f64>().ok() };
-                match (a_val, b_val) {
-                    (Some(a_num), Some(b_num)) => {
-                        a_num.partial_cmp(&b_num).unwrap_or(std::cmp::Ordering::Equal)
-                    }
-                    (Some(_), None) => std::cmp::Ordering::Less,
-                    (None, Some(_)) => std::cmp::Ordering::Greater,
-                    (None, None) => a.cmp(b),
+        dimension_names.sort_by(|a, b| {
+            let a_val = if a == "+Inf" { Some(f64::INFINITY) } else { a.parse::<f64>().ok() };
+            let b_val = if b == "+Inf" { Some(f64::INFINITY) } else { b.parse::<f64>().ok() };
+            match (a_val, b_val) {
+                (Some(a_num), Some(b_num)) => {
+                    a_num.partial_cmp(&b_num).unwrap_or(std::cmp::Ordering::Equal)
                 }
-            });
-        }
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (None, None) => a.cmp(b),
+            }
+        });
 
         let semantics = self.get_semantics();
         for dim_name in dimension_names {
@@ -350,12 +356,12 @@ mod tests {
         
         // Process at 16s (grace period passed for slot 0)
         chart.process(&mut buffer, UNIX_EPOCH + Duration::from_secs(16));
-        assert!(buffer.contains("SET test_dim 10"));
+        assert!(buffer.contains("SET test_dim 10000"));
         buffer.clear();
         
         // Slot 1: [10s, 20s) -> Gap. Process at 26s.
         chart.process(&mut buffer, UNIX_EPOCH + Duration::from_secs(26));
-        // For delta counter, gap should be filled with 0
+        // For delta counter, gap should be filled with 0 (divisor=1000 applied)
         assert!(buffer.contains("SET test_dim 0"));
     }
 
@@ -375,12 +381,12 @@ mod tests {
         
         // Process at 16s
         chart.process(&mut buffer, UNIX_EPOCH + Duration::from_secs(16));
-        assert!(buffer.contains("SET test_dim 100"));
+        assert!(buffer.contains("SET test_dim 100000"));
         buffer.clear();
         
         // Slot 1: [10s, 20s) -> Gap. Process at 26s.
         chart.process(&mut buffer, UNIX_EPOCH + Duration::from_secs(26));
-        // For cumulative counter, gap should be filled with last value (100)
-        assert!(buffer.contains("SET test_dim 100"));
+        // For cumulative counter, gap should be filled with last value (100 * divisor=1000)
+        assert!(buffer.contains("SET test_dim 100000"));
     }
 }
