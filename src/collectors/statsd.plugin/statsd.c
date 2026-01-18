@@ -25,6 +25,13 @@
 
 #define STATSD_DICTIONARY_OPTIONS (DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_ADD_IN_FRONT)
 #define STATSD_DECIMAL_DETAIL 1000 // floating point values get multiplied by this, with the same divisor
+#define STATSD_METRIC_MAX_TAGS 16
+
+typedef struct statsd_metric_tag {
+    char *key;
+    char *value;
+    struct statsd_metric_tag *next;
+} STATSD_METRIC_TAG;
 
 // --------------------------------------------------------------------------------------------------------------------
 // data specific to each metric type
@@ -133,6 +140,11 @@ typedef struct statsd_metric {
     char *dimname;
     char *family;
 
+    char *original_name;        // the original metric name without tags
+    char *tags_suffix;          // the sanitized tag values suffix (e.g., "_prod_us_east_1")
+    STATSD_METRIC_TAG *tags;    // user-defined tags
+    uint8_t tags_count;         // number of tags
+
     // chart related members
     STATS_METRIC_OPTIONS options;   // STATSD_METRIC_OPTION_* (bitfield)
     char reset;                     // set to 1 by the charting thread to instruct the collector thread(s) to reset this metric
@@ -194,6 +206,7 @@ typedef struct statsd_app_chart_dimension {
 
     RRDDIM *rd;                     // a pointer to the RRDDIM that has been created for this dimension
     collected_number *value_ptr;    // a pointer to the source metric value
+    STATSD_METRIC *source_metric;
 
     struct statsd_app_chart_dimension *next; // the next dimension for this chart
 } STATSD_APP_CHART_DIM;
@@ -283,6 +296,8 @@ static struct statsd {
     struct collection_thread_status *collection_threads_status;
 
     LISTEN_SOCKETS sockets;
+
+    DICTIONARY *metric_key_cache;  // Cache for metric keys (name+tags -> generated key)
 } statsd = {
         .enabled = 1,
         .max_private_charts_hard = 1000,
@@ -379,6 +394,9 @@ static void dictionary_metric_insert_callback(const DICTIONARY_ITEM *item, void 
     m->hash = simple_hash(name);
     m->type = index->type;
     m->options = index->default_options;
+    m->original_name = NULL;
+    m->tags = NULL;
+    m->tags_count = 0;
 
     if (m->type == STATSD_METRIC_TYPE_HISTOGRAM || m->type == STATSD_METRIC_TYPE_TIMER) {
         m->histogram.ext = callocz(1,sizeof(STATSD_METRIC_HISTOGRAM_EXTENSIONS));
@@ -393,11 +411,22 @@ static void dictionary_metric_delete_callback(const DICTIONARY_ITEM *item, void 
     (void)item;
     STATSD_METRIC *m = (STATSD_METRIC *)value;
 
-    if(m->type == STATSD_METRIC_TYPE_HISTOGRAM || m->type == STATSD_METRIC_TYPE_TIMER) {
+    if (m->type == STATSD_METRIC_TYPE_HISTOGRAM || m->type == STATSD_METRIC_TYPE_TIMER) {
         freez(m->histogram.ext);
         m->histogram.ext = NULL;
     }
 
+    STATSD_METRIC_TAG *tag = m->tags;
+    while (tag) {
+        STATSD_METRIC_TAG *next = tag->next;
+        freez(tag->key);
+        freez(tag->value);
+        freez(tag);
+        tag = next;
+    }
+
+    freez(m->original_name);
+    freez(m->tags_suffix);
     freez(m->units);
     freez(m->family);
     freez(m->dimname);
@@ -422,6 +451,307 @@ static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, cons
     return m;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// tag parsing and metric key generation with caching
+
+typedef struct parsed_tags {
+    char *keys[STATSD_METRIC_MAX_TAGS];
+    char *values[STATSD_METRIC_MAX_TAGS];
+    uint32_t key_hashes[STATSD_METRIC_MAX_TAGS];
+    uint32_t value_hashes[STATSD_METRIC_MAX_TAGS];
+    size_t count;
+    char *units;
+    char *dimname;
+    char *family;
+} PARSED_TAGS;
+
+static inline void parsed_tags_init(PARSED_TAGS *pt) {
+    memset(pt, 0, sizeof(PARSED_TAGS));
+}
+
+static inline void parsed_tags_free(PARSED_TAGS *pt) {
+    for(size_t i = 0; i < pt->count; i++) {
+        freez(pt->keys[i]);
+        freez(pt->values[i]);
+    }
+    freez(pt->units);
+    freez(pt->dimname);
+    freez(pt->family);
+}
+
+
+// Parse tags and separate reserved vs user tags (assumes consistent tag order)
+static inline void statsd_parse_tags(const char *tags, PARSED_TAGS *pt) {
+    if(!tags || !*tags) return;
+    
+    const char *s = tags;
+    while(*s) {
+        const char *tagkey = NULL, *tagvalue = NULL;
+        char *tagkey_end = NULL, *tagvalue_end = NULL;
+
+        s = tagkey_end = (char *)statsd_parse_skip_up_to(tagkey = s, ':', '=', ',');
+        if(tagkey == tagkey_end) {
+            if (*s) {
+                s++;
+                s = statsd_parse_skip_spaces(s);
+            }
+            continue;
+        }
+
+        if(likely(*s == ':' || *s == '='))
+            s = tagvalue_end = (char *)statsd_parse_skip_up_to(tagvalue = ++s, ',', '\0', '\0');
+
+        if(*s == ',') s++;
+
+        tagkey = statsd_parse_field_trim(tagkey, tagkey_end);
+        tagvalue = statsd_parse_field_trim(tagvalue, tagvalue_end);
+
+        if(tagkey && *tagkey && tagvalue && *tagvalue) {
+            if (strcmp(tagkey, "units") == 0) {
+                freez(pt->units);
+                pt->units = strdupz(tagvalue);
+            }
+            else if (strcmp(tagkey, "name") == 0) {
+                freez(pt->dimname);
+                pt->dimname = strdupz(tagvalue);
+            }
+            else if (strcmp(tagkey, "family") == 0) {
+                freez(pt->family);
+                pt->family = strdupz(tagvalue);
+            }
+            else {
+                if (pt->count >= STATSD_METRIC_MAX_TAGS) {
+                    netdata_log_error(
+                        "STATSD: exceeded maximum tags (%d), ignoring tag '%s'", STATSD_METRIC_MAX_TAGS, tagkey);
+                    continue;
+                }
+
+                // Check for duplicate keys and warn
+                for (size_t i = 0; i < pt->count; i++) {
+                    if (strcmp(pt->keys[i], tagkey) == 0) {
+                        netdata_log_error(
+                            "STATSD: duplicate tag key '%s' found in metric '%s', both values will be kept in metric name but label will use last value",
+                            tagkey,
+                            name);
+                        // Don't break - keep both in the arrays
+                    }
+                }
+
+                pt->keys[pt->count] = strdupz(tagkey);
+                pt->values[pt->count] = strdupz(tagvalue);
+                pt->key_hashes[pt->count] = simple_hash(tagkey);
+                pt->value_hashes[pt->count] = simple_hash(tagvalue);
+                pt->count++;
+            }
+        }
+    }
+}
+
+// Compute hash from name + pre-computed tag value hashes
+// Note: Assumes tag order is consistent across collections for same metric
+static inline uint32_t statsd_compute_metric_hash(const char *name, PARSED_TAGS *pt) {
+    uint32_t hash = simple_hash(name);
+    
+    for(size_t i = 0; i < pt->count; i++) {
+        hash = hash * 33 + pt->key_hashes[i];
+        hash = hash * 33 + pt->value_hashes[i];
+    }
+    
+    return hash;
+}
+
+// Generate metric key with sanitized tag key:value pairs
+// Format: metric_name_key1_value1_key2_value2
+static inline char *statsd_generate_metric_key_internal(const char *name, PARSED_TAGS *pt) {
+    if(!pt || pt->count == 0)
+        return strdupz(name);
+    
+    // Calculate required buffer size
+    size_t total_len = strlen(name) + 1;
+    for(size_t i = 0; i < pt->count; i++) {
+        total_len += 1 + strlen(pt->keys[i]) + 1 + strlen(pt->values[i]); // _key_value
+    }
+    
+    char *key = mallocz(total_len);
+    char *ptr = key;
+    
+    // Copy name
+    strcpy(ptr, name);
+    ptr += strlen(name);
+
+    // Append sanitized tag key:value pairs
+    for(size_t i = 0; i < pt->count; i++) {
+        *ptr++ = '_';
+        
+        // Sanitize tag key
+        const char *src = pt->keys[i];
+        while(*src) {
+            if(isalnum(*src) || *src == '-') {
+                *ptr++ = *src;
+            } else {
+                *ptr++ = '_';
+            }
+            src++;
+        }
+        
+        *ptr++ = '_';
+        
+        // Sanitize tag value
+        src = pt->values[i];
+        while(*src) {
+            if(isalnum(*src) || *src == '-') {
+                *ptr++ = *src;
+            } else {
+                *ptr++ = '_';
+            }
+            src++;
+        }
+    }
+    *ptr = '\0';
+    
+    return key;
+}
+
+static inline void sort_parsed_tags(PARSED_TAGS *pt) {
+    if (pt->count <= 1) return;
+    
+    // Insertion sort - optimal for small arrays
+    for (size_t i = 1; i < pt->count; i++) {
+        // Save current element
+        char *key = pt->keys[i];
+        char *value = pt->values[i];
+        uint32_t key_hash = pt->key_hashes[i];
+        uint32_t value_hash = pt->value_hashes[i];
+        
+        // Find insertion position
+        size_t j = i;
+        while (j > 0 && strcmp(pt->keys[j - 1], key) > 0) {
+            // Shift elements right
+            pt->keys[j] = pt->keys[j - 1];
+            pt->values[j] = pt->values[j - 1];
+            pt->key_hashes[j] = pt->key_hashes[j - 1];
+            pt->value_hashes[j] = pt->value_hashes[j - 1];
+            j--;
+        }
+        
+        // Insert at correct position
+        pt->keys[j] = key;
+        pt->values[j] = value;
+        pt->key_hashes[j] = key_hash;
+        pt->value_hashes[j] = value_hash;
+    }
+}
+
+// Get or create cached metric key
+static inline const char *statsd_get_metric_key(const char *name, PARSED_TAGS *pt) {
+    // If no tags, return name directly
+    if(!pt || pt->count == 0)
+        return name;
+
+    // Sort tags for consistent ordering
+    sort_parsed_tags(pt);
+
+    uint32_t hash = statsd_compute_metric_hash(name, pt);
+    
+    // Use hash as string key for dictionary
+    char hash_key[32];
+    snprintfz(hash_key, sizeof(hash_key), "%u", hash);
+    
+#ifdef STATSD_MULTITHREADED
+    // Try to get from cache first (read-only, no lock needed for existing entries)
+    const char *cached = dictionary_get(statsd.metric_key_cache, hash_key);
+    if(cached)
+        return cached;
+    
+    // Not in cache, generate and insert
+    char *generated_key = statsd_generate_metric_key_internal(name, pt);
+    const char *result = dictionary_set(statsd.metric_key_cache, hash_key, generated_key, strlen(generated_key) + 1);
+    freez(generated_key);
+    return result;
+#else
+    // Single-threaded: simpler logic
+    const char *cached = dictionary_get(statsd.metric_key_cache, hash_key);
+    if(cached)
+        return cached;
+    
+    char *generated_key = statsd_generate_metric_key_internal(name, pt);
+    dictionary_set(statsd.metric_key_cache, hash_key, generated_key, strlen(generated_key) + 1);
+    freez(generated_key);
+    
+    // Get the cached value (dictionary owns it now)
+    return dictionary_get(statsd.metric_key_cache, hash_key);
+#endif
+}
+
+// Apply parsed tags to metric
+static inline void statsd_apply_tags_to_metric(STATSD_METRIC *m, PARSED_TAGS *pt) {
+    if (pt->units) {
+        if (!m->units || strcmp(m->units, pt->units) != 0) {
+            freez(m->units);
+            m->units = strdupz(pt->units);
+            m->options |= STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
+        }
+    }
+
+    if (pt->dimname) {
+        if (!m->dimname || strcmp(m->dimname, pt->dimname) != 0) {
+            freez(m->dimname);
+            m->dimname = strdupz(pt->dimname);
+            m->options |= STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
+        }
+    }
+
+    if (pt->family) {
+        if (!m->family || strcmp(m->family, pt->family) != 0) {
+            freez(m->family);
+            m->family = strdupz(pt->family);
+            m->options |= STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
+        }
+    }
+
+    // Store user tags as labels (only first time)
+    if (!m->tags && pt->count > 0) {
+        STATSD_METRIC_TAG *tail = NULL;
+        for (size_t i = 0; i < pt->count; i++) {
+            STATSD_METRIC_TAG *new_tag = callocz(1, sizeof(STATSD_METRIC_TAG));
+            new_tag->key = strdupz(pt->keys[i]);
+            new_tag->value = strdupz(pt->values[i]);
+            new_tag->next = NULL;
+
+            if (!m->tags) {
+                m->tags = new_tag;
+                tail = new_tag;
+            } else {
+                tail->next = new_tag;
+                tail = new_tag;
+            }
+            m->tags_count++;
+        }
+
+        // Extract and store the tags suffix from the metric name
+        if (m->original_name && m->name) {
+            size_t original_len = strlen(m->original_name);
+            size_t full_len = strlen(m->name);
+
+            // The suffix starts after the original name
+            if (full_len > original_len) {
+                m->tags_suffix = strdupz(m->name + original_len);
+            }
+        }
+
+        m->options |= STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
+    }
+}
+
+static inline void statsd_add_metric_tags_to_chart(RRDSET *st, STATSD_METRIC *m) {
+    if (!st || !m || !m->tags || m->tags_count == 0)
+        return;
+    
+    STATSD_METRIC_TAG *tag;
+    for (tag = m->tags; tag; tag = tag->next) {
+        rrdlabels_add(st->rrdlabels, tag->key, tag->value, RRDLABEL_SRC_AUTO);
+    }
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 // statsd parsing numbers
@@ -678,97 +1008,64 @@ static inline const char *statsd_parse_field_trim(const char *start, char *end) 
 }
 
 static void statsd_process_metric(const char *name, const char *value, const char *type, const char *sampling, const char *tags) {
-    netdata_log_debug(D_STATSD, "STATSD: raw metric '%s', value '%s', type '%s', sampling '%s', tags '%s'", name?name:"(null)", value?value:"(null)", type?type:"(null)", sampling?sampling:"(null)", tags?tags:"(null)");
+    netdata_log_debug(D_STATSD, "STATSD: raw metric '%s', value '%s', type '%s', sampling '%s', tags '%s'", 
+                     name?name:"(null)", value?value:"(null)", type?type:"(null)", 
+                     sampling?sampling:"(null)", tags?tags:"(null)");
 
     if(unlikely(!name || !*name)) return;
     if(unlikely(!type || !*type)) type = "m";
 
+    PARSED_TAGS pt;
+    parsed_tags_init(&pt);
+    statsd_parse_tags(tags, &pt);
+    
+    const char *metric_key = statsd_get_metric_key(name, &pt);
+    
     STATSD_METRIC *m = NULL;
 
     char t0 = type[0], t1 = type[1];
     if(unlikely(t0 == 'g' && t1 == '\0')) {
-        statsd_process_gauge(
-            m = statsd_find_or_add_metric(&statsd.gauges, name),
-            value, sampling);
+        m = statsd_find_or_add_metric(&statsd.gauges, metric_key);
+        statsd_process_gauge(m, value, sampling);
     }
     else if(unlikely((t0 == 'c' || t0 == 'C') && t1 == '\0')) {
-        // etsy/statsd uses 'c'
-        // brubeck     uses 'C'
-        statsd_process_counter(
-            m = statsd_find_or_add_metric(&statsd.counters, name),
-            value, sampling);
+        m = statsd_find_or_add_metric(&statsd.counters, metric_key);
+        statsd_process_counter(m, value, sampling);
     }
     else if(unlikely(t0 == 'm' && t1 == '\0')) {
-        statsd_process_meter(
-            m = statsd_find_or_add_metric(&statsd.meters, name),
-            value, sampling);
+        m = statsd_find_or_add_metric(&statsd.meters, metric_key);
+        statsd_process_meter(m, value, sampling);
     }
     else if(unlikely(t0 == 'h' && t1 == '\0')) {
-        statsd_process_histogram(
-            m = statsd_find_or_add_metric(&statsd.histograms, name),
-            value, sampling);
+        m = statsd_find_or_add_metric(&statsd.histograms, metric_key);
+        statsd_process_histogram(m, value, sampling);
     }
     else if(unlikely(t0 == 's' && t1 == '\0')) {
-        statsd_process_set(
-            m = statsd_find_or_add_metric(&statsd.sets, name),
-            value);
+        m = statsd_find_or_add_metric(&statsd.sets, metric_key);
+        statsd_process_set(m, value);
     }
     else if(unlikely(t0 == 'd' && t1 == '\0')) {
-        statsd_process_dictionary(
-            m = statsd_find_or_add_metric(&statsd.dictionaries, name),
-            value);
+        m = statsd_find_or_add_metric(&statsd.dictionaries, metric_key);
+        statsd_process_dictionary(m, value);
     }
     else if(unlikely(t0 == 'm' && t1 == 's' && type[2] == '\0')) {
-        statsd_process_timer(
-            m = statsd_find_or_add_metric(&statsd.timers, name),
-            value, sampling);
+        m = statsd_find_or_add_metric(&statsd.timers, metric_key);
+        statsd_process_timer(m, value, sampling);
     }
     else {
         statsd.unknown_types++;
-        netdata_log_error("STATSD: metric '%s' with value '%s' is sent with unknown metric type '%s'", name, value?value:"", type);
+        netdata_log_error("STATSD: metric '%s' with value '%s' is sent with unknown metric type '%s'", 
+                         name, value?value:"", type);
     }
 
-    if(m && tags && *tags) {
-        const char *s = tags;
-        while(*s) {
-            const char *tagkey = NULL, *tagvalue = NULL;
-            char *tagkey_end = NULL, *tagvalue_end = NULL;
-
-            s = tagkey_end = (char *)statsd_parse_skip_up_to(tagkey = s, ':', '=', ',');
-            if(tagkey == tagkey_end) {
-                if (*s) {
-                    s++;
-                    s = statsd_parse_skip_spaces(s);
-                }
-                continue;
-            }
-
-            if(likely(*s == ':' || *s == '='))
-                s = tagvalue_end = (char *) statsd_parse_skip_up_to(tagvalue = ++s, ',', '\0', '\0');
-
-            if(*s == ',') s++;
-
-            statsd_parse_field_trim(tagkey, tagkey_end);
-            statsd_parse_field_trim(tagvalue, tagvalue_end);
-
-            if(tagkey && *tagkey && tagvalue && *tagvalue) {
-                if (strcmp(tagkey, "units") == 0 && (!m->units || strcmp(m->units, tagvalue) != 0)) {
-                    m->units = strdupz(tagvalue);
-                    m->options |= STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
-                }
-
-                if (strcmp(tagkey, "name") == 0 && (!m->dimname || strcmp(m->dimname, tagvalue) != 0)) {
-                    m->dimname = strdupz(tagvalue);
-                    m->options |= STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
-                }
-
-                if (strcmp(tagkey, "family") == 0 && (!m->family || strcmp(m->family, tagvalue) != 0)) {
-                    m->family = strdupz(tagvalue);
-                    m->options |= STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
-                }
-            }
-        }
+    if(m) {
+        if(!m->original_name)
+            m->original_name = strdupz(name);
+        
+        statsd_apply_tags_to_metric(m, &pt);
     }
+    
+    parsed_tags_free(&pt);
 }
 
 static inline size_t statsd_process(char *buffer, size_t size, int require_newlines) {
@@ -1538,41 +1835,29 @@ static inline void statsd_readdir(const char *user_path, const char *stock_path,
 
 // extract chart type and chart id from metric name
 static inline void statsd_get_metric_type_and_id(STATSD_METRIC *m, char *type, char *id, char *context, const char *metrictype, size_t len) {
-
-    // The full chart type.id looks like this:
-    // ${STATSD_CHART_PREFIX} + "_" + ${METRIC_NAME} + "_" + ${METRIC_TYPE}
-    //
-    // where:
-    // STATSD_CHART_PREFIX = "statsd" as defined above
-    // METRIC_NAME = whatever the user gave to statsd
-    // METRIC_TYPE = "gauge", "counter", "meter", "timer", "histogram", "set", "dictionary"
-
-    // for chart type, we want:
-    // ${STATSD_CHART_PREFIX} + "_" + the first word of ${METRIC_NAME}
+    // Use original_name (without tag suffix) for chart structure
+    const char *metric_name = m->original_name ? m->original_name : m->name;
 
     // find the first word of ${METRIC_NAME}
     char firstword[len + 1], *s = "";
-    strncpyz(firstword, m->name, len);
-    for (s = firstword; *s ; s++) {
+    strncpyz(firstword, metric_name, len);
+    for (s = firstword; *s; s++) {
         if (unlikely(*s == '.' || *s == '_')) {
             *s = '\0';
             s++;
             break;
         }
     }
-    // firstword has the first word of ${METRIC_NAME}
-    // s has the remaining, if any
 
     // create the chart type:
     snprintfz(type, len, STATSD_CHART_PREFIX "_%s", firstword);
 
     // for chart id, we want:
-    // the remaining of the words of ${METRIC_NAME} + "_" + ${METRIC_TYPE}
-    // or the ${METRIC_NAME} has no remaining words, the ${METRIC_TYPE} alone
-    if(*s)
-        snprintfz(id, len, "%s_%s", s, metrictype);
+    // the remaining of the words of ${METRIC_NAME} + "_" + ${METRIC_TYPE} + ${TAG_SUFFIX}
+    if (*s)
+        snprintfz(id, len, "%s_%s%s", s, metrictype, m->tags_suffix ? m->tags_suffix : "");
     else
-        snprintfz(id, len, "%s", metrictype);
+        snprintfz(id, len, "%s%s", metrictype, m->tags_suffix ? m->tags_suffix : "");
 
     // for the context, we want the full of both the above, separated with a dot (type.id):
     snprintfz(context, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
@@ -1620,6 +1905,8 @@ static inline RRDSET *statsd_private_rrdset_create(
 
     if(statsd.private_charts_hidden)
         rrdset_flag_set(st, RRDSET_FLAG_HIDDEN);
+
+    statsd_add_metric_tags_to_chart(st, m);
 
     // rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
     return st;
@@ -2040,6 +2327,8 @@ static inline RRD_ALGORITHM statsd_algorithm_for_metric(STATSD_METRIC *m) {
 }
 
 static inline void link_metric_to_app_dimension(STATSD_APP *app, STATSD_METRIC *m, STATSD_APP_CHART *chart, STATSD_APP_CHART_DIM *dim) {
+    dim->source_metric = m;
+
     if(dim->value_type == STATSD_APP_CHART_DIM_VALUE_TYPE_EVENTS) {
         dim->value_ptr = &m->events;
         dim->algorithm = RRD_ALGORITHM_INCREMENTAL;
@@ -2258,6 +2547,14 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
         );
 
         rrdset_flag_set(chart->st, RRDSET_FLAG_STORE_FIRST);
+        // Add labels from first linked metric (they should all have same tags since they're on same chart)
+        STATSD_APP_CHART_DIM *dim;
+        for (dim = chart->dimensions; dim; dim = dim->next) {
+            if (dim->source_metric && dim->source_metric->tags) {
+                statsd_add_metric_tags_to_chart(chart->st, dim->source_metric);
+                break; // Only need to add once
+            }
+        }
         // rrdset_flag_set(chart->st, RRDSET_FLAG_DEBUG);
     }
 
@@ -2421,6 +2718,7 @@ static void statsd_main_cleanup(void *pptr) {
     dictionary_destroy(statsd.dictionaries.dict);
     dictionary_destroy(statsd.sets.dict);
     dictionary_destroy(statsd.timers.dict);
+    dictionary_destroy(statsd.metric_key_cache);
 
     // Clean up app dictionaries
     STATSD_APP *app = statsd.apps;
@@ -2471,6 +2769,7 @@ void *statsd_main(void *ptr) {
     statsd.dictionaries.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS | DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(STATSD_METRIC));
     statsd.sets.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS | DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(STATSD_METRIC));
     statsd.timers.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS | DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(STATSD_METRIC));
+    statsd.metric_key_cache = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
 
     dictionary_register_insert_callback(statsd.gauges.dict, dictionary_metric_insert_callback, &statsd.gauges);
     dictionary_register_insert_callback(statsd.meters.dict, dictionary_metric_insert_callback, &statsd.meters);
