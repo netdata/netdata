@@ -159,38 +159,54 @@ const buildReduceSystemPrompt = (args: {
 };
 
 const buildReadGrepSystemPrompt = (args: {
-  toolName: string;
-  toolArgsJson: string;
-  handle: string;
-  rootDir: string;
-  extract: string;
   nonce: string;
 }): string => {
   return [
     EXTRACTOR_PREAMBLE +
-    'Your mission is to extract information from a document chunk you receive from the user. ' + 
-    'You can only use Read and Grep tools, to find the relevant data on the given file.' +
-    'Think step by step and make sure you extract all relevant information. Do not give up on the first match.' +
+    'Your mission is to extract relevant information from a handle file using the tools provided. ' +
+    'Think step by step and make sure you extract all relevant information. Do not give up on the first match. ' +
     'CRITICAL: YOU MUST ENSURE YOU EXTRACTED ALL POSSIBLE RELEVANT INFORMATION BY USING THE TOOLS PROVIDED.',
     '',
-    'IMPORTANT: The handle is a relative path under the root directory.',
-    'Use the handle exactly as given when calling Read or Grep.',
-    '',
-    SOURCE_TOOL_LABEL,
-    `- Name: ${args.toolName}`,
-    `- Arguments (verbatim JSON): ${args.toolArgsJson}`,
-    `- Handle/filename: ${args.handle}`,
-    `- Root directory: ${args.rootDir}`,
-    '',
-    WHAT_TO_EXTRACT_LABEL,
-    args.extract,
+    'You run in an isolated environment. If the extracted information includes other tools or filenames, you do not have access to them. ' +
+    'Your job is to extract the required information from the single filename/handle you have been provided with. ' +
+    'Do not attempt any other calls to any other file. Your tools will work exclusively on the filename/handle provided to you. ' +
+    'They will not work on any other file.',
     '',
     OUTPUT_FORMAT_LABEL,
     OUTPUT_WRAPPER_LABEL,
     `  <ai-agent-${args.nonce}-FINAL format="text"> ... </ai-agent-${args.nonce}-FINAL>`,
-    NO_RELEVANT_LABEL,
-    `  ${NO_RELEVANT_DATA}`,
-    '  <short description of what kind of information is available in the file>',
+  ].join('\n');
+};
+
+const buildReadGrepUserPrompt = (args: {
+  toolName: string;
+  toolArgsJson: string;
+  handle: string;
+  extract: string;
+}): string => {
+  return [
+    WHAT_TO_EXTRACT_LABEL,
+    args.extract,
+    '',
+    'FROM WHERE TO EXTRACT IT',
+    `The handle file is named \`${args.handle}\`, and you have direct access to it via your tools \`tool_output_fs__Read\` and \`tool_output_fs__Grep\`. Both tools accept a filename. Pass this filename to them.`,
+    '',
+    'ADDITIONAL CONTEXT',
+    'Use the following information ONLY for context:',
+    `The handle file has been created from an oversized output of a tool called \`${args.toolName}\` of another agent.`,
+    `That tool was run with parameters: ${args.toolArgsJson}`,
+    '',
+    'WHAT IS EXPECTED FROM YOU',
+    'You are expected to use your tools (`tool_output_fs__Read` and `tool_output_fs__Grep`) to find relevant and potentially useful information and provide your findings with your final report/answer.',
+    '',
+    'WHAT TO REPORT IF YOU FIND NOTHING RELEVANT',
+    `If you can't find anything relevant, your final report must start with: ${NO_RELEVANT_DATA}`,
+    'Then provide a short description of what kind of information is available in the handle file.',
+    '',
+    'IMPORTANT LIMITATION',
+    'You operate in an isolated environment with access only to the handle file specified above. ' +
+    'If the handle file contains references to other files or tools, you cannot access them. ' +
+    'Focus exclusively on extracting information from the handle file content itself.',
   ].join('\n');
 };
 
@@ -424,22 +440,23 @@ export class ToolOutputExtractor {
     const { name, config } = this.deps.buildFsServerConfig(this.deps.fsRootDir);
     const { AIAgent } = await import('../ai-agent.js');
     const systemPrompt = buildReadGrepSystemPrompt({
+      nonce: this.deps.sessionNonce,
+    });
+    const userPrompt = buildReadGrepUserPrompt({
       toolName: source.toolName,
       toolArgsJson: source.toolArgsJson,
       handle: source.handle,
-      rootDir: this.deps.fsRootDir,
       extract,
-      nonce: this.deps.sessionNonce,
     });
     const childConfig: AIAgentSessionConfig = {
       config,
       targets: targets.length > 0 ? targets : this.deps.sessionTargets,
       tools: [name],
       systemPrompt,
-      userPrompt: extract,
+      userPrompt,
       outputFormat: 'pipe',
-      maxTurns: 3,
-      maxToolCallsPerTurn: 6,
+      maxTurns: 15,
+      maxToolCallsPerTurn: 3,
       llmTimeout: this.deps.llmTimeout,
       toolTimeout: this.deps.toolTimeout,
       temperature: this.deps.temperature,
