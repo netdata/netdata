@@ -69,7 +69,6 @@ Our [static builds](#static-builds) are expected to work on these platforms if a
 | Rocky Linux              | 9.x            | x86\_64, AArch64              | Also includes support for Alma Linux and other ABI compatible RHEL derivatives                                 |
 | Rocky Linux              | 8.x            | x86\_64, AArch64              | Also includes support for Alma Linux and other ABI compatible RHEL derivatives                                 |
 | Ubuntu                   | 25.10          | x86\_64, AArch64, ARMv7       |                                                                                                                |
-| Ubuntu                   | 25.04          | x86\_64, AArch64, ARMv7       |                                                                                                                |
 | Ubuntu                   | 24.04          | x86\_64, AArch64, ARMv7       |                                                                                                                |
 | Ubuntu                   | 22.04          | x86\_64, ARMv7, AArch64       |                                                                                                                |
 | Ubuntu                   | 20.04          | x86\_64, ARMv7, AArch64       |                                                                                                                |
@@ -129,9 +128,9 @@ This is a list of platforms that we have supported in the recent past but no lon
 | Fedora       | 39        | EOL as of 2024-05-14 |
 | Fedora       | 38        | EOL as of 2024-05-14 |
 | openSUSE     | Leap 15.5 | EOL as of 2024-12-31 |
+| Ubuntu       | 25.04     | EOL as of 2025-01-17 |
 | Ubuntu       | 24.10     | EOL as of 2024-07-01 |
 | Ubuntu       | 23.10     | EOL as of 2024-07-01 |
-| Ubuntu       | 23.04     | EOL as of 2024-01-20 |
 | Ubuntu       | 18.04     | EOL as of 2023-04-02 |
 
 ## Static builds
