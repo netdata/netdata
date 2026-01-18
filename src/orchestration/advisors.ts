@@ -17,6 +17,7 @@ export interface AdvisorExecutionResult {
 export interface ExecuteAdvisorsOptions {
   advisors: OrchestrationRuntimeAgent[];
   userPrompt: string;
+  spawn?: (advisor: OrchestrationRuntimeAgent) => Promise<AIAgentResult>;
   parentSession: Pick<
     AIAgentSessionConfig,
     | "config"
@@ -38,6 +39,7 @@ export interface ExecuteAdvisorsOptions {
     | "tools"
     | "isMaster"
     | "pendingHandoffCount"
+    | "conversationHistory"
   > & {
     trace?: {
       originId?: string;
@@ -78,17 +80,20 @@ export async function executeAdvisors(
   if (advisors.length === 0) {
     return [];
   }
+  const spawn = opts.spawn ?? (async (advisor: OrchestrationRuntimeAgent) => (
+    spawnOrchestrationChild({
+      agent: advisor,
+      systemTemplate: advisor.systemTemplate,
+      userPrompt,
+      parentSession,
+      isMaster: false,
+      pendingHandoffCount: parentSession.pendingHandoffCount ?? 0,
+      ancestors,
+    })
+  ));
   const tasks = advisors.map(async (advisor) => {
     try {
-      const result = await spawnOrchestrationChild({
-        agent: advisor,
-        systemTemplate: advisor.systemTemplate,
-        userPrompt,
-        parentSession,
-        isMaster: false,
-        pendingHandoffCount: parentSession.pendingHandoffCount ?? 0,
-        ancestors,
-      });
+      const result = await spawn(advisor);
       if (!result.success) {
         const message = result.error ?? "unknown error";
         const content = buildFailureContent(advisor.ref, message);

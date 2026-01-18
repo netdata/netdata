@@ -74,7 +74,7 @@ export class ToolOutputProvider extends ToolProvider {
     ].join('\n');
   }
 
-  async execute(name: string, parameters: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
+  async execute(name: string, parameters: Record<string, unknown>, opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
     const start = Date.now();
     if (name !== TOOL_OUTPUT_NAME) {
       throw new Error(`Unknown tool: ${name}`);
@@ -125,6 +125,10 @@ export class ToolOutputProvider extends ToolProvider {
         extract,
         mode,
         targets,
+        {
+          onChildOpTree: opts?.onChildOpTree,
+          parentOpPath: opts?.parentOpPath,
+        },
       );
     } catch (error) {
       const errText = error instanceof Error ? error.message : String(error);

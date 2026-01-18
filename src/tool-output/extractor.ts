@@ -4,10 +4,12 @@ import type { TargetContextConfig } from '../context-guard.js';
 import type { LLMClient } from '../llm-client.js';
 import type {
   AccountingEntry,
+  AIAgentEventCallbacks,
   AIAgentSessionConfig,
   CachingMode,
   Configuration,
   ConversationMessage,
+  LogEntry,
   MCPTool,
   ProviderReasoningValue,
   ReasoningLevel,
@@ -16,7 +18,7 @@ import type {
 } from '../types.js';
 import type { ToolOutputConfig, ToolOutputExtractionResult, ToolOutputMode, ToolOutputTarget } from './types.js';
 
-import { SessionTreeBuilder } from '../session-tree.js';
+import { SessionTreeBuilder, type SessionNode } from '../session-tree.js';
 import { stripLeadingThinkBlock } from '../think-tag-filter.js';
 import { TRUNCATE_PREVIEW_BYTES, buildTruncationPrefix, truncateToBytes, truncateToBytesWithInfo } from '../truncation.js';
 import { estimateMessagesBytes } from '../utils.js';
@@ -49,7 +51,8 @@ interface ToolOutputExtractionContext {
   traceSdk?: boolean;
   pricing?: Configuration['pricing'];
   countTokens: (value: string) => number;
-  recordAccounting?: (entry: AccountingEntry) => void;
+  callbacks?: AIAgentEventCallbacks;
+  verbose?: boolean;
   fsRootDir: string;
   buildFsServerConfig: (rootDir: string) => { name: string; config: Configuration };
 }
@@ -61,6 +64,11 @@ interface ExtractSource {
   content: string;
   stats: { bytes: number; lines: number; tokens: number; avgLineBytes: number };
   sourceTarget?: ToolOutputTarget;
+}
+
+interface ToolOutputExtractOptions {
+  onChildOpTree?: (tree: SessionNode) => void;
+  parentOpPath?: string;
 }
 
 const NO_RELEVANT_DATA = 'NO RELEVANT DATA FOUND';
@@ -241,14 +249,20 @@ export class ToolOutputExtractor {
     this.deps = deps;
   }
 
-  async extract(source: ExtractSource, extract: string, mode: ToolOutputMode | undefined, targets: ToolOutputTarget[]): Promise<ToolOutputExtractionResult> {
+  async extract(
+    source: ExtractSource,
+    extract: string,
+    mode: ToolOutputMode | undefined,
+    targets: ToolOutputTarget[],
+    opts?: ToolOutputExtractOptions,
+  ): Promise<ToolOutputExtractionResult> {
     const selectedMode = this.resolveMode(source, mode, targets);
     if (selectedMode === MODE_TRUNCATE) {
       const truncated = this.truncateResult(source.content, 'truncate');
       return { ok: true, text: truncated.text, mode: MODE_TRUNCATE, warning: truncated.warning };
     }
     if (selectedMode === MODE_READ_GREP) {
-      const readGrepResult = await this.runReadGrep(source, extract, targets);
+      const readGrepResult = await this.runReadGrep(source, extract, targets, opts);
       if (readGrepResult.ok) return readGrepResult;
       const fallback = this.truncateResult(source.content, 'read-grep failed');
       return { ok: false, text: fallback.text, mode: MODE_TRUNCATE, warning: fallback.warning, childOpTree: readGrepResult.childOpTree };
@@ -401,7 +415,12 @@ export class ToolOutputExtractor {
     return { ok: true, text: reduced, mode: MODE_FULL_CHUNKED, childOpTree: child.getSession() };
   }
 
-  private async runReadGrep(source: ExtractSource, extract: string, targets: ToolOutputTarget[]): Promise<ToolOutputExtractionResult> {
+  private async runReadGrep(
+    source: ExtractSource,
+    extract: string,
+    targets: ToolOutputTarget[],
+    opts?: ToolOutputExtractOptions,
+  ): Promise<ToolOutputExtractionResult> {
     const { name, config } = this.deps.buildFsServerConfig(this.deps.fsRootDir);
     const { AIAgent } = await import('../ai-agent.js');
     const systemPrompt = buildReadGrepSystemPrompt({
@@ -434,21 +453,12 @@ export class ToolOutputExtractor {
       traceLLM: this.deps.traceLLM,
       traceMCP: this.deps.traceMCP,
       traceSdk: this.deps.traceSdk,
-      verbose: false,
+      verbose: this.deps.verbose,
       agentId: 'tool_output.read_grep',
       toolResponseMaxBytes: this.deps.toolResponseMaxBytes,
       toolOutput: { enabled: false },
-      callbacks: this.deps.recordAccounting !== undefined
-        ? {
-            onEvent: (event) => {
-              if (event.type === 'accounting') {
-                this.deps.recordAccounting?.(event.entry);
-              }
-            },
-          }
-        : undefined,
+      callbacks: this.wrapChildCallbacks(opts),
       headendId: 'tool_output',
-      headendWantsProgressUpdates: false,
       isMaster: false,
     };
 
@@ -465,6 +475,38 @@ export class ToolOutputExtractor {
       return { ok: false, text: 'read-grep extraction produced synthetic final report', mode: MODE_READ_GREP, childOpTree };
     }
     return { ok: true, text: content.trim(), mode: MODE_READ_GREP, childOpTree };
+  }
+
+  private wrapChildCallbacks(opts?: ToolOutputExtractOptions): AIAgentEventCallbacks | undefined {
+    const orig = this.deps.callbacks;
+    const onChildOpTree = opts?.onChildOpTree;
+    const parentOpPath = opts?.parentOpPath;
+    if (orig === undefined && onChildOpTree === undefined) return undefined;
+    return {
+      onEvent: (event, meta) => {
+        if (event.type === 'log') {
+          const cloned: LogEntry = { ...event.entry };
+          try {
+            const existingPath = (cloned as { path?: string }).path;
+            if (typeof parentOpPath === 'string' && parentOpPath.length > 0) {
+              if (typeof existingPath === 'string' && existingPath.length > 0) {
+                (cloned as { path?: string }).path = `${parentOpPath}.${existingPath}`;
+              } else {
+                (cloned as { path?: string }).path = parentOpPath;
+              }
+            }
+          } catch {
+            // ignore path prefix failures
+          }
+          orig?.onEvent?.({ type: 'log', entry: cloned }, meta);
+        } else {
+          orig?.onEvent?.(event, meta);
+        }
+        if (event.type === 'op_tree') {
+          onChildOpTree?.(event.tree);
+        }
+      },
+    };
   }
 
   private truncateResult(content: string, reason: string): { text: string; warning: string } {
@@ -545,11 +587,6 @@ export class ToolOutputExtractor {
       callPath: this.deps.callPath,
       txnId: this.deps.sessionId,
     };
-    try {
-      this.deps.recordAccounting?.(accounting);
-    } catch {
-      // accounting relay failures should not fail extraction
-    }
     child.appendAccounting(opId, accounting);
     const messageBytes = estimateMessagesBytes(messages);
     child.setRequest(opId, { kind: 'llm', payload: { messages: messages.length, bytes: messageBytes }, size: messageBytes });

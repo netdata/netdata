@@ -7,6 +7,16 @@ Sub-sessions (advisors, router, handoff) have two critical issues:
 Tool-output extraction is different: its child opTree is attached, but verbose logs are not forwarded for read-grep.
 
 ---
+
+## Analysis (Current Status)
+- **Implemented (pending tests/docs):**
+  - Orchestration sub-sessions now attach child opTrees and forward logs/progress via callback wrapper (`src/ai-agent.ts`).
+  - Orchestration children now receive full conversation history (`src/orchestration/spawn-child.ts` and callers).
+  - tool_output read-grep now forwards logs/opTree/progress via callbacks and preserves `--verbose` (`src/tool-output/extractor.ts`, `src/tool-output/provider.ts`).
+  - tool_output full-chunked remains internal SessionTreeBuilder (no progress/task_status), but LLM ops are captured in the child opTree.
+- **Completed:** tests + documentation updates + lint/build (see Verification below).
+
+---
 ## Decisions (Made by Costa)
 1) Tool_output must behave exactly like subagents (same rules for opTree, logs, task-status/progress).
 2) Advisors must follow the same rules as subagents (opTree, logs, progress).
@@ -14,7 +24,134 @@ Tool-output extraction is different: its child opTree is attached, but verbose l
 
 ---
 ## Decisions (Pending)
-- None
+- **Orchestration opTree anchoring strategy** (advisor pre-turn, handoff post-turn, router placement). See Evidence + Options below.
+
+---
+## Plan
+1) Add history propagation through orchestration child runs (advisors/router/handoff).
+2) Attach orchestration child opTrees to parent opTree (create session ops, attach child sessions).
+3) Forward orchestration child logs/progress like subagents (callback wrapper + op path prefixing).
+4) Align tool_output read-grep with subagent behavior (forward logs/op_tree/progress callbacks; keep opTree attachment).
+5) Ensure tool_output full-chunked LLM ops are attached to parent opTree (no progress/task_status).
+6) Update tests/harness to cover:
+   - advisor history propagation
+   - orchestration child opTree attachment
+   - tool_output read-grep logs/opTree visibility
+7) Update documentation to reflect new orchestration/tool_output visibility.
+
+---
+## Implied Decisions
+- tool_output remains a `session` op (not a `tool` op), like subagents.
+- Avoid double-counting child accounting in parent arrays (opTree is canonical).
+
+---
+## Testing Requirements
+- Add Phase 1 unit coverage:
+  - `spawnOrchestrationChild` passes conversation history.
+  - `tool_output` read-grep forwards logs/opTree with parent path prefix.
+- Update Phase 2 deterministic harness:
+  - Advisor/router/handoff scenarios assert orchestration child sessions in opTree.
+- Run `npm run lint` and `npm run build`.
+
+---
+
+## Verification (Executed)
+- `npm run test:phase1`
+- `npm run test:phase2`
+- `npm run lint`
+- `npm run build`
+
+---
+## Documentation Updates Required
+- Update `docs/specs/snapshots.md` (or `docs/skills/ai-agent-session-snapshots.md`) to reflect orchestration child sessions and tool_output log behavior.
+- Update any orchestration or tool_output behavior notes in `docs/specs/MULTI-AGENT.md` if applicable.
+
+---
+
+## Decision: Orchestration opTree anchoring
+
+### Evidence
+- Orchestration child ops are created in `src/ai-agent.ts:320` using `beginTurn(0)` (system init), then `beginOp(0, 'session', ...)`.
+- Handoff/router/advisor runs occur outside the main session loop (`AIAgent.run()` orchestration wrapper).
+- Sub-agent tools attach under the parent tool op in the user turn (normal tool flow in `src/tools/tools.ts:708-1230`).
+
+### Options
+1) **Pre/Post Orchestration Turns (recommended)**  
+   - Advisors: add a dedicated **pre‑turn** (e.g., turn index `-1` or a labeled system turn before 0).  
+   - Handoff/router: add a dedicated **post‑turn** after last user turn (e.g., `lastIndex + 1`, label `handoff`).  
+   - Pros: reflects actual sequence; preserves semantics; works even when orchestration occurs at any depth.  
+   - Cons: requires SessionTreeBuilder to support non‑standard turn indices or explicit “orchestration turns”.
+
+2) **Keep turn 0 (system) for all orchestration**  
+   - Pros: minimal change; no turn index changes.  
+   - Cons: loses ordering (handoff appears before user turns); misleading timeline.
+
+3) **Attach to nearest real turn**  
+   - Advisors: attach to first user turn; handoff/router: attach to last user turn.  
+   - Pros: keeps turn indices standard.  
+   - Cons: still misrepresents pre/post ordering; ambiguous with multi‑level orchestration.
+
+### Recommendation
+**Option 1** — explicit pre‑turn and post‑turn orchestration turns so opTree reflects real sequence.
+
+---
+
+## Decision: Turn index type/labeling for orchestration turns
+
+### Evidence
+- `TurnNode.index` is a **number** (`src/session-tree.ts`), used by:
+  - opTree path labels (`getOpPath()` formats `turnIndex` as a number)
+  - ASCII rendering (prints `Turn#${index}`)
+  - several tests assume numeric indices
+
+### Options
+1) **Keep numeric index + add orchestration label in turn attributes (recommended)**  
+   - Use negative index for pre‑turn (e.g., `-1`) and `lastIndex + 1` for post‑turn.  
+   - Add `attributes.label = "orchestration-pre"` / `"orchestration-post"`.  
+   - Pros: minimal type churn; preserves op path logic; clear semantics via label.  
+   - Cons: path labels include negative numbers (e.g., `-1-1`).
+
+2) **Keep numeric index, attach to nearest real turn**  
+   - Pros: avoids negative numbers.  
+   - Cons: ordering is misleading (advisors appear inside user turn).
+
+3) **Change turnIndex to string**  
+   - Pros: expressive labels (e.g., `"pre"`, `"post"`).  
+   - Cons: large refactor (types, op path, rendering, tests); higher risk.
+
+### Recommendation
+**Option 1** — keep numeric index and add explicit label for orchestration turns.
+
+---
+
+## Decision: Orchestration turn naming (explicit roles)
+
+### Context
+We need opTree to encode **what** orchestration happened, not just pre/post.
+
+### Options
+1) **Explicit turn kinds** (recommended)  
+   - Turn `kind` values: `advisors`, `router_handoff`, `handoff` (plus `system`, `user`).  
+   - Pros: truth is explicit; future roles can be added as new kinds.  
+   - Cons: requires extending the turn kind type union.
+
+2) **Generic orchestration turn + role attribute**  
+   - `kind: orchestration`, `attributes.role: "advisors" | "router_handoff" | "handoff"`.  
+   - Pros: stable kind; future roles don’t change type union.  
+   - Cons: requires reading attributes for truth; slightly less direct.
+
+### Recommendation
+**Option 1** — explicit turn kinds for each orchestration role.
+
+### Decision (Made by Costa)
+- Use explicit orchestration turn kinds: `advisors`, `router_handoff`, `handoff`.
+
+---
+
+## Decision: Steps vs Turns
+
+### Decision (Made by Costa)
+- **Option 1** — add **Steps** as the canonical timeline and keep **Turns** for user/LLM turns only.
 
 ---
 
@@ -42,7 +179,10 @@ Note: tool_output extraction uses a different path and SHOULD appear as a child 
 All LLM requests/responses from sub-sessions MUST appear in the opTree as child sessions or nested operations, so they are included in session snapshots.
 
 ### Root Cause (Orchestration Sub-Sessions)
-Advisors/router/handoff run via `spawnOrchestrationChild()` which creates a new session, but the child session's opTree is NOT attached to the parent's opTree. The merge path only combines logs/accounting/childConversations.
+Advisors/router/handoff run via `spawnOrchestrationChild()` which creates a new session, but (before the fix) the child session's opTree was NOT attached to the parent's opTree. The merge path only combined logs/accounting/childConversations.
+
+### Fix Status
+**Implemented** in `src/ai-agent.ts` using orchestration child session ops + opTree attachment and log path prefixing. Pending tests/docs.
 
 ### Snapshot Evidence (5e992547-3d3c-46c7-8d1d-bcbdb8539ab1)
 - Snapshot opCounts: only `llm` and `system` ops (no `session` ops).
@@ -106,8 +246,10 @@ The advisor (support-request) only saw message #3 without context of messages #1
 ### Fix Required
 1. Pass `parentSession.conversationHistory` through `executeAdvisors()`
 2. Pass `parentSession.conversationHistory` through router and handoff paths
-3. Update `spawnOrchestrationChild()` to accept and pass history
-4. Change line 185 from `history: undefined` to `history: opts.history ?? parentSession.conversationHistory`
+3. Update `spawnOrchestrationChild()` to pass history
+
+### Fix Status
+**Implemented** in `src/orchestration/spawn-child.ts`, `src/orchestration/advisors.ts`, `src/orchestration/handoff.ts`, `src/ai-agent.ts`. Pending tests/docs.
 
 ### Files to Modify
 - `src/orchestration/spawn-child.ts` - line 185, add history parameter
@@ -143,8 +285,8 @@ When tool_output uses read-grep (child AIAgent), verbose logs and tool calls are
 - Expected: `--verbose` shows child tool calls for read-grep.
 - Actual: no child log events are forwarded; only accounting is captured.
 
-### Note
-The opTree child session SHOULD still be attached via tool_output extras. Lack of verbose logs does not necessarily mean missing opTree.
+### Fix Status
+**Implemented** in `src/tool-output/extractor.ts` and `src/tool-output/provider.ts` (callbacks now forward logs/progress/op_tree; parent op path is prefixed). Pending tests/docs.
 
 ## Implementation Plan
 

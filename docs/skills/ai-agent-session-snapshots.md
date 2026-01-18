@@ -9,7 +9,7 @@ Session snapshots are gzipped JSON files (`{UUID}.json.gz`) containing complete 
 - Tool request/response payloads
 - All logs (including WRN/ERR)
 - Accounting entries
-- Nested sub-agent sessions
+- Nested sub-agent sessions (including orchestration advisors/router/handoff and tool_output extraction)
 
 Default location: `~/.ai-agent/sessions/`
 
@@ -212,17 +212,20 @@ zcat "$SNAPSHOT" | jq '[.opTree.turns[].ops[] | select(.kind == "tool") | {opId:
 zcat "$SNAPSHOT" | jq '[.opTree.turns[].ops[] | select(.kind == "tool") | .accounting[]]'
 ```
 
-### 6. Extract Sub-Agent Sessions
+### 6. Extract Child Sessions (Sub-Agents, Orchestration, Tool Output)
 
 ```bash
-# Find all sub-agent operations with metadata
-zcat "$SNAPSHOT" | jq '[.opTree.turns[].ops[] | select(.kind == "session") | {opId:.opId, name:.attributes.name, childSessionId:.childSession.id, childTurns:.childSession.turns | length}]'
+# Find all child session operations with metadata
+zcat "$SNAPSHOT" | jq '[.opTree.turns[].ops[] | select(.kind == "session") | {opId:.opId, name:.attributes.name, provider:.attributes.provider, kind:.attributes.kind, childSessionId:.childSession.id, childTurns:.childSession.turns | length}]'
 
 # Extract nested child session to file
 zcat "$SNAPSHOT" | jq '.opTree.turns[].ops[] | select(.kind == "session") | .childSession' > child-session.json
 
-# Extract specific sub-agent by name (e.g., "agent__bigquery")
+# Extract specific child session by name (e.g., "agent__bigquery" or "tool_output")
 zcat "$SNAPSHOT" | jq '.opTree.turns[].ops[] | select(.kind == "session" and .attributes.name == "agent__bigquery") | .childSession'
+
+# Extract orchestration child sessions (advisors/router/handoff)
+zcat "$SNAPSHOT" | jq '.opTree.turns[].ops[] | select(.kind == "session" and .attributes.provider == "orchestration") | {name:.attributes.name, kind:.attributes.kind, childSession:.childSession}'
 
 # Extract sub-agent by opId
 zcat "$SNAPSHOT" | jq '.opTree.turns[].ops[] | select(.kind == "session" and .opId == "mfpy4i9m-5nrtwm") | .childSession'

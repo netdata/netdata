@@ -6,8 +6,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { TargetContextConfig } from '../../context-guard.js';
 import type { LLMClient } from '../../llm-client.js';
+import type { SessionNode } from '../../session-tree.js';
 import type { ToolOutputConfig, ToolOutputTarget } from '../../tool-output/types.js';
-import type { Configuration, TurnRequest, TurnResult } from '../../types.js';
+import type { AIAgentEventCallbacks, AIAgentEventMeta, Configuration, LogEntry, TurnRequest, TurnResult } from '../../types.js';
 
 import { ToolOutputExtractor } from '../../tool-output/extractor.js';
 import { formatForGrep } from '../../tool-output/formatter.js';
@@ -15,22 +16,53 @@ import { ToolOutputHandler } from '../../tool-output/handler.js';
 import { ToolOutputProvider } from '../../tool-output/provider.js';
 import { ToolOutputStore } from '../../tool-output/store.js';
 
+const buildChildMeta = (): AIAgentEventMeta => ({
+  isMaster: false,
+  isFinal: false,
+  pendingHandoffCount: 0,
+  handoffConfigured: false,
+  sequence: 1,
+});
+
+const buildChildLog = (): LogEntry => ({
+  timestamp: Date.now(),
+  severity: 'VRB',
+  turn: 1,
+  subturn: 1,
+  path: '3.1',
+  direction: 'response',
+  type: 'tool',
+  toolKind: 'mcp',
+  remoteIdentifier: 'mcp:test',
+  fatal: false,
+  message: 'child log',
+});
+
+const buildChildSession = (): SessionNode => ({
+  id: 'tool-output-child',
+  traceId: 'trace-tool-output',
+  agentId: 'tool_output.read_grep',
+  callPath: 'tool_output.read_grep',
+  sessionTitle: '',
+  startedAt: Date.now(),
+  turns: [],
+});
+
 vi.mock('../../ai-agent.js', () => ({
   AIAgent: {
-    create: vi.fn(() => ({})),
-    run: vi.fn(() => Promise.resolve({
-      success: true,
-      finalReport: { format: 'text', content: 'read-grep-extracted', ts: Date.now() },
-      opTree: {
-        id: 'tool-output-child',
-        traceId: 'trace-tool-output',
-        agentId: 'tool_output.read_grep',
-        callPath: 'tool_output.read_grep',
-        sessionTitle: '',
-        startedAt: Date.now(),
-        turns: [],
-      },
-    })),
+    create: vi.fn((config: { callbacks?: AIAgentEventCallbacks }) => config),
+    run: vi.fn((session: { callbacks?: AIAgentEventCallbacks }) => {
+      const meta = buildChildMeta();
+      const logEntry = buildChildLog();
+      const opTree = buildChildSession();
+      session.callbacks?.onEvent?.({ type: 'log', entry: logEntry }, meta);
+      session.callbacks?.onEvent?.({ type: 'op_tree', tree: opTree }, meta);
+      return Promise.resolve({
+        success: true,
+        finalReport: { format: 'text', content: 'read-grep-extracted', ts: Date.now() },
+        opTree,
+      });
+    }),
   },
 }));
 
@@ -244,6 +276,67 @@ describe('ToolOutputExtractor', () => {
     expect(result.mode).toBe('read-grep');
     expect(result.text).toBe('read-grep-extracted');
     expect(result.childOpTree).toBeDefined();
+    cleanupTempRoot(root);
+  });
+
+  it('forwards read-grep child logs and opTree with parent op path', async () => {
+    const root = makeTempDir();
+    const forwardedLogs: LogEntry[] = [];
+    let forwardedTree: SessionNode | undefined;
+    const extractor = new ToolOutputExtractor({
+      config: buildConfig(root),
+      llmClient: createStubLlmClient(['']) as unknown as LLMClient,
+      targets: baseTargets,
+      computeMaxOutputTokens: () => 256,
+      sessionTargets,
+      sessionNonce: 'READGREPLOGS',
+      sessionId: 'session-read-grep-logs',
+      agentId: 'agent',
+      callPath: 'agent',
+      toolResponseMaxBytes: 4000,
+      temperature: null,
+      topP: null,
+      topK: null,
+      repeatPenalty: null,
+      maxOutputTokens: 256,
+      reasoning: undefined,
+      reasoningValue: undefined,
+      llmTimeout: 0,
+      toolTimeout: 0,
+      caching: 'none',
+      traceLLM: false,
+      traceMCP: false,
+      traceSdk: false,
+      pricing: undefined,
+      countTokens: (text) => Math.ceil(text.length / 4),
+      callbacks: {
+        onEvent: (event) => {
+          if (event.type === 'log') {
+            forwardedLogs.push(event.entry);
+          }
+        },
+      },
+      fsRootDir: root,
+      buildFsServerConfig: (rootDir) => ({
+        name: 'tool_output_fs',
+        config: { ...baseConfiguration, mcpServers: { tool_output_fs: { type: 'stdio', command: process.execPath, args: [rootDir] } } },
+      }),
+    });
+
+    const result = await extractor.extract({
+      handle: 'handle-read-log',
+      toolName: 'test__tool',
+      toolArgsJson: '{}',
+      content: 'payload',
+      stats: { bytes: 7, lines: 1, tokens: 2, avgLineBytes: 7 },
+    }, 'find value', 'read-grep', sessionTargets, {
+      onChildOpTree: (tree) => { forwardedTree = tree; },
+      parentOpPath: '1.2',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(forwardedLogs.some((entry) => entry.path === '1.2.3.1')).toBe(true);
+    expect(forwardedTree?.id).toBe('tool-output-child');
     cleanupTempRoot(root);
   });
 });

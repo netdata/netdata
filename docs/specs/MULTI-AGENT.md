@@ -40,6 +40,7 @@ This document proposes and specifies an in‑memory, preloaded, multi‑agent sy
   - Advisors/handoff/router are **not** tool calls; they are orchestration steps before/after the main session.
   - Sub‑agents still run as tools (`agent__*`) inside the main session.
   - Both paths preserve full session isolation.
+  - Orchestration runs are captured in opTree as `session` ops with attributes `{ provider: "orchestration", kind: "advisor" | "router" | "handoff" }`, so snapshots include their LLM requests/responses.
 - **Flow**:
   - Advisors run in parallel before the main session and inject advisory blocks into the user prompt.
   - Routers expose `router__handoff-to` and can delegate to a destination agent with an optional message.

@@ -10,6 +10,7 @@ export interface ExecuteHandoffOptions {
   parentAgentLabel: string;
   isMaster?: boolean;
   pendingHandoffCount?: number;
+  spawn?: (target: OrchestrationRuntimeAgent, prompt: string) => Promise<AIAgentResult>;
   parentSession: Pick<
     AIAgentSessionConfig,
     | "config"
@@ -31,6 +32,7 @@ export interface ExecuteHandoffOptions {
     | "tools"
     | "isMaster"
     | "pendingHandoffCount"
+    | "conversationHistory"
   > & {
     trace?: {
       originId?: string;
@@ -70,6 +72,9 @@ export async function executeHandoff(
     buildResponseBlock(parentAgentLabel, response),
     buildOriginalUserRequestBlock(originalUserPrompt),
   ]);
+  if (opts.spawn !== undefined) {
+    return await opts.spawn(target, prompt);
+  }
   return await spawnOrchestrationChild({
     agent: target,
     systemTemplate: target.systemTemplate,

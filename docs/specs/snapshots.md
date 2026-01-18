@@ -122,7 +122,7 @@ interface TurnNode {
 ```typescript
 interface OperationNode {
   opId: string;
-  kind: 'llm' | 'tool' | 'system';
+  kind: 'llm' | 'tool' | 'system' | 'session';
   startedAt: number;
   endedAt?: number;
   status?: 'ok' | 'failed';
@@ -145,7 +145,7 @@ interface OperationNode {
 7. LLM request/response payloads under `opTree.turns[].ops[].request.payload` and `opTree.turns[].ops[].response.payload`:
    - `payload.raw` = base64 of the full HTTP/SSE body capture (no placeholders; `[unavailable]` indicates a capture bug)
    - `payload.sdk` = base64 of serialized SDK request/response (verification copy)
-8. Child sessions for sub-agents **and** tool_output extraction (attached under `opTree.turns[].ops[].childSession` when `kind == "session"`).
+8. Child sessions for sub-agents, tool_output extraction, and orchestration (advisors/router/handoff) attached under `opTree.turns[].ops[].childSession` when `kind == "session"`. Orchestration child ops include attributes `{ provider: "orchestration", kind: "advisor" | "router" | "handoff" }`.
 
 ### Excluded Data
 1. Raw conversation (summarized in ops)
@@ -188,7 +188,7 @@ onEvent: async (event) => {
 
 - **Callback isolation**: `persistSessionSnapshot` emits `onEvent(type='snapshot')` and wraps the call in `try/catch`, logging `[warn] persistSessionSnapshot(...) failed` without interrupting the session (`src/ai-agent.ts:368-386`).
 - **Reason tagging**: Snapshots are emitted with explicit reasons—`'subagent_finish'` after every child agent completes and `'final'` exactly once at session end—so downstream systems can distinguish mid-run updates from the terminal snapshot (`src/ai-agent.ts:737`, `src/ai-agent.ts:1307`).
-- **Child captures via opTree**: Because each agent tool execution attaches the child SessionNode to its parent op, snapshot consumers automatically inherit the full nested structure without needing a secondary API (`src/ai-agent.ts:700-884`, `src/session-tree.ts:90-200`).
+- **Child captures via opTree**: Session tools (sub-agents/tool_output) and orchestration sub-sessions (advisors/router/handoff) attach child SessionNodes to the parent op, so snapshot consumers inherit the full nested structure without needing a secondary API (`src/ai-agent.ts:700-884`, `src/session-tree.ts:90-200`).
 
 ## Accounting Flush
 

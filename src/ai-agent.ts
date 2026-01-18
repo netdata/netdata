@@ -10,7 +10,7 @@ import type { ToolCacheResolver } from './cache/tool-cache-resolver.js';
 import type { OutputFormatId } from './formats.js';
 import type { AdvisorExecutionResult } from './orchestration/advisors.js';
 import type { SessionNode } from './session-tree.js';
-import type { AIAgentEvent, AIAgentEventMeta, AIAgentSessionConfig, AIAgentResult, AccountingEntry, AccountingFlushPayload, Configuration, ConversationMessage, LogDetailValue, LogEntry, LLMAccountingEntry, MCPTool, OrchestrationConfig, OrchestrationRuntimeAgent, OrchestrationRuntimeConfig, ProgressMetrics, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, RestToolConfig, SessionSnapshotPayload, TaskStatusData, ToolAccountingEntry, ToolChoiceMode, TurnRequestContextMetrics, LogPayload } from './types.js';
+import type { AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, AIAgentSessionConfig, AIAgentResult, AccountingEntry, AccountingFlushPayload, Configuration, ConversationMessage, LogDetailValue, LogEntry, LLMAccountingEntry, MCPTool, OrchestrationConfig, OrchestrationRuntimeAgent, OrchestrationRuntimeConfig, ProgressMetrics, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, RestToolConfig, SessionSnapshotPayload, TaskStatusData, ToolAccountingEntry, ToolChoiceMode, TurnRequestContextMetrics, LogPayload } from './types.js';
 
 import { getResponseCache } from './cache/cache-factory.js';
 import { createToolCacheResolver } from './cache/tool-cache-resolver.js';
@@ -298,6 +298,81 @@ export class AIAgentSession {
 
   public getSessionConfigSnapshot(): AIAgentSessionConfig {
     return this.sessionConfig;
+  }
+
+  public getOpTreeSnapshot(): SessionNode | undefined {
+    try { return this.opTree.getSession(); } catch { return undefined; }
+  }
+
+  public getOpTreeAsciiSnapshot(): string | undefined {
+    try { return this.opTree.renderAscii(); } catch { return undefined; }
+  }
+
+  public beginOrchestrationChildOp(params: { name: string; kind: 'advisor' | 'router' | 'handoff' }): { opId?: string; opPath?: string } {
+    try {
+      if (!this.systemTurnBegan) {
+        this.opTree.beginTurn(0, { system: true, label: 'init' });
+        this.systemTurnBegan = true;
+      }
+    } catch { /* ignore */ }
+    const opId = (() => {
+      try {
+        return this.opTree.beginOp(0, 'session', { name: params.name, provider: 'orchestration', kind: params.kind });
+      } catch {
+        return undefined;
+      }
+    })();
+    if (opId !== undefined) {
+      try {
+        const parentSession = this.opTree.getSession();
+        const baseAgentPath = (() => {
+          if (typeof this.agentPath === 'string' && this.agentPath.length > 0) return this.agentPath;
+          const sessionAgentId = this.sessionConfig.agentId;
+          if (typeof sessionAgentId === 'string' && sessionAgentId.length > 0) return sessionAgentId;
+          if (typeof parentSession.agentId === 'string' && parentSession.agentId.length > 0) return parentSession.agentId;
+          if (typeof parentSession.callPath === 'string' && parentSession.callPath.length > 0) return parentSession.callPath;
+          return 'agent';
+        })();
+        const childCallPath = appendCallPathSegment(baseAgentPath, params.name);
+        const stub: SessionNode = {
+          id: `${Date.now().toString(36)}-stub`,
+          traceId: parentSession.traceId,
+          agentId: params.name,
+          callPath: childCallPath,
+          sessionTitle: '',
+          startedAt: Date.now(),
+          turns: [],
+        };
+        this.opTree.attachChildSession(opId, stub);
+        this.emitEvent({ type: 'op_tree', tree: this.opTree.getSession() });
+      } catch (e) {
+        warn(`orchestration child stub attach failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    const opPath = (() => {
+      try { return opId !== undefined ? this.opTree.getOpPath(opId) : undefined; } catch { return undefined; }
+    })();
+    return { opId, opPath };
+  }
+
+  public attachOrchestrationChildOp(opId: string | undefined, child: SessionNode): void {
+    if (opId === undefined) return;
+    try {
+      this.opTree.attachChildSession(opId, child);
+      this.emitEvent({ type: 'op_tree', tree: this.opTree.getSession() });
+    } catch (e) {
+      warn(`orchestration child attach failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  public endOrchestrationChildOp(opId: string | undefined, status: 'ok' | 'failed', attributes?: Record<string, unknown>): void {
+    if (opId === undefined) return;
+    try {
+      this.opTree.endOp(opId, status, attributes);
+      this.emitEvent({ type: 'op_tree', tree: this.opTree.getSession() });
+    } catch (e) {
+      warn(`orchestration child finalize failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   public getOrchestrationRuntime(): OrchestrationRuntimeConfig | undefined {
@@ -619,7 +694,8 @@ export class AIAgentSession {
         traceSdk: sessionConfig.traceSdk,
         pricing: sessionConfig.config.pricing,
         countTokens: toolBudgetCallbacks.countTokens,
-        recordAccounting: (entry) => { this.recordAccounting(entry); },
+        callbacks: sessionConfig.callbacks,
+        verbose: sessionConfig.verbose,
         fsRootDir: toolOutputSession.runRootDir,
         buildFsServerConfig: (rootDir: string) => buildToolOutputFsServerConfig(sessionConfig.config, rootDir),
       })
@@ -2328,11 +2404,88 @@ export class AIAgent {
       }
     };
 
+    const wrapOrchestrationCallbacks = (
+      base: AIAgentSessionConfig['callbacks'] | undefined,
+      parentOpPath: string | undefined,
+      onChildOpTree: ((tree: SessionNode) => void) | undefined,
+    ): AIAgentEventCallbacks | undefined => {
+      if (base === undefined && onChildOpTree === undefined) return undefined;
+      return {
+        onEvent: (event, meta) => {
+          if (event.type === 'log') {
+            const cloned: LogEntry = { ...event.entry };
+            try {
+              const existingPath = (cloned as { path?: string }).path;
+              if (typeof parentOpPath === 'string' && parentOpPath.length > 0) {
+                if (typeof existingPath === 'string' && existingPath.length > 0) {
+                  (cloned as { path?: string }).path = `${parentOpPath}.${existingPath}`;
+                } else {
+                  (cloned as { path?: string }).path = parentOpPath;
+                }
+              }
+            } catch { /* ignore */ }
+            base?.onEvent?.({ type: 'log', entry: cloned }, meta);
+          } else {
+            base?.onEvent?.(event, meta);
+          }
+          if (event.type === 'op_tree') {
+            try { onChildOpTree?.(event.tree); } catch { /* ignore */ }
+          }
+        },
+      };
+    };
+
+    const runOrchestrationChild = async (
+      kind: 'advisor' | 'router' | 'handoff',
+      agent: OrchestrationRuntimeAgent,
+      systemTemplate: string,
+      userPrompt: string,
+      options: { isMaster?: boolean; pendingHandoffCount?: number; ancestors?: string[] },
+    ): Promise<AIAgentResult> => {
+      const opName = agent.toolName ?? agent.agentId;
+      const startedAt = Date.now();
+      const { opId, opPath } = session.beginOrchestrationChildOp({ name: opName, kind });
+      const onChildOpTree = (tree: SessionNode) => { session.attachOrchestrationChildOp(opId, tree); };
+      const callbacks = wrapOrchestrationCallbacks(parentSession.callbacks, opPath, onChildOpTree);
+      const childParentSession = { ...parentSession, callbacks };
+      try {
+        const result = await spawnOrchestrationChild({
+          agent,
+          systemTemplate,
+          userPrompt,
+          parentSession: childParentSession,
+          isMaster: options.isMaster,
+          pendingHandoffCount: options.pendingHandoffCount,
+          ancestors: options.ancestors,
+        });
+        if (result.opTree !== undefined) {
+          session.attachOrchestrationChildOp(opId, result.opTree);
+        }
+        session.endOrchestrationChildOp(opId, result.success ? 'ok' : 'failed', { latency: Date.now() - startedAt });
+        return result;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        session.endOrchestrationChildOp(opId, 'failed', { latency: Date.now() - startedAt, error: message });
+        throw error;
+      }
+    };
+
     const advisorResults = hasAdvisors
       ? await executeAdvisors({
           advisors,
           userPrompt: originalUserPrompt,
           parentSession,
+          spawn: async (advisor) => runOrchestrationChild(
+            'advisor',
+            advisor,
+            advisor.systemTemplate,
+            originalUserPrompt,
+            {
+              isMaster: false,
+              pendingHandoffCount: parentSession.pendingHandoffCount ?? 0,
+              ancestors: undefined,
+            },
+          ),
         })
       : [];
     if (advisorResults.length > 0) {
@@ -2381,14 +2534,17 @@ export class AIAgent {
       ];
       const routerPrompt = joinTaggedBlocks(routerBlocks);
       try {
-        const routed = await spawnOrchestrationChild({
-          agent: destination,
-          systemTemplate: destination.systemTemplate,
-          userPrompt: routerPrompt,
-          parentSession,
-          isMaster: parentIsMaster,
-          pendingHandoffCount: parentPending,
-        });
+        const routed = await runOrchestrationChild(
+          'router',
+          destination,
+          destination.systemTemplate,
+          routerPrompt,
+          {
+            isMaster: parentIsMaster,
+            pendingHandoffCount: parentPending,
+            ancestors: undefined,
+          },
+        );
         current = mergeResultWithChildFinal(current, routed, destination);
         currentAgentLabel = routed.finalAgentId ?? destination.agentId;
       } catch (error) {
@@ -2410,6 +2566,17 @@ export class AIAgent {
           parentSession,
           isMaster: parentIsMaster,
           pendingHandoffCount: decrementedPending,
+          spawn: async (target, prompt) => runOrchestrationChild(
+            'handoff',
+            target,
+            target.systemTemplate,
+            prompt,
+            {
+              isMaster: parentIsMaster,
+              pendingHandoffCount: decrementedPending,
+              ancestors: undefined,
+            },
+          ),
         });
         current = mergeResultWithChildFinal(current, handed, handoffTarget);
         currentAgentLabel = handed.finalAgentId ?? handoffTarget.agentId;
@@ -2423,6 +2590,11 @@ export class AIAgent {
     }
 
     current.finalAgentId = currentAgentLabel;
+    const refreshedOpTree = session.getOpTreeSnapshot();
+    if (refreshedOpTree !== undefined) {
+      current.opTree = refreshedOpTree;
+      current.opTreeAscii = session.getOpTreeAsciiSnapshot();
+    }
     return current;
   }
 }

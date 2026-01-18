@@ -33,6 +33,7 @@ export interface SpawnChildOptions {
     | "toolResponseMaxBytes"
     | "targets"
     | "tools"
+    | "conversationHistory"
   > & {
     trace?: {
       selfId?: string;
@@ -121,6 +122,7 @@ export interface SpawnChildAgentOptions {
     | "tools"
     | "isMaster"
     | "pendingHandoffCount"
+    | "conversationHistory"
   > & {
     trace?: {
       selfId?: string;
@@ -182,7 +184,7 @@ export async function spawnOrchestrationChild(
     return typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? Math.trunc(raw) : 0;
   })();
   return await loaded.run(opts.systemTemplate, opts.userPrompt, {
-    history: undefined,
+    history: parentSession.conversationHistory,
     callbacks: parentSession.callbacks,
     trace: childTrace,
     renderTarget: 'sub-agent',
