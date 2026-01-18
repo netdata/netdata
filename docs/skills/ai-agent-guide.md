@@ -910,6 +910,7 @@ handoff: ./agents/manager.ai
 - Skip-provider errors: auth error, quota exceeded → skip to next provider immediately
 - Fatal errors: stop session, log exit code
 - Rate limiting: honors `Retry-After` header, exponential backoff (max 60s)
+- Error classification uses structured fields (HTTP status, error name/code), not error message text.
 
 ### Context Window Limits
 When projected size approaches context limit:

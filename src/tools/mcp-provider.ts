@@ -4,6 +4,7 @@ import Ajv from 'ajv';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { performance } from 'node:perf_hooks';
 
@@ -162,8 +163,10 @@ class SharedServerHandle implements SharedRegistryHandle {
     try {
       return await this.entry.client.callTool({ name, arguments: parameters }, undefined, requestOptions);
     } catch (error) {
-      const message = error instanceof Error ? error.message : undefined;
-      const looksLikeTimeout = typeof message === 'string' && message.toLowerCase().includes('request timed out');
+      const errorCode = error instanceof McpError ? error.code : (isPlainObject(error) ? error.code : undefined);
+      const isErrorCode = (value: unknown): value is ErrorCode =>
+        typeof value === 'number' && Object.values(ErrorCode).includes(value);
+      const looksLikeTimeout = isErrorCode(errorCode) && errorCode === ErrorCode.RequestTimeout;
       if (looksLikeTimeout) {
         try {
           await this.registry.handleTimeout(this.key, this.entry.log);

@@ -23,6 +23,8 @@ import { ThinkTagStreamFilter } from '../think-tag-filter.js';
 import { truncateToBytes } from '../truncation.js';
 import { clampToolName, isPlainObject, parseJsonRecord, sanitizeToolName, TOOL_NAME_MAX_LENGTH, warn } from '../utils.js';
 
+import { classifyLlmErrorKind, isRetryableModelError } from './llm-error-mapping.js';
+
 const GUIDANCE_STRING_FORMATS = ['date-time', 'time', 'date', 'duration', 'email', 'hostname', 'ipv4', 'ipv6', 'uuid'] as const;
 const TOOL_FAILED_PREFIX = '(tool failed: ' as const;
 const TOOL_FAILED_SUFFIX = ')' as const;
@@ -803,8 +805,10 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       } catch { /* ignore debug errors */ }
     }
 
+    const errorKind = classifyLlmErrorKind({ status, name, code: codeStr });
+
     // Rate limit errors
-    if (status === 429 || name.includes('RateLimit') || providerMessage.toLowerCase().includes('rate limit')) {
+    if (errorKind === 'rate_limit') {
       const toRecord = (val: unknown): Record<string, unknown> | undefined => (val !== null && typeof val === 'object' && !Array.isArray(val)) ? val as Record<string, unknown> : undefined;
       const hasGetter = (val: unknown): val is { get: (key: string) => unknown } => val !== null && typeof val === 'object' && typeof (val as { get?: unknown }).get === 'function';
 
@@ -947,30 +951,29 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     }
 
     // Authentication errors
-    if (status === 401 || status === 403 || name.includes('Auth') || providerMessage.toLowerCase().includes('authentication') || providerMessage.toLowerCase().includes('unauthorized')) {
+    if (errorKind === 'auth_error') {
       return { type: 'auth_error', message: composedMessage };
     }
 
     // Quota exceeded
-    if (status === 402 || providerMessage.toLowerCase().includes('quota') || providerMessage.toLowerCase().includes('billing') || providerMessage.toLowerCase().includes('insufficient')) {
+    if (errorKind === 'quota_exceeded') {
       return { type: 'quota_exceeded', message: composedMessage };
     }
 
     // Model errors
-    if (status === 400 || name.includes('BadRequest') || providerMessage.toLowerCase().includes('invalid') || providerMessage.toLowerCase().includes('model')) {
-      const lower = providerMessage.toLowerCase();
-      const retryable = !(lower.includes('permanently') || lower.includes('unsupported'));
+    if (errorKind === 'model_error') {
+      const retryable = isRetryableModelError({ name, code: codeStr });
       this.logModelErrorDiagnostics(error, { composedMessage, name, status, codeStr, providerMessage, source: 'explicit' });
       return { type: 'model_error', message: composedMessage, retryable };
     }
 
     // Timeout errors
-    if (name.includes('Timeout') || name.includes('AbortError') || providerMessage.toLowerCase().includes('timeout') || providerMessage.toLowerCase().includes('aborted')) {
+    if (errorKind === 'timeout') {
       return { type: 'timeout', message: composedMessage };
     }
 
     // Network errors
-    if (status >= 500 || name.includes('Network') || name.includes('ECONNRESET') || name.includes('ENOTFOUND') || name.includes('ENETUNREACH') || name.includes('EHOSTUNREACH') || name.includes('ECONNREFUSED') || providerMessage.toLowerCase().includes('network') || providerMessage.toLowerCase().includes('connection')) {
+    if (errorKind === 'network_error') {
       return { type: 'network_error', message: composedMessage, retryable: true };
     }
 
@@ -1180,12 +1183,6 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
   private readonly REASONING_TYPE: string = BaseLLMProvider.PART_REASONING.replace('_','-');
   private readonly TOOL_RESULT_TYPE: string = BaseLLMProvider.PART_TOOL_RESULT.replace('_','-');
   private readonly TOOL_ERROR_TYPE: string = BaseLLMProvider.PART_TOOL_ERROR.replace('_','-');
-
-  private static isClosedStreamControllerError(error: unknown): boolean {
-    if (!(error instanceof Error)) return false;
-    const msg = error.message.toLowerCase();
-    return msg.includes('controller is already closed') || msg.includes('readablestream is already closed');
-  }
   
   // Shared streaming utilities
   protected createTimeoutController(timeoutMs: number): { controller: AbortController; resetIdle: () => void; clearIdle: () => void; didTimeout: () => boolean } {
@@ -1430,12 +1427,14 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
       clearIdle();
 
+      const shouldSuppressStreamError = (): boolean => controller.signal.aborted || didTimeout();
+
       const awaitWithSuppression = async <T>(promise: Promise<T>): Promise<T | undefined> => {
         try {
           return await promise;
         } catch (err) {
           captureStreamError(err);
-          if (BaseLLMProvider.isClosedStreamControllerError(err)) return undefined;
+          if (shouldSuppressStreamError()) return undefined;
           throw err;
         }
       };
@@ -1509,7 +1508,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const latencyMs = Date.now() - startTime;
 
       // Log if we captured a stream error that was recovered from (closed controller, etc.)
-      if (capturedStreamError !== undefined && BaseLLMProvider.isClosedStreamControllerError(capturedStreamError)) {
+      if (capturedStreamError !== undefined && shouldSuppressStreamError()) {
         warn(`streamText closed controller recovered: ${capturedStreamError.message}`);
       }
 

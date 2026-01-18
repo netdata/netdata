@@ -16,6 +16,12 @@
   - Added Phase 2 harness scenario for router invalid params → retry (`run-test-router-handoff-invalid-retry`).
   - Updated docs: `docs/specs/IMPLEMENTATION.md`, `docs/specs/DESIGN.md`, `docs/skills/ai-agent-guide.md`.
 - **Tests:** `npm run test:phase1` PASS, `npm run test:phase2` PASS, `npm run lint` PASS, `npm run build` PASS.
+- **Next focus (Jan 18 2026):** Convert remaining error string matching (LLM + MCP shared timeout) to structured errors.
+  - Added `src/llm-providers/llm-error-mapping.ts` with name/code/status → kind mapping.
+  - `BaseLLMProvider.mapError` now classifies via structured fields only (no message matching) and uses structured retryable model-error rules.
+  - Stream closed suppression now keys off abort state (no message matching).
+  - MCP shared registry timeout detection now checks `McpError.code === ErrorCode.RequestTimeout`.
+  - **Re-run tests after refactor:** `npm run test:phase1` PASS, `npm run test:phase2` PASS, `npm run lint` PASS, `npm run build` PASS.
 - **Reconfirmed decisions:** Option **1.1** (typed `ToolExecutionError`) and **2.1** (keep `ToolExecutor` returning `string`).
 
 ---
@@ -77,9 +83,9 @@ Tool errors (including JSON-RPC errors and timeouts) **must not** force turn fai
 - Schema validation / unknown tool **do not** count as executed.
 
 ### 6) Remaining string matches (non-tool path)
-- LLM error classification still matches strings in `src/llm-providers/base.ts` (timeouts/rate limits).
-- MCP shared registry timeout detection still checks message text in `src/tools/mcp-provider.ts` (request timed out).
-- Some tests assert on specific error message substrings (intentional).
+- LLM error classification now uses structured fields (status/name/code); no message parsing.
+- MCP shared registry timeout detection uses `ErrorCode.RequestTimeout`; no message parsing.
+- Some tests and log checks still assert on message content (intentional).
 
 ---
 

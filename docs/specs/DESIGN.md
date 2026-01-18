@@ -76,6 +76,8 @@ interface TurnResult {
 }
 ```
 
+LLM error classification derives `TurnStatus` from structured fields (HTTP status, error name/code) and does not inspect error message text.
+
 #### Tool Execution Status
 Each tool execution returns a clear status for error handling:
 
