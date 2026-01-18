@@ -109,7 +109,7 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 }
 
 func (c *Collector) Cleanup(context.Context) {
-	if c.db != nil {
+	if c.db == nil {
 		return
 	}
 	if err := c.db.Close(); err != nil {
