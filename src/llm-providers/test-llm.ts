@@ -14,6 +14,7 @@ const TOOL_CALL_KIND = 'tool-call' as const;
 const TOOL_RESULT_TYPE = 'tool-result' as const;
 const TOOL_ERROR_TYPE = 'tool-error' as const;
 const FINAL_REPORT_KIND = 'final-report' as const;
+const DEFAULT_FAILURE_STATUS = 'model_error' as const;
 
 type ToolCallStep = Extract<ScenarioStepResponse, { kind: typeof TOOL_CALL_KIND }>;
 type FinalReportStep = Extract<ScenarioStepResponse, { kind: typeof FINAL_REPORT_KIND }>;
@@ -30,6 +31,35 @@ interface StepContext {
 interface ErrorDescriptor {
   message: string;
 }
+
+type FailureStatus = NonNullable<ScenarioTurn['failureStatus']>;
+
+const FAILURE_ERROR_DETAILS: Record<FailureStatus, { name: string; status?: number; code?: string }> = {
+  model_error: { name: 'BadRequestError', status: 400, code: 'invalid_request' },
+  network_error: { name: 'NetworkError', code: 'ECONNRESET' },
+  timeout: { name: 'TimeoutError', status: 408, code: 'timeout' },
+  invalid_response: { name: 'InvalidResponseError', status: 400, code: 'invalid_response' },
+  rate_limit: { name: 'RateLimitError', status: 429, code: 'rate_limit' },
+};
+
+const applyFailureStatusDetails = (
+  target: Record<string, unknown>,
+  status: ScenarioTurn['failureStatus'] | undefined,
+  useDefault: boolean
+): void => {
+  const resolvedStatus = status ?? (useDefault ? DEFAULT_FAILURE_STATUS : undefined);
+  if (resolvedStatus === undefined) return;
+  const details = FAILURE_ERROR_DETAILS[resolvedStatus];
+  if (typeof target.name !== 'string') {
+    target.name = details.name;
+  }
+  if (details.status !== undefined && typeof target.status !== 'number') {
+    target.status = details.status;
+  }
+  if (details.code !== undefined && typeof target.code !== 'string') {
+    target.code = details.code;
+  }
+};
 
 // Extract XML nonce from messages (looks for xml-next notice with ai-agent-{nonce}-FINAL pattern)
 function extractXmlNonce(messages: ConversationMessage[]): string | undefined {
@@ -204,9 +234,12 @@ export class TestLLMProvider extends BaseLLMProvider {
             if (key === 'message') return;
             mutableError[key] = value;
           });
+          applyFailureStatusDetails(mutableError, activeStep.failureStatus, false);
           throw error;
         }
-        throw new Error(failureMessage);
+        const error = new Error(failureMessage);
+        applyFailureStatusDetails(error as unknown as Record<string, unknown>, activeStep.failureStatus, true);
+        throw error;
       }
       const latency = Date.now() - executionStart;
       const failureStatus = activeStep.failureStatus ?? 'model_error';

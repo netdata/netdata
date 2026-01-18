@@ -21,7 +21,9 @@
   - `BaseLLMProvider.mapError` now classifies via structured fields only (no message matching) and uses structured retryable model-error rules.
   - Stream closed suppression now keys off abort state (no message matching).
   - MCP shared registry timeout detection now checks `McpError.code === ErrorCode.RequestTimeout`.
+  - Test provider now wraps message-only failures with structured fields (`src/llm-providers/test-llm.ts`) to avoid text-only errors reaching `mapError`.
   - **Re-run tests after refactor:** `npm run test:phase1` PASS, `npm run test:phase2` PASS, `npm run lint` PASS, `npm run build` PASS.
+  - **Re-run tests after message-only error wrapping:** `npm run test:phase1` PASS, `npm run test:phase2` PASS, `npm run lint` PASS, `npm run build` PASS.
 - **Reconfirmed decisions:** Option **1.1** (typed `ToolExecutionError`) and **2.1** (keep `ToolExecutor` returning `string`).
 
 ---
@@ -108,6 +110,28 @@ Tool errors (including JSON-RPC errors and timeouts) **must not** force turn fai
 **Recommendation:** Option 2 (clarity + maintainability), because typed errors are long‑term infrastructure and reduce future failure modes.
 
 **Decision (Costa, Jan 18 2026):** **Option 2 — Clarity + maintainability.**
+
+### Decision D — **How to handle message-only LLM errors (no status/name/code)**
+**Context:** `mapError` now uses only structured fields. Pure text-only errors (e.g., `new Error('Request timed out')` with no status/name/code) default to `model_error` and may reduce classification precision.
+
+**Evidence:**
+- `src/llm-providers/test-llm.ts:193-209` throws `new Error(failureMessage)` when `failureThrows` is true and `failureError` is undefined (message-only error).
+- `src/llm-providers/base.ts:653-975` now classifies only via status/name/code in `classifyLlmErrorKind` (no message parsing).
+
+**Options:**
+1) **Reintroduce minimal message-text fallback** (only when status/name/code are missing).
+   - **Pros:** Captures timeout/network/rate-limit from message-only errors.
+   - **Cons:** Reintroduces brittle string matching (against the structured-only goal).
+2) **Eliminate message-only errors by wrapping at source** (preferred).
+   - **Pros:** Preserves structured-only classification and keeps behavior deterministic.
+   - **Cons:** Requires adding structured fields where message-only errors are created (tests and possibly provider wrappers).
+3) **Accept current behavior** (message-only → `model_error`).
+   - **Pros:** No additional changes.
+   - **Cons:** Less precise classification for message-only errors.
+
+**Recommendation:** **Option 2** — wrap message-only errors with structured fields at creation sites (tests + any internal throw sites we control).
+
+**Decision (Costa, Jan 18 2026):** **Option 2 — wrap message-only errors at source with structured fields.**
 
 ### Decision 1 — **Where to carry typed errors**
 **Context:** We need structured errors without breaking tool-output strings and without massive signature changes.
