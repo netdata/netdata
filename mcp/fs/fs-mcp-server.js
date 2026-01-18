@@ -132,6 +132,17 @@ function validateGlob(glob) {
   if (typeof glob !== "string") throw new Error("glob must be a string");
 }
 
+/**
+ * Sanitize a string by removing any occurrences of ROOT path.
+ * This prevents leaking absolute filesystem paths to the model.
+ */
+function sanitizePath(str) {
+  if (typeof str !== "string") return str;
+  // Replace ROOT path with <ROOT> placeholder
+  // Use global replace in case ROOT appears multiple times
+  return str.split(ROOT).join("<ROOT>");
+}
+
 async function execCommand(cmd, args, options = {}) {
   const { allowedExitCodes = [0] } = options;
   return new Promise((resolve, reject) => {
@@ -161,8 +172,10 @@ async function execCommand(cmd, args, options = {}) {
 
     child.on("close", (code) => {
       if (!allowedExitCodes.includes(code)) {
+        // Sanitize stderr to remove any absolute paths that might leak ROOT
+        const sanitizedStderr = sanitizePath(stderr.trim());
         const error = new Error(
-          `Command failed: ${cmd} ${args.join(" ")}: ${stderr.trim()}`,
+          `Command failed: ${cmd} ${args.join(" ")}: ${sanitizedStderr}`,
         );
         error.code = code;
         reject(error);
@@ -245,7 +258,8 @@ async function toolListDir(args) {
   assertWithinRoot(abs);
 
   const cmd = "ls";
-  const cmdArgs = ["-la", "--time-style=iso", abs];
+  // Use relative path to avoid leaking absolute paths in error messages
+  const cmdArgs = ["-la", "--time-style=iso", dir];
   const output = await execCommand(cmd, cmdArgs);
 
   const lines = output.split("\n");
@@ -314,7 +328,8 @@ async function toolTree(args) {
 
   const cmd = "tree";
   // Use -l to follow symlinks into directories
-  const cmdArgs = ["-l", abs];
+  // Use relative path to avoid leaking absolute paths in error messages
+  const cmdArgs = ["-l", dir];
   let output = await execCommand(cmd, cmdArgs);
 
   // Strip symlink targets " -> /path/to/target" to hide external paths
@@ -406,6 +421,7 @@ async function toolGrep(args) {
   const cs = caseSensitive === undefined ? false : caseSensitive;
 
   const cmd = "rg";
+  // Use relative path to avoid leaking absolute paths in error messages
   const cmdArgs = [
     "-n",
     "-B",
@@ -415,7 +431,7 @@ async function toolGrep(args) {
     ...(cs ? [] : ["-i"]),
     "--",
     regex,
-    abs,
+    file,
   ];
 
   const output = await execCommand(cmd, cmdArgs, { allowedExitCodes: [0, 1] });
