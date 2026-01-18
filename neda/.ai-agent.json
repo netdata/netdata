@@ -1113,7 +1113,7 @@
   },
   "embed": {
     "support": {
-      "allowedAgents": ["support"],
+      "allowedAgents": ["support-public"],
       "corsOrigins": ["*"]
     }
   },
