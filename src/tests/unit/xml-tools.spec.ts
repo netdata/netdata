@@ -7,6 +7,7 @@ const SLOT_ONE = `${NONCE}-0001`;
 const SLOT_TWO = `${NONCE}-0002`;
 const ALLOWED_SLOTS = new Set([SLOT_ONE]);
 const ALLOWED_TOOLS = new Set(['echo']);
+const ROUTER_HANDOFF_TOOL = 'router__handoff-to';
 
 describe('XML streaming parser', () => {
   it('parses a single complete tag', () => {
@@ -83,6 +84,27 @@ describe('XML streaming parser', () => {
     expect(xml).toContain(`${NONCE}-FINAL`);
     expect(xml).toContain('markdown');
     expect(xml).not.toContain('mock_tool');
+  });
+
+  it('mentions router handoff option on final turn when allowed', () => {
+    const xml = renderXmlNext({
+      nonce: NONCE,
+      turn: 3,
+      maxTurns: 3,
+      tools: [{ name: 'agent__final_report' }, { name: ROUTER_HANDOFF_TOOL }],
+      slotTemplates: [{ slotId: `${NONCE}-FINAL`, tools: ['agent__final_report'] }],
+      taskStatusToolEnabled: false,
+      expectedFinalFormat: 'markdown',
+      finalSchema: undefined,
+      attempt: 1,
+      maxRetries: 3,
+      contextPercentUsed: 90,
+      hasExternalTools: true,
+      forcedFinalTurnReason: 'max_turns',
+      finalTurnTools: [ROUTER_HANDOFF_TOOL],
+    });
+    expect(xml).toContain(ROUTER_HANDOFF_TOOL);
+    expect(xml).toContain(`OR call \`${ROUTER_HANDOFF_TOOL}\``);
   });
 
   it('skips <think> block and parses actual XML tag after it', () => {

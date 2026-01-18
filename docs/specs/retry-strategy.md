@@ -191,7 +191,7 @@ const fallbackWait = Math.min(Math.max(attempts * 1_000, RATE_LIMIT_MIN_WAIT_MS)
 **Behavior**:
 1. Set `forcedFinalTurnReason = 'context'`
 2. Inject instruction: "The conversation is at the context window limit..."
-3. Restrict tools to only `agent__final_report`
+3. Restrict tools to `agent__final_report` (and `router__handoff-to` when router destinations are configured)
 4. Log warning about context enforcement
 5. Retry if model doesn't call final_report
 
@@ -202,7 +202,7 @@ const fallbackWait = Math.min(Math.max(attempts * 1_000, RATE_LIMIT_MIN_WAIT_MS)
 
 **Behavior**:
 1. Inject instruction: "Maximum number of turns/steps reached..."
-2. Restrict tools to only `agent__final_report`
+2. Restrict tools to `agent__final_report` (and `router__handoff-to` when router destinations are configured)
 3. Log warning about final turn
 4. Retry if model doesn't call final_report
 
@@ -290,6 +290,8 @@ Shown when there are issues from the previous attempt or informational warnings:
 | Task status loop | You are repeatedly calling task-status without any other tools or a final report/answer and the system stopped you to prevent infinite loops. You MUST now provide your final report/answer, even if incomplete. |
 | Retry exhaustion | All retry attempts have been exhausted. You MUST now provide your final report/answer, even if incomplete. If you have not finished the task, state this limitation in your final report/answer. |
 
+**Router exception**: If `router__handoff-to` is allowed on the final turn, each final-turn warning appends: “OR call `router__handoff-to` to hand off the user request to another agent.”
+
 **Part 3: Footer (always present)**
 
 Non-final turn (with task_status enabled):
@@ -302,12 +304,14 @@ OR
 - Provide your final report/answer in the expected format (format) using the XML wrapper: <ai-agent-NONCE-FINAL format="format">...
 ```
 
-Final turn:
+Final turn (router allowed example):
 ```
-You must now provide your final report/answer in the expected format (format) using the XML wrapper: <ai-agent-NONCE-FINAL format="format">...
+You must now provide your final report/answer in the expected format (format) using the XML wrapper: <ai-agent-NONCE-FINAL format="format">... OR call `router__handoff-to` to hand off the user request to another agent.
 
 Allowed tools for this final turn: tool1, tool2
 ```
+
+When router is not configured, the OR clause is omitted and the footer instructs only the final report.
 
 ## Wasted Turn Detection
 

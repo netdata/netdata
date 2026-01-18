@@ -4,7 +4,7 @@
 XML transport is fixed to xml-final: native tool_calls remain for regular tools, while the final report must be sent over XML. Each turn advertises XML-NEXT (nonce, final slot, optional schema; progress slot omitted). Tags are parsed by substring; valid tags map to existing tools with the same orchestrator, budgets, and accounting. CLI override for transport has been removed.
 
 ## Turn Messages
-- **XML-NEXT (ephemeral)**: user notice with nonce, final-report slot, and optional schema; counts toward context like any user message. It reminds the model that non-final tools must be called via native tool_calls.
+- **XML-NEXT (ephemeral)**: user notice with nonce, final-report slot, and optional schema; counts toward context like any user message. It reminds the model that non-final tools must be called via native tool_calls. On forced-final turns, it also allows `router__handoff-to` when configured.
 - **XML-PAST**: suppressed; native tool results stay in the normal transcript.
 
 ## Slots & Validation

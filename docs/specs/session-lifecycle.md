@@ -145,7 +145,7 @@ for turn = 1 to maxTurns:
 - Provider cycling: round-robin through targets array
 - Backoff for rate limits: exponential with max wait
 - Synthetic retries: content without tools triggers retry
-- Final turn enforcement: last turn only allows final_report
+- Final turn enforcement: last turn allows final_report (plus `router__handoff-to` when router destinations are configured)
 
 **Context Guard**:
 - Before each LLM request: evaluate projected token usage
@@ -238,7 +238,7 @@ The flow is **procedural**, not state-machine driven. Error handling is inline v
   - `'stop'`: Graceful stop - triggers final turn with `forcedFinalReason='user_stop'`, allows model to summarize, success=true
   - `'abort'`: Immediate cancel - no final turn, success=false, abortSignal fired
   - `'shutdown'`: Global shutdown - no final turn, success=false, abortSignal fired
-- Tool execution during final turn: only `final_report` tool allowed when reason='stop'
+- Tool execution during final turn: `final_report` is allowed, plus `router__handoff-to` when router destinations are configured (including reason='stop')
 - Exit code: `EXIT-USER-STOP` when reason='stop' and final report received
 
 ## Configuration Effects

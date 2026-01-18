@@ -132,14 +132,14 @@ Note: Exit codes map to failure categories, not specific error types. Check `res
 - Overflow drops are logged with `projected_tokens`, `limit_tokens`, and `remaining_tokens` (if positive) so operators can audit exactly why the response was rejected.
 
 #### Forced Final Turn
-- When the guard fires (either from a tool overflow or a turn preflight), the session immediately injects the final-instruction system message, restricts the tool list to `agent__final_report`, and logs the `forcedFinalTurnReason = 'context'`.
+- When the guard fires (either from a tool overflow or a turn preflight), the session immediately injects the final-instruction system message, restricts the tool list to `agent__final_report` (plus `router__handoff-to` when router destinations are configured), and logs the `forcedFinalTurnReason = 'context'`.
 - Schema tokens are recomputed for the reduced toolset and the guard is re-evaluated. If projections still exceed the limit, the session proceeds best-effort but MUST log the post-shrink warning.
-- From this point forward no new tools (including task_status) may be executed; only the final report tool is allowed, and the agent must use already gathered information to respond.
+- From this point forward no new tools (including task_status) may be executed, except `router__handoff-to` when explicitly allowed; the agent must use already gathered information to respond.
 
 ### Empty or Invalid LLM Responses
 
 **Empty content without tool calls:**
-- If the assistant returns only reasoning (non-empty `reasoning` field) and no tool calls or text content, the reasoning is preserved in the conversation but the turn is retried with TURN-FAILED guidance (`reasoning_only`). On final turns, the guidance is final-turn specific (no tools; output the final report in the required wrapper).
+- If the assistant returns only reasoning (non-empty `reasoning` field) and no tool calls or text content, the reasoning is preserved in the conversation but the turn is retried with TURN-FAILED guidance (`reasoning_only`). On final turns, the guidance is final-turn specific (final report XML wrapper, or `router__handoff-to` when allowed).
 - Otherwise (no content, no tools, no reasoning), the response is NOT added to the conversation, and a synthetic retry is triggered with TURN-FAILED guidance (`empty_response`).
 - Counts as one attempt toward `maxRetries` budget
 
@@ -461,7 +461,7 @@ Any deviation from the guarantees above is a **contract violation** and must be 
 
 **Messages**
 - XML-PAST (permanent): a user message containing prior turn tool results (slot id, tool, status, duration, request, response). Suppressed in `xml-final` mode. Intended for the model’s context; may be capped to last turn.
-- XML-NEXT (ephemeral, not stored/cached): the **only** per-turn system notice. It carries the current nonce, the XML final wrapper, and tool-vs-final guidance. In forced-final turns it only advertises the final-report wrapper. Tool schemas remain in native tool definitions, not in XML-NEXT.
+- XML-NEXT (ephemeral, not stored/cached): the **only** per-turn system notice. It carries the current nonce, the XML final wrapper, and tool-vs-final guidance. In forced-final turns it advertises the final-report wrapper and, when allowed, the `router__handoff-to` alternative. Tool schemas remain in native tool definitions, not in XML-NEXT.
 
 **Final-report via XML**
 - Final-report uses a reserved slot in XML-NEXT (reserved FINAL slot, format attribute, raw content).

@@ -88,6 +88,8 @@ export const XML_NEXT_SLUGS = {
   },
 } as const satisfies Record<string, XmlNextSlugConfig>;
 
+const ROUTER_HANDOFF_TOOL = 'router__handoff-to';
+
 // Type for final turn reasons - derived from the slug keys
 type FinalTurnReason = 'context' | 'max_turns' | 'task_status_completed' | 'task_status_only' | 'retry_exhaustion' | 'user_stop';
 
@@ -159,6 +161,16 @@ interface Warning {
   message: string;
 }
 
+const hasRouterHandoffTool = (context: XmlNextNoticeContext): boolean => (
+  Array.isArray(context.finalTurnTools)
+  && context.finalTurnTools.some((tool) => tool === ROUTER_HANDOFF_TOOL)
+);
+
+const appendRouterHandoffOption = (message: string, allowRouterHandoff: boolean): string => {
+  if (!allowRouterHandoff) return message;
+  return `${message} OR call \`${ROUTER_HANDOFF_TOOL}\` to hand off the user request to another agent.`;
+};
+
 const buildWastedTurnWarning = (consecutiveCount: number): Warning | undefined => {
   if (consecutiveCount <= 0) return undefined;
 
@@ -170,16 +182,18 @@ const buildWastedTurnWarning = (consecutiveCount: number): Warning | undefined =
   };
 };
 
-const buildFinalTurnWarning = (reason: FinalTurnReason): Warning => {
+const buildFinalTurnWarning = (reason: FinalTurnReason, allowRouterHandoff: boolean): Warning => {
   const slugKey = FINAL_TURN_SLUG_MAP[reason];
+  const message = appendRouterHandoffOption(XML_NEXT_SLUGS[slugKey].message, allowRouterHandoff);
   return {
     type: 'final_turn',
-    message: XML_NEXT_SLUGS[slugKey].message,
+    message,
   };
 };
 
 const buildWarnings = (context: XmlNextNoticeContext): Warning[] => {
   const warnings: Warning[] = [];
+  const allowRouterHandoff = hasRouterHandoffTool(context);
 
   // Wasted turn warning (only shown when not on forced final turn)
   if (context.forcedFinalTurnReason === undefined) {
@@ -191,7 +205,7 @@ const buildWarnings = (context: XmlNextNoticeContext): Warning[] => {
 
   // Final turn warning
   if (context.forcedFinalTurnReason !== undefined) {
-    warnings.push(buildFinalTurnWarning(context.forcedFinalTurnReason));
+    warnings.push(buildFinalTurnWarning(context.forcedFinalTurnReason, allowRouterHandoff));
   }
 
   return warnings;
@@ -232,8 +246,13 @@ const buildNonFinalFooter = (context: XmlNextNoticeContext): string => {
 const buildFinalTurnFooter = (context: XmlNextNoticeContext): string => {
   const wrapperExample = buildFinalWrapperExample(context);
   const lines: string[] = [];
+  const allowRouterHandoff = hasRouterHandoffTool(context);
+  const finalLine = appendRouterHandoffOption(
+    `${XML_NEXT_SLUGS.tools_unavailable.message} (${context.expectedFinalFormat}) using the XML wrapper: ${wrapperExample}`,
+    allowRouterHandoff
+  );
 
-  lines.push(`${XML_NEXT_SLUGS.tools_unavailable.message} (${context.expectedFinalFormat}) using the XML wrapper: ${wrapperExample}`);
+  lines.push(finalLine);
 
   // Allowed tools for final turn
   if (Array.isArray(context.finalTurnTools) && context.finalTurnTools.length > 0) {

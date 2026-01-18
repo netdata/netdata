@@ -300,7 +300,7 @@ When parsing slack-block-kit payloads wrapped in XML or markdown:
 ## Final Turn Enforcement
 
 When `isFinalTurn === true`:
-1. Tools restricted to only `agent__final_report`
+1. Tools restricted to `agent__final_report` (plus `router__handoff-to` when router destinations are configured)
 2. System message injected: "You must provide your final report now..."
 3. If no final_report: synthetic retry triggered
 

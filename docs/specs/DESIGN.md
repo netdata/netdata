@@ -302,7 +302,7 @@ for turn in 0..maxTurns:
 ## Error Handling
 
 ### Final Turn Behavior
-- Tools disabled on final turn (turn >= maxTurns - 1) and `logEnteringFinalTurn` emits `agent:final-turn` (WRN) so telemetry/alerts can key off the last-turn window.
+- Tools disabled on final turn (turn >= maxTurns - 1) except `router__handoff-to` when router destinations are configured; `logEnteringFinalTurn` emits `agent:final-turn` (WRN) so telemetry/alerts can key off the last-turn window.
 - Special "no more tools" message is appended and deduped through `pushSystemRetryMessage`.
 - `pendingFinalReport` caches any report parsed from assistant text or tool output but defers acceptance until retries are exhausted **and** we are inside the forced final turn. Earlier turns keep retrying instead of short‑circuiting.
 - `finalReportAttempts` increments in both the sanitizer (invalid payload dropped) and tool executor (valid call). When either `incompleteFinalReportDetected` or `finalReportAttempts > 0` fires, `maxTurns` collapses to `currentTurn + 1` and we log `agent:orchestrator` plus fire a telemetry counter (see below).
