@@ -5,6 +5,7 @@
 - Remove **string-matching** on tool error messages; use structured kinds instead.
 - Turn failure should happen **only** when **no tool was executed** (schema/tool-existence failures). Tool errors must **not** force a turn failure.
 - Add/ensure Phase 1 harness coverage for invalid router handoff params → retry → success.
+- Reintroduce **message-based error classification once at the entrance** (LLM + MCP), using **all previous patterns** and expanding them, then keep the rest of the app structured.
 
 ---
 
@@ -25,6 +26,12 @@
   - **Re-run tests after refactor:** `npm run test:phase1` PASS, `npm run test:phase2` PASS, `npm run lint` PASS, `npm run build` PASS.
   - **Re-run tests after message-only error wrapping:** `npm run test:phase1` PASS, `npm run test:phase2` PASS, `npm run lint` PASS, `npm run build` PASS.
 - **Reconfirmed decisions:** Option **1.1** (typed `ToolExecutionError`) and **2.1** (keep `ToolExecutor` returning `string`).
+- **New decision (Jan 18 2026):** Reintroduce **message-based classification at the entrance** for LLM + MCP, using **all existing patterns** (and adding more) while keeping the app structured thereafter.
+- **Message-based classification implemented (Jan 18 2026):**
+  - LLM error mapping now combines structured fields + **message-pattern signals** (all prior patterns + approved additions).
+  - MCP shared timeout detection now checks **ErrorCode** OR **message patterns** (all prior patterns + approved additions).
+  - Phase2 harness now includes **message-only** `mapError` checks (run-test-64).
+- **Tests re-run:** `npm run test:phase1` PASS, `npm run test:phase2` PASS, `npm run lint` PASS, `npm run build` PASS.
 
 ---
 
@@ -133,6 +140,25 @@ Tool errors (including JSON-RPC errors and timeouts) **must not** force turn fai
 
 **Decision (Costa, Jan 18 2026):** **Option 2 — wrap message-only errors at source with structured fields.**
 
+### Decision E — **Message-only error classification at the entrance (LLM + MCP)**
+**Context:** We removed message-text parsing in `mapError`. External provider errors that lack `status/name/code` still map to `model_error`, and MCP timeouts rely on code-only checks.
+
+**Decision (Costa, Jan 18 2026):**
+- Reintroduce **message-based classification once at the entrance** (LLM + MCP), **using all existing patterns** (and adding more), then keep everything structured across the rest of the app.
+
+**Implications:**
+- Text parsing is limited to **one entrance layer** (LLM provider entry + MCP provider entry).
+- All **previous patterns** must be inventoried and preserved; additional patterns can be added.
+
+**Approved additions (Option 2):**
+- **LLM rate_limit:** `too many requests`, `ratelimit`, `rate_limit`
+- **LLM auth_error:** `invalid api key`, `unauthenticated`, `access denied`, `forbidden`
+- **LLM quota_exceeded:** `insufficient_quota`, `quota exceeded`, `payment required`, `credits`
+- **LLM model_error:** `model not found`, `unknown model`, `invalid model`, `unsupported model`, `not available`
+- **LLM timeout:** `timed out`, `deadline exceeded`, `context deadline exceeded`, `etimedout`, `econnaborted`
+- **LLM network_error:** `socket hang up`, `epipe`, `eai_again`, `dns`, `tls`, `ssl`, `certificate`
+- **MCP timeout:** `timeout`, `timed out`, `deadline exceeded`, `context deadline exceeded`, `etimedout`
+
 ### Decision 1 — **Where to carry typed errors**
 **Context:** We need structured errors without breaking tool-output strings and without massive signature changes.
 
@@ -176,6 +202,7 @@ Tool errors (including JSON-RPC errors and timeouts) **must not** force turn fai
 5) Update `SessionTurnRunner` and `llm-providers/base.ts` to stop string matching where possible.
 6) Add/confirm Phase 1 harness test for invalid router handoff → retry.
 7) Run tests (all except phase3): `npm run test:phase1`, `npm run test:phase2`, `npm run lint`, `npm run build`.
+8) Inventory **all previous message patterns** (LLM + MCP) and **reintroduce them at entrance**, then add any new patterns required.
 
 ---
 

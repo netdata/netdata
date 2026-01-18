@@ -150,6 +150,28 @@ const DEFAULT_HEALTH_PROBE = 'ping' as const;
 const PROBE_TIMEOUT_MS = 3000;
 const SHARED_RESTART_BACKOFF_MS = [0, 1000, 2000, 5000, 10000, 30000, 60000] as const;
 const SHARED_ACQUIRE_TIMEOUT_MS = 60000;
+const MCP_TIMEOUT_MESSAGE_PATTERNS = [
+  'request timed out',
+  'timeout',
+  'timed out',
+  'deadline exceeded',
+  'context deadline exceeded',
+  'etimedout',
+];
+
+const isErrorCode = (value: unknown): value is ErrorCode =>
+  typeof value === 'number' && Object.values(ErrorCode).includes(value);
+
+const isMcpTimeoutError = (error: unknown): boolean => {
+  const errorCode = error instanceof McpError ? error.code : (isPlainObject(error) ? (error as { code?: unknown }).code : undefined);
+  if (isErrorCode(errorCode) && errorCode === ErrorCode.RequestTimeout) return true;
+  const messageCandidate = error instanceof Error
+    ? error.message
+    : (isPlainObject(error) ? (error as { message?: unknown }).message : undefined);
+  if (typeof messageCandidate !== 'string') return false;
+  const normalized = messageCandidate.toLowerCase();
+  return MCP_TIMEOUT_MESSAGE_PATTERNS.some((pattern) => normalized.includes(pattern));
+};
 
 class SharedServerHandle implements SharedRegistryHandle {
   constructor(private registry: MCPSharedRegistry, private key: string, private entry: SharedServerEntry) {}
@@ -163,11 +185,7 @@ class SharedServerHandle implements SharedRegistryHandle {
     try {
       return await this.entry.client.callTool({ name, arguments: parameters }, undefined, requestOptions);
     } catch (error) {
-      const errorCode = error instanceof McpError ? error.code : (isPlainObject(error) ? error.code : undefined);
-      const isErrorCode = (value: unknown): value is ErrorCode =>
-        typeof value === 'number' && Object.values(ErrorCode).includes(value);
-      const looksLikeTimeout = isErrorCode(errorCode) && errorCode === ErrorCode.RequestTimeout;
-      if (looksLikeTimeout) {
+      if (isMcpTimeoutError(error)) {
         try {
           await this.registry.handleTimeout(this.key, this.entry.log);
         } catch (restartError) {

@@ -5058,6 +5058,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           model: provider.mapError({ status: 400, message: 'model unsupported', name: 'BadRequestError' }),
           nested: provider.mapError({ lastError: { response: { status: 429, data: { error: { message: 'Rate limit reached' } } }, message: 'Too Many Requests' } }),
           responseBody: provider.mapError({ status: 500, responseBody: '{"error":{"message":"Upstream invalid","code":"quota"}}', message: 'Server error' }),
+          messageAuth: provider.mapError({ message: 'Invalid API key provided.' }),
+          messageQuota: provider.mapError({ message: 'insufficient_quota' }),
+          messageRate: provider.mapError({ message: 'Too many requests - rate_limit' }),
+          messageTimeout: provider.mapError({ message: 'context deadline exceeded' }),
+          messageNetwork: provider.mapError({ message: 'socket hang up' }),
+          messageModel: provider.mapError({ message: 'model not found' }),
         };
         return Promise.resolve({
           success: true,
@@ -5072,6 +5078,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             model: statuses.model.type,
             nested: statuses.nested.type,
             responseBody: statuses.responseBody.type,
+            messageAuth: statuses.messageAuth.type,
+            messageQuota: statuses.messageQuota.type,
+            messageRate: statuses.messageRate.type,
+            messageTimeout: statuses.messageTimeout.type,
+            messageNetwork: statuses.messageNetwork.type,
+            messageModel: statuses.messageModel.type,
           }, ts: Date.now() },
         } as AIAgentResult);
       },
@@ -5086,6 +5098,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         invariant(data.model === 'model_error', 'Model error mapping mismatch for run-test-64.');
         invariant(data.nested === 'rate_limit', 'Nested error mapping mismatch for run-test-64.');
         invariant(data.responseBody === 'network_error', 'Response body mapping mismatch for run-test-64.');
+        invariant(data.messageAuth === 'auth_error', 'Message auth error mapping mismatch for run-test-64.');
+        invariant(data.messageQuota === 'quota_exceeded', 'Message quota error mapping mismatch for run-test-64.');
+        invariant(data.messageRate === 'rate_limit', 'Message rate error mapping mismatch for run-test-64.');
+        invariant(data.messageTimeout === 'timeout', 'Message timeout mapping mismatch for run-test-64.');
+        invariant(data.messageNetwork === 'network_error', 'Message network mapping mismatch for run-test-64.');
+        invariant(data.messageModel === 'model_error', 'Message model error mapping mismatch for run-test-64.');
       },
     };
   })(),

@@ -15,6 +15,61 @@ export const LLM_ERROR_KIND_MEANINGS: Record<LlmErrorKind, { summary: string }> 
   network_error: { summary: 'Network/transport failure; retryable.' },
 };
 
+const MESSAGE_KIND_PATTERNS: Record<LlmErrorKind, string[]> = {
+  rate_limit: [
+    'rate limit',
+    'ratelimit',
+    'rate_limit',
+    'too many requests',
+  ],
+  auth_error: [
+    'authentication',
+    'unauthorized',
+    'invalid api key',
+    'unauthenticated',
+    'access denied',
+    'forbidden',
+  ],
+  quota_exceeded: [
+    'quota',
+    'billing',
+    'insufficient',
+    'insufficient_quota',
+    'quota exceeded',
+    'payment required',
+    'credits',
+  ],
+  model_error: [
+    'invalid',
+    'model',
+    'model not found',
+    'unknown model',
+    'invalid model',
+    'unsupported model',
+    'not available',
+  ],
+  timeout: [
+    'timeout',
+    'timed out',
+    'deadline exceeded',
+    'context deadline exceeded',
+    'aborted',
+    'etimedout',
+    'econnaborted',
+  ],
+  network_error: [
+    'network',
+    'connection',
+    'socket hang up',
+    'epipe',
+    'eai_again',
+    'dns',
+    'tls',
+    'ssl',
+    'certificate',
+  ],
+};
+
 const STATUS_KIND_MAP = new Map<number, LlmErrorKind>([
   [429, 'rate_limit'],
   [401, 'auth_error'],
@@ -95,16 +150,42 @@ const NON_RETRYABLE_MODEL_ERROR_CODES = new Set([
   'invalid_model',
 ]);
 
+const NON_RETRYABLE_MODEL_ERROR_MESSAGE_PATTERNS = [
+  'permanently',
+  'unsupported',
+  'model not found',
+  'unknown model',
+  'invalid model',
+  'not available',
+];
+
 const normalize = (value: string | undefined): string | undefined =>
   typeof value === 'string' ? value.trim().toLowerCase() : undefined;
 
-export const classifyLlmErrorKind = (input: { status: number; name: string; code?: string }): LlmErrorKind | undefined => {
+export const classifyLlmErrorKindFromMessage = (message: string | undefined): LlmErrorKind | undefined => {
+  const normalized = normalize(message);
+  if (normalized === undefined || normalized.length === 0) return undefined;
+  const matches = (kind: LlmErrorKind): boolean =>
+    MESSAGE_KIND_PATTERNS[kind].some((pattern) => normalized.includes(pattern));
+
+  if (matches('rate_limit')) return 'rate_limit';
+  if (matches('auth_error')) return 'auth_error';
+  if (matches('quota_exceeded')) return 'quota_exceeded';
+  if (matches('model_error')) return 'model_error';
+  if (matches('timeout')) return 'timeout';
+  if (matches('network_error')) return 'network_error';
+  return undefined;
+};
+
+export const classifyLlmErrorKind = (input: { status: number; name: string; code?: string; message?: string }): LlmErrorKind | undefined => {
   const statusKind = STATUS_KIND_MAP.get(input.status);
   const nameKey = normalize(input.name);
   const codeKey = normalize(input.code);
   const nameKind = nameKey !== undefined ? NAME_KIND_MAP.get(nameKey) : undefined;
   const codeKind = codeKey !== undefined ? CODE_KIND_MAP.get(codeKey) : undefined;
-  const matches = (kind: LlmErrorKind): boolean => statusKind === kind || nameKind === kind || codeKind === kind;
+  const messageKind = classifyLlmErrorKindFromMessage(input.message);
+  const matches = (kind: LlmErrorKind): boolean =>
+    statusKind === kind || nameKind === kind || codeKind === kind || messageKind === kind;
 
   if (matches('rate_limit')) return 'rate_limit';
   if (matches('auth_error')) return 'auth_error';
@@ -116,10 +197,12 @@ export const classifyLlmErrorKind = (input: { status: number; name: string; code
   return undefined;
 };
 
-export const isRetryableModelError = (input: { name: string; code?: string }): boolean => {
+export const isRetryableModelError = (input: { name: string; code?: string; message?: string }): boolean => {
   const nameKey = normalize(input.name);
   const codeKey = normalize(input.code);
+  const messageKey = normalize(input.message);
   if (nameKey !== undefined && NON_RETRYABLE_MODEL_ERROR_NAMES.has(nameKey)) return false;
   if (codeKey !== undefined && NON_RETRYABLE_MODEL_ERROR_CODES.has(codeKey)) return false;
+  if (messageKey !== undefined && NON_RETRYABLE_MODEL_ERROR_MESSAGE_PATTERNS.some((pattern) => messageKey.includes(pattern))) return false;
   return true;
 };

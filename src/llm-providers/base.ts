@@ -805,7 +805,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       } catch { /* ignore debug errors */ }
     }
 
-    const errorKind = classifyLlmErrorKind({ status, name, code: codeStr });
+    const classificationMessage = providerMessageRaw ?? providerMessage;
+    const errorKind = classifyLlmErrorKind({ status, name, code: codeStr, message: classificationMessage });
 
     // Rate limit errors
     if (errorKind === 'rate_limit') {
@@ -962,7 +963,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
     // Model errors
     if (errorKind === 'model_error') {
-      const retryable = isRetryableModelError({ name, code: codeStr });
+      const retryable = isRetryableModelError({ name, code: codeStr, message: classificationMessage });
       this.logModelErrorDiagnostics(error, { composedMessage, name, status, codeStr, providerMessage, source: 'explicit' });
       return { type: 'model_error', message: composedMessage, retryable };
     }
