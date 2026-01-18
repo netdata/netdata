@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { RouterToolProvider } from "../../../orchestration/router.js";
 
 const ROUTER_HANDOFF_TOOL = "router__handoff-to";
-const DESTINATION_ONE = "./router-destination.ai";
-const DESTINATION_TWO = "./router-destination-two.ai";
+const DESTINATION_ONE = "router-destination";
+const DESTINATION_TWO = "router-destination-two";
 
 describe("RouterToolProvider", () => {
   it("returns empty tool list when no destinations configured", () => {

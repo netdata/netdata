@@ -371,4 +371,4 @@ Agent: [Should refuse each step that violates safety gate]
 - [Agent Files: Tools](Agent-Files-Tools) - Tool filtering with `toolsAllowed`/`toolsDenied` (configuration level)
 - [Agent Files: Behavior](Agent-Files-Behavior) - Turn and retry limits
 - [System Prompts: Writing](System-Prompts-Writing) - Prompt best practices
-- [AI Agent Configuration Guide](skills/ai-agent-configuration.md) - Complete reference
+- [AI Agent Configuration Guide](skills/ai-agent-guide.md) - Complete reference

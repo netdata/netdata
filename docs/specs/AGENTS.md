@@ -44,5 +44,5 @@ Format: `src/file.ts:line` or `src/file.ts:start-end`
 ## Business Logic Coverage (Verified 2025-11-16)
 
 - **Multi-agent review loop**: Every spec update must run through Codex + Gemini second-opinion reviews (see TODO-INTERNAL-DOCUMENTATION.md) with discrepancies reconciled before merge; this file now codifies that requirement.
-- **Cross-doc syncing**: Specs referencing runtime behavior must also update `docs/skills/ai-agent-configuration.md` and `docs/specs/index.md` so assistants consuming either source never see divergent facts.
+- **Cross-doc syncing**: Specs referencing runtime behavior must also update `docs/skills/ai-agent-guide.md` and `docs/specs/index.md` so assistants consuming either source never see divergent facts.
 - **Traceable evidence**: Each behavior statement must cite a specific source file/line or deterministic test ID, keeping the specs machine-verifiable.

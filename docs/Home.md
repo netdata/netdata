@@ -77,7 +77,7 @@ See [Getting Started](Getting-Started) for the complete walkthrough.
 
 ## For AI Assistants
 
-Building ai-agents programmatically? See the [AI Agent Configuration Guide](skills/ai-agent-configuration.md) - a single-page reference covering frontmatter schema, tool composition, patterns, and output contracts.
+Building ai-agents programmatically? See the [AI Agent Configuration Guide](skills/ai-agent-guide.md) - a single-page reference covering frontmatter schema, tool composition, patterns, and output contracts.
 
 ---
 

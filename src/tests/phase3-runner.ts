@@ -148,7 +148,7 @@ const ATTR_AGENT_ORCH_ROUTER_HANDOFF = 'agent="orchestration-router-handoff"';
 const ATTR_AGENT_ORCH_ADVISORS_HANDOFF = 'agent="orchestration-advisors-handoff"';
 const ATTR_AGENT_ROUTER_DEST = 'agent="router-destination"';
 const ROUTER_NOTE = "ROUTER NOTE";
-const ROUTER_DEST_REF = "./router-destination.ai";
+const ROUTER_DEST_REF = "router-destination";
 const ROUTER_DEST_ID = "router-destination";
 const HANDOFF_TARGET_ID = "handoff-target";
 const ADVISOR_FAIL_REF = "./advisor-fail.ai";

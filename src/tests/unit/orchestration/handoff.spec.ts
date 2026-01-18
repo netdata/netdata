@@ -43,6 +43,7 @@ const buildTarget = (ref: string): OrchestrationRuntimeAgent => ({
   agentId: "handoff-target",
   promptPath: ref,
   systemTemplate: "handoff system",
+  toolName: "handoff-target",
   run: () => Promise.reject(new Error("unused")),
 });
 

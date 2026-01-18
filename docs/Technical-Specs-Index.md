@@ -190,7 +190,7 @@ User-facing guarantees and SLAs.
 | Document               | Location                                                                               | Description                           |
 | ---------------------- | -------------------------------------------------------------------------------------- | ------------------------------------- |
 | User Contract          | [specs/CONTRACT.md](specs/CONTRACT.md)                                                 | End-user behavioral guarantees        |
-| AI Configuration Guide | [docs/skills/ai-agent-configuration.md](docs/skills/ai-agent-configuration.md)         | AI-facing configuration reference     |
+| AI Configuration Guide | [docs/skills/ai-agent-guide.md](docs/skills/ai-agent-guide.md)         | AI-facing configuration reference     |
 | AI Snapshots Guide     | [docs/skills/ai-agent-session-snapshots.md](docs/skills/ai-agent-session-snapshots.md) | AI-facing session snapshots reference |
 
 **Wiki Page**: [User Contract](Technical-Specs-User-Contract)

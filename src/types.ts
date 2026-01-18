@@ -659,6 +659,7 @@ export interface AIAgentEventCallbacks {
 export interface OrchestrationAgentRef {
   ref: string;
   path: string;
+  toolName?: string;
 }
 
 export interface OrchestrationConfig {
@@ -697,7 +698,7 @@ export interface OrchestrationRuntimeAgent {
   agentId: string;
   promptPath: string;
   systemTemplate: string;
-  toolName?: string;
+  toolName: string;
   expectedOutput?: { format: 'json' | 'markdown' | 'text'; schema?: Record<string, unknown> };
   run: (systemPrompt: string, userPrompt: string, opts?: AgentRunOptions) => Promise<AIAgentResult>;
 }

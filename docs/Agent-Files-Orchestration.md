@@ -65,7 +65,7 @@ maxTurns: 3
 temperature: 0
 ---
 Analyze the request and route to the appropriate handler.
-Use `router__handoff-to` with the destination path.
+Use `router__handoff-to` with the destination tool name (frontmatter `toolName`, or derived from the destination filename).
 ```
 
 ### Handoff
@@ -270,12 +270,12 @@ When `router.destinations` is configured, a special tool becomes available:
 
 ```json
 {
-  "agent": "./handlers/billing.ai", // Destination path (must match one of router.destinations exactly)
+  "agent": "billing", // Destination toolName (from frontmatter toolName or derived from filename)
   "message": "..." // Optional message to pass along
 }
 ```
 
-The `agent` parameter is an enum of destination paths (exact strings from the `router.destinations` configuration). If provided, the `message` is converted to an advisory block and combined with the original user request as the destination agent's prompt.
+The `agent` parameter is an enum of destination tool names derived from `router.destinations` (frontmatter `toolName` override or sanitized filename). If provided, the `message` is converted to an advisory block and combined with the original user request as the destination agent's prompt.
 
 ### Router Example
 
@@ -302,7 +302,7 @@ Analyze the user's request and route to the appropriate handler:
 - `./handlers/technical.ai`: Product bugs, API issues, integration help
 - `./handlers/general.ai`: Everything else
 
-Use the `router__handoff-to` tool with the appropriate destination path.
+Use the `router__handoff-to` tool with the appropriate destination tool name.
 ```
 
 **Destination** (`./handlers/billing.ai`):
@@ -887,14 +887,14 @@ router:
 
 **Problem**: Router tries to hand off to unknown destination.
 
-**Cause**: Destination path doesn't match any configured destination.
+**Cause**: Destination tool name doesn't match any configured destination tool name.
 
-**Solution**: Check destination paths match the exact strings in `router.destinations`:
+**Solution**: Check destination tool names (frontmatter `toolName` or derived from filename) match the router tool enum for your `router.destinations`:
 
 ```yaml
 router:
   destinations:
-    - ./handlers/billing.ai # Use this exact path string
+    - ./handlers/billing.ai # Tool name defaults to "billing"
 ```
 
 ### "Handoff not receiving main response"

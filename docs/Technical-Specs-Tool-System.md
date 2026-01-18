@@ -294,7 +294,7 @@ Dynamic agent routing.
 
 ```typescript
 {
-    agent: string;      // Must be in router.destinations
+    agent: string;      // Must be a destination toolName (from router.destinations)
     message?: string;   // Optional context for destination agent (plain text)
 }
 ```

@@ -888,8 +888,13 @@ export class AIAgentSession {
     {
       const routerConfig = this.sessionConfig.orchestration?.router;
       const destinations = routerConfig?.destinations ?? [];
-      const routerDestinations = destinations.map((dest) => dest.ref);
+      const routerDestinations = destinations
+        .map((dest) => dest.toolName)
+        .filter((name): name is string => typeof name === 'string' && name.length > 0);
       if (routerDestinations.length > 0) {
+        if (routerDestinations.length !== destinations.length) {
+          throw new Error('router.destinations missing toolName');
+        }
         const routerProvider = new RouterToolProvider({
           config: { destinations: routerDestinations },
         });
@@ -2287,7 +2292,7 @@ const buildChildConversationEntry = (
   agent: OrchestrationRuntimeAgent,
 ): ChildConversationEntry => ({
   agentId: agent.agentId,
-  toolName: agent.toolName ?? agent.agentId,
+  toolName: agent.toolName,
   promptPath: agent.promptPath,
   conversation: result.conversation,
 });
@@ -2442,7 +2447,7 @@ export class AIAgent {
       userPrompt: string,
       options: { isMaster?: boolean; pendingHandoffCount?: number; ancestors?: string[] },
     ): Promise<AIAgentResult> => {
-      const opName = agent.toolName ?? agent.agentId;
+      const opName = agent.toolName;
       const startedAt = Date.now();
       const { opId, opPath } = session.beginOrchestrationChildOp({ name: opName, kind });
       const onChildOpTree = (tree: SessionNode) => { session.attachOrchestrationChildOp(opId, tree); };
@@ -2517,7 +2522,7 @@ export class AIAgent {
 
     if (hasRouter && current.routerSelection?.agent !== undefined) {
       const selection = current.routerSelection.agent;
-      const destination = routerDestinations.find((agent) => agent.ref === selection);
+      const destination = routerDestinations.find((agent) => agent.toolName === selection);
       if (destination === undefined) {
         emitOrchestrationLog(`router_destination_missing: ${selection}`, 'ERR');
         current = mergeResultWithSupplement(current, logSupplement);

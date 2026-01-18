@@ -1,7 +1,7 @@
 # AI Agent Skill Document Merge
 
 ## TL;DR
-Merge three skill files (`ai-agent-configuration.md`, `ai-agent-configuration-user.md`, `ai-agent-user-guide.md`) into a single comprehensive `ai-agent-guide.md` skill document. Then review all wiki pages to enrich the skill with any missing content.
+Merge three skill files (`ai-agent-guide.md`, `ai-agent-configuration-user.md`, `ai-agent-user-guide.md`) into a single comprehensive `ai-agent-guide.md` skill document. Then review all wiki pages to enrich the skill with any missing content.
 
 ## Objective
 Create a single, dense, comprehensive skill document that AI assistants can use to help humans with all aspects of ai-agent: configuration, development, operations, troubleshooting.

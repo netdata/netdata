@@ -96,7 +96,7 @@ Each layer has paired `.ai-agent.env` for secrets. Higher layers override lower 
 | `tools` | string[] | `[]` | MCP server names, REST tool config keys |
 | `agents` | string[] | `[]` | Sub-agent paths (relative to agent file) |
 | `advisors` | string/string[] | - | Advisor agent paths (run pre-session in parallel) |
-| `router.destinations` | string[] | - | Agent paths for `router__handoff-to` tool |
+| `router.destinations` | string[] | - | Agent paths; router tool enum exposes destination toolName (frontmatter `toolName` or derived from filename) |
 | `handoff` | string | - | Post-session handoff agent path |
 | `maxTurns` | number | `10` | Max LLM conversation turns |
 | `maxToolCallsPerTurn` | number | `10` | Max tool invocations per turn |
@@ -1290,7 +1290,7 @@ All sub-agent calls **require** a `reason` parameter (up to 15 words):
 {
   "name": "router__handoff-to",
   "arguments": {
-    "agent": "./handlers/support.ai",
+    "agent": "support",
     "message": "User is experiencing login issues"
   }
 }

@@ -6,7 +6,7 @@
 - docs/Contributing-Testing.md for deterministic harness usage and coverage guidance.
 - docs/specs/AI-AGENT-INTERNAL-API.md current status of the ai-agent internal agent API.
 - README.md for end-user documentation of the application.
-- docs/skills/ai-agent-configuration.md for the AI-facing source of truth covering prompts, configs, headends, snapshots, and operational defaults.
+- docs/skills/ai-agent-guide.md for the AI-facing source of truth covering prompts, configs, headends, snapshots, and operational defaults.
 - **docs/skills/ai-agent-session-snapshots.md** for session snapshot extraction commands and structure. YOU MUST READ this document when working with session snapshots (debugging issues, extracting LLM payloads, tool requests/responses, logs, WRN/ERR entries, sub-agent data).
 
 The code has extensive tests and its business logic is described in detail in the documents under `docs/specs/*.md`. These documents have been SYNCHORIZED with the codebase and they act as a reference during code refactorings, new features and improvements (they are organized by feature, module and business logic).

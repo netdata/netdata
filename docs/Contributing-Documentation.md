@@ -32,7 +32,7 @@ This is non-negotiable. Documentation and code must stay synchronized.
 
 | Document                                | Purpose                       | Primary Audience |
 | --------------------------------------- | ----------------------------- | ---------------- |
-| `docs/skills/ai-agent-configuration.md` | AI assistants creating agents | AI/LLMs          |
+| `docs/skills/ai-agent-guide.md` | AI assistants creating agents | AI/LLMs          |
 | `docs/specs/*.md`                       | Technical specifications      | Contributors     |
 | `docs/specs/CONTRACT.md`                | User-facing guarantees        | Operators        |
 | Wiki pages (`docs/*.md`)                | User documentation            | End users        |
@@ -41,9 +41,9 @@ This is non-negotiable. Documentation and code must stay synchronized.
 
 | Change Type               | Update These                                    |
 | ------------------------- | ----------------------------------------------- |
-| New configuration option  | Spec file, ai-agent-configuration.md, wiki page |
+| New configuration option  | Spec file, ai-agent-guide.md, wiki page |
 | Behavior change           | Spec file, CONTRACT.md if affects guarantees    |
-| New feature               | Spec file, ai-agent-configuration.md, wiki page |
+| New feature               | Spec file, ai-agent-guide.md, wiki page |
 | Bug fix changing behavior | Spec file, wiki if user-visible                 |
 
 ---
@@ -159,14 +159,14 @@ Test reference pattern for Phase 2: scenario names use `run-test-*` format withi
 ### When Adding Features
 
 1. **Write spec BEFORE implementation** - Design is documented first
-2. **Update ai-agent-configuration.md** - If user-facing
+2. **Update ai-agent-guide.md** - If user-facing
 3. **Update wiki after merge** - User documentation
 
 ### When Changing Behavior
 
 1. **Update spec first** - Document the change
 2. **Cross-reference related specs** - Check for impacts
-3. **Verify ai-agent-configuration.md accuracy** - Update if needed
+3. **Verify ai-agent-guide.md accuracy** - Update if needed
 4. **Check CONTRACT.md implications** - Update if affects guarantees
 
 ### When Fixing Bugs
@@ -190,8 +190,8 @@ When updating specs that affect runtime behavior, also update:
 
 | If You Change         | Also Update                             |
 | --------------------- | --------------------------------------- |
-| Configuration options | `docs/skills/ai-agent-configuration.md` |
-| Default values        | `docs/skills/ai-agent-configuration.md` |
+| Configuration options | `docs/skills/ai-agent-guide.md` |
+| Default values        | `docs/skills/ai-agent-guide.md` |
 | User-visible behavior | Relevant wiki page                      |
 | API contracts         | `docs/specs/library-api.md`             |
 

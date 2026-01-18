@@ -182,7 +182,7 @@ Each headend flag is repeatable. All headends share the same agent registry and 
 
 ### For AI Assistants
 
-**See [`docs/skills/ai-agent-configuration.md`](docs/skills/ai-agent-configuration.md)**: Single-page reference for LLM agents designing ai-agents.
+**See [`docs/skills/ai-agent-guide.md`](docs/skills/ai-agent-guide.md)**: Single-page reference for LLM agents designing ai-agents.
 
 ---
 

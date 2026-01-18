@@ -157,7 +157,7 @@ interface FrontmatterOptions {
 ## Orchestration Fields
 
 - `advisors`: string or string[] (agent paths). Parsed verbatim and resolved later by the agent loader.
-- `router.destinations`: string[] (agent paths). Must be an object with a `destinations` list.
+- `router.destinations`: string[] (agent paths). Must be an object with a `destinations` list. Router tool calls use each destination’s toolName (frontmatter `toolName` or derived from filename).
 - `handoff`: string (single agent path). Arrays are rejected with an error.
 
 Validation occurs during frontmatter parsing (`src/frontmatter.ts`), and reference resolution happens in the loader (`src/agent-loader.ts`).

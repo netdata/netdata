@@ -41,7 +41,7 @@ export class RouterToolProvider extends ToolProvider {
             agent: {
               type: 'string',
               enum: this.config.destinations,
-              description: 'The destination agent to route to',
+              description: 'The destination tool name to route to',
             },
             message: {
               type: 'string',

@@ -144,7 +144,7 @@ See [Testing Guide](Contributing-Testing) for detailed instructions.
 | ------------------------------------- | ------------------------------------------------------ |
 | Synchronized updates                  | Every behavior change updates specs at the same commit |
 | Spec-first development                | Write or update specs before implementation            |
-| docs/skills/ai-agent-configuration.md | Source of truth for AI assistants creating agents      |
+| docs/skills/ai-agent-guide.md | Source of truth for AI assistants creating agents      |
 
 See [Documentation Standards](Contributing-Documentation) for detailed guidelines.
 

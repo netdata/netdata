@@ -162,7 +162,7 @@ export async function spawnOrchestrationChild(
       : 'agent';
   const childAgentPath = appendCallPathSegment(
     parentAgentPath,
-    loaded.toolName ?? loaded.agentId,
+    loaded.toolName,
   );
   const parentSelfId = parentSession.trace?.selfId;
   const childTrace = {

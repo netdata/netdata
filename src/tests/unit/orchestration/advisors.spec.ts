@@ -48,6 +48,7 @@ const buildAdvisor = (ref: string): OrchestrationRuntimeAgent => ({
   agentId: "advisor",
   promptPath: ref,
   systemTemplate: "Advisor system",
+  toolName: "advisor",
   run: () => Promise.reject(new Error("unused")),
 });
 

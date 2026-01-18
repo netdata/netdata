@@ -106,6 +106,28 @@ function deriveAgentIdFromPath(p: string): string {
   return path.basename(p).replace(/\.[^.]+$/, '');
 }
 
+function resolveToolName(promptPath: string, configured?: string): string {
+  if (typeof configured === 'string' && configured.trim().length > 0) {
+    return configured;
+  }
+  return deriveToolNameFromPath(promptPath);
+}
+
+function ensureUniqueToolName(
+  seen: Set<string>,
+  toolName: string,
+  promptPath: string,
+  messages: { reserved: string; duplicate: string }
+): void {
+  if (isReservedAgentName(toolName)) {
+    throw new Error(messages.reserved);
+  }
+  if (seen.has(toolName)) {
+    throw new Error(messages.duplicate);
+  }
+  seen.add(toolName);
+}
+
 function loadFlattenedPrompt(promptPath: string): { content: string; systemTemplate: string } {
   const raw = readFileText(promptPath);
   const baseDir = path.dirname(promptPath);
@@ -511,14 +533,11 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       // Pass through overrides intact; downstream loaders treat arrays as immutable.
       globalOverrides: options?.globalOverrides,
     });
-    const derivedToolName = childLoaded.toolName ?? deriveToolNameFromPath(childLoaded.promptPath);
-    if (isReservedAgentName(derivedToolName)) {
-      throw new Error(`Sub-agent '${childLoaded.promptPath}' uses a reserved tool name '${derivedToolName}'`);
-    }
-    if (seenToolNames.has(derivedToolName)) {
-      throw new Error(`Duplicate sub-agent tool name '${derivedToolName}' detected while loading '${childLoaded.promptPath}'`);
-    }
-    seenToolNames.add(derivedToolName);
+    const derivedToolName = resolveToolName(childLoaded.promptPath, childLoaded.toolName);
+    ensureUniqueToolName(seenToolNames, derivedToolName, childLoaded.promptPath, {
+      reserved: `Sub-agent '${childLoaded.promptPath}' uses a reserved tool name '${derivedToolName}'`,
+      duplicate: `Duplicate sub-agent tool name '${derivedToolName}' detected while loading '${childLoaded.promptPath}'`,
+    });
     if (typeof childLoaded.description !== 'string' || childLoaded.description.trim().length === 0) {
       throw new Error(`Sub-agent '${childLoaded.promptPath}' missing 'description' in frontmatter`);
     }
@@ -535,9 +554,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       systemTemplate: childLoaded.systemTemplate,
       loaded: childLoaded,
     };
-    if (childLoaded.toolName === undefined) {
-      (childLoaded as { toolName?: string }).toolName = derivedToolName;
-    }
+    (childLoaded as { toolName?: string }).toolName = derivedToolName;
     subAgentInfos.push(childInfo);
   });
 
@@ -569,7 +586,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
     agentId: deriveAgentIdFromPath(loaded.promptPath),
     promptPath: loaded.promptPath,
     systemTemplate: loaded.systemTemplate,
-    toolName: loaded.toolName,
+    toolName: resolveToolName(loaded.promptPath, loaded.toolName),
     expectedOutput: loaded.expectedOutput !== undefined
       ? { ...loaded.expectedOutput, schema: cloneOptionalJsonSchema(loaded.expectedOutput.schema) }
       : undefined,
@@ -598,19 +615,35 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
   if (routerConfig !== undefined && routerDestRefs.length === 0) {
     throw new Error(`router.destinations must include at least one agent in ${promptPath}`);
   }
+  const routerToolNames = new Set<string>();
   const routerEntries: OrchestrationRuntimeAgent[] = routerDestRefs.map((ref) => {
     const resolved = resolveOrchestrationAgentRef(ref);
     const loaded = loadOrchestrationAgent(resolved);
-    return buildRuntimeAgent(resolved, loaded);
+    const runtime = buildRuntimeAgent(resolved, loaded);
+    ensureUniqueToolName(routerToolNames, runtime.toolName, runtime.promptPath, {
+      reserved: `Router destination '${runtime.promptPath}' uses a reserved tool name '${runtime.toolName}'`,
+      duplicate: `Duplicate router destination tool name '${runtime.toolName}' detected while loading '${runtime.promptPath}'`,
+    });
+    return runtime;
   });
 
   const orchestrationConfig: OrchestrationConfig | undefined = (() => {
-    const handoff = handoffEntry !== undefined ? { ref: handoffEntry.ref, path: handoffEntry.path } : undefined;
+    const handoff = handoffEntry !== undefined
+      ? { ref: handoffEntry.ref, path: handoffEntry.path, toolName: handoffEntry.toolName }
+      : undefined;
     const advisors = advisorEntries.length > 0
-      ? advisorEntries.map((advisor) => ({ ref: advisor.ref, path: advisor.path }))
+      ? advisorEntries.map((advisor) => ({
+          ref: advisor.ref,
+          path: advisor.path,
+          toolName: advisor.toolName,
+        }))
       : undefined;
     const routerDestinations = routerEntries.length > 0
-      ? routerEntries.map((dest) => ({ ref: dest.ref, path: dest.path }))
+      ? routerEntries.map((dest) => ({
+          ref: dest.ref,
+          path: dest.path,
+          toolName: dest.toolName,
+        }))
       : undefined;
     if (handoff === undefined && advisors === undefined && routerDestinations === undefined) {
       return undefined;
@@ -894,7 +927,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
     systemTemplate,
     description: fm?.description,
     usage: fm?.usage,
-    toolName: fm?.toolName,
+    toolName: resolveToolName(promptPath, fm?.toolName),
     expectedOutput: resolvedExpectedOutput,
     input: resolvedInput,
     outputSchema: resolvedOutputSchema,

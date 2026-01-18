@@ -200,7 +200,7 @@ Analyze the user's request and route to the appropriate handler:
 - **./handlers/support.ai**: Technical issues, bugs, how-to questions
 - **./handlers/billing.ai**: Invoices, payments, subscriptions
 
-Use the `router__handoff-to` tool to delegate with the exact destination path.
+Use the `router__handoff-to` tool to delegate with the exact destination tool name (frontmatter `toolName` or derived from filename).
 ```
 
 ### Router Tool
@@ -211,7 +211,7 @@ The router pattern exposes a special `router__handoff-to` tool:
 {
   "name": "router__handoff-to",
   "arguments": {
-    "agent": "./handlers/support.ai",
+    "agent": "support",
     "message": "User is experiencing login issues on mobile"
   }
 }
@@ -219,7 +219,7 @@ The router pattern exposes a special `router__handoff-to` tool:
 
 **Arguments:**
 
-- `agent` (required): Destination agent path (exact string from `router.destinations`)
+- `agent` (required): Destination tool name (frontmatter `toolName` or derived from filename)
 - `message` (optional): Context to pass to the destination
 
 ### Message Injection
@@ -427,4 +427,4 @@ Each agent should do one thing well:
 - [Agent Files: Orchestration](Agent-Files-Orchestration) - Advisors, router, handoff config
 - [Technical Specs: Architecture](Technical-Specs-Architecture) - System internals
 - [specs/MULTI-AGENT.md](specs/MULTI-AGENT.md) - Detailed design document
-- [AI Agent Configuration Guide](skills/ai-agent-configuration.md) - Complete reference
+- [AI Agent Configuration Guide](skills/ai-agent-guide.md) - Complete reference

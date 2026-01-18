@@ -12298,6 +12298,7 @@ BASE_TEST_SCENARIOS.push({
       fs.writeFileSync(childPath, childContent, 'utf-8');
 
       const childRef = path.basename(childPath);
+      const childToolName = 'child';
       const parentPath = path.join(tempDir, 'parent.ai');
       const parentContent = [
         '---',
@@ -12345,11 +12346,11 @@ BASE_TEST_SCENARIOS.push({
             {
               name: 'router__handoff-to',
               id: routerCallId,
-              parameters: { agent: childRef, message: 'Route to child' },
+              parameters: { agent: childToolName, message: 'Route to child' },
             },
           ],
         };
-        await request.toolExecutor('router__handoff-to', { agent: childRef, message: 'Route to child' }, { toolCallId: routerCallId });
+        await request.toolExecutor('router__handoff-to', { agent: childToolName, message: 'Route to child' }, { toolCallId: routerCallId });
         return {
           status: { type: 'success', hasToolCalls: true, finalAnswer: false },
           latencyMs: 5,

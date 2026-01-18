@@ -227,7 +227,7 @@ Final turn is forced only when all three conditions are met:
 **Parameters**:
 ```typescript
 {
-  agent: string;    // required, must be one of router.destinations
+  agent: string;    // required, must be a destination toolName (from router.destinations)
   message?: string; // optional advisory text for the destination
 }
 ```

@@ -24,6 +24,7 @@ describe('spawnOrchestrationChild', () => {
       agentId: 'child',
       promptPath: CHILD_PATH,
       systemTemplate: 'child system',
+      toolName: 'child',
       run: (_systemPrompt, _userPrompt, opts) => {
         receivedHistory = opts?.history;
         const result: AIAgentResult = {
