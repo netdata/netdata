@@ -5,6 +5,7 @@ package mssql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -36,35 +37,20 @@ func (c *Collector) collect() (map[string]int64, error) {
 	if err := c.collectInstanceMetrics(mx); err != nil {
 		return nil, err
 	}
-
-	if c.CollectTransactions {
-		if err := c.collectDatabaseMetrics(mx); err != nil {
-			c.Warning(err)
-		}
+	if err := c.collectDatabaseMetrics(mx); err != nil {
+		return nil, err
 	}
-
-	if c.CollectLocks {
-		if err := c.collectLockMetrics(mx); err != nil {
-			c.Warning(err)
-		}
+	if err := c.collectLockMetrics(mx); err != nil {
+		return nil, err
 	}
-
-	if c.CollectWaits {
-		if err := c.collectWaitStats(mx); err != nil {
-			c.Warning(err)
-		}
+	if err := c.collectWaitStats(mx); err != nil {
+		return nil, err
 	}
-
-	if c.CollectJobs {
-		if err := c.collectJobStatus(mx); err != nil {
-			c.Warning(err)
-		}
+	if err := c.collectJobStatus(mx); err != nil {
+		return nil, err
 	}
-
-	if c.CollectReplication {
-		if err := c.collectReplicationStatus(mx); err != nil {
-			c.Warning(err)
-		}
+	if err := c.collectReplicationStatus(mx); err != nil {
+		return nil, err
 	}
 
 	return mx, nil
@@ -100,57 +86,46 @@ func (c *Collector) queryVersion() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	return version, nil
 }
 
 func (c *Collector) collectInstanceMetrics(mx map[string]int64) error {
-	if c.CollectUserConnections {
-		if err := c.collectUserConnections(mx); err != nil {
-			c.Warning(err)
-		}
-	}
+	var errs []error
 
-	if c.CollectBlockedProcesses {
-		if err := c.collectBlockedProcesses(mx); err != nil {
-			c.Warning(err)
-		}
+	if err := c.collectUserConnections(mx); err != nil {
+		errs = append(errs, err)
 	}
-
+	if err := c.collectBlockedProcesses(mx); err != nil {
+		errs = append(errs, err)
+	}
 	if err := c.collectBatchRequests(mx); err != nil {
-		c.Warning(err)
+		errs = append(errs, err)
 	}
-
 	if err := c.collectCompilations(mx); err != nil {
-		c.Warning(err)
+		errs = append(errs, err)
 	}
-
-	if c.CollectSQLErrors {
-		if err := c.collectSQLErrors(mx); err != nil {
-			c.Warning(err)
-		}
+	if err := c.collectSQLErrors(mx); err != nil {
+		errs = append(errs, err)
 	}
-
-	if c.CollectBufferStats {
-		if err := c.collectBufferManager(mx); err != nil {
-			c.Warning(err)
-		}
-		if err := c.collectMemoryManager(mx); err != nil {
-			c.Warning(err)
-		}
-		if err := c.collectAccessMethods(mx); err != nil {
-			c.Warning(err)
-		}
+	if err := c.collectBufferManager(mx); err != nil {
+		errs = append(errs, err)
 	}
-
+	if err := c.collectMemoryManager(mx); err != nil {
+		errs = append(errs, err)
+	}
+	if err := c.collectAccessMethods(mx); err != nil {
+		errs = append(errs, err)
+	}
 	// Process and OS memory metrics (always collected)
 	if err := c.collectProcessMemory(mx); err != nil {
-		c.Warning(err)
+		errs = append(errs, err)
 	}
 	if err := c.collectOSMemory(mx); err != nil {
-		c.Warning(err)
+		errs = append(errs, err)
 	}
 
-	return nil
+	return errors.Join(errs...)
 }
 
 func (c *Collector) collectUserConnections(mx map[string]int64) error {
@@ -329,30 +304,29 @@ func (c *Collector) collectAccessMethods(mx map[string]int64) error {
 }
 
 func (c *Collector) collectDatabaseMetrics(mx map[string]int64) error {
+	var errs []error
+
 	if err := c.collectDatabaseCounters(mx); err != nil {
-		return err
+		errs = append(errs, err)
 	}
 	if err := c.collectLockStatsByResourceType(mx); err != nil {
-		c.Warning(err)
+		errs = append(errs, err)
 	}
-	if c.CollectDatabaseSize {
-		if err := c.collectDatabaseSize(mx); err != nil {
-			c.Warning(err)
-		}
+	if err := c.collectDatabaseSize(mx); err != nil {
+		errs = append(errs, err)
 	}
-	if c.CollectDatabaseStatus {
-		if err := c.collectDatabaseStatus(mx); err != nil {
-			c.Warning(err)
-		}
+	if err := c.collectDatabaseStatus(mx); err != nil {
+		errs = append(errs, err)
 	}
 	// Collect I/O stall and log growth metrics per database
 	if err := c.collectIOStall(mx); err != nil {
-		c.Warning(err)
+		errs = append(errs, err)
 	}
 	if err := c.collectLogGrowths(mx); err != nil {
-		c.Warning(err)
+		errs = append(errs, err)
 	}
-	return nil
+
+	return errors.Join(errs...)
 }
 
 func (c *Collector) collectDatabaseCounters(mx map[string]int64) error {

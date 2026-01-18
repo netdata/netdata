@@ -29,72 +29,6 @@
         "type": "number",
         "minimum": 0.5,
         "default": 5
-      },
-      "collect_transactions": {
-        "title": "Collect transactions",
-        "description": "Collect transaction metrics from performance counters.",
-        "type": "boolean",
-        "default": true
-      },
-      "collect_waits": {
-        "title": "Collect wait statistics",
-        "description": "Collect wait statistics from sys.dm_os_wait_stats.",
-        "type": "boolean",
-        "default": true
-      },
-      "collect_locks": {
-        "title": "Collect locks",
-        "description": "Collect lock metrics from sys.dm_tran_locks.",
-        "type": "boolean",
-        "default": true
-      },
-      "collect_jobs": {
-        "title": "Collect jobs",
-        "description": "Collect SQL Agent job status.",
-        "type": "boolean",
-        "default": true
-      },
-      "collect_buffer_stats": {
-        "title": "Collect buffer stats",
-        "description": "Collect buffer manager statistics.",
-        "type": "boolean",
-        "default": true
-      },
-      "collect_database_size": {
-        "title": "Collect database size",
-        "description": "Collect data file sizes for each database.",
-        "type": "boolean",
-        "default": true
-      },
-      "collect_user_connections": {
-        "title": "Collect user connections",
-        "description": "Collect user connection counts.",
-        "type": "boolean",
-        "default": true
-      },
-      "collect_blocked_processes": {
-        "title": "Collect blocked processes",
-        "description": "Collect blocked process count.",
-        "type": "boolean",
-        "default": true
-      },
-      "collect_sql_errors": {
-        "title": "Collect SQL errors",
-        "description": "Collect SQL error statistics.",
-        "type": "boolean",
-        "default": true
-      },
-      "collect_database_status": {
-        "title": "Collect database status",
-        "description": "Collect database state (online/offline/etc.) and read-only status.",
-        "type": "boolean",
-        "default": true
-      },
-      "collect_replication": {
-        "title": "Collect replication",
-        "description": "Collect replication monitoring metrics (requires distribution database).",
-        "type": "boolean",
-        "default": true
       }
     },
     "required": [
@@ -128,22 +62,6 @@
             "dsn",
             "timeout",
             "vnode"
-          ]
-        },
-        {
-          "title": "Collection options",
-          "fields": [
-            "collect_transactions",
-            "collect_waits",
-            "collect_locks",
-            "collect_jobs",
-            "collect_buffer_stats",
-            "collect_database_size",
-            "collect_user_connections",
-            "collect_blocked_processes",
-            "collect_sql_errors",
-            "collect_database_status",
-            "collect_replication"
           ]
         }
       ]
