@@ -5061,6 +5061,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           messageAuth: provider.mapError({ message: 'Invalid API key provided.' }),
           messageQuota: provider.mapError({ message: 'insufficient_quota' }),
           messageRate: provider.mapError({ message: 'Too many requests - rate_limit' }),
+          messageOverload: provider.mapError({ message: 'server overload' }),
           messageTimeout: provider.mapError({ message: 'context deadline exceeded' }),
           messageNetwork: provider.mapError({ message: 'socket hang up' }),
           messageModel: provider.mapError({ message: 'model not found' }),
@@ -5081,6 +5082,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             messageAuth: statuses.messageAuth.type,
             messageQuota: statuses.messageQuota.type,
             messageRate: statuses.messageRate.type,
+            messageOverload: statuses.messageOverload.type,
             messageTimeout: statuses.messageTimeout.type,
             messageNetwork: statuses.messageNetwork.type,
             messageModel: statuses.messageModel.type,
@@ -5101,6 +5103,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         invariant(data.messageAuth === 'auth_error', 'Message auth error mapping mismatch for run-test-64.');
         invariant(data.messageQuota === 'quota_exceeded', 'Message quota error mapping mismatch for run-test-64.');
         invariant(data.messageRate === 'rate_limit', 'Message rate error mapping mismatch for run-test-64.');
+        invariant(data.messageOverload === 'rate_limit', 'Message overload mapping mismatch for run-test-64.');
         invariant(data.messageTimeout === 'timeout', 'Message timeout mapping mismatch for run-test-64.');
         invariant(data.messageNetwork === 'network_error', 'Message network mapping mismatch for run-test-64.');
         invariant(data.messageModel === 'model_error', 'Message model error mapping mismatch for run-test-64.');

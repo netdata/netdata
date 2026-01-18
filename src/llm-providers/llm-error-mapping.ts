@@ -21,6 +21,7 @@ const MESSAGE_KIND_PATTERNS: Record<LlmErrorKind, string[]> = {
     'ratelimit',
     'rate_limit',
     'too many requests',
+    'overload',
   ],
   auth_error: [
     'authentication',

@@ -31,6 +31,7 @@
   - LLM error mapping now combines structured fields + **message-pattern signals** (all prior patterns + approved additions).
   - MCP shared timeout detection now checks **ErrorCode** OR **message patterns** (all prior patterns + approved additions).
   - Phase2 harness now includes **message-only** `mapError` checks (run-test-64).
+- **Additional rate-limit pattern (Jan 18 2026):** added `overload` to message-based rate_limit mapping; phase2 harness updated with message-only overload check.
 - **Tests re-run:** `npm run test:phase1` PASS, `npm run test:phase2` PASS, `npm run lint` PASS, `npm run build` PASS.
 
 ---
@@ -152,6 +153,7 @@ Tool errors (including JSON-RPC errors and timeouts) **must not** force turn fai
 
 **Approved additions (Option 2):**
 - **LLM rate_limit:** `too many requests`, `ratelimit`, `rate_limit`
+- **LLM rate_limit (additional):** `overload` (provider-specific rate limit wording)
 - **LLM auth_error:** `invalid api key`, `unauthenticated`, `access denied`, `forbidden`
 - **LLM quota_exceeded:** `insufficient_quota`, `quota exceeded`, `payment required`, `credits`
 - **LLM model_error:** `model not found`, `unknown model`, `invalid model`, `unsupported model`, `not available`
