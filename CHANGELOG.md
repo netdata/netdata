@@ -186,6 +186,8 @@
 - Fix 32-bit builds of journal-viewer plugin. ([#21580](https://github.com/netdata/netdata/issues/21580))
 - Enable ARM package builds in PR CI runs. ([#21570](https://github.com/netdata/netdata/issues/21570))
 - SQL Chain (Windows.plugin) ([#21582](https://github.com/netdata/netdata/issues/21582))
+- Add MSSQL collector to go.d.plugin ([#21583](https://github.com/netdata/netdata/issues/21583))
+- Regenerate integrations docs ([#21584](https://github.com/netdata/netdata/issues/21584))
 
 ## [2.8.0] - 2025-11-19
 
