@@ -726,6 +726,12 @@ var (
 )
 
 func (c *Collector) addDatabaseCharts(dbName string) {
+	// internal databases used by SQL Server's engine
+	// Their metrics don't represent actual workload or user activity
+	if strings.HasPrefix(dbName, "model_") {
+		return
+	}
+
 	charts := &module.Charts{
 		databaseActiveTransactionsChartTmpl.Copy(),
 		databaseTransactionsChartTmpl.Copy(),
