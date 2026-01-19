@@ -9,7 +9,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { WebSocketServer } from 'ws';
 
 import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
-import type { AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, FinalReportPayload, LogDetailValue, LogEntry } from '../types.js';
+import type { AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, FinalReportPayload, LogDetailValue, LogEntry, ProgressEvent } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
@@ -50,6 +50,48 @@ const isSimplePromptSchema = (schema: Record<string, unknown>): boolean => {
   if (!isPlainObject(prompt)) return false;
   if (prompt.type !== undefined && prompt.type !== 'string') return false;
   return true;
+};
+
+const MAX_STATUS_FIELD_LENGTH = 200;
+const truncate = (s: string, max: number = MAX_STATUS_FIELD_LENGTH): string =>
+  s.length <= max ? s : `${s.slice(0, max - 3)}...`;
+
+const formatProgressMessage = (event: ProgressEvent): string => {
+  const path = event.callPath;
+  switch (event.type) {
+    case 'agent_started': {
+      const reason = event.reason ?? 'starting';
+      return `[${path}] started: ${truncate(reason)}`;
+    }
+    case 'agent_update': {
+      const ts = event.taskStatus;
+      if (ts !== undefined) {
+        const parts = [`[${path}] ${ts.status}`];
+        if (ts.now.length > 0) parts.push(`now: ${truncate(ts.now)}`);
+        if (ts.done.length > 0) parts.push(`done: ${truncate(ts.done)}`);
+        if (ts.pending.length > 0) parts.push(`pending: ${truncate(ts.pending)}`);
+        return parts.join(' | ');
+      }
+      return `[${path}] ${truncate(event.message)}`;
+    }
+    case 'agent_finished': {
+      return `[${path}] finished`;
+    }
+    case 'agent_failed': {
+      const err = event.error ?? 'unknown error';
+      return `[${path}] failed: ${truncate(err)}`;
+    }
+    case 'tool_started': {
+      return `[${path}] tool: ${event.tool.name} started`;
+    }
+    case 'tool_finished': {
+      return `[${path}] tool: ${event.tool.name} ${event.status}`;
+    }
+    default: {
+      const exhaustive: never = event;
+      return `[${path}] unknown: ${(exhaustive as ProgressEvent).type}`;
+    }
+  }
 };
 
 export type McpTransportSpec =
@@ -404,6 +446,23 @@ export class McpHeadend implements Headend {
                 this.logEntry(entry);
                 return;
               }
+              case 'progress': {
+                const progressToken = extra._meta?.progressToken;
+                if (progressToken === undefined) return;
+                const message = formatProgressMessage(event.event);
+                void (async () => {
+                  try {
+                    await extra.sendNotification({
+                      method: 'notifications/progress',
+                      params: { progressToken, progress: 0, message },
+                    });
+                  } catch (err: unknown) {
+                    const errMsg = err instanceof Error ? err.message : String(err);
+                    this.logVerbose(`progress notification failed: ${errMsg}`, 'response', 'WRN');
+                  }
+                })();
+                return;
+              }
               default: {
                 return;
               }
@@ -444,7 +503,7 @@ export class McpHeadend implements Headend {
             stopRef,
             headendId: this.id,
             telemetryLabels,
-            wantsProgressUpdates: false,
+            wantsProgressUpdates: true,
           });
           const result = await AIAgent.run(session);
           let text = output;
