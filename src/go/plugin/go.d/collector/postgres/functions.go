@@ -138,7 +138,21 @@ func (c *Collector) collectTopQueries(ctx context.Context, semanticSortCol strin
 
 // checkPgStatStatements checks if pg_stat_statements extension is available (cached)
 func (c *Collector) checkPgStatStatements(ctx context.Context) (bool, error) {
-	// Return cached result if already checked
+	// Fast path: return cached result if already checked
+	c.pgStatStatementsMu.RLock()
+	checked := c.pgStatStatementsChecked
+	avail := c.pgStatStatementsAvail
+	c.pgStatStatementsMu.RUnlock()
+	if checked {
+		return avail, nil
+	}
+
+	// Slow path: query and cache the result
+	// Use write lock for the entire operation to prevent duplicate queries
+	c.pgStatStatementsMu.Lock()
+	defer c.pgStatStatementsMu.Unlock()
+
+	// Double-check after acquiring write lock (another goroutine may have set it)
 	if c.pgStatStatementsChecked {
 		return c.pgStatStatementsAvail, nil
 	}

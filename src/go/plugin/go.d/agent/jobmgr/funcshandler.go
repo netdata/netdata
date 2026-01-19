@@ -125,6 +125,10 @@ func (m *Manager) makeModuleFuncHandler(moduleName string) func(functions.Functi
 			}
 		}
 
+		// Guard: if method has no sort options, sortColumn stays empty
+		// This is valid for methods that return unsorted data or handle sorting internally
+		// The handler will receive empty string and must handle it appropriately
+
 		// Create context with timeout from function request
 		// This ensures DB queries are cancelled if the function times out
 		// NOTE: fn.Timeout is already a time.Duration (set by parser as seconds)

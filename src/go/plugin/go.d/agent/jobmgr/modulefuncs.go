@@ -19,9 +19,10 @@ type moduleFuncRegistry struct {
 }
 
 type moduleFunc struct {
-	creator module.Creator        // The module creator (has Methods())
-	methods []module.MethodConfig // Static methods from creator
-	jobs    map[string]*jobEntry  // jobName → job entry with generation
+	creator        module.Creator           // The module creator (has Methods())
+	methods        []module.MethodConfig    // Static methods from creator
+	jobs           map[string]*jobEntry     // jobName → job entry with generation
+	lastGeneration map[string]uint64        // jobName → last known generation (persists across removals)
 }
 
 // jobEntry wraps a job with a generation number for race detection
@@ -47,9 +48,10 @@ func (r *moduleFuncRegistry) registerModule(name string, creator module.Creator)
 	}
 
 	r.modules[name] = &moduleFunc{
-		creator: creator,
-		methods: methods,
-		jobs:    make(map[string]*jobEntry),
+		creator:        creator,
+		methods:        methods,
+		jobs:           make(map[string]*jobEntry),
+		lastGeneration: make(map[string]uint64),
 	}
 }
 
@@ -67,14 +69,14 @@ func (r *moduleFuncRegistry) addJob(moduleName, jobName string, job *module.Job)
 
 	// Replace any existing job with the same name
 	// Increment generation to invalidate any in-flight requests to old job
-	oldGen := uint64(0)
-	if existing, ok := mf.jobs[jobName]; ok {
-		oldGen = existing.generation
-	}
+	// Use lastGeneration to ensure generation monotonically increases even across removals
+	lastGen := mf.lastGeneration[jobName]
+	newGen := lastGen + 1
 	mf.jobs[jobName] = &jobEntry{
 		job:        job,
-		generation: oldGen + 1,
+		generation: newGen,
 	}
+	mf.lastGeneration[jobName] = newGen
 }
 
 // removeJob is called when jobs stop
