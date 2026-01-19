@@ -14,12 +14,12 @@ const maxQueryTextLength = 4096
 
 // mysqlValidSortColumns defines the allowed sort columns for defense-in-depth
 var mysqlValidSortColumns = map[string]bool{
-	"SUM_TIMER_WAIT":      true,
-	"COUNT_STAR":          true,
-	"AVG_TIMER_WAIT":      true,
-	"SUM_ROWS_SENT":       true,
-	"SUM_ROWS_EXAMINED":   true,
-	"SUM_NO_INDEX_USED":   true,
+	"SUM_TIMER_WAIT":    true,
+	"COUNT_STAR":        true,
+	"AVG_TIMER_WAIT":    true,
+	"SUM_ROWS_SENT":     true,
+	"SUM_ROWS_EXAMINED": true,
+	"SUM_NO_INDEX_USED": true,
 }
 
 // mysqlMethods returns the available function methods for MySQL

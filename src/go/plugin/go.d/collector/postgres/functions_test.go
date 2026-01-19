@@ -54,9 +54,9 @@ func TestPgValidSortColumns(t *testing.T) {
 
 func TestCollector_mapSortColumn(t *testing.T) {
 	tests := map[string]struct {
-		pgVersion  int
-		input      string
-		expected   string
+		pgVersion int
+		input     string
+		expected  string
 	}{
 		"total_time on PG12": {
 			pgVersion: pgVersionOld,
@@ -111,19 +111,19 @@ func TestCollector_mapSortColumn(t *testing.T) {
 
 func TestCollector_buildTopQueriesSQL(t *testing.T) {
 	tests := map[string]struct {
-		pgVersion   int
-		sortColumn  string
-		checkPG13   bool // true if we expect PG13+ column aliases
+		pgVersion  int
+		sortColumn string
+		checkPG13  bool // true if we expect PG13+ column aliases
 	}{
 		"PG12 uses old column names": {
-			pgVersion:   pgVersionOld,
-			sortColumn:  "total_time",
-			checkPG13:   false,
+			pgVersion:  pgVersionOld,
+			sortColumn: "total_time",
+			checkPG13:  false,
 		},
 		"PG13 uses aliased column names": {
-			pgVersion:   pgVersion13,
-			sortColumn:  "total_exec_time",
-			checkPG13:   true,
+			pgVersion:  pgVersion13,
+			sortColumn: "total_exec_time",
+			checkPG13:  true,
 		},
 	}
 

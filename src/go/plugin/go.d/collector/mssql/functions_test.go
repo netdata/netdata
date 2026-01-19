@@ -94,18 +94,18 @@ func TestBuildMSSQLTopQueriesColumns(t *testing.T) {
 
 func TestCollector_buildQueryStoreSQL(t *testing.T) {
 	tests := map[string]struct {
-		sortColumn     string
-		timeWindowDays int
+		sortColumn      string
+		timeWindowDays  int
 		checkTimeFilter bool
 	}{
 		"with time filter": {
-			sortColumn:     "total_time_ms",
-			timeWindowDays: 7,
+			sortColumn:      "total_time_ms",
+			timeWindowDays:  7,
 			checkTimeFilter: true,
 		},
 		"without time filter": {
-			sortColumn:     "calls",
-			timeWindowDays: 0,
+			sortColumn:      "calls",
+			timeWindowDays:  0,
 			checkTimeFilter: false,
 		},
 	}

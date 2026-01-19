@@ -241,4 +241,3 @@ func buildMSSQLTopQueriesColumns() map[string]any {
 		},
 	}
 }
-

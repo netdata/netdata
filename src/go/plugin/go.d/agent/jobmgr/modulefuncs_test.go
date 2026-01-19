@@ -244,10 +244,10 @@ func TestModuleFuncRegistry_VerifyJobGeneration_JobStopped(t *testing.T) {
 	r.registerModule("postgres", module.Creator{})
 
 	job := module.NewJob(module.JobConfig{
-		PluginName:      "test",
-		Name:            "master",
-		ModuleName:      "postgres",
-		FullName:        "postgres_master",
+		PluginName: "test",
+		Name:       "master",
+		ModuleName: "postgres",
+		FullName:   "postgres_master",
 		Module: &module.MockModule{
 			InitFunc:    func(context.Context) error { return nil },
 			CheckFunc:   func(context.Context) error { return nil },
