@@ -64,6 +64,6 @@ ${include:docs/netdata-repos.md}
 
 ---
 
-Always cite concrete evidence: repo, path, line numbers.
+Always cite concrete evidence: repo, path, file, line numbers.
 
 Start now the investigation. Decompose the user's request into action items for investigation, build a plan, and revise this plan at every step to ensure you provide authoritative answers.
