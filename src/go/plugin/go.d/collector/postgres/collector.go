@@ -71,6 +71,7 @@ type Config struct {
 	QueryTimeHistogram []float64        `yaml:"query_time_histogram,omitempty" json:"query_time_histogram"`
 	MaxDBTables        int64            `yaml:"max_db_tables" json:"max_db_tables"`
 	MaxDBIndexes       int64            `yaml:"max_db_indexes" json:"max_db_indexes"`
+	TopQueriesLimit    int              `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
 }
 
 type (
@@ -90,7 +91,8 @@ type (
 		pgVersion               int
 		pgStatStatementsChecked bool
 		pgStatStatementsAvail   bool
-		pgStatStatementsMu      sync.RWMutex // protects pgStatStatementsChecked/Avail for concurrent access
+		pgStatStatementsColumns map[string]bool                    // cached column names from pg_stat_statements
+		pgStatStatementsMu      sync.RWMutex                       // protects pgStatStatements* fields for concurrent access
 		dbSr                    matcher.Matcher
 		recheckSettingsTime     time.Time
 		recheckSettingsEvery    time.Duration

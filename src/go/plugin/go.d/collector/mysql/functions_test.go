@@ -22,80 +22,221 @@ func TestMysqlMethods(t *testing.T) {
 	for _, opt := range methods[0].SortOptions {
 		if opt.Default {
 			hasDefault = true
-			require.Equal("total_time", opt.ID)
+			require.Equal("totalTime", opt.ID) // camelCase for UI
 			break
 		}
 	}
 	require.True(hasDefault, "should have a default sort option")
 }
 
-func TestMysqlValidSortColumns(t *testing.T) {
-	// Test that all expected columns are in the whitelist
-	expectedColumns := []string{
-		"SUM_TIMER_WAIT", "COUNT_STAR", "AVG_TIMER_WAIT",
-		"SUM_ROWS_SENT", "SUM_ROWS_EXAMINED", "SUM_NO_INDEX_USED",
+func TestMysqlAllColumns_HasRequiredColumns(t *testing.T) {
+	// Verify all required base columns are defined
+	requiredUIKeys := []string{
+		"digest", "query", "schema", "calls",
+		"totalTime", "avgTime", "minTime", "maxTime",
+		"rowsSent", "rowsExamined", "noIndexUsed",
 	}
 
-	for _, col := range expectedColumns {
-		assert.True(t, mysqlValidSortColumns[col], "column %s should be in whitelist", col)
+	uiKeys := make(map[string]bool)
+	for _, col := range mysqlAllColumns {
+		uiKeys[col.uiKey] = true
 	}
 
-	// Test that invalid columns are not in whitelist
-	invalidColumns := []string{"invalid", "drop_table", "'; DROP TABLE users;--", "total_time"}
-	for _, col := range invalidColumns {
-		assert.False(t, mysqlValidSortColumns[col], "column %s should NOT be in whitelist", col)
+	for _, key := range requiredUIKeys {
+		assert.True(t, uiKeys[key], "column %s should be defined in mysqlAllColumns", key)
 	}
 }
 
-func TestMysqlMethods_SortOptionsMatchWhitelist(t *testing.T) {
-	methods := mysqlMethods()
+func TestMysqlAllColumns_HasValidMetadata(t *testing.T) {
+	for _, col := range mysqlAllColumns {
+		// Every column must have a UI key
+		assert.NotEmpty(t, col.uiKey, "column %s must have uiKey", col.dbColumn)
 
-	for _, method := range methods {
-		for _, opt := range method.SortOptions {
-			// The Column field should be in the whitelist
-			assert.True(t, mysqlValidSortColumns[opt.Column],
-				"sort option %s column %s should be in whitelist", opt.ID, opt.Column)
+		// Every column must have a display name
+		assert.NotEmpty(t, col.displayName, "column %s must have displayName", col.uiKey)
+
+		// Every column must have a data type
+		assert.NotEmpty(t, col.dataType, "column %s must have dataType", col.uiKey)
+		assert.Contains(t, []string{"string", "integer", "float", "duration"}, col.dataType,
+			"column %s has invalid dataType: %s", col.uiKey, col.dataType)
+
+		// Duration columns must have units
+		if col.dataType == "duration" {
+			assert.NotEmpty(t, col.units, "duration column %s must have units", col.uiKey)
+		}
+
+		// Sort options must have labels
+		if col.isSortOption {
+			assert.NotEmpty(t, col.sortLabel, "sort option column %s must have sortLabel", col.uiKey)
 		}
 	}
 }
 
-func TestBuildMySQLTopQueriesColumns(t *testing.T) {
-	columns := buildMySQLTopQueriesColumns()
-
-	// Verify all expected columns are present
-	expectedColumns := []string{
-		"digest", "query", "schema", "calls",
-		"total_time", "avg_time", "min_time", "max_time",
-		"rows_sent", "rows_examined", "no_index_used", "no_good_index_used",
+func TestCollector_mapAndValidateMySQLSortColumn(t *testing.T) {
+	tests := map[string]struct {
+		availableCols map[string]bool
+		input         string
+		expected      string
+	}{
+		"totalTime maps to SUM_TIMER_WAIT": {
+			availableCols: map[string]bool{"SUM_TIMER_WAIT": true, "COUNT_STAR": true},
+			input:         "totalTime",
+			expected:      "SUM_TIMER_WAIT",
+		},
+		"calls maps to COUNT_STAR": {
+			availableCols: map[string]bool{"SUM_TIMER_WAIT": true, "COUNT_STAR": true},
+			input:         "calls",
+			expected:      "COUNT_STAR",
+		},
+		"invalid column falls back to SUM_TIMER_WAIT": {
+			availableCols: map[string]bool{"SUM_TIMER_WAIT": true, "COUNT_STAR": true},
+			input:         "invalid_column",
+			expected:      "SUM_TIMER_WAIT",
+		},
+		"SQL injection attempt falls back to SUM_TIMER_WAIT": {
+			availableCols: map[string]bool{"SUM_TIMER_WAIT": true, "COUNT_STAR": true},
+			input:         "'; DROP TABLE users;--",
+			expected:      "SUM_TIMER_WAIT",
+		},
+		"falls back to COUNT_STAR when SUM_TIMER_WAIT unavailable": {
+			availableCols: map[string]bool{"COUNT_STAR": true},
+			input:         "invalid_column",
+			expected:      "COUNT_STAR",
+		},
 	}
 
-	for _, col := range expectedColumns {
-		_, ok := columns[col]
-		assert.True(t, ok, "column %s should be present", col)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := &Collector{}
+			result := c.mapAndValidateMySQLSortColumn(tc.input, tc.availableCols)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestCollector_buildAvailableMySQLColumns(t *testing.T) {
+	tests := map[string]struct {
+		availableCols map[string]bool
+		expectCols    []string // UI keys we expect to see
+		notExpectCols []string // UI keys we don't expect
+	}{
+		"Basic MySQL 5.7 columns": {
+			availableCols: map[string]bool{
+				"DIGEST": true, "DIGEST_TEXT": true, "SCHEMA_NAME": true, "COUNT_STAR": true,
+				"SUM_TIMER_WAIT": true, "MIN_TIMER_WAIT": true, "AVG_TIMER_WAIT": true, "MAX_TIMER_WAIT": true,
+				"SUM_ROWS_SENT": true, "SUM_ROWS_EXAMINED": true, "SUM_NO_INDEX_USED": true,
+			},
+			expectCols:    []string{"digest", "query", "schema", "calls", "totalTime", "rowsSent"},
+			notExpectCols: []string{"p95Time", "cpuTime", "maxTotalMemory"}, // MySQL 8.0+ only
+		},
+		"MySQL 8.0 with quantiles": {
+			availableCols: map[string]bool{
+				"DIGEST": true, "DIGEST_TEXT": true, "SCHEMA_NAME": true, "COUNT_STAR": true,
+				"SUM_TIMER_WAIT": true, "QUANTILE_95": true, "QUANTILE_99": true,
+				"QUERY_SAMPLE_TEXT": true,
+			},
+			expectCols: []string{"digest", "query", "calls", "p95Time", "p99Time", "sampleQuery"},
+		},
 	}
 
-	// Verify column metadata follows v3 schema
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := &Collector{}
+			cols := c.buildAvailableMySQLColumns(tc.availableCols)
+
+			// Build map of UI keys for easy lookup
+			uiKeys := make(map[string]bool)
+			for _, col := range cols {
+				uiKeys[col.uiKey] = true
+			}
+
+			for _, key := range tc.expectCols {
+				assert.True(t, uiKeys[key], "expected column %s to be present", key)
+			}
+			for _, key := range tc.notExpectCols {
+				assert.False(t, uiKeys[key], "did not expect column %s to be present", key)
+			}
+		})
+	}
+}
+
+func TestCollector_buildMySQLDynamicSQL(t *testing.T) {
+	c := &Collector{}
+
+	cols := []mysqlColumnMeta{
+		{dbColumn: "DIGEST", uiKey: "digest", dataType: "string"},
+		{dbColumn: "DIGEST_TEXT", uiKey: "query", dataType: "string"},
+		{dbColumn: "COUNT_STAR", uiKey: "calls", dataType: "integer"},
+		{dbColumn: "SUM_TIMER_WAIT", uiKey: "totalTime", dataType: "duration", isPicoseconds: true},
+	}
+
+	sql := c.buildMySQLDynamicSQL(cols, "SUM_TIMER_WAIT", 500)
+
+	assert.Contains(t, sql, "performance_schema.events_statements_summary_by_digest")
+	assert.Contains(t, sql, "SUM_TIMER_WAIT")
+	assert.Contains(t, sql, "LIMIT 500")
+	assert.Contains(t, sql, "DIGEST")
+	// Picosecond columns should have conversion
+	assert.Contains(t, sql, "SUM_TIMER_WAIT/1000000000")
+}
+
+func TestCollector_buildMySQLDynamicColumns(t *testing.T) {
+	c := &Collector{}
+
+	cols := []mysqlColumnMeta{
+		{uiKey: "digest", displayName: "Digest", dataType: "string", visible: false, isUniqueKey: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
+		{uiKey: "query", displayName: "Query", dataType: "string", visible: true, isSticky: true, fullWidth: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
+		{uiKey: "totalTime", displayName: "Total Time", dataType: "duration", units: "seconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
+	}
+
+	columns := c.buildMySQLDynamicColumns(cols)
+
+	// Verify column count
+	assert.Len(t, columns, 3)
+
+	// Verify digest column
+	digestCol := columns["digest"].(map[string]any)
+	assert.Equal(t, "Digest", digestCol["name"])
+	assert.Equal(t, "string", digestCol["type"])
+	assert.True(t, digestCol["unique_key"].(bool))
+	assert.False(t, digestCol["visible"].(bool))
+	assert.Equal(t, 0, digestCol["index"])
+
+	// Verify query column
 	queryCol := columns["query"].(map[string]any)
 	assert.Equal(t, "Query", queryCol["name"])
-	assert.Equal(t, "string", queryCol["type"])
+	assert.True(t, queryCol["sticky"].(bool))
 	assert.True(t, queryCol["full_width"].(bool))
-	assert.True(t, queryCol["visible"].(bool))
 	assert.Equal(t, 1, queryCol["index"])
 
-	totalTimeCol := columns["total_time"].(map[string]any)
+	// Verify totalTime column
+	totalTimeCol := columns["totalTime"].(map[string]any)
+	assert.Equal(t, "Total Time", totalTimeCol["name"])
 	assert.Equal(t, "duration", totalTimeCol["type"])
-	assert.True(t, totalTimeCol["visible"].(bool))
+	assert.Equal(t, "seconds", totalTimeCol["units"])
+	assert.Equal(t, "bar", totalTimeCol["visualization"]) // duration uses bar
+	assert.Equal(t, 2, totalTimeCol["index"])
+}
 
-	// Verify unique_key is set on digest
-	digestCol := columns["digest"].(map[string]any)
-	assert.True(t, digestCol["unique_key"].(bool), "digest should be unique_key")
-	assert.False(t, digestCol["visible"].(bool), "digest should be hidden")
-	assert.Equal(t, 0, digestCol["index"])
+// Test that method config sort options have valid column references
+func TestMysqlMethods_SortOptionsHaveLabels(t *testing.T) {
+	methods := mysqlMethods()
+
+	for _, method := range methods {
+		for _, opt := range method.SortOptions {
+			assert.NotEmpty(t, opt.ID, "sort option must have ID")
+			assert.NotEmpty(t, opt.Label, "sort option %s must have Label", opt.ID)
+			assert.Contains(t, opt.Label, "Top queries by", "label should have standard prefix")
+		}
+	}
 }
 
 // TestSortColumnValidation_SQLInjection verifies that SQL injection attempts
-// are caught by the whitelist defense-in-depth mechanism
+// are handled by the validation mechanism
 func TestSortColumnValidation_SQLInjection(t *testing.T) {
+	c := &Collector{}
+	availableCols := map[string]bool{"SUM_TIMER_WAIT": true, "COUNT_STAR": true}
+
 	maliciousInputs := []string{
 		"'; DROP TABLE performance_schema; --",
 		"COUNT_STAR; DELETE FROM mysql.user",
@@ -105,7 +246,9 @@ func TestSortColumnValidation_SQLInjection(t *testing.T) {
 	}
 
 	for _, input := range maliciousInputs {
-		assert.False(t, mysqlValidSortColumns[input],
-			"malicious input should not be in whitelist: %s", input)
+		result := c.mapAndValidateMySQLSortColumn(input, availableCols)
+		// All malicious inputs should fall back to safe default
+		assert.True(t, result == "SUM_TIMER_WAIT" || result == "COUNT_STAR",
+			"malicious input should fall back to safe default: %s -> %s", input, result)
 	}
 }

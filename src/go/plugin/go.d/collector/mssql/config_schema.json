@@ -42,6 +42,14 @@
         "type": "integer",
         "minimum": 0,
         "default": 7
+      },
+      "top_queries_limit": {
+        "title": "Top Queries Limit",
+        "description": "Maximum number of queries to return in the top-queries function response.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 5000,
+        "default": 500
       }
     },
     "required": [

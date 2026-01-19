@@ -52,9 +52,24 @@ func (r *Responder) SendCodef(fn functions.Function, code int, message string, a
 	})
 }
 
-// SendJSON sends a JSON payload response
+// SendJSON sends a JSON payload response with HTTP 200 status
 func (r *Responder) SendJSON(fn functions.Function, payload string) {
 	r.sendPayload(fn, payload, "application/json")
+}
+
+// SendJSONWithCode sends a JSON payload response with a specific HTTP status code
+func (r *Responder) SendJSONWithCode(fn functions.Function, payload string, code int) {
+	if fn.UID == "" {
+		return
+	}
+
+	r.api.FUNCRESULT(netdataapi.FunctionResult{
+		UID:             fn.UID,
+		ContentType:     "application/json",
+		Payload:         payload,
+		Code:            strconv.Itoa(code),
+		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
+	})
 }
 
 // SendYAML sends a YAML payload response

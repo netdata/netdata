@@ -232,7 +232,14 @@ func (m *Manager) respondWithParams(fn functions.Function, moduleName, method st
 		"default_sort_column": dataResp.DefaultSortColumn,
 	}
 
-	if dataResp.GroupBy != nil {
+	// Add chart configuration if provided
+	if len(dataResp.Charts) > 0 {
+		resp["charts"] = dataResp.Charts
+	}
+	if len(dataResp.DefaultCharts) > 0 {
+		resp["default_charts"] = dataResp.DefaultCharts
+	}
+	if len(dataResp.GroupBy) > 0 {
 		resp["group_by"] = dataResp.GroupBy
 	}
 
@@ -312,7 +319,7 @@ func (m *Manager) buildRequiredParams(moduleName string, methodCfg *module.Metho
 		},
 		{
 			"id":          "__sort",
-			"name":        "Sort By",
+			"name":        "Filter By",
 			"help":        "Select the primary sort column",
 			"unique_view": true,
 			"type":        "select",
@@ -322,13 +329,29 @@ func (m *Manager) buildRequiredParams(moduleName string, methodCfg *module.Metho
 }
 
 // respondJSON sends a JSON response to the function request
+// The HTTP status code is extracted from the "status" field in the response
 func (m *Manager) respondJSON(fn functions.Function, resp map[string]any) {
 	data, err := json.Marshal(resp)
 	if err != nil {
 		m.Errorf("failed to marshal function response: %v", err)
 		return
 	}
-	m.dyncfgApi.SendJSON(fn, string(data))
+
+	// Extract status code from response for pluginsd protocol
+	// Default to 200 if not present or not an int
+	code := 200
+	if status, ok := resp["status"]; ok {
+		switch v := status.(type) {
+		case int:
+			code = v
+		case int64:
+			code = int(v)
+		case float64:
+			code = int(v)
+		}
+	}
+
+	m.dyncfgApi.SendJSONWithCode(fn, string(data), code)
 }
 
 // extractParamValue extracts a parameter value from JSON payload
@@ -392,6 +415,7 @@ func buildSortOptions(sortOpts []module.SortOption) []map[string]any {
 		opt := map[string]any{
 			"id":   s.ID,
 			"name": s.Label,
+			"sort": "descending", // Sort direction for this option (metrics typically sort desc)
 		}
 		// Set default: either the one marked as Default, or first option as fallback
 		if s.Default || (!hasDefault && i == 0) {

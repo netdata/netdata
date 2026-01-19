@@ -41,19 +41,30 @@ type MethodConfig struct {
 
 // FunctionResponse is the response from a module's HandleMethod.
 type FunctionResponse struct {
-	Status            int              // HTTP-like status code (200, 400, 403, 500, 503)
-	Message           string           // Error message (if Status != 200)
-	Help              string           // Help text for this response
-	Columns           map[string]any   // Column definitions for the table
-	Data              []map[string]any // Row data
-	DefaultSortColumn string           // Default sort column ID
-	GroupBy           *GroupByConfig   // Optional group-by configuration
+	Status            int            // HTTP-like status code (200, 400, 403, 500, 503)
+	Message           string         // Error message (if Status != 200)
+	Help              string         // Help text for this response
+	Columns           map[string]any // Column definitions for the table
+	Data              any            // Row data: [][]any (array of arrays, ordered by column index)
+	DefaultSortColumn string         // Default sort column ID
+
+	// Chart configuration for visualization
+	Charts        map[string]ChartConfig   // Chart definitions (chartID -> config)
+	DefaultCharts [][]string               // Default charts: [[chartID, groupByID], ...]
+	GroupBy       map[string]GroupByConfig // Group-by options (groupByID -> config)
 }
 
-// GroupByConfig defines grouping configuration for function responses.
+// ChartConfig defines a chart for visualization.
+type ChartConfig struct {
+	Name    string   `json:"name"`
+	Type    string   `json:"type"`    // "stacked-bar", "line", etc.
+	Columns []string `json:"columns"` // Column IDs to include in chart
+}
+
+// GroupByConfig defines a grouping option for function responses.
 type GroupByConfig struct {
-	Column string   `json:"column"`
-	Values []string `json:"values,omitempty"`
+	Name    string   `json:"name"`
+	Columns []string `json:"columns"` // Columns to group by
 }
 
 type (

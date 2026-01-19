@@ -118,8 +118,8 @@ func TestBuildSortOptions(t *testing.T) {
 				{ID: "total_time", Column: "SUM_TIMER_WAIT", Label: "By Total Time", Default: true},
 			},
 			expected: []map[string]any{
-				{"id": "calls", "name": "By Calls"},
-				{"id": "total_time", "name": "By Total Time", "defaultSelected": true},
+				{"id": "calls", "name": "By Calls", "sort": "descending"},
+				{"id": "total_time", "name": "By Total Time", "defaultSelected": true, "sort": "descending"},
 			},
 		},
 		"no explicit default (first becomes default)": {
@@ -128,8 +128,8 @@ func TestBuildSortOptions(t *testing.T) {
 				{ID: "total_time", Column: "SUM_TIMER_WAIT", Label: "By Total Time"},
 			},
 			expected: []map[string]any{
-				{"id": "calls", "name": "By Calls", "defaultSelected": true},
-				{"id": "total_time", "name": "By Total Time"},
+				{"id": "calls", "name": "By Calls", "defaultSelected": true, "sort": "descending"},
+				{"id": "total_time", "name": "By Total Time", "sort": "descending"},
 			},
 		},
 		"single option": {
@@ -137,7 +137,7 @@ func TestBuildSortOptions(t *testing.T) {
 				{ID: "total_time", Column: "SUM_TIMER_WAIT", Label: "By Total Time"},
 			},
 			expected: []map[string]any{
-				{"id": "total_time", "name": "By Total Time", "defaultSelected": true},
+				{"id": "total_time", "name": "By Total Time", "defaultSelected": true, "sort": "descending"},
 			},
 		},
 		"empty options": {
@@ -220,4 +220,56 @@ func TestMethodIDs(t *testing.T) {
 			assert.Equal(t, tc.expected, result)
 		})
 	}
+}
+
+// TestBuildRequiredParams_TypeSelect verifies that all selectors use type "select" (single-select)
+// This is critical because type "multiselect" would show checkboxes instead of dropdowns
+func TestBuildRequiredParams_TypeSelect(t *testing.T) {
+	// Setup a minimal manager with test data
+	r := newModuleFuncRegistry()
+	r.registerModule("postgres", module.Creator{
+		Methods: func() []module.MethodConfig {
+			return []module.MethodConfig{{
+				ID:   "top-queries",
+				Name: "Top Queries",
+				SortOptions: []module.SortOption{
+					{ID: "total_time", Column: "total_exec_time", Label: "By Total Time", Default: true},
+				},
+			}}
+		},
+	})
+	r.addJob("postgres", "master-db", newTestModuleFuncsJob("master-db"))
+
+	// Create a manager with the registry
+	mgr := &Manager{moduleFuncs: r}
+
+	// Get required_params through the public method
+	methods := r.getMethods("postgres")
+	methodCfg := &methods[0]
+	params := mgr.buildRequiredParams("postgres", methodCfg)
+
+	// Verify structure
+	assert.Len(t, params, 3, "should have 3 required params: __method, __job, __sort")
+
+	// All params should have type: "select" (NOT "multiselect")
+	for _, param := range params {
+		paramType, ok := param["type"]
+		assert.True(t, ok, "param should have type field")
+		assert.Equal(t, "select", paramType, "param type must be 'select' for single-select, not 'multiselect'")
+
+		// Verify required fields exist
+		assert.Contains(t, param, "id", "param should have id")
+		assert.Contains(t, param, "name", "param should have name")
+		assert.Contains(t, param, "options", "param should have options")
+		assert.Contains(t, param, "unique_view", "param should have unique_view")
+
+		// Verify unique_view is true
+		uniqueView, _ := param["unique_view"].(bool)
+		assert.True(t, uniqueView, "unique_view should be true")
+	}
+
+	// Verify specific param IDs
+	assert.Equal(t, "__method", params[0]["id"])
+	assert.Equal(t, "__job", params[1]["id"])
+	assert.Equal(t, "__sort", params[2]["id"])
 }

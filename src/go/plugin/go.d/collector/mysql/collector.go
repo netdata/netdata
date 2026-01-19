@@ -69,6 +69,7 @@ type Config struct {
 	DSN                string           `yaml:"dsn" json:"dsn"`
 	MyCNF              string           `yaml:"my.cnf,omitempty" json:"my.cnf"`
 	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	TopQueriesLimit    int              `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
 }
 
 type Collector struct {
@@ -108,6 +109,9 @@ type Collector struct {
 	varLogBin                string
 	varPerformanceSchema     string
 	varPerfSchemaMu          sync.RWMutex // protects varPerformanceSchema for concurrent access
+
+	stmtSummaryCols   map[string]bool // cached column names from events_statements_summary_by_digest
+	stmtSummaryColsMu sync.RWMutex    // protects stmtSummaryCols for concurrent access
 }
 
 func (c *Collector) Configuration() any {

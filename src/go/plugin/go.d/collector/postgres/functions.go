@@ -5,6 +5,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
@@ -12,20 +13,141 @@ import (
 
 const maxQueryTextLength = 4096
 
+// pgColumnMeta defines metadata for a pg_stat_statements column
+type pgColumnMeta struct {
+	// Database column name (may vary by version)
+	dbColumn string
+	// Alias to use in SELECT (for version-specific mapping)
+	alias string
+	// UI column key (camelCase for frontend)
+	uiKey string
+	// Display name in UI
+	displayName string
+	// Data type: "string", "integer", "float", "duration"
+	dataType string
+	// Unit for duration/numeric types
+	units string
+	// Whether visible by default
+	visible bool
+	// Transform for value_options
+	transform string
+	// Decimal points for display
+	decimalPoints int
+	// Sort direction preference
+	sortDir string
+	// Summary function
+	summary string
+	// Filter type
+	filter string
+	// Whether this is a time column (needs ms->sec conversion)
+	isTimeMs bool
+	// Whether this is a sortable option for the sort dropdown
+	isSortOption bool
+	// Sort option label (if isSortOption)
+	sortLabel string
+	// Whether this is the default sort
+	isDefaultSort bool
+	// Whether this is the unique key
+	isUniqueKey bool
+	// Whether this column is sticky (stays visible when scrolling)
+	isSticky bool
+	// Whether this column should take full width
+	fullWidth bool
+}
+
+// pgAllColumns defines ALL possible columns from pg_stat_statements
+// Order matters - this determines column index in the response
+var pgAllColumns = []pgColumnMeta{
+	// Core identification columns (always present)
+	{dbColumn: "s.queryid::text", alias: "queryid", uiKey: "queryid", displayName: "Query ID", dataType: "string", visible: false, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isUniqueKey: true},
+	{dbColumn: "s.query", uiKey: "query", displayName: "Query", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isSticky: true, fullWidth: true},
+	{dbColumn: "d.datname", alias: "database", uiKey: "database", displayName: "Database", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
+	{dbColumn: "u.usename", alias: "username", uiKey: "user", displayName: "User", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
+
+	// Execution count (always present)
+	{dbColumn: "s.calls", uiKey: "calls", displayName: "Calls", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Number of Calls"},
+
+	// Execution time columns (names vary by version - detected dynamically)
+	// PG <13: total_time, mean_time, min_time, max_time, stddev_time
+	// PG 13+: total_exec_time, mean_exec_time, min_exec_time, max_exec_time, stddev_exec_time
+	{dbColumn: "total_time", uiKey: "totalTime", displayName: "Total Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true, isSortOption: true, sortLabel: "Total Execution Time", isDefaultSort: true},
+	{dbColumn: "mean_time", uiKey: "meanTime", displayName: "Mean Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isTimeMs: true, isSortOption: true, sortLabel: "Average Execution Time"},
+	{dbColumn: "min_time", uiKey: "minTime", displayName: "Min Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "min", filter: "range", isTimeMs: true},
+	{dbColumn: "max_time", uiKey: "maxTime", displayName: "Max Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isTimeMs: true},
+	{dbColumn: "stddev_time", uiKey: "stddevTime", displayName: "Stddev Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isTimeMs: true},
+
+	// Planning time columns (PG 13+ only)
+	{dbColumn: "s.plans", uiKey: "plans", displayName: "Plans", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "total_plan_time", uiKey: "totalPlanTime", displayName: "Total Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true},
+	{dbColumn: "mean_plan_time", uiKey: "meanPlanTime", displayName: "Mean Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isTimeMs: true},
+	{dbColumn: "min_plan_time", uiKey: "minPlanTime", displayName: "Min Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "min", filter: "range", isTimeMs: true},
+	{dbColumn: "max_plan_time", uiKey: "maxPlanTime", displayName: "Max Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isTimeMs: true},
+	{dbColumn: "stddev_plan_time", uiKey: "stddevPlanTime", displayName: "Stddev Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isTimeMs: true},
+
+	// Row count (always present)
+	{dbColumn: "s.rows", uiKey: "rows", displayName: "Rows", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Rows Returned"},
+
+	// Shared buffer statistics (always present)
+	{dbColumn: "s.shared_blks_hit", uiKey: "sharedBlksHit", displayName: "Shared Blocks Hit", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Shared Blocks Hit (Cache)"},
+	{dbColumn: "s.shared_blks_read", uiKey: "sharedBlksRead", displayName: "Shared Blocks Read", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Shared Blocks Read (Disk I/O)"},
+	{dbColumn: "s.shared_blks_dirtied", uiKey: "sharedBlksDirtied", displayName: "Shared Blocks Dirtied", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.shared_blks_written", uiKey: "sharedBlksWritten", displayName: "Shared Blocks Written", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+
+	// Local buffer statistics (always present)
+	{dbColumn: "s.local_blks_hit", uiKey: "localBlksHit", displayName: "Local Blocks Hit", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.local_blks_read", uiKey: "localBlksRead", displayName: "Local Blocks Read", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.local_blks_dirtied", uiKey: "localBlksDirtied", displayName: "Local Blocks Dirtied", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.local_blks_written", uiKey: "localBlksWritten", displayName: "Local Blocks Written", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+
+	// Temp buffer statistics (always present)
+	{dbColumn: "s.temp_blks_read", uiKey: "tempBlksRead", displayName: "Temp Blocks Read", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.temp_blks_written", uiKey: "tempBlksWritten", displayName: "Temp Blocks Written", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Temp Blocks Written"},
+
+	// I/O timing (requires track_io_timing, always present but may be 0)
+	{dbColumn: "s.blk_read_time", uiKey: "blkReadTime", displayName: "Block Read Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true},
+	{dbColumn: "s.blk_write_time", uiKey: "blkWriteTime", displayName: "Block Write Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true},
+
+	// WAL statistics (PG 13+ only)
+	{dbColumn: "s.wal_records", uiKey: "walRecords", displayName: "WAL Records", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.wal_fpi", uiKey: "walFpi", displayName: "WAL Full Page Images", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.wal_bytes", uiKey: "walBytes", displayName: "WAL Bytes", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+
+	// JIT statistics (PG 15+ only)
+	{dbColumn: "s.jit_functions", uiKey: "jitFunctions", displayName: "JIT Functions", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.jit_generation_time", uiKey: "jitGenerationTime", displayName: "JIT Generation Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true},
+	{dbColumn: "s.jit_inlining_count", uiKey: "jitInliningCount", displayName: "JIT Inlining Count", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.jit_inlining_time", uiKey: "jitInliningTime", displayName: "JIT Inlining Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true},
+	{dbColumn: "s.jit_optimization_count", uiKey: "jitOptimizationCount", displayName: "JIT Optimization Count", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.jit_optimization_time", uiKey: "jitOptimizationTime", displayName: "JIT Optimization Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true},
+	{dbColumn: "s.jit_emission_count", uiKey: "jitEmissionCount", displayName: "JIT Emission Count", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.jit_emission_time", uiKey: "jitEmissionTime", displayName: "JIT Emission Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true},
+
+	// Temp file statistics (PG 15+ only)
+	{dbColumn: "s.temp_blk_read_time", uiKey: "tempBlkReadTime", displayName: "Temp Block Read Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true},
+	{dbColumn: "s.temp_blk_write_time", uiKey: "tempBlkWriteTime", displayName: "Temp Block Write Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true},
+}
+
 // pgMethods returns the available function methods for PostgreSQL
+// Sort options are built dynamically based on available columns
 func pgMethods() []module.MethodConfig {
+	// Build sort options from column metadata
+	var sortOptions []module.SortOption
+	for _, col := range pgAllColumns {
+		if col.isSortOption {
+			sortOptions = append(sortOptions, module.SortOption{
+				ID:      col.uiKey,
+				Column:  col.dbColumn,
+				Label:   "Top queries by " + col.sortLabel,
+				Default: col.isDefaultSort,
+			})
+		}
+	}
+
 	return []module.MethodConfig{{
-		ID:   "top-queries",
-		Name: "Top Queries",
-		Help: "Top SQL queries from pg_stat_statements",
-		SortOptions: []module.SortOption{
-			{ID: "total_time", Column: "total_time", Label: "Top 5k queries by Total Execution Time", Default: true},
-			{ID: "calls", Column: "calls", Label: "Top 5k queries by Number of Calls"},
-			{ID: "mean_time", Column: "mean_time", Label: "Top 5k queries by Average Execution Time"},
-			{ID: "rows", Column: "rows", Label: "Top 5k queries by Rows Returned"},
-			{ID: "shared_blks_read", Column: "shared_blks_read", Label: "Top 5k queries by Disk Reads (I/O)"},
-			{ID: "temp_blks_written", Column: "temp_blks_written", Label: "Top 5k queries by Temp Writes"},
-		},
+		ID:          "top-queries",
+		Name:        "Top Queries",
+		Help:        "Top SQL queries from pg_stat_statements",
+		SortOptions: sortOptions,
 	}}
 }
 
@@ -53,7 +175,7 @@ func pgHandleMethod(ctx context.Context, job *module.Job, method, sortColumn str
 }
 
 // collectTopQueries queries pg_stat_statements for top queries
-func (c *Collector) collectTopQueries(ctx context.Context, semanticSortCol string) *module.FunctionResponse {
+func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
 	// Check pg_stat_statements availability (lazy check)
 	available, err := c.checkPgStatStatements(ctx)
 	if err != nil {
@@ -69,11 +191,35 @@ func (c *Collector) collectTopQueries(ctx context.Context, semanticSortCol strin
 		}
 	}
 
-	// Map semantic column to actual SQL column for this PG version
-	actualSortCol := c.mapSortColumn(semanticSortCol)
+	// Detect available columns (lazy detection, cached)
+	availableCols, err := c.detectPgStatStatementsColumns(ctx)
+	if err != nil {
+		return &module.FunctionResponse{
+			Status:  500,
+			Message: fmt.Sprintf("failed to detect available columns: %v", err),
+		}
+	}
+
+	// Build list of columns to query based on what's available
+	queryCols := c.buildAvailableColumns(availableCols)
+	if len(queryCols) == 0 {
+		return &module.FunctionResponse{
+			Status:  500,
+			Message: "no queryable columns found in pg_stat_statements",
+		}
+	}
+
+	// Map and validate sort column
+	actualSortCol := c.mapAndValidateSortColumn(sortColumn, availableCols)
+
+	// Get query limit (default 500)
+	limit := c.TopQueriesLimit
+	if limit <= 0 {
+		limit = 500
+	}
 
 	// Build and execute query
-	query := c.buildTopQueriesSQL(actualSortCol)
+	query := c.buildDynamicSQL(queryCols, actualSortCol, limit)
 	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
@@ -84,43 +230,9 @@ func (c *Collector) collectTopQueries(ctx context.Context, semanticSortCol strin
 	defer rows.Close()
 
 	// Process rows and build response
-	data := make([]map[string]any, 0, 5000)
-	for rows.Next() {
-		var queryID int64
-		var queryText, dbName, userName string
-		var calls, totalRows int64
-		var totalTime, meanTime, minTime, maxTime float64
-		var sharedBlksHit, sharedBlksRead, tempBlksWritten int64
-
-		if err := rows.Scan(
-			&queryID, &queryText, &dbName, &userName,
-			&calls, &totalTime, &meanTime, &minTime, &maxTime,
-			&totalRows, &sharedBlksHit, &sharedBlksRead, &tempBlksWritten,
-		); err != nil {
-			return &module.FunctionResponse{Status: 500, Message: fmt.Sprintf("row scan failed: %v", err)}
-		}
-
-		// Truncate query text to prevent excessive memory usage
-		queryText = strmutil.TruncateText(queryText, maxQueryTextLength)
-
-		// Note: queryID is converted to string to avoid JavaScript integer precision loss
-		// (JS safe integer max is 2^53-1, pg queryid can exceed this)
-		// Duration values are converted from ms to seconds (UI expects seconds)
-		data = append(data, map[string]any{
-			"queryid":           fmt.Sprintf("%d", queryID),
-			"query":             queryText,
-			"database":          dbName,
-			"user":              userName,
-			"calls":             calls,
-			"total_time":        totalTime / 1000.0,
-			"mean_time":         meanTime / 1000.0,
-			"min_time":          minTime / 1000.0,
-			"max_time":          maxTime / 1000.0,
-			"rows":              totalRows,
-			"shared_blks_hit":   sharedBlksHit,
-			"shared_blks_read":  sharedBlksRead,
-			"temp_blks_written": tempBlksWritten,
-		})
+	data, err := c.scanDynamicRows(rows, queryCols)
+	if err != nil {
+		return &module.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
 	if err := rows.Err(); err != nil {
@@ -130,10 +242,359 @@ func (c *Collector) collectTopQueries(ctx context.Context, semanticSortCol strin
 	return &module.FunctionResponse{
 		Status:            200,
 		Help:              "Top SQL queries from pg_stat_statements",
-		Columns:           c.buildTopQueriesColumns(),
+		Columns:           c.buildDynamicColumns(queryCols),
 		Data:              data,
-		DefaultSortColumn: "total_time",
+		DefaultSortColumn: "totalTime",
+
+		// Charts for aggregated visualization
+		Charts: map[string]module.ChartConfig{
+			"Calls": {
+				Name:    "Number of Calls",
+				Type:    "stacked-bar",
+				Columns: []string{"calls"},
+			},
+			"Time": {
+				Name:    "Execution Time",
+				Type:    "stacked-bar",
+				Columns: []string{"totalTime", "meanTime"},
+			},
+			"Rows": {
+				Name:    "Rows Returned",
+				Type:    "stacked-bar",
+				Columns: []string{"rows"},
+			},
+			"IO": {
+				Name:    "Block I/O",
+				Type:    "stacked-bar",
+				Columns: []string{"sharedBlksHit", "sharedBlksRead"},
+			},
+		},
+		DefaultCharts: [][]string{
+			{"Time", "database"},
+			{"Calls", "database"},
+		},
+		GroupBy: map[string]module.GroupByConfig{
+			"database": {
+				Name:    "Group by Database",
+				Columns: []string{"database"},
+			},
+			"user": {
+				Name:    "Group by User",
+				Columns: []string{"user"},
+			},
+		},
 	}
+}
+
+// detectPgStatStatementsColumns queries the database to find available columns
+func (c *Collector) detectPgStatStatementsColumns(ctx context.Context) (map[string]bool, error) {
+	// Fast path: return cached result
+	c.pgStatStatementsMu.RLock()
+	if c.pgStatStatementsColumns != nil {
+		cols := c.pgStatStatementsColumns
+		c.pgStatStatementsMu.RUnlock()
+		return cols, nil
+	}
+	c.pgStatStatementsMu.RUnlock()
+
+	// Slow path: query and cache
+	c.pgStatStatementsMu.Lock()
+	defer c.pgStatStatementsMu.Unlock()
+
+	// Double-check after acquiring write lock
+	if c.pgStatStatementsColumns != nil {
+		return c.pgStatStatementsColumns, nil
+	}
+
+	// Query available columns from pg_stat_statements
+	query := `
+		SELECT column_name
+		FROM information_schema.columns
+		WHERE table_name = 'pg_stat_statements'
+		AND table_schema = 'public'
+	`
+	rows, err := c.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query columns: %v", err)
+	}
+	defer rows.Close()
+
+	cols := make(map[string]bool)
+	for rows.Next() {
+		var colName string
+		if err := rows.Scan(&colName); err != nil {
+			return nil, fmt.Errorf("failed to scan column name: %v", err)
+		}
+		cols[colName] = true
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %v", err)
+	}
+
+	// Cache the result
+	c.pgStatStatementsColumns = cols
+	return cols, nil
+}
+
+// buildAvailableColumns returns column metadata for columns that exist in this PG version
+func (c *Collector) buildAvailableColumns(availableCols map[string]bool) []pgColumnMeta {
+	var result []pgColumnMeta
+
+	for _, col := range pgAllColumns {
+		// Extract the actual column name (remove table prefix and type cast)
+		colName := col.dbColumn
+		if idx := strings.LastIndex(colName, "."); idx != -1 {
+			colName = colName[idx+1:]
+		}
+		// Remove PostgreSQL type cast suffix (e.g., "::text")
+		if idx := strings.Index(colName, "::"); idx != -1 {
+			colName = colName[:idx]
+		}
+
+		// Handle version-specific column names for time columns
+		// PG 13+ renamed time columns: total_time -> total_exec_time, etc.
+		actualColName := colName
+		if c.pgVersion >= pgVersion13 {
+			switch colName {
+			case "total_time":
+				actualColName = "total_exec_time"
+			case "mean_time":
+				actualColName = "mean_exec_time"
+			case "min_time":
+				actualColName = "min_exec_time"
+			case "max_time":
+				actualColName = "max_exec_time"
+			case "stddev_time":
+				actualColName = "stddev_exec_time"
+			}
+		}
+
+		// Check if column exists (either directly or via join)
+		// Join columns (datname, usename) come from other tables
+		isJoinCol := col.alias == "database" || col.alias == "username"
+		if isJoinCol || availableCols[actualColName] {
+			// Create a copy with the actual column name for this version
+			colCopy := col
+			if actualColName != colName {
+				// Update dbColumn to use the version-specific name with alias
+				prefix := "s."
+				if strings.HasPrefix(col.dbColumn, "s.") {
+					prefix = ""
+					colCopy.dbColumn = "s." + actualColName
+				}
+				_ = prefix // suppress unused warning
+			}
+			result = append(result, colCopy)
+		}
+	}
+
+	return result
+}
+
+// mapAndValidateSortColumn maps the semantic sort column to actual SQL column
+func (c *Collector) mapAndValidateSortColumn(sortColumn string, availableCols map[string]bool) string {
+	// Map UI key back to dbColumn
+	for _, col := range pgAllColumns {
+		if col.uiKey == sortColumn || col.dbColumn == sortColumn {
+			// Get actual column name (strip table prefix and type cast)
+			colName := col.dbColumn
+			if idx := strings.LastIndex(colName, "."); idx != -1 {
+				colName = colName[idx+1:]
+			}
+			if idx := strings.Index(colName, "::"); idx != -1 {
+				colName = colName[:idx]
+			}
+
+			// Handle version-specific mapping
+			if c.pgVersion >= pgVersion13 {
+				switch colName {
+				case "total_time":
+					colName = "total_exec_time"
+				case "mean_time":
+					colName = "mean_exec_time"
+				case "min_time":
+					colName = "min_exec_time"
+				case "max_time":
+					colName = "max_exec_time"
+				case "stddev_time":
+					colName = "stddev_exec_time"
+				}
+			}
+
+			// Validate column exists
+			if availableCols[colName] {
+				return colName
+			}
+		}
+	}
+
+	// Default fallback
+	if c.pgVersion >= pgVersion13 {
+		return "total_exec_time"
+	}
+	return "total_time"
+}
+
+// buildDynamicSQL builds the SQL query with only available columns
+func (c *Collector) buildDynamicSQL(cols []pgColumnMeta, sortColumn string, limit int) string {
+	var selectCols []string
+
+	for _, col := range cols {
+		colExpr := col.dbColumn
+
+		// Handle version-specific column names
+		if c.pgVersion >= pgVersion13 {
+			switch {
+			case strings.HasSuffix(colExpr, ".total_time"):
+				colExpr = strings.Replace(colExpr, ".total_time", ".total_exec_time", 1)
+			case strings.HasSuffix(colExpr, ".mean_time"):
+				colExpr = strings.Replace(colExpr, ".mean_time", ".mean_exec_time", 1)
+			case strings.HasSuffix(colExpr, ".min_time"):
+				colExpr = strings.Replace(colExpr, ".min_time", ".min_exec_time", 1)
+			case strings.HasSuffix(colExpr, ".max_time"):
+				colExpr = strings.Replace(colExpr, ".max_time", ".max_exec_time", 1)
+			case strings.HasSuffix(colExpr, ".stddev_time"):
+				colExpr = strings.Replace(colExpr, ".stddev_time", ".stddev_exec_time", 1)
+			case colExpr == "total_time":
+				colExpr = "total_exec_time"
+			case colExpr == "mean_time":
+				colExpr = "mean_exec_time"
+			case colExpr == "min_time":
+				colExpr = "min_exec_time"
+			case colExpr == "max_time":
+				colExpr = "max_exec_time"
+			case colExpr == "stddev_time":
+				colExpr = "stddev_exec_time"
+			}
+		}
+
+		// Add alias if needed
+		if col.alias != "" {
+			selectCols = append(selectCols, fmt.Sprintf("%s AS %s", colExpr, col.alias))
+		} else {
+			selectCols = append(selectCols, colExpr)
+		}
+	}
+
+	return fmt.Sprintf(`
+SELECT %s
+FROM pg_stat_statements s
+JOIN pg_database d ON s.dbid = d.oid
+JOIN pg_user u ON s.userid = u.usesysid
+ORDER BY %s DESC
+LIMIT %d
+`, strings.Join(selectCols, ", "), sortColumn, limit)
+}
+
+// scanDynamicRows scans rows into the data array based on column types
+func (c *Collector) scanDynamicRows(rows dbRows, cols []pgColumnMeta) ([][]any, error) {
+	data := make([][]any, 0, 500)
+
+	for rows.Next() {
+		// Create scan destinations based on column types
+		scanDest := make([]any, len(cols))
+		values := make([]any, len(cols))
+
+		for i, col := range cols {
+			switch col.dataType {
+			case "string":
+				var s string
+				scanDest[i] = &s
+				values[i] = &s
+			case "integer":
+				var n int64
+				scanDest[i] = &n
+				values[i] = &n
+			case "float", "duration":
+				var f float64
+				scanDest[i] = &f
+				values[i] = &f
+			default:
+				var s string
+				scanDest[i] = &s
+				values[i] = &s
+			}
+		}
+
+		if err := rows.Scan(scanDest...); err != nil {
+			return nil, fmt.Errorf("row scan failed: %v", err)
+		}
+
+		// Build row with proper type handling
+		row := make([]any, len(cols))
+		for i, col := range cols {
+			switch col.dataType {
+			case "string":
+				s := *(values[i].(*string))
+				// Special handling for queryid - convert to string to avoid JS precision loss
+				if col.uiKey == "queryid" {
+					row[i] = s
+				} else if col.uiKey == "query" {
+					row[i] = strmutil.TruncateText(s, maxQueryTextLength)
+				} else {
+					row[i] = s
+				}
+			case "integer":
+				row[i] = *(values[i].(*int64))
+			case "float":
+				row[i] = *(values[i].(*float64))
+			case "duration":
+				row[i] = *(values[i].(*float64))
+			default:
+				row[i] = *(values[i].(*string))
+			}
+		}
+
+		data = append(data, row)
+	}
+
+	return data, nil
+}
+
+// buildDynamicColumns builds column definitions for the response
+func (c *Collector) buildDynamicColumns(cols []pgColumnMeta) map[string]any {
+	result := make(map[string]any)
+
+	for i, col := range cols {
+		colDef := map[string]any{
+			"index":                   i,
+			"unique_key":              col.isUniqueKey,
+			"name":                    col.displayName,
+			"type":                    col.dataType,
+			"visible":                 col.visible,
+			"visualization":           "value",
+			"sort":                    col.sortDir,
+			"sortable":                true,
+			"sticky":                  col.isSticky,
+			"summary":                 col.summary,
+			"filter":                  col.filter,
+			"full_width":              col.fullWidth,
+			"wrap":                    false,
+			"default_expanded_filter": false,
+		}
+
+		// Add value_options
+		valueOpts := map[string]any{
+			"transform":      col.transform,
+			"decimal_points": col.decimalPoints,
+			"default_value":  nil,
+		}
+		if col.units != "" {
+			valueOpts["units"] = col.units
+			colDef["units"] = col.units
+		}
+		colDef["value_options"] = valueOpts
+
+		// Use bar visualization for duration columns
+		if col.dataType == "duration" {
+			colDef["visualization"] = "bar"
+		}
+
+		result[col.uiKey] = colDef
+	}
+
+	return result
 }
 
 // checkPgStatStatements checks if pg_stat_statements extension is available (cached)
@@ -170,167 +631,9 @@ func (c *Collector) checkPgStatStatements(ctx context.Context) (bool, error) {
 	return exists, nil
 }
 
-// pgValidSortColumns defines the allowed sort columns for defense-in-depth
-var pgValidSortColumns = map[string]bool{
-	"total_time":        true,
-	"calls":             true,
-	"mean_time":         true,
-	"rows":              true,
-	"shared_blks_read":  true,
-	"temp_blks_written": true,
-	// PG 13+ column names (mapped internally)
-	"total_exec_time": true,
-	"mean_exec_time":  true,
-	"min_exec_time":   true,
-	"max_exec_time":   true,
-}
-
-// mapSortColumn maps semantic column IDs to actual SQL columns based on PG version
-// Defense-in-depth: validates column against whitelist before returning
-func (c *Collector) mapSortColumn(semanticCol string) string {
-	var result string
-
-	if c.pgVersion >= pgVersion13 {
-		// PG 13+ uses _exec_ suffix for time columns
-		switch semanticCol {
-		case "total_time":
-			result = "total_exec_time"
-		case "mean_time":
-			result = "mean_exec_time"
-		case "min_time":
-			result = "min_exec_time"
-		case "max_time":
-			result = "max_exec_time"
-		default:
-			result = semanticCol
-		}
-	} else {
-		result = semanticCol
-	}
-
-	// Defense-in-depth: validate against whitelist
-	if !pgValidSortColumns[result] {
-		// Fall back to safe default if unrecognized
-		if c.pgVersion >= pgVersion13 {
-			return "total_exec_time"
-		}
-		return "total_time"
-	}
-
-	return result
-}
-
-// buildTopQueriesSQL builds the SQL query for top queries
-func (c *Collector) buildTopQueriesSQL(sortColumn string) string {
-	// Select version-appropriate column names
-	timeColumns := "total_time, mean_time, min_time, max_time"
-	if c.pgVersion >= pgVersion13 {
-		timeColumns = "total_exec_time AS total_time, mean_exec_time AS mean_time, min_exec_time AS min_time, max_exec_time AS max_time"
-	}
-
-	return fmt.Sprintf(`
-SELECT
-    s.queryid,
-    s.query,
-    d.datname AS database,
-    u.usename AS user,
-    s.calls,
-    %s,
-    s.rows,
-    s.shared_blks_hit,
-    s.shared_blks_read,
-    s.temp_blks_written
-FROM pg_stat_statements s
-JOIN pg_database d ON s.dbid = d.oid
-JOIN pg_user u ON s.userid = u.usesysid
-ORDER BY %s DESC
-LIMIT 5000
-`, timeColumns, sortColumn)
-}
-
-// buildTopQueriesColumns builds column definitions for the response
-// Column schema follows Netdata Functions v3 format with index, unique_key, visible fields
-func (c *Collector) buildTopQueriesColumns() map[string]any {
-	return map[string]any{
-		"queryid": map[string]any{
-			"index":      0,
-			"unique_key": true,
-			"name":       "Query ID",
-			"type":       "string", // string to avoid JS integer precision loss
-			"visible":    false,
-		},
-		"query": map[string]any{
-			"index":      1,
-			"name":       "Query",
-			"type":       "string",
-			"visible":    true,
-			"full_width": true,
-		},
-		"database": map[string]any{
-			"index":   2,
-			"name":    "Database",
-			"type":    "string",
-			"visible": true,
-		},
-		"user": map[string]any{
-			"index":   3,
-			"name":    "User",
-			"type":    "string",
-			"visible": true,
-		},
-		"calls": map[string]any{
-			"index":   4,
-			"name":    "Calls",
-			"type":    "integer",
-			"visible": true,
-		},
-		"total_time": map[string]any{
-			"index":   5,
-			"name":    "Total Time",
-			"type":    "duration",
-			"visible": true,
-		},
-		"mean_time": map[string]any{
-			"index":   6,
-			"name":    "Mean Time",
-			"type":    "duration",
-			"visible": true,
-		},
-		"min_time": map[string]any{
-			"index":   7,
-			"name":    "Min Time",
-			"type":    "duration",
-			"visible": false,
-		},
-		"max_time": map[string]any{
-			"index":   8,
-			"name":    "Max Time",
-			"type":    "duration",
-			"visible": false,
-		},
-		"rows": map[string]any{
-			"index":   9,
-			"name":    "Rows",
-			"type":    "integer",
-			"visible": true,
-		},
-		"shared_blks_hit": map[string]any{
-			"index":   10,
-			"name":    "Shared Blocks Hit",
-			"type":    "integer",
-			"visible": false,
-		},
-		"shared_blks_read": map[string]any{
-			"index":   11,
-			"name":    "Shared Blocks Read",
-			"type":    "integer",
-			"visible": true,
-		},
-		"temp_blks_written": map[string]any{
-			"index":   12,
-			"name":    "Temp Blocks Written",
-			"type":    "integer",
-			"visible": false,
-		},
-	}
+// dbRows interface for testing
+type dbRows interface {
+	Next() bool
+	Scan(dest ...any) error
+	Err() error
 }
