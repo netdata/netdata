@@ -19,10 +19,10 @@ type moduleFuncRegistry struct {
 }
 
 type moduleFunc struct {
-	creator        module.Creator           // The module creator (has Methods())
-	methods        []module.MethodConfig    // Static methods from creator
-	jobs           map[string]*jobEntry     // jobName → job entry with generation
-	lastGeneration map[string]uint64        // jobName → last known generation (persists across removals)
+	creator        module.Creator        // The module creator (has Methods())
+	methods        []module.MethodConfig // Static methods from creator
+	jobs           map[string]*jobEntry  // jobName → job entry with generation
+	lastGeneration map[string]uint64     // jobName → last known generation (persists across removals)
 }
 
 // jobEntry wraps a job with a generation number for race detection

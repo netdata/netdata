@@ -91,11 +91,11 @@ type (
 		pgStatStatementsChecked bool
 		pgStatStatementsAvail   bool
 		pgStatStatementsMu      sync.RWMutex // protects pgStatStatementsChecked/Avail for concurrent access
-		dbSr                 matcher.Matcher
-		recheckSettingsTime  time.Time
-		recheckSettingsEvery time.Duration
-		doSlowTime           time.Time
-		doSlowEvery          time.Duration
+		dbSr                    matcher.Matcher
+		recheckSettingsTime     time.Time
+		recheckSettingsEvery    time.Duration
+		doSlowTime              time.Time
+		doSlowEvery             time.Duration
 
 		mx *pgMetrics
 	}

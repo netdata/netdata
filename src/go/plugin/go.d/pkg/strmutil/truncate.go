@@ -15,19 +15,22 @@ func TruncateText(text string, maxLen int) string {
 	if len(text) <= maxLen {
 		return text
 	}
-	// Handle edge case where maxLen is too small for ellipsis
-	if maxLen < 3 {
-		return text[:maxLen]
-	}
 	// UTF-8 safe truncation
 	cutoff := 0
+	ellipsis := "..."
+	reserveForEllipsis := 3
+	if maxLen < 3 {
+		// Too small for ellipsis - just truncate without it
+		ellipsis = ""
+		reserveForEllipsis = 0
+	}
 	for i := 0; i < len(text); {
 		_, size := utf8.DecodeRuneInString(text[i:])
-		if cutoff+size > maxLen-3 {
+		if cutoff+size > maxLen-reserveForEllipsis {
 			break
 		}
 		cutoff += size
 		i += size
 	}
-	return text[:cutoff] + "..."
+	return text[:cutoff] + ellipsis
 }

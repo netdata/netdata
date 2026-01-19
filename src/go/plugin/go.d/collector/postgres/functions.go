@@ -107,19 +107,19 @@ func (c *Collector) collectTopQueries(ctx context.Context, semanticSortCol strin
 		// (JS safe integer max is 2^53-1, pg queryid can exceed this)
 		// Duration values are converted from ms to seconds (UI expects seconds)
 		data = append(data, map[string]any{
-			"queryid":            fmt.Sprintf("%d", queryID),
-			"query":              queryText,
-			"database":           dbName,
-			"user":               userName,
-			"calls":              calls,
-			"total_time":         totalTime / 1000.0,
-			"mean_time":          meanTime / 1000.0,
-			"min_time":           minTime / 1000.0,
-			"max_time":           maxTime / 1000.0,
-			"rows":               totalRows,
-			"shared_blks_hit":    sharedBlksHit,
-			"shared_blks_read":   sharedBlksRead,
-			"temp_blks_written":  tempBlksWritten,
+			"queryid":           fmt.Sprintf("%d", queryID),
+			"query":             queryText,
+			"database":          dbName,
+			"user":              userName,
+			"calls":             calls,
+			"total_time":        totalTime / 1000.0,
+			"mean_time":         meanTime / 1000.0,
+			"min_time":          minTime / 1000.0,
+			"max_time":          maxTime / 1000.0,
+			"rows":              totalRows,
+			"shared_blks_hit":   sharedBlksHit,
+			"shared_blks_read":  sharedBlksRead,
+			"temp_blks_written": tempBlksWritten,
 		})
 	}
 
@@ -334,4 +334,3 @@ func (c *Collector) buildTopQueriesColumns() map[string]any {
 		},
 	}
 }
-
