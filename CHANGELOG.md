@@ -188,6 +188,9 @@
 - SQL Chain (Windows.plugin) ([#21582](https://github.com/netdata/netdata/issues/21582))
 - Add MSSQL collector to go.d.plugin ([#21583](https://github.com/netdata/netdata/issues/21583))
 - Regenerate integrations docs ([#21584](https://github.com/netdata/netdata/issues/21584))
+- Chore(go.d/mssql): remove collect_ options ([#21586](https://github.com/netdata/netdata/issues/21586))
+- Regenerate integrations docs ([#21587](https://github.com/netdata/netdata/issues/21587))
+- Chore(go.d/mssql): ignore internal SQL Server databases ([#21588](https://github.com/netdata/netdata/issues/21588))
 
 ## [2.8.0] - 2025-11-19
 
