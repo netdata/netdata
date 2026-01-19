@@ -26,14 +26,22 @@ func (m *Manager) makeModuleFuncHandler(moduleName string) func(functions.Functi
 		method, jobName, sortBy := "", "", ""
 
 		// First, try to parse from JSON payload (v3 protocol sends params here)
-		// IMPORTANT: UI sends select values as arrays, e.g., {"__method": ["top-queries"]}
-		// We need to handle both array and string formats for robustness
+		// Frontend sends: {"selections": {"__method": ["top-queries"], ...}, "timeout": 120000}
+		// We need to extract from "selections" sub-object, with arrays as values
 		if len(fn.Payload) > 0 {
 			var payload map[string]any
 			if err := json.Unmarshal(fn.Payload, &payload); err == nil {
-				method = extractParamValue(payload, "__method")
-				jobName = extractParamValue(payload, "__job")
-				sortBy = extractParamValue(payload, "__sort")
+				// Check for "selections" sub-object (v3 frontend format)
+				if selections, ok := payload["selections"].(map[string]any); ok {
+					method = extractParamValue(selections, "__method")
+					jobName = extractParamValue(selections, "__job")
+					sortBy = extractParamValue(selections, "__sort")
+				} else {
+					// Fallback: params at top level (legacy or direct API calls)
+					method = extractParamValue(payload, "__method")
+					jobName = extractParamValue(payload, "__job")
+					sortBy = extractParamValue(payload, "__sort")
+				}
 			}
 		}
 
