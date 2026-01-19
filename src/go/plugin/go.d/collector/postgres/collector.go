@@ -27,6 +27,8 @@ func init() {
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
+		Methods:         pgMethods,
+		HandleMethod:    pgHandleMethod,
 	})
 }
 
@@ -83,9 +85,11 @@ type (
 		db      *sql.DB
 		dbConns map[string]*dbConn
 
-		superUser            *bool
-		pgIsInRecovery       *bool
-		pgVersion            int
+		superUser               *bool
+		pgIsInRecovery          *bool
+		pgVersion               int
+		pgStatStatementsChecked bool
+		pgStatStatementsAvail   bool
 		dbSr                 matcher.Matcher
 		recheckSettingsTime  time.Time
 		recheckSettingsEvery time.Duration

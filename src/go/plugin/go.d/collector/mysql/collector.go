@@ -27,6 +27,8 @@ func init() {
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
+		Methods:         mysqlMethods,
+		HandleMethod:    mysqlHandleMethod,
 	})
 }
 
@@ -105,6 +107,7 @@ type Collector struct {
 	varDisabledStorageEngine string
 	varLogBin                string
 	varPerformanceSchema     string
+	varPerfSchemaMu          sync.RWMutex // protects varPerformanceSchema for concurrent access
 }
 
 func (c *Collector) Configuration() any {

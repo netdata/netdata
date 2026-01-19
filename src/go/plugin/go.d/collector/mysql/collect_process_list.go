@@ -42,7 +42,10 @@ ORDER BY
 func (c *Collector) collectProcessListStatistics(mx map[string]int64) error {
 	var q string
 	mysqlMinVer := semver.Version{Major: 8, Minor: 0, Patch: 22}
-	if !c.isMariaDB && c.version.GTE(mysqlMinVer) && c.varPerformanceSchema == "ON" {
+	c.varPerfSchemaMu.RLock()
+	perfSchema := c.varPerformanceSchema
+	c.varPerfSchemaMu.RUnlock()
+	if !c.isMariaDB && c.version.GTE(mysqlMinVer) && perfSchema == "ON" {
 		q = queryShowProcessListPS
 	} else {
 		q = queryShowProcessList

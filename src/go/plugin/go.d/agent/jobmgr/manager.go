@@ -40,6 +40,7 @@ func New() *Manager {
 
 		Vnodes: make(map[string]*vnodes.VirtualNode),
 
+		moduleFuncs:       newModuleFuncRegistry(),
 		discoveredConfigs: newDiscoveredConfigsCache(),
 		seenConfigs:       newSeenConfigCache(),
 		exposedConfigs:    newExposedConfigCache(),
@@ -73,7 +74,8 @@ type Manager struct {
 	DumpAnalyzer interface{} // Will be *agent.DumpAnalyzer but avoid circular dependency
 	DumpDataDir  string
 
-	fileStatus *fileStatus
+	fileStatus  *fileStatus
+	moduleFuncs *moduleFuncRegistry
 
 	discoveredConfigs *discoveredConfigs
 	seenConfigs       *seenConfigs
@@ -107,8 +109,14 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 		m.dyncfgVnodeJobCreate(cfg, dyncfg.StatusRunning)
 	}
 
-	for name := range m.Modules {
+	for name, creator := range m.Modules {
 		m.dyncfgCollectorModuleCreate(name)
+
+		// Register module-level function if this module provides methods
+		if creator.Methods != nil {
+			m.moduleFuncs.registerModule(name, creator)
+			m.FnReg.Register(name, m.makeModuleFuncHandler(name))
+		}
 	}
 
 	m.loadFileStatus()
@@ -266,6 +274,9 @@ func (m *Manager) startRunningJob(job *module.Job) {
 
 	go job.Start()
 	m.runningJobs.add(job.FullName(), job)
+
+	// Track job for module function routing
+	m.moduleFuncs.addJob(job.ModuleName(), job.Name(), job)
 }
 
 func (m *Manager) stopRunningJob(name string) {
@@ -277,6 +288,8 @@ func (m *Manager) stopRunningJob(name string) {
 	m.runningJobs.unlock()
 
 	if ok {
+		// Remove job from module function registry
+		m.moduleFuncs.removeJob(job.ModuleName(), job.Name())
 		job.Stop()
 	}
 }
@@ -284,6 +297,13 @@ func (m *Manager) stopRunningJob(name string) {
 func (m *Manager) cleanup() {
 	m.FnReg.UnregisterPrefix("config", m.dyncfgCollectorPrefixValue())
 	m.FnReg.UnregisterPrefix("config", m.dyncfgVnodePrefixValue())
+
+	// Unregister module functions
+	for name, creator := range m.Modules {
+		if creator.Methods != nil {
+			m.FnReg.Unregister(name)
+		}
+	}
 
 	m.runningJobs.lock()
 	defer m.runningJobs.unlock()
