@@ -235,6 +235,10 @@ static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
                 unregister_node(host_check->machine_guid);
                 rrdhost_free___while_having_rrd_wrlock(host_check);
             }
+
+            // Restart iteration - the list may have changed while lock was released
+            next = localhost;
+            now = now_realtime_sec();
         }
         else
             rrdhost_cleanup_data_collection_and_health(host);
