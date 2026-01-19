@@ -34,7 +34,7 @@
         "title": "Enable Query Store Function",
         "description": "Enable the top-queries function using SQL Server Query Store. WARNING: Query Store may contain unmasked PII (customer names, emails, IDs) in query text. Only enable after ensuring proper access controls to the Netdata dashboard.",
         "type": "boolean",
-        "default": false
+        "default": true
       },
       "query_store_time_window_days": {
         "title": "Query Store Time Window (Days)",
