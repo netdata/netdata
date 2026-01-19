@@ -116,6 +116,22 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 		if creator.Methods != nil {
 			m.moduleFuncs.registerModule(name, creator)
 			m.FnReg.Register(name, m.makeModuleFuncHandler(name))
+
+			// Notify Netdata about this function so it appears in the functions API
+			methods := creator.Methods()
+			help := name + " data functions"
+			if len(methods) > 0 && methods[0].Help != "" {
+				help = methods[0].Help
+			}
+			m.dyncfgApi.FunctionGlobal(netdataapi.FunctionGlobalOpts{
+				Name:     name,
+				Timeout:  60,
+				Help:     help,
+				Tags:     "top",
+				Access:   "0x0000",
+				Priority: 100,
+				Version:  3,
+			})
 		}
 	}
 

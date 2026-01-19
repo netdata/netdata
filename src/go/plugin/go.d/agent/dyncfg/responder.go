@@ -90,3 +90,8 @@ func (r *Responder) ConfigStatus(id string, status Status) {
 func (r *Responder) ConfigDelete(id string) {
 	r.api.CONFIGDELETE(id)
 }
+
+// FunctionGlobal registers a global function with Netdata
+func (r *Responder) FunctionGlobal(opts netdataapi.FunctionGlobalOpts) {
+	r.api.FUNCTIONGLOBAL(opts)
+}
