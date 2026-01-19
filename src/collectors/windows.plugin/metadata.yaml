@@ -1299,8 +1299,8 @@ modules:
               chart_type: line
               dimensions:
                 - name: input
-            - name: system.hw.sensor.resistence.input
-              description: Electrical resistence
+            - name: system.hw.sensor.resistance.input
+              description: Electrical resistance
               unit: "Ohms"
               chart_type: line
               dimensions:
