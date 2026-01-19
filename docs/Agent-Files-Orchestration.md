@@ -258,7 +258,7 @@ router:
 3. Router calls `router__handoff-to` tool with the destination to declare intent
 4. Router session completes (its response is discarded if a destination is selected)
 5. Orchestration layer spawns the destination agent (passing router's optional message as an advisory block, plus original user request)
-6. Destination agent runs and produces output
+6. Destination agent runs and produces output (this is the user-visible answer)
 7. If a handoff is configured, the destination agent's output is passed to the handoff agent for processing; otherwise the destination agent's output is the final result
 
 ### The router\_\_handoff-to Tool

@@ -671,6 +671,8 @@ agents:
 
 **Reserved tool names**: The `agent__` prefix is reserved for internal tools. Do not create MCP servers, REST tools, or sub-agents with `toolName` starting with `agent__`.
 
+**Router handoff note**: When `router.destinations` is configured, `router__handoff-to` is available. It delegates the ORIGINAL user request (plus your optional message) to another agent, and that destination agent answers the user directly.
+
 **task_status parameters**: `status`, `done`, `pending`, `now`, `ready_for_final_report`, `need_to_run_more_tools`
 - When `status: 'completed'` → signals task completion, forces final turn
 

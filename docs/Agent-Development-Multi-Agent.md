@@ -222,6 +222,8 @@ The router pattern exposes a special `router__handoff-to` tool:
 - `agent` (required): Destination tool name (frontmatter `toolName` or derived from filename)
 - `message` (optional): Context to pass to the destination
 
+**Behavior**: This tool delegates the ORIGINAL user request (plus your optional message) to the destination agent, which answers the user directly.
+
 ### Message Injection
 
 The optional `message` becomes an advisory for the destination:

@@ -777,6 +777,8 @@ export class AIAgentSession {
         return true;
       });
       const hasSubAgentsConfigured = Array.isArray(this.sessionConfig.subAgents) && this.sessionConfig.subAgents.length > 0;
+      const routerDestinations = this.sessionConfig.orchestration?.router?.destinations ?? [];
+      const hasRouterHandoff = routerDestinations.some((dest) => typeof dest.toolName === 'string' && dest.toolName.length > 0);
       const wantsProgressUpdates = this.sessionConfig.headendWantsProgressUpdates !== false;
     const enableProgressTool = wantsProgressUpdates && (hasNonInternalDeclaredTools || hasSubAgentsConfigured);
     this.taskStatusToolEnabled = enableProgressTool;
@@ -791,6 +793,7 @@ export class AIAgentSession {
         expectedJsonSchema,
         disableProgressTool: !enableProgressTool,
         hasExternalTools: hasNonInternalDeclaredTools || hasSubAgentsConfigured,
+        hasRouterHandoff,
         maxToolCallsPerTurn: resolvedMaxToolCallsPerTurn,
         xmlSessionNonce: this.xmlTransport.getSessionNonce(),
         logError: (message: string) => {

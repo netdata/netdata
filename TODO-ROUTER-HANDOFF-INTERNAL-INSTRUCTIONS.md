@@ -26,44 +26,11 @@
 
 ---
 
-## Decisions (Pending)
+## Decisions (Made by Costa)
 
-### Decision 1: Show router section only when router is configured?
-**Context:** We can add the section conditionally or always.
-
-**Options:**
-1) **Conditional (recommended):** Show only when router destinations exist.
-   - **Pros:** No noise when router isn’t available; avoids misleading guidance.
-   - **Cons:** Slightly more wiring (pass flag to InternalToolProvider).
-2) **Always show:** Always include router section.
-   - **Pros:** No conditional logic.
-   - **Cons:** Misleads models when router tool isn’t available.
-
-**Recommendation:** Option 1.
-
-### Decision 2: How explicit should the wording be?
-**Context:** The goal is to stop models thinking handoff means no user answer.
-
-**Options:**
-1) **Direct + explicit (recommended):** “`router__handoff-to` hands off the ORIGINAL user request (plus your optional message) to another agent, which will answer the user directly.”
-   - **Pros:** Clear, minimal ambiguity.
-   - **Cons:** Hard-coded phrasing.
-2) **Soft wording:** “Handoff delegates the request to another agent to complete the response.”
-   - **Pros:** Shorter.
-   - **Cons:** Less explicit about “answers the user directly.”
-
-**Recommendation:** Option 1.
-
-### Decision 3: Include an example tool call?
-**Options:**
-1) **Yes** (brief JSON example)
-   - **Pros:** Clear usage pattern.
-   - **Cons:** Adds prompt length.
-2) **No** (text-only explanation)
-   - **Pros:** Minimal prompt size.
-   - **Cons:** Some models still misformat tool calls.
-
-**Recommendation:** Option 1 if you want maximum clarity; otherwise Option 2 to keep prompts short.
+1) **Show router section only when router is configured** (conditional).
+2) **Use explicit wording**: original user request + optional message, next agent answers user directly.
+3) **No example tool call** (text-only).
 
 ---
 
@@ -94,4 +61,3 @@
 - `docs/skills/ai-agent-guide.md` (Internal Tools section)
 - `docs/Technical-Specs-Tool-System.md` (router tool description)
 - `docs/Agent-Development-Multi-Agent.md` and/or `docs/Agent-Files-Orchestration.md` if they mention router semantics
-

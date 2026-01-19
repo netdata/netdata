@@ -301,6 +301,8 @@ Dynamic agent routing.
 
 **Registered When**: `router.destinations` is configured.
 
+**Behavior**: Calling `router__handoff-to` delegates the ORIGINAL user request (plus optional `message`) to the destination agent, which answers the user directly.
+
 ---
 
 ## Tool Namespacing

@@ -44,11 +44,13 @@ interface InternalToolProviderOptions {
   toolTimeoutMs?: number;
   disableProgressTool?: boolean;
   hasExternalTools?: boolean;  // Whether external tools (MCP, subagents, etc.) are available
+  hasRouterHandoff?: boolean;  // Whether router__handoff-to is available
   xmlSessionNonce: string;  // Session-wide nonce for final report XML wrapper
 }
 
 const TASK_STATUS_TOOL = 'agent__task_status';
 const BATCH_TOOL = 'agent__batch';
+const ROUTER_HANDOFF_TOOL = 'router__handoff-to';
 const SLACK_BLOCK_KIT_FORMAT: OutputFormatId = 'slack-block-kit';
 const DEFAULT_PARAMETERS_DESCRIPTION = 'Parameters for selected tool';
 const VALID_TASK_STATUSES = ['starting', 'in-progress', 'completed'] as const;
@@ -82,6 +84,7 @@ export class InternalToolProvider extends ToolProvider {
   private cachedBatchSchemasKey?: string;
   private listingTools = false;
   private readonly disableProgressTool: boolean;
+  private readonly hasRouterHandoff: boolean;
   private readonly xmlSessionNonce: string;
 
   constructor(
@@ -103,6 +106,7 @@ export class InternalToolProvider extends ToolProvider {
       throw new Error(`JSON output required but expected format is ${expected}`);
     }
     this.disableProgressTool = opts.disableProgressTool === true;
+    this.hasRouterHandoff = opts.hasRouterHandoff === true;
     this.xmlSessionNonce = opts.xmlSessionNonce;
     this.instructions = this.buildInstructions();
   }
@@ -231,7 +235,7 @@ export class InternalToolProvider extends ToolProvider {
     // SECTION 3: Internal tools (only if any are available)
     const hasProgressTool = !this.disableProgressTool;
     const hasBatchTool = this.opts.enableBatch;
-    const hasAnyTools = hasProgressTool || hasBatchTool || this.opts.hasExternalTools === true;
+    const hasAnyTools = hasProgressTool || hasBatchTool || this.opts.hasExternalTools === true || this.hasRouterHandoff;
 
     // Tool limits (only when tools exist)
     if (hasAnyTools) {
@@ -244,7 +248,7 @@ export class InternalToolProvider extends ToolProvider {
       }
     }
 
-    if (hasProgressTool || hasBatchTool) {
+    if (hasProgressTool || hasBatchTool || this.hasRouterHandoff) {
       lines.push('');
       lines.push('### Internal Tools');
       lines.push('');
@@ -284,6 +288,14 @@ export class InternalToolProvider extends ToolProvider {
         if (hasProgressTool) {
           lines.push(TASK_STATUS_TOOL_BATCH_RULES);
         }
+      }
+
+      if (this.hasRouterHandoff) {
+        lines.push('');
+        lines.push(`#### ${ROUTER_HANDOFF_TOOL} — Router Handoff`);
+        lines.push('- This tool delegates the ORIGINAL user request to another agent.');
+        lines.push('- The destination agent will answer the user directly.');
+        lines.push('- You can include an optional message for the destination agent.');
       }
     }
 
