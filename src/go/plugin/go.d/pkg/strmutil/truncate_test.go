@@ -55,6 +55,41 @@ func TestTruncateText(t *testing.T) {
 			maxLen:   8, // "test" (4) + "..." (3) = 7 bytes fits in 8
 			expected: "test...",
 		},
+		"maxLen zero": {
+			input:    "hello",
+			maxLen:   0,
+			expected: "",
+		},
+		"maxLen negative": {
+			input:    "hello",
+			maxLen:   -1,
+			expected: "",
+		},
+		"maxLen one ASCII": {
+			input:    "hello",
+			maxLen:   1,
+			expected: "h",
+		},
+		"maxLen two ASCII": {
+			input:    "hello",
+			maxLen:   2,
+			expected: "he",
+		},
+		"maxLen one UTF-8 too small": {
+			input:    "日本語", // each char is 3 bytes
+			maxLen:   1,     // can't fit any full rune
+			expected: "",
+		},
+		"maxLen two UTF-8 too small": {
+			input:    "日本語",
+			maxLen:   2, // still can't fit a 3-byte rune
+			expected: "",
+		},
+		"maxLen three with long text": {
+			input:    "日本語",
+			maxLen:   3, // only room for ellipsis, no content
+			expected: "...",
+		},
 	}
 
 	for name, tc := range tests {
