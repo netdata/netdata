@@ -26,7 +26,7 @@ Capture and analyze complete session state for debugging and post-mortem analysi
 
 Session snapshots capture **complete session state** including:
 
-- **opTree hierarchy**: Turns and operations
+- **opTree hierarchy**: Turns and steps with operations
 - **LLM request/response payloads**: Stored under `.request.payload.raw` and `.response.payload.raw` as base64-encoded `{format, encoding: 'base64', value}`. Additionally, SDK-serialized payloads are available under `.payload.sdk`.
 - **Tool request/response payloads**: Arguments and results
 - **All logs**: VRB, WRN, ERR, TRC, THK, FIN entries
@@ -90,6 +90,7 @@ zcat "$SNAPSHOT" | jq '{
   success: .opTree.success,
   error: .opTree.error,
   turns: (.opTree.turns | length),
+  steps: (.opTree.steps | length),
   totals: .opTree.totals
 }'
 ```
@@ -103,6 +104,7 @@ zcat "$SNAPSHOT" | jq '{
   "success": true,
   "error": null,
   "turns": 5,
+  "steps": 2,
   "totals": {
     "tokensIn": 4523,
     "tokensOut": 1234,
@@ -118,7 +120,7 @@ zcat "$SNAPSHOT" | jq '{
 
 ```
 snapshot.json.gz
-├── version: 1                    # Schema version
+├── version: 2                    # Schema version
 ├── reason: "final"               # Optional trigger (e.g., "final", "subagent_finish")
 └── opTree
     ├── id                        # Internal session ID
@@ -140,14 +142,15 @@ snapshot.json.gz
     │   ├── costUsd?
     │   ├── toolsRun
     │   └── agentsRun
-    └── turns[]                   # Array of TurnNode
-        ├── id                    # Turn ID
-        ├── index                 # 1-based turn number
+    ├── turns[]                   # Array of TurnNode (LLM turns)
+    └── steps[]                   # Array of StepNode (orchestration timeline)
+        ├── id                    # Step ID
+        ├── index                 # 0-based step number
+        ├── kind                  # system | user | advisors | router_handoff | handoff | internal
         ├── startedAt
         ├── endedAt?
-        ├── attributes?
-        │   └── prompts          # {system, user}
-        └── ops[]                # Array of OperationNode
+        ├── attributes?           # Optional step attributes
+        └── ops[]                 # Array of OperationNode
             ├── opId
             ├── kind             # "llm" | "tool" | "session" | "system"
             ├── startedAt
@@ -159,7 +162,7 @@ snapshot.json.gz
             ├── request?         # {kind, payload, size?}
             ├── response?        # {payload, size?, truncated?}
             ├── reasoning?       # {chunks: [{text, ts}], final?: string} for thinking models
-            └── childSession?   # Nested SessionNode for sub-agents
+            └── childSession?   # Nested SessionNode for sub-agents or tool_output
 ```
 
 ---
@@ -360,6 +363,14 @@ zcat "$SNAPSHOT" | jq '[.. | objects | select(.fatal == true)]'
 ```bash
 zcat "$SNAPSHOT" | jq '[.opTree.turns[].ops[] | select(.kind == "session")]'
 ```
+
+### Orchestration Sessions (Steps)
+
+```bash
+zcat "$SNAPSHOT" | jq '[.opTree.steps[].ops[] | select(.kind == "session" and .attributes.provider == "orchestration")]'
+```
+
+Note: tool_output **full-chunked** extraction runs inside the tool_output child session. Its LLM ops appear under that child session’s `steps[]` (kind `internal`).
 
 ### Sub-Agent Names
 

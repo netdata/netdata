@@ -29,6 +29,7 @@ interface SessionNode {
   attributes?: Record<string, unknown>;
   totals?: SessionTotals;
   turns: TurnNode[];
+  steps: StepNode[];
 }
 ```
 **Notes**
@@ -42,6 +43,21 @@ interface SessionNode {
 interface TurnNode {
   id: string;
   index: number;  // 1-based
+  startedAt: number;
+  endedAt?: number;
+  attributes?: Record<string, unknown>;
+  ops: OperationNode[];
+}
+```
+
+### StepNode
+**Location**: `src/session-tree.ts`
+
+```typescript
+interface StepNode {
+  id: string;
+  index: number;
+  kind: 'system' | 'user' | 'advisors' | 'router_handoff' | 'handoff' | 'internal';
   startedAt: number;
   endedAt?: number;
   attributes?: Record<string, unknown>;
@@ -105,6 +121,7 @@ Creates:
 - Unique session ID via `uid()`
 - StartedAt timestamp
 - Empty turns array
+- Empty steps array
 
 ### Turn Management
 
@@ -120,12 +137,33 @@ Creates:
 - Merges attributes if provided
 - Recomputes totals
 
+### Step Management
+
+**beginStep(index, kind, attributes)**
+- Creates StepNode with unique ID
+- Sets index and kind
+- Pushes to steps array
+- Indexes by step number
+- Recomputes totals
+
+**endStep(index, attributes)**
+- Sets endedAt timestamp
+- Merges attributes if provided
+- Recomputes totals
+
 ### Operation Management
 
 **beginOp(turnIndex, kind, attributes)**
 - Creates OperationNode with unique ID
 - Empty logs and accounting arrays
 - Pushes to turn's ops array
+- Indexes by opId
+- Returns opId for reference
+
+**beginOpForStep(stepIndex, kind, attributes)**
+- Creates OperationNode with unique ID
+- Empty logs and accounting arrays
+- Pushes to step's ops array
 - Indexes by opId
 - Returns opId for reference
 
@@ -140,6 +178,8 @@ Creates:
 **appendLog(opId, log)**
 - Adds log entry to operation
 - Computes and attaches stable path label
+  - Turn ops: `{turn}-{op}` (e.g., `1-2`)
+  - Step ops: `S{step}-{op}` (e.g., `S0-1`)
 
 **appendAccounting(opId, acc)**
 - Adds accounting entry to operation

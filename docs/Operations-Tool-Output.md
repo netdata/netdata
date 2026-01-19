@@ -423,6 +423,12 @@ the content you need. Start with a summary or grep for relevant patterns.
 zcat "$SNAPSHOT" | jq '.opTree.turns[].ops[] | select(.kind == "tool") | {name: .attributes.name, response: .response}'
 ```
 
+For **tool_output full-chunked**, extraction LLM ops are recorded under the tool_output child session steps:
+
+```bash
+zcat "$SNAPSHOT" | jq '.opTree.turns[].ops[] | select(.kind == "session" and .attributes.provider == "tool-output") | .childSession.steps[] | select(.kind == "internal") | .ops[] | select(.kind == "llm")'
+```
+
 Note: Snapshots capture the handle, not the full stored content. For full recovery, extract from the storage directory before process exit.
 
 ---

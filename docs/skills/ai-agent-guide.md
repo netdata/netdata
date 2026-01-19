@@ -1028,9 +1028,9 @@ DEBUG=true CONTEXT_DEBUG=true ai-agent --agent myagent.ai "query"
 - Format:
 ```json
 {
-  "version": 1,
+  "version": 2,
   "reason": "final|subagent_finish",
-  "opTree": { "turns": [...], "logs": [...] }
+  "opTree": { "turns": [...], "steps": [...], "logs": [...] }
 }
 ```
 
@@ -1038,6 +1038,9 @@ DEBUG=true CONTEXT_DEBUG=true ai-agent --agent myagent.ai "query"
 ```bash
 # Read snapshot
 zcat <file> | jq '.opTree.turns'
+
+# Read steps (orchestration timeline)
+zcat <file> | jq '.opTree.steps'
 
 # Extract LLM requests/responses
 zcat <file> | jq '.opTree.turns[].ops[] | select(.kind == "llm")'
@@ -1050,6 +1053,12 @@ zcat <file> | jq '[.. | objects | select(.severity == "WRN" or .severity == "ERR
 
 # Extract sub-agent sessions
 zcat <file> | jq '.opTree.turns[].ops[] | select(.kind == "session") | .childSession'
+
+# Extract orchestration sessions (advisors/router/handoff)
+zcat <file> | jq '.opTree.steps[].ops[] | select(.kind == "session" and .attributes.provider == "orchestration") | .childSession'
+
+# Extract tool_output full-chunked LLM ops (nested under tool_output child session)
+zcat <file> | jq '.opTree.turns[].ops[] | select(.kind == "session" and .attributes.provider == "tool-output") | .childSession.steps[] | select(.kind == "internal") | .ops[] | select(.kind == "llm")'
 ```
 
 ### Accounting

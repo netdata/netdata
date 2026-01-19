@@ -130,6 +130,27 @@ export function buildSnapshotFromOpTree(root: SessionNode, nowTs: number): Snaps
         if (o.kind === 'session' && o.childSession) visit(o.childSession);
       }
     }
+    const steps = Array.isArray(node.steps) ? node.steps : [];
+    for (const s of steps) {
+      const ops = Array.isArray(s.ops) ? s.ops : [];
+      for (const o of ops) {
+        if (o.kind === 'tool') toolsRun += 1;
+        const acc = Array.isArray(o.accounting) ? o.accounting : [];
+        for (const a of acc) {
+          const typ = (a as unknown as { type?: string }).type;
+          if (typ === 'llm') {
+            const tk = (a as unknown as { tokens?: { inputTokens?: number; outputTokens?: number; cacheReadInputTokens?: number; cacheWriteInputTokens?: number; cachedTokens?: number } }).tokens ?? {};
+            tokens.in += tk.inputTokens ?? 0;
+            tokens.out += tk.outputTokens ?? 0;
+            tokens.read += tk.cacheReadInputTokens ?? tk.cachedTokens ?? 0;
+            tokens.write += tk.cacheWriteInputTokens ?? 0;
+            const c = (a as unknown as { costUsd?: number }).costUsd;
+            if (typeof c === 'number') costUsd += c;
+          }
+        }
+        if (o.kind === 'session' && o.childSession) visit(o.childSession);
+      }
+    }
   };
   visit(root);
 

@@ -160,6 +160,7 @@ zcat "$SNAPSHOT" | jq '{
   success: .opTree.success,
   error: .opTree.error,
   turns: (.opTree.turns | length),
+  steps: (.opTree.steps | length),
   totals: .opTree.totals
 }'
 
@@ -168,6 +169,12 @@ zcat "$SNAPSHOT" | jq '[.. | objects | select(.severity == "ERR" or .severity ==
 
 # View last turn (where failure usually occurs)
 zcat "$SNAPSHOT" | jq '.opTree.turns[-1]'
+
+# View orchestration steps
+zcat "$SNAPSHOT" | jq '.opTree.steps[] | {index:.index, kind:.kind, opCount:(.ops | length)}'
+
+# View tool_output full-chunked LLM ops (nested under tool_output child session)
+zcat "$SNAPSHOT" | jq '.opTree.turns[].ops[] | select(.kind == "session" and .attributes.provider == "tool-output") | .childSession.steps[] | select(.kind == "internal") | .ops[] | select(.kind == "llm")'
 
 # View LLM calls
 zcat "$SNAPSHOT" | jq '.opTree.turns[].ops[] | select(.kind == "llm")'

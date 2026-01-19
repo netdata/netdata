@@ -46,6 +46,7 @@ const buildChildSession = (): SessionNode => ({
   sessionTitle: '',
   startedAt: Date.now(),
   turns: [],
+  steps: [],
 });
 
 vi.mock('../../ai-agent.js', () => ({
@@ -229,6 +230,10 @@ describe('ToolOutputExtractor', () => {
     expect(result.mode).toBe('full-chunked');
     expect(result.text).toBe('final answer');
     expect(result.childOpTree).toBeDefined();
+    const child = result.childOpTree;
+    if (child === undefined) throw new Error('expected child opTree');
+    expect(child.steps.length).toBe(1);
+    expect(child.steps[0]?.kind).toBe('internal');
     cleanupTempRoot(root);
   });
 

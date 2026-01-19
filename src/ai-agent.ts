@@ -9,7 +9,7 @@ import type { ResponseCache } from './cache/response-cache.js';
 import type { ToolCacheResolver } from './cache/tool-cache-resolver.js';
 import type { OutputFormatId } from './formats.js';
 import type { AdvisorExecutionResult } from './orchestration/advisors.js';
-import type { SessionNode } from './session-tree.js';
+import type { SessionNode, StepKind } from './session-tree.js';
 import type { AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, AIAgentSessionConfig, AIAgentResult, AccountingEntry, AccountingFlushPayload, Configuration, ConversationMessage, LogDetailValue, LogEntry, LLMAccountingEntry, MCPTool, OrchestrationConfig, OrchestrationRuntimeAgent, OrchestrationRuntimeConfig, ProgressMetrics, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, RestToolConfig, SessionSnapshotPayload, TaskStatusData, ToolAccountingEntry, ToolChoiceMode, TurnRequestContextMetrics, LogPayload } from './types.js';
 
 import { getResponseCache } from './cache/cache-factory.js';
@@ -308,16 +308,42 @@ export class AIAgentSession {
     try { return this.opTree.renderAscii(); } catch { return undefined; }
   }
 
-  public beginOrchestrationChildOp(params: { name: string; kind: 'advisor' | 'router' | 'handoff' }): { opId?: string; opPath?: string } {
+  private getOrchestrationStepMeta(kind: 'advisor' | 'router' | 'handoff'): { index: number; kind: StepKind } {
+    if (kind === 'advisor') return { index: 0, kind: 'advisors' };
+    if (kind === 'router') return { index: 1, kind: 'router_handoff' };
+    return { index: 2, kind: 'handoff' };
+  }
+
+  public ensureOrchestrationStep(kind: 'advisor' | 'router' | 'handoff'): number {
+    const meta = this.getOrchestrationStepMeta(kind);
     try {
-      if (!this.systemTurnBegan) {
-        this.opTree.beginTurn(0, { system: true, label: 'init' });
-        this.systemTurnBegan = true;
+      if (!this.opTree.hasStep(meta.index)) {
+        this.opTree.beginStep(meta.index, meta.kind);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
+    return meta.index;
+  }
+
+  public endOrchestrationStep(kind: 'advisor' | 'router' | 'handoff'): void {
+    const meta = this.getOrchestrationStepMeta(kind);
+    try {
+      if (this.opTree.hasStep(meta.index)) {
+        this.opTree.endStep(meta.index);
+      }
+      this.emitEvent({ type: 'op_tree', tree: this.opTree.getSession() });
+    } catch (e) {
+      warn(`orchestration step finalize failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  public beginOrchestrationChildOp(params: { name: string; kind: 'advisor' | 'router' | 'handoff' }): { opId?: string; opPath?: string } {
+    const stepIndex = this.ensureOrchestrationStep(params.kind);
+    const stepKind = this.getOrchestrationStepMeta(params.kind).kind;
     const opId = (() => {
       try {
-        return this.opTree.beginOp(0, 'session', { name: params.name, provider: 'orchestration', kind: params.kind });
+        return this.opTree.beginOpForStep(stepIndex, 'session', { name: params.name, provider: 'orchestration', kind: stepKind });
       } catch {
         return undefined;
       }
@@ -342,6 +368,7 @@ export class AIAgentSession {
           sessionTitle: '',
           startedAt: Date.now(),
           turns: [],
+          steps: [],
         };
         this.opTree.attachChildSession(opId, stub);
         this.emitEvent({ type: 'op_tree', tree: this.opTree.getSession() });
@@ -492,7 +519,7 @@ export class AIAgentSession {
         sessionId: this.txnId,
         originId: this.originTxnId ?? this.txnId,
         timestamp: Date.now(),
-        snapshot: { version: 1, opTree: this.opTree.getSession() },
+        snapshot: { version: 2, opTree: this.opTree.getSession() },
       };
       const failure = this.emitEvent({ type: 'snapshot', payload });
       if (failure !== undefined) {
@@ -2478,8 +2505,21 @@ export class AIAgent {
       }
     };
 
+    const runWithOrchestrationStep = async <T>(
+      kind: 'advisor' | 'router' | 'handoff',
+      fn: () => Promise<T>,
+    ): Promise<T> => {
+      session.ensureOrchestrationStep(kind);
+      try {
+        return await fn();
+      } finally {
+        session.endOrchestrationStep(kind);
+      }
+    };
+
     const advisorResults = hasAdvisors
-      ? await executeAdvisors({
+      ? await runWithOrchestrationStep('advisor', async () => (
+        executeAdvisors({
           advisors,
           userPrompt: originalUserPrompt,
           parentSession,
@@ -2495,6 +2535,7 @@ export class AIAgent {
             },
           ),
         })
+      ))
       : [];
     if (advisorResults.length > 0) {
       const advisoryBlocks = advisorResults.map((result) => result.block);
@@ -2542,17 +2583,19 @@ export class AIAgent {
       ];
       const routerPrompt = joinTaggedBlocks(routerBlocks);
       try {
-        const routed = await runOrchestrationChild(
-          'router',
-          destination,
-          destination.systemTemplate,
-          routerPrompt,
-          {
-            isMaster: parentIsMaster,
-            pendingHandoffCount: parentPending,
-            ancestors: undefined,
-          },
-        );
+        const routed = await runWithOrchestrationStep('router', async () => (
+          runOrchestrationChild(
+            'router',
+            destination,
+            destination.systemTemplate,
+            routerPrompt,
+            {
+              isMaster: parentIsMaster,
+              pendingHandoffCount: parentPending,
+              ancestors: undefined,
+            },
+          )
+        ));
         current = mergeResultWithChildFinal(current, routed, destination);
         currentAgentLabel = routed.finalAgentId ?? destination.agentId;
       } catch (error) {
@@ -2566,26 +2609,28 @@ export class AIAgent {
 
     if (handoffTarget !== undefined) {
       try {
-        const handed = await executeHandoff({
-          target: handoffTarget,
-          parentResult: current,
-          originalUserPrompt,
-          parentAgentLabel: currentAgentLabel,
-          parentSession,
-          isMaster: parentIsMaster,
-          pendingHandoffCount: decrementedPending,
-          spawn: async (target, prompt) => runOrchestrationChild(
-            'handoff',
-            target,
-            target.systemTemplate,
-            prompt,
-            {
-              isMaster: parentIsMaster,
-              pendingHandoffCount: decrementedPending,
-              ancestors: undefined,
-            },
-          ),
-        });
+        const handed = await runWithOrchestrationStep('handoff', async () => (
+          executeHandoff({
+            target: handoffTarget,
+            parentResult: current,
+            originalUserPrompt,
+            parentAgentLabel: currentAgentLabel,
+            parentSession,
+            isMaster: parentIsMaster,
+            pendingHandoffCount: decrementedPending,
+            spawn: async (target, prompt) => runOrchestrationChild(
+              'handoff',
+              target,
+              target.systemTemplate,
+              prompt,
+              {
+                isMaster: parentIsMaster,
+                pendingHandoffCount: decrementedPending,
+                ancestors: undefined,
+              },
+            ),
+          })
+        ));
         current = mergeResultWithChildFinal(current, handed, handoffTarget);
         currentAgentLabel = handed.finalAgentId ?? handoffTarget.agentId;
       } catch (error) {

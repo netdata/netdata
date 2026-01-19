@@ -383,6 +383,7 @@ export class ToolsOrchestrator {
           sessionTitle: '',
           startedAt: Date.now(),
           turns: [],
+          steps: [],
         };
         this.opTree.attachChildSession(opId, stub);
         this.emitOpTree(this.opTree.getSession());

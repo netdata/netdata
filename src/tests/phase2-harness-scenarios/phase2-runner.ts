@@ -285,13 +285,13 @@ const updateRestartFixtureState = (file: string, updater: (prev: RestartFixtureS
 const toError = (value: unknown): Error => (value instanceof Error ? value : new Error(String(value)));
 const toErrorMessage = (value: unknown): string => (value instanceof Error ? value.message : String(value));
 const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
-const collectSessionOps = (tree: AIAgentResult['opTree'] | undefined): { kind?: unknown; attributes?: unknown }[] => {
+const collectStepSessionOps = (tree: AIAgentResult['opTree'] | undefined): { kind?: unknown; attributes?: unknown }[] => {
   if (tree === undefined) return [];
-  return tree.turns.flatMap((turn) => (Array.isArray(turn.ops) ? turn.ops : []))
+  return tree.steps.flatMap((step) => (Array.isArray(step.ops) ? step.ops : []))
     .filter((op) => op.kind === 'session');
 };
 const hasOrchestrationSession = (tree: AIAgentResult['opTree'] | undefined, kind: string): boolean => {
-  return collectSessionOps(tree).some((op) => {
+  return collectStepSessionOps(tree).some((op) => {
     const attrs = isRecord(op.attributes) ? op.attributes : undefined;
     return attrs?.provider === 'orchestration' && attrs?.kind === kind;
   });
@@ -12413,7 +12413,7 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(result.success, 'run-test-router-handoff-event should succeed.');
-    invariant(hasOrchestrationSession(result.opTree, 'router'), 'Expected orchestration router session in opTree for run-test-router-handoff-event.');
+    invariant(hasOrchestrationSession(result.opTree, 'router_handoff'), 'Expected orchestration router session in opTree for run-test-router-handoff-event.');
     invariant(routerHandoffEventCoverage !== undefined, 'Router handoff coverage missing for run-test-router-handoff-event.');
     const events = routerHandoffEventCoverage.events;
     const handoffEvents = events.filter((entry) => entry.event.type === 'handoff');
@@ -12660,7 +12660,7 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(result.success, 'run-test-advisor-event-meta should succeed.');
-    invariant(hasOrchestrationSession(result.opTree, 'advisor'), 'Expected orchestration advisor session in opTree for run-test-advisor-event-meta.');
+    invariant(hasOrchestrationSession(result.opTree, 'advisors'), 'Expected orchestration advisor session in opTree for run-test-advisor-event-meta.');
     invariant(advisorEventCoverage !== undefined, 'Advisor event coverage missing for run-test-advisor-event-meta.');
     const events = advisorEventCoverage.events;
     const advisorOutputEvents = events.filter((entry) => entry.event.type === 'output' && entry.meta.isMaster === false);

@@ -61,7 +61,7 @@ private persistSessionSnapshot(reason?: string): void {
     originId: this.originTxnId ?? this.txnId,
     timestamp: Date.now(),
     snapshot: {
-      version: 1,
+      version: 2,
       opTree: this.opTree.getSession()
     },
   };
@@ -102,6 +102,7 @@ interface SessionNode {
   success?: boolean;
   error?: string;
   turns: TurnNode[];
+  steps: StepNode[];
   totals?: SessionTotals;
 }
 ```
@@ -112,6 +113,17 @@ interface TurnNode {
   index: number;
   system?: boolean;
   label?: string;
+  ops: OperationNode[];
+  startedAt?: number;
+  endedAt?: number;
+}
+```
+
+### StepNode
+```typescript
+interface StepNode {
+  index: number;
+  kind: 'system' | 'user' | 'advisors' | 'router_handoff' | 'handoff' | 'internal';
   ops: OperationNode[];
   startedAt?: number;
   endedAt?: number;
@@ -145,7 +157,9 @@ interface OperationNode {
 7. LLM request/response payloads under `opTree.turns[].ops[].request.payload` and `opTree.turns[].ops[].response.payload`:
    - `payload.raw` = base64 of the full HTTP/SSE body capture (no placeholders; `[unavailable]` indicates a capture bug)
    - `payload.sdk` = base64 of serialized SDK request/response (verification copy)
-8. Child sessions for sub-agents, tool_output extraction, and orchestration (advisors/router/handoff) attached under `opTree.turns[].ops[].childSession` when `kind == "session"`. Orchestration child ops include attributes `{ provider: "orchestration", kind: "advisor" | "router" | "handoff" }`.
+8. Child sessions for sub-agents and tool_output read-grep attach under `opTree.turns[].ops[].childSession` when `kind == "session"`.
+9. Orchestration (advisors/router/handoff) child sessions attach under `opTree.steps[].ops[].childSession` when `kind == "session"`. Orchestration child ops include attributes `{ provider: "orchestration", kind: "advisors" | "router_handoff" | "handoff" }`.
+10. tool_output **full-chunked** extraction runs inside the tool_output child session; its LLM ops are recorded under that child session’s `steps[]` (kind `internal`).
 
 ### Excluded Data
 1. Raw conversation (summarized in ops)
@@ -188,7 +202,7 @@ onEvent: async (event) => {
 
 - **Callback isolation**: `persistSessionSnapshot` emits `onEvent(type='snapshot')` and wraps the call in `try/catch`, logging `[warn] persistSessionSnapshot(...) failed` without interrupting the session (`src/ai-agent.ts:368-386`).
 - **Reason tagging**: Snapshots are emitted with explicit reasons—`'subagent_finish'` after every child agent completes and `'final'` exactly once at session end—so downstream systems can distinguish mid-run updates from the terminal snapshot (`src/ai-agent.ts:737`, `src/ai-agent.ts:1307`).
-- **Child captures via opTree**: Session tools (sub-agents/tool_output) and orchestration sub-sessions (advisors/router/handoff) attach child SessionNodes to the parent op, so snapshot consumers inherit the full nested structure without needing a secondary API (`src/ai-agent.ts:700-884`, `src/session-tree.ts:90-200`).
+- **Child captures via opTree**: Sub-agents and tool_output read-grep attach under `turns`; orchestration attaches under `steps`; tool_output full-chunked LLM ops are inside the tool_output child session’s `steps`, so snapshot consumers inherit the full nested structure without needing a secondary API (`src/ai-agent.ts:700-884`, `src/session-tree.ts:90-200`).
 
 ## Accounting Flush
 

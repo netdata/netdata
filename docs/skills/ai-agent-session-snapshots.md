@@ -4,12 +4,12 @@
 
 Session snapshots are gzipped JSON files (`{UUID}.json.gz`) containing complete session state:
 
-- opTree hierarchy (turns → operations)
+- opTree hierarchy (turns + steps → operations)
 - LLM request/response payloads
 - Tool request/response payloads
 - All logs (including WRN/ERR)
 - Accounting entries
-- Nested sub-agent sessions (including orchestration advisors/router/handoff and tool_output extraction)
+- Nested sub-agent sessions (orchestration sessions under `steps[]`; tool_output full-chunked LLM ops under the tool_output child session’s `steps[]`)
 
 Default location: `~/.ai-agent/sessions/`
 
@@ -21,7 +21,7 @@ Default location: `~/.ai-agent/sessions/`
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "reason": "final" | "subagent_finish",
   "opTree": { ... }
 }
@@ -29,7 +29,7 @@ Default location: `~/.ai-agent/sessions/`
 
 | Field     | Description                                                                |
 | --------- | -------------------------------------------------------------------------- |
-| `version` | Snapshot schema version (currently 1)                                      |
+| `version` | Snapshot schema version (currently 2)                                      |
 | `reason`  | Trigger: `"final"` (session end) or `"subagent_finish"` (child agent done) |
 | `opTree`  | Complete session hierarchy (see below)                                     |
 
@@ -77,6 +77,14 @@ SessionNode
                 ├── request      // {kind, payload, size}
                 ├── response     // {payload, size, truncated}
                 └── childSession // Nested SessionNode (for sub-agents and tool_output)
+└── steps                // Array of StepNode (orchestration timeline)
+    └── StepNode
+        ├── id
+        ├── index
+        ├── kind        // system | user | advisors | router_handoff | handoff | internal
+        ├── startedAt
+        ├── endedAt
+        └── ops         // Array of OperationNode (same shape as turns)
 ```
 
 ### LogEntry Structure
@@ -87,7 +95,7 @@ interface LogEntry {
   severity: "VRB" | "WRN" | "ERR" | "TRC" | "THK" | "FIN";
   turn: number; // Turn index (0-based, 0=system init)
   subturn: number; // Tool call index within turn
-  path?: string; // Hierarchical path (e.g., "1-2.3-1" = turn1-op2.subturn3-op1)
+  path?: string; // Hierarchical path (e.g., "1-2.3-1" or "S0-1.1-2")
   direction: "request" | "response";
   type: "llm" | "tool";
   toolKind?: "mcp" | "rest" | "agent" | "command";
@@ -161,7 +169,7 @@ SNAPSHOT="${SNAPSHOT_DIR}/${TXN_ID}.json.gz"
 zcat "$SNAPSHOT" | jq . > "${TXN_ID}.json"
 
 # View structure summary
-zcat "$SNAPSHOT" | jq '{version, reason, opTree: {id, traceId, agentId, turns: [.opTree.turns[].index]}}'
+zcat "$SNAPSHOT" | jq '{version, reason, opTree: {id, traceId, agentId, turns: [.opTree.turns[].index], steps: [.opTree.steps[].index]}}'
 ```
 
 ### 2. Extract Session Metadata
@@ -189,7 +197,14 @@ zcat "$SNAPSHOT" | jq '{sessionId:.opTree.id, traceId:.opTree.traceId, agentId:.
 zcat "$SNAPSHOT" | jq '[.opTree.turns[] | {index:.index, opCount:.ops | length, startedAt:.startedAt}]'
 ```
 
-### 4. Extract LLM Operations Only
+### 4. Extract Steps Summary
+
+```bash
+# List all steps with their operation counts
+zcat "$SNAPSHOT" | jq '[.opTree.steps[] | {index:.index, kind:.kind, opCount:.ops | length, startedAt:.startedAt}]'
+```
+
+### 5. Extract LLM Operations Only
 
 ```bash
 # All LLM operations with request/response previews
@@ -202,7 +217,7 @@ zcat "$SNAPSHOT" | jq '.opTree.turns[].ops[] | select(.kind == "llm") | .request
 zcat "$SNAPSHOT" | jq '[.opTree.turns[].ops[] | select(.kind == "llm") | .accounting[]]'
 ```
 
-### 5. Extract Tool Operations Only
+### 6. Extract Tool Operations Only
 
 ```bash
 # All tool operations
@@ -225,7 +240,10 @@ zcat "$SNAPSHOT" | jq '.opTree.turns[].ops[] | select(.kind == "session") | .chi
 zcat "$SNAPSHOT" | jq '.opTree.turns[].ops[] | select(.kind == "session" and .attributes.name == "agent__bigquery") | .childSession'
 
 # Extract orchestration child sessions (advisors/router/handoff)
-zcat "$SNAPSHOT" | jq '.opTree.turns[].ops[] | select(.kind == "session" and .attributes.provider == "orchestration") | {name:.attributes.name, kind:.attributes.kind, childSession:.childSession}'
+zcat "$SNAPSHOT" | jq '.opTree.steps[].ops[] | select(.kind == "session" and .attributes.provider == "orchestration") | {name:.attributes.name, kind:.attributes.kind, childSession:.childSession}'
+
+# Extract tool_output full-chunked LLM ops (nested under tool_output child session)
+zcat "$SNAPSHOT" | jq '.opTree.turns[].ops[] | select(.kind == "session" and .attributes.provider == "tool-output") | .childSession.steps[] | select(.kind == "internal") | .ops[] | select(.kind == "llm")'
 
 # Extract sub-agent by opId
 zcat "$SNAPSHOT" | jq '.opTree.turns[].ops[] | select(.kind == "session" and .opId == "mfpy4i9m-5nrtwm") | .childSession'

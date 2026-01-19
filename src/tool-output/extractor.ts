@@ -346,9 +346,9 @@ export class ToolOutputExtractor {
       callPath: this.deps.callPath,
       sessionTitle: `tool_output:${source.handle}`,
     });
-    child.beginTurn(1, { mode: MODE_FULL_CHUNKED });
+    child.beginStep(0, 'internal', { mode: MODE_FULL_CHUNKED });
     const endFailure = (message: string): ToolOutputExtractionResult => {
-      try { child.endTurn(1); } catch { /* ignore double-end */ }
+      try { child.endStep(0); } catch { /* ignore double-end */ }
       child.endSession(false, message);
       return { ok: false, text: message, mode: MODE_FULL_CHUNKED, childOpTree: child.getSession() };
     };
@@ -371,7 +371,7 @@ export class ToolOutputExtractor {
     const chunkOutputs: string[] = [];
     // eslint-disable-next-line functional/no-loop-statements -- sequential map
     for (const chunk of chunks) {
-      const opId = child.beginOp(1, 'llm', { provider: target.provider, model: target.model, chunk: chunk.index + 1 });
+      const opId = child.beginOpForStep(0, 'llm', { provider: target.provider, model: target.model, chunk: chunk.index + 1 });
       const system = buildMapSystemPrompt({
         toolName: source.toolName,
         toolArgsJson: source.toolArgsJson,
@@ -387,7 +387,14 @@ export class ToolOutputExtractor {
         { role: 'user', content: chunk.text },
       ];
       const turnRequest = this.buildLlmRequest(messages, target);
-      const result = await this.deps.llmClient.executeTurn(turnRequest);
+      let result: TurnResult;
+      try {
+        result = await this.deps.llmClient.executeTurn(turnRequest);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        child.endOp(opId, 'failed', { error: message });
+        return endFailure(`full-chunked map failed: ${message}`);
+      }
       const text = extractTextFromTurn(result);
       const extracted = extractFinalContent(this.deps.sessionNonce, text);
       this.recordLlmOp(child, opId, target, result, messages, text);
@@ -399,12 +406,12 @@ export class ToolOutputExtractor {
 
     // Skip reduce step when there's only 1 chunk - the map output is the final output
     if (chunkOutputs.length === 1) {
-      child.endTurn(1);
+      child.endStep(0);
       child.endSession(true);
       return { ok: true, text: chunkOutputs[0], mode: MODE_FULL_CHUNKED, childOpTree: child.getSession() };
     }
 
-    const reduceOp = child.beginOp(1, 'llm', { provider: target.provider, model: target.model, stage: 'reduce' });
+    const reduceOp = child.beginOpForStep(0, 'llm', { provider: target.provider, model: target.model, stage: 'reduce' });
     const reduceSystem = buildReduceSystemPrompt({
       toolName: source.toolName,
       toolArgsJson: source.toolArgsJson,
@@ -417,11 +424,18 @@ export class ToolOutputExtractor {
       { role: 'user', content: 'Synthesize the extracted content into a final answer.' },
     ];
     const reduceRequest = this.buildLlmRequest(reduceMessages, target);
-    const reduceResult = await this.deps.llmClient.executeTurn(reduceRequest);
+    let reduceResult: TurnResult;
+    try {
+      reduceResult = await this.deps.llmClient.executeTurn(reduceRequest);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      child.endOp(reduceOp, 'failed', { error: message });
+      return endFailure(`full-chunked reduce failed: ${message}`);
+    }
     const reduceText = extractTextFromTurn(reduceResult);
     const reduced = extractFinalContent(this.deps.sessionNonce, reduceText);
     this.recordLlmOp(child, reduceOp, target, reduceResult, reduceMessages, reduceText);
-    child.endTurn(1);
+    child.endStep(0);
     if (reduced === undefined) {
       child.endSession(false, 'full-chunked reduce failed to emit final report');
       return { ok: false, text: 'full-chunked reduce failed to emit final report', mode: MODE_FULL_CHUNKED, childOpTree: child.getSession() };

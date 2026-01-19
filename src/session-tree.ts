@@ -30,6 +30,24 @@ interface TurnNode {
   ops: OperationNode[];
 }
 
+export type StepKind =
+  | 'system'
+  | 'user'
+  | 'advisors'
+  | 'router_handoff'
+  | 'handoff'
+  | 'internal';
+
+export interface StepNode {
+  id: string;
+  index: number;
+  kind: StepKind;
+  startedAt: number;
+  endedAt?: number;
+  attributes?: Record<string, unknown>;
+  ops: OperationNode[];
+}
+
 export interface SessionNode {
   id: string;
   traceId?: string;
@@ -53,6 +71,7 @@ export interface SessionNode {
     agentsRun: number;
   };
   turns: TurnNode[];
+  steps: StepNode[];
 }
 
 function uid(): string {
@@ -62,6 +81,7 @@ function uid(): string {
 export class SessionTreeBuilder {
   private readonly session: SessionNode;
   private readonly turnIndex = new Map<number, TurnNode>();
+  private readonly stepIndex = new Map<number, StepNode>();
   private readonly opIndex = new Map<string, OperationNode>();
 
   constructor(meta?: { traceId?: string; agentId?: string; callPath?: string; sessionTitle?: string; attributes?: Record<string, unknown> }) {
@@ -74,6 +94,7 @@ export class SessionTreeBuilder {
       startedAt: Date.now(),
       attributes: meta?.attributes,
       turns: [],
+      steps: [],
     };
   }
 
@@ -128,6 +149,43 @@ export class SessionTreeBuilder {
     this.recomputeTotals();
   }
 
+  beginStep(index: number, kind: StepKind, attributes?: Record<string, unknown>): string {
+    const existing = this.stepIndex.get(index);
+    if (existing !== undefined) {
+      return existing.id;
+    }
+    const id = uid();
+    const node: StepNode = { id, index, kind, startedAt: Date.now(), attributes, ops: [] };
+    this.session.steps.push(node);
+    this.stepIndex.set(index, node);
+    this.recomputeTotals();
+    return id;
+  }
+
+  hasStep(index: number): boolean {
+    return this.stepIndex.has(index);
+  }
+
+  endStep(index: number, attributes?: Record<string, unknown>): void {
+    const s = this.stepIndex.get(index);
+    if (s !== undefined) {
+      if (s.endedAt !== undefined) return;
+      s.endedAt = Date.now();
+      if (attributes !== undefined) s.attributes = { ...(s.attributes ?? {}), ...attributes };
+    }
+    this.recomputeTotals();
+  }
+
+  beginOpForStep(stepIndex: number, kind: OperationKind, attributes?: Record<string, unknown>): string {
+    const s = this.stepIndex.get(stepIndex);
+    const id = uid();
+    const node: OperationNode = { opId: id, kind, startedAt: Date.now(), attributes, logs: [], accounting: [] };
+    if (s !== undefined) s.ops.push(node);
+    this.opIndex.set(id, node);
+    this.recomputeTotals();
+    return id;
+  }
+
   beginOp(turnIndex: number, kind: OperationKind, attributes?: Record<string, unknown>): string {
     const t = this.turnIndex.get(turnIndex);
     const id = uid();
@@ -166,6 +224,7 @@ export class SessionTreeBuilder {
   // Compute a stable, bijective path label (e.g., 1-1 or 1-1.2-3) for a given opId
   getOpPath(opId: string): string {
     const formatSegment = (turn: number, op: number): string => `${String(turn)}-${String(op)}`;
+    const formatStepSegment = (step: number, op: number): string => `S${String(step)}-${String(op)}`;
     const walk = (node: SessionNode, prefix: string[]): string | undefined => {
       // eslint-disable-next-line functional/no-loop-statements -- iterative traversal is clearer here
       for (const t of node.turns) {
@@ -175,6 +234,22 @@ export class SessionTreeBuilder {
           const o = t.ops[i];
           const opIdx = i + 1;
           const seg = formatSegment(turnIndex, opIdx);
+          const label = [...prefix, seg];
+          if (o.opId === opId) return label.join('.');
+          if (o.kind === 'session' && o.childSession !== undefined) {
+            const child = walk(o.childSession, label);
+            if (child !== undefined) return child;
+          }
+        }
+      }
+      // eslint-disable-next-line functional/no-loop-statements -- iterative traversal is clearer here
+      for (const s of node.steps) {
+        const stepIndex = s.index;
+        // eslint-disable-next-line functional/no-loop-statements -- index needed for stable path labels
+        for (let i = 0; i < s.ops.length; i++) {
+          const o = s.ops[i];
+          const opIdx = i + 1;
+          const seg = formatStepSegment(stepIndex, opIdx);
           const label = [...prefix, seg];
           if (o.opId === opId) return label.join('.');
           if (o.kind === 'session' && o.childSession !== undefined) {
@@ -254,6 +329,13 @@ export class SessionTreeBuilder {
     const visit = (node: SessionNode): void => {
       node.turns.forEach((t) => {
         t.ops.forEach((o) => {
+          logs.push(...o.logs);
+          acc.push(...o.accounting);
+          if (o.kind === 'session' && o.childSession !== undefined) visit(o.childSession);
+        });
+      });
+      node.steps.forEach((s) => {
+        s.ops.forEach((o) => {
           logs.push(...o.logs);
           acc.push(...o.accounting);
           if (o.kind === 'session' && o.childSession !== undefined) visit(o.childSession);
@@ -351,6 +433,39 @@ export class SessionTreeBuilder {
         }
       });
     });
+    if (s.steps.length > 0) {
+      lines.push(`├─ steps=${String(s.steps.length)}`);
+      s.steps.forEach((step, si) => {
+        const sLast = si === s.steps.length - 1;
+        const sp = sLast ? '└─' : '├─';
+        lines.push(`${sp} Step#${String(step.index)} [${step.kind}] ${fmtTs(step.startedAt)}${(typeof step.endedAt === 'number') ? ` → ${fmtTs(step.endedAt)} (${dur(step.startedAt, step.endedAt)})` : ''}`);
+        step.ops.forEach((o, oi) => {
+          const oLast = oi === step.ops.length - 1;
+          const opfx = sLast ? (oLast ? '   └─' : '   ├─') : (oLast ? '│  └─' : '│  ├─');
+          const adur = dur(o.startedAt, o.endedAt);
+          const attrsRec = (() => {
+            const v = o.attributes as unknown;
+            return (v !== null && v !== undefined && typeof v === 'object' && !Array.isArray(v)) ? (v as Record<string, unknown>) : undefined;
+          })();
+          const prov = attrsRec?.provider;
+          const modelOrName = (attrsRec?.model ?? attrsRec?.name);
+          const meta = (() => {
+            const a: string[] = [];
+            if (typeof prov === 'string') a.push(prov);
+            if (typeof modelOrName === 'string') a.push(modelOrName);
+            return a.length > 0 ? ` [${a.join(':')}]` : '';
+          })();
+          lines.push(`${opfx} ${o.kind.toUpperCase()} op=${o.opId}${meta} ${fmtTs(o.startedAt)}${(typeof o.endedAt === 'number') ? ` → ${fmtTs(o.endedAt)} (${adur})` : ''}${(typeof o.status === 'string') ? ` status=${o.status}` : ''}`);
+          const lpfx = sLast ? '      ' : '│     ';
+          lines.push(`${lpfx}logs=${String(o.logs.length)} accounting=${String(o.accounting.length)}`);
+          if (o.childSession !== undefined) {
+            lines.push(`${lpfx}child:`);
+            const childLines = SessionTreeBuilder.indentAscii(this.renderChild(o.childSession)).split('\n');
+            childLines.forEach((ln) => { if (ln.length > 0) lines.push(`${lpfx}${ln}`); });
+          }
+        });
+      });
+    }
     return lines.join('\n');
   }
 
@@ -377,6 +492,27 @@ export class SessionTreeBuilder {
         lines.push(`${lpfx}logs=${String(o.logs.length)} accounting=${String(o.accounting.length)}`);
       });
     });
+    if (child.steps.length > 0) {
+      lines.push(`├─ steps=${String(child.steps.length)}`);
+      child.steps.forEach((step, si) => {
+        const sLast = si === child.steps.length - 1;
+        const sp = sLast ? '└─' : '├─';
+        lines.push(`${sp} Step#${String(step.index)} [${step.kind}] ${fmtTs(step.startedAt)}${(typeof step.endedAt === 'number') ? ` → ${fmtTs(step.endedAt)} (${dur(step.startedAt, step.endedAt)})` : ''}`);
+        step.ops.forEach((o, oi) => {
+          const oLast = oi === step.ops.length - 1;
+          const opfx = sLast ? (oLast ? '   └─' : '   ├─') : (oLast ? '│  └─' : '│  ├─');
+          const adur = dur(o.startedAt, o.endedAt);
+          lines.push(`${opfx} ${o.kind.toUpperCase()} op=${o.opId} ${fmtTs(o.startedAt)}${(typeof o.endedAt === 'number') ? ` → ${fmtTs(o.endedAt)} (${adur})` : ''}${(typeof o.status === 'string') ? ` status=${o.status}` : ''}`);
+          const lpfx = sLast ? '      ' : '│     ';
+          lines.push(`${lpfx}logs=${String(o.logs.length)} accounting=${String(o.accounting.length)}`);
+          if (o.childSession !== undefined) {
+            lines.push(`${lpfx}child:`);
+            const childLines = SessionTreeBuilder.indentAscii(this.renderChild(o.childSession)).split('\n');
+            childLines.forEach((ln) => { if (ln.length > 0) lines.push(`${lpfx}${ln}`); });
+          }
+        });
+      });
+    }
     return lines.join('\n');
   }
 
@@ -415,6 +551,30 @@ export class SessionTreeBuilder {
           // eslint-disable-next-line functional/no-loop-statements
           for (const a of acc) {
             // Narrow via structural shape
+            const typ = (a as unknown as { type?: string }).type;
+            if (typ === 'llm') {
+              const tk = (a as unknown as { tokens?: { inputTokens?: number; outputTokens?: number; cacheReadInputTokens?: number; cacheWriteInputTokens?: number; cachedTokens?: number } }).tokens ?? {};
+              tokensIn += tk.inputTokens ?? 0;
+              tokensOut += tk.outputTokens ?? 0;
+              tokensCacheRead += tk.cacheReadInputTokens ?? tk.cachedTokens ?? 0;
+              tokensCacheWrite += tk.cacheWriteInputTokens ?? 0;
+              const c = (a as unknown as { costUsd?: number }).costUsd;
+              if (typeof c === 'number') costUsd += c;
+            }
+          }
+          if (o.kind === 'session' && o.childSession !== undefined) visit(o.childSession);
+        }
+      }
+      const steps = Array.isArray(node.steps) ? node.steps : [];
+      // eslint-disable-next-line functional/no-loop-statements
+      for (const s of steps) {
+        const ops = Array.isArray(s.ops) ? s.ops : [];
+        // eslint-disable-next-line functional/no-loop-statements
+        for (const o of ops) {
+          if (o.kind === 'tool') toolsRun += 1;
+          const acc = Array.isArray(o.accounting) ? o.accounting : [];
+          // eslint-disable-next-line functional/no-loop-statements
+          for (const a of acc) {
             const typ = (a as unknown as { type?: string }).type;
             if (typ === 'llm') {
               const tk = (a as unknown as { tokens?: { inputTokens?: number; outputTokens?: number; cacheReadInputTokens?: number; cacheWriteInputTokens?: number; cachedTokens?: number } }).tokens ?? {};
