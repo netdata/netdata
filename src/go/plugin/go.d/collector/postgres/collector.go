@@ -91,8 +91,8 @@ type (
 		pgVersion               int
 		pgStatStatementsChecked bool
 		pgStatStatementsAvail   bool
-		pgStatStatementsColumns map[string]bool                    // cached column names from pg_stat_statements
-		pgStatStatementsMu      sync.RWMutex                       // protects pgStatStatements* fields for concurrent access
+		pgStatStatementsColumns map[string]bool // cached column names from pg_stat_statements
+		pgStatStatementsMu      sync.RWMutex    // protects pgStatStatements* fields for concurrent access
 		dbSr                    matcher.Matcher
 		recheckSettingsTime     time.Time
 		recheckSettingsEvery    time.Duration

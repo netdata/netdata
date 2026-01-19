@@ -127,10 +127,10 @@ func TestCollector_buildAvailableMSSQLColumns(t *testing.T) {
 		},
 		"SQL Server 2017 with log bytes and tempdb": {
 			availableCols: map[string]bool{
-				"count_executions":     true,
-				"avg_duration":         true,
-				"avg_cpu_time":         true,
-				"avg_log_bytes_used":   true,
+				"count_executions":      true,
+				"avg_duration":          true,
+				"avg_cpu_time":          true,
+				"avg_log_bytes_used":    true,
 				"avg_tempdb_space_used": true,
 			},
 			expectCols: []string{"queryHash", "query", "calls", "avgLogBytes", "avgTempdb"},
