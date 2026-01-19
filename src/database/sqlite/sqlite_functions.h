@@ -57,6 +57,10 @@ void analytics_set_data_str(char **name, const char *value);
         (db) != NULL;                                                                                                  \
     })
 
+extern bool sqlite_databases_closed;
+#define REQUIRE_HEALTH_DB_OPEN()                                                                                       \
+    (!__atomic_load_n(&sqlite_databases_closed, __ATOMIC_ACQUIRE))
+
 #define PREPARE_COMPILED_STATEMENT(db, sql, stmt_ptr)                                                                  \
     ({                                                                                                                 \
         bool _ret = true;                                                                                              \
