@@ -108,9 +108,16 @@ criteria:
   - label: role == database
 ```
 
-### 10.4.2 Room-Specific Alerts
+### 10.4.2 Room-Scoped Alerts
 
-Room-scoped alerts fire only for nodes within that room, enabling targeted alerting for specific teams or environments without affecting other infrastructure groups.
+When creating an alert in Cloud UI, scope it to specific rooms using the **Scope** setting:
+
+1. Go to **Nodes** → Select a node → **Configuration** → **Health**
+2. Click **+** to create a new alert
+3. In the **Scope** field, select specific rooms (e.g., "Production Databases")
+4. The alert will only fire for nodes within those rooms
+
+By default, alerts apply only to the selected node. Use room filters to apply the same alert to all nodes in designated rooms.
 
 ### 10.4.3 Related Sections
 
