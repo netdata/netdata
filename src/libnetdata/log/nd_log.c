@@ -310,9 +310,20 @@ static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LO
     if(nd_log_queue_enabled()) {
         // For methods we support asynchronously
         if(output == NDLM_FILE || output == NDLM_STDOUT || output == NDLM_STDERR || output == NDLM_SYSLOG) {
-            if(nd_logger_log_fields_async(fp, limit, priority, output, source, fields, fields_max))
+            // Skip async if using a fallback FILE* that differs from what the source provides.
+            // This happens when journal/ETW/WEL isn't initialized and select_output() remaps
+            // to stderr. The async path looks up fp from source->fp at write time, but for
+            // non-file sources that's NULL, so the message would be lost.
+            // SYSLOG is safe because write_entry() handles the fallback internally.
+            bool use_async = true;
+            if(output == NDLM_FILE && fp != source->fp) {
+                // Fallback FILE* - source->fp is NULL or different (e.g., journal->stderr)
+                use_async = false;
+            }
+
+            if(use_async && nd_logger_log_fields_async(fp, limit, priority, output, source, fields, fields_max))
                 return;  // Successfully queued
-            // Fall through to sync if queue failed (full)
+            // Fall through to sync if queue failed (full) or fallback detected
         }
         // Journal and Windows event log still use sync path for now
         // They require special handling that's harder to serialize
