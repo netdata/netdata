@@ -39,8 +39,8 @@ lookup: average -5m of deadlocks
 ```conf
 template: redis_connections_rejected
     on: redis.connections
-lookup: average -5m of rejected
-     every: 1m
+lookup: sum -1m unaligned of rejected
+     every: 10s
       warn: $this > 0
         to: cache-team
 ```

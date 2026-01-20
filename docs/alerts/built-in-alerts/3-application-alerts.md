@@ -19,21 +19,21 @@ Databases are typically the most critical components in an infrastructure, and t
 Tracks whether the replication position is advancing, catching replication stalls immediately.
 
 **Context:** `mysql.slave_behind`
-**Thresholds:** WARN > 5s, CRIT > 10s
+**Thresholds:** WARN > 10s (tightens to 5s while already WARNING), CRIT > 30s (tightens to 10s while already CRITICAL)
 
 #### mysql_10s_slow_queries
 
 Identifies workloads generating excessive slow query traffic, which often precedes performance degradation.
 
 **Context:** `mysql.queries`
-**Thresholds:** WARN > 5/s, CRIT > 10/s
+**Thresholds:** WARN > 10/s (drops to 5/s while already WARNING), CRIT > 20/s (drops to 10/s while already CRITICAL)
 
 #### mysql_connections
 
 Tracks connection pool saturation to prevent connection exhaustion.
 
 **Context:** `mysql.connections_active`
-**Thresholds:** WARN > 60% of limit, CRIT > 80% of limit
+**Thresholds:** WARN > 70% of limit (drops to 60% while already WARNING), CRIT > 90% (drops to 80% while already CRITICAL)
 
 ### PostgreSQL
 
@@ -42,14 +42,14 @@ Tracks connection pool saturation to prevent connection exhaustion.
 Detects deadlocks that indicate concurrent transaction conflicts.
 
 **Context:** `postgres.db_deadlocks_rate`
-**Thresholds:** WARN > 0
+**Thresholds:** WARN > 10 deadlocks/min (tightens to >0 while already WARNING)
 
 #### postgres_total_connection_utilization
 
 Tracks connection pool saturation to prevent connection exhaustion.
 
 **Context:** `postgres.connections_utilization`
-**Thresholds:** WARN > 70%, CRIT > 80%
+**Thresholds:** WARN > 80% (drops to 70% while already WARNING), CRIT > 90% (drops to 80% while already CRITICAL)
 
 ## Related Sections
 

@@ -13,7 +13,7 @@ The alert never returns to `CLEAR`. This typically indicates threshold issues, c
 ## 7.2.2 Diagnostic Steps
 
 ```bash
-curl -s "http://localhost:19999/api/v1/alarms" | jq '.alerts.your_alert_name.value'
+curl -s "http://localhost:19999/api/v1/alarms" | jq '.alarms.your_alert_name.value'
 ```
 
 Check if the value actually crosses the threshold.

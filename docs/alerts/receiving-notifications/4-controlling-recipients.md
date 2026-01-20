@@ -8,7 +8,14 @@ In Cloud integrations, you can configure which severities trigger notifications:
 
 ```yaml
 integration: Slack #alerts
-  severity:
+severity:
+  critical:
+    - "#urgent"
+    - on-call-pager
+  warning:
+    - "#alerts"
+  clear:
+    - "#alerts"
     critical:
       - "#urgent"
       - on-call-pager
@@ -30,7 +37,11 @@ Then configure notification routing by role:
 
 ```yaml
 integration: Email ops-team@company.com
-  role:
+role:
+  - name: sre-on-call
+    severity: [critical, warning]
+  - name: manager
+    severity: [critical]
     - name: sre-on-call
       severity: [critical, warning]
     - name: manager

@@ -62,7 +62,7 @@ DEFAULT_RECIPIENT_SLACK="#alerts"
 ```conf
 SEND_PD="YES"
 PD_SERVICE_KEY="your-service-key"
-DEFAULT_RECIPIENT_PD=" pagerduty-group"
+DEFAULT_RECIPIENT_PD="pagerduty-group"
 ```
 
 ## 5.2.6 Using Custom Scripts with `exec`

@@ -492,7 +492,7 @@ Shows all possible matches for a variable name with their scores (label-based ma
 ```conf
 alarm: 10min_cpu_usage
     on: system.cpu
-  calc: $this + ($ram_available < 1000 ? 50 : 0)
+  calc: $this + (($mem.available.available < 1000) ? 50 : 0)
    warn: $this > 100
 ```
 

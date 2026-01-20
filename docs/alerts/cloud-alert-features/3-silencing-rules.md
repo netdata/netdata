@@ -9,7 +9,7 @@
 name: Weekend Maintenance
 scope:
   nodes: env:production
-  alerts: *
+  alerts: "*"
 schedule:
   - every: Saturday 1:00 AM
     to: Monday 6:00 AM
@@ -17,5 +17,5 @@ schedule:
 
 ## 10.2.2 Related Sections
 
-- **4.3 Silencing in Netdata Cloud** for local silencing
+- **4.3 Silencing in Netdata Cloud** for Cloud-level silencing workflows
 - **4.2 Silencing vs Disabling** for conceptual difference
