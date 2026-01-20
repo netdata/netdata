@@ -25,7 +25,7 @@ type mysqlColumnMeta struct {
 	transform     string // Transform for value_options (e.g., "duration", "number", "none")
 	decimalPoints int    // Decimal points for display
 	sortDir       string // Sort direction: "ascending" or "descending"
-	summary       string // Summary function: "sum", "count", "max", "min", "avg"
+	summary       string // Summary function: "sum", "count", "max", "min", "mean" (UI aggregations)
 	filter        string // Filter type: "multiselect" or "range"
 	isPicoseconds bool   // Needs picoseconds to seconds conversion
 	isSortOption  bool   // Show in sort dropdown
@@ -50,7 +50,7 @@ var mysqlAllColumns = []mysqlColumnMeta{
 	// Timer metrics (picoseconds -> seconds)
 	{dbColumn: "SUM_TIMER_WAIT", uiKey: "totalTime", displayName: "Total Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by Total Execution Time", isDefaultSort: true},
 	{dbColumn: "MIN_TIMER_WAIT", uiKey: "minTime", displayName: "Min Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "min", filter: "range", isPicoseconds: true},
-	{dbColumn: "AVG_TIMER_WAIT", uiKey: "avgTime", displayName: "Avg Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "avg", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by Average Execution Time"},
+	{dbColumn: "AVG_TIMER_WAIT", uiKey: "avgTime", displayName: "Avg Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "mean", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by Average Execution Time"},
 	{dbColumn: "MAX_TIMER_WAIT", uiKey: "maxTime", displayName: "Max Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isPicoseconds: true},
 
 	// Lock time (picoseconds -> seconds)

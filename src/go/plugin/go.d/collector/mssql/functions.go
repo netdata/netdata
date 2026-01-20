@@ -51,77 +51,77 @@ var mssqlAllColumns = []mssqlColumnMeta{
 
 	// Duration metrics (microseconds -> milliseconds) - SQL 2016+
 	{dbColumn: "avg_duration", uiKey: "totalTime", displayName: "Total Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isMicroseconds: true, isSortOption: true, sortLabel: "Top queries by Total Execution Time", isDefaultSort: true},
-	{dbColumn: "avg_duration", uiKey: "avgTime", displayName: "Avg Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "avg", filter: "range", isMicroseconds: true, needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average Execution Time"},
+	{dbColumn: "avg_duration", uiKey: "avgTime", displayName: "Avg Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "mean", filter: "range", isMicroseconds: true, needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average Execution Time"},
 	{dbColumn: "last_duration", uiKey: "lastTime", displayName: "Last Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isMicroseconds: true},
 	{dbColumn: "min_duration", uiKey: "minTime", displayName: "Min Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "min", filter: "range", isMicroseconds: true},
 	{dbColumn: "max_duration", uiKey: "maxTime", displayName: "Max Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isMicroseconds: true},
 	{dbColumn: "stdev_duration", uiKey: "stdevTime", displayName: "StdDev Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isMicroseconds: true},
 
 	// CPU time metrics (microseconds -> milliseconds)
-	{dbColumn: "avg_cpu_time", uiKey: "avgCpu", displayName: "Avg CPU", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "avg", filter: "range", isMicroseconds: true, needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average CPU Time"},
+	{dbColumn: "avg_cpu_time", uiKey: "avgCpu", displayName: "Avg CPU", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "mean", filter: "range", isMicroseconds: true, needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average CPU Time"},
 	{dbColumn: "last_cpu_time", uiKey: "lastCpu", displayName: "Last CPU", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isMicroseconds: true},
 	{dbColumn: "min_cpu_time", uiKey: "minCpu", displayName: "Min CPU", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "min", filter: "range", isMicroseconds: true},
 	{dbColumn: "max_cpu_time", uiKey: "maxCpu", displayName: "Max CPU", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isMicroseconds: true},
 	{dbColumn: "stdev_cpu_time", uiKey: "stdevCpu", displayName: "StdDev CPU", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isMicroseconds: true},
 
 	// Logical I/O reads
-	{dbColumn: "avg_logical_io_reads", uiKey: "avgReads", displayName: "Avg Logical Reads", dataType: "float", visible: true, transform: "number", decimalPoints: 0, sortDir: "descending", summary: "avg", filter: "range", needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average Logical Reads"},
+	{dbColumn: "avg_logical_io_reads", uiKey: "avgReads", displayName: "Avg Logical Reads", dataType: "float", visible: true, transform: "number", decimalPoints: 0, sortDir: "descending", summary: "mean", filter: "range", needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average Logical Reads"},
 	{dbColumn: "last_logical_io_reads", uiKey: "lastReads", displayName: "Last Logical Reads", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 	{dbColumn: "min_logical_io_reads", uiKey: "minReads", displayName: "Min Logical Reads", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "min", filter: "range"},
 	{dbColumn: "max_logical_io_reads", uiKey: "maxReads", displayName: "Max Logical Reads", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 	{dbColumn: "stdev_logical_io_reads", uiKey: "stdevReads", displayName: "StdDev Logical Reads", dataType: "float", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 
 	// Logical I/O writes
-	{dbColumn: "avg_logical_io_writes", uiKey: "avgWrites", displayName: "Avg Logical Writes", dataType: "float", visible: true, transform: "number", decimalPoints: 0, sortDir: "descending", summary: "avg", filter: "range", needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average Logical Writes"},
+	{dbColumn: "avg_logical_io_writes", uiKey: "avgWrites", displayName: "Avg Logical Writes", dataType: "float", visible: true, transform: "number", decimalPoints: 0, sortDir: "descending", summary: "mean", filter: "range", needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average Logical Writes"},
 	{dbColumn: "last_logical_io_writes", uiKey: "lastWrites", displayName: "Last Logical Writes", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 	{dbColumn: "min_logical_io_writes", uiKey: "minWrites", displayName: "Min Logical Writes", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "min", filter: "range"},
 	{dbColumn: "max_logical_io_writes", uiKey: "maxWrites", displayName: "Max Logical Writes", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 	{dbColumn: "stdev_logical_io_writes", uiKey: "stdevWrites", displayName: "StdDev Logical Writes", dataType: "float", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 
 	// Physical I/O reads
-	{dbColumn: "avg_physical_io_reads", uiKey: "avgPhysReads", displayName: "Avg Physical Reads", dataType: "float", visible: true, transform: "number", decimalPoints: 0, sortDir: "descending", summary: "avg", filter: "range", needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average Physical Reads"},
+	{dbColumn: "avg_physical_io_reads", uiKey: "avgPhysReads", displayName: "Avg Physical Reads", dataType: "float", visible: true, transform: "number", decimalPoints: 0, sortDir: "descending", summary: "mean", filter: "range", needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average Physical Reads"},
 	{dbColumn: "last_physical_io_reads", uiKey: "lastPhysReads", displayName: "Last Physical Reads", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 	{dbColumn: "min_physical_io_reads", uiKey: "minPhysReads", displayName: "Min Physical Reads", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "min", filter: "range"},
 	{dbColumn: "max_physical_io_reads", uiKey: "maxPhysReads", displayName: "Max Physical Reads", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 	{dbColumn: "stdev_physical_io_reads", uiKey: "stdevPhysReads", displayName: "StdDev Physical Reads", dataType: "float", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 
 	// CLR time (microseconds -> milliseconds)
-	{dbColumn: "avg_clr_time", uiKey: "avgClr", displayName: "Avg CLR Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "avg", filter: "range", isMicroseconds: true, needsAvg: true},
+	{dbColumn: "avg_clr_time", uiKey: "avgClr", displayName: "Avg CLR Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "mean", filter: "range", isMicroseconds: true, needsAvg: true},
 	{dbColumn: "last_clr_time", uiKey: "lastClr", displayName: "Last CLR Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isMicroseconds: true},
 	{dbColumn: "min_clr_time", uiKey: "minClr", displayName: "Min CLR Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "min", filter: "range", isMicroseconds: true},
 	{dbColumn: "max_clr_time", uiKey: "maxClr", displayName: "Max CLR Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isMicroseconds: true},
 	{dbColumn: "stdev_clr_time", uiKey: "stdevClr", displayName: "StdDev CLR Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isMicroseconds: true},
 
 	// DOP (degree of parallelism)
-	{dbColumn: "avg_dop", uiKey: "avgDop", displayName: "Avg DOP", dataType: "float", visible: true, transform: "number", decimalPoints: 1, sortDir: "descending", summary: "avg", filter: "range", needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average Parallelism"},
+	{dbColumn: "avg_dop", uiKey: "avgDop", displayName: "Avg DOP", dataType: "float", visible: true, transform: "number", decimalPoints: 1, sortDir: "descending", summary: "mean", filter: "range", needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average Parallelism"},
 	{dbColumn: "last_dop", uiKey: "lastDop", displayName: "Last DOP", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 	{dbColumn: "min_dop", uiKey: "minDop", displayName: "Min DOP", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "min", filter: "range"},
 	{dbColumn: "max_dop", uiKey: "maxDop", displayName: "Max DOP", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 	{dbColumn: "stdev_dop", uiKey: "stdevDop", displayName: "StdDev DOP", dataType: "float", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 
 	// Memory grant (8KB pages)
-	{dbColumn: "avg_query_max_used_memory", uiKey: "avgMemory", displayName: "Avg Memory (8KB pages)", dataType: "float", visible: true, transform: "number", decimalPoints: 0, sortDir: "descending", summary: "avg", filter: "range", needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average Memory Grant"},
+	{dbColumn: "avg_query_max_used_memory", uiKey: "avgMemory", displayName: "Avg Memory (8KB pages)", dataType: "float", visible: true, transform: "number", decimalPoints: 0, sortDir: "descending", summary: "mean", filter: "range", needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average Memory Grant"},
 	{dbColumn: "last_query_max_used_memory", uiKey: "lastMemory", displayName: "Last Memory (8KB pages)", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 	{dbColumn: "min_query_max_used_memory", uiKey: "minMemory", displayName: "Min Memory (8KB pages)", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "min", filter: "range"},
 	{dbColumn: "max_query_max_used_memory", uiKey: "maxMemory", displayName: "Max Memory (8KB pages)", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 	{dbColumn: "stdev_query_max_used_memory", uiKey: "stdevMemory", displayName: "StdDev Memory", dataType: "float", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 
 	// Row count
-	{dbColumn: "avg_rowcount", uiKey: "avgRows", displayName: "Avg Rows", dataType: "float", visible: true, transform: "number", decimalPoints: 0, sortDir: "descending", summary: "avg", filter: "range", needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average Row Count"},
+	{dbColumn: "avg_rowcount", uiKey: "avgRows", displayName: "Avg Rows", dataType: "float", visible: true, transform: "number", decimalPoints: 0, sortDir: "descending", summary: "mean", filter: "range", needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average Row Count"},
 	{dbColumn: "last_rowcount", uiKey: "lastRows", displayName: "Last Rows", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 	{dbColumn: "min_rowcount", uiKey: "minRows", displayName: "Min Rows", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "min", filter: "range"},
 	{dbColumn: "max_rowcount", uiKey: "maxRows", displayName: "Max Rows", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 	{dbColumn: "stdev_rowcount", uiKey: "stdevRows", displayName: "StdDev Rows", dataType: "float", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 
 	// SQL Server 2017+ log bytes
-	{dbColumn: "avg_log_bytes_used", uiKey: "avgLogBytes", displayName: "Avg Log Bytes", dataType: "float", visible: true, transform: "number", decimalPoints: 0, sortDir: "descending", summary: "avg", filter: "range", needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average Log Bytes"},
+	{dbColumn: "avg_log_bytes_used", uiKey: "avgLogBytes", displayName: "Avg Log Bytes", dataType: "float", visible: true, transform: "number", decimalPoints: 0, sortDir: "descending", summary: "mean", filter: "range", needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average Log Bytes"},
 	{dbColumn: "last_log_bytes_used", uiKey: "lastLogBytes", displayName: "Last Log Bytes", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 	{dbColumn: "min_log_bytes_used", uiKey: "minLogBytes", displayName: "Min Log Bytes", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "min", filter: "range"},
 	{dbColumn: "max_log_bytes_used", uiKey: "maxLogBytes", displayName: "Max Log Bytes", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 	{dbColumn: "stdev_log_bytes_used", uiKey: "stdevLogBytes", displayName: "StdDev Log Bytes", dataType: "float", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 
 	// SQL Server 2017+ tempdb space
-	{dbColumn: "avg_tempdb_space_used", uiKey: "avgTempdb", displayName: "Avg TempDB (8KB pages)", dataType: "float", visible: true, transform: "number", decimalPoints: 0, sortDir: "descending", summary: "avg", filter: "range", needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average TempDB Usage"},
+	{dbColumn: "avg_tempdb_space_used", uiKey: "avgTempdb", displayName: "Avg TempDB (8KB pages)", dataType: "float", visible: true, transform: "number", decimalPoints: 0, sortDir: "descending", summary: "mean", filter: "range", needsAvg: true, isSortOption: true, sortLabel: "Top queries by Average TempDB Usage"},
 	{dbColumn: "last_tempdb_space_used", uiKey: "lastTempdb", displayName: "Last TempDB (8KB pages)", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
 	{dbColumn: "min_tempdb_space_used", uiKey: "minTempdb", displayName: "Min TempDB (8KB pages)", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "min", filter: "range"},
 	{dbColumn: "max_tempdb_space_used", uiKey: "maxTempdb", displayName: "Max TempDB (8KB pages)", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "max", filter: "range"},
