@@ -282,30 +282,30 @@ func (c *Collector) buildMSSQLDynamicSQL(cols []mssqlColumnMeta, sortColumn stri
 		case col.isIdentity:
 			switch col.uiKey {
 			case "queryHash":
-				expr = fmt.Sprintf("CONVERT(VARCHAR(64), q.query_hash, 1) AS %s", col.uiKey)
+				expr = fmt.Sprintf("CONVERT(VARCHAR(64), q.query_hash, 1) AS [%s]", col.uiKey)
 			case "query":
-				expr = fmt.Sprintf("qt.query_sql_text AS %s", col.uiKey)
+				expr = fmt.Sprintf("qt.query_sql_text AS [%s]", col.uiKey)
 			case "database":
-				expr = fmt.Sprintf("DB_NAME() AS %s", col.uiKey)
+				expr = fmt.Sprintf("DB_NAME() AS [%s]", col.uiKey)
 			}
 		case col.uiKey == "calls":
-			expr = fmt.Sprintf("SUM(rs.count_executions) AS %s", col.uiKey)
+			expr = fmt.Sprintf("SUM(rs.count_executions) AS [%s]", col.uiKey)
 		case col.uiKey == "totalTime":
 			// Total time = sum of (avg_duration * executions) converted to milliseconds
-			expr = fmt.Sprintf("SUM(rs.avg_duration * rs.count_executions) / 1000.0 AS %s", col.uiKey)
+			expr = fmt.Sprintf("SUM(rs.avg_duration * rs.count_executions) / 1000.0 AS [%s]", col.uiKey)
 		case col.needsAvg && col.isMicroseconds:
 			// Weighted average with μs to milliseconds conversion
-			expr = fmt.Sprintf("CASE WHEN SUM(rs.count_executions) > 0 THEN SUM(rs.%s * rs.count_executions) / SUM(rs.count_executions) / 1000.0 ELSE 0 END AS %s", col.dbColumn, col.uiKey)
+			expr = fmt.Sprintf("CASE WHEN SUM(rs.count_executions) > 0 THEN SUM(rs.%s * rs.count_executions) / SUM(rs.count_executions) / 1000.0 ELSE 0 END AS [%s]", col.dbColumn, col.uiKey)
 		case col.needsAvg:
 			// Weighted average without time conversion
-			expr = fmt.Sprintf("CASE WHEN SUM(rs.count_executions) > 0 THEN SUM(rs.%s * rs.count_executions) / SUM(rs.count_executions) ELSE 0 END AS %s", col.dbColumn, col.uiKey)
+			expr = fmt.Sprintf("CASE WHEN SUM(rs.count_executions) > 0 THEN SUM(rs.%s * rs.count_executions) / SUM(rs.count_executions) ELSE 0 END AS [%s]", col.dbColumn, col.uiKey)
 		case col.isMicroseconds:
 			// Aggregate with μs to milliseconds conversion
 			aggFunc := "MAX"
 			if strings.HasPrefix(col.dbColumn, "min_") {
 				aggFunc = "MIN"
 			}
-			expr = fmt.Sprintf("%s(rs.%s) / 1000.0 AS %s", aggFunc, col.dbColumn, col.uiKey)
+			expr = fmt.Sprintf("%s(rs.%s) / 1000.0 AS [%s]", aggFunc, col.dbColumn, col.uiKey)
 		default:
 			// Simple aggregate
 			aggFunc := "MAX"
@@ -315,7 +315,7 @@ func (c *Collector) buildMSSQLDynamicSQL(cols []mssqlColumnMeta, sortColumn stri
 			if strings.HasPrefix(col.dbColumn, "stdev_") {
 				aggFunc = "MAX" // Use MAX for stddev aggregation
 			}
-			expr = fmt.Sprintf("%s(rs.%s) AS %s", aggFunc, col.dbColumn, col.uiKey)
+			expr = fmt.Sprintf("%s(rs.%s) AS [%s]", aggFunc, col.dbColumn, col.uiKey)
 		}
 		if expr != "" {
 			selectParts = append(selectParts, expr)
@@ -344,7 +344,7 @@ JOIN sys.query_store_runtime_stats rs ON p.plan_id = rs.plan_id
 JOIN sys.query_store_runtime_stats_interval rsi ON rs.runtime_stats_interval_id = rsi.runtime_stats_interval_id
 %s
 GROUP BY q.query_hash, qt.query_sql_text
-ORDER BY %s DESC
+ORDER BY [%s] DESC
 `, limit, strings.Join(selectParts, ",\n    "), timeFilter, orderByExpr)
 }
 
