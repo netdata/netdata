@@ -88,8 +88,7 @@ lookup: average -5m unaligned of used
 lookup: sum -30m unaligned absolute of out
   calc: $this / 1024 * 100 / ( $system.ram.used + $system.ram.cached + $system.ram.free )
  units: % of RAM
-  warn: $this > 200
-  crit: $this > 400
+  warn: $this > 20
 ```
 
 **Guidelines**:

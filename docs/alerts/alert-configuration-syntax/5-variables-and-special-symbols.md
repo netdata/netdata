@@ -124,8 +124,8 @@ Use when you need the exact raw value from the collector, not the interpolated c
 **Example:**
 ```conf
 on: system.mem
-calc: $mem_raw > 5000000  # Raw collected value in KiB
-warn: $this > 4000000
+calc: $mem_raw  # Raw collected value in KiB
+warn: $this > 5000000
 ```
 
 </details>
@@ -183,6 +183,8 @@ Alert status values are exposed as constants you can use in expressions for stat
 **Why values 1, 3, 4 instead of 1, 2, 3?**
 
 There's an internal status value 2 (`RAISED`) used by the health engine for state transitions. This status is not exposed as a constant variable (no `$RAISED`), but you may see `$status == 2` in logs or API responses during alert lifecycle transitions.
+
+:::
 
 :::note
 
