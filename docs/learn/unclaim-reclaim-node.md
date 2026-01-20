@@ -105,7 +105,10 @@ After reclaiming, verify the node appears in:
 **Node doesn't appear in new Space:**
 - Verify the claim token is correct for the new Space
 - Check `/var/lib/netdata/cloud.d/` was removed before reclaiming
-- Review agent logs: `grep -i CLAIM /var/log/netdata/daemon.log`
+- Review agent logs using:
+   - `journalctl --namespace netdata -b 0 | grep -i CLAIM`
+-or:
+   - `grep -i CLAIM /var/log/netdata/daemon.log`
 
 **Reconnection fails:**
 - Check connection status: `curl http://localhost:19999/api/v1/aclk`
