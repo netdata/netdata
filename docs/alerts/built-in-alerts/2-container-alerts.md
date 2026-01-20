@@ -1,4 +1,4 @@
-# 11.2 Container and Orchestration Alerts
+# 6.2 Container and Orchestration Alerts
 
 Container and orchestration alerts address the unique monitoring requirements of dynamic infrastructure. These alerts rely on collectors specific to container runtimes and orchestrators.
 
@@ -8,7 +8,7 @@ Container alerts require the appropriate collector to be enabled and collecting 
 
 :::
 
-## 11.2.1 Docker Container Alerts
+## 6.2.1 Docker Container Alerts
 
 Docker container alerts monitor both the runtime state of containers and their resource consumption.
 
@@ -26,7 +26,7 @@ Tracks running state of each container. A critical alert fires when a previously
 **Context:** `docker.container_state`
 **Thresholds:** CRIT not running
 
-## 11.2.2 Kubernetes Pod Alerts
+## 6.2.2 Kubernetes Pod Alerts
 
 Kubernetes pod alerts require the Netdata Kubernetes collector and provide visibility into pod health from the cluster perspective.
 
@@ -44,7 +44,7 @@ Fires when containers reach 90% of their configured memory limits.
 **Context:** `cgroup.mem_usage`
 **Thresholds:** WARN > 90% of limit
 
-## 11.2.3 Kubernetes Node Alerts
+## 6.2.3 Kubernetes Node Alerts
 
 Kubernetes node alerts are available through kubelet metrics.
 
@@ -57,7 +57,7 @@ Kubernetes node configuration error status from kubelet perspective.
 
 ## Related Sections
 
-- [11.1 Application Alerts](./3-application-alerts.md) - Database, web server, cache, and message queue alerts
-- [11.3 Hardware Alerts](./5-hardware-alerts.md) - Physical server and storage device alerts
-- [11.4 Network Alerts](./4-network-alerts.md) - Network interface and protocol monitoring
-- [11.5 System Resource Alerts](./1-system-resource-alerts.md) - CPU, memory, disk, and load alerts
+- [6.1 System Resource Alerts](./1-system-resource-alerts.md) - CPU, memory, disk, and load alerts
+- [6.3 Application Alerts](./3-application-alerts.md) - Database, web server, cache, and message queue alerts
+- [6.4 Network Alerts](./4-network-alerts.md) - Network interface and protocol monitoring
+- [6.5 Hardware Alerts](./5-hardware-alerts.md) - Physical server and storage device alerts
