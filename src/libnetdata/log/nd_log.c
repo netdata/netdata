@@ -226,7 +226,7 @@ cleanup:
 }
 
 // Async logging - formats message and enqueues for background writing
-static bool nd_logger_log_fields_async(FILE *fp, bool limit, ND_LOG_FIELD_PRIORITY priority,
+static bool nd_logger_log_fields_async(FILE *fp __maybe_unused, bool limit, ND_LOG_FIELD_PRIORITY priority,
                                        ND_LOG_METHOD output, struct nd_log_source *source,
                                        struct log_field *fields, size_t fields_max) {
     // Check limits without holding spinlock - slightly racy but acceptable for logging
@@ -234,28 +234,22 @@ static bool nd_logger_log_fields_async(FILE *fp, bool limit, ND_LOG_FIELD_PRIORI
         return true;  // Rate limited, but successfully "handled"
 
     // Pre-format the message into a queue entry (no locks held)
+    // Note: FILE* is looked up at write time from nd_log.sources[source] to handle log rotation
     struct nd_log_queue_entry entry = {
         .source = source - nd_log.sources,  // Calculate source index
         .priority = priority,
         .method = output,
         .format = source->format,
-        .fp = fp,
-        .fd = nd_log.journal_direct.fd,
-        .journal_direct_initialized = nd_log.journal_direct.initialized,
-        .journal_libsystemd_initialized = nd_log.journal.initialized,
         .syslog_initialized = nd_log.syslog.initialized,
         .message_len = 0,
         .message_allocated = NULL,
     };
 
     // Format the message based on output method
-    BUFFER *wb = buffer_create(1024, NULL);
+    // Note: NDLM_JOURNAL is not supported async - it goes through sync path
+    CLEAN_BUFFER *wb = buffer_create(1024, NULL);
 
-    if(output == NDLM_JOURNAL) {
-        // Format using journal native protocol (KEY=VALUE\n format)
-        nd_logger_journal_format(wb, fields, fields_max);
-    }
-    else if(output == NDLM_FILE || output == NDLM_STDOUT || output == NDLM_STDERR) {
+    if(output == NDLM_FILE || output == NDLM_STDOUT || output == NDLM_STDERR) {
         if(source->format == NDLF_JSON)
             nd_logger_json(wb, fields, fields_max);
         else
@@ -266,7 +260,6 @@ static bool nd_logger_log_fields_async(FILE *fp, bool limit, ND_LOG_FIELD_PRIORI
         nd_logger_logfmt(wb, fields, fields_max);
     }
     else {
-        buffer_free(wb);
         return false;
     }
 
@@ -294,9 +287,8 @@ static bool nd_logger_log_fields_async(FILE *fp, bool limit, ND_LOG_FIELD_PRIORI
         entry.message_allocated[msg_len] = '\0';
     }
 
-    buffer_free(wb);
-
     // Enqueue the entry (transfers ownership of allocated pointer)
+    // Note: wb is CLEAN_BUFFER so it auto-frees on return
     return nd_log_queue_enqueue(&entry);
 }
 
@@ -304,11 +296,11 @@ static bool nd_logger_log_fields_async(FILE *fp, bool limit, ND_LOG_FIELD_PRIORI
 static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LOG_FIELD_PRIORITY priority,
                                  ND_LOG_METHOD output, struct nd_log_source *source,
                                  struct log_field *fields, size_t fields_max) {
-    // Always call fatal hook first
-    nd_log_fatal_hook(fields, fields_max);
-
-    // Critical messages (ALERT and above) always go synchronously
-    // This ensures they are written immediately before potential crash
+    // Critical messages (ALERT and above) always go synchronously.
+    // This ensures they are written immediately before potential crash.
+    // Note: nd_logger_log_fields_sync() calls nd_log_fatal_hook() which only
+    // does work when nd_log_fatal_event is true. That flag is only set for
+    // fatal messages (NDLP_ALERT), which always take this sync path.
     if(priority <= NDLP_ALERT) {
         nd_logger_log_fields_sync(spinlock, fp, limit, priority, output, source, fields, fields_max);
         return;
