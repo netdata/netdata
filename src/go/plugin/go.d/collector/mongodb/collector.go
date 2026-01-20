@@ -23,6 +23,8 @@ func init() {
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
+		Methods:         mongoMethods,
+		HandleMethod:    mongoHandleMethod,
 	})
 }
 
@@ -50,12 +52,23 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string             `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int                `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry int                `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	URI                string             `yaml:"uri" json:"uri"`
-	Timeout            confopt.Duration   `yaml:"timeout,omitempty" json:"timeout"`
-	Databases          matcher.SimpleExpr `yaml:"databases,omitempty" json:"databases"`
+	Vnode                     string             `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery               int                `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry        int                `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	URI                       string             `yaml:"uri" json:"uri"`
+	Timeout                   confopt.Duration   `yaml:"timeout,omitempty" json:"timeout"`
+	Databases                 matcher.SimpleExpr `yaml:"databases,omitempty" json:"databases"`
+	TopQueriesFunctionEnabled *bool              `yaml:"top_queries_function_enabled,omitempty" json:"top_queries_function_enabled,omitempty"`
+	TopQueriesLimit           int                `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
+}
+
+// GetTopQueriesFunctionEnabled returns whether the top queries function is enabled.
+// Defaults to true if not explicitly configured.
+func (c *Config) GetTopQueriesFunctionEnabled() bool {
+	if c.TopQueriesFunctionEnabled == nil {
+		return true
+	}
+	return *c.TopQueriesFunctionEnabled
 }
 
 type Collector struct {
@@ -72,6 +85,10 @@ type Collector struct {
 	databases      map[string]bool
 	replSetMembers map[string]bool
 	shards         map[string]bool
+
+	// Top queries column cache with double-checked locking
+	topQueriesColsMu sync.RWMutex
+	topQueriesCols   map[string]bool
 }
 
 func (c *Collector) Configuration() any {

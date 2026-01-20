@@ -8,11 +8,38 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
 const maxQueryTextLength = 4096
+
+const (
+	paramSort = "__sort"
+
+	ftString   = funcapi.FieldTypeString
+	ftInteger  = funcapi.FieldTypeInteger
+	ftFloat    = funcapi.FieldTypeFloat
+	ftDuration = funcapi.FieldTypeDuration
+
+	trNone     = funcapi.FieldTransformNone
+	trNumber   = funcapi.FieldTransformNumber
+	trDuration = funcapi.FieldTransformDuration
+
+	sortAsc  = funcapi.FieldSortAscending
+	sortDesc = funcapi.FieldSortDescending
+
+	summaryCount  = funcapi.FieldSummaryCount
+	summarySum    = funcapi.FieldSummarySum
+	summaryMin    = funcapi.FieldSummaryMin
+	summaryMax    = funcapi.FieldSummaryMax
+	summaryMean   = funcapi.FieldSummaryMean
+	summaryMedian = funcapi.FieldSummaryMedian
+
+	filterMulti = funcapi.FieldFilterMultiselect
+	filterRange = funcapi.FieldFilterRange
+)
 
 // pgColumnMeta defines metadata for a pg_stat_statements column
 type pgColumnMeta struct {
@@ -23,21 +50,21 @@ type pgColumnMeta struct {
 	// Display name in UI
 	displayName string
 	// Data type: "string", "integer", "float", "duration"
-	dataType string
+	dataType funcapi.FieldType
 	// Unit for duration/numeric types
 	units string
 	// Whether visible by default
 	visible bool
 	// Transform for value_options
-	transform string
+	transform funcapi.FieldTransform
 	// Decimal points for display
 	decimalPoints int
 	// Sort direction preference
-	sortDir string
+	sortDir funcapi.FieldSort
 	// Summary function
-	summary string
+	summary funcapi.FieldSummary
 	// Filter type
-	filter string
+	filter funcapi.FieldFilter
 	// Whether this is a sortable option for the sort dropdown
 	isSortOption bool
 	// Sort option label (if isSortOption)
@@ -56,100 +83,111 @@ type pgColumnMeta struct {
 // Order matters - this determines column index in the response
 var pgAllColumns = []pgColumnMeta{
 	// Core identification columns (always present)
-	{dbColumn: "s.queryid::text", uiKey: "queryid", displayName: "Query ID", dataType: "string", visible: false, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isUniqueKey: true},
-	{dbColumn: "s.query", uiKey: "query", displayName: "Query", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isSticky: true, fullWidth: true},
-	{dbColumn: "d.datname", uiKey: "database", displayName: "Database", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
-	{dbColumn: "u.usename", uiKey: "user", displayName: "User", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
+	{dbColumn: "s.queryid::text", uiKey: "queryid", displayName: "Query ID", dataType: ftString, visible: false, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti, isUniqueKey: true},
+	{dbColumn: "s.query", uiKey: "query", displayName: "Query", dataType: ftString, visible: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti, isSticky: true, fullWidth: true},
+	{dbColumn: "d.datname", uiKey: "database", displayName: "Database", dataType: ftString, visible: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti},
+	{dbColumn: "u.usename", uiKey: "user", displayName: "User", dataType: ftString, visible: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti},
 
 	// Execution count (always present)
-	{dbColumn: "s.calls", uiKey: "calls", displayName: "Calls", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Number of Calls"},
+	{dbColumn: "s.calls", uiKey: "calls", displayName: "Calls", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Number of Calls"},
 
 	// Execution time columns (names vary by version - detected dynamically)
 	// PG <13: total_time, mean_time, min_time, max_time, stddev_time
 	// PG 13+: total_exec_time, mean_exec_time, min_exec_time, max_exec_time, stddev_exec_time
-	{dbColumn: "total_time", uiKey: "totalTime", displayName: "Total Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Total Execution Time", isDefaultSort: true},
-	{dbColumn: "mean_time", uiKey: "meanTime", displayName: "Mean Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isSortOption: true, sortLabel: "Average Execution Time"},
-	{dbColumn: "min_time", uiKey: "minTime", displayName: "Min Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "min", filter: "range"},
-	{dbColumn: "max_time", uiKey: "maxTime", displayName: "Max Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range"},
-	{dbColumn: "stddev_time", uiKey: "stddevTime", displayName: "Stddev Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range"},
+	{dbColumn: "total_time", uiKey: "totalTime", displayName: "Total Time", dataType: ftDuration, units: "milliseconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Total Execution Time", isDefaultSort: true},
+	{dbColumn: "mean_time", uiKey: "meanTime", displayName: "Mean Time", dataType: ftDuration, units: "milliseconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange, isSortOption: true, sortLabel: "Average Execution Time"},
+	{dbColumn: "min_time", uiKey: "minTime", displayName: "Min Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMin, filter: filterRange},
+	{dbColumn: "max_time", uiKey: "maxTime", displayName: "Max Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange},
+	{dbColumn: "stddev_time", uiKey: "stddevTime", displayName: "Stddev Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange},
 
 	// Planning time columns (PG 13+ only)
-	{dbColumn: "s.plans", uiKey: "plans", displayName: "Plans", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "total_plan_time", uiKey: "totalPlanTime", displayName: "Total Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "mean_plan_time", uiKey: "meanPlanTime", displayName: "Mean Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range"},
-	{dbColumn: "min_plan_time", uiKey: "minPlanTime", displayName: "Min Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "min", filter: "range"},
-	{dbColumn: "max_plan_time", uiKey: "maxPlanTime", displayName: "Max Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range"},
-	{dbColumn: "stddev_plan_time", uiKey: "stddevPlanTime", displayName: "Stddev Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range"},
+	{dbColumn: "s.plans", uiKey: "plans", displayName: "Plans", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "total_plan_time", uiKey: "totalPlanTime", displayName: "Total Plan Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "mean_plan_time", uiKey: "meanPlanTime", displayName: "Mean Plan Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange},
+	{dbColumn: "min_plan_time", uiKey: "minPlanTime", displayName: "Min Plan Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMin, filter: filterRange},
+	{dbColumn: "max_plan_time", uiKey: "maxPlanTime", displayName: "Max Plan Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange},
+	{dbColumn: "stddev_plan_time", uiKey: "stddevPlanTime", displayName: "Stddev Plan Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange},
 
 	// Row count (always present)
-	{dbColumn: "s.rows", uiKey: "rows", displayName: "Rows", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Rows Returned"},
+	{dbColumn: "s.rows", uiKey: "rows", displayName: "Rows", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Rows Returned"},
 
 	// Shared buffer statistics (always present)
-	{dbColumn: "s.shared_blks_hit", uiKey: "sharedBlksHit", displayName: "Shared Blocks Hit", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Shared Blocks Hit (Cache)"},
-	{dbColumn: "s.shared_blks_read", uiKey: "sharedBlksRead", displayName: "Shared Blocks Read", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Shared Blocks Read (Disk I/O)"},
-	{dbColumn: "s.shared_blks_dirtied", uiKey: "sharedBlksDirtied", displayName: "Shared Blocks Dirtied", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.shared_blks_written", uiKey: "sharedBlksWritten", displayName: "Shared Blocks Written", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.shared_blks_hit", uiKey: "sharedBlksHit", displayName: "Shared Blocks Hit", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Shared Blocks Hit (Cache)"},
+	{dbColumn: "s.shared_blks_read", uiKey: "sharedBlksRead", displayName: "Shared Blocks Read", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Shared Blocks Read (Disk I/O)"},
+	{dbColumn: "s.shared_blks_dirtied", uiKey: "sharedBlksDirtied", displayName: "Shared Blocks Dirtied", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "s.shared_blks_written", uiKey: "sharedBlksWritten", displayName: "Shared Blocks Written", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
 
 	// Local buffer statistics (always present)
-	{dbColumn: "s.local_blks_hit", uiKey: "localBlksHit", displayName: "Local Blocks Hit", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.local_blks_read", uiKey: "localBlksRead", displayName: "Local Blocks Read", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.local_blks_dirtied", uiKey: "localBlksDirtied", displayName: "Local Blocks Dirtied", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.local_blks_written", uiKey: "localBlksWritten", displayName: "Local Blocks Written", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.local_blks_hit", uiKey: "localBlksHit", displayName: "Local Blocks Hit", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "s.local_blks_read", uiKey: "localBlksRead", displayName: "Local Blocks Read", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "s.local_blks_dirtied", uiKey: "localBlksDirtied", displayName: "Local Blocks Dirtied", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "s.local_blks_written", uiKey: "localBlksWritten", displayName: "Local Blocks Written", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
 
 	// Temp buffer statistics (always present)
-	{dbColumn: "s.temp_blks_read", uiKey: "tempBlksRead", displayName: "Temp Blocks Read", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.temp_blks_written", uiKey: "tempBlksWritten", displayName: "Temp Blocks Written", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Temp Blocks Written"},
+	{dbColumn: "s.temp_blks_read", uiKey: "tempBlksRead", displayName: "Temp Blocks Read", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "s.temp_blks_written", uiKey: "tempBlksWritten", displayName: "Temp Blocks Written", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Temp Blocks Written"},
 
 	// I/O timing (requires track_io_timing, always present but may be 0)
-	{dbColumn: "s.blk_read_time", uiKey: "blkReadTime", displayName: "Block Read Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.blk_write_time", uiKey: "blkWriteTime", displayName: "Block Write Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.blk_read_time", uiKey: "blkReadTime", displayName: "Block Read Time", dataType: ftDuration, units: "milliseconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "s.blk_write_time", uiKey: "blkWriteTime", displayName: "Block Write Time", dataType: ftDuration, units: "milliseconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
 
 	// WAL statistics (PG 13+ only)
-	{dbColumn: "s.wal_records", uiKey: "walRecords", displayName: "WAL Records", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.wal_fpi", uiKey: "walFpi", displayName: "WAL Full Page Images", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.wal_bytes", uiKey: "walBytes", displayName: "WAL Bytes", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.wal_records", uiKey: "walRecords", displayName: "WAL Records", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "s.wal_fpi", uiKey: "walFpi", displayName: "WAL Full Page Images", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "s.wal_bytes", uiKey: "walBytes", displayName: "WAL Bytes", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
 
 	// JIT statistics (PG 15+ only)
-	{dbColumn: "s.jit_functions", uiKey: "jitFunctions", displayName: "JIT Functions", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.jit_generation_time", uiKey: "jitGenerationTime", displayName: "JIT Generation Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.jit_inlining_count", uiKey: "jitInliningCount", displayName: "JIT Inlining Count", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.jit_inlining_time", uiKey: "jitInliningTime", displayName: "JIT Inlining Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.jit_optimization_count", uiKey: "jitOptimizationCount", displayName: "JIT Optimization Count", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.jit_optimization_time", uiKey: "jitOptimizationTime", displayName: "JIT Optimization Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.jit_emission_count", uiKey: "jitEmissionCount", displayName: "JIT Emission Count", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.jit_emission_time", uiKey: "jitEmissionTime", displayName: "JIT Emission Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.jit_functions", uiKey: "jitFunctions", displayName: "JIT Functions", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "s.jit_generation_time", uiKey: "jitGenerationTime", displayName: "JIT Generation Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "s.jit_inlining_count", uiKey: "jitInliningCount", displayName: "JIT Inlining Count", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "s.jit_inlining_time", uiKey: "jitInliningTime", displayName: "JIT Inlining Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "s.jit_optimization_count", uiKey: "jitOptimizationCount", displayName: "JIT Optimization Count", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "s.jit_optimization_time", uiKey: "jitOptimizationTime", displayName: "JIT Optimization Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "s.jit_emission_count", uiKey: "jitEmissionCount", displayName: "JIT Emission Count", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "s.jit_emission_time", uiKey: "jitEmissionTime", displayName: "JIT Emission Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
 
 	// Temp file statistics (PG 15+ only)
-	{dbColumn: "s.temp_blk_read_time", uiKey: "tempBlkReadTime", displayName: "Temp Block Read Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.temp_blk_write_time", uiKey: "tempBlkWriteTime", displayName: "Temp Block Write Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.temp_blk_read_time", uiKey: "tempBlkReadTime", displayName: "Temp Block Read Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "s.temp_blk_write_time", uiKey: "tempBlkWriteTime", displayName: "Temp Block Write Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
 }
 
 // pgMethods returns the available function methods for PostgreSQL
 // Sort options are built dynamically based on available columns
 func pgMethods() []module.MethodConfig {
 	// Build sort options from column metadata
-	var sortOptions []module.SortOption
+	var sortOptions []funcapi.ParamOption
+	sortDir := funcapi.FieldSortDescending
 	for _, col := range pgAllColumns {
 		if col.isSortOption {
-			sortOptions = append(sortOptions, module.SortOption{
+			sortOptions = append(sortOptions, funcapi.ParamOption{
 				ID:      col.uiKey,
-				Column:  col.dbColumn,
-				Label:   "Top queries by " + col.sortLabel,
+				Column:  col.uiKey,
+				Name:    "Top queries by " + col.sortLabel,
 				Default: col.isDefaultSort,
+				Sort:    &sortDir,
 			})
 		}
 	}
 
 	return []module.MethodConfig{{
-		ID:          "top-queries",
-		Name:        "Top Queries",
-		Help:        "Top SQL queries from pg_stat_statements",
-		SortOptions: sortOptions,
+		ID:   "top-queries",
+		Name: "Top Queries",
+		Help: "Top SQL queries from pg_stat_statements",
+		RequiredParams: []funcapi.ParamConfig{
+			{
+				ID:         paramSort,
+				Name:       "Filter By",
+				Help:       "Select the primary sort column",
+				Selection:  funcapi.ParamSelect,
+				Options:    sortOptions,
+				UniqueView: true,
+			},
+		},
 	}}
 }
 
 // pgHandleMethod handles function requests for PostgreSQL
-func pgHandleMethod(ctx context.Context, job *module.Job, method, sortColumn string) *module.FunctionResponse {
+func pgHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
 	collector, ok := job.Module().(*Collector)
 	if !ok {
 		return &module.FunctionResponse{Status: 500, Message: "internal error: invalid module type"}
@@ -165,7 +203,7 @@ func pgHandleMethod(ctx context.Context, job *module.Job, method, sortColumn str
 
 	switch method {
 	case "top-queries":
-		return collector.collectTopQueries(ctx, sortColumn)
+		return collector.collectTopQueries(ctx, params.Column(paramSort))
 	default:
 		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
 	}
@@ -239,6 +277,14 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 
 	// Build dynamic sort options from available columns (only those actually detected)
 	sortOptions := c.buildDynamicSortOptions(queryCols)
+	sortParam := funcapi.ParamConfig{
+		ID:         paramSort,
+		Name:       "Filter By",
+		Help:       "Select the primary sort column",
+		Selection:  funcapi.ParamSelect,
+		Options:    sortOptions,
+		UniqueView: true,
+	}
 
 	// Find default sort column UI key from metadata
 	defaultSort := ""
@@ -259,7 +305,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		Columns:           c.buildDynamicColumns(queryCols),
 		Data:              data,
 		DefaultSortColumn: defaultSort,
-		SortOptions:       sortOptions,
+		RequiredParams:    []funcapi.ParamConfig{sortParam},
 
 		// Charts for aggregated visualization
 		Charts: map[string]module.ChartConfig{
@@ -512,13 +558,13 @@ func (c *Collector) scanDynamicRows(rows dbRows, cols []pgColumnMeta) ([][]any, 
 		// Reset value holders for each row
 		for i, col := range cols {
 			switch col.dataType {
-			case "string":
+			case ftString:
 				var v sql.NullString
 				values[i] = &v
-			case "integer":
+			case ftInteger:
 				var v sql.NullInt64
 				values[i] = &v
-			case "float", "duration":
+			case ftFloat, ftDuration:
 				var v sql.NullFloat64
 				values[i] = &v
 			default:
@@ -573,41 +619,33 @@ func (c *Collector) buildDynamicColumns(cols []pgColumnMeta) map[string]any {
 	result := make(map[string]any)
 
 	for i, col := range cols {
-		colDef := map[string]any{
-			"index":                   i,
-			"unique_key":              col.isUniqueKey,
-			"name":                    col.displayName,
-			"type":                    col.dataType,
-			"visible":                 col.visible,
-			"visualization":           "value",
-			"sort":                    col.sortDir,
-			"sortable":                true,
-			"sticky":                  col.isSticky,
-			"summary":                 col.summary,
-			"filter":                  col.filter,
-			"full_width":              col.fullWidth,
-			"wrap":                    false,
-			"default_expanded_filter": false,
+		visual := funcapi.FieldVisualValue
+		if col.dataType == ftDuration {
+			visual = funcapi.FieldVisualBar
 		}
-
-		// Add value_options
-		valueOpts := map[string]any{
-			"transform":      col.transform,
-			"decimal_points": col.decimalPoints,
-			"default_value":  nil,
+		colDef := funcapi.Column{
+			Index:                 i,
+			Name:                  col.displayName,
+			Type:                  col.dataType,
+			Units:                 col.units,
+			Visualization:         visual,
+			Sort:                  col.sortDir,
+			Sortable:              true,
+			Sticky:                col.isSticky,
+			Summary:               col.summary,
+			Filter:                col.filter,
+			FullWidth:             col.fullWidth,
+			Wrap:                  false,
+			DefaultExpandedFilter: false,
+			UniqueKey:             col.isUniqueKey,
+			Visible:               col.visible,
+			ValueOptions: funcapi.ValueOptions{
+				Transform:     col.transform,
+				DecimalPoints: col.decimalPoints,
+				DefaultValue:  nil,
+			},
 		}
-		if col.units != "" {
-			valueOpts["units"] = col.units
-			colDef["units"] = col.units
-		}
-		colDef["value_options"] = valueOpts
-
-		// Use bar visualization for duration columns
-		if col.dataType == "duration" {
-			colDef["visualization"] = "bar"
-		}
-
-		result[col.uiKey] = colDef
+		result[col.uiKey] = colDef.BuildColumn()
 	}
 
 	return result
@@ -615,18 +653,20 @@ func (c *Collector) buildDynamicColumns(cols []pgColumnMeta) map[string]any {
 
 // buildDynamicSortOptions builds sort options from available columns
 // Returns only sort options for columns that actually exist in the database
-func (c *Collector) buildDynamicSortOptions(cols []pgColumnMeta) []module.SortOption {
-	var sortOpts []module.SortOption
+func (c *Collector) buildDynamicSortOptions(cols []pgColumnMeta) []funcapi.ParamOption {
+	var sortOpts []funcapi.ParamOption
 	seen := make(map[string]bool)
+	sortDir := funcapi.FieldSortDescending
 
 	for _, col := range cols {
 		if col.isSortOption && !seen[col.uiKey] {
 			seen[col.uiKey] = true
-			sortOpts = append(sortOpts, module.SortOption{
+			sortOpts = append(sortOpts, funcapi.ParamOption{
 				ID:      col.uiKey,
 				Column:  col.uiKey,
-				Label:   col.sortLabel,
+				Name:    col.sortLabel,
 				Default: col.isDefaultSort,
+				Sort:    &sortDir,
 			})
 		}
 	}

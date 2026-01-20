@@ -5,6 +5,7 @@ package mssql
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,11 +16,21 @@ func TestMssqlMethods(t *testing.T) {
 	require.Len(methods, 1)
 	require.Equal("top-queries", methods[0].ID)
 	require.Equal("Top Queries", methods[0].Name)
-	require.NotEmpty(methods[0].SortOptions)
+	require.NotEmpty(methods[0].RequiredParams)
 
 	// Verify at least one default sort option exists
+	var sortParam *funcapi.ParamConfig
+	for i := range methods[0].RequiredParams {
+		if methods[0].RequiredParams[i].ID == "__sort" {
+			sortParam = &methods[0].RequiredParams[i]
+			break
+		}
+	}
+	require.NotNil(sortParam, "expected __sort required param")
+	require.NotEmpty(sortParam.Options)
+
 	hasDefault := false
-	for _, opt := range methods[0].SortOptions {
+	for _, opt := range sortParam.Options {
 		if opt.Default {
 			hasDefault = true
 			require.Equal("totalTime", opt.ID) // camelCase for UI
@@ -56,12 +67,10 @@ func TestMssqlAllColumns_HasValidMetadata(t *testing.T) {
 		assert.NotEmpty(t, col.displayName, "column %s must have displayName", col.uiKey)
 
 		// Every column must have a data type
-		assert.NotEmpty(t, col.dataType, "column %s must have dataType", col.uiKey)
-		assert.Contains(t, []string{"string", "integer", "float", "duration"}, col.dataType,
-			"column %s has invalid dataType: %s", col.uiKey, col.dataType)
+		assert.NotEqual(t, funcapi.FieldTypeNone, col.dataType, "column %s must have dataType", col.uiKey)
 
 		// Duration columns must have units
-		if col.dataType == "duration" {
+		if col.dataType == ftDuration {
 			assert.NotEmpty(t, col.units, "duration column %s must have units", col.uiKey)
 		}
 
@@ -166,11 +175,11 @@ func TestCollector_buildMSSQLDynamicSQL(t *testing.T) {
 	c := &Collector{}
 
 	cols := []mssqlColumnMeta{
-		{dbColumn: "query_hash", uiKey: "queryHash", dataType: "string", isIdentity: true},
-		{dbColumn: "query_sql_text", uiKey: "query", dataType: "string", isIdentity: true},
-		{dbColumn: "database_name", uiKey: "database", dataType: "string", isIdentity: true},
-		{dbColumn: "count_executions", uiKey: "calls", dataType: "integer"},
-		{dbColumn: "avg_duration", uiKey: "totalTime", dataType: "duration", isMicroseconds: true},
+		{dbColumn: "query_hash", uiKey: "queryHash", dataType: ftString, isIdentity: true},
+		{dbColumn: "query_sql_text", uiKey: "query", dataType: ftString, isIdentity: true},
+		{dbColumn: "database_name", uiKey: "database", dataType: ftString, isIdentity: true},
+		{dbColumn: "count_executions", uiKey: "calls", dataType: ftInteger},
+		{dbColumn: "avg_duration", uiKey: "totalTime", dataType: ftDuration, isMicroseconds: true},
 	}
 
 	// sortColumn is the uiKey which is also used as the SQL alias
@@ -197,8 +206,8 @@ func TestCollector_buildMSSQLDynamicSQL_NoTimeFilter(t *testing.T) {
 	c := &Collector{}
 
 	cols := []mssqlColumnMeta{
-		{dbColumn: "query_hash", uiKey: "queryHash", dataType: "string", isIdentity: true},
-		{dbColumn: "count_executions", uiKey: "calls", dataType: "integer"},
+		{dbColumn: "query_hash", uiKey: "queryHash", dataType: ftString, isIdentity: true},
+		{dbColumn: "count_executions", uiKey: "calls", dataType: ftInteger},
 	}
 
 	sql := c.buildMSSQLDynamicSQL(cols, "calls", 0, 500)
@@ -213,9 +222,9 @@ func TestCollector_buildMSSQLDynamicColumns(t *testing.T) {
 	c := &Collector{}
 
 	cols := []mssqlColumnMeta{
-		{uiKey: "queryHash", displayName: "Query Hash", dataType: "string", visible: false, isUniqueKey: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
-		{uiKey: "query", displayName: "Query", dataType: "string", visible: true, isSticky: true, fullWidth: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
-		{uiKey: "totalTime", displayName: "Total Time", dataType: "duration", units: "seconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
+		{uiKey: "queryHash", displayName: "Query Hash", dataType: ftString, visible: false, isUniqueKey: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti},
+		{uiKey: "query", displayName: "Query", dataType: ftString, visible: true, isSticky: true, fullWidth: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti},
+		{uiKey: "totalTime", displayName: "Total Time", dataType: ftDuration, units: "seconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
 	}
 
 	columns := c.buildMSSQLDynamicColumns(cols)
@@ -252,10 +261,18 @@ func TestMssqlMethods_SortOptionsHaveLabels(t *testing.T) {
 	methods := mssqlMethods()
 
 	for _, method := range methods {
-		for _, opt := range method.SortOptions {
+		var sortParam *funcapi.ParamConfig
+		for i := range method.RequiredParams {
+			if method.RequiredParams[i].ID == "__sort" {
+				sortParam = &method.RequiredParams[i]
+				break
+			}
+		}
+		assert.NotNil(t, sortParam)
+		for _, opt := range sortParam.Options {
 			assert.NotEmpty(t, opt.ID, "sort option must have ID")
-			assert.NotEmpty(t, opt.Label, "sort option %s must have Label", opt.ID)
-			assert.Contains(t, opt.Label, "Top queries by", "label should have standard prefix")
+			assert.NotEmpty(t, opt.Name, "sort option %s must have Name", opt.ID)
+			assert.Contains(t, opt.Name, "Top queries by", "label should have standard prefix")
 		}
 	}
 }

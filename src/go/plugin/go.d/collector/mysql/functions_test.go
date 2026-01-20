@@ -5,6 +5,7 @@ package mysql
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,11 +16,21 @@ func TestMysqlMethods(t *testing.T) {
 	require.Len(methods, 1)
 	require.Equal("top-queries", methods[0].ID)
 	require.Equal("Top Queries", methods[0].Name)
-	require.NotEmpty(methods[0].SortOptions)
+	require.NotEmpty(methods[0].RequiredParams)
 
 	// Verify at least one default sort option exists
+	var sortParam *funcapi.ParamConfig
+	for i := range methods[0].RequiredParams {
+		if methods[0].RequiredParams[i].ID == "__sort" {
+			sortParam = &methods[0].RequiredParams[i]
+			break
+		}
+	}
+	require.NotNil(sortParam, "expected __sort required param")
+	require.NotEmpty(sortParam.Options)
+
 	hasDefault := false
-	for _, opt := range methods[0].SortOptions {
+	for _, opt := range sortParam.Options {
 		if opt.Default {
 			hasDefault = true
 			require.Equal("totalTime", opt.ID) // camelCase for UI
@@ -56,12 +67,10 @@ func TestMysqlAllColumns_HasValidMetadata(t *testing.T) {
 		assert.NotEmpty(t, col.displayName, "column %s must have displayName", col.uiKey)
 
 		// Every column must have a data type
-		assert.NotEmpty(t, col.dataType, "column %s must have dataType", col.uiKey)
-		assert.Contains(t, []string{"string", "integer", "float", "duration"}, col.dataType,
-			"column %s has invalid dataType: %s", col.uiKey, col.dataType)
+		assert.NotEqual(t, funcapi.FieldTypeNone, col.dataType, "column %s must have dataType", col.uiKey)
 
 		// Duration columns must have units
-		if col.dataType == "duration" {
+		if col.dataType == ftDuration {
 			assert.NotEmpty(t, col.units, "duration column %s must have units", col.uiKey)
 		}
 
@@ -164,10 +173,10 @@ func TestCollector_buildMySQLDynamicSQL(t *testing.T) {
 	c := &Collector{}
 
 	cols := []mysqlColumnMeta{
-		{dbColumn: "DIGEST", uiKey: "digest", dataType: "string"},
-		{dbColumn: "DIGEST_TEXT", uiKey: "query", dataType: "string"},
-		{dbColumn: "COUNT_STAR", uiKey: "calls", dataType: "integer"},
-		{dbColumn: "SUM_TIMER_WAIT", uiKey: "totalTime", dataType: "duration", isPicoseconds: true},
+		{dbColumn: "DIGEST", uiKey: "digest", dataType: ftString},
+		{dbColumn: "DIGEST_TEXT", uiKey: "query", dataType: ftString},
+		{dbColumn: "COUNT_STAR", uiKey: "calls", dataType: ftInteger},
+		{dbColumn: "SUM_TIMER_WAIT", uiKey: "totalTime", dataType: ftDuration, isPicoseconds: true},
 	}
 
 	sql := c.buildMySQLDynamicSQL(cols, "totalTime", 500)
@@ -186,9 +195,9 @@ func TestCollector_buildMySQLDynamicColumns(t *testing.T) {
 	c := &Collector{}
 
 	cols := []mysqlColumnMeta{
-		{uiKey: "digest", displayName: "Digest", dataType: "string", visible: false, isUniqueKey: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
-		{uiKey: "query", displayName: "Query", dataType: "string", visible: true, isSticky: true, fullWidth: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
-		{uiKey: "totalTime", displayName: "Total Time", dataType: "duration", units: "seconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
+		{uiKey: "digest", displayName: "Digest", dataType: ftString, visible: false, isUniqueKey: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti},
+		{uiKey: "query", displayName: "Query", dataType: ftString, visible: true, isSticky: true, fullWidth: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti},
+		{uiKey: "totalTime", displayName: "Total Time", dataType: ftDuration, units: "seconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
 	}
 
 	columns := c.buildMySQLDynamicColumns(cols)
@@ -225,10 +234,18 @@ func TestMysqlMethods_SortOptionsHaveLabels(t *testing.T) {
 	methods := mysqlMethods()
 
 	for _, method := range methods {
-		for _, opt := range method.SortOptions {
+		var sortParam *funcapi.ParamConfig
+		for i := range method.RequiredParams {
+			if method.RequiredParams[i].ID == "__sort" {
+				sortParam = &method.RequiredParams[i]
+				break
+			}
+		}
+		assert.NotNil(t, sortParam)
+		for _, opt := range sortParam.Options {
 			assert.NotEmpty(t, opt.ID, "sort option must have ID")
-			assert.NotEmpty(t, opt.Label, "sort option %s must have Label", opt.ID)
-			assert.Contains(t, opt.Label, "Top queries by", "label should have standard prefix")
+			assert.NotEmpty(t, opt.Name, "sort option %s must have Name", opt.ID)
+			assert.Contains(t, opt.Name, "Top queries by", "label should have standard prefix")
 		}
 	}
 }

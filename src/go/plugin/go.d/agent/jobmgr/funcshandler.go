@@ -9,8 +9,15 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+)
+
+const (
+	paramMethod = "__method"
+	paramJob    = "__job"
+	paramSort   = "__sort"
 )
 
 // makeModuleFuncHandler creates a function handler for a module that provides methods
@@ -22,120 +29,55 @@ func (m *Manager) makeModuleFuncHandler(moduleName string) func(functions.Functi
 			return
 		}
 
-		// Parse __method:xxx, __job:xxx, __sort:xxx from args AND payload (v3 protocol)
-		method, jobName, sortBy := "", "", ""
-
-		// First, try to parse from JSON payload (v3 protocol sends params here)
-		// Frontend sends: {"selections": {"__method": ["top-queries"], ...}, "timeout": 120000}
-		// We need to extract from "selections" sub-object, with arrays as values
-		if len(fn.Payload) > 0 {
-			var payload map[string]any
-			if err := json.Unmarshal(fn.Payload, &payload); err == nil {
-				// Check for "selections" sub-object (v3 frontend format)
-				if selections, ok := payload["selections"].(map[string]any); ok {
-					method = extractParamValue(selections, "__method")
-					jobName = extractParamValue(selections, "__job")
-					sortBy = extractParamValue(selections, "__sort")
-				} else {
-					// Fallback: params at top level (legacy or direct API calls)
-					method = extractParamValue(payload, "__method")
-					jobName = extractParamValue(payload, "__job")
-					sortBy = extractParamValue(payload, "__sort")
-				}
-			}
-		}
-
-		// Fallback: parse from args (v2 protocol or CLI)
-		// Args override payload if both are present
-		for _, arg := range fn.Args {
-			switch {
-			case strings.HasPrefix(arg, "__method:"):
-				method = strings.TrimPrefix(arg, "__method:")
-			case strings.HasPrefix(arg, "__job:"):
-				jobName = strings.TrimPrefix(arg, "__job:")
-			case strings.HasPrefix(arg, "__sort:"):
-				sortBy = strings.TrimPrefix(arg, "__sort:")
-			}
-		}
-
-		// Validate method selection
 		methods := m.moduleFuncs.getMethods(moduleName)
-		if method == "" {
-			// No method yet, use nil for methodCfg - buildRequiredParams handles this
-			m.respondErrorWithParams(fn, moduleName, nil, 400,
-				"missing __method parameter, available: %v", methodIDs(methods))
+		if len(methods) == 0 {
+			m.respondError(fn, 404, "no methods available for %s", moduleName)
 			return
 		}
+
+		payload := parsePayload(fn.Payload)
+		argValues := parseArgsParams(fn.Args)
+
+		methodParam := buildMethodParamConfig(methods)
+		methodValues := paramValues(argValues, payload, paramMethod)
+		resolvedMethod := funcapi.ResolveParam(methodParam, methodValues)
+		method := resolvedMethod.GetOne()
 		methodCfg := findMethod(methods, method)
 		if methodCfg == nil {
-			m.respondErrorWithParams(fn, moduleName, nil, 404,
-				"unknown method '%s', available: %v", method, methodIDs(methods))
+			m.respondError(fn, 404, "unknown method '%s', available: %v", method, methodIDs(methods))
 			return
 		}
 
-		// Validate job selection
 		jobs := m.moduleFuncs.getJobNames(moduleName)
 		if len(jobs) == 0 {
-			m.respondErrorWithParams(fn, moduleName, methodCfg, 503,
-				"no %s instances configured", moduleName)
+			m.respondError(fn, 503, "no %s instances configured", moduleName)
 			return
 		}
+		jobParam := buildJobParamConfig(jobs)
+		jobValues := paramValues(argValues, payload, paramJob)
+		resolvedJob := funcapi.ResolveParam(jobParam, jobValues)
+		jobName := resolvedJob.GetOne()
 		if jobName == "" {
-			m.respondErrorWithParams(fn, moduleName, methodCfg, 400,
-				"missing __job parameter, available: %v", jobs)
+			m.respondError(fn, 404, "no %s instances configured", moduleName)
 			return
 		}
+
 		// Get job WITH generation for race condition detection
 		// The generation increments when a job is replaced (config reload)
 		job, jobGen := m.moduleFuncs.getJobWithGeneration(moduleName, jobName)
 		if job == nil {
-			m.respondErrorWithParams(fn, moduleName, methodCfg, 404,
-				"unknown job '%s', available: %v", jobName, jobs)
+			m.respondError(fn, 404, "unknown job '%s', available: %v", jobName, jobs)
 			return
 		}
 
-		// Validate and resolve sortBy
-		// SECURITY: sortBy MUST be validated against allowed options to prevent SQL injection
-		// The module uses sortBy to build ORDER BY clauses
-		sortColumn := "" // The actual column name to use in SQL
-		if sortBy == "" {
-			// Use default sort option
-			for _, opt := range methodCfg.SortOptions {
-				if opt.Default {
-					sortBy = opt.ID
-					sortColumn = opt.Column // Safe column name
-					break
-				}
-			}
-			// Fallback to first option if no default
-			if sortColumn == "" && len(methodCfg.SortOptions) > 0 {
-				sortBy = methodCfg.SortOptions[0].ID
-				sortColumn = methodCfg.SortOptions[0].Column
-			}
-		} else {
-			// Validate user-provided sortBy against whitelist
-			found := false
-			for _, opt := range methodCfg.SortOptions {
-				if opt.ID == sortBy {
-					sortColumn = opt.Column // Map ID to safe column name
-					found = true
-					break
-				}
-			}
-			if !found {
-				sortIDs := make([]string, len(methodCfg.SortOptions))
-				for i, opt := range methodCfg.SortOptions {
-					sortIDs[i] = opt.ID
-				}
-				m.respondErrorWithParams(fn, moduleName, methodCfg, 400,
-					"invalid __sort value '%s', allowed: %v", sortBy, sortIDs)
-				return
-			}
+		// Resolve method-specific required params
+		methodParamValues := make(map[string][]string, len(methodCfg.RequiredParams))
+		for _, paramCfg := range methodCfg.RequiredParams {
+			methodParamValues[paramCfg.ID] = paramValues(argValues, payload, paramCfg.ID)
 		}
-
-		// Guard: if method has no sort options, sortColumn stays empty
-		// This is valid for methods that return unsorted data or handle sorting internally
-		// The handler will receive empty string and must handle it appropriately
+		resolvedParams := funcapi.ResolveParams(methodCfg.RequiredParams, methodParamValues)
+		resolvedParams[paramMethod] = resolvedMethod
+		resolvedParams[paramJob] = resolvedJob
 
 		// Create context with timeout from function request
 		// This ensures DB queries are cancelled if the function times out
@@ -147,22 +89,19 @@ func (m *Manager) makeModuleFuncHandler(moduleName string) func(functions.Functi
 		// RACE CONDITION MITIGATION: Verify job is still running before handler
 		// The job could be stopped between lookup and handler call
 		if !job.IsRunning() {
-			m.respondErrorWithParams(fn, moduleName, methodCfg, 503,
-				"job '%s' is no longer running", jobName)
+			m.respondError(fn, 503, "job '%s' is no longer running", jobName)
 			return
 		}
 
 		// Get the creator for this module to call HandleMethod
 		creator, ok := m.moduleFuncs.getCreator(moduleName)
 		if !ok || creator.HandleMethod == nil {
-			m.respondErrorWithParams(fn, moduleName, methodCfg, 500,
-				"module '%s' does not implement HandleMethod", moduleName)
+			m.respondError(fn, 500, "module '%s' does not implement HandleMethod", moduleName)
 			return
 		}
 
 		// Route to the module's handler - get DATA ONLY response
-		// Pass sortColumn (safe SQL column name), NOT the raw sortBy from user input
-		dataResp := creator.HandleMethod(ctx, job, method, sortColumn)
+		dataResp := creator.HandleMethod(ctx, job, method, resolvedParams)
 
 		// RACE CONDITION MITIGATION: Verify job was not replaced during handler execution
 		// If a config reload replaced this job while we were querying, the response
@@ -170,8 +109,7 @@ func (m *Manager) makeModuleFuncHandler(moduleName string) func(functions.Functi
 		if !m.moduleFuncs.verifyJobGeneration(moduleName, jobName, jobGen) {
 			// Job was replaced during our request - the response may be unreliable
 			// Return error to prompt client to retry with new job instance
-			m.respondErrorWithParams(fn, moduleName, methodCfg, 503,
-				"job '%s' was replaced during request, please retry", jobName)
+			m.respondError(fn, 503, "job '%s' was replaced during request, please retry", jobName)
 			return
 		}
 
@@ -196,7 +134,7 @@ func (m *Manager) handleModuleFuncInfo(moduleName string, fn functions.Function)
 		"type":            "table",
 		"has_history":     false,
 		"help":            fmt.Sprintf("%s data functions", moduleName),
-		"accepted_params": []string{"__method", "__job", "__sort"},
+		"accepted_params": buildAcceptedParams(methodCfg, nil),
 		"required_params": m.buildRequiredParams(moduleName, methodCfg, nil),
 	}
 
@@ -207,7 +145,12 @@ func (m *Manager) handleModuleFuncInfo(moduleName string, fn functions.Function)
 func (m *Manager) respondWithParams(fn functions.Function, moduleName, method string, dataResp *module.FunctionResponse) {
 	// Nil guard: if module returns nil, treat as internal error
 	if dataResp == nil {
-		m.respondErrorWithParams(fn, moduleName, nil, 500, "internal error: module returned nil response")
+		m.respondError(fn, 500, "internal error: module returned nil response")
+		return
+	}
+
+	if dataResp.Status >= 400 {
+		m.respondError(fn, dataResp.Status, "%s", dataResp.Message)
 		return
 	}
 
@@ -217,15 +160,13 @@ func (m *Manager) respondWithParams(fn functions.Function, moduleName, method st
 	// Build the full response with injected required_params
 	// Use dynamic sort options from response if provided (reflects actual DB capabilities)
 	resp := map[string]any{
-		"v":           3,
-		"status":      dataResp.Status,
-		"type":        "table",
-		"has_history": false,
-		"help":        dataResp.Help,
-
-		// ALWAYS include fresh required_params
-		"accepted_params": []string{"__method", "__job", "__sort"},
-		"required_params": m.buildRequiredParams(moduleName, methodCfg, dataResp.SortOptions),
+		"v":               3,
+		"status":          dataResp.Status,
+		"type":            "table",
+		"has_history":     false,
+		"help":            dataResp.Help,
+		"accepted_params": buildAcceptedParams(methodCfg, dataResp.RequiredParams),
+		"required_params": m.buildRequiredParams(moduleName, methodCfg, dataResp.RequiredParams),
 	}
 
 	// Only include data fields when present (avoid null values on errors)
@@ -250,94 +191,41 @@ func (m *Manager) respondWithParams(fn functions.Function, moduleName, method st
 		resp["group_by"] = dataResp.GroupBy
 	}
 
-	if dataResp.Status != 200 {
-		resp["errorMessage"] = dataResp.Message
-	}
-
 	m.respondJSON(fn, resp)
 }
 
-// respondErrorWithParams sends an error response that STILL includes required_params
-// This is critical: even error responses must include selectors so the UI can show them
-func (m *Manager) respondErrorWithParams(fn functions.Function, moduleName string, methodCfg *module.MethodConfig, status int, format string, args ...any) {
+// respondError sends a minimal error response (status + errorMessage).
+func (m *Manager) respondError(fn functions.Function, status int, format string, args ...any) {
 	resp := map[string]any{
-		"v":             3,
-		"status":        status,
-		"type":          "table",
-		"has_history":   false,
+		"status":       status,
 		"errorMessage": fmt.Sprintf(format, args...),
-
-		// ALWAYS include required_params even in errors
-		"accepted_params": []string{"__method", "__job", "__sort"},
-		"required_params": m.buildRequiredParams(moduleName, methodCfg, nil),
 	}
 	m.respondJSON(fn, resp)
 }
 
 // buildRequiredParams creates the required_params array with current job list
-// dynamicSortOpts overrides static methodCfg.SortOptions when provided (for DB-specific capabilities)
-func (m *Manager) buildRequiredParams(moduleName string, methodCfg *module.MethodConfig, dynamicSortOpts []module.SortOption) []map[string]any {
+// overrideParams overrides static methodCfg.RequiredParams when provided (for DB-specific capabilities)
+func (m *Manager) buildRequiredParams(moduleName string, methodCfg *module.MethodConfig, overrideParams []funcapi.ParamConfig) []map[string]any {
 	methods := m.moduleFuncs.getMethods(moduleName)
 	jobs := m.moduleFuncs.getJobNames(moduleName)
 
-	// Build __job options (or "no instances" message)
-	var jobOptions []map[string]any
-	if len(jobs) == 0 {
-		jobOptions = []map[string]any{
-			{"id": "", "name": "(No instances configured)", "disabled": true},
+	paramConfigs := []funcapi.ParamConfig{
+		buildMethodParamConfig(methods),
+		buildJobParamConfig(jobs),
+	}
+	if methodCfg != nil {
+		methodParams := methodCfg.RequiredParams
+		if len(overrideParams) > 0 {
+			methodParams = funcapi.MergeParamConfigs(methodParams, overrideParams)
 		}
-	} else {
-		for i, j := range jobs {
-			opt := map[string]any{"id": j, "name": j}
-			if i == 0 {
-				opt["defaultSelected"] = true
-			}
-			jobOptions = append(jobOptions, opt)
-		}
+		paramConfigs = append(paramConfigs, methodParams...)
 	}
 
-	// Build sort options - prefer dynamic options from module response (reflects actual DB capabilities)
-	// Fall back to static methodCfg.SortOptions when dynamic options not provided
-	var sortOptions []map[string]any
-	if len(dynamicSortOpts) > 0 {
-		// Use dynamic sort options from module (based on detected DB columns)
-		sortOptions = buildSortOptions(dynamicSortOpts)
-	} else if methodCfg != nil && len(methodCfg.SortOptions) > 0 {
-		// Fall back to static sort options from method config
-		sortOptions = buildSortOptions(methodCfg.SortOptions)
-	} else {
-		// Provide a placeholder when no method is selected or method has no sort options
-		sortOptions = []map[string]any{
-			{"id": "", "name": "(Select a method first)", "disabled": true},
-		}
+	required := make([]map[string]any, 0, len(paramConfigs))
+	for _, cfg := range paramConfigs {
+		required = append(required, cfg.RequiredParam())
 	}
-
-	return []map[string]any{
-		{
-			"id":          "__method",
-			"name":        "Method",
-			"help":        "Select the operation to perform",
-			"unique_view": true,
-			"type":        "select",
-			"options":     buildMethodOptions(methods),
-		},
-		{
-			"id":          "__job",
-			"name":        "Instance",
-			"help":        "Select which database instance to query",
-			"unique_view": true,
-			"type":        "select",
-			"options":     jobOptions,
-		},
-		{
-			"id":          "__sort",
-			"name":        "Filter By",
-			"help":        "Select the primary sort column",
-			"unique_view": true,
-			"type":        "select",
-			"options":     sortOptions,
-		},
-	}
+	return required
 }
 
 // respondJSON sends a JSON response to the function request
@@ -366,76 +254,172 @@ func (m *Manager) respondJSON(fn functions.Function, resp map[string]any) {
 	m.dyncfgApi.SendJSONWithCode(fn, string(data), code)
 }
 
-// extractParamValue extracts a parameter value from JSON payload
-// Handles both string and array formats: "value" or ["value"]
-func extractParamValue(payload map[string]any, key string) string {
-	val, ok := payload[key]
-	if !ok {
-		return ""
-	}
-	switch v := val.(type) {
-	case string:
-		return v
-	case []any:
-		if len(v) > 0 {
-			if s, ok := v[0].(string); ok {
-				return s
-			}
-		}
-	case []string:
-		if len(v) > 0 {
-			return v[0]
-		}
-	}
-	return ""
-}
-
-// buildMethodOptions creates options for __method selector
-func buildMethodOptions(methods []module.MethodConfig) []map[string]any {
-	options := make([]map[string]any, 0, len(methods))
-	for i, m := range methods {
-		opt := map[string]any{
-			"id":   m.ID,
-			"name": m.Name,
-		}
-		if i == 0 {
-			opt["defaultSelected"] = true // First method is default
-		}
-		options = append(options, opt)
-	}
-	return options
-}
-
-// buildSortOptions creates options for __sort selector with default fallback
-func buildSortOptions(sortOpts []module.SortOption) []map[string]any {
-	if len(sortOpts) == 0 {
+func parsePayload(raw []byte) map[string]any {
+	if len(raw) == 0 {
 		return nil
 	}
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil
+	}
+	return payload
+}
 
-	options := make([]map[string]any, 0, len(sortOpts))
-	hasDefault := false
+func parseArgsParams(args []string) map[string][]string {
+	if len(args) == 0 {
+		return nil
+	}
+	params := make(map[string][]string)
+	for _, arg := range args {
+		if arg == "info" {
+			continue
+		}
+		parts := strings.SplitN(arg, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := parts[0]
+		value := parts[1]
+		if key == "" || value == "" {
+			continue
+		}
+		params[key] = splitCSV(value)
+	}
+	return params
+}
 
-	// Check if any option has Default: true
-	for _, s := range sortOpts {
-		if s.Default {
-			hasDefault = true
-			break
+func paramValues(args map[string][]string, payload map[string]any, key string) []string {
+	if args != nil {
+		if vals := args[key]; len(vals) > 0 {
+			return vals
 		}
 	}
+	return extractParamValues(payload, key)
+}
 
-	for i, s := range sortOpts {
-		opt := map[string]any{
-			"id":   s.ID,
-			"name": s.Label,
-			"sort": "descending", // Sort direction for this option (metrics typically sort desc)
+// extractParamValues extracts parameter values from payload, checking selections first.
+func extractParamValues(payload map[string]any, key string) []string {
+	if payload == nil {
+		return nil
+	}
+	if selections, ok := payload["selections"].(map[string]any); ok {
+		if vals := extractValues(selections[key]); len(vals) > 0 {
+			return vals
 		}
-		// Set default: either the one marked as Default, or first option as fallback
-		if s.Default || (!hasDefault && i == 0) {
-			opt["defaultSelected"] = true
+	}
+	return extractValues(payload[key])
+}
+
+func extractValues(val any) []string {
+	switch v := val.(type) {
+	case string:
+		if v == "" {
+			return nil
+		}
+		return []string{v}
+	case []any:
+		var out []string
+		for _, item := range v {
+			if s, ok := item.(string); ok && s != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	case []string:
+		var out []string
+		for _, s := range v {
+			if s != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func splitCSV(value string) []string {
+	if !strings.Contains(value, ",") {
+		return []string{value}
+	}
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p == "" {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+func buildMethodParamConfig(methods []module.MethodConfig) funcapi.ParamConfig {
+	options := make([]funcapi.ParamOption, 0, len(methods))
+	for i, m := range methods {
+		opt := funcapi.ParamOption{
+			ID:   m.ID,
+			Name: m.Name,
+		}
+		if i == 0 {
+			opt.Default = true
 		}
 		options = append(options, opt)
 	}
-	return options
+	return funcapi.ParamConfig{
+		ID:         paramMethod,
+		Name:       "Method",
+		Help:       "Select the operation to perform",
+		Selection:  funcapi.ParamSelect,
+		Options:    options,
+		UniqueView: true,
+	}
+}
+
+func buildJobParamConfig(jobs []string) funcapi.ParamConfig {
+	options := make([]funcapi.ParamOption, 0, len(jobs))
+	if len(jobs) == 0 {
+		options = append(options, funcapi.ParamOption{
+			ID:       "",
+			Name:     "(No instances configured)",
+			Disabled: true,
+		})
+	} else {
+		for i, j := range jobs {
+			opt := funcapi.ParamOption{
+				ID:   j,
+				Name: j,
+			}
+			if i == 0 {
+				opt.Default = true
+			}
+			options = append(options, opt)
+		}
+	}
+	return funcapi.ParamConfig{
+		ID:         paramJob,
+		Name:       "Instance",
+		Help:       "Select which database instance to query",
+		Selection:  funcapi.ParamSelect,
+		Options:    options,
+		UniqueView: true,
+	}
+}
+
+func buildAcceptedParams(methodCfg *module.MethodConfig, overrideParams []funcapi.ParamConfig) []string {
+	accepted := []string{paramMethod, paramJob}
+	if methodCfg == nil {
+		return accepted
+	}
+	params := methodCfg.RequiredParams
+	if len(overrideParams) > 0 {
+		params = funcapi.MergeParamConfigs(params, overrideParams)
+	}
+	for _, p := range params {
+		if !slices.Contains(accepted, p.ID) {
+			accepted = append(accepted, p.ID)
+		}
+	}
+	return accepted
 }
 
 // findMethod finds a method config by ID

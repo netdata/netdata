@@ -8,131 +8,167 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
 const maxQueryTextLength = 4096
 
+const (
+	paramSort = "__sort"
+
+	ftString   = funcapi.FieldTypeString
+	ftInteger  = funcapi.FieldTypeInteger
+	ftDuration = funcapi.FieldTypeDuration
+
+	trNone     = funcapi.FieldTransformNone
+	trNumber   = funcapi.FieldTransformNumber
+	trDuration = funcapi.FieldTransformDuration
+
+	sortAsc  = funcapi.FieldSortAscending
+	sortDesc = funcapi.FieldSortDescending
+
+	summaryCount = funcapi.FieldSummaryCount
+	summarySum   = funcapi.FieldSummarySum
+	summaryMin   = funcapi.FieldSummaryMin
+	summaryMax   = funcapi.FieldSummaryMax
+	summaryMean  = funcapi.FieldSummaryMean
+
+	filterMulti = funcapi.FieldFilterMultiselect
+	filterRange = funcapi.FieldFilterRange
+)
+
 // mysqlColumnMeta defines metadata for a single column
 type mysqlColumnMeta struct {
-	dbColumn      string // Column name in database (e.g., "SUM_TIMER_WAIT")
-	uiKey         string // Canonical name used everywhere: SQL alias, UI key, sort key
-	displayName   string // Display name in UI (e.g., "Total Time")
-	dataType      string // "string", "integer", "float", "duration"
-	units         string // Unit for duration/numeric types (e.g., "seconds")
-	visible       bool   // Default visibility
-	transform     string // Transform for value_options (e.g., "duration", "number", "none")
-	decimalPoints int    // Decimal points for display
-	sortDir       string // Sort direction: "ascending" or "descending"
-	summary       string // Summary function: "sum", "count", "max", "min", "mean" (UI aggregations)
-	filter        string // Filter type: "multiselect" or "range"
-	isPicoseconds bool   // Needs picoseconds to seconds conversion
-	isSortOption  bool   // Show in sort dropdown
-	sortLabel     string // Label for sort option
-	isDefaultSort bool   // Is this the default sort option
-	isUniqueKey   bool   // Is this column a unique key
-	isSticky      bool   // Is this column sticky in UI
-	fullWidth     bool   // Should column take full width
+	dbColumn      string                 // Column name in database (e.g., "SUM_TIMER_WAIT")
+	uiKey         string                 // Canonical name used everywhere: SQL alias, UI key, sort key
+	displayName   string                 // Display name in UI (e.g., "Total Time")
+	dataType      funcapi.FieldType      // "string", "integer", "float", "duration"
+	units         string                 // Unit for duration/numeric types (e.g., "seconds")
+	visible       bool                   // Default visibility
+	transform     funcapi.FieldTransform // Transform for value_options (e.g., "duration", "number", "none")
+	decimalPoints int                    // Decimal points for display
+	sortDir       funcapi.FieldSort      // Sort direction: "ascending" or "descending"
+	summary       funcapi.FieldSummary   // Summary function: "sum", "count", "max", "min", "mean" (UI aggregations)
+	filter        funcapi.FieldFilter    // Filter type: "multiselect" or "range"
+	isPicoseconds bool                   // Needs picoseconds to seconds conversion
+	isSortOption  bool                   // Show in sort dropdown
+	sortLabel     string                 // Label for sort option
+	isDefaultSort bool                   // Is this the default sort option
+	isUniqueKey   bool                   // Is this column a unique key
+	isSticky      bool                   // Is this column sticky in UI
+	fullWidth     bool                   // Should column take full width
 }
 
 // mysqlAllColumns defines ALL possible columns from events_statements_summary_by_digest
 // Columns that don't exist in certain MySQL/MariaDB versions will be filtered at runtime
 var mysqlAllColumns = []mysqlColumnMeta{
 	// Identity columns - always available
-	{dbColumn: "DIGEST", uiKey: "digest", displayName: "Digest", dataType: "string", visible: false, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isUniqueKey: true},
-	{dbColumn: "DIGEST_TEXT", uiKey: "query", displayName: "Query", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isSticky: true, fullWidth: true},
-	{dbColumn: "SCHEMA_NAME", uiKey: "schema", displayName: "Schema", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
+	{dbColumn: "DIGEST", uiKey: "digest", displayName: "Digest", dataType: ftString, visible: false, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti, isUniqueKey: true},
+	{dbColumn: "DIGEST_TEXT", uiKey: "query", displayName: "Query", dataType: ftString, visible: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti, isSticky: true, fullWidth: true},
+	{dbColumn: "SCHEMA_NAME", uiKey: "schema", displayName: "Schema", dataType: ftString, visible: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti},
 
 	// Execution counts
-	{dbColumn: "COUNT_STAR", uiKey: "calls", displayName: "Calls", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Number of Calls"},
+	{dbColumn: "COUNT_STAR", uiKey: "calls", displayName: "Calls", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Top queries by Number of Calls"},
 
 	// Timer metrics (picoseconds -> seconds)
-	{dbColumn: "SUM_TIMER_WAIT", uiKey: "totalTime", displayName: "Total Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by Total Execution Time", isDefaultSort: true},
-	{dbColumn: "MIN_TIMER_WAIT", uiKey: "minTime", displayName: "Min Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "min", filter: "range", isPicoseconds: true},
-	{dbColumn: "AVG_TIMER_WAIT", uiKey: "avgTime", displayName: "Avg Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "mean", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by Average Execution Time"},
-	{dbColumn: "MAX_TIMER_WAIT", uiKey: "maxTime", displayName: "Max Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isPicoseconds: true},
+	{dbColumn: "SUM_TIMER_WAIT", uiKey: "totalTime", displayName: "Total Time", dataType: ftDuration, units: "milliseconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange, isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by Total Execution Time", isDefaultSort: true},
+	{dbColumn: "MIN_TIMER_WAIT", uiKey: "minTime", displayName: "Min Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMin, filter: filterRange, isPicoseconds: true},
+	{dbColumn: "AVG_TIMER_WAIT", uiKey: "avgTime", displayName: "Avg Time", dataType: ftDuration, units: "milliseconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMean, filter: filterRange, isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by Average Execution Time"},
+	{dbColumn: "MAX_TIMER_WAIT", uiKey: "maxTime", displayName: "Max Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange, isPicoseconds: true},
 
 	// Lock time (picoseconds -> seconds)
-	{dbColumn: "SUM_LOCK_TIME", uiKey: "lockTime", displayName: "Lock Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by Lock Time"},
+	{dbColumn: "SUM_LOCK_TIME", uiKey: "lockTime", displayName: "Lock Time", dataType: ftDuration, units: "milliseconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange, isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by Lock Time"},
 
 	// Error and warning counts
-	{dbColumn: "SUM_ERRORS", uiKey: "errors", displayName: "Errors", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Errors"},
-	{dbColumn: "SUM_WARNINGS", uiKey: "warnings", displayName: "Warnings", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Warnings"},
+	{dbColumn: "SUM_ERRORS", uiKey: "errors", displayName: "Errors", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Top queries by Errors"},
+	{dbColumn: "SUM_WARNINGS", uiKey: "warnings", displayName: "Warnings", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Top queries by Warnings"},
 
 	// Row operations
-	{dbColumn: "SUM_ROWS_AFFECTED", uiKey: "rowsAffected", displayName: "Rows Affected", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Rows Affected"},
-	{dbColumn: "SUM_ROWS_SENT", uiKey: "rowsSent", displayName: "Rows Sent", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Rows Sent"},
-	{dbColumn: "SUM_ROWS_EXAMINED", uiKey: "rowsExamined", displayName: "Rows Examined", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Rows Examined"},
+	{dbColumn: "SUM_ROWS_AFFECTED", uiKey: "rowsAffected", displayName: "Rows Affected", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Top queries by Rows Affected"},
+	{dbColumn: "SUM_ROWS_SENT", uiKey: "rowsSent", displayName: "Rows Sent", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Top queries by Rows Sent"},
+	{dbColumn: "SUM_ROWS_EXAMINED", uiKey: "rowsExamined", displayName: "Rows Examined", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Top queries by Rows Examined"},
 
 	// Temp table usage
-	{dbColumn: "SUM_CREATED_TMP_DISK_TABLES", uiKey: "tmpDiskTables", displayName: "Temp Disk Tables", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Temp Disk Tables"},
-	{dbColumn: "SUM_CREATED_TMP_TABLES", uiKey: "tmpTables", displayName: "Temp Tables", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Temp Tables"},
+	{dbColumn: "SUM_CREATED_TMP_DISK_TABLES", uiKey: "tmpDiskTables", displayName: "Temp Disk Tables", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Top queries by Temp Disk Tables"},
+	{dbColumn: "SUM_CREATED_TMP_TABLES", uiKey: "tmpTables", displayName: "Temp Tables", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Top queries by Temp Tables"},
 
 	// Join operations
-	{dbColumn: "SUM_SELECT_FULL_JOIN", uiKey: "fullJoin", displayName: "Full Joins", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Full Joins"},
-	{dbColumn: "SUM_SELECT_FULL_RANGE_JOIN", uiKey: "fullRangeJoin", displayName: "Full Range Joins", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "SUM_SELECT_RANGE", uiKey: "selectRange", displayName: "Select Range", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "SUM_SELECT_RANGE_CHECK", uiKey: "selectRangeCheck", displayName: "Select Range Check", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "SUM_SELECT_SCAN", uiKey: "selectScan", displayName: "Select Scan", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Table Scans"},
+	{dbColumn: "SUM_SELECT_FULL_JOIN", uiKey: "fullJoin", displayName: "Full Joins", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Top queries by Full Joins"},
+	{dbColumn: "SUM_SELECT_FULL_RANGE_JOIN", uiKey: "fullRangeJoin", displayName: "Full Range Joins", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "SUM_SELECT_RANGE", uiKey: "selectRange", displayName: "Select Range", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "SUM_SELECT_RANGE_CHECK", uiKey: "selectRangeCheck", displayName: "Select Range Check", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "SUM_SELECT_SCAN", uiKey: "selectScan", displayName: "Select Scan", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Top queries by Table Scans"},
 
 	// Sort operations
-	{dbColumn: "SUM_SORT_MERGE_PASSES", uiKey: "sortMergePasses", displayName: "Sort Merge Passes", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "SUM_SORT_RANGE", uiKey: "sortRange", displayName: "Sort Range", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "SUM_SORT_ROWS", uiKey: "sortRows", displayName: "Sort Rows", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Rows Sorted"},
-	{dbColumn: "SUM_SORT_SCAN", uiKey: "sortScan", displayName: "Sort Scan", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "SUM_SORT_MERGE_PASSES", uiKey: "sortMergePasses", displayName: "Sort Merge Passes", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "SUM_SORT_RANGE", uiKey: "sortRange", displayName: "Sort Range", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{dbColumn: "SUM_SORT_ROWS", uiKey: "sortRows", displayName: "Sort Rows", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Top queries by Rows Sorted"},
+	{dbColumn: "SUM_SORT_SCAN", uiKey: "sortScan", displayName: "Sort Scan", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
 
 	// Index usage
-	{dbColumn: "SUM_NO_INDEX_USED", uiKey: "noIndexUsed", displayName: "No Index Used", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by No Index Used"},
-	{dbColumn: "SUM_NO_GOOD_INDEX_USED", uiKey: "noGoodIndexUsed", displayName: "No Good Index Used", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "SUM_NO_INDEX_USED", uiKey: "noIndexUsed", displayName: "No Index Used", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Top queries by No Index Used"},
+	{dbColumn: "SUM_NO_GOOD_INDEX_USED", uiKey: "noGoodIndexUsed", displayName: "No Good Index Used", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
 
 	// Timestamp columns
-	{dbColumn: "FIRST_SEEN", uiKey: "firstSeen", displayName: "First Seen", dataType: "string", visible: false, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
-	{dbColumn: "LAST_SEEN", uiKey: "lastSeen", displayName: "Last Seen", dataType: "string", visible: false, transform: "none", sortDir: "descending", summary: "count", filter: "multiselect"},
+	{dbColumn: "FIRST_SEEN", uiKey: "firstSeen", displayName: "First Seen", dataType: ftString, visible: false, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti},
+	{dbColumn: "LAST_SEEN", uiKey: "lastSeen", displayName: "Last Seen", dataType: ftString, visible: false, transform: trNone, sortDir: sortDesc, summary: summaryCount, filter: filterMulti},
 
 	// MySQL 8.0+ quantile columns
-	{dbColumn: "QUANTILE_95", uiKey: "p95Time", displayName: "P95 Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by 95th Percentile Time"},
-	{dbColumn: "QUANTILE_99", uiKey: "p99Time", displayName: "P99 Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by 99th Percentile Time"},
-	{dbColumn: "QUANTILE_999", uiKey: "p999Time", displayName: "P99.9 Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isPicoseconds: true},
+	{dbColumn: "QUANTILE_95", uiKey: "p95Time", displayName: "P95 Time", dataType: ftDuration, units: "milliseconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange, isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by 95th Percentile Time"},
+	{dbColumn: "QUANTILE_99", uiKey: "p99Time", displayName: "P99 Time", dataType: ftDuration, units: "milliseconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange, isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by 99th Percentile Time"},
+	{dbColumn: "QUANTILE_999", uiKey: "p999Time", displayName: "P99.9 Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange, isPicoseconds: true},
 
 	// MySQL 8.0+ sample query
-	{dbColumn: "QUERY_SAMPLE_TEXT", uiKey: "sampleQuery", displayName: "Sample Query", dataType: "string", visible: false, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", fullWidth: true},
-	{dbColumn: "QUERY_SAMPLE_SEEN", uiKey: "sampleSeen", displayName: "Sample Seen", dataType: "string", visible: false, transform: "none", sortDir: "descending", summary: "count", filter: "multiselect"},
-	{dbColumn: "QUERY_SAMPLE_TIMER_WAIT", uiKey: "sampleTime", displayName: "Sample Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isPicoseconds: true},
+	{dbColumn: "QUERY_SAMPLE_TEXT", uiKey: "sampleQuery", displayName: "Sample Query", dataType: ftString, visible: false, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti, fullWidth: true},
+	{dbColumn: "QUERY_SAMPLE_SEEN", uiKey: "sampleSeen", displayName: "Sample Seen", dataType: ftString, visible: false, transform: trNone, sortDir: sortDesc, summary: summaryCount, filter: filterMulti},
+	{dbColumn: "QUERY_SAMPLE_TIMER_WAIT", uiKey: "sampleTime", displayName: "Sample Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange, isPicoseconds: true},
 
 	// MySQL 8.0.28+ CPU time
-	{dbColumn: "SUM_CPU_TIME", uiKey: "cpuTime", displayName: "CPU Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by CPU Time"},
+	{dbColumn: "SUM_CPU_TIME", uiKey: "cpuTime", displayName: "CPU Time", dataType: ftDuration, units: "milliseconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange, isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by CPU Time"},
 
 	// MySQL 8.0.31+ memory columns
-	{dbColumn: "MAX_CONTROLLED_MEMORY", uiKey: "maxControlledMemory", displayName: "Max Controlled Memory", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "max", filter: "range", isSortOption: true, sortLabel: "Top queries by Max Controlled Memory"},
-	{dbColumn: "MAX_TOTAL_MEMORY", uiKey: "maxTotalMemory", displayName: "Max Total Memory", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "max", filter: "range", isSortOption: true, sortLabel: "Top queries by Max Total Memory"},
+	{dbColumn: "MAX_CONTROLLED_MEMORY", uiKey: "maxControlledMemory", displayName: "Max Controlled Memory", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summaryMax, filter: filterRange, isSortOption: true, sortLabel: "Top queries by Max Controlled Memory"},
+	{dbColumn: "MAX_TOTAL_MEMORY", uiKey: "maxTotalMemory", displayName: "Max Total Memory", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summaryMax, filter: filterRange, isSortOption: true, sortLabel: "Top queries by Max Total Memory"},
 }
 
 // mysqlMethods returns the available function methods for MySQL
 func mysqlMethods() []module.MethodConfig {
 	// Build sort options from column metadata
-	var sortOptions []module.SortOption
+	var sortOptions []funcapi.ParamOption
+	sortDir := funcapi.FieldSortDescending
 	for _, col := range mysqlAllColumns {
 		if col.isSortOption {
-			sortOptions = append(sortOptions, module.SortOption{
+			sortOptions = append(sortOptions, funcapi.ParamOption{
 				ID:      col.uiKey,
 				Column:  col.dbColumn,
-				Label:   col.sortLabel,
+				Name:    col.sortLabel,
 				Default: col.isDefaultSort,
+				Sort:    &sortDir,
 			})
 		}
 	}
 
 	return []module.MethodConfig{{
-		ID:          "top-queries",
-		Name:        "Top Queries",
-		Help:        "Top SQL queries from performance_schema",
-		SortOptions: sortOptions,
+		ID:   "top-queries",
+		Name: "Top Queries",
+		Help: "Top SQL queries from performance_schema",
+		RequiredParams: []funcapi.ParamConfig{
+			{
+				ID:         paramSort,
+				Name:       "Filter By",
+				Help:       "Select the primary sort column",
+				Selection:  funcapi.ParamSelect,
+				Options:    sortOptions,
+				UniqueView: true,
+			},
+		},
 	}}
 }
 
 // mysqlHandleMethod handles function requests for MySQL
-func mysqlHandleMethod(ctx context.Context, job *module.Job, method, sortColumn string) *module.FunctionResponse {
+func mysqlHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
 	collector, ok := job.Module().(*Collector)
 	if !ok {
 		return &module.FunctionResponse{Status: 500, Message: "internal error: invalid module type"}
@@ -148,7 +184,7 @@ func mysqlHandleMethod(ctx context.Context, job *module.Job, method, sortColumn 
 
 	switch method {
 	case "top-queries":
-		return collector.collectTopQueries(ctx, sortColumn)
+		return collector.collectTopQueries(ctx, params.Column(paramSort))
 	default:
 		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
 	}
@@ -268,13 +304,13 @@ func (c *Collector) scanMySQLDynamicRows(rows mysqlRowScanner, cols []mysqlColum
 		// Reset value holders for each row
 		for i, col := range cols {
 			switch col.dataType {
-			case "string":
+			case ftString:
 				var v sql.NullString
 				values[i] = &v
-			case "integer":
+			case ftInteger:
 				var v sql.NullInt64
 				values[i] = &v
-			case "float", "duration":
+			case ftDuration:
 				var v sql.NullFloat64
 				values[i] = &v
 			default:
@@ -333,59 +369,53 @@ func (c *Collector) scanMySQLDynamicRows(rows mysqlRowScanner, cols []mysqlColum
 func (c *Collector) buildMySQLDynamicColumns(cols []mysqlColumnMeta) map[string]any {
 	columns := make(map[string]any)
 	for i, col := range cols {
-		colDef := map[string]any{
-			"index":                   i,
-			"unique_key":              col.isUniqueKey,
-			"name":                    col.displayName,
-			"type":                    col.dataType,
-			"visible":                 col.visible,
-			"visualization":           "value",
-			"sort":                    col.sortDir,
-			"sortable":                true,
-			"sticky":                  col.isSticky,
-			"summary":                 col.summary,
-			"filter":                  col.filter,
-			"full_width":              col.fullWidth,
-			"wrap":                    false,
-			"default_expanded_filter": false,
+		visual := funcapi.FieldVisualValue
+		if col.dataType == ftDuration {
+			visual = funcapi.FieldVisualBar
 		}
-
-		// Add value_options
-		valueOpts := map[string]any{
-			"transform":      col.transform,
-			"decimal_points": col.decimalPoints,
-			"default_value":  nil,
+		colDef := funcapi.Column{
+			Index:                 i,
+			Name:                  col.displayName,
+			Type:                  col.dataType,
+			Units:                 col.units,
+			Visualization:         visual,
+			Sort:                  col.sortDir,
+			Sortable:              true,
+			Sticky:                col.isSticky,
+			Summary:               col.summary,
+			Filter:                col.filter,
+			FullWidth:             col.fullWidth,
+			Wrap:                  false,
+			DefaultExpandedFilter: false,
+			UniqueKey:             col.isUniqueKey,
+			Visible:               col.visible,
+			ValueOptions: funcapi.ValueOptions{
+				Transform:     col.transform,
+				DecimalPoints: col.decimalPoints,
+				DefaultValue:  nil,
+			},
 		}
-		if col.units != "" {
-			valueOpts["units"] = col.units
-			colDef["units"] = col.units
-		}
-		colDef["value_options"] = valueOpts
-
-		// Duration columns use bar visualization
-		if col.dataType == "duration" {
-			colDef["visualization"] = "bar"
-		}
-
-		columns[col.uiKey] = colDef
+		columns[col.uiKey] = colDef.BuildColumn()
 	}
 	return columns
 }
 
 // buildMySQLDynamicSortOptions builds sort options from available columns
 // Returns only sort options for columns that actually exist in the database
-func (c *Collector) buildMySQLDynamicSortOptions(cols []mysqlColumnMeta) []module.SortOption {
-	var sortOpts []module.SortOption
+func (c *Collector) buildMySQLDynamicSortOptions(cols []mysqlColumnMeta) []funcapi.ParamOption {
+	var sortOpts []funcapi.ParamOption
 	seen := make(map[string]bool)
+	sortDir := funcapi.FieldSortDescending
 
 	for _, col := range cols {
 		if col.isSortOption && !seen[col.uiKey] {
 			seen[col.uiKey] = true
-			sortOpts = append(sortOpts, module.SortOption{
+			sortOpts = append(sortOpts, funcapi.ParamOption{
 				ID:      col.uiKey,
-				Column:  col.uiKey,
-				Label:   col.sortLabel,
+				Column:  col.dbColumn,
+				Name:    col.sortLabel,
 				Default: col.isDefaultSort,
+				Sort:    &sortDir,
 			})
 		}
 	}
@@ -463,6 +493,14 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 
 	// Build dynamic sort options from available columns (only those actually detected)
 	sortOptions := c.buildMySQLDynamicSortOptions(cols)
+	sortParam := funcapi.ParamConfig{
+		ID:         paramSort,
+		Name:       "Filter By",
+		Help:       "Select the primary sort column",
+		Selection:  funcapi.ParamSelect,
+		Options:    sortOptions,
+		UniqueView: true,
+	}
 
 	// Find default sort column UI key
 	defaultSort := ""
@@ -483,7 +521,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		Columns:           c.buildMySQLDynamicColumns(cols),
 		Data:              data,
 		DefaultSortColumn: defaultSort,
-		SortOptions:       sortOptions,
+		RequiredParams:    []funcapi.ParamConfig{sortParam},
 
 		// Charts for aggregated visualization
 		Charts: map[string]module.ChartConfig{

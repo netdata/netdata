@@ -385,7 +385,6 @@ Special last element in data array for row styling:
       "id": "priority",        // Plain field name (not hash)
       "name": "Priority",
       "order": 1,
-      "defaultExpanded": true,
       "options": [
         {
           "id": "ERROR",
@@ -856,7 +855,7 @@ buffer_rrdf_table_add_field(wb, field_id++, "row_options", "Row Options",
 | `full_width` | 0x08 | Expand to fill space |
 | `wrap` | 0x10 | Enable text wrapping |
 | `dummy` | 0x20 | Internal use only |
-| `expanded_filter` | 0x40 | Expand filter by default |
+| `default_expanded_filter` | 0x40 | Expand filter by default |
 
 ### Sort Options (RRDF_FIELD_SORT_*)
 

@@ -5,72 +5,83 @@ package jobmgr
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestExtractParamValue(t *testing.T) {
+func TestExtractParamValues(t *testing.T) {
 	tests := map[string]struct {
 		payload  map[string]any
 		key      string
-		expected string
+		expected []string
 	}{
 		"string value": {
 			payload:  map[string]any{"__method": "top-queries"},
 			key:      "__method",
-			expected: "top-queries",
+			expected: []string{"top-queries"},
 		},
 		"array value (single element)": {
 			payload:  map[string]any{"__method": []any{"top-queries"}},
 			key:      "__method",
-			expected: "top-queries",
+			expected: []string{"top-queries"},
 		},
-		"array value (multiple elements - takes first)": {
+		"array value (multiple elements)": {
 			payload:  map[string]any{"__sort": []any{"calls", "total_time"}},
 			key:      "__sort",
-			expected: "calls",
+			expected: []string{"calls", "total_time"},
 		},
 		"string array value": {
 			payload:  map[string]any{"__job": []string{"master-db"}},
 			key:      "__job",
-			expected: "master-db",
+			expected: []string{"master-db"},
 		},
 		"missing key": {
 			payload:  map[string]any{"__method": "top-queries"},
 			key:      "__job",
-			expected: "",
+			expected: nil,
 		},
 		"empty payload": {
 			payload:  map[string]any{},
 			key:      "__method",
-			expected: "",
+			expected: nil,
 		},
 		"nil in array": {
 			payload:  map[string]any{"__method": []any{nil, "test"}},
 			key:      "__method",
-			expected: "",
+			expected: []string{"test"},
 		},
 		"empty array": {
 			payload:  map[string]any{"__method": []any{}},
 			key:      "__method",
-			expected: "",
+			expected: nil,
 		},
 		"non-string value": {
 			payload:  map[string]any{"__method": 123},
 			key:      "__method",
-			expected: "",
+			expected: nil,
+		},
+		"prefers selections": {
+			payload: map[string]any{
+				"__method": "root",
+				"selections": map[string]any{
+					"__method": []any{"selected"},
+				},
+			},
+			key:      "__method",
+			expected: []string{"selected"},
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			result := extractParamValue(tc.payload, tc.key)
+			result := extractParamValues(tc.payload, tc.key)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
 }
 
-func TestBuildMethodOptions(t *testing.T) {
+func TestBuildMethodParamConfig(t *testing.T) {
 	tests := map[string]struct {
 		methods  []module.MethodConfig
 		expected []map[string]any
@@ -101,57 +112,31 @@ func TestBuildMethodOptions(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			result := buildMethodOptions(tc.methods)
-			assert.Equal(t, tc.expected, result)
+			cfg := buildMethodParamConfig(tc.methods)
+			param := cfg.RequiredParam()
+			assert.Equal(t, "select", param["type"])
+			assert.Equal(t, "__method", param["id"])
+			assert.Equal(t, tc.expected, param["options"])
 		})
 	}
 }
 
-func TestBuildSortOptions(t *testing.T) {
-	tests := map[string]struct {
-		sortOpts []module.SortOption
-		expected []map[string]any
-	}{
-		"with explicit default": {
-			sortOpts: []module.SortOption{
-				{ID: "calls", Column: "COUNT_STAR", Label: "By Calls"},
-				{ID: "total_time", Column: "SUM_TIMER_WAIT", Label: "By Total Time", Default: true},
-			},
-			expected: []map[string]any{
-				{"id": "calls", "name": "By Calls", "sort": "descending"},
-				{"id": "total_time", "name": "By Total Time", "defaultSelected": true, "sort": "descending"},
-			},
-		},
-		"no explicit default (first becomes default)": {
-			sortOpts: []module.SortOption{
-				{ID: "calls", Column: "COUNT_STAR", Label: "By Calls"},
-				{ID: "total_time", Column: "SUM_TIMER_WAIT", Label: "By Total Time"},
-			},
-			expected: []map[string]any{
-				{"id": "calls", "name": "By Calls", "defaultSelected": true, "sort": "descending"},
-				{"id": "total_time", "name": "By Total Time", "sort": "descending"},
-			},
-		},
-		"single option": {
-			sortOpts: []module.SortOption{
-				{ID: "total_time", Column: "SUM_TIMER_WAIT", Label: "By Total Time"},
-			},
-			expected: []map[string]any{
-				{"id": "total_time", "name": "By Total Time", "defaultSelected": true, "sort": "descending"},
-			},
-		},
-		"empty options": {
-			sortOpts: []module.SortOption{},
-			expected: nil,
+func TestBuildAcceptedParams(t *testing.T) {
+	sortDir := funcapi.FieldSortDescending
+	methodCfg := &module.MethodConfig{
+		RequiredParams: []funcapi.ParamConfig{
+			{ID: "__sort", Selection: funcapi.ParamSelect, Options: []funcapi.ParamOption{{ID: "calls", Name: "Calls", Sort: &sortDir}}},
+			{ID: "db"},
 		},
 	}
 
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			result := buildSortOptions(tc.sortOpts)
-			assert.Equal(t, tc.expected, result)
-		})
+	overrides := []funcapi.ParamConfig{
+		{ID: "__sort", Selection: funcapi.ParamSelect, Options: []funcapi.ParamOption{{ID: "time", Name: "Time", Sort: &sortDir}}},
+		{ID: "extra"},
 	}
+
+	result := buildAcceptedParams(methodCfg, overrides)
+	assert.Equal(t, []string{"__method", "__job", "__sort", "db", "extra"}, result)
 }
 
 func TestFindMethod(t *testing.T) {
@@ -232,8 +217,16 @@ func TestBuildRequiredParams_TypeSelect(t *testing.T) {
 			return []module.MethodConfig{{
 				ID:   "top-queries",
 				Name: "Top Queries",
-				SortOptions: []module.SortOption{
-					{ID: "total_time", Column: "total_exec_time", Label: "By Total Time", Default: true},
+				RequiredParams: []funcapi.ParamConfig{
+					{
+						ID:         "__sort",
+						Name:       "Filter By",
+						Selection:  funcapi.ParamSelect,
+						UniqueView: true,
+						Options: []funcapi.ParamOption{
+							{ID: "total_time", Name: "By Total Time", Default: true},
+						},
+					},
 				},
 			}}
 		},
