@@ -54,12 +54,6 @@ To apply the unclaiming change immediately, run:
 sudo systemctl restart netdata
 ```
 
-Or use the live reload command:
-
-```bash
-sudo netdatacli reload-claiming-state
-```
-
 :::
 
 ## Step 2: Reclaim to New Space
