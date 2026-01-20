@@ -84,15 +84,14 @@ Just ensure the file is under `/etc/netdata/health.d/` and has a `.conf` extensi
 
 ## 2.2.3 Adding or Modifying Alert Definitions
 
-Alert definitions use two main keywords:
-- **`alarm`** chart-specific rule (targets one specific chart instance)
-- **`template`** context-based rule (applies to all charts of a context)
+Alert definitions use the `template` keyword, which is the recommended and future-proof way to define alerts for any scope:
 
-:::note
+| Scope | How to Target |
+|-------|---------------|
+| **All charts of a context** | Use `on: <context>` (for example, `on: disk.space`) |
+| **Specific chart instance** | Use `families: <chart-name>` to filter (for example, `families: _` for root filesystem only) |
 
-For the conceptual difference between `alarm` and `template`, see **1.2 Alert Types: `alarm` vs `template`**.
-
-:::
+For the conceptual difference between context-based and chart-specific targeting, see **1.2 Alert Types: `alarm` vs `template`**.
 
 <details>
 <summary><strong>Example: Adding an Alert for a Specific Context</strong></summary>
@@ -138,49 +137,25 @@ template: root_disk_space
 
 </details>
 
-<details>
-<summary><strong>Example: Adding a Context-Based Alert (`template`)</strong></summary>
+:::note
 
-To monitor **all filesystems** with the same rule:
+**Chart IDs vs Contexts**
 
-```conf
-# Template: watch free space on all filesystems
-template: disk_space_usage
-    on: disk.space
-lookup: average -5m unaligned percentage of avail
-   units: %
-   every: 1m
-    warn: $this < 10
-    crit: $this < 5
-    info: Filesystem has very low free space
-```
+Both use **dots** in their naming convention.
 
-At runtime, Netdata instantiates this template for **every chart** that matches the `disk.space` context (one alert per filesystem).
+**Contexts** (`on:`): Reference **chart types** — applies to all matching charts
+- Example: `on: disk.space` monitors all filesystems
+- Example: `on: net.net` monitors all network interfaces
 
-:::note 
-
-Chart IDs vs Contexts
-
-Both chart IDs and contexts use **dots** in their naming convention.
-
-**The difference is specificity:**
-- **Chart IDs** (for `alarm` rules): Reference **specific chart instances**
-  - Example: `disk_space./` (root filesystem only)
-  - Example: `system.cpu` (CPU chart on this specific node)
-  
-- **Contexts** (for `template` rules): Reference **chart types**
-  - Example: `disk.space` (applies to all filesystems)
-  - Example: `net.net` (applies to all network interfaces)
+**Chart IDs** (`families:`): Reference **specific chart instances**
+- Example: `families: _` targets root filesystem only
+- Example: `families: eth0` targets specific network interface
 
 **How to find them:**
-- **Dashboard:** Hover over the date on a chart and check the tooltip
-- **API:** `curl "http://localhost:19999/api/v1/charts" | jq '.charts[] | {id, context}'`
-
-+Contexts use dots (`.`), while chart IDs may include dots or underscores (for example, `disk_space._run`).
+- Dashboard: Hover over chart → check tooltip
+- API: `curl "http://localhost:19999/api/v1/charts" | jq '.charts[] | {id, context}'`
 
 :::
-
-</details>
 
 :::note
 
