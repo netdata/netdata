@@ -621,7 +621,8 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 0.375em;
-    padding: 0.75em 1em;
+    /* Match assistant message content padding */
+    padding: 0.75em clamp(0.5em, 5cqi, 5em);
     animation: ai-agent-fadeIn 0.2s ease-out;
   }
 
