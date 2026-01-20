@@ -107,7 +107,7 @@ After reclaiming, verify the node appears in:
 - Check `/var/lib/netdata/cloud.d/` was removed before reclaiming
 - Review agent logs using:
    - `journalctl --namespace netdata -b 0 | grep -i CLAIM`
--or:
+- or:
    - `grep -i CLAIM /var/log/netdata/daemon.log`
 
 **Reconnection fails:**
