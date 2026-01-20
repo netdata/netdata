@@ -196,34 +196,29 @@ func (c *Collector) detectMSSQLQueryStoreColumns(ctx context.Context) (map[strin
 		return c.queryStoreCols, nil
 	}
 
-	// Query sys.columns to get available columns
-	query := `
-		SELECT name
-		FROM sys.columns
-		WHERE object_id = OBJECT_ID('sys.query_store_runtime_stats')
-	`
+	// Use SELECT TOP 0 to get column metadata from result set
+	// This works for system catalog views unlike sys.columns
+	query := `SELECT TOP 0 * FROM sys.query_store_runtime_stats`
 	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query column information: %w", err)
+		// Query Store may not be enabled or accessible
+		return nil, fmt.Errorf("Query Store may not be enabled or accessible: %w", err)
 	}
 	defer rows.Close()
 
+	// Get column names from result set metadata
+	columnNames, err := rows.Columns()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get column names: %w", err)
+	}
+
 	cols := make(map[string]bool)
-	for rows.Next() {
-		var colName string
-		if err := rows.Scan(&colName); err != nil {
-			return nil, fmt.Errorf("failed to scan column name: %w", err)
-		}
+	for _, colName := range columnNames {
 		// Normalize to lowercase for case-insensitive comparison
 		cols[strings.ToLower(colName)] = true
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating columns: %w", err)
-	}
-
 	// If we found no columns, Query Store might be disabled
-	// Check if we got any runtime stats columns
 	if len(cols) == 0 {
 		return nil, fmt.Errorf("no columns found in sys.query_store_runtime_stats - Query Store may not be enabled")
 	}
