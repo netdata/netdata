@@ -95,7 +95,7 @@ For the conceptual difference between `alarm` and `template`, see **1.2 Alert Ty
 :::
 
 <details>
-<summary><strong>Example: Adding a Chart-Specific Alert (`alarm`)</strong></summary>
+<summary><strong>Example: Adding an Alert for a Specific Context</strong></summary>
 
 Open or create a file:
 
@@ -110,11 +110,11 @@ Add this alert definition:
 template: disk_space_usage
     on: disk.space
    lookup: average -1m percentage of avail
-    units: %
-    every: 1m
-     warn: $this < 20
-     crit: $this < 10
-     info: Filesystem has less than 20% free space
+     units: %
+     every: 1m
+      warn: $this < 20
+      crit: $this < 10
+      info: Filesystem has less than 20% free space
 ```
 
 **What this does:**
@@ -122,6 +122,19 @@ template: disk_space_usage
 - `on:` attaches it to the `disk.space` context (applies to all filesystems)
 - `lookup:` aggregates data over the last minute
 - `warn:` and `crit:` define warning and critical thresholds
+
+**To target a specific chart only** (for example, only root filesystem), use `families:`:
+
+```conf
+template: root_disk_space
+    on: disk.space
+ families: _  # Restrict to root filesystem only
+   lookup: average -1m percentage of avail
+    units: %
+    every: 1m
+     warn: $this < 20
+     crit: $this < 10
+```
 
 </details>
 
