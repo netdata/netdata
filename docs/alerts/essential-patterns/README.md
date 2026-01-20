@@ -2,6 +2,16 @@
 
 This chapter covers standard techniques for effective alerting used in most production environments.
 
+## Here
+
+| Section | Technique |
+|---------|-----------|
+| **[8.1 Hysteresis and Status-Based Conditions](#81-hysteresis-and-status-based-conditions)** | Status-dependent thresholds |
+| **[8.2 Multi-Dimensional and Per-Instance Alerts](#82-multi-dimensional-and-per-instance-alerts)** | Target specific dimensions or instances |
+| **[8.3 Host, Chart, and Label-Based Targeting](#83-host-chart-and-label-based-targeting)** | Fine-grained scoping with labels |
+| **[8.4 Custom Actions with `exec`](#84-custom-actions-with-exec)** (Advanced) | `exec` for automation scripts |
+| **[8.5 Performance Considerations](#85-performance-considerations)** (Advanced) | Optimizing alert evaluation |
+
 ## 8.1 Hysteresis and Status-Based Conditions
 
 Hysteresis prevents alert flapping by using different thresholds for entering and clearing states based on current alert status.
@@ -206,13 +216,3 @@ lookup: average -1m unaligned of user,system
       warn: $this > 80
       crit: $this > 95
 ```
-
-## What You'll Find in This Chapter
-
-| Section | Technique |
-|---------|-----------|
-| **[8.1 Hysteresis and Status-Based Conditions](#81-hysteresis-and-status-based-conditions)** | Status-dependent thresholds |
-| **[8.2 Multi-Dimensional and Per-Instance Alerts](#82-multi-dimensional-and-per-instance-alerts)** | Target specific dimensions or instances |
-| **[8.3 Host, Chart, and Label-Based Targeting](#83-host-chart-and-label-based-targeting)** | Fine-grained scoping with labels |
-| **[8.4 Custom Actions with `exec`](#84-custom-actions-with-exec)** (Advanced) | `exec` for automation scripts |
-| **[8.5 Performance Considerations](#85-performance-considerations)** (Advanced) | Optimizing alert evaluation |
