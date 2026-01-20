@@ -223,4 +223,3 @@ lookup: average -1m unaligned of user,system
 - **[7.3 Alert Flapping](../troubleshooting-alerts/flapping.md)** - Debugging alert flapping issues
 - **[10.4 Room-Based Alerting](../cloud-alert-features/README.md)** - Using labels in Cloud
 - **[13.1 Evaluation Architecture](../architecture/1-evaluation-architecture.md)** - Alert evaluation internals
-```
