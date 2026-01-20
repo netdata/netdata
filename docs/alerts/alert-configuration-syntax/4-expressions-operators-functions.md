@@ -241,7 +241,7 @@ flowchart TD
     
     Note1("Threshold to enter WARNING: 85<br/>Uses condition:<br/>($this > 85) && ($status == $CLEAR)")
     Note2("Threshold to exit WARNING: 75<br/>10-point hysteresis buffer<br/>Uses condition:<br/>($this > ($status >= $WARNING ? 75 : 85))")
-    Note3("Once CRITICAL, must drop below 75 to clear<br/>Cannot go back to WARNING directly")
+    Note3("Once CRITICAL, drops to 75-85 returns to WARNING<br/>Must drop below 75 to clear")
     
     CLEAR -.-> Note1
     WARNING -.-> Note2
@@ -258,8 +258,8 @@ flowchart TD
 
 **This creates a 10-point hysteresis buffer:**
 - When CLEAR, `$this` must exceed **85** to trigger WARNING
-- Once in WARNING, `$this` must drop below **75** to return to CLEAR
-- Values between 75-85 maintain current state (prevents flapping)
+- When WARNING, dropping below **75** returns to CLEAR; crossing **95** enters CRITICAL
+- When CRITICAL, dropping to 75-85 returns to WARNING; below 75 returns to CLEAR
 
 :::tip
 
