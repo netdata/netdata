@@ -206,6 +206,7 @@ lookup: average -10m unaligned of user,system
      every: 1m     # Good: 60 evaluations/hour
       warn: $this > 80
       crit: $this > 95
+```
 
 # Inefficient: 10-second evaluation
 template: 10min_cpu_usage
@@ -215,6 +216,7 @@ lookup: average -1m unaligned of user,system
      every: 10s    # Bad: 360 evaluations/hour
       warn: $this > 80
       crit: $this > 95
+```
 
 ## Related Sections
 
