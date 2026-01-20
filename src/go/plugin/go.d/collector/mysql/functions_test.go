@@ -173,13 +173,13 @@ func TestCollector_buildMySQLDynamicSQL(t *testing.T) {
 	sql := c.buildMySQLDynamicSQL(cols, "totalTime", 500)
 
 	assert.Contains(t, sql, "performance_schema.events_statements_summary_by_digest")
-	assert.Contains(t, sql, "ORDER BY totalTime DESC")
+	assert.Contains(t, sql, "ORDER BY `totalTime` DESC")
 	assert.Contains(t, sql, "LIMIT 500")
-	assert.Contains(t, sql, "AS digest")
-	assert.Contains(t, sql, "AS calls")
-	assert.Contains(t, sql, "AS totalTime")
+	assert.Contains(t, sql, "AS `digest`")
+	assert.Contains(t, sql, "AS `calls`")
+	assert.Contains(t, sql, "AS `totalTime`")
 	// Picosecond columns should have conversion
-	assert.Contains(t, sql, "SUM_TIMER_WAIT/1000000000 AS totalTime")
+	assert.Contains(t, sql, "SUM_TIMER_WAIT/1000000000 AS `totalTime`")
 }
 
 func TestCollector_buildMySQLDynamicColumns(t *testing.T) {

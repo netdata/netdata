@@ -197,7 +197,7 @@ func (m *Manager) handleModuleFuncInfo(moduleName string, fn functions.Function)
 		"has_history":     false,
 		"help":            fmt.Sprintf("%s data functions", moduleName),
 		"accepted_params": []string{"__method", "__job", "__sort"},
-		"required_params": m.buildRequiredParams(moduleName, methodCfg),
+		"required_params": m.buildRequiredParams(moduleName, methodCfg, nil),
 	}
 
 	m.respondJSON(fn, resp)
@@ -215,6 +215,7 @@ func (m *Manager) respondWithParams(fn functions.Function, moduleName, method st
 	methodCfg := findMethod(methods, method)
 
 	// Build the full response with injected required_params
+	// Use dynamic sort options from response if provided (reflects actual DB capabilities)
 	resp := map[string]any{
 		"v":           3,
 		"status":      dataResp.Status,
@@ -224,7 +225,7 @@ func (m *Manager) respondWithParams(fn functions.Function, moduleName, method st
 
 		// ALWAYS include fresh required_params
 		"accepted_params": []string{"__method", "__job", "__sort"},
-		"required_params": m.buildRequiredParams(moduleName, methodCfg),
+		"required_params": m.buildRequiredParams(moduleName, methodCfg, dataResp.SortOptions),
 	}
 
 	// Only include data fields when present (avoid null values on errors)
@@ -268,13 +269,14 @@ func (m *Manager) respondErrorWithParams(fn functions.Function, moduleName strin
 
 		// ALWAYS include required_params even in errors
 		"accepted_params": []string{"__method", "__job", "__sort"},
-		"required_params": m.buildRequiredParams(moduleName, methodCfg),
+		"required_params": m.buildRequiredParams(moduleName, methodCfg, nil),
 	}
 	m.respondJSON(fn, resp)
 }
 
 // buildRequiredParams creates the required_params array with current job list
-func (m *Manager) buildRequiredParams(moduleName string, methodCfg *module.MethodConfig) []map[string]any {
+// dynamicSortOpts overrides static methodCfg.SortOptions when provided (for DB-specific capabilities)
+func (m *Manager) buildRequiredParams(moduleName string, methodCfg *module.MethodConfig, dynamicSortOpts []module.SortOption) []map[string]any {
 	methods := m.moduleFuncs.getMethods(moduleName)
 	jobs := m.moduleFuncs.getJobNames(moduleName)
 
@@ -294,10 +296,14 @@ func (m *Manager) buildRequiredParams(moduleName string, methodCfg *module.Metho
 		}
 	}
 
-	// Build sort options from current method
-	// IMPORTANT: Always include at least one sort option for UI consistency
+	// Build sort options - prefer dynamic options from module response (reflects actual DB capabilities)
+	// Fall back to static methodCfg.SortOptions when dynamic options not provided
 	var sortOptions []map[string]any
-	if methodCfg != nil && len(methodCfg.SortOptions) > 0 {
+	if len(dynamicSortOpts) > 0 {
+		// Use dynamic sort options from module (based on detected DB columns)
+		sortOptions = buildSortOptions(dynamicSortOpts)
+	} else if methodCfg != nil && len(methodCfg.SortOptions) > 0 {
+		// Fall back to static sort options from method config
 		sortOptions = buildSortOptions(methodCfg.SortOptions)
 	} else {
 		// Provide a placeholder when no method is selected or method has no sort options

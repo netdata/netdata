@@ -236,13 +236,20 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		return &module.FunctionResponse{Status: 500, Message: fmt.Sprintf("rows iteration error: %v", err)}
 	}
 
+	// Build dynamic sort options from available columns (only those actually detected)
+	sortOptions := c.buildDynamicSortOptions(queryCols)
+
 	// Find default sort column UI key from metadata
-	defaultSort := "totalTime"
+	defaultSort := ""
 	for _, col := range queryCols {
-		if col.isDefaultSort {
+		if col.isDefaultSort && col.isSortOption {
 			defaultSort = col.uiKey
 			break
 		}
+	}
+	// Fallback to first sort option if no default
+	if defaultSort == "" && len(sortOptions) > 0 {
+		defaultSort = sortOptions[0].ID
 	}
 
 	return &module.FunctionResponse{
@@ -251,6 +258,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		Columns:           c.buildDynamicColumns(queryCols),
 		Data:              data,
 		DefaultSortColumn: defaultSort,
+		SortOptions:       sortOptions,
 
 		// Charts for aggregated visualization
 		Charts: map[string]module.ChartConfig{
@@ -602,6 +610,26 @@ func (c *Collector) buildDynamicColumns(cols []pgColumnMeta) map[string]any {
 	}
 
 	return result
+}
+
+// buildDynamicSortOptions builds sort options from available columns
+// Returns only sort options for columns that actually exist in the database
+func (c *Collector) buildDynamicSortOptions(cols []pgColumnMeta) []module.SortOption {
+	var sortOpts []module.SortOption
+	seen := make(map[string]bool)
+
+	for _, col := range cols {
+		if col.isSortOption && !seen[col.uiKey] {
+			seen[col.uiKey] = true
+			sortOpts = append(sortOpts, module.SortOption{
+				ID:      col.uiKey,
+				Column:  col.uiKey,
+				Label:   col.sortLabel,
+				Default: col.isDefaultSort,
+			})
+		}
+	}
+	return sortOpts
 }
 
 // checkPgStatStatements checks if pg_stat_statements extension is available (cached)

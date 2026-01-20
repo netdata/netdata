@@ -222,7 +222,13 @@ func (c *Collector) detectMSSQLQueryStoreColumns(ctx context.Context) (map[strin
 		return nil, fmt.Errorf("error iterating columns: %w", err)
 	}
 
-	// Add identity columns that are always available
+	// If we found no columns, Query Store might be disabled
+	// Check if we got any runtime stats columns
+	if len(cols) == 0 {
+		return nil, fmt.Errorf("no columns found in sys.query_store_runtime_stats - Query Store may not be enabled")
+	}
+
+	// Add identity columns that are always available (from other Query Store views)
 	cols["query_hash"] = true
 	cols["query_sql_text"] = true
 	cols["database_name"] = true
@@ -275,14 +281,19 @@ func (c *Collector) mapAndValidateMSSQLSortColumn(sortKey string, cols []mssqlCo
 		}
 	}
 
-	// Last resort: use first non-identity column (should never happen)
+	// Last resort: use first non-identity column
 	for _, col := range cols {
 		if !col.isIdentity {
 			return col.uiKey
 		}
 	}
 
-	return "calls" // absolute fallback
+	// Absolute fallback: use first column in the list (must exist in SELECT)
+	if len(cols) > 0 {
+		return cols[0].uiKey
+	}
+
+	return "" // empty - will be handled by caller
 }
 
 // buildMSSQLDynamicSQL builds the SQL query with only available columns
@@ -342,9 +353,20 @@ func (c *Collector) buildMSSQLDynamicSQL(cols []mssqlColumnMeta, sortColumn stri
 	}
 
 	// sortColumn is already the uiKey which is used as the SQL alias
+	// Must be a column that exists in the SELECT list
 	orderByExpr := sortColumn
 	if orderByExpr == "" {
-		orderByExpr = "totalTime" // default
+		// Find first non-identity column from the available columns
+		for _, col := range cols {
+			if !col.isIdentity {
+				orderByExpr = col.uiKey
+				break
+			}
+		}
+		// Last resort: use first column
+		if orderByExpr == "" && len(cols) > 0 {
+			orderByExpr = cols[0].uiKey
+		}
 	}
 
 	return fmt.Sprintf(`
@@ -440,6 +462,26 @@ func (c *Collector) scanMSSQLDynamicRows(rows mssqlRowScanner, cols []mssqlColum
 	return data, nil
 }
 
+// buildMSSQLDynamicSortOptions builds sort options from available columns
+// Returns only sort options for columns that actually exist in the database
+func (c *Collector) buildMSSQLDynamicSortOptions(cols []mssqlColumnMeta) []module.SortOption {
+	var sortOpts []module.SortOption
+	seen := make(map[string]bool)
+
+	for _, col := range cols {
+		if col.isSortOption && !seen[col.uiKey] {
+			seen[col.uiKey] = true
+			sortOpts = append(sortOpts, module.SortOption{
+				ID:      col.uiKey,
+				Column:  col.uiKey,
+				Label:   col.sortLabel,
+				Default: col.isDefaultSort,
+			})
+		}
+	}
+	return sortOpts
+}
+
 // buildMSSQLDynamicColumns builds column definitions for the response
 func (c *Collector) buildMSSQLDynamicColumns(cols []mssqlColumnMeta) map[string]any {
 	columns := make(map[string]any)
@@ -528,7 +570,15 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		if ctx.Err() == context.DeadlineExceeded {
 			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
 		}
-		return &module.FunctionResponse{Status: 500, Message: fmt.Sprintf("query failed: %v", err)}
+		// Include diagnostic info: which columns were detected and used
+		colUIKeys := make([]string, len(cols))
+		for i, col := range cols {
+			colUIKeys[i] = col.uiKey
+		}
+		return &module.FunctionResponse{
+			Status:  500,
+			Message: fmt.Sprintf("query failed: %v (sort: %s, detected cols: %v)", err, validatedSortColumn, colUIKeys),
+		}
 	}
 	defer rows.Close()
 
@@ -538,13 +588,20 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		return &module.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
+	// Build dynamic sort options from available columns (only those actually detected)
+	sortOptions := c.buildMSSQLDynamicSortOptions(cols)
+
 	// Find default sort column UI key
-	defaultSort := "totalTime"
+	defaultSort := ""
 	for _, col := range cols {
-		if col.isDefaultSort {
+		if col.isDefaultSort && col.isSortOption {
 			defaultSort = col.uiKey
 			break
 		}
+	}
+	// Fallback to first sort option if no default
+	if defaultSort == "" && len(sortOptions) > 0 {
+		defaultSort = sortOptions[0].ID
 	}
 
 	return &module.FunctionResponse{
@@ -553,6 +610,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		Columns:           c.buildMSSQLDynamicColumns(cols),
 		Data:              data,
 		DefaultSortColumn: defaultSort,
+		SortOptions:       sortOptions,
 
 		// Charts for aggregated visualization
 		Charts: map[string]module.ChartConfig{

@@ -177,8 +177,8 @@ func TestCollector_buildMSSQLDynamicSQL(t *testing.T) {
 	sql := c.buildMSSQLDynamicSQL(cols, "totalTime", 7, 500)
 
 	assert.Contains(t, sql, "sys.query_store_query")
-	assert.Contains(t, sql, "AS totalTime")
-	assert.Contains(t, sql, "ORDER BY totalTime DESC")
+	assert.Contains(t, sql, "AS [totalTime]")
+	assert.Contains(t, sql, "ORDER BY [totalTime] DESC")
 	assert.Contains(t, sql, "TOP 500")
 	assert.Contains(t, sql, "DATEADD")
 	assert.Contains(t, sql, "q.query_hash")
@@ -196,7 +196,7 @@ func TestCollector_buildMSSQLDynamicSQL_NoTimeFilter(t *testing.T) {
 
 	assert.Contains(t, sql, "sys.query_store_query")
 	assert.Contains(t, sql, "TOP 500")
-	assert.Contains(t, sql, "ORDER BY calls DESC")
+	assert.Contains(t, sql, "ORDER BY [calls] DESC")
 	assert.NotContains(t, sql, "DATEADD")
 }
 
@@ -249,6 +249,26 @@ func TestMssqlMethods_SortOptionsHaveLabels(t *testing.T) {
 			assert.Contains(t, opt.Label, "Top queries by", "label should have standard prefix")
 		}
 	}
+}
+
+// TestMapAndValidateMSSQLSortColumn_NoSortOptions verifies fallback when no sort columns exist
+func TestMapAndValidateMSSQLSortColumn_NoSortOptions(t *testing.T) {
+	c := &Collector{}
+
+	// Only identity columns available (no sort options)
+	identityOnlyCols := []mssqlColumnMeta{
+		{uiKey: "queryHash", isIdentity: true},
+		{uiKey: "query", isIdentity: true},
+		{uiKey: "database", isIdentity: true},
+	}
+
+	result := c.mapAndValidateMSSQLSortColumn("totalTime", identityOnlyCols)
+	// Should fall back to first column since no sort options exist
+	assert.Equal(t, "queryHash", result, "should fall back to first column when no sort options")
+
+	// Empty columns list
+	result = c.mapAndValidateMSSQLSortColumn("totalTime", []mssqlColumnMeta{})
+	assert.Equal(t, "", result, "should return empty string when no columns available")
 }
 
 // TestSortColumnValidation_SQLInjection verifies that SQL injection attempts

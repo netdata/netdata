@@ -372,6 +372,26 @@ func (c *Collector) buildMySQLDynamicColumns(cols []mysqlColumnMeta) map[string]
 	return columns
 }
 
+// buildMySQLDynamicSortOptions builds sort options from available columns
+// Returns only sort options for columns that actually exist in the database
+func (c *Collector) buildMySQLDynamicSortOptions(cols []mysqlColumnMeta) []module.SortOption {
+	var sortOpts []module.SortOption
+	seen := make(map[string]bool)
+
+	for _, col := range cols {
+		if col.isSortOption && !seen[col.uiKey] {
+			seen[col.uiKey] = true
+			sortOpts = append(sortOpts, module.SortOption{
+				ID:      col.uiKey,
+				Column:  col.uiKey,
+				Label:   col.sortLabel,
+				Default: col.isDefaultSort,
+			})
+		}
+	}
+	return sortOpts
+}
+
 // mysqlRowScanner interface for testing
 type mysqlRowScanner interface {
 	Next() bool
@@ -441,13 +461,20 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		return &module.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
+	// Build dynamic sort options from available columns (only those actually detected)
+	sortOptions := c.buildMySQLDynamicSortOptions(cols)
+
 	// Find default sort column UI key
-	defaultSort := "totalTime"
+	defaultSort := ""
 	for _, col := range cols {
-		if col.isDefaultSort {
+		if col.isDefaultSort && col.isSortOption {
 			defaultSort = col.uiKey
 			break
 		}
+	}
+	// Fallback to first sort option if no default
+	if defaultSort == "" && len(sortOptions) > 0 {
+		defaultSort = sortOptions[0].ID
 	}
 
 	return &module.FunctionResponse{
@@ -456,6 +483,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		Columns:           c.buildMySQLDynamicColumns(cols),
 		Data:              data,
 		DefaultSortColumn: defaultSort,
+		SortOptions:       sortOptions,
 
 		// Charts for aggregated visualization
 		Charts: map[string]module.ChartConfig{

@@ -48,6 +48,10 @@ type FunctionResponse struct {
 	Data              any            // Row data: [][]any (array of arrays, ordered by column index)
 	DefaultSortColumn string         // Default sort column ID
 
+	// Dynamic sort options based on detected database capabilities
+	// If provided, these override the static MethodConfig.SortOptions
+	SortOptions []SortOption
+
 	// Chart configuration for visualization
 	Charts        map[string]ChartConfig   // Chart definitions (chartID -> config)
 	DefaultCharts [][]string               // Default charts: [[chartID, groupByID], ...]

@@ -246,7 +246,7 @@ func TestBuildRequiredParams_TypeSelect(t *testing.T) {
 	// Get required_params through the public method
 	methods := r.getMethods("postgres")
 	methodCfg := &methods[0]
-	params := mgr.buildRequiredParams("postgres", methodCfg)
+	params := mgr.buildRequiredParams("postgres", methodCfg, nil)
 
 	// Verify structure
 	assert.Len(t, params, 3, "should have 3 required params: __method, __job, __sort")
