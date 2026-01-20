@@ -633,27 +633,19 @@ func (c *Collector) buildDynamicSortOptions(cols []pgColumnMeta) []module.SortOp
 	return sortOpts
 }
 
-// checkPgStatStatements checks if pg_stat_statements extension is available (cached)
+// checkPgStatStatements checks if pg_stat_statements extension is available
+// Only positive results are cached - negative results are re-checked each time
+// so users don't need to restart after installing the extension
 func (c *Collector) checkPgStatStatements(ctx context.Context) (bool, error) {
-	// Fast path: return cached result if already checked
+	// Fast path: return cached positive result
 	c.pgStatStatementsMu.RLock()
-	checked := c.pgStatStatementsChecked
 	avail := c.pgStatStatementsAvail
 	c.pgStatStatementsMu.RUnlock()
-	if checked {
-		return avail, nil
+	if avail {
+		return true, nil
 	}
 
-	// Slow path: query and cache the result
-	// Use write lock for the entire operation to prevent duplicate queries
-	c.pgStatStatementsMu.Lock()
-	defer c.pgStatStatementsMu.Unlock()
-
-	// Double-check after acquiring write lock (another goroutine may have set it)
-	if c.pgStatStatementsChecked {
-		return c.pgStatStatementsAvail, nil
-	}
-
+	// Slow path: query the database
 	var exists bool
 	query := `SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements')`
 	err := c.db.QueryRowContext(ctx, query).Scan(&exists)
@@ -661,9 +653,13 @@ func (c *Collector) checkPgStatStatements(ctx context.Context) (bool, error) {
 		return false, err
 	}
 
-	// Cache the result
-	c.pgStatStatementsAvail = exists
-	c.pgStatStatementsChecked = true
+	// Only cache positive results
+	if exists {
+		c.pgStatStatementsMu.Lock()
+		c.pgStatStatementsAvail = true
+		c.pgStatStatementsMu.Unlock()
+	}
+
 	return exists, nil
 }
 

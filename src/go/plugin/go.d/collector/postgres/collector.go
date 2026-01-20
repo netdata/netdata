@@ -89,8 +89,7 @@ type (
 		superUser               *bool
 		pgIsInRecovery          *bool
 		pgVersion               int
-		pgStatStatementsChecked bool
-		pgStatStatementsAvail   bool
+		pgStatStatementsAvail   bool            // cached positive result only
 		pgStatStatementsColumns map[string]bool // cached column names from pg_stat_statements
 		pgStatStatementsMu      sync.RWMutex    // protects pgStatStatements* fields for concurrent access
 		dbSr                    matcher.Matcher
