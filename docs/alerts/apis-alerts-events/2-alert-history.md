@@ -1,5 +1,7 @@
 # 9.2 Alert History
 
+The `/api/v1/alarm_log` endpoint returns all alert state transitions within a time window, showing when each alert transitioned between states.
+
 ```bash
 curl -s "http://localhost:19999/api/v1/alarm_log?after=-3600" | jq '.'
 ```

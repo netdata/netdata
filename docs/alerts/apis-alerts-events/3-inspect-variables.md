@@ -1,5 +1,7 @@
 # 9.3 Inspect Alert Variables
 
+The `/api/v1/alarm_variables` endpoint returns all variables available to an alert expression for a given chart, useful for debugging why an alert triggered or didn't trigger.
+
 ```bash
 curl -s "http://localhost:19999/api/v1/alarm_variables?chart=system.cpu" | jq '.'
 ```

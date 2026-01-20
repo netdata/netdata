@@ -1,5 +1,7 @@
 # 9.1 Query Current Alerts
 
+The `/api/v1/alarms` endpoint returns all currently active alerts on the agent. Response includes each alert's name, status, current value, and configured threshold.
+
 ```bash
 curl -s "http://localhost:19999/api/v1/alarms" | jq '.'
 ```

@@ -1,5 +1,7 @@
 # 9.5 Cloud Events API
 
+The Cloud Events API (`/api/v2/events`) queries alert and event history stored in Netdata Cloud, providing aggregated, multi-node event data that requires authentication.
+
 ```bash
 curl -s "https://app.netdata.cloud/api/v2/events?space_id=YOUR_SPACE" \
   -H "Authorization: Bearer YOUR_TOKEN" | jq '.'

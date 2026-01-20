@@ -1,5 +1,7 @@
 # 9.4 Health Management API
 
+The `/api/v1/manage/health` endpoint provides programmatic control over the health monitoring subsystem, allowing you to enable, disable, or silence alerts individually or globally.
+
 :::warning
 
 The health management API requires authentication. See [9.4.3 Authentication](#943-authentication) for details.
