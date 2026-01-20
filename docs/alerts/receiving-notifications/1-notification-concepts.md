@@ -35,6 +35,13 @@ flowchart TD
 
 Each Netdata Agent runs its own health engine and sends notifications directly to configured destinations.
 
+| Step | What Happens |
+|------|--------------|
+| 1 | Health Engine evaluates alert conditions |
+| 2 | Alert status changes (CLEAR → WARNING → CRITICAL) |
+| 3 | Health Engine generates alert event |
+| 4 | Event routes to configured recipients (Slack, Email, PagerDuty) |
+
 **Pros:**
 - Works without Cloud connectivity
 - Lowest latency for local notifications
@@ -48,6 +55,13 @@ Each Netdata Agent runs its own health engine and sends notifications directly t
 
 Parents receive streamed metrics from children and run health checks centrally. Notifications are sent from the Parent.
 
+| Step | What Happens |
+|------|--------------|
+| 1 | Child node streams metrics to Parent |
+| 2 | Parent's Health Engine evaluates conditions |
+| 3 | Alert events generated on Parent |
+| 4 | Parent sends notifications to recipients |
+
 **Pros:**
 - Single point of control for a cluster
 - Reduced traffic to Cloud
@@ -60,6 +74,13 @@ Parents receive streamed metrics from children and run health checks centrally. 
 **3. Cloud-Dispatched Notifications**
 
 Netdata Cloud receives alert events from all connected Agents/Parents and dispatches notifications through Cloud integrations.
+
+| Step | What Happens |
+|------|--------------|
+| 1 | Agent/Parent generates alert event |
+| 2 | Event sent to Netdata Cloud via ACLK |
+| 3 | Cloud processes through configured integrations |
+| 4 | Notifications sent to Slack, Teams, webhooks |
 
 **Pros:**
 - Centralized management of notification settings
