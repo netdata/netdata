@@ -176,12 +176,21 @@ func TestCollector_buildMSSQLDynamicSQL(t *testing.T) {
 	// sortColumn is the uiKey which is also used as the SQL alias
 	sql := c.buildMSSQLDynamicSQL(cols, "totalTime", 7, 500)
 
+	// Basic query structure
 	assert.Contains(t, sql, "sys.query_store_query")
 	assert.Contains(t, sql, "AS [totalTime]")
 	assert.Contains(t, sql, "ORDER BY [totalTime] DESC")
 	assert.Contains(t, sql, "TOP 500")
 	assert.Contains(t, sql, "DATEADD")
 	assert.Contains(t, sql, "q.query_hash")
+
+	// Cross-database aggregation features
+	assert.Contains(t, sql, "QUOTENAME(name)")                              // Safe database name escaping
+	assert.Contains(t, sql, "UNION ALL")                                    // Combining results from multiple databases
+	assert.Contains(t, sql, "sp_executesql")                                // Executing dynamic SQL
+	assert.Contains(t, sql, "sys.databases")                                // Finding databases with Query Store
+	assert.Contains(t, sql, "is_query_store_on = 1")                        // Condition for Query Store enabled
+	assert.Contains(t, sql, "NOT IN ('master', 'tempdb', 'model', 'msdb')") // Excluding system databases
 }
 
 func TestCollector_buildMSSQLDynamicSQL_NoTimeFilter(t *testing.T) {

@@ -176,7 +176,7 @@ func mssqlHandleMethod(ctx context.Context, job *module.Job, method, sortColumn 
 	}
 }
 
-// detectMSSQLQueryStoreColumns queries the database to discover available columns
+// detectMSSQLQueryStoreColumns queries any database with Query Store enabled to discover available columns
 func (c *Collector) detectMSSQLQueryStoreColumns(ctx context.Context) (map[string]bool, error) {
 	// Fast path: return cached result
 	c.queryStoreColsMu.RLock()
@@ -196,13 +196,27 @@ func (c *Collector) detectMSSQLQueryStoreColumns(ctx context.Context) (map[strin
 		return c.queryStoreCols, nil
 	}
 
-	// Use SELECT TOP 0 to get column metadata from result set
-	// This works for system catalog views unlike sys.columns
-	query := `SELECT TOP 0 * FROM sys.query_store_runtime_stats`
+	// Find any database with Query Store enabled (excluding system databases)
+	var sampleDB string
+	err := c.db.QueryRowContext(ctx, `
+		SELECT TOP 1 name
+		FROM sys.databases
+		WHERE is_query_store_on = 1
+		  AND name NOT IN ('master', 'tempdb', 'model', 'msdb')
+	`).Scan(&sampleDB)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("no databases have Query Store enabled")
+		}
+		return nil, fmt.Errorf("failed to find database with Query Store: %w", err)
+	}
+
+	// Use dynamic SQL to get column metadata from that database's Query Store view
+	// Three-part naming works: [DatabaseName].sys.query_store_runtime_stats
+	query := fmt.Sprintf(`SELECT TOP 0 * FROM [%s].sys.query_store_runtime_stats`, sampleDB)
 	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
-		// Query Store may not be enabled or accessible
-		return nil, fmt.Errorf("Query Store may not be enabled or accessible: %w", err)
+		return nil, fmt.Errorf("failed to query Query Store columns from %s: %w", sampleDB, err)
 	}
 	defer rows.Close()
 
@@ -218,9 +232,9 @@ func (c *Collector) detectMSSQLQueryStoreColumns(ctx context.Context) (map[strin
 		cols[strings.ToLower(colName)] = true
 	}
 
-	// If we found no columns, Query Store might be disabled
+	// If we found no columns, something is wrong
 	if len(cols) == 0 {
-		return nil, fmt.Errorf("no columns found in sys.query_store_runtime_stats - Query Store may not be enabled")
+		return nil, fmt.Errorf("no columns found in sys.query_store_runtime_stats")
 	}
 
 	// Add identity columns that are always available (from other Query Store views)
@@ -291,8 +305,8 @@ func (c *Collector) mapAndValidateMSSQLSortColumn(sortKey string, cols []mssqlCo
 	return "" // empty - will be handled by caller
 }
 
-// buildMSSQLDynamicSQL builds the SQL query with only available columns
-func (c *Collector) buildMSSQLDynamicSQL(cols []mssqlColumnMeta, sortColumn string, timeWindowDays int, limit int) string {
+// buildMSSQLSelectExpressions builds the SELECT expressions for a single database query
+func (c *Collector) buildMSSQLSelectExpressions(cols []mssqlColumnMeta, dbNameExpr string) []string {
 	var selectParts []string
 
 	for _, col := range cols {
@@ -305,7 +319,7 @@ func (c *Collector) buildMSSQLDynamicSQL(cols []mssqlColumnMeta, sortColumn stri
 			case "query":
 				expr = fmt.Sprintf("qt.query_sql_text AS [%s]", col.uiKey)
 			case "database":
-				expr = fmt.Sprintf("DB_NAME() AS [%s]", col.uiKey)
+				expr = fmt.Sprintf("%s AS [%s]", dbNameExpr, col.uiKey)
 			}
 		case col.uiKey == "calls":
 			expr = fmt.Sprintf("SUM(rs.count_executions) AS [%s]", col.uiKey)
@@ -340,6 +354,16 @@ func (c *Collector) buildMSSQLDynamicSQL(cols []mssqlColumnMeta, sortColumn stri
 			selectParts = append(selectParts, expr)
 		}
 	}
+	return selectParts
+}
+
+// buildMSSQLDynamicSQL builds dynamic SQL that aggregates across all databases with Query Store enabled
+// Uses sp_executesql to execute the built query
+func (c *Collector) buildMSSQLDynamicSQL(cols []mssqlColumnMeta, sortColumn string, timeWindowDays int, limit int) string {
+	// Build the SELECT expressions template (with placeholder for database name)
+	// We use N'''' + name + N'''' to create a properly quoted string literal for each database
+	selectParts := c.buildMSSQLSelectExpressions(cols, "N''''' + name + N'''''")
+	selectExpr := strings.Join(selectParts, ",\n        ")
 
 	// Time window filter
 	timeFilter := ""
@@ -347,35 +371,49 @@ func (c *Collector) buildMSSQLDynamicSQL(cols []mssqlColumnMeta, sortColumn stri
 		timeFilter = fmt.Sprintf("WHERE rsi.start_time >= DATEADD(day, -%d, GETUTCDATE())", timeWindowDays)
 	}
 
-	// sortColumn is already the uiKey which is used as the SQL alias
-	// Must be a column that exists in the SELECT list
+	// Validate sort column
 	orderByExpr := sortColumn
 	if orderByExpr == "" {
-		// Find first non-identity column from the available columns
 		for _, col := range cols {
 			if !col.isIdentity {
 				orderByExpr = col.uiKey
 				break
 			}
 		}
-		// Last resort: use first column
 		if orderByExpr == "" && len(cols) > 0 {
 			orderByExpr = cols[0].uiKey
 		}
 	}
 
+	// Build the dynamic SQL that creates UNION ALL across all databases
+	// The database names come from sys.databases, ensuring safety (no user input)
 	return fmt.Sprintf(`
-SELECT TOP %d
+DECLARE @sql NVARCHAR(MAX) = N'';
+
+SELECT @sql = @sql +
+    CASE WHEN @sql = N'' THEN N'' ELSE N' UNION ALL ' END +
+    N'SELECT
+        %s
+    FROM ' + QUOTENAME(name) + N'.sys.query_store_query q
+    INNER JOIN ' + QUOTENAME(name) + N'.sys.query_store_query_text qt ON q.query_text_id = qt.query_text_id
+    INNER JOIN ' + QUOTENAME(name) + N'.sys.query_store_plan p ON q.query_id = p.query_id
+    INNER JOIN ' + QUOTENAME(name) + N'.sys.query_store_runtime_stats rs ON p.plan_id = rs.plan_id
+    INNER JOIN ' + QUOTENAME(name) + N'.sys.query_store_runtime_stats_interval rsi ON rs.runtime_stats_interval_id = rsi.runtime_stats_interval_id
     %s
-FROM sys.query_store_query q
-JOIN sys.query_store_query_text qt ON q.query_text_id = qt.query_text_id
-JOIN sys.query_store_plan p ON q.query_id = p.query_id
-JOIN sys.query_store_runtime_stats rs ON p.plan_id = rs.plan_id
-JOIN sys.query_store_runtime_stats_interval rsi ON rs.runtime_stats_interval_id = rsi.runtime_stats_interval_id
-%s
-GROUP BY q.query_hash, qt.query_sql_text
-ORDER BY [%s] DESC
-`, limit, strings.Join(selectParts, ",\n    "), timeFilter, orderByExpr)
+    GROUP BY q.query_hash, qt.query_sql_text'
+FROM sys.databases
+WHERE is_query_store_on = 1
+  AND name NOT IN ('master', 'tempdb', 'model', 'msdb');
+
+IF @sql = N''
+BEGIN
+    RAISERROR('No databases have Query Store enabled', 16, 1);
+    RETURN;
+END
+
+SET @sql = N'SELECT TOP %d * FROM (' + @sql + N') AS combined ORDER BY [%s] DESC';
+EXEC sp_executesql @sql;
+`, selectExpr, timeFilter, limit, orderByExpr)
 }
 
 // mssqlRowScanner interface for testing
