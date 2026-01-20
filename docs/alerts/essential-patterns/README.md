@@ -215,4 +215,12 @@ lookup: average -1m unaligned of user,system
      every: 10s    # Bad: 360 evaluations/hour
       warn: $this > 80
       crit: $this > 95
+
+## Related Sections
+
+- **[4.4 Reducing Flapping](../controlling-alerts-noise/4-reducing-flapping.md)** - Delay and repeat techniques
+- **[5.2.6 Custom Scripts](../receiving-notifications/2-agent-parent-notifications.md)** - Exec and webhook examples
+- **[7.3 Alert Flapping](../troubleshooting-alerts/flapping.md)** - Debugging alert flapping issues
+- **[10.4 Room-Based Alerting](../cloud-alert-features/README.md)** - Using labels in Cloud
+- **[13.1 Evaluation Architecture](../architecture/1-evaluation-architecture.md)** - Alert evaluation internals
 ```
