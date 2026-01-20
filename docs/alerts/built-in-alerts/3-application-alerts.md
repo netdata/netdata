@@ -4,52 +4,31 @@ Application alerts cover common database, web server, cache, and message queue t
 
 :::note
 
-Application alerts require the appropriate database or service collector to be enabled. Check the **Collectors** tab in the dashboard to verify your application collectors are running.
+To see more application alerts, visit the [Collectors list](https://learn.netdata.io/docs/observability/collectors/collectors/) on learn.netdata.io.
 
 :::
 
 ## 6.3.1 Database Alerts
 
-Databases are typically the most critical components in an infrastructure, and their alerts reflect this importance.
+- [MySQL & MariaDB](https://learn.netdata.io/docs/observability/collectors/collectors.complex.list/mysql/) - replication lag, slow queries, connection utilization
+- [PostgreSQL](https://learn.netdata.io/docs/observability/collectors/collectors.complex.list/postgresql/) - deadlocks, connection utilization, replication lag
+- [MongoDB](https://learn.netdata.io/docs/observability/collectors/collectors.complex.list/mongodb/) - query performance, connection pooling
+- [Redis](https://learn.netdata.io/docs/observability/collectors/collectors.complex.list/redis/) - memory pressure, eviction rates
 
-### MySQL and MariaDB
+## 6.3.2 Web Server Alerts
 
-#### mysql_replication_lag
+- [nginx](https://learn.netdata.io/docs/observability/collectors/collectors.complex.list/nginx/) - request handling, connection states
+- [Apache](https://learn.netdata.io/docs/observability/collectors/collectors.complex.list/apache/) - request processing, worker utilization
 
-Tracks whether the replication position is advancing, catching replication stalls immediately.
+## 6.3.3 Message Queue Alerts
 
-**Context:** `mysql.slave_behind`
-**Thresholds:** WARN > 10s (tightens to 5s while already WARNING), CRIT > 30s (tightens to 10s while already CRITICAL)
+- [RabbitMQ](https://learn.netdata.io/docs/observability/collectors/collectors.complex.list/rabbitmq/) - queue depth, message rates
+- [Kafka](https://learn.netdata.io/docs/observability/collectors/collectors.complex.list/apache_kafka/) - consumer lag, partition health
 
-#### mysql_10s_slow_queries
+## 6.3.4 Proxy & Load Balancer Alerts
 
-Identifies workloads generating excessive slow query traffic, which often precedes performance degradation.
-
-**Context:** `mysql.queries`
-**Thresholds:** WARN > 10/s (drops to 5/s while already WARNING), CRIT > 20/s (drops to 10/s while already CRITICAL)
-
-#### mysql_connections
-
-Tracks connection pool saturation to prevent connection exhaustion.
-
-**Context:** `mysql.connections_active`
-**Thresholds:** WARN > 70% of limit (drops to 60% while already WARNING), CRIT > 90% (drops to 80% while already CRITICAL)
-
-### PostgreSQL
-
-#### postgres_db_deadlocks_rate
-
-Detects deadlocks that indicate concurrent transaction conflicts.
-
-**Context:** `postgres.db_deadlocks_rate`
-**Thresholds:** WARN > 10 deadlocks/min (tightens to >0 while already WARNING)
-
-#### postgres_total_connection_utilization
-
-Tracks connection pool saturation to prevent connection exhaustion.
-
-**Context:** `postgres.connections_utilization`
-**Thresholds:** WARN > 80% (drops to 70% while already WARNING), CRIT > 90% (drops to 80% while already CRITICAL)
+- [HAProxy](https://learn.netdata.io/docs/observability/collectors/collectors.complex.list/haproxy/) - request rates, backend health
+- [Traefik](https://learn.netdata.io/docs/observability/collectors/collectors.complex.list/traefik/) - request handling, middleware health
 
 ## Related Sections
 
