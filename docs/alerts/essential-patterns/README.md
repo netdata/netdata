@@ -208,6 +208,7 @@ lookup: average -10m unaligned of user,system
       crit: $this > 95
 ```
 
+```conf
 # Inefficient: 10-second evaluation
 template: 10min_cpu_usage
     on: system.cpu
