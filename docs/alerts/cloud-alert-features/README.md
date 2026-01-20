@@ -2,6 +2,17 @@
 
 Netdata Cloud provides centralized features for event monitoring, alert management, and team coordination.
 
+## What You'll Find in This Chapter
+
+| Section | Feature |
+|---------|---------|
+| **[10.1 Events Feed](#101-events-feed)** | Unified event stream |
+| **[10.2 Silencing Rules Manager](#102-silencing-rules-manager)** | Cloud-based silencing |
+| **[10.3 Alert Deduplication](#103-alert-deduplication-and-aggregation)** | Cloud aggregation |
+| **[10.4 Room-Based Alerting](#104-room-based-alerting)** | Room scoping |
+
+---
+
 ## 10.1 Events Feed
 
 **A unified stream of all alerts and events across your infrastructure.**
@@ -29,8 +40,6 @@ alert:*cpu*      # CPU-related alerts
 - **9.5 Cloud Events API** for programmatic access
 - **5.3 Cloud Notifications** for routing
 
----
-
 ## 10.2 Silencing Rules Manager
 
 **Temporarily suppress alerts during maintenance windows or known issues.**
@@ -53,8 +62,6 @@ schedule:
 
 - **4.3 Silencing in Netdata Cloud** for Cloud-level silencing workflows
 - **4.2 Silencing vs Disabling** for conceptual difference
-
----
 
 ## 10.3 Alert Deduplication and Aggregation
 
@@ -82,8 +89,6 @@ When the same alert fires across multiple nodes, Cloud groups them into one acti
 - **[12.4 Large Environment Patterns](../best-practices/4-scaling-large-environments.md)** for multi-node setups
 - **[13.5 Scaling Topologies](../architecture/5-scaling-topologies.md)** for complex topologies
 
----
-
 ## 10.4 Room-Based Alerting
 
 **Organize nodes into rooms to scope alerts and notifications to specific teams or environments.**
@@ -105,20 +110,9 @@ criteria:
 
 ### 10.4.2 Room-Specific Alerts
 
-Create alerts scoped to specific rooms in the Cloud UI.
+Room-scoped alerts fire only for nodes within that room, enabling targeted alerting for specific teams or environments without affecting other infrastructure groups.
 
 ### 10.4.3 Related Sections
 
-- **8.3 Label-Based Targeting** for label usage
-- **12.4 Large Environment Patterns** for multi-room strategies
-
----
-
-## What You'll Find in This Chapter
-
-| Section | Feature |
-|---------|---------|
-| **[10.1 Events Feed](#101-events-feed)** | Unified event stream |
-| **[10.2 Silencing Rules Manager](#102-silencing-rules-manager)** | Cloud-based silencing |
-| **[10.3 Alert Deduplication](#103-alert-deduplication-and-aggregation)** | Cloud aggregation |
-| **[10.4 Room-Based Alerting](#104-room-based-alerting)** | Room scoping |
+- **[8.3 Host, Chart, and Label-Based Targeting](../advanced-techniques/3-label-targeting.md)** for label usage
+- **[12.4 Large Environment Patterns](../best-practices/4-scaling-large-environments.md)** for multi-room strategies
