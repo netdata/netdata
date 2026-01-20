@@ -244,7 +244,11 @@ lookup: average -5m unaligned of deviation
 
 The `abs()` function returns the absolute value. Both `+15` and `-15` deviation are treated as `15`.
 
-**Note:** You can also use the `absolute` lookup option (see **3.2.4**):
+:::note
+
+You can also use the `absolute` lookup option (see **3.2.4**):
+
+:::
 ```conf
 lookup: average -5m unaligned absolute of deviation
 ```
