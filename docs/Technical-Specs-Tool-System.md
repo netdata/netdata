@@ -79,7 +79,7 @@ classDiagram
 
     class AgentProvider {
         +kind: "agent"
-        +namespace: "subagent"
+        +namespace: "agent"
     }
 
     class RouterToolProvider {
@@ -248,9 +248,9 @@ Built-in tools provided by ai-agent itself.
 Sub-agent invocation as tools.
 
 **Kind**: `agent`
-**Namespace**: `subagent`
+**Namespace**: `agent`
 
-**Tool Naming**: `agent__{agentname}`
+**Tool Naming**: `agent__{agentname}` (model-facing name; namespace matches the `agent__` prefix)
 
 Example: `agent__researcher`, `agent__code_reviewer`
 

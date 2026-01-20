@@ -281,7 +281,7 @@ const session = new Session({ cwd: newDir, config: settings });
 
 ```typescript
 // BAD: Direct tool type switching in orchestration logic
-if (kind === "agent" && namespace === "subagent") {
+if (kind === "agent" && provider instanceof AgentProvider) {
   // special sub-agent handling
 } else if (kind === "mcp") {
   // special MCP handling

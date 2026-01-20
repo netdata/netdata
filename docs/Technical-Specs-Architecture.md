@@ -231,7 +231,7 @@ The core loop is implemented in `TurnRunner.execute()` and invoked by `AIAgentSe
 | MCPProvider          | `mcp`         | Model Context Protocol servers (stdio/websocket/http/sse)                   |
 | RestProvider         | `rest`        | REST/OpenAPI endpoints (frontmatter-selected)                               |
 | InternalToolProvider | `agent`       | Built-in: final_report, task_status, batch, progress, title                 |
-| AgentProvider        | `subagent`    | Sub-agent tool invocations (registered via SubAgentRegistry)                |
+| AgentProvider        | `agent`       | Sub-agent tool invocations (registered via SubAgentRegistry)                |
 | RouterToolProvider   | `agent`       | router\_\_handoff-to (registered only when router.destinations configured)  |
 | ToolOutputProvider   | `tool-output` | tool_output tool for storage/retrieval (registered when toolOutput.enabled) |
 

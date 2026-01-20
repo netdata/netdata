@@ -35,7 +35,7 @@ export interface ToolExecuteResult {
   error?: string;
   latencyMs: number;
   kind: ToolKind;
-  namespace: string; // e.g., mcp server namespace, 'rest', 'subagent'
+  namespace: string; // e.g., mcp server namespace, 'rest', 'agent'
   // Optional extras for providers that produce rich results (e.g., sub-agents)
   extras?: Record<string, unknown> | {
     taskStatusCompleted?: boolean;
@@ -50,7 +50,7 @@ export interface ToolCancelOptions {
 
 export abstract class ToolProvider {
   abstract readonly kind: ToolKind;
-  abstract readonly namespace: string; // provider namespace (e.g., 'rest', server namespace)
+  abstract readonly namespace: string; // provider namespace (e.g., 'rest', 'agent', server namespace)
   abstract listTools(): MCPTool[];
   abstract hasTool(name: string): boolean;
   abstract execute(name: string, parameters: Record<string, unknown>, opts?: ToolExecuteOptions): Promise<ToolExecuteResult>;

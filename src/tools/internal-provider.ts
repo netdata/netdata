@@ -1,7 +1,7 @@
 import Ajv from 'ajv';
 
 import type { OutputFormatId } from '../formats.js';
-import type { MCPTool, TaskStatusData } from '../types.js';
+import type { LogDetailValue, MCPTool, TaskStatusData } from '../types.js';
 import type { ToolsOrchestrator } from './tools.js';
 import type { ToolExecuteOptions, ToolExecuteResult, ToolExecutionContext } from './types.js';
 import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
@@ -22,6 +22,7 @@ import {
   TASK_STATUS_TOOL_BATCH_RULES,
   TASK_STATUS_TOOL_INSTRUCTIONS,
 } from '../llm-messages.js';
+import { LOG_EVENTS } from '../logging/log-events.js';
 import { normalizeSlackMessages, SLACK_BLOCK_KIT_SCHEMA } from '../slack-block-kit.js';
 import { truncateToBytes } from '../truncation.js';
 import { parseJsonRecord, parseJsonValueDetailed } from '../utils.js';
@@ -38,7 +39,7 @@ interface InternalToolProviderOptions {
   updateStatus: (text: string, taskStatus?: TaskStatusData) => void;
   setTitle: (title: string, emoji?: string) => void;
   setFinalReport: (payload: { format: string; content?: string; content_json?: Record<string, unknown>; metadata?: Record<string, unknown>; messages?: unknown[] }) => void;
-  logError: (message: string) => void;
+  logError: (message: string, details?: Record<string, LogDetailValue>) => void;
   orchestrator: ToolsOrchestrator;
   getCurrentTurn: () => number;
   toolTimeoutMs?: number;
@@ -762,7 +763,11 @@ export class InternalToolProvider extends ToolProvider {
       }
 
       if (typeof content !== 'string' || content.trim().length === 0) {
-        this.opts.logError('agent__final_report requires non-empty report_content field.');
+        this.opts.logError('agent__final_report requires non-empty report_content field.', {
+          event: LOG_EVENTS.FINAL_REPORT_CONTENT_MISSING,
+          tool: FINAL_REPORT_TOOL,
+          reason: 'report_content_missing',
+        });
         throw new Error('agent__final_report requires non-empty report_content field.');
       }
       const mergedMeta = {

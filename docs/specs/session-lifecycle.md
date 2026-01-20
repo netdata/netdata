@@ -50,7 +50,7 @@ Session created via static factory; `AIAgent.run()` wraps orchestration (advisor
     - MCPProvider (mcp)
     - RestProvider (rest) - if REST tools configured
     - InternalToolProvider (agent) - always registered
-    - AgentProvider (subagent) - if subAgents present
+    - AgentProvider (agent) - if subAgents present
 13. Apply initial session title if provided
 
 **Invariants**:

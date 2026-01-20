@@ -9,10 +9,11 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { performance } from 'node:perf_hooks';
 
 import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions, ValidateFunction } from 'ajv';
-import type { AIAgentEvent, MCPServerConfig, MCPTool, MCPServer, LogEntry } from '../types.js';
+import type { AIAgentEvent, LogDetailValue, MCPServerConfig, MCPTool, MCPServer, LogEntry } from '../types.js';
 import type { ToolCancelOptions, ToolExecuteOptions, ToolExecuteResult } from './types.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 
+import { LOG_EVENTS } from '../logging/log-events.js';
 import { createWebSocketTransport } from '../websocket-transport.js';
 import { isPlainObject, warn } from '../utils.js';
 
@@ -28,7 +29,7 @@ interface MCPProcessHandle {
 }
 
 type LogSeverity = 'VRB' | 'WRN' | 'ERR' | 'TRC';
-export type LogFn = (severity: LogSeverity, message: string, remoteIdentifier: string, fatal?: boolean) => void;
+export type LogFn = (severity: LogSeverity, message: string, remoteIdentifier: string, fatal?: boolean, details?: Record<string, LogDetailValue>) => void;
 
 type AjvInstance = AjvClass;
 type AjvErrorObject = ErrorObject<string, Record<string, unknown>>;
@@ -333,7 +334,17 @@ class MCPSharedRegistry {
       logger('VRB', `shared probe succeeded for '${serverName}'`, `mcp:${serverName}`);
       return;
     }
-    logger('WRN', `shared probe failed for '${serverName}', scheduling restart sequence`, `mcp:${serverName}`);
+    logger(
+      'WRN',
+      `shared probe failed for '${serverName}', scheduling restart sequence`,
+      `mcp:${serverName}`,
+      false,
+      {
+        event: LOG_EVENTS.MCP_RESTART_DECISION,
+        server: serverName,
+        reason: 'probe_failed',
+      }
+    );
     const firstAttemptSuccess = await this.startRestartLoop(entry, logger, 'probe-failure');
     if (!firstAttemptSuccess) {
       const err = entry.restartError ?? new MCPRestartFailedError(serverName, 'restart attempt failed');
@@ -353,15 +364,28 @@ class MCPSharedRegistry {
       return;
     }
     if (entry.transportClosing) {
-      entry.log('VRB', `shared transport closed for '${entry.serverName}' during managed restart`, `mcp:${entry.serverName}`);
+      entry.log('VRB', `shared transport closed for '${entry.serverName}' during managed restart`, `mcp:${entry.serverName}`, false, {
+        event: LOG_EVENTS.MCP_TRANSPORT_CLOSED,
+        server: entry.serverName,
+        during_restart: true,
+      });
       return;
     }
-    entry.log('WRN', `shared transport closed for '${entry.serverName}', scheduling restart sequence`, `mcp:${entry.serverName}`);
+    entry.log('WRN', `shared transport closed for '${entry.serverName}', scheduling restart sequence`, `mcp:${entry.serverName}`, false, {
+      event: LOG_EVENTS.MCP_TRANSPORT_CLOSED,
+      server: entry.serverName,
+      during_restart: false,
+    });
     try {
       await this.startRestartLoop(entry, entry.log, 'transport-exit');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      entry.log('ERR', `shared restart scheduling failed for '${entry.serverName}' after transport exit: ${message}`, `mcp:${entry.serverName}`, true);
+      entry.log('ERR', `shared restart scheduling failed for '${entry.serverName}' after transport exit: ${message}`, `mcp:${entry.serverName}`, true, {
+        event: LOG_EVENTS.MCP_RESTART_ERROR,
+        server: entry.serverName,
+        reason: 'transport_exit',
+        error: message,
+      });
     }
   }
   
@@ -419,11 +443,20 @@ class MCPSharedRegistry {
           await delay(backoffMs);
         }
         const attemptLabel = attempt + 1;
-        logger('WRN', `shared restart attempt ${String(attemptLabel)} for '${entry.serverName}' (${reason})`, `mcp:${entry.serverName}`);
+        logger('WRN', `shared restart attempt ${String(attemptLabel)} for '${entry.serverName}' (${reason})`, `mcp:${entry.serverName}`, false, {
+          event: LOG_EVENTS.MCP_RESTART_ATTEMPT,
+          server: entry.serverName,
+          attempt: attemptLabel,
+          reason,
+        });
         entry.restartError = undefined;
         try {
           await this.performRestartAttempt(entry, logger);
-          logger('VRB', `shared restart succeeded for '${entry.serverName}' on attempt ${String(attemptLabel)}`, `mcp:${entry.serverName}`);
+          logger('VRB', `shared restart succeeded for '${entry.serverName}' on attempt ${String(attemptLabel)}`, `mcp:${entry.serverName}`, false, {
+            event: LOG_EVENTS.MCP_RESTART_SUCCEEDED,
+            server: entry.serverName,
+            attempt: attemptLabel,
+          });
           const latch = entry.restartAttempt;
           if (latch !== undefined) {
             latch.resolve(true);
@@ -437,7 +470,12 @@ class MCPSharedRegistry {
             : new MCPRestartFailedError(entry.serverName, error instanceof Error ? error.message : String(error));
           entry.restartError = err;
           const configDetails = formatMCPConfigForLog(entry.serverName, entry.config);
-          logger('ERR', `shared MCP server restart failed (attempt ${String(attemptLabel)}): ${err.message} [${configDetails}]`, `mcp:${entry.serverName}`, true);
+          logger('ERR', `shared MCP server restart failed (attempt ${String(attemptLabel)}): ${err.message} [${configDetails}]`, `mcp:${entry.serverName}`, true, {
+            event: LOG_EVENTS.MCP_RESTART_FAILED,
+            server: entry.serverName,
+            attempt: attemptLabel,
+            error: err.message,
+          });
           const latch = entry.restartAttempt;
           if (latch !== undefined) {
             latch.resolve(false);
@@ -1050,8 +1088,8 @@ export class MCPProvider extends ToolProvider {
         trace: this.trace,
         verbose: this.verbose,
         requestTimeoutMs: this.requestTimeoutMs,
-        log: (severity, message, remoteIdentifier, fatal = false) => {
-          this.log(severity, message, remoteIdentifier, fatal);
+        log: (severity, message, remoteIdentifier, fatal = false, details) => {
+          this.log(severity, message, remoteIdentifier, fatal, details);
         },
         filterTools: (raw) => this.filterToolsForServer(name, config, raw),
       });
@@ -1186,8 +1224,8 @@ export class MCPProvider extends ToolProvider {
   }
 
   createStdioTransport(name: string, config: MCPServerConfig): StdioClientTransport {
-    return createStdioTransport(name, config, (severity, message, remoteIdentifier, fatal = false) => {
-      this.log(severity, message, remoteIdentifier, fatal);
+    return createStdioTransport(name, config, (severity, message, remoteIdentifier, fatal = false, details) => {
+      this.log(severity, message, remoteIdentifier, fatal, details);
     });
   }
 
@@ -1195,9 +1233,10 @@ export class MCPProvider extends ToolProvider {
     return Object.prototype.hasOwnProperty.call(this.serversConfig, name);
   }
 
-  private log(severity: 'VRB' | 'WRN' | 'ERR' | 'TRC', message: string, remoteIdentifier: string, fatal = false): void {
+  private log(severity: 'VRB' | 'WRN' | 'ERR' | 'TRC', message: string, remoteIdentifier: string, fatal = false, details?: Record<string, LogDetailValue>): void {
     const entry: LogEntry = {
       timestamp: Date.now(), severity, turn: 0, subturn: 0, direction: 'response', type: 'tool', toolKind: 'mcp', remoteIdentifier, fatal, message,
+      details,
     };
     try { this.emitEvent?.({ type: 'log', entry }); } catch (e) { warn(`mcp emitEvent failed: ${e instanceof Error ? e.message : String(e)}`); }
   }

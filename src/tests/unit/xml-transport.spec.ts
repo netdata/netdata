@@ -2,18 +2,25 @@ import crypto from 'node:crypto';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { MCPTool } from '../../types.js';
+import type { LogDetailValue, MCPTool } from '../../types.js';
 
 import { XmlToolTransport } from '../../xml-transport.js';
 
 const MOCK_UUID = 'abcd1234-abcd-abcd-abcd-abcd12345678';
 const NONCE = 'abcd1234';
+const SLACK_BLOCK_FORMAT = 'slack-block-kit' as const;
 
 const baseTools: MCPTool[] = [
   { name: 'mock_tool', description: 'mock', inputSchema: { type: 'object' } },
   { name: 'agent__final_report', description: 'final', inputSchema: { type: 'object' } },
   { name: 'agent__task_status', description: 'task_status', inputSchema: { type: 'object' } },
 ];
+
+interface XmlWarningEntry {
+  severity: 'WRN';
+  message: string;
+  details?: Record<string, LogDetailValue>;
+}
 
 describe('XmlToolTransport', () => {
   afterEach(() => {
@@ -85,7 +92,8 @@ describe('XmlToolTransport', () => {
 
     const slotId = build.slotTemplates[0].slotId;
     const recordFailure = vi.fn();
-    const logWarning = vi.fn();
+    const logCalls: XmlWarningEntry[] = [];
+    const logWarning = vi.fn((entry: XmlWarningEntry) => { logCalls.push(entry); });
 
     const result = transport.parseAssistantMessage(
       `<ai-agent-${slotId} tool="mock_tool">{"x":1}</ai-agent-${slotId}>`,
@@ -97,6 +105,8 @@ describe('XmlToolTransport', () => {
     expect(result.toolCalls).toBeUndefined();
     expect(recordFailure).toHaveBeenCalled();
     expect(logWarning).toHaveBeenCalled();
+    expect(logCalls[0]?.details?.warning).toBeDefined();
+    expect(logCalls[0]?.details?.action).toBeDefined();
   });
 
   it('records final-report JSON errors in xml-final mode', () => {
@@ -153,8 +163,8 @@ describe('XmlToolTransport', () => {
 
       const finalSlot = `${NONCE}-FINAL`;
       const recordFailure = vi.fn();
-      const logCalls: { severity: string; message: string }[] = [];
-      const logWarning = vi.fn((entry: { severity: 'WRN'; message: string }) => { logCalls.push(entry); });
+      const logCalls: XmlWarningEntry[] = [];
+      const logWarning = vi.fn((entry: XmlWarningEntry) => { logCalls.push(entry); });
 
       // Unclosed tag with stopReason=length and structured format
       const parse = transport.parseAssistantMessage(
@@ -173,7 +183,11 @@ describe('XmlToolTransport', () => {
       // Should log with content dump
       expect(logWarning).toHaveBeenCalledTimes(1);
       expect(logCalls[0].severity).toBe('WRN');
-      expect(logCalls[0].message).toContain('Will retry');
+      expect(logCalls[0].details?.warning).toBe('final_report_truncated');
+      expect(logCalls[0].details?.action).toBe('retry');
+      expect(logCalls[0].details?.stop_reason).toBe('length');
+      expect(logCalls[0].details?.format).toBe('json');
+      expect(logCalls[0].details?.truncated).toBe(true);
     });
 
     it('rejects truncated structured output (slack-block-kit) and calls recordTurnFailure', () => {
@@ -186,7 +200,7 @@ describe('XmlToolTransport', () => {
         maxToolCallsPerTurn: 1,
         taskStatusToolEnabled: false,
         finalReportToolName: 'agent__final_report',
-        resolvedFormat: 'slack-block-kit',
+        resolvedFormat: SLACK_BLOCK_FORMAT,
         expectedJsonSchema: undefined,
         attempt: 1,
         maxRetries: 3,
@@ -199,8 +213,8 @@ describe('XmlToolTransport', () => {
 
       // Unclosed tag with stopReason=length and structured format
       const parse = transport.parseAssistantMessage(
-        `<ai-agent-${finalSlot} format="slack-block-kit">[{"blocks": [`,
-        { turn: 1, resolvedFormat: 'slack-block-kit', stopReason: 'max_tokens', maxOutputTokens: 4096 },
+        `<ai-agent-${finalSlot} format="${SLACK_BLOCK_FORMAT}">[{"blocks": [`,
+        { turn: 1, resolvedFormat: SLACK_BLOCK_FORMAT, stopReason: 'max_tokens', maxOutputTokens: 4096 },
         { recordTurnFailure: recordFailure, logWarning }
       );
 
@@ -213,6 +227,12 @@ describe('XmlToolTransport', () => {
       expect(recordFailure.mock.calls[0][1]).toContain('4096 tokens');
       // Should log
       expect(logWarning).toHaveBeenCalledTimes(1);
+      const warningEntry = logWarning.mock.calls[0]?.[0] as XmlWarningEntry | undefined;
+      expect(warningEntry?.details?.warning).toBe('final_report_truncated');
+      expect(warningEntry?.details?.action).toBe('retry');
+      expect(warningEntry?.details?.stop_reason).toBe('max_tokens');
+      expect(warningEntry?.details?.format).toBe(SLACK_BLOCK_FORMAT);
+      expect(warningEntry?.details?.truncated).toBe(true);
     });
 
     it('accepts truncated unstructured output (markdown) with truncated flag', () => {
@@ -234,8 +254,8 @@ describe('XmlToolTransport', () => {
 
       const finalSlot = `${NONCE}-FINAL`;
       const recordFailure = vi.fn();
-      const logCalls: { severity: string; message: string }[] = [];
-      const logWarning = vi.fn((entry: { severity: 'WRN'; message: string }) => { logCalls.push(entry); });
+      const logCalls: XmlWarningEntry[] = [];
+      const logWarning = vi.fn((entry: XmlWarningEntry) => { logCalls.push(entry); });
 
       const truncatedContent = '# Report\n\nThis is a truncated markdown report that got cut off mid-senten';
 
@@ -257,7 +277,11 @@ describe('XmlToolTransport', () => {
       // Should log acceptance
       expect(logWarning).toHaveBeenCalledTimes(1);
       expect(logCalls[0].severity).toBe('WRN');
-      expect(logCalls[0].message).toContain('Accepting truncated output');
+      expect(logCalls[0].details?.warning).toBe('final_report_truncated');
+      expect(logCalls[0].details?.action).toBe('accept');
+      expect(logCalls[0].details?.stop_reason).toBe('length');
+      expect(logCalls[0].details?.format).toBe('markdown');
+      expect(logCalls[0].details?.truncated).toBe(true);
     });
 
     it('accepts truncated unstructured output (tty) with truncated flag', () => {
@@ -291,6 +315,13 @@ describe('XmlToolTransport', () => {
       expect(parse.toolCalls).toHaveLength(1);
       expect(parse.toolCalls?.[0].parameters).toHaveProperty('_truncated', true);
       expect(recordFailure).not.toHaveBeenCalled();
+      expect(logWarning).toHaveBeenCalledTimes(1);
+      const warningEntry = logWarning.mock.calls[0]?.[0] as XmlWarningEntry | undefined;
+      expect(warningEntry?.details?.warning).toBe('final_report_truncated');
+      expect(warningEntry?.details?.action).toBe('accept');
+      expect(warningEntry?.details?.stop_reason).toBe('length');
+      expect(warningEntry?.details?.format).toBe('tty');
+      expect(warningEntry?.details?.truncated).toBe(true);
     });
 
     it('accepts normal completion (stopReason=stop) without truncated flag', () => {

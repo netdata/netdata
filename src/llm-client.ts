@@ -22,6 +22,7 @@ import { OpenAICompatibleProvider } from './llm-providers/openai-compatible.js';
 import { OpenAIProvider } from './llm-providers/openai.js';
 import { OpenRouterProvider, OPENROUTER_DEFAULT_REFERER, OPENROUTER_DEFAULT_TITLE } from './llm-providers/openrouter.js';
 import { TestLLMProvider } from './llm-providers/test-llm.js';
+import { LOG_EVENTS } from './logging/log-events.js';
 import { updateAiSdkWarningPreference } from './setup-ai-sdk.js';
 import { isPlainObject, warn } from './utils.js';
 
@@ -299,7 +300,13 @@ export class LLMClient {
           }
 
           const traceMessage = `LLM request: ${method} ${url}\nheaders: ${JSON.stringify(headerObj, null, 2)}${bodyPretty ? `\nbody: ${bodyPretty}` : ''}`;
-          this.log('TRC', 'request', 'llm', `trace:${method}`, traceMessage);
+          this.log('TRC', 'request', 'llm', `trace:${method}`, traceMessage, {
+            details: {
+              event: LOG_EVENTS.LLM_TRACE_REQUEST,
+              method,
+              url,
+            },
+          });
         }
 
         const response = await fetch(input, requestInit);
@@ -475,7 +482,14 @@ export class LLMClient {
       } catch (error) {
         if (this.traceLLM) {
           const message = error instanceof Error ? error.message : String(error);
-          this.log('TRC', 'response', 'llm', `trace:${method}`, `HTTP Error: ${message}`);
+          this.log('TRC', 'response', 'llm', `trace:${method}`, `HTTP Error: ${message}`, {
+            details: {
+              event: LOG_EVENTS.LLM_TRACE_ERROR,
+              method,
+              url,
+              error: message,
+            },
+          });
         }
         throw error;
       }
@@ -602,7 +616,18 @@ export class LLMClient {
         traceMessage += `\ncontent-type: ${contentType}`;
       }
 
-      this.log('TRC', 'response', 'llm', `trace:${method}`, traceMessage);
+      const payloadFormat = lowered.includes(LLMClient.CONTENT_TYPE_EVENT_STREAM) ? 'sse' : 'http';
+      this.log('TRC', 'response', 'llm', `trace:${method}`, traceMessage, {
+        details: {
+          event: LOG_EVENTS.LLM_TRACE_RESPONSE,
+          method,
+          url: _url,
+          status: response.status,
+          status_text: response.statusText,
+          content_type: contentType,
+          payload_format: payloadFormat,
+        },
+      });
     })();
 
     void (async () => {
@@ -810,7 +835,13 @@ export class LLMClient {
     const remoteId = `${event.provider}:${event.model}`;
     const label = event.stage === 'request' ? 'SDK request payload' : 'SDK response payload';
     const serialized = this.serializeForTrace(event.payload);
-    this.log('TRC', direction, 'llm', remoteId, label, { details: { payload: serialized } });
+    this.log('TRC', direction, 'llm', remoteId, label, {
+      details: {
+        event: LOG_EVENTS.SDK_PAYLOAD,
+        stage: event.stage,
+        payload: serialized,
+      },
+    });
   }
 
   private serializeForTrace(value: unknown): string {
@@ -881,6 +912,7 @@ export class LLMClient {
     }
     warnings.forEach((warning) => {
       const details: Record<string, LogDetailValue> = {
+        event: LOG_EVENTS.LLM_INVALID_TOOL_PARAMETERS,
         reason: warning.reason,
       };
       if (typeof warning.toolCallId === 'string' && warning.toolCallId.length > 0) {

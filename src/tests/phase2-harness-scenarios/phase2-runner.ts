@@ -12,7 +12,7 @@ import type { StructuredLogEvent } from '../../logging/structured-log-event.js';
 import type { PreloadedSubAgent } from '../../subagent-registry.js';
 import type { MCPRestartFailedError, LogFn, SharedAcquireOptions, SharedRegistry, SharedRegistryHandle } from '../../tools/mcp-provider.js';
 import type { ToolExecuteResult } from '../../tools/types.js';
-import type { AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogDetailValue, LogEntry, LogPayload, MCPServer, MCPServerConfig, MCPTool, ProviderConfig, ProviderReasoningValue, ReasoningLevel, TokenUsage, TurnRequest, TurnResult, TurnStatus, ToolChoiceMode } from '../../types.js';
+import type { AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogDetailValue, LogEntry, LogPayload, MCPServer, MCPServerConfig, MCPTool, ProviderConfig, ProviderReasoningValue, ReasoningLevel, TaskStatusData, TokenUsage, TurnRequest, TurnResult, TurnStatus, ToolChoiceMode } from '../../types.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { ModelMessage, LanguageModel, ToolSet } from 'ai';
 import type { ChildProcess } from 'node:child_process';
@@ -34,6 +34,7 @@ import { AnthropicProvider } from '../../llm-providers/anthropic.js';
 import { BaseLLMProvider, type ResponseMessage } from '../../llm-providers/base.js';
 import { OpenRouterProvider } from '../../llm-providers/openrouter.js';
 import { TestLLMProvider } from '../../llm-providers/test-llm.js';
+import { LOG_EVENTS } from '../../logging/log-events.js';
 import { formatRichLogLine } from '../../logging/rich-format.js';
 import { ShutdownController } from '../../shutdown-controller.js';
 import { SubAgentRegistry } from '../../subagent-registry.js';
@@ -84,7 +85,6 @@ const COLLAPSE_FIXED_RESULT = 'Fixed after collapse.';
 const MAX_RETRY_SUCCESS_RESULT = 'Success after retries.';
 const TASK_STATUS_IN_PROGRESS = 'in-progress';
 const RETRY_EXHAUSTED_MESSAGE = 'retry exhausted';
-const COLLAPSING_REMAINING_TURNS_FRAGMENT = 'Collapsing remaining turns';
 const CONTEXT_LIMIT_TURN_WARN = 'Context limit exceeded during turn execution; proceeding with final turn.';
 const FINAL_TURN_FRAGMENT = 'final turn';
 const THINK_TAG_INNER = 'Example reasoning with <ai-agent-EXAMPLE-FINAL format="markdown">not real';
@@ -518,9 +518,16 @@ const findLogByIdentifier = (logs: readonly LogEntry[], identifier: string, pred
   if (predicate === undefined) return logs.find((entry) => entry.remoteIdentifier === identifier);
   return logs.find((entry) => entry.remoteIdentifier === identifier && predicate(entry));
 };
-const expectLogIncludes = (logs: readonly LogEntry[], identifier: string, substring: string, scenarioId: string): void => {
-  const log = findLogByIdentifier(logs, identifier, (entry) => typeof entry.message === 'string' && entry.message.includes(substring));
-  invariant(log !== undefined, `Expected log ${identifier} containing "${substring}" for ${scenarioId}.`);
+const logHasEvent = (entry: LogEntry, event: LogDetailValue): boolean => getLogDetail(entry, 'event') === event;
+const findLogByEvent = (logs: readonly LogEntry[], event: LogDetailValue, predicate?: (entry: LogEntry) => boolean): LogEntry | undefined => {
+  if (predicate === undefined) {
+    return logs.find((entry) => logHasEvent(entry, event));
+  }
+  return logs.find((entry) => logHasEvent(entry, event) && predicate(entry));
+};
+const expectLogEvent = (logs: readonly LogEntry[], identifier: string, event: LogDetailValue, scenarioId: string): void => {
+  const log = findLogByIdentifier(logs, identifier, (entry) => logHasEvent(entry, event));
+  invariant(log !== undefined, `Expected log ${identifier} with event "${String(event)}" for ${scenarioId}.`);
 };
 
 const expectTurnFailureSlugs = (logs: readonly LogEntry[], scenarioId: string, required: string[]): LogEntry => {
@@ -713,6 +720,8 @@ function getEffectiveTimeoutMs(test: HarnessTest): number {
 const SUBAGENT_PRICING_PROMPT = path.resolve(process.cwd(), 'src/tests/fixtures/subagents/pricing-subagent.ai');
 const SUBAGENT_PRICING_SUCCESS_PROMPT = path.resolve(process.cwd(), 'src/tests/fixtures/subagents-success/pricing-subagent-success.ai');
 const SUBAGENT_SUCCESS_TOOL = 'agent__pricing-subagent-success';
+const SUBAGENT_LOG_TOOL = SUBAGENT_TOOL;
+const SUBAGENT_LOG_SUCCESS_TOOL = SUBAGENT_SUCCESS_TOOL;
 const SUBAGENT_SCHEMA_FALLBACK_PROMPT = path.resolve(process.cwd(), 'src/tests/fixtures/subagents/schema-fallback.ai');
 const SUBAGENT_SCHEMA_JSON_PROMPT = path.resolve(process.cwd(), 'src/tests/fixtures/subagents/schema-json.ai');
 const AGENT_SCHEMA_DEFAULT_PROMPT = path.resolve(process.cwd(), 'src/tests/fixtures/agents/schema-default.ai');
@@ -720,6 +729,7 @@ const AGENT_SCHEMA_JSON_PROMPT = path.resolve(process.cwd(), 'src/tests/fixtures
 const CONCURRENCY_TIMEOUT_ARGUMENT = 'trigger-timeout';
 const CONCURRENCY_SECOND_ARGUMENT = 'concurrency-second';
 const THROW_FAILURE_MESSAGE = 'Simulated provider throw for coverage.';
+const THROW_FAILURE_STATUS_MESSAGE = `400 [invalid_request]: ${THROW_FAILURE_MESSAGE}`;
 const BATCH_PROGRESS_RESPONSE = 'batch-progress-follow-up';
 const BATCH_STRING_PROGRESS = 'Batch progress conveyed via string payload.';
 const BATCH_STRING_RESULT = 'batch-string-mode';
@@ -743,7 +753,7 @@ const BATCH_TRUNCATED_ARGUMENT_STRING = `{
 }, ... (truncated for brevity)`;
 const FINAL_ANSWER_DELIVERED = 'Final answer delivered.';
 const TRACEABLE_PROVIDER_URL = 'https://openrouter.ai/api/v1';
-const RATE_LIMIT_WARNING_TOKEN = 'rate limit';
+const NETWORK_DOWN_MESSAGE = 'network down';
 const CONFIG_FILENAME = '.ai-agent.json';
 const FRONTMATTER_BODY_PREFIX = 'System body start.';
 const FRONTMATTER_BODY_SUFFIX = 'System body end.';
@@ -753,7 +763,6 @@ const LONG_TOOL_NAME = `tool-${'x'.repeat(140)}`;
 const FINAL_REPORT_RETRY_MESSAGE = 'Final report completed after mixed tools.';
 const SANITIZER_VALID_ARGUMENT = 'sanitizer-valid-call';
 const SANITIZER_REMOTE_IDENTIFIER = 'agent:sanitizer';
-const SANITIZER_DROPPED_MESSAGE = 'Invalid tool call payload sanitized';
 const EXIT_FINAL_REPORT_IDENTIFIER = 'agent:EXIT-FINAL-ANSWER';
 
 const GITHUB_SERVER_PATH = path.resolve(__dirname, '../mcp/github-stdio-server.js');
@@ -1433,12 +1442,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(testEntry.status === 'ok', 'Test MCP tool accounting should be ok for run-test-1.');
       const llmLogs = result.logs.filter((entry) => entry.type === 'llm' && entry.direction === 'response');
       invariant(llmLogs.length > 0, 'LLM response log missing for run-test-1.');
-      const hasStopReason = llmLogs.some((log) => {
-        if (typeof log.message === 'string' && log.message.includes('stop=')) {
-          return true;
-        }
-        return logHasDetail(log, 'stop_reason');
-      });
+      const hasStopReason = llmLogs.some((log) => logHasDetail(log, 'stop_reason'));
       invariant(hasStopReason, 'LLM log should include stop reason for run-test-1.');
     },
   },
@@ -1454,7 +1458,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const failureEntry = toolEntries.find((entry) => entry.command === 'test__test');
       invariant(failureEntry !== undefined, 'Expected MCP accounting entry for run-test-2.');
       invariant(failureEntry.status === 'failed', 'Accounting entry must reflect MCP failure for run-test-2.');
-      const failureLog = result.logs.find((entry) => entry.type === 'tool' && typeof entry.message === 'string' && entry.message.includes('error') && entry.message.includes('test__test'));
+      const failureLog = result.logs.find((entry) =>
+        entry.type === 'tool'
+        && logHasEvent(entry, LOG_EVENTS.TOOL_EXECUTION_FAILED)
+        && getLogDetail(entry, 'tool') === 'test__test'
+      );
       invariant(failureLog !== undefined, 'Tool failure log expected for run-test-2.');
       invariant(failureLog.severity === 'WRN', 'Tool failure logs must emit WRN severity for run-test-2.');
     },
@@ -1472,9 +1480,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
 
       const failureLog = result.logs.find((entry) =>
         entry.type === 'tool'
-        && typeof entry.message === 'string'
-        && entry.message.includes('test__required')
-        && entry.message.includes('Validation error')
+        && logHasEvent(entry, LOG_EVENTS.TOOL_EXECUTION_FAILED)
+        && getLogDetail(entry, 'tool') === 'test__required'
+        && getLogDetail(entry, 'error_kind') === 'invalid_parameters'
       );
       invariant(failureLog !== undefined, 'Validation failure log expected for run-test-132.');
 
@@ -1584,7 +1592,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       // The report content indicates failure, but transport succeeded.
       invariant(result.success, 'Scenario run-test-9: transport succeeds with model-provided report.');
       invariant(result.finalReport !== undefined, 'Final report should be present for run-test-9.');
-      const log = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Unknown tool requested'));
+      const log = findLogByEvent(result.logs, LOG_EVENTS.TOOL_UNKNOWN_REQUESTED);
       invariant(log !== undefined, 'Unknown tool warning log expected for run-test-9.');
     },
   },
@@ -1593,7 +1601,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-9-autocorrect expected success.');
       invariant(result.finalReport !== undefined, 'Final report should be present for run-test-9-autocorrect.');
-      const warnLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Auto-corrected tool name'));
+      const warnLog = findLogByEvent(result.logs, LOG_EVENTS.TOOL_AUTOCORRECTED);
       invariant(warnLog !== undefined, 'Auto-correct warning log expected for run-test-9-autocorrect.');
       const assistantWithTool = result.conversation.find((message) => message.role === 'assistant' && Array.isArray(message.toolCalls));
       invariant(assistantWithTool !== undefined, 'Assistant message with tool calls expected for run-test-9-autocorrect.');
@@ -1648,7 +1656,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-12 expected success.');
-      const finalTurnLog = result.logs.find((log) => typeof log.remoteIdentifier === 'string' && log.remoteIdentifier.includes('primary:') && typeof log.message === 'string' && log.message.includes(FINAL_TURN_FRAGMENT));
+      const finalTurnLog = result.logs.find((log) =>
+        typeof log.remoteIdentifier === 'string'
+        && log.remoteIdentifier.includes('primary:')
+        && log.direction === 'request'
+        && getLogDetail(log, 'final_turn') === true
+      );
       invariant(finalTurnLog !== undefined, 'LLM request log should reflect final turn for run-test-12.');
     },
   },
@@ -1847,9 +1860,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         && !Array.isArray(value);
       const warnLog = result.logs.find((entry) =>
         entry.remoteIdentifier === CONTEXT_REMOTE
-        && typeof entry.message === 'string'
-        && entry.message.includes(CONTEXT_LIMIT_TURN_WARN)
-        && entry.message.includes(FINAL_TURN_FRAGMENT)
+        && logHasEvent(entry, LOG_EVENTS.CONTEXT_GUARD_FORCED_FINAL)
         && isRecord(entry.details)
         && entry.details.provider === PRIMARY_PROVIDER
         && entry.details.model === MODEL_NAME);
@@ -1969,8 +1980,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const contextWarn = result.logs.find((entry) =>
         entry.remoteIdentifier === CONTEXT_REMOTE
         && entry.severity === 'WRN'
-        && typeof entry.message === 'string'
-        && entry.message.includes(CONTEXT_FORCING_FRAGMENT)
+        && logHasEvent(entry, LOG_EVENTS.CONTEXT_GUARD_FORCED_FINAL)
       );
       invariant(contextWarn !== undefined, 'Context guard warning log expected for run-test-context-forced-final.');
 
@@ -1981,8 +1991,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         entry.type === 'llm'
         && entry.direction === 'request'
         && entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`
-        && typeof entry.message === 'string'
-        && entry.message.includes('(final turn)')
+        && getLogDetail(entry, 'final_turn') === true
       );
       invariant(finalTurnRequest !== undefined, 'Final-turn LLM request log expected for run-test-context-forced-final.');
       const requestDetails = expectRecord(finalTurnRequest.details, 'Final-turn request details missing for run-test-context-forced-final.');
@@ -1996,8 +2005,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const shrinkWarn = result.logs.find((entry) =>
           entry.remoteIdentifier === CONTEXT_REMOTE
           && entry.severity === 'WRN'
-          && typeof entry.message === 'string'
-          && entry.message.includes(CONTEXT_LIMIT_TURN_WARN)
+          && logHasEvent(entry, LOG_EVENTS.CONTEXT_GUARD_FORCED_FINAL)
         );
         invariant(shrinkWarn !== undefined, 'Post-shrink warning log expected when schema tokens exceed limit for run-test-context-forced-final.');
       } else {
@@ -2126,8 +2134,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         entry.type === 'tool'
         && entry.direction === 'response'
         && entry.severity === 'VRB'
-        && typeof entry.message === 'string'
-        && entry.message.includes('ok preview')
+        && logHasEvent(entry, LOG_EVENTS.TOOL_RESPONSE_PREVIEW)
         && entry.remoteIdentifier === MCP_TEST_REMOTE
         && logHasDetail(entry, 'tokens_estimated')
       );
@@ -2359,8 +2366,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         entry.type === 'tool'
         && entry.direction === 'response'
         && entry.severity === 'WRN'
-        && typeof entry.message === 'string'
-        && entry.message.includes(TOOL_OUTPUT_STORE_LOG_FRAGMENT)
+        && logHasEvent(entry, LOG_EVENTS.TOOL_OUTPUT_STORED)
         && getLogDetail(entry, 'tool') === 'test__test'
       );
       invariant(storeLog !== undefined, 'tool_output storage warning expected for context_guard__tool_drop_after_success.');
@@ -2376,8 +2382,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const finalReportSkipLog = result.logs.find((entry) =>
         entry.type === 'tool'
         && entry.severity === 'WRN'
-        && typeof entry.message === 'string'
-        && entry.message.includes("Tool 'agent__final_report' skipped"));
+        && logHasEvent(entry, LOG_EVENTS.TOOL_EXECUTION_SKIPPED)
+        && getLogDetail(entry, 'tool') === 'agent__final_report');
       invariant(finalReportSkipLog === undefined, 'Final report must not be skipped after guard drop.');
     },
   },
@@ -2421,8 +2427,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const progressSkipLog = result.logs.find((entry) =>
         entry.type === 'tool'
         && entry.severity === 'WRN'
-        && typeof entry.message === 'string'
-        && entry.message.includes("Tool 'agent__task_status' skipped"));
+        && logHasEvent(entry, LOG_EVENTS.TOOL_EXECUTION_SKIPPED)
+        && getLogDetail(entry, 'tool') === 'agent__task_status');
       invariant(progressSkipLog === undefined, 'Progress tool must not be skipped after guard activation.');
     },
   },
@@ -2467,8 +2473,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const batchSkipLog = result.logs.find((entry) =>
         entry.type === 'tool'
         && entry.severity === 'WRN'
-        && typeof entry.message === 'string'
-        && entry.message.includes("Tool 'agent__batch' output dropped"));
+        && logHasEvent(entry, LOG_EVENTS.TOOL_OUTPUT_DROPPED)
+        && getLogDetail(entry, 'tool') === 'agent__batch');
       invariant(batchSkipLog === undefined, 'Batch output must not be dropped by the context guard.');
 
       const batchAccounting = result.accounting.filter(isToolAccounting).find((entry) => entry.command === 'agent__batch');
@@ -2501,8 +2507,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const contextWarn = result.logs.find((entry) =>
         entry.remoteIdentifier === CONTEXT_REMOTE
         && entry.severity === 'WRN'
-        && typeof entry.message === 'string'
-        && entry.message.includes(CONTEXT_FORCING_FRAGMENT)
+        && logHasEvent(entry, LOG_EVENTS.CONTEXT_GUARD_FORCED_FINAL)
       );
       invariant(contextWarn !== undefined, 'Context guard warning log expected for schema-only projection.');
 
@@ -2611,8 +2616,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const contextWarn = result.logs.find((entry) =>
         entry.remoteIdentifier === CONTEXT_REMOTE
         && entry.severity === 'WRN'
-        && typeof entry.message === 'string'
-        && entry.message.includes(CONTEXT_FORCING_FRAGMENT)
+        && logHasEvent(entry, LOG_EVENTS.CONTEXT_GUARD_FORCED_FINAL)
       );
       invariant(contextWarn !== undefined, 'Context guard warning log expected for context_guard__forced_final_turn_flow.');
 
@@ -2623,8 +2627,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         entry.type === 'llm'
         && entry.direction === 'request'
         && entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`
-        && typeof entry.message === 'string'
-        && entry.message.includes('(final turn)')
+        && getLogDetail(entry, 'final_turn') === true
       );
       invariant(finalTurnRequest !== undefined, 'Final-turn LLM request log expected for context_guard__forced_final_turn_flow.');
       const requestDetails = expectRecord(finalTurnRequest.details, 'Final-turn request details missing for context_guard__forced_final_turn_flow.');
@@ -2638,8 +2641,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const shrinkWarn = result.logs.find((entry) =>
           entry.remoteIdentifier === CONTEXT_REMOTE
           && entry.severity === 'WRN'
-          && typeof entry.message === 'string'
-          && entry.message.includes(CONTEXT_LIMIT_TURN_WARN)
+          && logHasEvent(entry, LOG_EVENTS.CONTEXT_GUARD_FORCED_FINAL)
         );
         invariant(shrinkWarn !== undefined, 'Post-shrink warning log expected when schema tokens exceed limit for context_guard__forced_final_turn_flow.');
       } else {
@@ -2704,9 +2706,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         && !Array.isArray(value);
       const warnLog = result.logs.find((entry) =>
         entry.remoteIdentifier === CONTEXT_REMOTE
-        && typeof entry.message === 'string'
-        && entry.message.includes(CONTEXT_LIMIT_TURN_WARN)
-        && entry.message.includes(FINAL_TURN_FRAGMENT)
+        && logHasEvent(entry, LOG_EVENTS.CONTEXT_GUARD_FORCED_FINAL)
         && isRecord(entry.details)
         && entry.details.provider === PRIMARY_PROVIDER
         && entry.details.model === MODEL_NAME);
@@ -2939,8 +2939,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const warnLog = result.logs.find((entry) =>
         entry.remoteIdentifier === CONTEXT_REMOTE
         && entry.severity === 'WRN'
-        && typeof entry.message === 'string'
-        && entry.message.includes('Context limit exceeded'));
+        && logHasEvent(entry, LOG_EVENTS.CONTEXT_GUARD_FORCED_FINAL));
       invariant(warnLog !== undefined, 'Context guard warning expected for bulk tool scenario.');
       invariant(result.success, 'Final report should succeed after bulk trimming.');
     },
@@ -3025,8 +3024,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success, 'Scenario run-test-15 expected success.');
       const llmEntry = result.accounting.filter(isLlmAccounting).at(-1);
       invariant(llmEntry !== undefined && typeof llmEntry.costUsd === 'number' && llmEntry.costUsd > 0, 'LLM accounting should include computed cost for run-test-15.');
-      const summaryLog = result.logs.find((entry) => entry.remoteIdentifier === 'summary');
-      invariant(summaryLog !== undefined && typeof summaryLog.message === 'string' && summaryLog.message.includes('cost total=$') && !summaryLog.message.includes('cost total=$0.00000'), 'Summary log should report non-zero cost for run-test-15.');
+      const summaryLog = findLogByEvent(result.logs, LOG_EVENTS.LLM_SUMMARY);
+      const summaryCost = summaryLog !== undefined ? getLogDetail(summaryLog, 'cost_usd') : undefined;
+      invariant(typeof summaryCost === 'number' && summaryCost > 0, 'Summary log should report non-zero cost for run-test-15.');
     },
   },
   {
@@ -3103,7 +3103,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         .find((entry) => entry.command === SUBAGENT_TOOL);
       invariant(subAgentAccounting !== undefined, 'Sub-agent accounting entry expected for run-test-19.');
       invariant(subAgentAccounting.status === 'failed', 'Sub-agent accounting should indicate failure for run-test-19.');
-      const subAgentErrorLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes(SUBAGENT_TOOL) && entry.message.includes('error'));
+      const subAgentErrorLog = result.logs.find((entry) =>
+        logHasEvent(entry, LOG_EVENTS.TOOL_EXECUTION_FAILED)
+        && getLogDetail(entry, 'tool') === SUBAGENT_LOG_TOOL
+      );
       invariant(subAgentErrorLog !== undefined, 'Sub-agent failure log expected for run-test-19.');
     },
   },
@@ -3135,12 +3138,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     id: RUN_TEST_21,
     expect: (result) => {
       invariant(result.success, `Scenario ${RUN_TEST_21} expected success.`);
-      const rateLimitCandidate = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.toLowerCase().includes(RATE_LIMIT_WARNING_TOKEN));
+      const rateLimitCandidate = findLogByEvent(result.logs, LOG_EVENTS.LLM_RATE_LIMIT);
       const rateLimitLog = expectLlmLogContext(rateLimitCandidate, RUN_TEST_21, { message: rateLimitWarningExpected(RUN_TEST_21), severity: 'WRN', remote: PRIMARY_REMOTE });
-      invariant(typeof rateLimitLog.message === 'string' && rateLimitLog.message.toLowerCase().includes(RATE_LIMIT_WARNING_TOKEN), rateLimitMessageMismatch(RUN_TEST_21));
-      const retryCandidate = result.logs.find((entry) => entry.remoteIdentifier === RETRY_REMOTE);
+      invariant(getLogDetail(rateLimitLog, 'event') === LOG_EVENTS.LLM_RATE_LIMIT, rateLimitMessageMismatch(RUN_TEST_21));
+      const retryCandidate = findLogByEvent(result.logs, LOG_EVENTS.LLM_RATE_LIMIT_BACKOFF, (entry) => entry.remoteIdentifier === RETRY_REMOTE);
       const retryLog = expectLlmLogContext(retryCandidate, RUN_TEST_21, { message: retryBackoffExpected(RUN_TEST_21), severity: 'WRN', remote: RETRY_REMOTE });
-      invariant(typeof retryLog.message === 'string' && retryLog.message.includes(BACKING_OFF_FRAGMENT), retryBackoffMessageMismatch(RUN_TEST_21));
+      invariant(getLogDetail(retryLog, 'event') === LOG_EVENTS.LLM_RATE_LIMIT_BACKOFF, retryBackoffMessageMismatch(RUN_TEST_21));
     },
   },
   {
@@ -3176,22 +3179,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const subAgentAccounting = result.accounting.filter(isToolAccounting).find((entry) => entry.command === SUBAGENT_SUCCESS_TOOL);
       invariant(subAgentAccounting?.status === 'ok', 'Successful sub-agent accounting expected for run-test-24.');
       const subAgentLog = result.logs.find((entry) => {
-        // Check if it's a subagent log
         if (typeof entry.remoteIdentifier !== 'string' || !entry.remoteIdentifier.startsWith('agent:')) {
           return false;
         }
-        // Check for error
-        if (typeof entry.message === 'string' && entry.message.includes('error')) {
-          return false;
-        }
-        // Check for the tool name in message or details
-        const hasToolInMessage = typeof entry.message === 'string' && entry.message.includes(SUBAGENT_SUCCESS_TOOL);
-        const hasToolInDetails = (
-          logHasDetail(entry, 'tool') && String(getLogDetail(entry, 'tool')).includes(SUBAGENT_SUCCESS_TOOL)
-        ) || (
-          logHasDetail(entry, 'request_preview') && String(getLogDetail(entry, 'request_preview')).includes(SUBAGENT_SUCCESS_TOOL)
-        );
-        return hasToolInMessage || hasToolInDetails;
+        return logHasEvent(entry, LOG_EVENTS.TOOL_RESPONSE_PREVIEW)
+          && getLogDetail(entry, 'tool') === SUBAGENT_LOG_SUCCESS_TOOL;
       });
       invariant(subAgentLog !== undefined, 'Sub-agent success log expected for run-test-24.');
     },
@@ -3236,13 +3228,13 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         log.type === 'tool' &&
         typeof log.remoteIdentifier === 'string' &&
         log.remoteIdentifier.startsWith('mcp:');
+      const firstRequestPreview = formatToolRequestCompact('test__test', { text: CONCURRENCY_TIMEOUT_ARGUMENT });
+      const secondRequestPreview = formatToolRequestCompact('test__test', { text: CONCURRENCY_SECOND_ARGUMENT });
       const firstRequestIndex = logs.findIndex(
         (log) =>
           isMcpToolLog(log) &&
           log.direction === 'request' &&
-          ((typeof log.message === 'string' && log.message.includes(CONCURRENCY_TIMEOUT_ARGUMENT)) ||
-           (logHasDetail(log, 'request_preview') &&
-            String(getLogDetail(log, 'request_preview')).includes(CONCURRENCY_TIMEOUT_ARGUMENT)))
+          getLogDetail(log, 'request_preview') === firstRequestPreview
       );
       invariant(firstRequestIndex !== -1, 'First tool request log missing for run-test-25.');
       const firstResponseIndex = logs.findIndex(
@@ -3250,9 +3242,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           idx > firstRequestIndex &&
           isMcpToolLog(log) &&
           log.direction === 'response' &&
-          ((typeof log.message === 'string' && (log.message.includes('ok test__test') || log.message.includes('ok preview:'))) ||
-           (logHasDetail(log, 'tool') &&
-            String(getLogDetail(log, 'tool')).includes('test__test')))
+          logHasEvent(log, LOG_EVENTS.TOOL_RESPONSE_PREVIEW) &&
+          getLogDetail(log, 'tool') === 'test__test'
       );
       invariant(firstResponseIndex !== -1, 'First tool response log missing for run-test-25.');
       const secondRequestIndex = logs.findIndex(
@@ -3260,13 +3251,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           idx > firstRequestIndex &&
           isMcpToolLog(log) &&
           log.direction === 'request' &&
-          ((typeof log.message === 'string' && log.message.includes(CONCURRENCY_SECOND_ARGUMENT)) ||
-           (logHasDetail(log, 'request_preview') &&
-            String(getLogDetail(log, 'request_preview')).includes(CONCURRENCY_SECOND_ARGUMENT)))
+          getLogDetail(log, 'request_preview') === secondRequestPreview
       );
       invariant(secondRequestIndex !== -1, 'Second tool request log missing for run-test-25.');
       invariant(secondRequestIndex > firstResponseIndex, 'Second tool request should occur after first tool response for run-test-25.');
-      const queuedLog = logs.find((entry) => entry.message === 'queued' && entry.remoteIdentifier.startsWith('queue:'));
+      const queuedLog = logs.find((entry) => logHasEvent(entry, LOG_EVENTS.QUEUE_ENQUEUED) && entry.remoteIdentifier.startsWith('queue:'));
       invariant(queuedLog !== undefined, 'Queued log entry missing for run-test-25.');
       invariant(queuedLog.details?.queue === 'default', 'Queued log should reference default queue for run-test-25.');
     },
@@ -3309,7 +3298,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result) => {
       invariant(!result.success, 'Scenario run-test-queue-cancel expected cancellation.');
       invariant(result.error === 'canceled', 'Cancellation must propagate error for run-test-queue-cancel.');
-      const queuedLog = result.logs.find((entry) => entry.message === 'queued' && entry.remoteIdentifier.startsWith('queue:'));
+      const queuedLog = result.logs.find((entry) => logHasEvent(entry, LOG_EVENTS.QUEUE_ENQUEUED) && entry.remoteIdentifier.startsWith('queue:'));
       invariant(queuedLog !== undefined, 'Queued log entry missing for run-test-queue-cancel.');
       invariant(queuedLog.details?.queue === 'default', 'Queued log should reference default queue for run-test-queue-cancel.');
     },
@@ -3336,9 +3325,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-queue-isolation expected success.');
-      const queuedDefault = result.logs.some((entry) => entry.message === 'queued' && entry.details?.queue === 'default');
+      const queuedDefault = result.logs.some((entry) => logHasEvent(entry, LOG_EVENTS.QUEUE_ENQUEUED) && entry.details?.queue === 'default');
       invariant(queuedDefault, 'Default queue should log a queued entry in run-test-queue-isolation.');
-      const queuedFast = result.logs.some((entry) => entry.message === 'queued' && entry.details?.queue === 'fast');
+      const queuedFast = result.logs.some((entry) => logHasEvent(entry, LOG_EVENTS.QUEUE_ENQUEUED) && entry.details?.queue === 'fast');
       invariant(!queuedFast, 'Fast queue must not log a queued entry in run-test-queue-isolation.');
     },
   },
@@ -3522,12 +3511,15 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success, `Scenario ${RUN_TEST_31} expected success after provider throw.`);
       const finalReport = result.finalReport!;
       invariant(result.success, 'Final report should indicate success for run-test-31.');
-      const thrownCandidate = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes(THROW_FAILURE_MESSAGE));
+      const thrownCandidate = result.logs.find((entry) =>
+        getLogDetail(entry, 'status') === 'model_error'
+        && getLogDetail(entry, 'status_message') === THROW_FAILURE_STATUS_MESSAGE
+      );
       const thrownLog = expectLlmLogContext(thrownCandidate, RUN_TEST_31, { message: `Thrown failure log expected for ${RUN_TEST_31}.`, severity: 'WRN', remote: PRIMARY_REMOTE });
       const thrownDetails = thrownLog.details;
       invariant(thrownDetails?.status === 'model_error', 'Thrown LLM error should record model_error status for run-test-31.');
       const thrownStatusMessage = thrownDetails.status_message;
-      invariant(typeof thrownStatusMessage === 'string' && thrownStatusMessage.includes(THROW_FAILURE_MESSAGE), 'Thrown LLM error should preserve status message for run-test-31.');
+      invariant(thrownStatusMessage === THROW_FAILURE_STATUS_MESSAGE, 'Thrown LLM error should preserve status message for run-test-31.');
       const failedAttempt = result.accounting.filter(isLlmAccounting).find((entry) => entry.status === 'failed');
       invariant(failedAttempt !== undefined, 'LLM accounting failure expected for run-test-31.');
     },
@@ -3615,12 +3607,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success, `Scenario ${RUN_TEST_37} expected success after rate limit retry.`);
       const finalReport = result.finalReport!;
       invariant(result.success === true, 'Final report should indicate success for run-test-37.');
-      const rateLimitCandidate = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.toLowerCase().includes(RATE_LIMIT_WARNING_TOKEN));
+      const rateLimitCandidate = findLogByEvent(result.logs, LOG_EVENTS.LLM_RATE_LIMIT);
       const rateLimitLog = expectLlmLogContext(rateLimitCandidate, RUN_TEST_37, { message: rateLimitWarningExpected(RUN_TEST_37), severity: 'WRN', remote: PRIMARY_REMOTE });
-      invariant(typeof rateLimitLog.message === 'string' && rateLimitLog.message.toLowerCase().includes(RATE_LIMIT_WARNING_TOKEN), rateLimitMessageMismatch(RUN_TEST_37));
-      const retryCandidate = result.logs.find((entry) => entry.remoteIdentifier === RETRY_REMOTE);
+      invariant(getLogDetail(rateLimitLog, 'event') === LOG_EVENTS.LLM_RATE_LIMIT, rateLimitMessageMismatch(RUN_TEST_37));
+      const retryCandidate = findLogByEvent(result.logs, LOG_EVENTS.LLM_RATE_LIMIT_BACKOFF, (entry) => entry.remoteIdentifier === RETRY_REMOTE);
       const retryLog = expectLlmLogContext(retryCandidate, RUN_TEST_37, { message: retryBackoffExpected(RUN_TEST_37), severity: 'WRN', remote: RETRY_REMOTE });
-      invariant(typeof retryLog.message === 'string' && retryLog.message.includes(BACKING_OFF_FRAGMENT), retryBackoffMessageMismatch(RUN_TEST_37));
+      invariant(getLogDetail(retryLog, 'event') === LOG_EVENTS.LLM_RATE_LIMIT_BACKOFF, retryBackoffMessageMismatch(RUN_TEST_37));
     },
   },
   {
@@ -3640,8 +3632,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-45 expected success with traced fetch.');
-      const summaryCostLog = result.logs.find((entry) => entry.severity === 'FIN' && entry.remoteIdentifier === 'summary' && typeof entry.message === 'string' && entry.message.includes('cost total=$'));
-      invariant(summaryCostLog !== undefined, 'Pricing summary log expected for run-test-45.');
+      const summaryCostLog = findLogByEvent(result.logs, LOG_EVENTS.LLM_SUMMARY);
+      const summaryCost = summaryCostLog !== undefined ? getLogDetail(summaryCostLog, 'cost_usd') : undefined;
+      invariant(typeof summaryCost === 'number', 'Pricing summary log expected for run-test-45.');
     },
   },
   {
@@ -3723,7 +3716,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       // Pre-commit validation now rejects invalid payloads and triggers retries.
       // Session fails because the LLM keeps returning invalid content and retries exhaust.
       invariant(!result.success, 'Scenario run-test-47: schema validation failure triggers retries leading to session failure.');
-      const schemaLog = result.logs.find((entry) => entry.severity === 'ERR' && typeof entry.message === 'string' && entry.message.includes('validation failed'));
+      const schemaLog = findLogByEvent(result.logs, LOG_EVENTS.FINAL_REPORT_SCHEMA_VALIDATION_FAILED);
       invariant(schemaLog !== undefined, 'Schema validation log expected for run-test-47.');
     },
   },
@@ -3735,7 +3728,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-48 expected success with trace logs.');
-      const traceLog = result.logs.find((entry) => entry.severity === 'TRC' && typeof entry.message === 'string' && entry.message.includes('REQUEST test__test'));
+      const traceLog = findLogByEvent(result.logs, LOG_EVENTS.TOOL_REQUEST_TRACE);
       invariant(traceLog !== undefined, 'Trace log expected for run-test-48.');
     },
   },
@@ -3771,7 +3764,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
            invariant(!result.success, 'Scenario run-test-51 should produce a usable final report (presence-based contract).');
       const finalReport = result.finalReport!;
       invariant(!result.success, 'Final report should indicate failure for run-test-51.');
-      const errorLog = result.logs.find((entry) => entry.severity === 'ERR' && typeof entry.message === 'string' && entry.message.includes('requires `messages` or non-empty `content`'));
+      const errorLog = findLogByEvent(result.logs, LOG_EVENTS.FINAL_REPORT_SLACK_MESSAGES_MISSING);
       invariant(errorLog !== undefined, 'Slack content error log expected for run-test-51.');
     },
   },
@@ -4096,7 +4089,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         },
         {
           type: 'error',
-          error: new Error('network down'),
+          error: new Error(NETWORK_DOWN_MESSAGE),
         },
       ];
       const originalFetch = globalThis.fetch;
@@ -4274,22 +4267,28 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-55 should succeed.');
-      const trcRequestLog = result.logs.find((entry) => entry.severity === 'TRC' && entry.message.includes('LLM request'));
+      const trcRequestLog = findLogByEvent(result.logs, LOG_EVENTS.LLM_TRACE_REQUEST);
       invariant(trcRequestLog !== undefined, 'TRC request log expected for run-test-55.');
-      const trcResponseLog = result.logs.find((entry) => entry.severity === 'TRC' && entry.message.includes('LLM response') && (entry.message.includes('raw-sse') || entry.message.includes('text/event-stream')));
+      const trcResponseLog = result.logs.find((entry) =>
+        logHasEvent(entry, LOG_EVENTS.LLM_TRACE_RESPONSE)
+        && getLogDetail(entry, 'payload_format') === 'sse'
+      );
       if (trcResponseLog === undefined) {
          
         console.error(JSON.stringify(result.logs, null, 2));
         invariant(false, 'TRC response log with SSE expected for run-test-55.');
       }
-      const errorTrace = result.logs.find((entry) => entry.severity === 'TRC' && entry.message.includes('HTTP Error: network down'));
+      const errorTrace = result.logs.find((entry) =>
+        logHasEvent(entry, LOG_EVENTS.LLM_TRACE_ERROR)
+        && getLogDetail(entry, 'error') === NETWORK_DOWN_MESSAGE
+      );
       invariant(errorTrace !== undefined, 'HTTP error trace expected for run-test-55.');
       // Since logResponse doesn't emit VRB logs for success, check that costs are properly tracked
       // in error logs which DO get emitted
       const quotaLog = result.logs.find((entry) =>
-        entry.severity === 'ERR' &&
-        entry.message.includes('QUOTA_EXCEEDED') &&
-        logHasDetail(entry, 'latency_ms')
+        entry.severity === 'ERR'
+        && getLogDetail(entry, 'status') === 'quota_exceeded'
+        && logHasDetail(entry, 'latency_ms')
       );
 
       if (quotaLog === undefined && process.env.CONTEXT_DEBUG === 'true') {
@@ -4314,10 +4313,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       if (!hasCostData && process.env.CONTEXT_DEBUG === 'true') {
         console.error('No cost data in final report:', JSON.stringify(report, null, 2));
       }
-      const failureLog = result.logs.find((entry) => entry.severity === 'ERR' && entry.message.includes('AUTH_ERROR'));
+      const failureLog = result.logs.find((entry) => entry.severity === 'ERR' && getLogDetail(entry, 'status') === 'auth_error');
       invariant(failureLog !== undefined, 'Failure log expected for run-test-55.');
       const fetchErrorMsg = typeof report.fetchError === 'string' ? report.fetchError : undefined;
-      invariant(fetchErrorMsg === 'network down', 'Fetch error message expected for run-test-55.');
+      invariant(fetchErrorMsg === NETWORK_DOWN_MESSAGE, 'Fetch error message expected for run-test-55.');
       const routingAfterJson = report.routingAfterJson;
       assertRecord(routingAfterJson, 'JSON routing metadata expected for run-test-55.');
       if (routingAfterJson.provider === undefined || routingAfterJson.model === undefined) {
@@ -4350,24 +4349,24 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(failedEntries.length >= 2, 'Multiple LLM failures expected for run-test-56.');
       const modelFailure = failedEntries.find((entry) => typeof entry.error === 'string' && entry.error.includes('Model failure during first attempt.'));
       invariant(modelFailure !== undefined, 'Model error accounting entry expected for run-test-56.');
-      const rateLog = result.logs.find((entry) => entry.type === 'llm' && typeof entry.message === 'string' && entry.message.toLowerCase().includes(RATE_LIMIT_WARNING_TOKEN));
+      const rateLog = findLogByEvent(result.logs, LOG_EVENTS.LLM_RATE_LIMIT);
       invariant(rateLog !== undefined, 'Rate limit warning log expected for run-test-56.');
     },
   },
   (() => {
-    let progressMessages: string[] = [];
+    let progressUpdates: TaskStatusData[] = [];
     return {
       id: 'run-test-57',
       configure: (_configuration, sessionConfig) => {
-        progressMessages = [];
+        progressUpdates = [];
         sessionConfig.outputFormat = SLACK_OUTPUT_FORMAT;
         sessionConfig.initialTitle = 'Initial Title';
         const existingCallbacks = sessionConfig.callbacks ?? {};
         sessionConfig.callbacks = {
           ...existingCallbacks,
           onEvent: (event, meta) => {
-            if (event.type === 'progress' && event.event.type === 'agent_update' && typeof event.event.message === 'string') {
-              progressMessages.push(event.event.message);
+            if (event.type === 'progress' && event.event.type === 'agent_update' && event.event.taskStatus !== undefined) {
+              progressUpdates.push(event.event.taskStatus);
             }
             existingCallbacks.onEvent?.(event, meta);
           },
@@ -4387,7 +4386,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const messagesValue = slackMeta !== undefined ? slackMeta.messages : undefined;
         const messages = Array.isArray(messagesValue) ? messagesValue : [];
         invariant(messages.length >= 2, 'Normalized Slack messages expected for run-test-57.');
-        invariant(progressMessages.some((message) => message.includes('Analyzing deterministic harness outputs.')), 'Progress update should be forwarded for run-test-57.');
+        invariant(progressUpdates.some((status) => status.done === 'Analyzing deterministic harness outputs.'), 'Progress update should be forwarded for run-test-57.');
       },
     };
   })(),
@@ -4711,18 +4710,18 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
   },
   (() => {
-    let progressMessages: string[] = [];
+    let progressUpdates: TaskStatusData[] = [];
     return {
       id: 'run-test-58',
       configure: (_configuration, sessionConfig) => {
-        progressMessages = [];
+        progressUpdates = [];
         sessionConfig.initialTitle = 'Harness Metrics';
         const existingCallbacks = sessionConfig.callbacks ?? {};
         sessionConfig.callbacks = {
           ...existingCallbacks,
           onEvent: (event, meta) => {
-            if (event.type === 'progress' && event.event.type === 'agent_update' && typeof event.event.message === 'string') {
-              progressMessages.push(event.event.message);
+            if (event.type === 'progress' && event.event.type === 'agent_update' && event.event.taskStatus !== undefined) {
+              progressUpdates.push(event.event.taskStatus);
             }
             existingCallbacks.onEvent?.(event, meta);
           },
@@ -4730,7 +4729,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       },
       expect: (result) => {
         invariant(result.success, 'Scenario run-test-58 expected success.');
-        invariant(progressMessages.some((message) => message.includes('Collecting metrics via test MCP tool.')), 'Progress update should include MCP metrics message for run-test-58.');
+        invariant(progressUpdates.some((status) => status.done === 'Collecting metrics via test MCP tool.'), 'Progress update should include MCP metrics message for run-test-58.');
         const llmEntries = result.accounting.filter(isLlmAccounting);
         invariant(llmEntries.length >= 1, 'LLM accounting entry expected for run-test-58.');
         const toolEntries = result.accounting.filter(isToolAccounting);
@@ -4748,7 +4747,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-59 expected success.');
-      const storeLogs = result.logs.filter((entry) => entry.severity === 'WRN' && typeof entry.message === 'string' && entry.message.includes(TOOL_OUTPUT_STORE_LOG_FRAGMENT));
+      const storeLogs = result.logs.filter((entry) => logHasEvent(entry, LOG_EVENTS.TOOL_OUTPUT_STORED));
       invariant(storeLogs.length > 0, 'tool_output storage warning expected for run-test-59.');
       const mcpStore = storeLogs.find((entry) => logHasDetail(entry, 'tool') && getLogDetail(entry, 'tool') === 'test__test');
       invariant(mcpStore !== undefined, 'MCP tool_output storage warning missing for run-test-59.');
@@ -4892,7 +4891,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       },
       expect: (result: AIAgentResult) => {
         invariant(!result.success, 'Scenario run-test-61 should produce a usable final report (presence-based contract).');
-        const limitLog = capturedLogs.find((entry) => entry.remoteIdentifier === 'agent:limits' && typeof entry.message === 'string' && entry.message.includes(TOOL_LIMIT_WARNING_MESSAGE));
+        const limitLog = capturedLogs.find((entry) => entry.remoteIdentifier === 'agent:limits' && logHasEvent(entry, LOG_EVENTS.TOOL_LIMIT_EXCEEDED));
         invariant(limitLog !== undefined, 'Limit enforcement log expected for run-test-61.');
         invariant(limitLog.severity === 'WRN', 'Tool limit log should be severity WRN for run-test-61.');
         invariant(!result.success, 'Final report should indicate failure for run-test-61.');
@@ -5516,7 +5515,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const registryAccessor = provider as unknown as { sharedRegistry: SharedRegistry };
         const restartRegistry = registryAccessor.sharedRegistry as unknown as { handleTimeout: (name: string, logger: LogFn) => Promise<void> };
         try {
-          await restartRegistry.handleTimeout(serverName, (severity, message, remoteIdentifier, fatal = false) => {
+          await restartRegistry.handleTimeout(serverName, (severity, message, remoteIdentifier, fatal = false, details) => {
             logs.push({
               timestamp: Date.now(),
               severity,
@@ -5527,6 +5526,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
               remoteIdentifier,
               fatal,
               message,
+              details,
             });
           });
         } catch (error) {
@@ -5541,9 +5541,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         await hangingPromise;
         const finalState = readRestartFixtureState(stateFile);
         fs.rmSync(path.dirname(stateFile), { recursive: true, force: true });
-        const attemptLogs = logs.filter((entry) => entry.message.includes(restartAttemptMarker));
-        const failureLogs = logs.filter((entry) => entry.message.includes(restartFailureMarker));
-        const decisionLogs = logs.filter((entry) => entry.message.includes(restartDecisionMarker));
+        const attemptLogs = logs.filter((entry) => logHasEvent(entry, LOG_EVENTS.MCP_RESTART_ATTEMPT));
+        const failureLogs = logs.filter((entry) => logHasEvent(entry, LOG_EVENTS.MCP_RESTART_FAILED));
+        const decisionLogs = logs.filter((entry) => logHasEvent(entry, LOG_EVENTS.MCP_RESTART_DECISION));
         return {
           success: true,
           conversation: [],
@@ -5652,8 +5652,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
               firstError: firstErrorMessage,
               recoveredResult: recoveredResultText,
               state: finalState,
-              transportExitLogs: logs.filter((entry) => entry.message.includes('shared transport closed')).length,
-              restartSuccessLogs: logs.filter((entry) => entry.message.includes('shared restart succeeded')).length,
+              transportExitLogs: logs.filter((entry) => logHasEvent(entry, LOG_EVENTS.MCP_TRANSPORT_CLOSED)).length,
+              restartSuccessLogs: logs.filter((entry) => logHasEvent(entry, LOG_EVENTS.MCP_RESTART_SUCCEEDED)).length,
               restartInProgressErrors,
             },
             ts: Date.now(),
@@ -5866,7 +5866,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         invariant(toolEntry !== undefined, 'Tool accounting entry missing for run-test-72-probe-success-no-restart.');
         invariant(toolEntry.status === 'failed', 'Tool accounting should record failure for run-test-72-probe-success-no-restart.');
         invariant(typeof toolEntry.error === 'string' && toolEntry.error.includes('Tool execution timed out'), 'Probe-success timeout should bubble the generic timeout error.');
-        const restartLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('mcp_restart_failed'));
+        const restartLog = result.logs.find((entry) => logHasEvent(entry, LOG_EVENTS.MCP_RESTART_FAILED));
         invariant(restartLog === undefined, 'Probe-success timeout must not emit mcp_restart_failed logs.');
       },
     } satisfies HarnessTest;
@@ -7004,7 +7004,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success, 'Scenario run-test-78 should complete successfully.');
       const summaryLog = result.logs.find((entry) => entry.severity === 'FIN' && entry.type === 'llm' && entry.remoteIdentifier === 'summary');
       invariant(summaryLog !== undefined, 'LLM summary log missing for run-test-78.');
-      invariant(summaryLog.message.includes('stop reasons: max_tokens'), 'Summary log should include max_tokens stop reason for run-test-78.');
+      invariant(getLogDetail(summaryLog, 'stop_reason_max_tokens') === 1, 'Summary log should include max_tokens stop reason for run-test-78.');
     },
   },
   {
@@ -7391,7 +7391,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(!result.success, 'Scenario run-test-85: schema validation failure triggers retries leading to session failure.');
       const ajvLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:ajv');
       invariant(ajvLog !== undefined, 'AJV warning expected for run-test-85.');
-      invariant(typeof ajvLog.message === 'string' && ajvLog.message.includes('preview'), 'Payload preview missing in AJV warning for run-test-85.');
+      const payloadPreview = getLogDetail(ajvLog, 'payload_preview');
+      invariant(typeof payloadPreview === 'string' && payloadPreview.length > 0, 'Payload preview missing in AJV warning for run-test-85.');
     },
   },
   {
@@ -7605,7 +7606,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const sanitizerLog = result.logs.find((entry) => entry.remoteIdentifier === SANITIZER_REMOTE_IDENTIFIER);
       invariant(sanitizerLog !== undefined, 'Sanitizer log expected for run-test-89.');
       invariant(
-        typeof sanitizerLog.message === 'string' && sanitizerLog.message.includes(SANITIZER_DROPPED_MESSAGE),
+        logHasEvent(sanitizerLog, LOG_EVENTS.SANITIZER_INVALID_TOOL_PAYLOAD),
         'Sanitizer log should report invalid tool payload for run-test-89.'
       );
 
@@ -7727,7 +7728,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const sanitizerLog = result.logs.find((entry) => entry.remoteIdentifier === SANITIZER_REMOTE_IDENTIFIER);
       invariant(sanitizerLog !== undefined, 'Sanitizer log expected for run-test-90.');
       invariant(
-        typeof sanitizerLog.message === 'string' && sanitizerLog.message.includes(SANITIZER_DROPPED_MESSAGE),
+        logHasEvent(sanitizerLog, LOG_EVENTS.SANITIZER_INVALID_TOOL_PAYLOAD),
         'Sanitizer message mismatch for run-test-90.',
       );
       const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
@@ -7744,7 +7745,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(retainedCall.name === 'test__test', 'Retained tool call name mismatch for run-test-90.');
       const textValue = (retainedCall.parameters as { text?: unknown }).text;
       invariant(textValue === SANITIZER_VALID_ARGUMENT, 'Retained tool call arguments mismatch for run-test-90.');
-      const retryLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes(SANITIZER_DROPPED_MESSAGE));
+      const retryLog = result.logs.find((entry) =>
+        entry.remoteIdentifier === SANITIZER_REMOTE_IDENTIFIER
+        && logHasEvent(entry, LOG_EVENTS.SANITIZER_INVALID_TOOL_PAYLOAD)
+      );
       invariant(retryLog !== undefined, 'Retry warning log missing for run-test-90.');
       const llmAttempts = result.accounting.filter(isLlmAccounting).length;
       invariant(llmAttempts === 3, 'Three LLM attempts expected for run-test-90.');
@@ -8052,7 +8056,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         (entry) =>
           entry.severity === 'ERR'
           && entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`
-          && entry.message.includes('invalid tool parameters')
+          && logHasEvent(entry, LOG_EVENTS.LLM_INVALID_TOOL_PARAMETERS)
       );
       invariant(warningLog !== undefined, 'Parameter warning log missing for run-test-131.');
       const previewDetail = warningLog.details?.raw_preview;
@@ -8215,7 +8219,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result: AIAgentResult) => {
       invariant(result.success, 'Scenario run-test-90-rate-limit expected success.');
-      const rateLimitLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.toLowerCase().includes('rate limited'));
+      const rateLimitLog = findLogByEvent(result.logs, LOG_EVENTS.LLM_RATE_LIMIT);
       if (rateLimitLog === undefined) {
         console.error('DEBUG run-test-90-rate-limit logs:', JSON.stringify(result.logs, null, 2));
       }
@@ -8406,11 +8410,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(finalReport.content === FINAL_REPORT_SANITIZED_CONTENT, 'Final report content mismatch for run-test-90-no-retry.');
       invariant(finalReport.format === 'markdown', 'Final report format mismatch for run-test-90-no-retry.');
       const systemNotices = result.logs
-        .filter((entry) => typeof entry.message === 'string' && entry.message.includes('plain text responses are ignored'));
+        .filter((entry) => logHasEvent(entry, LOG_EVENTS.PLAIN_TEXT_IGNORED));
       invariant(systemNotices.length === 0, 'No retry warning log expected for run-test-90-no-retry.');
       const llmAttempts = result.accounting.filter(isLlmAccounting).length;
       invariant(llmAttempts === 1, 'Single LLM attempt expected for run-test-90-no-retry.');
-      const warnLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('plain text responses are ignored'));
+      const warnLog = findLogByEvent(result.logs, LOG_EVENTS.PLAIN_TEXT_IGNORED);
       invariant(warnLog === undefined, 'No retry warning log expected for run-test-90-no-retry.');
     },
   },
@@ -8424,7 +8428,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const batchAccountingEntries = result.accounting.filter(isToolAccounting).filter((entry) => entry.command === 'agent__batch');
       const hasInvalidBatchAccounting = batchAccountingEntries.some((entry) => typeof entry.error === 'string' && entry.error.includes('invalid_batch_input'));
       invariant(hasInvalidBatchAccounting, 'Invalid batch handling signal expected for run-test-91.');
-      const unknownToolLog = result.logs.find((entry) => entry.remoteIdentifier === 'assistant:tool' && typeof entry.message === 'string' && entry.message.includes('Unknown tool requested'));
+      const unknownToolLog = findLogByEvent(result.logs, LOG_EVENTS.TOOL_UNKNOWN_REQUESTED);
       invariant(unknownToolLog !== undefined, 'Unknown tool warning expected for run-test-91.');
       const finalReportErrorMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes('final_report requires non-empty report_content'));
       invariant(finalReportErrorMessage === undefined, 'Final report tool path is deprecated; no tool validation message expected for run-test-91.');
@@ -8453,7 +8457,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success === true, 'Final report missing for run-test-92.');
       invariant(finalReport.format === 'pipe', `Final report format mismatch for run-test-92 (actual=${finalReport.format}).`);
       invariant(finalReport.content === 'My name is ChatGPT.', 'Final report content mismatch for run-test-92.');
-      const failureLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('requires non-empty report_content'));
+      const failureLog = findLogByEvent(result.logs, LOG_EVENTS.FINAL_REPORT_CONTENT_MISSING);
       invariant(failureLog === undefined, 'Final report validation error must not surface for run-test-92.');
     },
   },
@@ -8470,7 +8474,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const assistantContent = typeof firstAssistant.content === 'string' ? firstAssistant.content.trim() : undefined;
       invariant(assistantContent === undefined || assistantContent.length === 0, 'Reasoning-only assistant turn should not include textual content for run-test-93.');
       invariant(Array.isArray(firstAssistant.reasoning) && firstAssistant.reasoning.length > 0, 'Reasoning payload missing for run-test-93.');
-      const emptyWarning = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Empty response without tools'));
+      const emptyWarning = findLogByEvent(result.logs, LOG_EVENTS.EMPTY_RESPONSE_WITHOUT_TOOLS);
       invariant(emptyWarning === undefined, 'Reasoning-only response must not trigger empty-response warning for run-test-93.');
       const retryNotice = result.logs.find((entry) => entry.remoteIdentifier === RETRY_REMOTE);
       invariant(retryNotice === undefined, 'Reasoning-only response should not schedule retry for run-test-93.');
@@ -9213,8 +9217,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-114 expected success.');
       const traceLogs = result.logs.filter((entry) => entry.severity === 'TRC' && entry.type === 'llm');
-      invariant(traceLogs.some((log) => typeof log.message === 'string' && log.message.includes('SDK request payload')), 'SDK request payload log missing for run-test-114.');
-      invariant(traceLogs.some((log) => typeof log.message === 'string' && log.message.includes('SDK response payload')), 'SDK response payload log missing for run-test-114.');
+      const sdkLogs = traceLogs.filter((log) => logHasEvent(log, LOG_EVENTS.SDK_PAYLOAD));
+      invariant(sdkLogs.some((log) => getLogDetail(log, 'stage') === 'request'), 'SDK request payload log missing for run-test-114.');
+      invariant(sdkLogs.some((log) => getLogDetail(log, 'stage') === 'response'), 'SDK response payload log missing for run-test-114.');
     },
   },
   {
@@ -9466,7 +9471,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success, `Coverage ${COVERAGE_OPENROUTER_SSE_ID} should succeed.`);
       invariant(coverageOpenrouterSse !== undefined, 'Coverage data missing for openrouter sse.');
       invariant(coverageOpenrouterSse.accept === CONTENT_TYPE_JSON, 'Accept header should remain unchanged when preset.');
-      invariant(coverageOpenrouterSse.logs.some((log) => typeof log.message === 'string' && log.message.includes('raw-sse')), 'Trace response should capture raw SSE content.');
+      invariant(
+        coverageOpenrouterSse.logs.some((log) => logHasEvent(log, LOG_EVENTS.LLM_TRACE_RESPONSE) && getLogDetail(log, 'payload_format') === 'sse'),
+        'Trace response should capture raw SSE content.'
+      );
       invariant(coverageOpenrouterSse.routed.provider === COVERAGE_ROUTER_SSE_PROVIDER, 'Actual provider mismatch for openrouter sse.');
       invariant(coverageOpenrouterSse.routed.model === COVERAGE_ROUTER_SSE_MODEL, 'Actual model mismatch for openrouter sse.');
       invariant(coverageOpenrouterSse.cost.costUsd === 0.4, 'Cost extraction mismatch for openrouter sse.');
@@ -9985,7 +9993,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success, 'Interleaved SDK payload test expected success.');
       const traceLogs = result.logs.filter((entry) => entry.severity === 'TRC'
         && entry.type === 'llm'
-        && entry.message === 'SDK request payload');
+        && logHasEvent(entry, LOG_EVENTS.SDK_PAYLOAD)
+        && getLogDetail(entry, 'stage') === 'request');
       invariant(traceLogs.length > 0, 'SDK request payload logs missing for interleaved SDK payload test.');
       const payloads = traceLogs
         .map((entry) => entry.details?.payload)
@@ -10384,7 +10393,7 @@ const scenarioFilterIdsFromEnv = (() => {
       invariant(finalReport?.content === 'Tool call succeeds after invalid parameters.', `Final report content mismatch for ${scenarioId}.`);
       const sanitizerLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_SANITIZER);
       invariant(sanitizerLog !== undefined, `Sanitizer log expected for ${scenarioId}.`);
-      const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes('Collapsing'));
+      const collapseLog = findLogByEvent(result.logs, LOG_EVENTS.TURNS_COLLAPSED, (entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR);
       invariant(collapseLog !== undefined, `Turn collapse log expected for ${scenarioId}.`);
       const fallbackLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FALLBACK_REPORT);
       invariant(fallbackLog === undefined, `Fallback log should not appear for ${scenarioId}.`);
@@ -10471,7 +10480,7 @@ const scenarioFilterIdsFromEnv = (() => {
       invariant(result.success, `Scenario ${scenarioId} expected success.`);
       const finalReport = result.finalReport!;
       invariant(finalReport?.content === 'Recovered after missing content.', `Final report content mismatch for ${scenarioId}.`);
-      const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes('Collapsing'));
+      const collapseLog = findLogByEvent(result.logs, LOG_EVENTS.TURNS_COLLAPSED, (entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR);
       invariant(collapseLog !== undefined, `Turn collapse log expected for ${scenarioId}.`);
       const acceptanceLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FINAL_REPORT_ACCEPTED);
       invariant(acceptanceLog !== undefined && acceptanceLog.details?.source === 'tool-call', `Final report should be accepted from tool call for ${scenarioId}.`);
@@ -10557,7 +10566,7 @@ const scenarioFilterIdsFromEnv = (() => {
       invariant(result.success, `Scenario ${scenarioId} expected success.`);
       const finalReport = result.finalReport!;
       invariant(finalReport?.content === 'Recovered after wrong field types.', `Final report content mismatch for ${scenarioId}.`);
-      const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes('Collapsing'));
+      const collapseLog = findLogByEvent(result.logs, LOG_EVENTS.TURNS_COLLAPSED, (entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR);
       invariant(collapseLog !== undefined, `Turn collapse log expected for ${scenarioId}.`);
     },
   } satisfies HarnessTest);
@@ -10630,7 +10639,7 @@ const scenarioFilterIdsFromEnv = (() => {
       invariant(finalReport?.content === 'Recovered after null parameters.', `Final report content mismatch for ${scenarioId}.`);
       const sanitizerLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_SANITIZER);
       invariant(sanitizerLog !== undefined, `Sanitizer log expected for ${scenarioId}.`);
-      const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes('Collapsing'));
+      const collapseLog = findLogByEvent(result.logs, LOG_EVENTS.TURNS_COLLAPSED, (entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR);
       invariant(collapseLog !== undefined, `Turn collapse log expected for ${scenarioId}.`);
     },
   } satisfies HarnessTest);
@@ -10710,7 +10719,7 @@ const scenarioFilterIdsFromEnv = (() => {
       invariant(result.success, `Scenario ${scenarioId} expected success.`);
       const finalReport = result.finalReport!;
       invariant(finalReport?.content === 'Recovered after empty parameters.', `Final report content mismatch for ${scenarioId}.`);
-      const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes('Collapsing'));
+      const collapseLog = findLogByEvent(result.logs, LOG_EVENTS.TURNS_COLLAPSED, (entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR);
       invariant(collapseLog !== undefined, `Turn collapse log expected for ${scenarioId}.`);
     },
   } satisfies HarnessTest);
@@ -10781,7 +10790,7 @@ const scenarioFilterIdsFromEnv = (() => {
       invariant(result.success, `Scenario ${scenarioId} expected success.`);
       // Note: No sanitizer log expected - json-repair successfully fixes the malformed JSON
       // so the tool call is NOT dropped, just processed with repaired parameters
-      const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes('Collapsing'));
+      const collapseLog = findLogByEvent(result.logs, LOG_EVENTS.TURNS_COLLAPSED, (entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR);
       invariant(collapseLog !== undefined, `Turn collapse log expected for ${scenarioId}.`);
     },
   } satisfies HarnessTest);
@@ -10860,13 +10869,11 @@ BASE_TEST_SCENARIOS.push({
     invariant(result.success, `Scenario ${FINAL_REPORT_RETRY_TEXT_SCENARIO} expected success.`);
     const finalReport = result.finalReport!;
     invariant(finalReport?.content === FINAL_REPORT_AFTER_RETRY, `Final report content mismatch for ${FINAL_REPORT_RETRY_TEXT_SCENARIO}.`);
-    const sanitizerLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_SANITIZER
-      && typeof entry.message === 'string'
-      && entry.message.includes(SANITIZER_DROPPED_MESSAGE));
+    const sanitizerLog = findLogByEvent(result.logs, LOG_EVENTS.SANITIZER_INVALID_TOOL_PAYLOAD, (entry) => entry.remoteIdentifier === LOG_SANITIZER);
     invariant(sanitizerLog !== undefined, `Sanitizer log expected for ${FINAL_REPORT_RETRY_TEXT_SCENARIO}.`);
     const textExtractionLogs = result.logs.filter((entry) => entry.remoteIdentifier === LOG_TEXT_EXTRACTION);
     invariant(textExtractionLogs.length === 0, `Text extraction log should not appear for ${FINAL_REPORT_RETRY_TEXT_SCENARIO}.`);
-    const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes(COLLAPSING_REMAINING_TURNS_FRAGMENT));
+    const collapseLog = findLogByEvent(result.logs, LOG_EVENTS.TURNS_COLLAPSED, (entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR);
     invariant(collapseLog !== undefined, `Turn collapse log expected for ${FINAL_REPORT_RETRY_TEXT_SCENARIO}.`);
     const fallbackLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FALLBACK_REPORT);
     invariant(fallbackLog === undefined, `Fallback acceptance should not occur before the final turn for ${FINAL_REPORT_RETRY_TEXT_SCENARIO}.`);
@@ -11101,12 +11108,12 @@ BASE_TEST_SCENARIOS.push({
     invariant(finalReport?.content === TEXT_EXTRACTION_RETRY_RESULT, `Final report content mismatch for ${scenarioId}.`);
     const sanitizerLog = findLogByIdentifier(result.logs, LOG_SANITIZER);
     invariant(sanitizerLog !== undefined, `Sanitizer log expected for ${scenarioId}.`);
-    expectLogIncludes(result.logs, LOG_SANITIZER, SANITIZER_DROPPED_MESSAGE, scenarioId);
+    expectLogEvent(result.logs, LOG_SANITIZER, LOG_EVENTS.SANITIZER_INVALID_TOOL_PAYLOAD, scenarioId);
     const textExtractionLogs = getLogsByIdentifier(result.logs, LOG_TEXT_EXTRACTION);
     invariant(textExtractionLogs.length === 0, `Text extraction should not occur for ${scenarioId}.`);
     const fallbackLog = findLogByIdentifier(result.logs, LOG_FALLBACK_REPORT);
     invariant(fallbackLog === undefined, `Fallback log should not appear before the final turn for ${scenarioId}.`);
-    const collapseLog = findLogByIdentifier(result.logs, LOG_ORCHESTRATOR, (entry) => typeof entry.message === 'string' && entry.message.includes(COLLAPSING_REMAINING_TURNS_FRAGMENT));
+    const collapseLog = findLogByEvent(result.logs, LOG_EVENTS.TURNS_COLLAPSED, (entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR);
     invariant(collapseLog !== undefined, `Turn collapse log expected for ${scenarioId}.`);
     const acceptanceLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_FINAL_REPORT_ACCEPTED);
     invariant(acceptanceLog !== undefined && acceptanceLog.details?.source === 'tool-call', `Final report should be accepted from tool call for ${scenarioId}.`);
@@ -11470,10 +11477,9 @@ BASE_TEST_SCENARIOS.push({
     expect: (result: AIAgentResult) => {
       invariant(result.success, `Scenario ${scenarioId} expected success.`);
       const sanitizerLogs = result.logs.filter((entry) => entry.remoteIdentifier === LOG_SANITIZER
-        && typeof entry.message === 'string'
-        && entry.message.includes(SANITIZER_DROPPED_MESSAGE));
+        && logHasEvent(entry, LOG_EVENTS.SANITIZER_INVALID_TOOL_PAYLOAD));
       invariant(sanitizerLogs.length >= 3, `Expected sanitizer logs for each invalid tool call in ${scenarioId}.`);
-      expectLogIncludes(result.logs, LOG_ORCHESTRATOR, COLLAPSING_REMAINING_TURNS_FRAGMENT, scenarioId);
+      expectLogEvent(result.logs, LOG_ORCHESTRATOR, LOG_EVENTS.TURNS_COLLAPSED, scenarioId);
     },
   } satisfies HarnessTest);
 })();
@@ -11845,7 +11851,7 @@ BASE_TEST_SCENARIOS.push({
     invariant(result.success, 'Scenario run-test-turn-collapse-final-report-attempted expected success.');
     const finalReport = result.finalReport!;
     invariant(finalReport?.content === COLLAPSE_FIXED_RESULT, 'Final report content mismatch for run-test-turn-collapse-final-report-attempted.');
-    const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes(COLLAPSING_REMAINING_TURNS_FRAGMENT));
+    const collapseLog = findLogByEvent(result.logs, LOG_EVENTS.TURNS_COLLAPSED, (entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR);
     invariant(collapseLog !== undefined, 'Turn collapse log expected for run-test-turn-collapse-final-report-attempted.');
     const finalTurnLog = result.logs.find((entry) => entry.remoteIdentifier === FINAL_TURN_REMOTE);
     invariant(finalTurnLog !== undefined, 'Final turn log expected for run-test-turn-collapse-final-report-attempted.');
@@ -11920,7 +11926,7 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(result.success, 'Scenario run-test-turn-collapse-both-flags expected success.');
-    const collapseLogs = result.logs.filter((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes(COLLAPSING_REMAINING_TURNS_FRAGMENT));
+    const collapseLogs = result.logs.filter((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && logHasEvent(entry, LOG_EVENTS.TURNS_COLLAPSED));
     invariant(collapseLogs.length === 1, 'Collapse log should appear exactly once for run-test-turn-collapse-both-flags.');
   },
 } satisfies HarnessTest);
@@ -13337,7 +13343,7 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(result.success, 'Session should succeed after consecutive task_status updates and final report');
-    const logHit = result.logs.find((entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && typeof entry.message === 'string' && entry.message.includes('Consecutive standalone task_status calls detected'));
+    const logHit = findLogByEvent(result.logs, LOG_EVENTS.PROGRESS_ONLY_THRESHOLD, (entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR);
     invariant(logHit !== undefined, 'Expected log for consecutive standalone task_status forcing final turn');
   },
 } satisfies HarnessTest);
@@ -13587,7 +13593,8 @@ BASE_TEST_SCENARIOS.push({
     const toolMessage = result.conversation.find((msg) => msg.role === 'tool' && typeof msg.content === 'string' && msg.content.includes('XML wrapper tag as if it were a tool'));
     invariant(toolMessage !== undefined, 'Expected injected tool failure message for XML wrapper misuse');
     expectTurnFailureContains(result.logs, 'run-test-xml-wrapper-as-tool', ['malformed_tool_call', 'invalid_response']);
-    expectLogIncludes(result.logs, 'agent:orchestrator', 'XML wrapper called as tool', 'run-test-xml-wrapper-as-tool');
+    const collapseLog = findLogByEvent(result.logs, LOG_EVENTS.TURNS_COLLAPSED, (entry) => entry.remoteIdentifier === LOG_ORCHESTRATOR && getLogDetail(entry, 'reason') === 'xml_wrapper_as_tool');
+    invariant(collapseLog !== undefined, 'Expected collapse log for XML wrapper misuse.');
   },
 } satisfies HarnessTest);
 

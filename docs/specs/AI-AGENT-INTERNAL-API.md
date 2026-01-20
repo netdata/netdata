@@ -73,6 +73,9 @@ The library performs no direct I/O (no stdout/stderr/file writes). All output, l
   - `type: 'llm' | 'tool'`
   - `remoteIdentifier: string` – `provider:model` for LLM events, `protocol:namespace:tool` for tool events
   - `message: string`
+  - `details?: Record<string, string | number | boolean>` – structured metadata for deterministic matching
+    - `details.event` is a stable event code (see `src/logging/log-events.ts`) used by tests and consumers to match logs without relying on message text
+    - For tool logs, `details.tool` (when present) uses the model-facing tool name (e.g., `agent__pricing-subagent`), while `details.tool_namespace` indicates the provider namespace (`agent`, `mcp`, `rest`, `tool-output`, etc.)
   - `headendId?: string` – populated when invoked via a headend so consumers can correlate activity with the entry point
 - `AccountingEntry`
   - `type: 'llm'` (with tokens, cost, latency) or `type: 'tool'` (with characters in/out, latency)

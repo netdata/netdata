@@ -239,7 +239,7 @@ Final turn is forced only when all three conditions are met:
 
 ### AgentProvider
 **Kind**: `agent`
-**Namespace**: `subagent`
+**Namespace**: `agent`
 
 **Features**:
 - Sub-agent invocation
@@ -248,7 +248,7 @@ Final turn is forced only when all three conditions are met:
 - OpTree hierarchy
 - Accounting aggregation
 
-**Tool Naming**: `agent__{agentname}` (e.g., `agent__researcher`)
+**Tool Naming**: `agent__{agentname}` (model-facing name; namespace matches the `agent__` prefix)
 
 **Execution**:
 1. Resolve sub-agent definition from SubAgentRegistry

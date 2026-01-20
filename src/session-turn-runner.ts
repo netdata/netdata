@@ -34,6 +34,7 @@ import {
   isXmlFinalReportTagName,
   TOOL_NO_OUTPUT,
 } from './llm-messages.js';
+import { LOG_EVENTS } from './logging/log-events.js';
 import {
   TOOL_SANITIZATION_FAILED_KEY,
   TOOL_SANITIZATION_ORIGINAL_PAYLOAD_KEY,
@@ -395,7 +396,13 @@ export class TurnRunner {
                     type: 'llm' as const,
                     remoteIdentifier: REMOTE_ORCHESTRATOR,
                     fatal: false,
-                    message: collapseMessage
+                    message: collapseMessage,
+                    details: {
+                        event: LOG_EVENTS.TURNS_COLLAPSED,
+                        reason,
+                        previous_max_turns: previousMaxTurns,
+                        new_max_turns: maxTurns,
+                    },
                 };
                 this.log(adjustLog);
                 recordRetryCollapseMetrics({
@@ -522,6 +529,8 @@ export class TurnRunner {
                                 fatal: false,
                                 message: 'Context limit exceeded; forcing final turn.',
                                 details: {
+                                    event: LOG_EVENTS.CONTEXT_GUARD_FORCED_FINAL,
+                                    trigger: 'turn_preflight',
                                     projected_tokens: postEnforce.projectedTokens,
                                     limit_tokens: firstBlocked.limit,
                                     provider: firstBlocked.provider,
@@ -560,6 +569,10 @@ export class TurnRunner {
                             fatal: false,
                             message: `Projected context size ${String(blocked.projected)} tokens exceeds limit ${String(blocked.limit)} for ${provider}:${model}; continuing turn but guard will enforce finalization.`,
                             details: {
+                                event: LOG_EVENTS.CONTEXT_GUARD_SKIPPED_PROVIDER,
+                                trigger: 'turn_preflight',
+                                provider,
+                                model,
                                 projected_tokens: blocked.projected,
                                 limit_tokens: limitTokens,
                                 ...(remainingTokens !== undefined ? { remaining_tokens: remainingTokens } : {}),
@@ -708,6 +721,8 @@ export class TurnRunner {
                                 fatal: false,
                                 message: 'Context limit exceeded during turn execution; proceeding with final turn.',
                                 details: {
+                                    event: LOG_EVENTS.CONTEXT_GUARD_FORCED_FINAL,
+                                    trigger: 'turn_execution',
                                     projected_tokens: postEnforceGuard.projectedTokens,
                                     limit_tokens: firstBlocked.limit,
                                     provider: firstBlocked.provider,
@@ -851,7 +866,13 @@ export class TurnRunner {
                                         type: 'llm' as const,
                                         remoteIdentifier: 'assistant:tool',
                                         fatal: false,
-                                        message: `Unknown tool requested (not executed): ${req}`
+                                        message: `Unknown tool requested (not executed): ${req}`,
+                                        details: {
+                                            event: LOG_EVENTS.TOOL_UNKNOWN_REQUESTED,
+                                            tool: n,
+                                            phase: 'preflight',
+                                            request_preview: req,
+                                        },
                                     };
                                     this.log(warnLog);
                                 }
@@ -1105,6 +1126,11 @@ export class TurnRunner {
                                     remoteIdentifier: REMOTE_SANITIZER,
                                     fatal: false,
                                     message: `Extracted and executed ${String(fallbackResult.toolCalls.length)} tool call(s) from leaked XML patterns (${patterns}).`,
+                                    details: {
+                                        event: LOG_EVENTS.SANITIZER_EXTRACTED_TOOL_CALLS,
+                                        extracted_calls: fallbackResult.toolCalls.length,
+                                        patterns,
+                                    },
                                 });
                             } else if (/report_/i.test(textContent) || /final_report/i.test(textContent)) {
                                 this.log({
@@ -1311,7 +1337,13 @@ export class TurnRunner {
                                             type: 'llm' as const,
                                             remoteIdentifier: REMOTE_ORCHESTRATOR,
                                             fatal: false,
-                                            message: `final_report(slack-block-kit) ${failureMessage}`
+                                            message: `final_report(slack-block-kit) ${failureMessage}`,
+                                            details: {
+                                                event: LOG_EVENTS.FINAL_REPORT_SLACK_MESSAGES_MISSING,
+                                                phase: 'pre_commit',
+                                                reason: 'invalid_json',
+                                                error_hint: slackErrorHint,
+                                            },
                                         });
                                         this.addTurnFailure('final_report_slack_messages_missing', parseReason);
                                         this.logFinalReportDump(currentTurn, params, 'expected messages array', rawContent);
@@ -1348,7 +1380,12 @@ export class TurnRunner {
                                             type: 'llm' as const,
                                             remoteIdentifier: REMOTE_ORCHESTRATOR,
                                             fatal: false,
-                                            message: 'final_report(slack-block-kit) requires `messages` or non-empty `content`'
+                                            message: 'final_report(slack-block-kit) requires `messages` or non-empty `content`',
+                                            details: {
+                                                event: LOG_EVENTS.FINAL_REPORT_SLACK_MESSAGES_MISSING,
+                                                phase: 'pre_commit',
+                                                reason: 'empty_messages',
+                                            },
                                         });
                                         this.addTurnFailure('final_report_slack_messages_missing');
                                         this.logFinalReportDump(currentTurn, params, 'expected messages array', rawContent);
@@ -1418,6 +1455,14 @@ export class TurnRunner {
                                     const preview = preCommitValidation.payloadPreview;
                                     const mismatchMessage = buildSchemaMismatchFailure(errs, preview);
                                     const failureMessage = `final_report schema validation failed: ${mismatchMessage}`;
+                                    const schemaDetails: Record<string, LogDetailValue> = {
+                                        event: LOG_EVENTS.FINAL_REPORT_SCHEMA_VALIDATION_FAILED,
+                                        phase: 'pre_commit',
+                                        validation_errors: errs,
+                                    };
+                                    if (preview !== undefined) {
+                                        schemaDetails.payload_preview = preview;
+                                    }
                                     this.log({
                                         timestamp: Date.now(),
                                         severity: 'ERR' as const,
@@ -1427,7 +1472,8 @@ export class TurnRunner {
                                         type: 'llm' as const,
                                         remoteIdentifier: 'agent:ajv',
                                         fatal: false,
-                                        message: `pre-commit validation failed: ${failureMessage}`
+                                        message: `pre-commit validation failed: ${failureMessage}`,
+                                        details: schemaDetails,
                                     });
                                     setFinalReportFailureMessage(`${TOOL_FAILED_PREFIX} ${failureMessage}`);
                                     const schemaSummary = formatSchemaMismatchSummary(errs);
@@ -1584,7 +1630,11 @@ export class TurnRunner {
                 remoteIdentifier: REMOTE_ORCHESTRATOR,
                 fatal: false,
                 message: `Consecutive standalone task_status calls detected (count=${String(nextProgressOnlyTurns)}, threshold=5); forcing final turn.`,
-                details: { consecutiveProgressOnlyTurns: nextProgressOnlyTurns, threshold: 5 },
+                details: {
+                    event: LOG_EVENTS.PROGRESS_ONLY_THRESHOLD,
+                    consecutiveProgressOnlyTurns: nextProgressOnlyTurns,
+                    threshold: 5,
+                },
             });
         }
 
@@ -1713,6 +1763,13 @@ export class TurnRunner {
                                         remoteIdentifier: remoteId,
                                         fatal: false,
                                         message: logMessage,
+                                        details: {
+                                            event: LOG_EVENTS.LLM_RATE_LIMIT,
+                                            provider,
+                                            model,
+                                            ...(typeof effectiveWaitMs === 'number' ? { retry_after_ms: effectiveWaitMs } : {}),
+                                            ...(Array.isArray(sources) && sources.length > 0 ? { sources: sources.join(' | ') } : {}),
+                                        },
                                     };
                                     this.log(warnEntry);
                                     // Check if all providers in cycle are rate-limited
@@ -1729,7 +1786,12 @@ export class TurnRunner {
                                                 type: 'llm' as const,
                                                 remoteIdentifier: 'agent:retry',
                                                 fatal: false,
-                                                message: `All ${String(pairs.length)} providers rate-limited; backing off for ${String(maxRateLimitWaitMs)}ms before retry.`
+                                                message: `All ${String(pairs.length)} providers rate-limited; backing off for ${String(maxRateLimitWaitMs)}ms before retry.`,
+                                                details: {
+                                                    event: LOG_EVENTS.LLM_RATE_LIMIT_BACKOFF,
+                                                    providers_total: pairs.length,
+                                                    backoff_ms: maxRateLimitWaitMs,
+                                                },
                                             };
                                             this.log(waitLog);
                                             const sleepResult = await this.sleepWithAbort(maxRateLimitWaitMs);
@@ -1895,7 +1957,13 @@ export class TurnRunner {
                 type: 'llm' as const,
                 remoteIdentifier: REMOTE_ORCHESTRATOR,
                 fatal: false,
-                message: `No final report after ${String(currentTurn)} turns; Collapsing remaining turns from ${String(maxTurns)} to ${String(currentTurn)}.`
+                message: `No final report after ${String(currentTurn)} turns; Collapsing remaining turns from ${String(maxTurns)} to ${String(currentTurn)}.`,
+                details: {
+                    event: LOG_EVENTS.TURNS_COLLAPSED,
+                    reason: 'max_turns_exhausted',
+                    previous_max_turns: maxTurns,
+                    new_max_turns: currentTurn,
+                },
             };
             this.log(collapseEntry);
             const turnLabel = `${String(maxTurns)} turn${maxTurns === 1 ? '' : 's'}`;
@@ -2129,6 +2197,7 @@ export class TurnRunner {
             fatal: false,
             message,
             details: {
+                event: LOG_EVENTS.FINAL_TURN_DETECTED,
                 final_turn_reason: reason,
                 original_max_turns: originalMaxTurns,
                 active_max_turns: activeMaxTurns,
@@ -2244,6 +2313,11 @@ export class TurnRunner {
                 remoteIdentifier: 'agent:final-report-dump',
                 fatal: false,
                 message: `Final report params (${context}): ${paramsDump}`,
+                details: {
+                    event: LOG_EVENTS.FINAL_REPORT_DUMP,
+                    context,
+                    params_bytes: Buffer.byteLength(paramsDump, 'utf8'),
+                },
             });
             // Also log raw content if available (for debugging XML issues)
             if (typeof rawContent === 'string' && rawContent.trim().length > 0) {
@@ -2257,6 +2331,12 @@ export class TurnRunner {
                     remoteIdentifier: 'agent:final-report-raw',
                     fatal: false,
                     message: `Raw assistant content:\n${rawContent}`,
+                    details: {
+                        event: LOG_EVENTS.FINAL_REPORT_DUMP,
+                        context,
+                        raw_content: true,
+                        raw_bytes: Buffer.byteLength(rawContent, 'utf8'),
+                    },
                 });
             }
         }
@@ -2515,7 +2595,12 @@ export class TurnRunner {
                     type: 'llm' as const,
                     remoteIdentifier: REMOTE_ORCHESTRATOR,
                     fatal: false,
-                    message: 'final_report(slack-block-kit) requires `messages` or non-empty `content`'
+                    message: 'final_report(slack-block-kit) requires `messages` or non-empty `content`',
+                    details: {
+                        event: LOG_EVENTS.FINAL_REPORT_SLACK_MESSAGES_MISSING,
+                        phase: 'post_commit',
+                        reason: 'empty_messages',
+                    },
                 });
                 this.state.lastFinalReportStatus = 'failure';
                 this.state.finalReportInvalidFormat = true;
@@ -2538,6 +2623,14 @@ export class TurnRunner {
             const payloadPreview = validationResult.payloadPreview;
             const mismatchMessage = buildSchemaMismatchFailure(errs, payloadPreview);
             const errMsg = `final_report schema validation failed: ${mismatchMessage}`;
+            const schemaDetails: Record<string, LogDetailValue> = {
+                event: LOG_EVENTS.FINAL_REPORT_SCHEMA_VALIDATION_FAILED,
+                phase: 'post_commit',
+                validation_errors: errs,
+            };
+            if (payloadPreview !== undefined) {
+                schemaDetails.payload_preview = payloadPreview;
+            }
             const errLog = {
                 timestamp: Date.now(),
                 severity: 'ERR' as const,
@@ -2547,7 +2640,8 @@ export class TurnRunner {
                 type: 'llm' as const,
                 remoteIdentifier: 'agent:ajv',
                 fatal: false,
-                message: errMsg
+                message: errMsg,
+                details: schemaDetails,
             };
             this.log(errLog);
             this.state.lastFinalReportStatus = 'failure';
@@ -2559,6 +2653,14 @@ export class TurnRunner {
             // loop decides to finalize. Phase 2 cleanup will centralize final report logic to fix this.
             const source = this.ctx.finalReportManager.getSource();
             if (source !== 'synthetic') {
+                const replaceDetails: Record<string, LogDetailValue> = {
+                    event: LOG_EVENTS.FINAL_REPORT_SCHEMA_VALIDATION_FAILED,
+                    phase: 'post_commit_replace',
+                    validation_errors: errs,
+                };
+                if (payloadPreview !== undefined) {
+                    replaceDetails.payload_preview = payloadPreview;
+                }
                 this.log({
                     timestamp: Date.now(),
                     severity: 'ERR' as const,
@@ -2568,7 +2670,8 @@ export class TurnRunner {
                     type: 'llm' as const,
                     remoteIdentifier: 'agent:ajv',
                     fatal: false,
-                    message: 'Post-commit validation failed; replacing with synthetic failure report.'
+                    message: 'Post-commit validation failed; replacing with synthetic failure report.',
+                    details: replaceDetails,
                 });
                 this.ctx.finalReportManager.clear();
                 const syntheticContent = `Final report validation failed: ${mismatchMessage}`;
@@ -2748,6 +2851,30 @@ export class TurnRunner {
             if (stopReasonStr.length > 0) {
                 msg += `, stop reasons: ${stopReasonStr}`;
             }
+            const summaryDetails: Record<string, LogDetailValue> = {
+                event: LOG_EVENTS.LLM_SUMMARY,
+                requests: llmRequests,
+                failed: llmFailures,
+                tokens_prompt: tokIn,
+                tokens_output: tokOut,
+                tokens_cache_read: tokCacheRead,
+                tokens_cache_write: tokCacheWrite,
+                tokens_total: tokTotal,
+                cost_usd: Number(totalCost.toFixed(5)),
+                upstream_cost_usd: Number(totalUpstreamCost.toFixed(5)),
+                latency_sum_ms: llmLatencySum,
+                latency_avg_ms: llmLatencyAvg,
+                providers_models: pairsStr.length > 0 ? pairsStr : 'none',
+            };
+            if (stopReasonStr.length > 0) {
+                summaryDetails.stop_reasons = stopReasonStr;
+                stopReasonStats.forEach((count, reason) => {
+                    const safeKey = reason.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+                    if (safeKey.length > 0) {
+                        summaryDetails[`stop_reason_${safeKey}`] = count;
+                    }
+                });
+            }
             const fin = {
                 timestamp: Date.now(),
                 severity: 'FIN' as const,
@@ -2758,6 +2885,7 @@ export class TurnRunner {
                 remoteIdentifier: 'summary',
                 fatal: false,
                 message: msg,
+                details: summaryDetails,
             };
             this.log(fin);
             // MCP summary
@@ -2781,6 +2909,15 @@ export class TurnRunner {
                 .map(([k, s]) => `${String(s.total)}x [${String(s.ok)}+${String(s.failed)}] ${k}`)
                 .join(', ');
             const sizeCaps = this.state.centralSizeCapHits;
+            const toolSummaryDetails: Record<string, LogDetailValue> = {
+                event: LOG_EVENTS.TOOL_SUMMARY,
+                requests: mcpRequests,
+                failed: mcpFailures,
+                capped: sizeCaps,
+                bytes_in: totalToolCharsIn,
+                bytes_out: totalToolCharsOut,
+                providers_tools: toolPairsStr.length > 0 ? toolPairsStr : 'none',
+            };
             const finMcp = {
                 timestamp: Date.now(),
                 severity: 'FIN' as const,
@@ -2791,6 +2928,7 @@ export class TurnRunner {
                 remoteIdentifier: 'summary',
                 fatal: false,
                 message: `requests=${String(mcpRequests)}, failed=${String(mcpFailures)}, capped=${String(sizeCaps)}, bytes in=${String(totalToolCharsIn)} out=${String(totalToolCharsOut)}, providers/tools: ${toolPairsStr.length > 0 ? toolPairsStr : 'none'}`,
+                details: toolSummaryDetails,
             };
             this.log(finMcp);
         }
@@ -3026,7 +3164,13 @@ export class TurnRunner {
                 remoteIdentifier: REMOTE_SANITIZER,
                 fatal: false,
                 message: `Invalid tool call payload sanitized: ${reason}`,
-                details: { toolName: name, toolCallId: id, payload },
+                details: {
+                    event: LOG_EVENTS.SANITIZER_INVALID_TOOL_PAYLOAD,
+                    reason,
+                    toolName: name,
+                    toolCallId: id,
+                    payload,
+                },
             });
         };
         const sanitized = messages.map((msg, _msgIndex) => {
@@ -3047,6 +3191,10 @@ export class TurnRunner {
                             remoteIdentifier: REMOTE_SANITIZER,
                             fatal: false,
                             message: entry.message,
+                            details: {
+                                event: LOG_EVENTS.XML_WARNING,
+                                ...(entry.details ?? {}),
+                            },
                         });
                     },
                 });

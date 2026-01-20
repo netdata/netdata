@@ -15,6 +15,7 @@ import type { XmlToolTransport } from './xml-transport.js';
 
 import { ContextGuard } from './context-guard.js';
 import { TOOL_NO_OUTPUT, unknownToolFailureMessage } from './llm-messages.js';
+import { LOG_EVENTS } from './logging/log-events.js';
 import { addSpanEvent } from './telemetry/index.js';
 import {
   type ToolErrorKind,
@@ -290,6 +291,11 @@ export class SessionToolExecutor {
             remoteIdentifier: SessionToolExecutor.REMOTE_AGENT_TOOLS,
             fatal: false,
             message: `Auto-corrected tool name '${original}' -> '${resolvedCorrection}' after schema validation.`,
+            details: {
+              event: LOG_EVENTS.TOOL_AUTOCORRECTED,
+              tool_from: original,
+              tool_to: resolvedCorrection,
+            },
           };
           this.log(warn);
         }
@@ -367,6 +373,10 @@ export class SessionToolExecutor {
             remoteIdentifier: 'agent:limits',
             fatal: false,
             message: msg,
+            details: {
+              event: LOG_EVENTS.TOOL_LIMIT_EXCEEDED,
+              max_tool_calls_per_turn: maxToolCallsPerTurn,
+            },
           };
           this.log(warn);
           state.toolLimitExceeded = true;
@@ -766,6 +776,11 @@ export class SessionToolExecutor {
             remoteIdentifier: 'assistant:tool',
             fatal: false,
             message: msg,
+            details: {
+              event: LOG_EVENTS.TOOL_UNKNOWN_REQUESTED,
+              tool: effectiveToolName,
+              phase: 'execution',
+            },
           };
           this.log(warn);
           state.unknownToolEncountered = true;

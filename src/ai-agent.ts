@@ -20,6 +20,7 @@ import { FinalReportManager, type PendingFinalReportPayload } from './final-repo
 import { extractBodyWithoutFrontmatter, parseFrontmatter, parsePairs } from './frontmatter.js';
 import { FINAL_REPORT_TOOL } from './internal-tools.js';
 import { LLMClient } from './llm-client.js';
+import { LOG_EVENTS } from './logging/log-events.js';
 import { executeAdvisors } from './orchestration/advisors.js';
 import { executeHandoff } from './orchestration/handoff.js';
 import { buildAdvisoryBlock, buildOriginalUserRequestBlock, joinTaggedBlocks } from './orchestration/prompt-tags.js';
@@ -823,7 +824,7 @@ export class AIAgentSession {
         hasRouterHandoff,
         maxToolCallsPerTurn: resolvedMaxToolCallsPerTurn,
         xmlSessionNonce: this.xmlTransport.getSessionNonce(),
-        logError: (message: string) => {
+        logError: (message: string, details?: Record<string, LogDetailValue>) => {
           const entry: LogEntry = {
             timestamp: Date.now(),
             severity: 'ERR',
@@ -834,6 +835,7 @@ export class AIAgentSession {
             remoteIdentifier: 'agent:batch',
             fatal: false,
             message,
+            details,
           };
           this.log(entry);
         },
@@ -974,7 +976,7 @@ export class AIAgentSession {
         return { result: exec.result, childAccounting: exec.accounting, childOpTree: exec.opTree };
       };
       // Register AgentProvider synchronously so sub-agent tools are known before first turn
-      orch.register(new AgentProvider('subagent', subAgents, execFn));
+      orch.register(new AgentProvider('agent', subAgents, execFn));
     }
     // Populate mapping now (before warmup) so hasTool() sees all registered providers
     void orch.listTools();
@@ -1984,6 +1986,30 @@ export class AIAgentSession {
       if (stopReasonStr.length > 0) {
         msg += `, stop reasons: ${stopReasonStr}`;
       }
+      const summaryDetails: Record<string, LogDetailValue> = {
+        event: LOG_EVENTS.LLM_SUMMARY,
+        requests: llmRequests,
+        failed: llmFailures,
+        tokens_prompt: tokIn,
+        tokens_output: tokOut,
+        tokens_cache_read: tokCacheRead,
+        tokens_cache_write: tokCacheWrite,
+        tokens_total: tokTotal,
+        cost_usd: Number(totalCost.toFixed(5)),
+        upstream_cost_usd: Number(totalUpstreamCost.toFixed(5)),
+        latency_sum_ms: llmLatencySum,
+        latency_avg_ms: llmLatencyAvg,
+        providers_models: pairsStr.length > 0 ? pairsStr : 'none',
+      };
+      if (stopReasonStr.length > 0) {
+        summaryDetails.stop_reasons = stopReasonStr;
+        stopReasonStats.forEach((count, reason) => {
+          const safeKey = reason.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+          if (safeKey.length > 0) {
+            summaryDetails[`stop_reason_${safeKey}`] = count;
+          }
+        });
+      }
       const fin: LogEntry = {
         timestamp: Date.now(),
         severity: 'FIN',
@@ -1994,6 +2020,7 @@ export class AIAgentSession {
         remoteIdentifier: 'summary',
         fatal: false,
         message: msg,
+        details: summaryDetails,
       };
       this.log(fin);
 
@@ -2015,6 +2042,14 @@ export class AIAgentSession {
       const toolPairsStr = [...byToolStats.entries()]
         .map(([k, s]) => `${String(s.total)}x [${String(s.ok)}+${String(s.failed)}] ${k}`)
         .join(', ');
+      const toolSummaryDetails: Record<string, LogDetailValue> = {
+        event: LOG_EVENTS.TOOL_SUMMARY,
+        requests: mcpRequests,
+        failed: mcpFailures,
+        bytes_in: totalToolCharsIn,
+        bytes_out: totalToolCharsOut,
+        providers_tools: toolPairsStr.length > 0 ? toolPairsStr : 'none',
+      };
       const finMcp: LogEntry = {
         timestamp: Date.now(),
         severity: 'FIN',
@@ -2025,6 +2060,7 @@ export class AIAgentSession {
         remoteIdentifier: 'summary',
         fatal: false,
         message: `requests=${String(mcpRequests)}, failed=${String(mcpFailures)}, bytes in=${String(totalToolCharsIn)} out=${String(totalToolCharsOut)}, providers/tools: ${toolPairsStr.length > 0 ? toolPairsStr : 'none'}`,
+        details: toolSummaryDetails,
       };
       this.log(finMcp);
     } catch { /* swallow summary errors */ }
@@ -2165,6 +2201,10 @@ export class AIAgentSession {
       fatal: false,
       message,
       details: {
+        event: LOG_EVENTS.CONTEXT_GUARD_FORCED_FINAL,
+        trigger,
+        provider: first.provider,
+        model: first.model,
         projected_tokens: first.projected,
         limit_tokens: first.limit,
         ...(remainingTokens !== undefined ? { remaining_tokens: remainingTokens } : {}),
@@ -2195,6 +2235,7 @@ export class AIAgentSession {
       fatal: false,
       message,
       details: {
+        event: LOG_EVENTS.FINAL_TURN_DETECTED,
         final_turn_reason: reason,
         original_max_turns: originalMaxTurns,
         active_max_turns: originalMaxTurns,

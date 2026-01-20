@@ -9,10 +9,12 @@ import type { ToolMetricsRecord } from '../telemetry/index.js';
 import type { MCPTool, LogEntry, AccountingEntry, ProgressMetrics, LogDetailValue } from '../types.js';
 import type { ToolExecuteOptions, ToolExecuteResult, ToolKind, ToolProvider, ToolExecutionContext } from './types.js';
 
+import { LOG_EVENTS } from '../logging/log-events.js';
 import { recordToolMetrics, runWithSpan, addSpanAttributes, addSpanEvent, recordSpanError, recordQueueDepthMetrics, recordQueueWaitMetrics } from '../telemetry/index.js';
 import { computeTruncationPercent, truncateToBytesWithInfo } from '../truncation.js';
 import { appendCallPathSegment, formatToolRequestCompact, normalizeCallPath, sanitizeToolName, warn } from '../utils.js';
 
+import { AgentProvider } from './agent-provider.js';
 import { queueManager, type AcquireResult, QueueAbortError } from './queue-manager.js';
 import { ToolExecutionError, isToolExecutionError } from './tool-errors.js';
 
@@ -331,6 +333,7 @@ export class ToolsOrchestrator {
       }
     })();
     const composedToolName = `${toolIdentity.namespace}__${toolIdentity.tool}`;
+    const logToolName = composedToolName;
     const logProviderLabel = (() => {
       try {
         return provider.resolveLogProvider(effective);
@@ -340,15 +343,16 @@ export class ToolsOrchestrator {
     })();
     const logProviderNamespace = toolIdentity.namespace;
     addSpanAttributes({
-      'ai.tool.name': composedToolName,
+      'ai.tool.name': logToolName,
       'ai.tool.provider': logProviderNamespace,
       'ai.tool.kind': kind,
     });
     // no spans; opTree is canonical
     // Begin hierarchical op (Option C).
-    // Only treat sub-agents and tool_output as child 'session' ops.
-    // Internal agent-scoped tools (provider.namespace === 'agent') remain regular 'tool' ops.
-    const isSessionTool = kind === 'agent' && (provider.namespace === 'subagent' || provider.namespace === 'tool-output');
+    // Only treat sub-agents (AgentProvider) and tool_output as child 'session' ops.
+    // Internal agent-scoped tools remain regular 'tool' ops.
+    const isSubAgentProvider = provider instanceof AgentProvider;
+    const isSessionTool = kind === 'agent' && (isSubAgentProvider || provider.namespace === 'tool-output');
     const opKind = isSessionTool ? 'session' : 'tool';
     const opId = (() => {
       try { return this.opTree.beginOp(ctx.turn, opKind, { name: effective, provider: logProviderNamespace, kind }); } catch { return undefined; }
@@ -394,7 +398,7 @@ export class ToolsOrchestrator {
     const remoteIdentifier = `${kind}:${toolIdentity.namespace}:${toolIdentity.tool}`;
     const traceIdentifier = `trace:${kind}:${toolIdentity.namespace}`;
     const requestDetails: Record<string, LogDetailValue> = {
-      tool: composedToolName,
+      tool: logToolName,
       tool_namespace: toolIdentity.namespace,
       provider: logProviderLabel,
       tool_kind: kind,
@@ -421,7 +425,7 @@ export class ToolsOrchestrator {
         callPath: callPathLabel,
         agentId: agentIdLabel,
         agentPath: agentPathLabel,
-        tool: { name: composedToolName, provider: logProviderNamespace },
+        tool: { name: logToolName, provider: logProviderNamespace },
       });
     }
     const normalizeParameters = (toolName: string, a: Record<string, unknown>): Record<string, unknown> => {
@@ -506,6 +510,13 @@ export class ToolsOrchestrator {
         remoteIdentifier: traceIdentifier,
         fatal: false,
         message: `REQUEST ${effective}\n${fullParams}`,
+        details: {
+          event: LOG_EVENTS.TOOL_REQUEST_TRACE,
+          tool: logToolName,
+          tool_namespace: toolIdentity.namespace,
+          provider: logProviderLabel,
+          tool_kind: kind,
+        },
       };
       this.log(traceReq, { opId });
     }
@@ -526,7 +537,8 @@ export class ToolsOrchestrator {
       const failureStub = '(tool failed: context window budget exceeded; previous tool overflowed. Session will conclude after this turn.)';
       const finalBytesForSkip = Buffer.byteLength(failureStub, 'utf8');
       const dropDetails: Record<string, LogDetailValue> = {
-        tool: composedToolName,
+        event: LOG_EVENTS.TOOL_EXECUTION_SKIPPED,
+        tool: logToolName,
         tool_namespace: toolIdentity.namespace,
         provider: logProviderLabel,
         tool_kind: kind,
@@ -550,7 +562,7 @@ export class ToolsOrchestrator {
         toolKind: kind,
         remoteIdentifier,
         fatal: false,
-        message: `Tool '${composedToolName}' skipped execution: token budget exceeded by previous tool.`,
+        message: `Tool '${logToolName}' skipped execution: token budget exceeded by previous tool.`,
         details: dropDetails,
       };
       this.log(dropLog, { opId });
@@ -560,7 +572,7 @@ export class ToolsOrchestrator {
           callPath: callPathLabel,
           agentId: agentIdLabel,
           agentPath: agentPathLabel,
-          tool: { name: composedToolName, provider: logProviderNamespace },
+          tool: { name: logToolName, provider: logProviderNamespace },
           metrics: failureMetrics,
           error: failureReason,
           status: STATUS_FAILED,
@@ -582,7 +594,7 @@ export class ToolsOrchestrator {
         agentId: agentIdLabel,
         callPath: callPathLabel,
         headendId,
-        toolName: composedToolName,
+        toolName: logToolName,
         toolKind: kind,
         provider: kind === 'mcp' ? `${kind}:${logProviderNamespace}` : logProviderLabel,
         status: STATUS_ERROR,
@@ -594,7 +606,7 @@ export class ToolsOrchestrator {
       } satisfies ToolMetricsRecord;
       recordToolMetrics(errorMetricsDrop);
       addSpanAttributes({ 'ai.tool.status': STATUS_ERROR, 'ai.tool.latency_ms': latency });
-      addSpanEvent(TOOL_MANAGE_ERROR_EVENT, { 'ai.tool.name': composedToolName, 'ai.tool.error': failureReason });
+      addSpanEvent(TOOL_MANAGE_ERROR_EVENT, { 'ai.tool.name': logToolName, 'ai.tool.error': failureReason });
       recordSpanError(failureReason);
       try {
         if (opId !== undefined) {
@@ -663,7 +675,7 @@ export class ToolsOrchestrator {
           toolKind: kind,
           remoteIdentifier,
           fatal: false,
-          message: `cache hit: ${composedToolName}`,
+          message: `cache hit: ${logToolName}`,
           details: cacheDetails,
         };
         this.log(cacheLog, { opId });
@@ -769,7 +781,8 @@ export class ToolsOrchestrator {
         ? `${kind}:${exec?.namespace ?? logProviderNamespace}`
         : logProviderLabel;
       const failureDetails: Record<string, LogDetailValue> = {
-        tool: composedToolName,
+        event: LOG_EVENTS.TOOL_EXECUTION_FAILED,
+        tool: logToolName,
         tool_namespace: toolIdentity.namespace,
         provider: providerFieldFailed,
         tool_kind: kind,
@@ -797,12 +810,19 @@ export class ToolsOrchestrator {
           remoteIdentifier: traceIdentifier,
           fatal: false,
           message: `ERROR ${effective}\n${msg}`,
+          details: {
+            event: LOG_EVENTS.TOOL_ERROR_TRACE,
+            tool: logToolName,
+            tool_namespace: toolIdentity.namespace,
+            provider: logProviderLabel,
+            tool_kind: kind,
+          },
         };
       this.log(traceErr, { opId });
       }
       const errMessage = batchToolSummary !== undefined
-        ? `error ${composedToolName}: ${msg} (calls: ${batchToolSummary})`
-        : `error ${composedToolName}: ${msg}`;
+        ? `error ${logToolName}: ${msg} (calls: ${batchToolSummary})`
+        : `error ${logToolName}: ${msg}`;
       const errLog: LogEntry = {
         timestamp: Date.now(),
         severity: 'WRN',
@@ -827,7 +847,7 @@ export class ToolsOrchestrator {
           callPath: callPathLabel,
           agentId: agentIdLabel,
           agentPath: agentPathLabel,
-          tool: { name: composedToolName, provider: logProviderNamespace },
+          tool: { name: logToolName, provider: logProviderNamespace },
           metrics: failureMetrics,
           error: msg,
           status: 'failed',
@@ -846,7 +866,7 @@ export class ToolsOrchestrator {
         agentId: agentIdLabel,
         callPath: callPathLabel,
         headendId,
-        toolName: composedToolName,
+        toolName: logToolName,
         toolKind: kind,
         provider: kind === 'mcp' ? `${kind}:${logProviderNamespace}` : logProviderLabel,
         status: 'error',
@@ -858,7 +878,7 @@ export class ToolsOrchestrator {
       } satisfies ToolMetricsRecord;
       recordToolMetrics(errorMetrics);
       addSpanAttributes({ 'ai.tool.status': 'error', 'ai.tool.latency_ms': latency });
-      addSpanEvent(TOOL_MANAGE_ERROR_EVENT, { 'ai.tool.name': composedToolName, 'ai.tool.error': msg });
+      addSpanEvent(TOOL_MANAGE_ERROR_EVENT, { 'ai.tool.name': logToolName, 'ai.tool.error': msg });
       recordSpanError(msg);
       // Accounting is recorded in opTree op context only via attach; keep arrays via SessionManager callbacks
     try {
@@ -902,6 +922,13 @@ export class ToolsOrchestrator {
         remoteIdentifier: traceIdentifier,
         fatal: false,
         message: `RESPONSE ${effective}\n${rawPayload}`,
+        details: {
+          event: LOG_EVENTS.TOOL_RESPONSE_TRACE,
+          tool: logToolName,
+          tool_namespace: toolIdentity.namespace,
+          provider: logProviderLabel,
+          tool_kind: kind,
+        },
       };
       this.log(traceRes, { opId });
     }
@@ -925,7 +952,8 @@ export class ToolsOrchestrator {
     let resultTruncated = false;
     const logToolOutputHandle = (stored: ToolOutputHandleResult): void => {
       const warnDetails: Record<string, LogDetailValue> = {
-        tool: composedToolName,
+        event: LOG_EVENTS.TOOL_OUTPUT_STORED,
+        tool: logToolName,
         tool_namespace: toolIdentity.namespace,
         provider: providerField,
         tool_kind: kind,
@@ -949,7 +977,7 @@ export class ToolsOrchestrator {
         toolKind: kind,
         remoteIdentifier,
         fatal: false,
-        message: `Tool '${composedToolName}' output stored for tool_output (${stored.reason}).`,
+        message: `Tool '${logToolName}' output stored for tool_output (${stored.reason}).`,
         details: warnDetails,
       };
       this.log(warnLog, { opId });
@@ -978,7 +1006,7 @@ export class ToolsOrchestrator {
           fatal: false,
           message: `tool_output store failed: ${msg}`,
           details: {
-            tool: composedToolName,
+            tool: logToolName,
             provider: providerField,
           },
         };
@@ -1001,7 +1029,8 @@ export class ToolsOrchestrator {
         result = finalValue;
         resultTruncated = true;
         const warnDetails: Record<string, LogDetailValue> = {
-          tool: composedToolName,
+          event: LOG_EVENTS.TOOL_OUTPUT_TRUNCATED,
+          tool: logToolName,
           tool_namespace: toolIdentity.namespace,
           provider: providerField,
           tool_kind: kind,
@@ -1022,7 +1051,7 @@ export class ToolsOrchestrator {
           toolKind: kind,
           remoteIdentifier,
           fatal: false,
-          message: `Tool '${composedToolName}' output truncated to toolResponseMaxBytes (${String(limit)} bytes).`,
+          message: `Tool '${logToolName}' output truncated to toolResponseMaxBytes (${String(limit)} bytes).`,
           details: warnDetails,
         };
         this.log(warnLog, { opId });
@@ -1068,7 +1097,8 @@ export class ToolsOrchestrator {
       const finalBytesForDrop = Buffer.byteLength(dropResult, 'utf8');
       const truncatedPct = computeTruncationPercent(originalBytesForDrop, finalBytesForDrop);
       const dropDetails: Record<string, LogDetailValue> = {
-        tool: composedToolName,
+        event: LOG_EVENTS.TOOL_OUTPUT_DROPPED,
+        tool: logToolName,
         tool_namespace: toolIdentity.namespace,
         provider: providerField,
         tool_kind: kind,
@@ -1093,7 +1123,7 @@ export class ToolsOrchestrator {
         toolKind: kind,
         remoteIdentifier,
         fatal: false,
-        message: `Tool '${composedToolName}' output dropped after execution: token budget exceeded.`,
+        message: `Tool '${logToolName}' output dropped after execution: token budget exceeded.`,
         details: dropDetails,
       };
       this.log(dropLog, { opId });
@@ -1107,7 +1137,7 @@ export class ToolsOrchestrator {
           callPath: callPathLabel,
           agentId: agentIdLabel,
           agentPath: agentPathLabel,
-          tool: { name: composedToolName, provider: logProviderNamespace },
+          tool: { name: logToolName, provider: logProviderNamespace },
           metrics: failureMetrics,
           error: failureReason,
           status: STATUS_FAILED,
@@ -1129,7 +1159,7 @@ export class ToolsOrchestrator {
         agentId: agentIdLabel,
         callPath: callPathLabel,
         headendId,
-        toolName: composedToolName,
+        toolName: logToolName,
         toolKind: kind,
         provider: kind === 'mcp' ? `${kind}:${logProviderNamespace}` : logProviderLabel,
         status: STATUS_ERROR,
@@ -1141,7 +1171,7 @@ export class ToolsOrchestrator {
       } satisfies ToolMetricsRecord;
       recordToolMetrics(errorMetricsDrop);
       addSpanAttributes({ 'ai.tool.status': STATUS_ERROR, 'ai.tool.latency_ms': latency });
-      addSpanEvent(TOOL_MANAGE_ERROR_EVENT, { 'ai.tool.name': composedToolName, 'ai.tool.error': failureReason });
+      addSpanEvent(TOOL_MANAGE_ERROR_EVENT, { 'ai.tool.name': logToolName, 'ai.tool.error': failureReason });
       recordSpanError(failureReason);
       try {
         if (opId !== undefined) {
@@ -1162,7 +1192,8 @@ export class ToolsOrchestrator {
     }
 
     const responseDetails: Record<string, LogDetailValue> = {
-      tool: composedToolName,
+      event: LOG_EVENTS.TOOL_RESPONSE_PREVIEW,
+      tool: logToolName,
       tool_namespace: toolIdentity.namespace,
       provider: providerField,
       tool_kind: kind,
@@ -1219,7 +1250,7 @@ export class ToolsOrchestrator {
         callPath: callPathLabel,
         agentId: agentIdLabel,
         agentPath: agentPathLabel,
-        tool: { name: composedToolName, provider: logProviderNamespace },
+        tool: { name: logToolName, provider: logProviderNamespace },
         metrics: successMetrics,
         status: 'ok',
       });
@@ -1270,7 +1301,7 @@ export class ToolsOrchestrator {
       agentId: agentIdLabel,
       callPath: callPathLabel,
       headendId,
-      toolName: composedToolName,
+      toolName: logToolName,
       toolKind: kind,
       provider: kind === 'mcp' ? `${kind}:${logProviderNamespace}` : logProviderLabel,
       status: 'success',
@@ -1402,6 +1433,7 @@ export class ToolsOrchestrator {
       fatal: false,
       message: 'queued',
       details: {
+        event: LOG_EVENTS.QUEUE_ENQUEUED,
         queue: queueName,
         wait_ms: result.waitMs,
         queued_depth: result.queuedDepth,
