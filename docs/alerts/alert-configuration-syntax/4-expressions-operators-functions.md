@@ -33,7 +33,7 @@ crit: $this > 95
   ok: $this < 70
 ```
 
-In many built-in alerts, `ok:` is omitted and Netdata uses default clear behavior based on `warn:`/`crit:` transitions. Use `ok:` only when you need more explicit or asymmetric clear conditions.
+In many stock alerts, `ok:` is omitted and Netdata uses default clear behavior based on `warn:`/`crit:` transitions. Use `ok:` only when you need more explicit or asymmetric clear conditions.
 
 :::tip
 

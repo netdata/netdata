@@ -14,7 +14,7 @@ Netdata loads alert (health) configuration from two main directories:
 
 | Directory | Purpose | Managed By | Survives Upgrades? |
 |-----------|---------|------------|-------------------|
-| `/usr/lib/netdata/conf.d/health.d/` | Stock alerts (built-in) | Netdata packages | **No** (overwritten) |
+| `/usr/lib/netdata/conf.d/health.d/` | Stock alerts | Netdata packages | **No** (overwritten) |
 | `/etc/netdata/health.d/` | Custom alerts (yours) | You | **Yes** |
 
 **Rule of thumb:**
@@ -309,7 +309,7 @@ To modify an alert you've already created:
 
 ## 2.2.8 Customizing Stock Alerts
 
-To modify a **built-in (stock) alert** without losing your changes on upgrade:
+To modify a **stock alert** without losing your changes on upgrade:
 
 1. **Locate** the stock alert in `/usr/lib/netdata/conf.d/health.d/`
    ```bash
@@ -345,6 +345,6 @@ File-based alerts give you **maximum control and reproducibility**. Define rules
 ## What's Next
 
 - **[2.3 Creating and Editing Alerts via Netdata Cloud](3-creating-and-editing-alerts-via-cloud.md)** Learn the Cloud UI workflow for centralized alert management
-- **[2.4 Managing Stock versus Custom Alerts](4-managing-stock-vs-custom-alerts.md)** Patterns for combining built-in and custom rules
+- **[2.4 Managing Stock versus Custom Alerts](4-managing-stock-vs-custom-alerts.md)** Patterns for combining stock and custom rules
 - **[2.5 Reloading and Validating Alert Configuration](5-reloading-and-validating-alert-configuration.md)** Deeper troubleshooting and validation techniques
 - **[Chapter 3: Alert Configuration Syntax](../alert-configuration-syntax/index.md)** Detailed reference for every configuration line and option

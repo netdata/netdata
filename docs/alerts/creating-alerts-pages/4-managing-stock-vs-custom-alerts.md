@@ -1,6 +1,6 @@
 # 2.4 Managing Stock versus Custom Alerts
 
-This section explains **how to strategically combine** Netdata's built-in (stock) alerts with your own custom alerts and Cloud-defined alerts to create a maintainable, effective alerting setup.
+This section explains **how to strategically combine** Netdata's stock alerts with your own custom alerts and Cloud-defined alerts to create a maintainable, effective alerting setup.
 
 You've seen how to create and edit alerts in files (2.2) and in Cloud (2.3). This section focuses on how those sources work together over time.
 
@@ -368,4 +368,4 @@ The three alert sources are **complementary, not competing**. Use stock alerts a
 - **[2.5 Reloading and Validating Alert Configuration](5-reloading-and-validating-alert-configuration.md)** Deeper troubleshooting and validation techniques
 - **[Chapter 3: Alert Configuration Syntax](../alert-configuration-syntax/index.md)** Full syntax reference for writing alert definitions
 - **[Chapter 4: Controlling Alerts and Noise](../controlling-alerts-noise/index.md)** Silencing rules, delays, and hysteresis
-- **[Chapter 11: Built-In Alerts Reference](../built-in-alerts/index.md)** Catalog of stock alerts shipped with Netdata
+- **[Chapter 11: Stock Alerts Reference](../stock-alerts/index.md)** Catalog of stock alerts shipped with Netdata

@@ -1,16 +1,16 @@
-# 6: Built-in Alerts
+# 6: Stock Alerts
 
 Netdata ships with a comprehensive library of pre-configured alerts covering system resources, applications, containers, and hardware monitoring. These alerts are enabled by default and require no configuration to provide immediate visibility into common problems.
 
 :::note
 
-Built-in alerts follow the principle of conservative defaults. They are tuned to detect genuine issues while avoiding noise from normal operational variation. However, every environment is unique—use these as a starting point and adjust thresholds based on your specific requirements.
+Stock alerts follow the principle of conservative defaults. They are tuned to detect genuine issues while avoiding noise from normal operational variation. However, every environment is unique—use these as a starting point and adjust thresholds based on your specific requirements.
 
 :::
 
-## 6.0.1 What Built-in Alerts Cover
+## 6.0.1 What Stock Alerts Cover
 
-Built-in alerts are organized into four categories based on what they monitor.
+Stock alerts are organized into four categories based on what they monitor.
 
 | Category | Focus | Typical Issues |
 |----------|-------|----------------|
@@ -21,13 +21,13 @@ Built-in alerts are organized into four categories based on what they monitor.
 
 ## 6.0.2 Alert Priority and Scope
 
-Built-in alerts are scoped to the components present on each node. A database server receives database-specific alerts but not web server alerts. This prevents noise from irrelevant alerts while ensuring critical components receive appropriate coverage.
+Stock alerts are scoped to the components present on each node. A database server receives database-specific alerts but not web server alerts. This prevents noise from irrelevant alerts while ensuring critical components receive appropriate coverage.
 
 Alert priorities are set based on impact severity. Resource exhaustion alerts (CPU, memory, disk) are highest priority because they can affect all services on a node. Application-specific alerts are medium priority, scoped to individual services.
 
-## 6.0.3 Modifying Built-in Alerts
+## 6.0.3 Modifying Stock Alerts
 
-To modify a built-in alert, copy the specific alert definition to your custom health configuration directory (`/etc/netdata/health.d/`) and adjust as needed. The original alert remains in stock configuration and is overridden by your custom version.
+To modify a stock alert, copy the specific alert definition to your custom health configuration directory (`/etc/netdata/health.d/`) and adjust as needed. The original alert remains in stock configuration and is overridden by your custom version.
 
 Do not modify stock alerts directly—your changes will be lost during upgrades. Always copy and customize in `/etc/netdata/health.d/`.
 
