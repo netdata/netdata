@@ -183,8 +183,9 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	}
 	if !available {
 		return &module.FunctionResponse{
-			Status:  503,
-			Message: "pg_stat_statements extension is not installed or not available",
+			Status: 503,
+			Message: "pg_stat_statements extension is not installed in this database. " +
+				"Run 'CREATE EXTENSION pg_stat_statements;' in the database the collector connects to.",
 		}
 	}
 
