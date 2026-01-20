@@ -4,7 +4,7 @@ These templates demonstrate application-specific monitoring using contexts provi
 
 :::tip
 
-To see more application alerts, visit the [Collectors list](https://learn.netdata.cloud/docs/collecting-metrics/collectors-configuration) on learn.netdata.io.
+To see more application alerts, visit the [Collectors list](https://learn.netdata.cloud/docs/collecting-metrics/collectors-configuration) on learn.netdata.cloud.
 
 :::
 

@@ -4,7 +4,7 @@ Application alerts cover common database, web server, cache, and message queue t
 
 :::note
 
-To see more application alerts, visit the [Collectors list](https://learn.netdata.cloud/docs/collecting-metrics/collectors-configuration) on learn.netdata.io.
+To see more application alerts, visit the [Collectors list](https://learn.netdata.cloud/docs/collecting-metrics/collectors-configuration) on learn.netdata.cloud.
 
 :::
 
