@@ -236,13 +236,14 @@ func (c *Collector) mapAndValidateMySQLSortColumn(sortKey string, availableCols 
 func (c *Collector) buildMySQLDynamicSQL(cols []mysqlColumnMeta, sortColumn string, limit int) string {
 	var selectParts []string
 	for _, col := range cols {
+		// Use backticks to handle reserved keywords
 		if col.isPicoseconds {
 			// Convert picoseconds to milliseconds (divide by 10^9)
-			selectParts = append(selectParts, fmt.Sprintf("%s/1000000000 AS %s", col.dbColumn, col.uiKey))
+			selectParts = append(selectParts, fmt.Sprintf("%s/1000000000 AS `%s`", col.dbColumn, col.uiKey))
 		} else if col.dbColumn == "SCHEMA_NAME" {
-			selectParts = append(selectParts, fmt.Sprintf("IFNULL(%s, '') AS %s", col.dbColumn, col.uiKey))
+			selectParts = append(selectParts, fmt.Sprintf("IFNULL(%s, '') AS `%s`", col.dbColumn, col.uiKey))
 		} else {
-			selectParts = append(selectParts, fmt.Sprintf("%s AS %s", col.dbColumn, col.uiKey))
+			selectParts = append(selectParts, fmt.Sprintf("%s AS `%s`", col.dbColumn, col.uiKey))
 		}
 	}
 
@@ -250,7 +251,7 @@ func (c *Collector) buildMySQLDynamicSQL(cols []mysqlColumnMeta, sortColumn stri
 SELECT %s
 FROM performance_schema.events_statements_summary_by_digest
 WHERE DIGEST IS NOT NULL
-ORDER BY %s DESC
+ORDER BY `+"`%s`"+` DESC
 LIMIT %d
 `, strings.Join(selectParts, ", "), sortColumn, limit)
 }

@@ -476,7 +476,8 @@ func (c *Collector) buildDynamicSQL(cols []pgColumnMeta, sortColumn string, limi
 		}
 
 		// Always use uiKey as the SQL alias for consistent naming
-		selectCols = append(selectCols, fmt.Sprintf("%s AS %s", colExpr, col.uiKey))
+		// Use double quotes to handle reserved keywords like "database", "user"
+		selectCols = append(selectCols, fmt.Sprintf("%s AS \"%s\"", colExpr, col.uiKey))
 	}
 
 	return fmt.Sprintf(`
@@ -484,7 +485,7 @@ SELECT %s
 FROM pg_stat_statements s
 JOIN pg_database d ON s.dbid = d.oid
 JOIN pg_user u ON s.userid = u.usesysid
-ORDER BY %s DESC
+ORDER BY "%s" DESC
 LIMIT %d
 `, strings.Join(selectCols, ", "), sortColumn, limit)
 }
