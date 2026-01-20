@@ -17,8 +17,7 @@ const maxQueryTextLength = 4096
 // mysqlColumnMeta defines metadata for a single column
 type mysqlColumnMeta struct {
 	dbColumn      string // Column name in database (e.g., "SUM_TIMER_WAIT")
-	alias         string // SQL alias (snake_case for consistency)
-	uiKey         string // camelCase key for UI (e.g., "totalTime")
+	uiKey         string // Canonical name used everywhere: SQL alias, UI key, sort key
 	displayName   string // Display name in UI (e.g., "Total Time")
 	dataType      string // "string", "integer", "float", "duration"
 	units         string // Unit for duration/numeric types (e.g., "seconds")
@@ -41,72 +40,72 @@ type mysqlColumnMeta struct {
 // Columns that don't exist in certain MySQL/MariaDB versions will be filtered at runtime
 var mysqlAllColumns = []mysqlColumnMeta{
 	// Identity columns - always available
-	{dbColumn: "DIGEST", alias: "digest", uiKey: "digest", displayName: "Digest", dataType: "string", visible: false, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isUniqueKey: true},
-	{dbColumn: "DIGEST_TEXT", alias: "query", uiKey: "query", displayName: "Query", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isSticky: true, fullWidth: true},
-	{dbColumn: "SCHEMA_NAME", alias: "schema_name", uiKey: "schema", displayName: "Schema", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
+	{dbColumn: "DIGEST", uiKey: "digest", displayName: "Digest", dataType: "string", visible: false, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isUniqueKey: true},
+	{dbColumn: "DIGEST_TEXT", uiKey: "query", displayName: "Query", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isSticky: true, fullWidth: true},
+	{dbColumn: "SCHEMA_NAME", uiKey: "schema", displayName: "Schema", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
 
 	// Execution counts
-	{dbColumn: "COUNT_STAR", alias: "calls", uiKey: "calls", displayName: "Calls", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Number of Calls"},
+	{dbColumn: "COUNT_STAR", uiKey: "calls", displayName: "Calls", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Number of Calls"},
 
 	// Timer metrics (picoseconds -> seconds)
-	{dbColumn: "SUM_TIMER_WAIT", alias: "total_time", uiKey: "totalTime", displayName: "Total Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by Total Execution Time", isDefaultSort: true},
-	{dbColumn: "MIN_TIMER_WAIT", alias: "min_time", uiKey: "minTime", displayName: "Min Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "min", filter: "range", isPicoseconds: true},
-	{dbColumn: "AVG_TIMER_WAIT", alias: "avg_time", uiKey: "avgTime", displayName: "Avg Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "avg", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by Average Execution Time"},
-	{dbColumn: "MAX_TIMER_WAIT", alias: "max_time", uiKey: "maxTime", displayName: "Max Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isPicoseconds: true},
+	{dbColumn: "SUM_TIMER_WAIT", uiKey: "totalTime", displayName: "Total Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by Total Execution Time", isDefaultSort: true},
+	{dbColumn: "MIN_TIMER_WAIT", uiKey: "minTime", displayName: "Min Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "min", filter: "range", isPicoseconds: true},
+	{dbColumn: "AVG_TIMER_WAIT", uiKey: "avgTime", displayName: "Avg Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "avg", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by Average Execution Time"},
+	{dbColumn: "MAX_TIMER_WAIT", uiKey: "maxTime", displayName: "Max Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isPicoseconds: true},
 
 	// Lock time (picoseconds -> seconds)
-	{dbColumn: "SUM_LOCK_TIME", alias: "lock_time", uiKey: "lockTime", displayName: "Lock Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by Lock Time"},
+	{dbColumn: "SUM_LOCK_TIME", uiKey: "lockTime", displayName: "Lock Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by Lock Time"},
 
 	// Error and warning counts
-	{dbColumn: "SUM_ERRORS", alias: "errors", uiKey: "errors", displayName: "Errors", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Errors"},
-	{dbColumn: "SUM_WARNINGS", alias: "warnings", uiKey: "warnings", displayName: "Warnings", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Warnings"},
+	{dbColumn: "SUM_ERRORS", uiKey: "errors", displayName: "Errors", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Errors"},
+	{dbColumn: "SUM_WARNINGS", uiKey: "warnings", displayName: "Warnings", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Warnings"},
 
 	// Row operations
-	{dbColumn: "SUM_ROWS_AFFECTED", alias: "rows_affected", uiKey: "rowsAffected", displayName: "Rows Affected", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Rows Affected"},
-	{dbColumn: "SUM_ROWS_SENT", alias: "rows_sent", uiKey: "rowsSent", displayName: "Rows Sent", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Rows Sent"},
-	{dbColumn: "SUM_ROWS_EXAMINED", alias: "rows_examined", uiKey: "rowsExamined", displayName: "Rows Examined", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Rows Examined"},
+	{dbColumn: "SUM_ROWS_AFFECTED", uiKey: "rowsAffected", displayName: "Rows Affected", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Rows Affected"},
+	{dbColumn: "SUM_ROWS_SENT", uiKey: "rowsSent", displayName: "Rows Sent", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Rows Sent"},
+	{dbColumn: "SUM_ROWS_EXAMINED", uiKey: "rowsExamined", displayName: "Rows Examined", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Rows Examined"},
 
 	// Temp table usage
-	{dbColumn: "SUM_CREATED_TMP_DISK_TABLES", alias: "tmp_disk_tables", uiKey: "tmpDiskTables", displayName: "Temp Disk Tables", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Temp Disk Tables"},
-	{dbColumn: "SUM_CREATED_TMP_TABLES", alias: "tmp_tables", uiKey: "tmpTables", displayName: "Temp Tables", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Temp Tables"},
+	{dbColumn: "SUM_CREATED_TMP_DISK_TABLES", uiKey: "tmpDiskTables", displayName: "Temp Disk Tables", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Temp Disk Tables"},
+	{dbColumn: "SUM_CREATED_TMP_TABLES", uiKey: "tmpTables", displayName: "Temp Tables", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Temp Tables"},
 
 	// Join operations
-	{dbColumn: "SUM_SELECT_FULL_JOIN", alias: "full_join", uiKey: "fullJoin", displayName: "Full Joins", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Full Joins"},
-	{dbColumn: "SUM_SELECT_FULL_RANGE_JOIN", alias: "full_range_join", uiKey: "fullRangeJoin", displayName: "Full Range Joins", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "SUM_SELECT_RANGE", alias: "select_range", uiKey: "selectRange", displayName: "Select Range", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "SUM_SELECT_RANGE_CHECK", alias: "select_range_check", uiKey: "selectRangeCheck", displayName: "Select Range Check", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "SUM_SELECT_SCAN", alias: "select_scan", uiKey: "selectScan", displayName: "Select Scan", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Table Scans"},
+	{dbColumn: "SUM_SELECT_FULL_JOIN", uiKey: "fullJoin", displayName: "Full Joins", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Full Joins"},
+	{dbColumn: "SUM_SELECT_FULL_RANGE_JOIN", uiKey: "fullRangeJoin", displayName: "Full Range Joins", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "SUM_SELECT_RANGE", uiKey: "selectRange", displayName: "Select Range", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "SUM_SELECT_RANGE_CHECK", uiKey: "selectRangeCheck", displayName: "Select Range Check", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "SUM_SELECT_SCAN", uiKey: "selectScan", displayName: "Select Scan", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Table Scans"},
 
 	// Sort operations
-	{dbColumn: "SUM_SORT_MERGE_PASSES", alias: "sort_merge_passes", uiKey: "sortMergePasses", displayName: "Sort Merge Passes", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "SUM_SORT_RANGE", alias: "sort_range", uiKey: "sortRange", displayName: "Sort Range", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "SUM_SORT_ROWS", alias: "sort_rows", uiKey: "sortRows", displayName: "Sort Rows", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Rows Sorted"},
-	{dbColumn: "SUM_SORT_SCAN", alias: "sort_scan", uiKey: "sortScan", displayName: "Sort Scan", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "SUM_SORT_MERGE_PASSES", uiKey: "sortMergePasses", displayName: "Sort Merge Passes", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "SUM_SORT_RANGE", uiKey: "sortRange", displayName: "Sort Range", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "SUM_SORT_ROWS", uiKey: "sortRows", displayName: "Sort Rows", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Rows Sorted"},
+	{dbColumn: "SUM_SORT_SCAN", uiKey: "sortScan", displayName: "Sort Scan", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
 
 	// Index usage
-	{dbColumn: "SUM_NO_INDEX_USED", alias: "no_index_used", uiKey: "noIndexUsed", displayName: "No Index Used", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by No Index Used"},
-	{dbColumn: "SUM_NO_GOOD_INDEX_USED", alias: "no_good_index_used", uiKey: "noGoodIndexUsed", displayName: "No Good Index Used", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "SUM_NO_INDEX_USED", uiKey: "noIndexUsed", displayName: "No Index Used", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by No Index Used"},
+	{dbColumn: "SUM_NO_GOOD_INDEX_USED", uiKey: "noGoodIndexUsed", displayName: "No Good Index Used", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
 
 	// Timestamp columns
-	{dbColumn: "FIRST_SEEN", alias: "first_seen", uiKey: "firstSeen", displayName: "First Seen", dataType: "string", visible: false, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
-	{dbColumn: "LAST_SEEN", alias: "last_seen", uiKey: "lastSeen", displayName: "Last Seen", dataType: "string", visible: false, transform: "none", sortDir: "descending", summary: "count", filter: "multiselect"},
+	{dbColumn: "FIRST_SEEN", uiKey: "firstSeen", displayName: "First Seen", dataType: "string", visible: false, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
+	{dbColumn: "LAST_SEEN", uiKey: "lastSeen", displayName: "Last Seen", dataType: "string", visible: false, transform: "none", sortDir: "descending", summary: "count", filter: "multiselect"},
 
 	// MySQL 8.0+ quantile columns
-	{dbColumn: "QUANTILE_95", alias: "p95_time", uiKey: "p95Time", displayName: "P95 Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by 95th Percentile Time"},
-	{dbColumn: "QUANTILE_99", alias: "p99_time", uiKey: "p99Time", displayName: "P99 Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by 99th Percentile Time"},
-	{dbColumn: "QUANTILE_999", alias: "p999_time", uiKey: "p999Time", displayName: "P99.9 Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isPicoseconds: true},
+	{dbColumn: "QUANTILE_95", uiKey: "p95Time", displayName: "P95 Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by 95th Percentile Time"},
+	{dbColumn: "QUANTILE_99", uiKey: "p99Time", displayName: "P99 Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by 99th Percentile Time"},
+	{dbColumn: "QUANTILE_999", uiKey: "p999Time", displayName: "P99.9 Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isPicoseconds: true},
 
 	// MySQL 8.0+ sample query
-	{dbColumn: "QUERY_SAMPLE_TEXT", alias: "sample_query", uiKey: "sampleQuery", displayName: "Sample Query", dataType: "string", visible: false, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", fullWidth: true},
-	{dbColumn: "QUERY_SAMPLE_SEEN", alias: "sample_seen", uiKey: "sampleSeen", displayName: "Sample Seen", dataType: "string", visible: false, transform: "none", sortDir: "descending", summary: "count", filter: "multiselect"},
-	{dbColumn: "QUERY_SAMPLE_TIMER_WAIT", alias: "sample_time", uiKey: "sampleTime", displayName: "Sample Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isPicoseconds: true},
+	{dbColumn: "QUERY_SAMPLE_TEXT", uiKey: "sampleQuery", displayName: "Sample Query", dataType: "string", visible: false, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", fullWidth: true},
+	{dbColumn: "QUERY_SAMPLE_SEEN", uiKey: "sampleSeen", displayName: "Sample Seen", dataType: "string", visible: false, transform: "none", sortDir: "descending", summary: "count", filter: "multiselect"},
+	{dbColumn: "QUERY_SAMPLE_TIMER_WAIT", uiKey: "sampleTime", displayName: "Sample Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isPicoseconds: true},
 
 	// MySQL 8.0.28+ CPU time
-	{dbColumn: "SUM_CPU_TIME", alias: "cpu_time", uiKey: "cpuTime", displayName: "CPU Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by CPU Time"},
+	{dbColumn: "SUM_CPU_TIME", uiKey: "cpuTime", displayName: "CPU Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isPicoseconds: true, isSortOption: true, sortLabel: "Top queries by CPU Time"},
 
 	// MySQL 8.0.31+ memory columns
-	{dbColumn: "MAX_CONTROLLED_MEMORY", alias: "max_controlled_memory", uiKey: "maxControlledMemory", displayName: "Max Controlled Memory", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "max", filter: "range", isSortOption: true, sortLabel: "Top queries by Max Controlled Memory"},
-	{dbColumn: "MAX_TOTAL_MEMORY", alias: "max_total_memory", uiKey: "maxTotalMemory", displayName: "Max Total Memory", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "max", filter: "range", isSortOption: true, sortLabel: "Top queries by Max Total Memory"},
+	{dbColumn: "MAX_CONTROLLED_MEMORY", uiKey: "maxControlledMemory", displayName: "Max Controlled Memory", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "max", filter: "range", isSortOption: true, sortLabel: "Top queries by Max Controlled Memory"},
+	{dbColumn: "MAX_TOTAL_MEMORY", uiKey: "maxTotalMemory", displayName: "Max Total Memory", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "max", filter: "range", isSortOption: true, sortLabel: "Top queries by Max Total Memory"},
 }
 
 // mysqlMethods returns the available function methods for MySQL
@@ -218,19 +217,19 @@ func (c *Collector) buildAvailableMySQLColumns(availableCols map[string]bool) []
 	return cols
 }
 
-// mapAndValidateMySQLSortColumn maps UI sort key to SQL alias and validates
+// mapAndValidateMySQLSortColumn validates sort key and returns the uiKey to use
 func (c *Collector) mapAndValidateMySQLSortColumn(sortKey string, availableCols map[string]bool) string {
-	// Find the column mapping from UI key or DB column to SQL alias
+	// Find the column by uiKey or dbColumn
 	for _, col := range mysqlAllColumns {
-		if (col.uiKey == sortKey || col.dbColumn == sortKey || col.alias == sortKey) && availableCols[col.dbColumn] {
-			return col.alias
+		if (col.uiKey == sortKey || col.dbColumn == sortKey) && availableCols[col.dbColumn] {
+			return col.uiKey
 		}
 	}
-	// Default to total_time (SUM_TIMER_WAIT alias) if available
+	// Default to totalTime if available
 	if availableCols["SUM_TIMER_WAIT"] {
-		return "total_time"
+		return "totalTime"
 	}
-	return "calls" // Ultimate fallback (COUNT_STAR alias)
+	return "calls" // Ultimate fallback
 }
 
 // buildMySQLDynamicSQL builds the SQL query with only available columns
@@ -239,11 +238,11 @@ func (c *Collector) buildMySQLDynamicSQL(cols []mysqlColumnMeta, sortColumn stri
 	for _, col := range cols {
 		if col.isPicoseconds {
 			// Convert picoseconds to milliseconds (divide by 10^9)
-			selectParts = append(selectParts, fmt.Sprintf("%s/1000000000 AS %s", col.dbColumn, col.alias))
+			selectParts = append(selectParts, fmt.Sprintf("%s/1000000000 AS %s", col.dbColumn, col.uiKey))
 		} else if col.dbColumn == "SCHEMA_NAME" {
-			selectParts = append(selectParts, fmt.Sprintf("IFNULL(%s, '') AS %s", col.dbColumn, col.alias))
+			selectParts = append(selectParts, fmt.Sprintf("IFNULL(%s, '') AS %s", col.dbColumn, col.uiKey))
 		} else {
-			selectParts = append(selectParts, fmt.Sprintf("%s AS %s", col.dbColumn, col.alias))
+			selectParts = append(selectParts, fmt.Sprintf("%s AS %s", col.dbColumn, col.uiKey))
 		}
 	}
 

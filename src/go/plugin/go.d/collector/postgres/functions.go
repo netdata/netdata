@@ -18,9 +18,7 @@ const maxQueryTextLength = 4096
 type pgColumnMeta struct {
 	// Database column name (may vary by version)
 	dbColumn string
-	// Alias to use in SELECT (for version-specific mapping)
-	alias string
-	// UI column key (camelCase for frontend)
+	// Canonical name used everywhere: SQL alias, UI key, sort key
 	uiKey string
 	// Display name in UI
 	displayName string
@@ -58,10 +56,10 @@ type pgColumnMeta struct {
 // Order matters - this determines column index in the response
 var pgAllColumns = []pgColumnMeta{
 	// Core identification columns (always present)
-	{dbColumn: "s.queryid::text", alias: "queryid", uiKey: "queryid", displayName: "Query ID", dataType: "string", visible: false, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isUniqueKey: true},
+	{dbColumn: "s.queryid::text", uiKey: "queryid", displayName: "Query ID", dataType: "string", visible: false, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isUniqueKey: true},
 	{dbColumn: "s.query", uiKey: "query", displayName: "Query", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isSticky: true, fullWidth: true},
-	{dbColumn: "d.datname", alias: "database_name", uiKey: "database", displayName: "Database", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
-	{dbColumn: "u.usename", alias: "username", uiKey: "user", displayName: "User", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
+	{dbColumn: "d.datname", uiKey: "database", displayName: "Database", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
+	{dbColumn: "u.usename", uiKey: "user", displayName: "User", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
 
 	// Execution count (always present)
 	{dbColumn: "s.calls", uiKey: "calls", displayName: "Calls", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Number of Calls"},
@@ -379,8 +377,8 @@ func (c *Collector) buildAvailableColumns(availableCols map[string]bool) []pgCol
 		}
 
 		// Check if column exists (either directly or via join)
-		// Join columns (datname, usename) come from other tables
-		isJoinCol := col.alias == "database_name" || col.alias == "username"
+		// Join columns (database, user) come from other tables (d.datname, u.usename)
+		isJoinCol := col.uiKey == "database" || col.uiKey == "user"
 		if isJoinCol || availableCols[actualColName] {
 			// Create a copy with the actual column name for this version
 			colCopy := col
@@ -477,12 +475,8 @@ func (c *Collector) buildDynamicSQL(cols []pgColumnMeta, sortColumn string, limi
 			}
 		}
 
-		// Add alias if needed
-		if col.alias != "" {
-			selectCols = append(selectCols, fmt.Sprintf("%s AS %s", colExpr, col.alias))
-		} else {
-			selectCols = append(selectCols, colExpr)
-		}
+		// Always use uiKey as the SQL alias for consistent naming
+		selectCols = append(selectCols, fmt.Sprintf("%s AS %s", colExpr, col.uiKey))
 	}
 
 	return fmt.Sprintf(`
