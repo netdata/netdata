@@ -142,33 +142,15 @@ static void write_entry(struct nd_log_queue_entry *entry) {
     switch (entry->method) {
         case NDLM_FILE:
         case NDLM_STDOUT:
-        case NDLM_STDERR:
-            if (entry->fp) {
-                fprintf(entry->fp, "%s\n", message);
-                fflush(entry->fp);
+        case NDLM_STDERR: {
+            // Lookup FILE* at write time to handle log rotation correctly
+            FILE *fp = nd_log.sources[entry->source].fp;
+            if (fp) {
+                fprintf(fp, "%s\n", message);
+                fflush(fp);
             }
             break;
-
-        case NDLM_JOURNAL:
-            if (entry->journal_direct_initialized && entry->fd >= 0) {
-                if (!journal_direct_send(entry->fd, message, entry->message_len)) {
-                    fprintf(stderr, "async-logger: journal_direct_send() failed (fd=%d): %s\n",
-                            entry->fd, strerror(errno));
-                    fprintf(stderr, "%s\n", message);
-                    fflush(stderr);
-                }
-            }
-#ifdef HAVE_SYSTEMD
-            else if (entry->journal_libsystemd_initialized) {
-                fprintf(stderr, "%s\n", message);
-                fflush(stderr);
-            }
-#endif
-            else {
-                fprintf(stderr, "%s\n", message);
-                fflush(stderr);
-            }
-            break;
+        }
 
         case NDLM_SYSLOG:
             if (entry->syslog_initialized) {
@@ -361,6 +343,9 @@ bool nd_log_queue_init(void) {
     return __atomic_load_n(&log_ev.initialized, __ATOMIC_ACQUIRE);
 }
 
+// Timeout in seconds for shutdown wait - prevents indefinite hang if logger thread is dead
+#define ND_LOG_SHUTDOWN_TIMEOUT_S 5
+
 void nd_log_queue_shutdown(void) {
     if (!__atomic_load_n(&log_ev.initialized, __ATOMIC_ACQUIRE))
         return;
@@ -376,7 +361,10 @@ void nd_log_queue_shutdown(void) {
 
     if (cmd_pool_push(&log_ev.cmd_pool, &cmd)) {
         uv_async_send(&log_ev.async);
-        completion_wait_for(&shutdown_complete);
+        if (!completion_timedwait_for(&shutdown_complete, ND_LOG_SHUTDOWN_TIMEOUT_S)) {
+            // Timeout - logger thread may be dead, proceed with cleanup anyway
+            fprintf(stderr, "LOGGER: shutdown wait timed out after %d seconds\n", ND_LOG_SHUTDOWN_TIMEOUT_S);
+        }
     }
     completion_destroy(&shutdown_complete);
 
