@@ -8,7 +8,7 @@ System resource alerts are enabled by default on all Netdata installations. Thes
 
 :::
 
-## 11.1.1 CPU Alerts
+## 6.1.1 CPU Alerts
 
 The CPU alerts monitor utilization, saturation, and scheduling behavior.
 
@@ -33,7 +33,7 @@ Tracks time stolen by other virtual machines (in cloud/VPS environments). High s
 **Context:** `system.cpu`
 **Thresholds:** WARN > 10%, CRIT > 20%
 
-## 11.1.2 Memory Alerts
+## 6.1.2 Memory Alerts
 
 Memory monitoring balances three competing concerns: availability for new allocations, pressure on cached data, and swapping activity that indicates the working set exceeds physical memory.
 
@@ -51,7 +51,7 @@ Monitors actual available memory, accounting for free memory, reclaimable caches
 **Context:** `mem.available`
 **Thresholds:** WARN < 20%, CRIT < 10%
 
-## 11.1.3 Disk Space Alerts
+## 6.1.3 Disk Space Alerts
 
 Disk space monitoring addresses space availability and inode exhaustion.
 
@@ -71,7 +71,7 @@ For filesystems with many small files, tracks inode exhaustion which can occur b
 
 ## Related Sections
 
-- [11.2 Container Alerts](./2-container-alerts.md) - Docker and Kubernetes monitoring
-- [11.4 Network Alerts](./4-network-alerts.md) - Network interface and protocol monitoring
-- [11.4 Hardware Alerts](./5-hardware-alerts.md) - Physical server and storage device alerts
-- [11.5 Application Alerts](./3-application-alerts.md) - Database, web server, cache, and message queue alerts
+- [6.2 Container Alerts](./2-container-alerts.md) - Docker and Kubernetes monitoring
+- [6.4 Network Alerts](./4-network-alerts.md) - Network interface and protocol monitoring
+- [6.5 Hardware Alerts](./5-hardware-alerts.md) - Physical server and storage device alerts
+- [6.3 Application Alerts](./3-application-alerts.md) - Database, web server, cache, and message queue alerts

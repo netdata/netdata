@@ -8,7 +8,7 @@ Hardware monitoring requires collector support for your specific hardware. Check
 
 :::
 
-## 11.5.1 RAID Monitoring
+## 6.5.1 RAID Monitoring
 
 ### adaptec_raid_logical_device_status
 
@@ -24,7 +24,7 @@ Tracks individual disk failures within RAID arrays.
 **Context:** `adaptecraid.physical_device_state`
 **Thresholds:** CRIT > 0 (failed)
 
-## 11.5.2 Power Monitoring
+## 6.5.2 Power Monitoring
 
 ### apcupsd_ups_battery_charge
 
@@ -61,7 +61,7 @@ NUT UPS load percentage.
 **Context:** `upsd.ups_load`
 **Thresholds:** WARN > 80%, CRIT > 90%
 
-## 11.5.3 BMC/IPMI Monitoring
+## 6.5.3 BMC/IPMI Monitoring
 
 ### ipmi_sensor_state
 
@@ -79,7 +79,7 @@ Tracks IPMI event log entries for critical hardware events.
 
 ## Related Sections
 
-- [11.1 System Resource Alerts](./1-system-resource-alerts.md) - CPU, memory, disk, and load alerts
-- [11.2 Container Alerts](./2-container-alerts.md) - Docker and Kubernetes monitoring
-- [11.3 Application Alerts](./3-application-alerts.md) - Database, web server, cache, and message queue alerts
-- [11.4 Network Alerts](./4-network-alerts.md) - Network interface and protocol monitoring
+- [6.1 System Resource Alerts](./1-system-resource-alerts.md) - CPU, memory, disk, and load alerts
+- [6.2 Container Alerts](./2-container-alerts.md) - Docker and Kubernetes monitoring
+- [6.3 Application Alerts](./3-application-alerts.md) - Database, web server, cache, and message queue alerts
+- [6.4 Network Alerts](./4-network-alerts.md) - Network interface and protocol monitoring

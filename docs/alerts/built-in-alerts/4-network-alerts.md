@@ -8,7 +8,7 @@ Network connectivity alerts require specific endpoints to be configured. Add the
 
 :::
 
-## 11.4.1 Ping and Latency Monitoring
+## 6.4.1 Ping and Latency Monitoring
 
 ### ping_host_latency
 
@@ -31,7 +31,7 @@ Tracks host reachability status.
 **Context:** `ping.host_packet_loss`
 **Thresholds:** CRIT == 0 (not reachable)
 
-## 11.4.2 Port and Service Monitoring
+## 6.4.2 Port and Service Monitoring
 
 ### portcheck_connection_fails
 
@@ -54,7 +54,7 @@ Tracks port/service reachability status.
 **Context:** `portcheck.status`
 **Thresholds:** CRIT < 75% success
 
-## 11.4.3 SSL Certificate Monitoring
+## 6.4.3 SSL Certificate Monitoring
 
 ### x509check_days_until_expiration
 
@@ -70,7 +70,7 @@ Tracks SSL/TLS certificate revocation status.
 **Context:** `x509check.revocation_status`
 **Thresholds:** CRIT revoked
 
-## 11.4.4 DNS Monitoring
+## 6.4.4 DNS Monitoring
 
 ### dns_query_query_status
 
@@ -79,7 +79,7 @@ Fires when DNS resolution fails entirely, which causes cascading failures in dep
 **Context:** `dns_query.query_status`
 **Thresholds:** WARN != 1 (failed)
 
-## 11.4.5 HTTP Endpoint Monitoring
+## 6.4.5 HTTP Endpoint Monitoring
 
 ### httpcheck_web_service_bad_status
 
@@ -111,7 +111,7 @@ Tracks when HTTP responses don't match expected content patterns.
 
 ## Related Sections
 
-- [11.1 Application Alerts](./3-application-alerts.md) - Database, web server, cache, and message queue alerts
-- [11.2 Container Alerts](./2-container-alerts.md) - Docker and Kubernetes monitoring
-- [11.3 Hardware Alerts](./5-hardware-alerts.md) - Physical server and storage device alerts
-- [11.5 System Resource Alerts](./1-system-resource-alerts.md) - CPU, memory, disk, and load alerts
+- [6.3 Application Alerts](./3-application-alerts.md) - Database, web server, cache, and message queue alerts
+- [6.2 Container Alerts](./2-container-alerts.md) - Docker and Kubernetes monitoring
+- [6.5 Hardware Alerts](./5-hardware-alerts.md) - Physical server and storage device alerts
+- [6.1 System Resource Alerts](./1-system-resource-alerts.md) - CPU, memory, disk, and load alerts

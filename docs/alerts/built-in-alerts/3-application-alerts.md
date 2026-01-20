@@ -8,7 +8,7 @@ Application alerts require the appropriate database or service collector to be e
 
 :::
 
-## 11.3.1 Database Alerts
+## 6.3.1 Database Alerts
 
 Databases are typically the most critical components in an infrastructure, and their alerts reflect this importance.
 
@@ -53,7 +53,7 @@ Tracks connection pool saturation to prevent connection exhaustion.
 
 ## Related Sections
 
-- [11.1 System Resource Alerts](./1-system-resource-alerts.md) - CPU, memory, disk, and load alerts
-- [11.2 Container Alerts](./2-container-alerts.md) - Docker and Kubernetes monitoring
-- [11.4 Network Alerts](./4-network-alerts.md) - Network interface and protocol monitoring
-- [11.5 Hardware Alerts](./5-hardware-alerts.md) - Physical server and storage device alerts
+- [6.1 System Resource Alerts](./1-system-resource-alerts.md) - CPU, memory, disk, and load alerts
+- [6.2 Container Alerts](./2-container-alerts.md) - Docker and Kubernetes monitoring
+- [6.4 Network Alerts](./4-network-alerts.md) - Network interface and protocol monitoring
+- [6.5 Hardware Alerts](./5-hardware-alerts.md) - Physical server and storage device alerts
