@@ -45,7 +45,7 @@ var mssqlAllColumns = []mssqlColumnMeta{
 	// Identity columns - always available
 	{dbColumn: "query_hash", alias: "query_hash", uiKey: "queryHash", displayName: "Query Hash", dataType: "string", visible: false, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isUniqueKey: true, isIdentity: true},
 	{dbColumn: "query_sql_text", alias: "query", uiKey: "query", displayName: "Query", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isSticky: true, fullWidth: true, isIdentity: true},
-	{dbColumn: "database_name", alias: "database", uiKey: "database", displayName: "Database", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isIdentity: true},
+	{dbColumn: "database_name", alias: "database_name", uiKey: "database", displayName: "Database", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isIdentity: true},
 
 	// Execution count - always available
 	{dbColumn: "count_executions", alias: "calls", uiKey: "calls", displayName: "Calls", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Number of Calls"},
@@ -286,7 +286,7 @@ func (c *Collector) buildMSSQLDynamicSQL(cols []mssqlColumnMeta, sortColumn stri
 				expr = fmt.Sprintf("CONVERT(VARCHAR(64), q.query_hash, 1) AS %s", col.alias)
 			case "query":
 				expr = fmt.Sprintf("qt.query_sql_text AS %s", col.alias)
-			case "database":
+			case "database_name":
 				expr = fmt.Sprintf("DB_NAME() AS %s", col.alias)
 			}
 		case col.alias == "calls":
