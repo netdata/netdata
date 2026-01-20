@@ -258,18 +258,30 @@ func (c *Collector) buildAvailableMSSQLColumns(availableCols map[string]bool) []
 }
 
 // mapAndValidateMSSQLSortColumn maps UI sort key to the appropriate sort expression
-func (c *Collector) mapAndValidateMSSQLSortColumn(sortKey string, availableCols map[string]bool) string {
-	// Find the column mapping
-	for _, col := range mssqlAllColumns {
-		if col.uiKey == sortKey {
-			// Check if the underlying column is available
-			if col.isIdentity || availableCols[col.dbColumn] {
-				return col.uiKey // Return UI key, we'll build the right expression in SQL
-			}
+// Uses the filtered cols list to ensure the sort column is actually in the SELECT
+func (c *Collector) mapAndValidateMSSQLSortColumn(sortKey string, cols []mssqlColumnMeta) string {
+	// First, check if the requested sort key is in the available columns
+	for _, col := range cols {
+		if col.uiKey == sortKey && col.isSortOption {
+			return col.uiKey
 		}
 	}
-	// Default to totalTime
-	return "totalTime"
+
+	// Fall back to the first available sort column
+	for _, col := range cols {
+		if col.isSortOption {
+			return col.uiKey
+		}
+	}
+
+	// Last resort: use first non-identity column (should never happen)
+	for _, col := range cols {
+		if !col.isIdentity {
+			return col.uiKey
+		}
+	}
+
+	return "calls" // absolute fallback
 }
 
 // buildMSSQLDynamicSQL builds the SQL query with only available columns
@@ -499,8 +511,8 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		}
 	}
 
-	// Validate and map sort column
-	validatedSortColumn := c.mapAndValidateMSSQLSortColumn(sortColumn, availableCols)
+	// Validate and map sort column (use filtered cols to ensure sort column is in SELECT)
+	validatedSortColumn := c.mapAndValidateMSSQLSortColumn(sortColumn, cols)
 
 	// Build and execute query
 	timeWindowDays := c.Config.GetQueryStoreTimeWindowDays()

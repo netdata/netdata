@@ -73,37 +73,41 @@ func TestMssqlAllColumns_HasValidMetadata(t *testing.T) {
 }
 
 func TestCollector_mapAndValidateMSSQLSortColumn(t *testing.T) {
+	// Build a filtered column list with common available columns
+	availableCols := map[string]bool{"avg_duration": true, "count_executions": true}
+	c := &Collector{}
+	cols := c.buildAvailableMSSQLColumns(availableCols)
+
 	tests := map[string]struct {
-		availableCols map[string]bool
-		input         string
-		expected      string
+		cols     []mssqlColumnMeta
+		input    string
+		expected string
 	}{
 		"totalTime maps correctly": {
-			availableCols: map[string]bool{"avg_duration": true, "count_executions": true},
-			input:         "totalTime",
-			expected:      "totalTime",
+			cols:     cols,
+			input:    "totalTime",
+			expected: "totalTime",
 		},
 		"calls maps correctly": {
-			availableCols: map[string]bool{"avg_duration": true, "count_executions": true},
-			input:         "calls",
-			expected:      "calls",
+			cols:     cols,
+			input:    "calls",
+			expected: "calls",
 		},
-		"invalid column falls back to totalTime": {
-			availableCols: map[string]bool{"avg_duration": true, "count_executions": true},
-			input:         "invalid_column",
-			expected:      "totalTime",
+		"invalid column falls back to first sort option": {
+			cols:     cols,
+			input:    "invalid_column",
+			expected: "calls", // first sort option in filtered cols
 		},
-		"SQL injection attempt falls back to totalTime": {
-			availableCols: map[string]bool{"avg_duration": true, "count_executions": true},
-			input:         "'; DROP TABLE users;--",
-			expected:      "totalTime",
+		"SQL injection attempt falls back to first sort option": {
+			cols:     cols,
+			input:    "'; DROP TABLE users;--",
+			expected: "calls", // first sort option in filtered cols
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			c := &Collector{}
-			result := c.mapAndValidateMSSQLSortColumn(tc.input, tc.availableCols)
+			result := c.mapAndValidateMSSQLSortColumn(tc.input, tc.cols)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
@@ -252,6 +256,7 @@ func TestMssqlMethods_SortOptionsHaveLabels(t *testing.T) {
 func TestMssqlSortColumnValidation_SQLInjection(t *testing.T) {
 	c := &Collector{}
 	availableCols := map[string]bool{"avg_duration": true, "count_executions": true}
+	cols := c.buildAvailableMSSQLColumns(availableCols)
 
 	maliciousInputs := []string{
 		"'; DROP TABLE sys.query_store_query; --",
@@ -262,9 +267,9 @@ func TestMssqlSortColumnValidation_SQLInjection(t *testing.T) {
 	}
 
 	for _, input := range maliciousInputs {
-		result := c.mapAndValidateMSSQLSortColumn(input, availableCols)
-		// All malicious inputs should fall back to safe default
-		assert.Equal(t, "totalTime", result,
+		result := c.mapAndValidateMSSQLSortColumn(input, cols)
+		// All malicious inputs should fall back to first available sort option
+		assert.Equal(t, "calls", result,
 			"malicious input should fall back to safe default: %s -> %s", input, result)
 	}
 }
