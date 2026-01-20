@@ -361,8 +361,9 @@ func (c *Collector) buildMSSQLSelectExpressions(cols []mssqlColumnMeta, dbNameEx
 // Uses sp_executesql to execute the built query
 func (c *Collector) buildMSSQLDynamicSQL(cols []mssqlColumnMeta, sortColumn string, timeWindowDays int, limit int) string {
 	// Build the SELECT expressions template (with placeholder for database name)
-	// We use N'''' + name + N'''' to create a properly quoted string literal for each database
-	selectParts := c.buildMSSQLSelectExpressions(cols, "N''''' + name + N'''''")
+	// We use ''' + name + N''' to close the outer string, concatenate the db name, and reopen
+	// This produces a properly quoted string literal like 'DatabaseName' in the final SQL
+	selectParts := c.buildMSSQLSelectExpressions(cols, "''' + name + N'''")
 	selectExpr := strings.Join(selectParts, ",\n        ")
 
 	// Time window filter
