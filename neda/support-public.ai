@@ -386,6 +386,7 @@ You may limit the scope of the research and your final report/answer, ONLY when 
 
 <netdata_product_descrition>
 ${include:docs/netdata-complete-product-description.md}
+${include:docs/netdata-support-instructions.md}
 </netdata_product_descrition>
 
 ---

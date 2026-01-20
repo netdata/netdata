@@ -61,6 +61,7 @@ type EmbedClientEvent =
 interface AiAgentChatConfig {
   endpoint: string;
   agentId?: string;
+  format?: string;  // Output format: 'markdown', 'markdown+mermaid', etc.
   statusFields?: ('status' | 'now' | 'done' | 'pending')[];
   enableChat?: boolean;
   clientId?: string;
@@ -111,6 +112,7 @@ class AiAgentChat {
       clientId: this.clientId ?? undefined,
       history: historyPayload,
       agentId: this.config.agentId,
+      format: this.config.format,
     };
 
     let report = '';

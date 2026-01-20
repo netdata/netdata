@@ -186,6 +186,7 @@ For complex questions that require investigation:
 ---
 
 ${include:docs/netdata-complete-product-description.md}
+${include:docs/netdata-support-instructions.md}
 
 ---
 

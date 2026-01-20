@@ -32,6 +32,7 @@
   const defaultConfig = {
     endpoint: window.location.origin,
     agentId: undefined,  // Server decides based on allowedAgents config
+    format: 'markdown+mermaid',  // Tell model it can use mermaid charts
     icon: null,
     position: 'bottom-right',
     storageKey: 'ai-agent-chat',
@@ -50,6 +51,7 @@
     if (script) {
       if (script.dataset.endpoint) config.endpoint = script.dataset.endpoint;
       if (script.dataset.agentId) config.agentId = script.dataset.agentId;
+      if (script.dataset.format) config.format = script.dataset.format;
       if (script.dataset.icon) config.icon = script.dataset.icon;
       if (script.dataset.position) config.position = script.dataset.position;
     }
@@ -184,11 +186,12 @@
       if (!window.markdownit) {
         await this.waitFor(() => window.markdownit, 5000);
       }
-      // html:false prevents XSS from markdown content
+      // html:true allows HTML in markdown (needed for some content)
+      // typographer:false prevents (C) -> © conversion (problematic for DevOps)
       this.md = window.markdownit({
-        html: false,
+        html: true,
         linkify: true,
-        typographer: true,
+        typographer: false,
         highlight: (str, lang) => {
           // Use escapeHtml to prevent XSS in code blocks
           const escapedCode = escapeHtml(str);
@@ -369,6 +372,7 @@
       this.chat = new window.AiAgentChat({
         endpoint: this.config.endpoint,
         agentId: this.config.agentId,
+        format: this.config.format,
         clientId: this.clientId,
         onEvent: (event) => this.handleChatEvent(event),
       });
@@ -626,19 +630,29 @@
         case 'client':
           this.clientId = event.clientId;
           this.saveState();
+          // Clear "Connecting..." status on first client event
+          this.updateStatus('');
+          break;
+
+        case 'meta':
+          // Clear status on meta event (session started)
+          this.updateStatus('');
           break;
 
         case 'status':
           this.currentStatus = event.data.message || event.data.status || '';
+          // Show spinner when receiving status updates (model is working)
+          this.showSpinner();
           this.updateSpinnerStatus(this.currentStatus);
           break;
 
         case 'report':
-          // First chunk - hide spinner and create message
+          // First chunk - create the message element
           if (!this.streamingMessageId) {
-            this.hideSpinner();
             this.streamingMessageId = this.addMessage('assistant', '', true);
           }
+          // Hide spinner when content is streaming
+          this.hideSpinner();
           this.streamingContent = event.report;
           this.updateStreamingMessage(this.streamingContent);
           break;
@@ -711,11 +725,10 @@
       el.textContent = '';
 
       if (msg.role === 'user') {
-        // User messages: single content div with plain text
+        // User messages: render markdown (preserves newlines, supports formatting)
+        // Note: markdown-it processes the content; user input is their own
         const contentDiv = createElement('div', 'ai-agent-message-content');
-        const p = document.createElement('p');
-        p.textContent = msg.content;
-        contentDiv.appendChild(p);
+        contentDiv.innerHTML = this.renderer.render(msg.content);
         el.appendChild(contentDiv);
       } else if (msg.isStreaming) {
         // Streaming assistant messages: double-buffer with two content divs

@@ -195,6 +195,7 @@ Every response must be reality-checked against official documentation and source
 ---
 
 ${include:docs/netdata-complete-product-description.md}
+${include:docs/netdata-support-instructions.md}
 
 ---
 

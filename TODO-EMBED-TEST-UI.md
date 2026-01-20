@@ -99,3 +99,31 @@ None - all requirements are clear.
 
 ## Documentation Updates
 - Update `docs/Headends-Embed.md` to mention test UI
+
+
+## ISSUES (added by Costa)
+
+- The spinner is removed when the model sends conents, but it is not added back when the model starting sending reasoning tags or any other tags.
+  This is a problem because the model frequently says:
+  > I'll research X. Let me gather specifics...
+  and immediately continues working. So, output from the model, is not necessarily the end of the spinner.
+  The spinner should stop while the model is sending output, but it should continue when the model sends progress, reasoning, etc.
+
+- At the lower left corner there is a status line. This stays at "Connecting..." forever
+
+- markdown parser:
+  - allow html in markdown
+  - noticed that it turns `(C)` into the copyright symbol, but this is problematic for devops, because `(C)` means a program written in C. Can it be disabled?
+
+- the solution must set the format to `markdown+mermaid` so that the model knows it can use mermaid charts instead of text blocks art
+
+- text input:
+  - must preserve newlines
+  - it converts html to markdown on paste, but it must render markdown at the user bubble
+
+- agent response:
+  - the left-right padding must be dynamic depending on the width of the underlying parent div. The wider the screen the more padding should exist.
+  - code blocks should have line spacing 1.0 so that ascii art is shown correctly (no dotted lines)
+  - monospace font is significantly smaller than the normal one - code blocks are prime content for configurations, we need them to match the page font
+
+

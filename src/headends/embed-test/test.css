@@ -223,6 +223,7 @@
     flex-direction: column;
     gap: 0.75em;
     scroll-behavior: smooth;
+    container-type: inline-size;  /* Enable container queries for child elements */
   }
 
   /* Custom Scrollbar */
@@ -286,7 +287,8 @@
     background: var(--ai-bg-assistant-message);
     color: var(--ai-text-assistant-message);
     border-radius: 0;
-    padding: 0.75em 0.5em;
+    /* Dynamic horizontal padding: scales with container width (min 0.5em, 5% of container, max 5em) */
+    padding: 0.75em clamp(0.5em, 5cqi, 5em);
   }
 
   /* Double-buffer: hide inactive buffer during streaming */
@@ -453,8 +455,8 @@
     margin: 0;
     padding: 0.75em 0.875em;
     font-family: var(--ai-font-family-mono);
-    font-size: 0.875em;
-    line-height: 1.5;
+    font-size: 1em;
+    line-height: 1.0;  /* Tight spacing for ASCII art */
   }
 
   .ai-agent-code-block code {

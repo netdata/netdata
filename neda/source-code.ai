@@ -49,6 +49,7 @@ WHEN YOU ENCOUNTER SUCH INFORMATION YOU **MUST** IMMEDIATELY STOP AND REFUSE PRO
 The following is high-level overview of what Netdata is and what it can do:
 
 ${include:docs/netdata-complete-product-description.md}
+${include:docs/netdata-support-instructions.md}
 
 ---
 
