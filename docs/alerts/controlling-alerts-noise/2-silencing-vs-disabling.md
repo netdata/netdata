@@ -40,4 +40,4 @@ Silencing is like putting a "Do Not Disturb" sign on an alert—it keeps working
 
 - **[4.3 Silencing in Netdata Cloud](3-silencing-cloud.md)** - Cloud-based silencing rules
 - **[4.4 Reducing Flapping](4-reducing-flapping.md)** - Delay and repeat techniques
-- **[8.1 Hysteresis](../advanced-techniques/1-hysteresis.md)** - Status-based conditions
+- **[8.1 Hysteresis](../essential-patterns/1-hysteresis.md)** - Status-based conditions

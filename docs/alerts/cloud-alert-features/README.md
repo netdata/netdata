@@ -121,5 +121,5 @@ By default, alerts apply only to the selected node. Use room filters to apply th
 
 ### 10.4.3 Related Sections
 
-- **[8.3 Host, Chart, and Label-Based Targeting](../advanced-techniques/3-label-targeting.md)** for label usage
+- **[8.3 Host, Chart, and Label-Based Targeting](../essential-patterns/3-label-targeting.md)** for label usage
 - **[12.4 Large Environment Patterns](../best-practices/4-scaling-large-environments.md)** for multi-room strategies

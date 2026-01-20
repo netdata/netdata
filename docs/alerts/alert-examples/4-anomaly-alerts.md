@@ -39,7 +39,7 @@ See **3.3 Calculations and Transformations** for complex expressions.
 ## 6.4.3 Related Sections
 
 - **[6.5 Trend and Capacity Alerts](5-trend-capacity.md)** - Predictive alerts
-- **[8.4 Custom Actions with exec](../advanced-techniques/4-custom-actions.md)** - Automation with exec
+- **[8.4 Custom Actions with exec](../essential-patterns/4-custom-actions.md)** - Automation with exec
 
 ## What's Next
 

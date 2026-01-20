@@ -35,4 +35,4 @@ The `repeat:` line controls how often notifications are sent for sustained condi
 ## 7.3.4 Related Sections
 
 - **[4.4 Reducing Flapping and Noise](../controlling-alerts-noise/4-reducing-flapping.md)** for delay techniques
-- **[8.1 Hysteresis and Status-Based Conditions](../advanced-techniques/1-hysteresis.md)** for status-based thresholds
+- **[8.1 Hysteresis and Status-Based Conditions](../essential-patterns/1-hysteresis.md)** for status-based thresholds
