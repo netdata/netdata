@@ -88,5 +88,5 @@ Monitor the relationship between alert behavior and workload changes. When signi
 ## See Also
 
 - [Creating and Editing Alerts via Config Files](../../creating-alerts-pages/creating-and-editing-alerts-via-config-files.md) - File-based editing
-- [Reloading and Validating Configuration](../../creating-alerts-pages/reloading-and-validating-alert-configuration.md) - Validation procedures
+- [Reloading and Validating Configuration](../../creating-alerts-pages/5-reloading-and-validating-alert-configuration.md) - Validation procedures
 - [Disabling Alerts](../controlling-alerts-noise/disabling-alerts.md) - How to temporarily disable alerts
