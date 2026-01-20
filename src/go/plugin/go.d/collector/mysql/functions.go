@@ -43,7 +43,7 @@ var mysqlAllColumns = []mysqlColumnMeta{
 	// Identity columns - always available
 	{dbColumn: "DIGEST", alias: "digest", uiKey: "digest", displayName: "Digest", dataType: "string", visible: false, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isUniqueKey: true},
 	{dbColumn: "DIGEST_TEXT", alias: "query", uiKey: "query", displayName: "Query", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isSticky: true, fullWidth: true},
-	{dbColumn: "SCHEMA_NAME", alias: "schema", uiKey: "schema", displayName: "Schema", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
+	{dbColumn: "SCHEMA_NAME", alias: "schema_name", uiKey: "schema", displayName: "Schema", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
 
 	// Execution counts
 	{dbColumn: "COUNT_STAR", alias: "calls", uiKey: "calls", displayName: "Calls", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Top queries by Number of Calls"},

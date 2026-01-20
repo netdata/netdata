@@ -4,6 +4,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -39,8 +40,6 @@ type pgColumnMeta struct {
 	summary string
 	// Filter type
 	filter string
-	// Whether this is a time column (needs ms->sec conversion)
-	isTimeMs bool
 	// Whether this is a sortable option for the sort dropdown
 	isSortOption bool
 	// Sort option label (if isSortOption)
@@ -70,19 +69,19 @@ var pgAllColumns = []pgColumnMeta{
 	// Execution time columns (names vary by version - detected dynamically)
 	// PG <13: total_time, mean_time, min_time, max_time, stddev_time
 	// PG 13+: total_exec_time, mean_exec_time, min_exec_time, max_exec_time, stddev_exec_time
-	{dbColumn: "total_time", uiKey: "totalTime", displayName: "Total Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true, isSortOption: true, sortLabel: "Total Execution Time", isDefaultSort: true},
-	{dbColumn: "mean_time", uiKey: "meanTime", displayName: "Mean Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isTimeMs: true, isSortOption: true, sortLabel: "Average Execution Time"},
-	{dbColumn: "min_time", uiKey: "minTime", displayName: "Min Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "min", filter: "range", isTimeMs: true},
-	{dbColumn: "max_time", uiKey: "maxTime", displayName: "Max Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isTimeMs: true},
-	{dbColumn: "stddev_time", uiKey: "stddevTime", displayName: "Stddev Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isTimeMs: true},
+	{dbColumn: "total_time", uiKey: "totalTime", displayName: "Total Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Total Execution Time", isDefaultSort: true},
+	{dbColumn: "mean_time", uiKey: "meanTime", displayName: "Mean Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isSortOption: true, sortLabel: "Average Execution Time"},
+	{dbColumn: "min_time", uiKey: "minTime", displayName: "Min Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "min", filter: "range"},
+	{dbColumn: "max_time", uiKey: "maxTime", displayName: "Max Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range"},
+	{dbColumn: "stddev_time", uiKey: "stddevTime", displayName: "Stddev Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range"},
 
 	// Planning time columns (PG 13+ only)
 	{dbColumn: "s.plans", uiKey: "plans", displayName: "Plans", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "total_plan_time", uiKey: "totalPlanTime", displayName: "Total Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true},
-	{dbColumn: "mean_plan_time", uiKey: "meanPlanTime", displayName: "Mean Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isTimeMs: true},
-	{dbColumn: "min_plan_time", uiKey: "minPlanTime", displayName: "Min Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "min", filter: "range", isTimeMs: true},
-	{dbColumn: "max_plan_time", uiKey: "maxPlanTime", displayName: "Max Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isTimeMs: true},
-	{dbColumn: "stddev_plan_time", uiKey: "stddevPlanTime", displayName: "Stddev Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range", isTimeMs: true},
+	{dbColumn: "total_plan_time", uiKey: "totalPlanTime", displayName: "Total Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "mean_plan_time", uiKey: "meanPlanTime", displayName: "Mean Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range"},
+	{dbColumn: "min_plan_time", uiKey: "minPlanTime", displayName: "Min Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "min", filter: "range"},
+	{dbColumn: "max_plan_time", uiKey: "maxPlanTime", displayName: "Max Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range"},
+	{dbColumn: "stddev_plan_time", uiKey: "stddevPlanTime", displayName: "Stddev Plan Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "max", filter: "range"},
 
 	// Row count (always present)
 	{dbColumn: "s.rows", uiKey: "rows", displayName: "Rows", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Rows Returned"},
@@ -104,8 +103,8 @@ var pgAllColumns = []pgColumnMeta{
 	{dbColumn: "s.temp_blks_written", uiKey: "tempBlksWritten", displayName: "Temp Blocks Written", dataType: "integer", visible: true, transform: "number", sortDir: "descending", summary: "sum", filter: "range", isSortOption: true, sortLabel: "Temp Blocks Written"},
 
 	// I/O timing (requires track_io_timing, always present but may be 0)
-	{dbColumn: "s.blk_read_time", uiKey: "blkReadTime", displayName: "Block Read Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true},
-	{dbColumn: "s.blk_write_time", uiKey: "blkWriteTime", displayName: "Block Write Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true},
+	{dbColumn: "s.blk_read_time", uiKey: "blkReadTime", displayName: "Block Read Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.blk_write_time", uiKey: "blkWriteTime", displayName: "Block Write Time", dataType: "duration", units: "milliseconds", visible: true, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
 
 	// WAL statistics (PG 13+ only)
 	{dbColumn: "s.wal_records", uiKey: "walRecords", displayName: "WAL Records", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
@@ -114,17 +113,17 @@ var pgAllColumns = []pgColumnMeta{
 
 	// JIT statistics (PG 15+ only)
 	{dbColumn: "s.jit_functions", uiKey: "jitFunctions", displayName: "JIT Functions", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.jit_generation_time", uiKey: "jitGenerationTime", displayName: "JIT Generation Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true},
+	{dbColumn: "s.jit_generation_time", uiKey: "jitGenerationTime", displayName: "JIT Generation Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
 	{dbColumn: "s.jit_inlining_count", uiKey: "jitInliningCount", displayName: "JIT Inlining Count", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.jit_inlining_time", uiKey: "jitInliningTime", displayName: "JIT Inlining Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true},
+	{dbColumn: "s.jit_inlining_time", uiKey: "jitInliningTime", displayName: "JIT Inlining Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
 	{dbColumn: "s.jit_optimization_count", uiKey: "jitOptimizationCount", displayName: "JIT Optimization Count", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.jit_optimization_time", uiKey: "jitOptimizationTime", displayName: "JIT Optimization Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true},
+	{dbColumn: "s.jit_optimization_time", uiKey: "jitOptimizationTime", displayName: "JIT Optimization Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
 	{dbColumn: "s.jit_emission_count", uiKey: "jitEmissionCount", displayName: "JIT Emission Count", dataType: "integer", visible: false, transform: "number", sortDir: "descending", summary: "sum", filter: "range"},
-	{dbColumn: "s.jit_emission_time", uiKey: "jitEmissionTime", displayName: "JIT Emission Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true},
+	{dbColumn: "s.jit_emission_time", uiKey: "jitEmissionTime", displayName: "JIT Emission Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
 
 	// Temp file statistics (PG 15+ only)
-	{dbColumn: "s.temp_blk_read_time", uiKey: "tempBlkReadTime", displayName: "Temp Block Read Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true},
-	{dbColumn: "s.temp_blk_write_time", uiKey: "tempBlkWriteTime", displayName: "Temp Block Write Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range", isTimeMs: true},
+	{dbColumn: "s.temp_blk_read_time", uiKey: "tempBlkReadTime", displayName: "Temp Block Read Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
+	{dbColumn: "s.temp_blk_write_time", uiKey: "tempBlkWriteTime", displayName: "Temp Block Write Time", dataType: "duration", units: "milliseconds", visible: false, transform: "duration", decimalPoints: 2, sortDir: "descending", summary: "sum", filter: "range"},
 }
 
 // pgMethods returns the available function methods for PostgreSQL
@@ -239,12 +238,21 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		return &module.FunctionResponse{Status: 500, Message: fmt.Sprintf("rows iteration error: %v", err)}
 	}
 
+	// Find default sort column UI key from metadata
+	defaultSort := "totalTime"
+	for _, col := range queryCols {
+		if col.isDefaultSort {
+			defaultSort = col.uiKey
+			break
+		}
+	}
+
 	return &module.FunctionResponse{
 		Status:            200,
 		Help:              "Top SQL queries from pg_stat_statements",
 		Columns:           c.buildDynamicColumns(queryCols),
 		Data:              data,
-		DefaultSortColumn: "totalTime",
+		DefaultSortColumn: defaultSort,
 
 		// Charts for aggregated visualization
 		Charts: map[string]module.ChartConfig{
@@ -488,61 +496,65 @@ LIMIT %d
 }
 
 // scanDynamicRows scans rows into the data array based on column types
+// Uses sql.Null* types to handle NULL values safely
 func (c *Collector) scanDynamicRows(rows dbRows, cols []pgColumnMeta) ([][]any, error) {
 	data := make([][]any, 0, 500)
 
-	for rows.Next() {
-		// Create scan destinations based on column types
-		scanDest := make([]any, len(cols))
-		values := make([]any, len(cols))
+	// Create value holders for scanning (reuse across rows for efficiency)
+	valuePtrs := make([]any, len(cols))
+	values := make([]any, len(cols))
 
+	for rows.Next() {
+		// Reset value holders for each row
 		for i, col := range cols {
 			switch col.dataType {
 			case "string":
-				var s string
-				scanDest[i] = &s
-				values[i] = &s
+				var v sql.NullString
+				values[i] = &v
 			case "integer":
-				var n int64
-				scanDest[i] = &n
-				values[i] = &n
+				var v sql.NullInt64
+				values[i] = &v
 			case "float", "duration":
-				var f float64
-				scanDest[i] = &f
-				values[i] = &f
+				var v sql.NullFloat64
+				values[i] = &v
 			default:
-				var s string
-				scanDest[i] = &s
-				values[i] = &s
+				var v sql.NullString
+				values[i] = &v
 			}
+			valuePtrs[i] = values[i]
 		}
 
-		if err := rows.Scan(scanDest...); err != nil {
+		if err := rows.Scan(valuePtrs...); err != nil {
 			return nil, fmt.Errorf("row scan failed: %v", err)
 		}
 
-		// Build row with proper type handling
+		// Convert scanned values to output format
 		row := make([]any, len(cols))
 		for i, col := range cols {
-			switch col.dataType {
-			case "string":
-				s := *(values[i].(*string))
-				// Special handling for queryid - convert to string to avoid JS precision loss
-				if col.uiKey == "queryid" {
-					row[i] = s
-				} else if col.uiKey == "query" {
-					row[i] = strmutil.TruncateText(s, maxQueryTextLength)
+			switch v := values[i].(type) {
+			case *sql.NullString:
+				if v.Valid {
+					s := v.String
+					if col.uiKey == "query" {
+						row[i] = strmutil.TruncateText(s, maxQueryTextLength)
+					} else {
+						row[i] = s
+					}
 				} else {
-					row[i] = s
+					row[i] = ""
 				}
-			case "integer":
-				row[i] = *(values[i].(*int64))
-			case "float":
-				row[i] = *(values[i].(*float64))
-			case "duration":
-				row[i] = *(values[i].(*float64))
-			default:
-				row[i] = *(values[i].(*string))
+			case *sql.NullInt64:
+				if v.Valid {
+					row[i] = v.Int64
+				} else {
+					row[i] = int64(0)
+				}
+			case *sql.NullFloat64:
+				if v.Valid {
+					row[i] = v.Float64
+				} else {
+					row[i] = float64(0)
+				}
 			}
 		}
 
