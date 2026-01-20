@@ -10,16 +10,34 @@ The examples below show simplified calc patterns for trend analysis. Stock alert
 
 ## 6.5.1 Disk Days Remaining
 
+Capacity planning for disk space requires two coordinated templates: one to calculate the fill rate, and another to derive remaining time.
+
 ```conf
+# Template 1: Calculate the disk fill rate (GB/hour)
+# This is a calculation-only template used by the second template
+template: disk_fill_rate
+    on: disk.space
+lookup: min -10m at -50m unaligned of avail
+     every: 1m
+   calc: ($this - $avail) / (($now - $after) / 3600)
+        units: GB/hour
+
+# Template 2: Calculate hours remaining based on fill rate
 template: out_of_disk_space_time
     on: disk.space
-lookup: average -1h percentage of avail
+lookup: min -10m at -50m unaligned of avail
      every: 1m
-   calc: ($this > 0) ? ($avail / ($this / 100 * 86400 / 3600)) : 0
-       warn: $this > 0 and $this < 72
-       crit: $this > 0 and $this < 24
-         to: sysadmin
+   calc: ($disk_fill_rate > 0) ? ($avail / $disk_fill_rate) : (inf)
+        units: hours
+        warn: $this > 0 and $this < 48
+        crit: $this > 0 and $this < 24
+          to: sysadmin
 ```
+
+**How it works:**
+1. `disk_fill_rate` calculates fill rate from historical data (`$this - $avail`) divided by time delta
+2. `out_of_disk_space_time` divides available bytes by fill rate to get hours remaining
+3. If fill rate is ≤ 0 (disk growing or stable), returns `inf` (never fills)
 
 ## 6.5.2 Memory Leak Detection
 
