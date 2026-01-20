@@ -366,6 +366,12 @@ void nd_log_queue_shutdown(void) {
             fprintf(stderr, "LOGGER: shutdown wait timed out after %d seconds\n", ND_LOG_SHUTDOWN_TIMEOUT_S);
         }
     }
+    else {
+        // Queue is full - signal shutdown directly via atomic flag.
+        // The logger thread checks this flag in its main loop and will exit.
+        __atomic_store_n(&log_ev.shutdown_requested, true, __ATOMIC_RELEASE);
+        uv_async_send(&log_ev.async);
+    }
     completion_destroy(&shutdown_complete);
 
     // Join thread
