@@ -40,7 +40,7 @@ lookup: average -5m of avail
 ```conf
 template: disk_space_usage
     on: disk.space
-lookup: average -1m percentage of avail
+lookup: average -1m percentage of used
      units: %
      every: 1m
       warn: $this > 80
