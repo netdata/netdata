@@ -33,15 +33,11 @@ typedef enum __attribute__((packed)) {
 // Log entry structure (pre-formatted message)
 
 struct nd_log_queue_entry {
-    ND_LOG_SOURCES source;
+    ND_LOG_SOURCES source;                          // source index - used to lookup FILE* at write time
     ND_LOG_FIELD_PRIORITY priority;
     ND_LOG_METHOD method;
     ND_LOG_FORMAT format;
-    FILE *fp;                                       // target file pointer (for NDLM_FILE)
-    int fd;                                         // target fd (for journal direct)
     size_t message_len;
-    bool journal_direct_initialized;                // captured at enqueue time
-    bool journal_libsystemd_initialized;            // captured at enqueue time
     bool syslog_initialized;                        // captured at enqueue time
     char *message_allocated;                        // mallocz'd for messages > INLINE_SIZE (NULL if inline)
     char message_inline[ND_LOG_QUEUE_INLINE_SIZE];  // inline buffer for short messages
