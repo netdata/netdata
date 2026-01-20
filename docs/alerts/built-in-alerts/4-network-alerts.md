@@ -1,4 +1,4 @@
-# 11.4 Network and Connectivity Alerts
+# 6.4 Network and Connectivity Alerts
 
 Network alerts focus on endpoints and services rather than interface statistics. These alerts ensure that network-dependent services remain reachable.
 

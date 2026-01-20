@@ -1,4 +1,4 @@
-# 11.1 System Resource Alerts
+# 6.1 System Resource Alerts
 
 System resource alerts cover the fundamental building blocks of any server: CPU, memory, disk, network, and load. These alerts apply to every Netdata node and provide the baseline monitoring that every infrastructure should have.
 

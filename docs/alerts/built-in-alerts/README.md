@@ -1,4 +1,4 @@
-# 11: Built-in Alerts
+# 6: Built-in Alerts
 
 Netdata ships with a comprehensive library of pre-configured alerts covering system resources, applications, containers, and hardware monitoring. These alerts are enabled by default and require no configuration to provide immediate visibility into common problems.
 

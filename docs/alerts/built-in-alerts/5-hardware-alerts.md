@@ -1,4 +1,4 @@
-# 11.5 Hardware and Sensor Alerts
+# 6.5 Hardware and Sensor Alerts
 
 Hardware monitoring provides visibility into infrastructure that is often neglected until failure occurs. These alerts protect physical infrastructure health.
 

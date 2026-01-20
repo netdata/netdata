@@ -1,4 +1,4 @@
-# 11.3 Application Alerts
+# 6.3 Application Alerts
 
 Application alerts cover common database, web server, cache, and message queue technologies. Each application has unique metrics that indicate health and performance.
 
