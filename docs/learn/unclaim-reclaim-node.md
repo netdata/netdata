@@ -4,10 +4,10 @@
 
 **What's the difference between unclaiming/reclaiming and removing a node?**
 
-| Action | What it does | Agent status |
-|--------|--------------|--------------|
-| **Unclaim & Reclaim** | Disconnect from current Space, connect to a new Space | Agent keeps running |
-| **Remove** | Permanently delete node from Netdata Cloud | Agent may keep running but disconnected |
+| Action                | What it does                                          | Agent status                            |
+|-----------------------|-------------------------------------------------------|-----------------------------------------|
+| **Unclaim & Reclaim** | Disconnect from current Space, connect to a new Space | Agent keeps running                     |
+| **Remove**            | Permanently delete node from Netdata Cloud            | Agent may keep running but disconnected |
 
 If you want to **move a node to a different Space**, use the **unclaim and reclaim** process on this page.
 
@@ -20,6 +20,7 @@ This guide covers how to move a node from one Space to another without removing 
 ## Why Move a Node Between Spaces?
 
 You might need to move a node to a different Space when:
+
 - Reorganizing your infrastructure monitoring structure
 - Transferring node ownership between teams or departments
 - Consolidating multiple Spaces into one
@@ -38,7 +39,8 @@ You might need to move a node to a different Space when:
 
 ## Step 1: Unclaim from Current Space
 
-See our **[Reconnect Agent](/docs/netdata-cloud/connect-agent.md#reconnect-agent)** guide for the exact commands to:
+See our **[Reconnect Agent](/src/claim/README.md#reconnect-agent)** guide for the exact commands to:
+
 - Remove the Cloud connection directory (Linux)
 - Remove connection files and recreate container (Docker)
 
@@ -103,14 +105,16 @@ After reclaiming, verify the node appears in:
 ## Troubleshooting
 
 **Node doesn't appear in new Space:**
+
 - Verify the claim token is correct for the new Space
 - Check `/var/lib/netdata/cloud.d/` was removed before reclaiming
 - Review agent logs using:
-   - `journalctl --namespace netdata -b 0 | grep -i CLAIM`
-   - or:
-   - `grep -i CLAIM /var/log/netdata/daemon.log`
+    - `journalctl --namespace netdata -b 0 | grep -i CLAIM`
+    - or:
+    - `grep -i CLAIM /var/log/netdata/daemon.log`
 
 **Reconnection fails:**
+
 - Check connection status: `curl http://localhost:19999/api/v1/aclk`
 - Ensure the agent has internet access to `app.netdata.cloud`
 - Check for firewall blocking port 443
@@ -118,5 +122,5 @@ After reclaiming, verify the node appears in:
 ## Related Documentation
 
 - [Remove a node from Netdata Cloud entirely](/docs/learn/remove-node.md) - For permanent node removal
-- [Connect Agent to Cloud](/src/claim/README.md) - Initial connection setup
-- [Reconnect Agent](/docs/netdata-cloud/connect-agent#reconnect-agent) - Linux/Docker based installations
+- [Connect Agent to Cloud](/src/claim/README.md#connect-agent-to-cloud) - Initial connection setup
+- [Reconnect Agent](/src/claim/README.md#reconnect-agent) - Linux/ Docker-based installations
