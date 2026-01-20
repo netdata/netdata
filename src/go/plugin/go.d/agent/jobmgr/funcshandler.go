@@ -250,7 +250,7 @@ func (m *Manager) respondWithParams(fn functions.Function, moduleName, method st
 	}
 
 	if dataResp.Status != 200 {
-		resp["error_message"] = dataResp.Message
+		resp["errorMessage"] = dataResp.Message
 	}
 
 	m.respondJSON(fn, resp)
@@ -264,7 +264,7 @@ func (m *Manager) respondErrorWithParams(fn functions.Function, moduleName strin
 		"status":        status,
 		"type":          "table",
 		"has_history":   false,
-		"error_message": fmt.Sprintf(format, args...),
+		"errorMessage": fmt.Sprintf(format, args...),
 
 		// ALWAYS include required_params even in errors
 		"accepted_params": []string{"__method", "__job", "__sort"},
