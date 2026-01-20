@@ -225,11 +225,17 @@ func (m *Manager) respondWithParams(fn functions.Function, moduleName, method st
 		// ALWAYS include fresh required_params
 		"accepted_params": []string{"__method", "__job", "__sort"},
 		"required_params": m.buildRequiredParams(moduleName, methodCfg),
+	}
 
-		// Data from module
-		"columns":             dataResp.Columns,
-		"data":                dataResp.Data,
-		"default_sort_column": dataResp.DefaultSortColumn,
+	// Only include data fields when present (avoid null values on errors)
+	if dataResp.Columns != nil {
+		resp["columns"] = dataResp.Columns
+	}
+	if dataResp.Data != nil {
+		resp["data"] = dataResp.Data
+	}
+	if dataResp.DefaultSortColumn != "" {
+		resp["default_sort_column"] = dataResp.DefaultSortColumn
 	}
 
 	// Add chart configuration if provided
