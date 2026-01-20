@@ -35,61 +35,31 @@ flowchart TD
 
 Each Netdata Agent runs its own health engine and sends notifications directly to configured destinations.
 
-| Step | What Happens |
-|------|--------------|
-| 1 | Health Engine evaluates alert conditions |
-| 2 | Alert status changes (CLEAR → WARNING → CRITICAL) |
-| 3 | Health Engine generates alert event |
-| 4 | Event routes to configured recipients (Slack, Email, PagerDuty) |
-
-**Pros:**
-- Works without Cloud connectivity
-- Lowest latency for local notifications
-- Complete control via local configuration
-
-**Cons:**
-- Duplicate notifications if multiple Agents alert on the same issue
-- Configuration must be managed per node
+| Pros | Cons |
+|------|------|
+| Works without Cloud connectivity | Duplicate notifications if multiple Agents alert on the same issue |
+| Lowest latency for local notifications | Configuration must be managed per node |
+| Complete control via local configuration | |
 
 **2. Parent-Dispatched Notifications**
 
 Parents receive streamed metrics from children and run health checks centrally. Notifications are sent from the Parent.
 
-| Step | What Happens |
-|------|--------------|
-| 1 | Child node streams metrics to Parent |
-| 2 | Parent's Health Engine evaluates conditions |
-| 3 | Alert events generated on Parent |
-| 4 | Parent sends notifications to recipients |
-
-**Pros:**
-- Single point of control for a cluster
-- Reduced traffic to Cloud
-- Aggregated view of child health
-
-**Cons:**
-- Parent must be available for children to alert
-- More complex configuration
+| Pros | Cons |
+|------|------|
+| Single point of control for a cluster | Parent must be available for children to alert |
+| Reduced traffic to Cloud | More complex configuration |
+| Aggregated view of child health | |
 
 **3. Cloud-Dispatched Notifications**
 
 Netdata Cloud receives alert events from all connected Agents/Parents and dispatches notifications through Cloud integrations.
 
-| Step | What Happens |
-|------|--------------|
-| 1 | Agent/Parent generates alert event |
-| 2 | Event sent to Netdata Cloud via ACLK |
-| 3 | Cloud processes through configured integrations |
-| 4 | Notifications sent to Slack, Teams, webhooks |
-
-**Pros:**
-- Centralized management of notification settings
-- Integrations with Cloud-native tools (Slack, Teams, webhooks)
-- Personal and space-wide notification rules
-
-**Cons:**
-- Requires Cloud connectivity
-- Additional latency (events travel to Cloud first)
+| Pros | Cons |
+|------|------|
+| Centralized management of notification settings | Requires Cloud connectivity |
+| Integrations with Cloud-native tools (Slack, Teams, webhooks) | Additional latency (events travel to Cloud first) |
+| Personal and space-wide notification rules | |
 
 ## 5.1.2 Which Model Should You Use?
 
