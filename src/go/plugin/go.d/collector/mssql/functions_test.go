@@ -162,17 +162,19 @@ func TestCollector_buildMSSQLDynamicSQL(t *testing.T) {
 	c := &Collector{}
 
 	cols := []mssqlColumnMeta{
-		{dbColumn: "query_hash", uiKey: "queryHash", dataType: "string", isIdentity: true},
-		{dbColumn: "query_sql_text", uiKey: "query", dataType: "string", isIdentity: true},
-		{dbColumn: "database_name", uiKey: "database", dataType: "string", isIdentity: true},
-		{dbColumn: "count_executions", uiKey: "calls", dataType: "integer"},
-		{dbColumn: "avg_duration", uiKey: "totalTime", dataType: "duration", isMicroseconds: true},
+		{dbColumn: "query_hash", alias: "query_hash", uiKey: "queryHash", dataType: "string", isIdentity: true},
+		{dbColumn: "query_sql_text", alias: "query", uiKey: "query", dataType: "string", isIdentity: true},
+		{dbColumn: "database_name", alias: "database", uiKey: "database", dataType: "string", isIdentity: true},
+		{dbColumn: "count_executions", alias: "calls", uiKey: "calls", dataType: "integer"},
+		{dbColumn: "avg_duration", alias: "total_time", uiKey: "totalTime", dataType: "duration", isMicroseconds: true},
 	}
 
+	// Note: sortColumn here is the uiKey which gets mapped to alias in buildMSSQLDynamicSQL
 	sql := c.buildMSSQLDynamicSQL(cols, "totalTime", 7, 500)
 
 	assert.Contains(t, sql, "sys.query_store_query")
-	assert.Contains(t, sql, "total_time")
+	assert.Contains(t, sql, "AS total_time")
+	assert.Contains(t, sql, "ORDER BY total_time DESC")
 	assert.Contains(t, sql, "TOP 500")
 	assert.Contains(t, sql, "DATEADD")
 	assert.Contains(t, sql, "q.query_hash")
@@ -182,14 +184,15 @@ func TestCollector_buildMSSQLDynamicSQL_NoTimeFilter(t *testing.T) {
 	c := &Collector{}
 
 	cols := []mssqlColumnMeta{
-		{dbColumn: "query_hash", uiKey: "queryHash", dataType: "string", isIdentity: true},
-		{dbColumn: "count_executions", uiKey: "calls", dataType: "integer"},
+		{dbColumn: "query_hash", alias: "query_hash", uiKey: "queryHash", dataType: "string", isIdentity: true},
+		{dbColumn: "count_executions", alias: "calls", uiKey: "calls", dataType: "integer"},
 	}
 
 	sql := c.buildMSSQLDynamicSQL(cols, "calls", 0, 500)
 
 	assert.Contains(t, sql, "sys.query_store_query")
 	assert.Contains(t, sql, "TOP 500")
+	assert.Contains(t, sql, "ORDER BY calls DESC")
 	assert.NotContains(t, sql, "DATEADD")
 }
 

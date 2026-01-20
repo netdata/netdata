@@ -78,30 +78,30 @@ func TestCollector_mapAndValidateMySQLSortColumn(t *testing.T) {
 		input         string
 		expected      string
 	}{
-		"totalTime maps to SUM_TIMER_WAIT": {
+		"totalTime maps to total_time alias": {
 			availableCols: map[string]bool{"SUM_TIMER_WAIT": true, "COUNT_STAR": true},
 			input:         "totalTime",
-			expected:      "SUM_TIMER_WAIT",
+			expected:      "total_time",
 		},
-		"calls maps to COUNT_STAR": {
+		"calls maps to calls alias": {
 			availableCols: map[string]bool{"SUM_TIMER_WAIT": true, "COUNT_STAR": true},
 			input:         "calls",
-			expected:      "COUNT_STAR",
+			expected:      "calls",
 		},
-		"invalid column falls back to SUM_TIMER_WAIT": {
+		"invalid column falls back to total_time alias": {
 			availableCols: map[string]bool{"SUM_TIMER_WAIT": true, "COUNT_STAR": true},
 			input:         "invalid_column",
-			expected:      "SUM_TIMER_WAIT",
+			expected:      "total_time",
 		},
-		"SQL injection attempt falls back to SUM_TIMER_WAIT": {
+		"SQL injection attempt falls back to total_time alias": {
 			availableCols: map[string]bool{"SUM_TIMER_WAIT": true, "COUNT_STAR": true},
 			input:         "'; DROP TABLE users;--",
-			expected:      "SUM_TIMER_WAIT",
+			expected:      "total_time",
 		},
-		"falls back to COUNT_STAR when SUM_TIMER_WAIT unavailable": {
+		"falls back to calls alias when SUM_TIMER_WAIT unavailable": {
 			availableCols: map[string]bool{"COUNT_STAR": true},
 			input:         "invalid_column",
-			expected:      "COUNT_STAR",
+			expected:      "calls",
 		},
 	}
 
@@ -164,20 +164,22 @@ func TestCollector_buildMySQLDynamicSQL(t *testing.T) {
 	c := &Collector{}
 
 	cols := []mysqlColumnMeta{
-		{dbColumn: "DIGEST", uiKey: "digest", dataType: "string"},
-		{dbColumn: "DIGEST_TEXT", uiKey: "query", dataType: "string"},
-		{dbColumn: "COUNT_STAR", uiKey: "calls", dataType: "integer"},
-		{dbColumn: "SUM_TIMER_WAIT", uiKey: "totalTime", dataType: "duration", isPicoseconds: true},
+		{dbColumn: "DIGEST", alias: "digest", uiKey: "digest", dataType: "string"},
+		{dbColumn: "DIGEST_TEXT", alias: "query", uiKey: "query", dataType: "string"},
+		{dbColumn: "COUNT_STAR", alias: "calls", uiKey: "calls", dataType: "integer"},
+		{dbColumn: "SUM_TIMER_WAIT", alias: "total_time", uiKey: "totalTime", dataType: "duration", isPicoseconds: true},
 	}
 
-	sql := c.buildMySQLDynamicSQL(cols, "SUM_TIMER_WAIT", 500)
+	sql := c.buildMySQLDynamicSQL(cols, "total_time", 500)
 
 	assert.Contains(t, sql, "performance_schema.events_statements_summary_by_digest")
-	assert.Contains(t, sql, "SUM_TIMER_WAIT")
+	assert.Contains(t, sql, "ORDER BY total_time DESC")
 	assert.Contains(t, sql, "LIMIT 500")
-	assert.Contains(t, sql, "DIGEST")
+	assert.Contains(t, sql, "AS digest")
+	assert.Contains(t, sql, "AS calls")
+	assert.Contains(t, sql, "AS total_time")
 	// Picosecond columns should have conversion
-	assert.Contains(t, sql, "SUM_TIMER_WAIT/1000000000")
+	assert.Contains(t, sql, "SUM_TIMER_WAIT/1000000000 AS total_time")
 }
 
 func TestCollector_buildMySQLDynamicColumns(t *testing.T) {
@@ -247,8 +249,8 @@ func TestSortColumnValidation_SQLInjection(t *testing.T) {
 
 	for _, input := range maliciousInputs {
 		result := c.mapAndValidateMySQLSortColumn(input, availableCols)
-		// All malicious inputs should fall back to safe default
-		assert.True(t, result == "SUM_TIMER_WAIT" || result == "COUNT_STAR",
-			"malicious input should fall back to safe default: %s -> %s", input, result)
+		// All malicious inputs should fall back to safe default (aliases)
+		assert.True(t, result == "total_time" || result == "calls",
+			"malicious input should fall back to safe default alias: %s -> %s", input, result)
 	}
 }
