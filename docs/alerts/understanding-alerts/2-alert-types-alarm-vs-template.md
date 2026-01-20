@@ -98,6 +98,24 @@ template: 1m_received_traffic_overflow
     crit: $this > (($status >= $WARNING) ? (95) : (98))
 ```
 
+:::note
+
+**Important:** The template above applies to **all** network interfaces. To restrict it to a specific chart like `eth0`, use additional scoping:
+
+```conf
+template: eth0_inbound_utilization
+    on: net.net
+    families: eth0  # Restrict to eth0 interface only
+    lookup: average -1m unaligned absolute of received
+    units: Mbits
+    warn: $this > 80
+    crit: $this > 90
+```
+
+Or use `host:` labels to target a specific host's network interfaces.
+
+:::
+
 ## Key Takeaways
 
 - **`template`** is the **recommended and future-proof** way to define alerts
