@@ -56,6 +56,7 @@ void do_PerflibMSSQL_cleanup();
 void do_GetHardwareInfo_cleanup();
 void do_Sensors_cleanup();
 void do_GetServicesStatus_cleanup();
+void do_GetSystemCPU_cleanup();
 
 enum MSSQL_REPLICATION_WARNINGS {
     MSSQL_REPLICATON_EXPIRATION = 1 << 0,
