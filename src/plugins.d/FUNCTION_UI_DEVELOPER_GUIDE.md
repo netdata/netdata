@@ -875,9 +875,12 @@ For errors, return:
 ```json
 {
   "status": 400,
-  "error_message": "Descriptive error message"
+  "errorMessage": "Descriptive error message"
 }
 ```
+
+**Compatibility note (cloud-frontend):**
+- The Functions UI expects `errorMessage` (camelCase) and does **not** camelize error payloads.
 
 ### Performance Optimization
 

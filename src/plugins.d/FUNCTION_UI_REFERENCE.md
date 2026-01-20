@@ -110,10 +110,21 @@ GET /api/v3/function?function=systemd-journal info after:1234567890 before:12345
 ```
 
 **Frontend Processing:**
-- `accepted_params`: Validates which parameters can be sent to function
+- `accepted_params`: **drives outgoing payload** (only params in this list are sent). When facets are selected, filters are restricted to `accepted_params` plus required param IDs.
 - `required_params`: Generates filter UI, prevents execution if missing
 - `v: 3`: Enables POST requests with JSON payloads
 - Missing required parameters show user-friendly error messages
+
+**Parameter shapes (wire format):**
+- `accepted_params`: array of **strings** (parameter IDs). Example: `["sockets"]`, `["group"]`.
+- `required_params`: array of **objects** that define UI selectors.
+  - Required fields: `id`, `name`, `type`, `options`
+  - Common fields: `help`, `unique_view`
+  - `options[]`: `id`, `name`, optional `defaultSelected`, `disabled`, `sort`
+
+**Cloud-frontend UI notes (verified):**
+- `type: "select"` renders as a **single-select**.
+- If no `defaultSelected`, UI selects the **first** option by default.
 
 ### Backend Implementation
 
@@ -283,16 +294,22 @@ Row 3: message="error info", category="testing"
       "visible": true,            // Default visibility
       "sticky": false,            // Pin when scrolling
       "visualization": "value",   // How to render
-      "transform": "none",        // Value transformation
-      "decimal_points": 2,        // For numbers
-      "units": "bytes",           // Display units
+      "value_options": {          // Value formatting options
+        "units": "bytes",
+        "transform": "none",
+        "decimal_points": 2,
+        "default_value": ""
+      },
       "max": 100,                 // For bar types
+      "pointer_to": "col_id",     // Optional reference target
       "sort": "descending",       // Default sort
       "sortable": true,           // User can sort
       "filter": "multiselect",    // Filter type
       "full_width": false,        // Expand to fill
       "wrap": false,              // Text wrapping
-      "summary": "sum"            // Aggregation (backend only)
+      "default_expanded_filter": false,
+      "summary": "sum",           // Aggregation (backend only)
+      "dummy": false              // True for hidden/internal columns
     }
   },
   
@@ -315,13 +332,19 @@ Row 3: message="error info", category="testing"
       "columns": ["col1", "col2"]
     }
   },
-  "accepted_params": [{
-    "id": "param_id",
-    "name": "Parameter Name",
-    "type": "string|integer|boolean",
-    "default": "default_value"
-  }],
-  "required_params": ["param1", "param2"]
+  "accepted_params": ["param_id"],
+  "required_params": [
+    {
+      "id": "param_id",
+      "name": "Parameter Name",
+      "type": "select",
+      "unique_view": true,
+      "options": [
+        {"id": "opt1", "name": "Option 1", "defaultSelected": true},
+        {"id": "opt2", "name": "Option 2"}
+      ]
+    }
+  ]
 }
 ```
 
@@ -772,6 +795,8 @@ To add aggregated count support to a function:
 **Fallback Behavior**: `gauge` is not a recognized visualization. If used, it is ignored, and the renderer falls back to using the field's `type` to select a component.
 
 ### Transform Types (RRDF_FIELD_TRANSFORM_*)
+
+**JSON path:** `columns[*].value_options.transform` (and `columns[*].value_options.decimal_points` for numeric formatting).
 
 | Type | Input | Output | Notes |
 |------|-------|--------|-------|
@@ -1370,18 +1395,26 @@ Frontend handles 304 responses gracefully without showing errors to users.
 - `update_every`: Default 1
 - `expires`: Cache control
 - `default_sort_column`: Initial sort
+- `accepted_params`, `required_params`: Some backends include these in data responses (e.g., go.d functions)
 - All column options except `index`, `name`, `type`
+
+### UI-required fields (cloud-frontend)
+- **Info response**: `v`, `type`, `has_history`, `accepted_params`, `required_params`, `help`
+- **Data response**: `type`, `columns`, `data`
+- **Error response**: `errorMessage` (camelCase) is used by the Functions UI
+
+**Note on casing:** cloud-frontend camelizes **successful** responses (info/data) before use, but **does not** camelize error payloads.
 
 ## Error Handling
 
 ### Error Response Format
 
-When a function encounters an error, the backend returns a JSON object. The primary error generation function (`rrd_call_function_error`) produces the following minimal format:
+When a function encounters an error, the backend returns a JSON object. The primary error generator (`rrd_call_function_error`) produces the following minimal format:
 
 ```json
 {
-  "status": 400,                  // The HTTP status code (e.g., 400, 404, 500)
-  "error_message": "A descriptive error message" // A human-readable message explaining the error
+  "status": 400,                        // The HTTP status code (e.g., 400, 404, 500)
+  "errorMessage": "A descriptive error message"
 }
 ```
 
@@ -1389,15 +1422,18 @@ When a function encounters an error, the backend returns a JSON object. The prim
 The frontend is designed to handle a more comprehensive error structure, allowing for richer error display and localization. When an error occurs, the frontend will attempt to extract information from the received error object using the following hierarchy:
 
 *   **`status`**: The HTTP status code, used for general error classification (e.g., 400 for bad request, 404 for not found).
-*   **`error_message`**: The primary detailed message from the backend. This is the most consistently populated field by current backend functions.
+*   **`errorMessage`**: Primary detailed message used by the cloud-frontend Functions UI.
 *   **`error`**: A short, machine-readable error identifier (e.g., "MissingParameter"). While not consistently generated by `rrd_call_function_error`, other parts of the system or future backend implementations might provide this.
-*   **`message`**: A user-friendly message. The frontend often maps `error_message` or an internal `errorMsgKey` to this for display.
+*   **`message`**: A user-friendly message. The frontend often maps `errorMessage` or an internal `errorMsgKey` to this for display.
 *   **`help`**: Optional additional guidance for resolving the error. This field is not currently generated by `rrd_call_function_error`.
 
-**Example of Frontend Interpretation (Conceptual):**
-The frontend might internally map specific `error_message` strings to predefined `errorMsgKey` values to provide localized or more context-specific messages to the user. For instance, a backend `error_message` like "The 'time_range' parameter is required" might be mapped to an `errorMsgKey` of "ErrMissingTimeRange" in the frontend, which then displays a user-friendly message like "Please specify a time range for this function."
+**Compatibility note (cloud-frontend):**
+- Cloud-frontend Functions UI expects `errorMessage` (camelCase) and does **not** camelize error payloads.
 
-Therefore, while the backend currently provides `status` and `error_message`, developers should be aware that the frontend's error handling is capable of utilizing the more detailed fields (`error`, `message`, `help`) if they are provided by the backend in the future or by other API endpoints.
+**Example of Frontend Interpretation (Conceptual):**
+The frontend might internally map specific `errorMessage` strings to predefined `errorMsgKey` values to provide localized or more context-specific messages to the user. For instance, a backend `errorMessage` like "The 'time_range' parameter is required" might be mapped to an `errorMsgKey` of "ErrMissingTimeRange" in the frontend, which then displays a user-friendly message like "Please specify a time range for this function."
+
+Therefore, while the backend currently provides `status` and `errorMessage`, developers should be aware that the frontend's error handling is capable of utilizing the more detailed fields (`error`, `message`, `help`) if they are provided by the backend in the future or by other API endpoints.
 
 **Common Error Codes:**
 
