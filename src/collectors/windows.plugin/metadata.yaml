@@ -3102,18 +3102,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: request
-            - name: ad.dra_replication_sync_objects_remaining
-              description: DRA replication full sync objects remaining
-              unit: objects
-              chart_type: line
-              dimensions:
-                - name: object
-            - name: ad.dra_replication_sync_objects_remaining
-              description: DRA replication full sync objects remaining
-              unit: objects
-              chart_type: line
-              dimensions:
-                - name: object
             - name: ad.name_cache_hits
               description: Name cache hits
               unit: hits/s
