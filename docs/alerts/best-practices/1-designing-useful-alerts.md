@@ -3,7 +3,9 @@
 Effective alerting requires balancing multiple concerns: detecting problems quickly, avoiding noise that causes fatigue, and ensuring that alerts drive meaningful action. This chapter provides guidance derived from operational experience across thousands of Netdata deployments.
 
 :::tip
+
 Before creating any alert, complete this sentence: "When this alert fires, **[specific person]** will **[specific action]** within **[specific timeframe]**." If you cannot complete the sentence, reconsider whether the alert serves a purpose.
+
 :::
 
 ## 12.1.1 Principles of Effective Alert Design
