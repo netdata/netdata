@@ -191,6 +191,11 @@
 - Chore(go.d/mssql): remove collect_ options ([#21586](https://github.com/netdata/netdata/issues/21586))
 - Regenerate integrations docs ([#21587](https://github.com/netdata/netdata/issues/21587))
 - Chore(go.d/mssql): ignore internal SQL Server databases ([#21588](https://github.com/netdata/netdata/issues/21588))
+- Build(deps): bump github.com/microsoft/go-mssqldb from 1.9.5 to 1.9.6 in /src/go ([#21590](https://github.com/netdata/netdata/issues/21590))
+- Build(deps): bump azure/trusted-signing-action from 0.5.11 to 1.0.0 ([#21589](https://github.com/netdata/netdata/issues/21589))
+- Add health database check before processing alerts and saving logs ([#21592](https://github.com/netdata/netdata/issues/21592))
+- Send node info when node is switched to ephemeral ([#21456](https://github.com/netdata/netdata/issues/21456))
+- Use static buffer for saving daemon status ([#21593](https://github.com/netdata/netdata/issues/21593))
 
 ## [2.8.0] - 2025-11-19
 
