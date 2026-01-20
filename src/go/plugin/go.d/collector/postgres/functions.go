@@ -60,7 +60,7 @@ var pgAllColumns = []pgColumnMeta{
 	// Core identification columns (always present)
 	{dbColumn: "s.queryid::text", alias: "queryid", uiKey: "queryid", displayName: "Query ID", dataType: "string", visible: false, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isUniqueKey: true},
 	{dbColumn: "s.query", uiKey: "query", displayName: "Query", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect", isSticky: true, fullWidth: true},
-	{dbColumn: "d.datname", alias: "database", uiKey: "database", displayName: "Database", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
+	{dbColumn: "d.datname", alias: "database_name", uiKey: "database", displayName: "Database", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
 	{dbColumn: "u.usename", alias: "username", uiKey: "user", displayName: "User", dataType: "string", visible: true, transform: "none", sortDir: "ascending", summary: "count", filter: "multiselect"},
 
 	// Execution count (always present)
@@ -380,7 +380,7 @@ func (c *Collector) buildAvailableColumns(availableCols map[string]bool) []pgCol
 
 		// Check if column exists (either directly or via join)
 		// Join columns (datname, usename) come from other tables
-		isJoinCol := col.alias == "database" || col.alias == "username"
+		isJoinCol := col.alias == "database_name" || col.alias == "username"
 		if isJoinCol || availableCols[actualColName] {
 			// Create a copy with the actual column name for this version
 			colCopy := col
