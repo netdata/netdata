@@ -282,6 +282,7 @@ static void logger_event_loop(void *arg) {
             write_entry(&cmd.entry);
             entry_free_allocated(&cmd.entry);
             __atomic_add_fetch(&ev->entries_processed, 1, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&ev->current_queue_depth, 1, __ATOMIC_RELAXED);
         } else if (cmd.sync.completion) {
             completion_mark_complete(cmd.sync.completion);
         }
@@ -391,8 +392,14 @@ bool nd_log_queue_enabled(void) {
 }
 
 bool nd_log_queue_enqueue(struct nd_log_queue_entry *entry) {
-    if (!nd_log_queue_enabled())
+    if (!nd_log_queue_enabled()) {
+        // Not accepting entries - free any allocated buffer to prevent leak
+        if (entry->message_allocated) {
+            freez(entry->message_allocated);
+            entry->message_allocated = NULL;
+        }
         return false;
+    }
 
     struct nd_log_queue_cmd cmd = {
         .opcode = ND_LOG_OP_ENTRY,

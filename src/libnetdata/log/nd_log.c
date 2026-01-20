@@ -247,9 +247,10 @@ static bool nd_logger_log_fields_async(FILE *fp __maybe_unused, bool limit, ND_L
 
     // Format the message based on output method
     // Note: NDLM_JOURNAL is not supported async - it goes through sync path
+    // Note: NDLM_STDOUT/STDERR are remapped to NDLM_FILE by select_output()
     CLEAN_BUFFER *wb = buffer_create(1024, NULL);
 
-    if(output == NDLM_FILE || output == NDLM_STDOUT || output == NDLM_STDERR) {
+    if(output == NDLM_FILE) {
         if(source->format == NDLF_JSON)
             nd_logger_json(wb, fields, fields_max);
         else
@@ -309,7 +310,8 @@ static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LO
     // Try async logging if available and appropriate
     if(nd_log_queue_enabled()) {
         // For methods we support asynchronously
-        if(output == NDLM_FILE || output == NDLM_STDOUT || output == NDLM_STDERR || output == NDLM_SYSLOG) {
+        // Note: NDLM_STDOUT/STDERR are remapped to NDLM_FILE by select_output()
+        if(output == NDLM_FILE || output == NDLM_SYSLOG) {
             // Skip async if using a fallback FILE* that differs from what the source provides.
             // This happens when journal/ETW/WEL isn't initialized and select_output() remaps
             // to stderr. The async path looks up fp from source->fp at write time, but for
