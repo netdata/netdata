@@ -214,7 +214,8 @@ func (c *Collector) detectMSSQLQueryStoreColumns(ctx context.Context) (map[strin
 		if err := rows.Scan(&colName); err != nil {
 			return nil, fmt.Errorf("failed to scan column name: %w", err)
 		}
-		cols[colName] = true
+		// Normalize to lowercase for case-insensitive comparison
+		cols[strings.ToLower(colName)] = true
 	}
 
 	if err := rows.Err(); err != nil {
