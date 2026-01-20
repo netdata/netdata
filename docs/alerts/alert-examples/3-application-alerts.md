@@ -4,13 +4,13 @@ These templates demonstrate application-specific monitoring using contexts provi
 
 :::tip
 
-To see more application alerts, visit the [Collectors list](https://learn.netdata.cloud/docs/collecting-metrics/collectors-configuration) on learn.netdata.cloud.
+To see more application alerts, visit the [Collectors list](/docs/collecting-metrics/collectors-configuration) on learn.netdata.cloud.
 
 :::
 
 ## 6.3.1 MySQL Alerts
 
-- [MySQL & MariaDB](https://learn.netdata.cloud/docs/data-collection/monitor-anything/Databases/MySQL) - replication lag, slow queries, connection utilization
+- [MySQL & MariaDB](/docs/src/go/plugin/go.d/collector/mysql/README.md) - replication lag, slow queries, connection utilization
 
 ```conf
 template: mysql_10s_slow_queries
@@ -26,7 +26,7 @@ lookup: sum -10s of slow_queries
 
 ## 6.3.2 PostgreSQL Alerts
 
-- [PostgreSQL](https://learn.netdata.cloud/docs/data-collection/databases/postgresql) - deadlocks, connection utilization, replication lag
+- [PostgreSQL](/docs/src/go/plugin/go.d/collector/postgres/README.md) - deadlocks, connection utilization, replication lag
 
 ```conf
 template: postgres_db_deadlocks_rate
@@ -40,7 +40,7 @@ lookup: average -5m of deadlocks
 
 ## 6.3.3 Redis Alerts
 
-- [Redis](https://learn.netdata.cloud/docs/data-collection/monitor-anything/Databases/Redis) - memory pressure, eviction rates
+- [Redis](/docs/src/go/plugin/go.d/collector/redis/README.md) - memory pressure, eviction rates
 
 ```conf
 template: redis_connections_rejected
