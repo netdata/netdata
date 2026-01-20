@@ -1,5 +1,7 @@
 # 8.1 Hysteresis and Status-Based Conditions
 
+Hysteresis prevents alert flapping by using different thresholds for entering and clearing states based on current alert status.
+
 ## 8.1.1 The Problem with Simple Thresholds
 
 ```conf

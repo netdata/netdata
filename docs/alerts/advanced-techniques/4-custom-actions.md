@@ -1,5 +1,7 @@
 # 8.4 Custom Actions with `exec`
 
+The `exec` line triggers external scripts when alerts fire, enabling automation like paging systems or incident response workflows.
+
 ## 8.4.1 Basic exec Syntax
 
 ```conf

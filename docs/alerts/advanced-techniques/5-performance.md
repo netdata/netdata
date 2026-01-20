@@ -1,5 +1,7 @@
 # 8.5 Performance Considerations
 
+Balance alert responsiveness with resource usage by tuning evaluation frequency, lookup windows, and alert counts.
+
 ## 8.5.1 What Affects Performance
 
 | Factor | Impact | Recommendation |
