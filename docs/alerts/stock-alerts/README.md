@@ -1,4 +1,4 @@
-# 6: Stock Alerts
+# 11: Stock Alerts
 
 Netdata ships with a comprehensive library of pre-configured alerts covering system resources, applications, containers, and hardware monitoring. These alerts are enabled by default and require no configuration to provide immediate visibility into common problems.
 
@@ -12,14 +12,14 @@ Stock alerts follow the principle of conservative defaults. They are tuned to de
 
 | Section | Focus Area |
 |---------|------------|
-| **[6.1 System Resource Alerts](#61-system-resource-alerts)** | CPU, memory, disk space, network, load averages |
-| **[6.2 Container Alerts](#62-container-and-orchestration-alerts)** | Docker containers, Kubernetes pods, cgroup metrics |
-| **[6.3 Application Alerts](#63-application-alerts)** | MySQL, PostgreSQL, Redis, nginx, Apache, and more |
-| **[6.4 Network Alerts](#64-network-and-connectivity-alerts)** | Interface errors, packet drops, bandwidth utilization |
-| **[6.5 Hardware Alerts](#65-hardware-and-sensor-alerts)** | RAID controllers, UPS battery, SMART disk status |
-| **[6.6 Special Monitors](#66-netdata-infrastructure-and-special-monitors)** | DB engine, web logs, IOPing, 100+ platforms |
+| **[11.1 System Resource Alerts](#111-system-resource-alerts)** | CPU, memory, disk space, network, load averages |
+| **[11.2 Container Alerts](#112-container-and-orchestration-alerts)** | Docker containers, Kubernetes pods, cgroup metrics |
+| **[11.3 Application Alerts](#113-application-alerts)** | MySQL, PostgreSQL, Redis, nginx, Apache, and more |
+| **[11.4 Network Alerts](#114-network-and-connectivity-alerts)** | Interface errors, packet drops, bandwidth utilization |
+| **[11.5 Hardware Alerts](#115-hardware-and-sensor-alerts)** | RAID controllers, UPS battery, SMART disk status |
+| **[11.6 Special Monitors](#116-netdata-infrastructure-and-special-monitors)** | DB engine, web logs, IOPing, 100+ platforms |
 
-## 6.1 System Resource Alerts
+## 11.1 System Resource Alerts
 
 System resource alerts cover the fundamental building blocks of any server: CPU, memory, disk, network, and load. These alerts apply to every Netdata node and provide the baseline monitoring that every infrastructure should have.
 
@@ -96,7 +96,7 @@ Low-level kernel and time synchronization alerts.
 | **semaphores_used** | System V semaphores in use | `ipc.semaphore` | Various |
 | **semaphore_arrays_used** | System V semaphore arrays in use | `ipc.semaphore_array` | Various |
 
-## 6.2 Container and Orchestration Alerts
+## 11.2 Container and Orchestration Alerts
 
 Container and orchestration alerts address the unique monitoring requirements of dynamic infrastructure.
 
@@ -151,7 +151,7 @@ Kubernetes node alerts available through kubelet metrics.
 | **kubelet_operations_error** | Kubelet operations error count | `k8s_kubelet.operations` | WARN > 0 |
 | **kubelet_token_requests** | Kubelet token request metrics | `k8s_kubelet.token` | Various |
 
-## 6.3 Application Alerts
+## 11.3 Application Alerts
 
 Application alerts cover databases, web servers, message queues, caching systems, and other infrastructure services. Each application integration includes domain-specific alerts for health, performance, and availability.
 
@@ -250,7 +250,7 @@ Additional infrastructure monitoring.
 | [Fail2Ban](/docs/src/go/plugin/go.d/collector/fail2ban/integrations/fail2ban.md) | Jail status, banned IPs |
 | [Supervisord](/docs/src/go/plugin/go.d/collector/supervisord/integrations/supervisord.md) | Supervised process health |
 
-## 6.4 Network and Connectivity Alerts
+## 11.4 Network and Connectivity Alerts
 
 Network alerts cover interface statistics, endpoint monitoring, firewall state, and connectivity health.
 
@@ -380,7 +380,7 @@ Kernel network processing queue monitoring.
 | **1min_netdev_budget_ran_outs** | Budget run-outs (softirq) | `system.softnet_stat` | WARN > 0 |
 | **10min_netisr_backlog_exceeded** | NetISR queue drops (FreeBSD) | `system.softnet_stat` | WARN > 0 |
 
-## 6.5 Hardware and Sensor Alerts
+## 11.5 Hardware and Sensor Alerts
 
 Hardware monitoring protects physical infrastructure health: storage arrays, power supplies, cooling systems, and drive SMART status.
 
@@ -583,7 +583,7 @@ Metrics export and streaming pipeline health.
 |-------|-------------|---------|------------|
 | **ceph_cluster_physical_capacity_utilization** | Ceph cluster capacity utilization | `ceph.cluster` | WARN > 80%, CRIT > 90% |
 
-## 6.6 Netdata Infrastructure and Special Monitors
+## 11.6 Netdata Infrastructure and Special Monitors
 
 Specialized monitoring for Netdata internals, web logging, I/O latency, and additional platforms.
 
