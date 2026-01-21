@@ -543,7 +543,7 @@ export class ToolOutputExtractor {
       outputFormat: 'pipe',
       stream: this.deps.stream,
       maxTurns: 15,
-      maxToolCallsPerTurn: 3,
+      maxToolCallsPerTurn: 10,
       llmTimeout: this.deps.llmTimeout,
       toolTimeout: this.deps.toolTimeout,
       temperature: this.deps.temperature,
