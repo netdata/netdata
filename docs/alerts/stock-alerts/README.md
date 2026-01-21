@@ -672,7 +672,7 @@ Block device latency measurements and thresholds.
 | [Typesense](/docs/src/go/plugin/go.d/collector/typesense/integrations/typesense.md) | Search requests,latency, memory |
 | [YugaByte DB](/docs/src/go/plugin/go.d/collector/yugabytedb/integrations/yugabytedb.md) | YSQL connections, tablet servers |
 | [MaxScale](/docs/src/go/plugin/go.d/collector/maxscale/integrations/maxscale.md) | MaxScale routers, connections, threads |
-| [Oracledb](/docs/src/go/plugin/go.d/lector/oracledb/integrations/oracledb.md) | PDB status, ASM disk groups |
+| [Oracledb](/docs/src/go/plugin/go.d/collector/oracledb/integrations/oracledb.md) | PDB status, ASM disk groups |
 | [Pika](/docs/src/go/plugin/go.d/collector/pika/integrations/pika.md) | Compaction, memory, compression |
 | [Pulsar](/docs/src/go/plugin/go.d/collector/pulsar/integrations/pulsar.md) | Messages published, replication lag |
 | [Solr](/docs/src/go/plugin/go.d/collector/solr/integrations/solr.md) | Solr core stats, request latency |
