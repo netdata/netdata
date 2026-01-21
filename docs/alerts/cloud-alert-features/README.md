@@ -11,8 +11,6 @@ Netdata Cloud provides centralized features for event monitoring, alert manageme
 | **[10.3 Alert Deduplication](#103-alert-deduplication-and-aggregation)** | Cloud aggregation |
 | **[10.4 Room-Based Alerting](#104-room-based-alerting)** | Room scoping |
 
----
-
 ## 10.1 Events Feed
 
 **A unified stream of all alerts and events across your infrastructure.**
