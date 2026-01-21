@@ -192,7 +192,7 @@ static int kernel_is_rejected()
         if (read_txt_file("/proc/version", version_string, sizeof(version_string))) {
             struct utsname uname_buf;
             if (!uname(&uname_buf)) {
-                netdata_log_info("Cannot check kernel version");
+                collector_info("Cannot check kernel version");
                 return 0;
             }
             version_string_len =
@@ -241,7 +241,7 @@ static int kernel_is_rejected()
             reject_string_len--;
             if (version_string_len >= reject_string_len) {
                 if (!strncmp(version_string, reject_string, reject_string_len)) {
-                    netdata_log_info("A buggy kernel is detected");
+                    collector_info("A buggy kernel is detected");
                     fclose(kernel_reject_list);
                     freez(reject_string);
                     return 1;
@@ -590,7 +590,7 @@ void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *m
                     report->memlock_kern += memsize;
                     report->hash_tables += 1;
 #ifdef NETDATA_DEV_MODE
-                    netdata_log_info(
+                    collector_info(
                         "Hash table %u: %s (FD = %d) is consuming %lu bytes totalizing %lu bytes",
                         report->hash_tables,
                         map->name,
@@ -604,7 +604,7 @@ void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *m
                     report->memlock_kern -= memsize;
                     report->hash_tables -= 1;
 #ifdef NETDATA_DEV_MODE
-                    netdata_log_info(
+                    collector_info(
                         "Hash table %s (FD = %d) was removed releasing %lu bytes, now we have %u tables loaded totalizing %lu bytes.",
                         map->name,
                         map->map_fd,
@@ -682,7 +682,7 @@ void ebpf_update_map_size(
     if (lmap->user_input && lmap->user_input != lmap->internal_input) {
         define_size = lmap->internal_input;
 #ifdef NETDATA_INTERNAL_CHECKS
-        netdata_log_info("Changing map %s from size %u to %u ", map_name, lmap->internal_input, lmap->user_input);
+        collector_info("Changing map %s from size %u to %u ", map_name, lmap->internal_input, lmap->user_input);
 #endif
     } else if (((lmap->type & apps_type) == apps_type) && (!em->apps_charts) && (!em->cgroup_charts)) {
         lmap->user_input = ND_EBPF_DEFAULT_MIN_PID;
@@ -987,7 +987,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
     size_t count_programs = ebpf_count_programs(*obj);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    netdata_log_info("eBPF program %s loaded with success!", lpath);
+    collector_info("eBPF program %s loaded with success!", lpath);
 #endif
 
     return ebpf_attach_programs(*obj, count_programs, em->names);
@@ -1215,7 +1215,7 @@ struct btf *ebpf_load_btf_file(const char *path, const char *filename)
     snprintfz(fullpath, PATH_MAX, "%s/%s", path, filename);
     struct btf *ret = ebpf_parse_btf_file(fullpath);
     if (!ret)
-        netdata_log_info(
+        collector_info(
             "Your environment does not have BTF file %s/%s. The plugin will work with 'legacy' code.", path, filename);
 
     return ret;
@@ -1382,7 +1382,7 @@ void ebpf_update_module_using_config(
         modules->maps_per_core = CONFIG_BOOLEAN_NO;
 
 #ifdef NETDATA_DEV_MODE
-    netdata_log_info(
+    collector_info(
         "The thread %s was configured with: mode = %s; update every = %d; apps = %s; cgroup = %s; ebpf type format = %s; ebpf co-re tracing = %s; collect pid = %s; maps per core = %s, lifetime=%u",
         modules->info.thread_name,
         load_mode,
