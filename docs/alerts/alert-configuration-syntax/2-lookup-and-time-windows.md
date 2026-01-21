@@ -436,5 +436,5 @@ on a handful.
 ## What's Next
 
 - **[3.3 Calculations and Transformations (`calc`, `absolute`, `percentage`, `anomaly-bit`)](3-calculations-and-transformations.md)** explains how to transform lookup results (or build alerts without explicit lookups) using `calc` and related flags
-- **[6.5 Trend and Capacity Alerts](../alert-examples/5-trend-capacity.md)** gives concrete examples of how different time windows change alert behavior in practice
-- **[9.3 Querying Alert Variables and Metadata](../apis-alerts-events/3-inspect-variables.md)** for using the `alarm_variables` API to inspect available dimensions when building lookups
+- **[6.5 Trend and Capacity Alerts](../alert-examples/README.md)** gives concrete examples of how different time windows change alert behavior in practice
+- **[9.3 Querying Alert Variables and Metadata](../apis-alerts-events/README.md)** for using the `alarm_variables` API to inspect available dimensions when building lookups

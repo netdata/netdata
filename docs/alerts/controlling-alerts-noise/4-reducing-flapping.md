@@ -130,12 +130,12 @@ This means:
 - **Entering CRITICAL:** needs >95%
 - **Staying in CRITICAL:** tolerates up to 98%
 
-See **[8.1 Hysteresis and Status-Based Conditions](../essential-patterns/1-hysteresis.md)** for more examples of status-dependent thresholds.
+See **[8.1 Hysteresis and Status-Based Conditions](../essential-patterns/README.md)** for more examples of status-dependent thresholds.
 
 ## 4.4.6 Related Sections
 
-- **[8.1 Hysteresis and Status-Based Conditions](../essential-patterns/1-hysteresis.md)** - Status-aware logic
-- **[7.3 Alert Flapping](../troubleshooting-alerts/flapping.md)** - Debugging and fixing flapping alerts
+- **[8.1 Hysteresis and Status-Based Conditions](../essential-patterns/README.md)** - Status-aware logic
+- **[7.3 Alert Flapping](../troubleshooting-alerts/README.md)** - Debugging and fixing flapping alerts
 - **[5.5 Testing and Troubleshooting](../receiving-notifications/5-testing-troubleshooting.md)** - Verifying notification delivery
 
 ## What's Next

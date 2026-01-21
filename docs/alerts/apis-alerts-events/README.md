@@ -131,10 +131,10 @@ curl -s "https://app.netdata.cloud/api/v2/events?space_id=YOUR_SPACE" \
 
 ## Related Sections
 
-- **[Variables Not Found](../../troubleshooting-alerts/variables-not-found.md)** for troubleshooting
+- **[Variables Not Found](../../troubleshooting-alerts/README.md)** for troubleshooting
 - **[Variables and Special Symbols](../../alert-configuration-syntax/5-variables-and-special-symbols.md)** for reference
 - **[Disabling Alerts](../../controlling-alerts-noise/1-disabling-alerts.md)** for configuration-based disabling
-- **[Events Feed](../cloud-alert-features/1-events-feed.md)** for Cloud UI features
+- **[Events Feed](../cloud-alert-features/README.md)** for Cloud UI features
 - **[Cloud Notifications](../../receiving-notifications/3-cloud-notifications.md)** for Cloud routing
 
 ## What's Next
