@@ -48,8 +48,11 @@ To install and connect to Netdata Cloud in a single step from your terminal:
   </TabItem>
 </Tabs>
 
-> **Tip**
-> Pick **Stable** or **Nightly**: Check the [guide](/docs/netdata-agent/versions-and-platforms.md) for differences.
+:::tip
+
+Pick **Stable** or **Nightly**: Check the [guide](/docs/netdata-agent/versions-and-platforms.md) for differences.
+
+:::
 
 <details><summary>🔍 Where to find your claim token</summary>
 
@@ -90,8 +93,11 @@ These environment variables provide additional customization options (most users
 | `ROOTCMD`           | Command to run with root privileges          | Uses `sudo`, `doas`, or `pkexec` (in order) |
 | `DISABLE_TELEMETRY` | Disable telemetry when set to non-zero value | Telemetry enabled                           |
 
-> [!NOTE]
-> The user running the script needs write and execute permissions in the temporary directory specified by TMPDIR.
+:::note
+
+The user running the script needs write and execute permissions in the temporary directory specified by TMPDIR.
+
+:::
 
 ## Verify Script Integrity
 
