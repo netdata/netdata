@@ -237,51 +237,133 @@ Additional infrastructure monitoring.
 
 ## 6.4 Network and Connectivity Alerts
 
-Network alerts focus on endpoints and services rather than interface statistics.
+Network alerts cover interface statistics, endpoint monitoring, firewall state, and connectivity health.
 
 :::note
 
-Network connectivity alerts require specific endpoints to be configured. Add the hosts, ports, or URLs you want to monitor using the appropriate collector configuration.
+Network connectivity alerts (ping, port check, HTTP) require specific endpoints to be configured. Interface and TCP/UDP alerts apply to all systems.
 
 :::
 
-### Ping and Latency Monitoring
+### ICMP and Latency Monitoring
+
+Host reachability and network latency monitoring.
 
 | Alert | Description | Context | Thresholds |
 |-------|-------------|---------|------------|
-| **ping_host_latency** | Tracks round-trip time | `ping.host_rtt` | WARN > 500ms, CRIT > 1000ms |
-| **ping_packet_loss** | Measures percentage of packets without responses | `ping.host_packet_loss` | WARN > 5%, CRIT > 10% |
-| **ping_host_reachable** | Tracks host reachability status | `ping.host_packet_loss` | CRIT == 0 (not reachable) |
+| **ping_host_latency** | Round-trip time to target host | `ping.host_rtt` | WARN > 500ms, CRIT > 1000ms |
+| **ping_packet_loss** | Percentage of packets without responses | `ping.host_packet_loss` | WARN > 5%, CRIT > 10% |
+| **ping_host_reachable** | Host reachability status | `ping.host_packet_loss` | CRIT == 0 (not reachable) |
 
 ### Port and Service Monitoring
 
+TCP connection testing and service availability.
+
 | Alert | Description | Context | Thresholds |
 |-------|-------------|---------|------------|
-| **portcheck_connection_fails** | Attempts connection to specified port | `portcheck.status` | CRIT > 40% failed |
-| **portcheck_connection_timeouts** | Tracks connection establishment time | `portcheck.status` | WARN > 10% timeout, CRIT > 40% timeout |
-| **portcheck_service_reachable** | Tracks port/service reachability status | `portcheck.status` | CRIT < 75% success |
+| **portcheck_connection_fails** | Failed connection attempts | `portcheck.status` | CRIT > 40% failed |
+| **portcheck_connection_timeouts** | Connection establishment timeouts | `portcheck.status` | WARN > 10% timeout, CRIT > 40% timeout |
+| **portcheck_service_reachable** | Overall service reachability | `portcheck.status` | CRIT < 75% success |
 
 ### SSL Certificate Monitoring
 
-| Alert | Description | Context | Thresholds |
-|-------|-------------|---------|------------|
-| **x509check_days_until_expiration** | Monitors certificate validity period | `x509check.time_until_expiration` | WARN < 14 days, CRIT < 7 days |
-| **x509check_revocation_status** | Tracks SSL/TLS certificate revocation status | `x509check.revocation_status` | CRIT revoked |
-
-### DNS Monitoring
+TLS certificate validity and expiration.
 
 | Alert | Description | Context | Thresholds |
 |-------|-------------|---------|------------|
-| **dns_query_query_status** | Fires when DNS resolution fails entirely | `dns_query.query_status` | WARN != 1 (failed) |
+| **x509check_days_until_expiration** | Days until certificate expires | `x509check.time_until_expiration` | WARN < 14 days, CRIT < 7 days |
+| **x509check_revocation_status** | Certificate revocation status | `x509check.revocation_status` | CRIT revoked |
+| **whoisquery_days_until_expiration** | Domain registration expiry | `whoisquery.days_left` | WARN < 30 days, CRIT < 7 days |
+
+### DNS Resolution Monitoring
+
+DNS query and resolution health.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **dns_query_query_status** | DNS resolution success/failure | `dns_query.query_status` | WARN != 1 (failed) |
+| **unbound_request_list_dropped** | Dropped requests due to cache full | `unbound.request_list` | WARN > 0 |
+| **unbound_request_list_overwritten** | Overwritten cache entries | `unbound.request_list` | WARN > 0 |
 
 ### HTTP Endpoint Monitoring
 
+Web service availability and response validation.
+
 | Alert | Description | Context | Thresholds |
 |-------|-------------|---------|------------|
-| **httpcheck_web_service_bad_status** | Tracks non-2xx responses | `httpcheck.status` | WARN >= 10% bad status, CRIT >= 40% bad status |
-| **httpcheck_web_service_timeouts** | Monitors HTTP request timeouts | `httpcheck.status` | WARN >= 10% timeouts, CRIT >= 40% timeouts |
-| **httpcheck_web_service_up** | Tracks overall HTTP service availability | `httpcheck.status` | CRIT not responding |
-| **httpcheck_web_service_bad_content** | Tracks unexpected HTTP response content | `httpcheck.status` | CRIT bad content |
+| **httpcheck_web_service_bad_status** | Non-2xx HTTP responses | `httpcheck.status` | WARN >= 10% bad, CRIT >= 40% bad |
+| **httpcheck_web_service_timeouts** | HTTP request timeouts | `httpcheck.status` | WARN >= 10% timeout, CRIT >= 40% |
+| **httpcheck_web_service_up** | Overall HTTP service availability | `httpcheck.status` | CRIT not responding |
+| **httpcheck_web_service_bad_content** | Unexpected response content | `httpcheck.status` | CRIT bad content |
+| **httpcheck_web_service_bad_header** | Malformed response headers | `httpcheck.header` | CRIT != 0 |
+| **httpcheck_web_service_no_connection** | Unable to connect | `httpcheck.connect` | CRIT != 0 |
+
+### Network Interface Statistics
+
+Interface-level traffic and error monitoring.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **1m_received_traffic_overflow** | Inbound utilization percentage | `net.net` | WARN > 85%, CRIT > 90% |
+| **1m_sent_traffic_overflow** | Outbound utilization percentage | `net.net` | WARN > 85%, CRIT > 90% |
+| **inbound_packets_dropped_ratio** | Dropped inbound packets ratio | `net.drops` | WARN >= 2% |
+| **outbound_packets_dropped_ratio** | Dropped outbound packets ratio | `net.drops` | WARN >= 2% |
+| **wifi_inbound_packets_dropped_ratio** | WiFi inbound drop ratio | `net.drops` | WARN >= 10% |
+| **wifi_outbound_packets_dropped_ratio** | WiFi outbound drop ratio | `net.drops` | WARN >= 10% |
+| **10min_fifo_errors** | Network FIFO buffer errors | `net.fifo` | WARN > 0 |
+| **1m_received_packets_storm** | Sudden spike in received packets | `net.packets` | WARN > 200%, CRIT > 5000% |
+
+### TCP Connection and Queue Monitoring
+
+Connection pool, queue overflow, and socket statistics.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **tcp_connections** | TCP connections utilization | `ip.tcpsock` | WARN > 60%, CRIT > 80% |
+| **tcp_memory** | TCP memory consumption | `ip.tcpmemory` | Various |
+| **tcp_orphans** | Orphan TCP sockets | `ip.tcporphan` | Various |
+| **1m_tcp_accept_queue_overflows** | TCP accept queue overflows | `ip.tcp_accept_queue` | WARN > 1 |
+| **1m_tcp_accept_queue_drops** | TCP accept queue drops | `ip.tcp_accept_queue` | WARN > 1 |
+| **1m_tcp_syn_queue_drops** | SYN queue drops (no cookies) | `ip.tcp_syn_queue` | CRIT > 0 |
+| **1m_tcp_syn_queue_cookies** | SYN cookies issued | `ip.tcp_syn_queue` | WARN > 1 |
+
+### TCP Reset and Error Rates
+
+Connection failure and reset monitoring.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **1m_ip_tcp_resets_sent** | TCP RSTs sent (1-min avg) | `ip.tcphandshake` | Various |
+| **10s_ip_tcp_resets_sent** | TCP RSTs sent (10-sec burst) | `ip.tcphandshake` | Dynamic threshold |
+| **1m_ip_tcp_resets_received** | TCP RSTs received (1-min avg) | `ip.tcphandshake` | Various |
+| **10s_ip_tcp_resets_received** | TCP RSTs received (10-sec burst) | `ip.tcphandshake` | Dynamic threshold |
+
+### UDP Error Monitoring
+
+UDP buffer and transmission errors.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **1m_ipv4_udp_receive_buffer_errors** | UDP receive buffer errors | `ipv4.udperrors` | WARN > 0 |
+| **1m_ipv4_udp_send_buffer_errors** | UDP send buffer errors | `ipv4.udperrors` | WARN > 0 |
+
+### Firewall and Connection Tracking
+
+Netfilter connection tracking and state.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **netfilter_conntrack_full** | Connection tracker nearly full | `nf.conntrack` | WARN > 90% of max |
+
+### Softnet and Processing Backlogs
+
+Kernel network processing queue monitoring.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **1min_netdev_backlog_exceeded** | Dropped packets (netdev backlog) | `system.softnet_stat` | WARN > 0 |
+| **1min_netdev_budget_ran_outs** | Budget run-outs (softirq) | `system.softnet_stat` | WARN > 0 |
+| **10min_netisr_backlog_exceeded** | NetISR queue drops (FreeBSD) | `system.softnet_stat` | WARN > 0 |
 
 ## 6.5 Hardware and Sensor Alerts
 
