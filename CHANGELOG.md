@@ -196,6 +196,8 @@
 - Add health database check before processing alerts and saving logs ([#21592](https://github.com/netdata/netdata/issues/21592))
 - Send node info when node is switched to ephemeral ([#21456](https://github.com/netdata/netdata/issues/21456))
 - Use static buffer for saving daemon status ([#21593](https://github.com/netdata/netdata/issues/21593))
+- Remove Ubuntu 25.04 from CI and package builds. ([#21519](https://github.com/netdata/netdata/issues/21519))
+- Docs: Add unclaim/reclaim node guide ([#21539](https://github.com/netdata/netdata/issues/21539))
 
 ## [2.8.0] - 2025-11-19
 
