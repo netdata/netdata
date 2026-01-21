@@ -17,6 +17,7 @@ Stock alerts follow the principle of conservative defaults. They are tuned to de
 | **[6.3 Application Alerts](#63-application-alerts)** | MySQL, PostgreSQL, Redis, nginx, Apache, and more |
 | **[6.4 Network Alerts](#64-network-and-connectivity-alerts)** | Interface errors, packet drops, bandwidth utilization |
 | **[6.5 Hardware Alerts](#65-hardware-and-sensor-alerts)** | RAID controllers, UPS battery, SMART disk status |
+| **[6.6 Special Monitors](#66-netdata-infrastructure-and-special-monitors)** | DB engine, web logs, IOPing, 100+ platforms |
 
 ## 6.1 System Resource Alerts
 
