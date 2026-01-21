@@ -686,7 +686,7 @@ Block device latency measurements and thresholds.
 | [TDEngine](/docs/src/go/plugin/go.d/collector/tdengine/integrations/tdengine.md) | TDEngine insert, queries, vgroups |
 | [VictoriaMetrics](/docs/src/go/plugin/go.d/collector/victoriametrics/integrations/victoriametrics.md) | vminsert/vmselect efficiency |
 | [TimescaleDB](/docs/src/go/plugin/go.d/collector/prometheus/integrations/timescaledb.md) | Compression, bgw jobs, tuples |
-| [Crushmap](/docs/src/go/plugin/go.d/collector/crushe/map/integrations/crushmap.md) | Crush map rule analysis |
+| [Crushmap](/docs/src/go/plugin/go.d/collector/crushmap/integrations/crushmap.md) | Crush map rule analysis |
 | [ScaleIO](/docs/src/go/plugin/go.d/collector/scaleio/integrations/scaleio.md) | SDC/MDM connection, storage pools |
 | [EMC PowerPath](/docs/src/go/plugin/go.d/collector/emcpower/integrations/emcpower.md) | PowerPath device paths |
 | [NetApp](/docs/src/go/plugin/go.d/collector/netapp/integrations/netapp.md) | Aggregate, lun, volume utilization |
