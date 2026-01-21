@@ -2,7 +2,7 @@
 
 Netdata provides APIs for querying and managing alerts programmatically.
 
-## 9.1 Query Current Alerts
+## 9.1 Query Active Alerts
 
 The `/api/v1/alarms` endpoint returns all currently active alerts on the agent. Response includes each alert's name, status, current value, and configured threshold.
 
@@ -10,15 +10,12 @@ The `/api/v1/alarms` endpoint returns all currently active alerts on the agent. 
 curl -s "http://localhost:19999/api/v1/alarms" | jq '.'
 ```
 
-### Filter Alerts
+### Filter Results
 
-```bash
-# Get all alerts including cleared
-curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.'
-
-# Get only active alerts (default)
-curl -s "http://localhost:19999/api/v1/alarms" | jq '.'
-```
+| Parameter | Description |
+|-----------|-------------|
+| `(none)` | Returns active WARNING/CRITICAL alerts (default) |
+| `?all=true` | Includes CLEAR alerts in response |
 
 ## 9.2 Alert History
 
@@ -34,6 +31,14 @@ Returns all transitions in the last hour.
 
 ```bash
 curl -s "http://localhost:19999/api/v1/alarm_log?chart=system.cpu" | jq '.'
+```
+
+### Incremental Updates
+
+For polling implementations, use the `after` parameter with the last seen UNIQUEID:
+
+```bash
+curl -s "http://localhost:19999/api/v1/alarm_log?after=LAST_UNIQUEID" | jq '.'
 ```
 
 ## 9.3 Inspect Alert Variables
@@ -57,7 +62,24 @@ curl -s "http://localhost:19999/api/v1/alarm_variables?chart=system.cpu" | jq '.
 }
 ```
 
-## 9.4 Health Management API
+## 9.4 Generate Alert Badges
+
+The `/api/v1/badge.svg` endpoint generates SVG badges showing alert status, suitable for embedding in external dashboards or documentation.
+
+```bash
+curl -s "http://localhost:19999/api/v1/badge.svg?alarm=TEMPLATE_NAME&chart=CHART_NAME" -o alert-badge.svg
+```
+
+### Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `alarm` | Alert or template name |
+| `chart` | Chart name the alert is attached to |
+| `after` | Time window for value calculation (default: -60s) |
+| `label` | Custom label for badge display |
+
+## 9.5 Health Management API
 
 The `/api/v1/manage/health` endpoint provides programmatic control over the health monitoring subsystem, allowing you to enable, disable, or silence alerts individually or globally.
 
@@ -67,9 +89,7 @@ The health management API requires authentication. Use a bearer token with the `
 
 :::
 
-### Enable/Disable Alerts
-
-Valid commands are:
+### Commands
 
 | Command | Description |
 |---------|-------------|
@@ -79,6 +99,8 @@ Valid commands are:
 | `SILENCE` | Silence notifications for specific alarms (requires `alarm=` parameter) |
 | `RESET` | Reset all silencers and re-enable checks |
 | `LIST` | Return current silencer configuration as JSON |
+
+### Examples
 
 ```bash
 # Disable all health checks (requires auth token)
@@ -112,7 +134,7 @@ sudo netdatacli reload-health
 
 This triggers the health subsystem to reload configuration files.
 
-## 9.5 Cloud Events API
+## 9.6 Cloud Events API
 
 The Cloud Events API (`/api/v2/events`) queries alert and event history stored in Netdata Cloud, providing aggregated, multi-node event data that requires authentication.
 
