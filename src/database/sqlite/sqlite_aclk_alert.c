@@ -625,6 +625,9 @@ done:
 
 bool process_alert_pending_queue(RRDHOST *host)
 {
+    if (!REQUIRE_HEALTH_DB_OPEN())
+        return false;
+
     static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
 

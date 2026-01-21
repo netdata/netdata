@@ -945,7 +945,7 @@ bool aclk_host_state_update_auto(RRDHOST *host) {
             live = 1;
             break;
     }
-    aclk_host_state_update(host, live, 1);
+    aclk_host_state_update(host, live, 1, NULL);
     return true;
 }
 
@@ -976,16 +976,23 @@ void aclk_create_node_instance_job(RRDHOST *host)
     aclk_add_job(query);
 }
 
-void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable)
+void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable, struct aclk_sync_completion *sync_completion)
 {
-    if (unlikely(!host))
+    if (unlikely(!host)) {
+        if (sync_completion)
+            aclk_sync_completion_signal(sync_completion);
         return;
+    }
 
     CLAIM_ID claim_id = claim_id_get();
-    if (!claim_id_is_set(claim_id))
+    if (!claim_id_is_set(claim_id)) {
+        if (sync_completion)
+            aclk_sync_completion_signal(sync_completion);
         return;
+    }
 
     aclk_query_t *query = aclk_query_new(NODE_STATE_UPDATE);
+    query->sync_completion = sync_completion;
 
     int32_t hops = rrdhost_ingestion_hops(host);
     node_instance_connection_t node_state_update = {
@@ -1017,15 +1024,21 @@ void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable)
     aclk_add_job(query);
 }
 
-void aclk_host_state_update(RRDHOST *host, int live, int queryable)
+void aclk_host_state_update(RRDHOST *host, int live, int queryable, struct aclk_sync_completion *sync_completion)
 {
-    if (!aclk_online())
+    if (!aclk_online()) {
+        if (sync_completion)
+            aclk_sync_completion_signal(sync_completion);
         return;
+    }
 
-    if (uuid_is_null(host->node_id.uuid))
+    if (uuid_is_null(host->node_id.uuid)) {
         aclk_create_node_instance_job(host);
+        if (sync_completion)
+            aclk_sync_completion_signal(sync_completion);
+    }
     else
-        aclk_update_node_instance_job(host, live, queryable);
+        aclk_update_node_instance_job(host, live, queryable, sync_completion);
 }
 
 void aclk_send_node_instances()
@@ -1034,7 +1047,7 @@ void aclk_send_node_instances()
     dfe_start_reentrant(rrdhost_root_index, host)
     {
         int live = rrdhost_ingestion_status(host) == RRDHOST_INGEST_STATUS_ONLINE ? 1 : 0;
-        aclk_host_state_update(host, live, 1);
+        aclk_host_state_update(host, live, 1, NULL);
     }
     dfe_done(host);
 }
