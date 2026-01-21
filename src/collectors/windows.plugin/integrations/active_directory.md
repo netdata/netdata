@@ -77,8 +77,6 @@ Metrics:
 | ad.dra_replication_pending_syncs | pending | syncs |
 | ad.dra_replication_pending_syncs | pending | syncs |
 | ad.dra_replication_sync_requests | request | requests/s |
-| ad.dra_replication_sync_objects_remaining | object | objects |
-| ad.dra_replication_sync_objects_remaining | object | objects |
 | ad.name_cache_hits | hits | hits/s |
 | ad.ds_threads | thread | threads |
 | ad.ldap_last_bind_time | last_bind | seconds |
