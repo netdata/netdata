@@ -71,11 +71,14 @@ static void cmd_pool_init(struct nd_log_cmd_pool *pool, size_t size) {
 
 static void cmd_pool_destroy(struct nd_log_cmd_pool *pool) {
     // Free any allocated message buffers in remaining commands
-    for (size_t i = 0; i < pool->size; i++) {
-        if (pool->cmds[i].opcode == ND_LOG_OP_ENTRY && pool->cmds[i].entry.message_allocated) {
-            freez(pool->cmds[i].entry.message_allocated);
-            pool->cmds[i].entry.message_allocated = NULL;
+    // Only iterate through valid entries (between tail and head)
+    size_t idx = pool->tail;
+    while (idx != pool->head) {
+        if (pool->cmds[idx].opcode == ND_LOG_OP_ENTRY && pool->cmds[idx].entry.message_allocated) {
+            freez(pool->cmds[idx].entry.message_allocated);
+            pool->cmds[idx].entry.message_allocated = NULL;
         }
+        idx = (idx + 1) % pool->size;
     }
     freez(pool->cmds);
     pool->cmds = NULL;
@@ -106,9 +109,8 @@ static struct nd_log_queue_cmd cmd_pool_pop(struct nd_log_cmd_pool *pool) {
 
     if (pool->tail != pool->head) {
         cmd = pool->cmds[pool->tail];
-        // Clear the slot (important for allocated pointers)
-        pool->cmds[pool->tail].opcode = ND_LOG_OP_NOOP;
-        pool->cmds[pool->tail].entry.message_allocated = NULL;
+        // Clear the entire slot to prevent stale data in the union
+        memset(&pool->cmds[pool->tail], 0, sizeof(pool->cmds[pool->tail]));
         pool->tail = (pool->tail + 1) % pool->size;
     }
 
@@ -136,6 +138,12 @@ static inline void entry_free_allocated(struct nd_log_queue_entry *entry) {
 static void write_entry(struct nd_log_queue_entry *entry) {
     if (!entry || entry->message_len == 0)
         return;
+
+    // Bounds check on source index to prevent out-of-bounds access
+    if (entry->source >= _NDLS_MAX) {
+        fprintf(stderr, "async-logger: invalid source index %d, dropping message\n", entry->source);
+        return;
+    }
 
     const char *message = entry_message(entry);
 
@@ -302,9 +310,11 @@ static void logger_event_loop(void *arg) {
 // ----------------------------------------------------------------------------
 // Public API
 
-bool nd_log_queue_init(void) {
+void nd_log_queue_init(void) {
+    FUNCTION_RUN_ONCE();
+
     if (__atomic_load_n(&log_ev.initialized, __ATOMIC_ACQUIRE))
-        return true;
+        return;
 
     // Initialize command pool
     cmd_pool_init(&log_ev.cmd_pool, ND_LOG_QUEUE_CMD_POOL_SIZE);
@@ -334,14 +344,12 @@ bool nd_log_queue_init(void) {
     if (!log_ev.thread) {
         cmd_pool_destroy(&log_ev.cmd_pool);
         completion_destroy(&log_ev.start_stop_complete);
-        return false;
+        return;
     }
 
     // Wait for initialization to complete
     completion_wait_for(&log_ev.start_stop_complete);
     completion_reset(&log_ev.start_stop_complete);
-
-    return __atomic_load_n(&log_ev.initialized, __ATOMIC_ACQUIRE);
 }
 
 // Timeout in seconds for shutdown wait - prevents indefinite hang if logger thread is dead
@@ -373,13 +381,16 @@ void nd_log_queue_shutdown(void) {
         __atomic_store_n(&log_ev.shutdown_requested, true, __ATOMIC_RELEASE);
         uv_async_send(&log_ev.async);
     }
-    completion_destroy(&shutdown_complete);
 
-    // Join thread
+    // Join thread BEFORE destroying completion - a slow thread might still
+    // call completion_mark_complete() after timeout but before exiting
     if (log_ev.thread) {
         nd_thread_join(log_ev.thread);
         log_ev.thread = NULL;
     }
+
+    // Now safe to destroy - thread has exited and won't access completion
+    completion_destroy(&shutdown_complete);
 
     // Cleanup
     cmd_pool_destroy(&log_ev.cmd_pool);
@@ -424,12 +435,21 @@ bool nd_log_queue_enqueue(struct nd_log_queue_entry *entry) {
     __atomic_add_fetch(&log_ev.bytes_queued, entry->message_len, __ATOMIC_RELAXED);
 
     size_t depth = __atomic_add_fetch(&log_ev.current_queue_depth, 1, __ATOMIC_RELAXED);
-    size_t high = __atomic_load_n(&log_ev.queue_high_water, __ATOMIC_RELAXED);
-    if (depth > high)
-        __atomic_store_n(&log_ev.queue_high_water, depth, __ATOMIC_RELAXED);
 
-    // Wake up logger thread
-    uv_async_send(&log_ev.async);
+    // Update high water mark using CAS loop to handle concurrent updates correctly
+    size_t high = __atomic_load_n(&log_ev.queue_high_water, __ATOMIC_RELAXED);
+    while (depth > high) {
+        if (__atomic_compare_exchange_n(&log_ev.queue_high_water, &high, depth,
+                                        false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+            break;
+        // CAS failed - 'high' now contains the current value, loop will re-check
+    }
+
+    // Wake up logger thread, but only if not shutting down.
+    // If shutdown is in progress, the async handle may be closed/invalid,
+    // and the drain loop will process this entry anyway.
+    if (!__atomic_load_n(&log_ev.shutdown_requested, __ATOMIC_ACQUIRE))
+        uv_async_send(&log_ev.async);
 
     return true;
 }

@@ -74,7 +74,7 @@ struct nd_log_queue_stats {
 
 // Initialize the async logging queue and start the logger thread
 // Returns true on success, false on failure
-bool nd_log_queue_init(void);
+void nd_log_queue_init(void);
 
 // Shutdown the async logging queue
 // Drains all pending messages before returning
