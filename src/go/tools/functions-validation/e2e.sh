@@ -111,7 +111,7 @@ run_info() {
   local output="$WORKDIR/${module}-info.json"
   run "$WORKDIR/go.d.plugin" \
     --config-dir "$WORKDIR/config" \
-    --function "$module" \
+    --function "${module}:top-queries" \
     --function-args info \
     > "$output"
   validate "$output"
@@ -122,8 +122,7 @@ run_top_queries() {
   local output="$WORKDIR/${module}-top-queries.json"
   run "$WORKDIR/go.d.plugin" \
     --config-dir "$WORKDIR/config" \
-    --function "$module" \
-    --function-args __method:top-queries \
+    --function "${module}:top-queries" \
     --function-args __job:local \
     > "$output"
   validate "$output" --min-rows 1

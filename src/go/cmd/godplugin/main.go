@@ -105,9 +105,15 @@ func parseCLI() *cli.Option {
 }
 
 func runFunctionCLI(opts *cli.Option) int {
-	moduleName := strings.TrimSpace(opts.Function)
-	if moduleName == "" {
-		writeFunctionError(400, "missing function name")
+	functionName := strings.TrimSpace(opts.Function)
+	if functionName == "" {
+		writeFunctionError(400, "missing function name (expected module:method)")
+		return 1
+	}
+
+	moduleName, methodID, err := functions.SplitFunctionName(functionName)
+	if err != nil {
+		writeFunctionError(400, "%v", err)
 		return 1
 	}
 
@@ -118,6 +124,10 @@ func runFunctionCLI(opts *cli.Option) int {
 	}
 	if creator.Methods == nil {
 		writeFunctionError(404, "module '%s' does not expose functions", moduleName)
+		return 1
+	}
+	if methodID == "" {
+		writeFunctionError(400, "missing method name in function '%s'", functionName)
 		return 1
 	}
 
@@ -186,13 +196,13 @@ func runFunctionCLI(opts *cli.Option) int {
 	}
 
 	fn := functions.Function{
-		Name:        moduleName,
+		Name:        functionName,
 		Args:        opts.FunctionArgs,
 		Payload:     payloadBytes,
 		Timeout:     timeout,
 		ContentType: "application/json",
 	}
-	jobMgr.ExecuteFunction(moduleName, fn)
+	jobMgr.ExecuteFunction(functionName, fn)
 
 	return 0
 }

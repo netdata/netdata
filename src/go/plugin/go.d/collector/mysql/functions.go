@@ -167,6 +167,22 @@ func mysqlMethods() []module.MethodConfig {
 	}}
 }
 
+func mysqlMethodParams(ctx context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
+	collector, ok := job.Module().(*Collector)
+	if !ok {
+		return nil, fmt.Errorf("invalid module type")
+	}
+	if collector.db == nil {
+		return nil, fmt.Errorf("collector is still initializing")
+	}
+	switch method {
+	case "top-queries":
+		return collector.topQueriesParams(ctx)
+	default:
+		return nil, fmt.Errorf("unknown method: %s", method)
+	}
+}
+
 // mysqlHandleMethod handles function requests for MySQL
 func mysqlHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
 	collector, ok := job.Module().(*Collector)
@@ -422,6 +438,41 @@ func (c *Collector) buildMySQLDynamicSortOptions(cols []mysqlColumnMeta) []funca
 	return sortOpts
 }
 
+func (c *Collector) topQueriesSortParam(cols []mysqlColumnMeta) (funcapi.ParamConfig, []funcapi.ParamOption) {
+	sortOptions := c.buildMySQLDynamicSortOptions(cols)
+	sortParam := funcapi.ParamConfig{
+		ID:         paramSort,
+		Name:       "Filter By",
+		Help:       "Select the primary sort column",
+		Selection:  funcapi.ParamSelect,
+		Options:    sortOptions,
+		UniqueView: true,
+	}
+	return sortParam, sortOptions
+}
+
+func (c *Collector) topQueriesParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
+	available, err := c.checkPerformanceSchema(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !available {
+		return nil, fmt.Errorf("performance_schema is not enabled")
+	}
+
+	availableCols, err := c.detectMySQLStatementsColumns(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cols := c.buildAvailableMySQLColumns(availableCols)
+	if len(cols) == 0 {
+		return nil, fmt.Errorf("no columns available in events_statements_summary_by_digest")
+	}
+
+	sortParam, _ := c.topQueriesSortParam(cols)
+	return []funcapi.ParamConfig{sortParam}, nil
+}
+
 // mysqlRowScanner interface for testing
 type mysqlRowScanner interface {
 	Next() bool
@@ -492,15 +543,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	}
 
 	// Build dynamic sort options from available columns (only those actually detected)
-	sortOptions := c.buildMySQLDynamicSortOptions(cols)
-	sortParam := funcapi.ParamConfig{
-		ID:         paramSort,
-		Name:       "Filter By",
-		Help:       "Select the primary sort column",
-		Selection:  funcapi.ParamSelect,
-		Options:    sortOptions,
-		UniqueView: true,
-	}
+	sortParam, sortOptions := c.topQueriesSortParam(cols)
 
 	// Find default sort column UI key
 	defaultSort := ""

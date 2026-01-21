@@ -76,6 +76,11 @@ type (
 		// If Methods is non-nil, this module provides functions
 		Methods func() []MethodConfig
 
+		// Optional: MethodParams returns dynamic required params for a job+method.
+		// Use this to provide job-specific options (e.g., based on DB capabilities).
+		// When nil, MethodConfig.RequiredParams is used as-is.
+		MethodParams func(ctx context.Context, job *Job, method string) ([]funcapi.ParamConfig, error)
+
 		// HandleMethod handles a function request for a specific job
 		// ctx: context with timeout from function request
 		// job: the job instance to query

@@ -190,6 +190,22 @@ func mssqlMethods() []module.MethodConfig {
 	}}
 }
 
+func mssqlMethodParams(ctx context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
+	collector, ok := job.Module().(*Collector)
+	if !ok {
+		return nil, fmt.Errorf("invalid module type")
+	}
+	if collector.db == nil {
+		return nil, fmt.Errorf("collector is still initializing")
+	}
+	switch method {
+	case "top-queries":
+		return collector.topQueriesParams(ctx)
+	default:
+		return nil, fmt.Errorf("unknown method: %s", method)
+	}
+}
+
 // mssqlHandleMethod handles function requests for MSSQL
 func mssqlHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
 	collector, ok := job.Module().(*Collector)
@@ -555,6 +571,38 @@ func (c *Collector) buildMSSQLDynamicSortOptions(cols []mssqlColumnMeta) []funca
 	return sortOpts
 }
 
+func (c *Collector) topQueriesSortParam(cols []mssqlColumnMeta) (funcapi.ParamConfig, []funcapi.ParamOption) {
+	sortOptions := c.buildMSSQLDynamicSortOptions(cols)
+	sortParam := funcapi.ParamConfig{
+		ID:         paramSort,
+		Name:       "Filter By",
+		Help:       "Select the primary sort column",
+		Selection:  funcapi.ParamSelect,
+		Options:    sortOptions,
+		UniqueView: true,
+	}
+	return sortParam, sortOptions
+}
+
+func (c *Collector) topQueriesParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
+	if !c.Config.GetQueryStoreFunctionEnabled() {
+		return nil, fmt.Errorf("query store function disabled")
+	}
+
+	availableCols, err := c.detectMSSQLQueryStoreColumns(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	cols := c.buildAvailableMSSQLColumns(availableCols)
+	if len(cols) == 0 {
+		return nil, fmt.Errorf("no columns available in Query Store")
+	}
+
+	sortParam, _ := c.topQueriesSortParam(cols)
+	return []funcapi.ParamConfig{sortParam}, nil
+}
+
 // buildMSSQLDynamicColumns builds column definitions for the response
 func (c *Collector) buildMSSQLDynamicColumns(cols []mssqlColumnMeta) map[string]any {
 	columns := make(map[string]any)
@@ -654,15 +702,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	}
 
 	// Build dynamic sort options from available columns (only those actually detected)
-	sortOptions := c.buildMSSQLDynamicSortOptions(cols)
-	sortParam := funcapi.ParamConfig{
-		ID:         paramSort,
-		Name:       "Filter By",
-		Help:       "Select the primary sort column",
-		Selection:  funcapi.ParamSelect,
-		Options:    sortOptions,
-		UniqueView: true,
-	}
+	sortParam, sortOptions := c.topQueriesSortParam(cols)
 
 	// Find default sort column UI key
 	defaultSort := ""

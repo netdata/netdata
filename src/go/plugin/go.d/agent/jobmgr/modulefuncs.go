@@ -20,9 +20,10 @@ type moduleFuncRegistry struct {
 
 type moduleFunc struct {
 	creator        module.Creator        // The module creator (has Methods())
-	methods        []module.MethodConfig // Static methods from creator
-	jobs           map[string]*jobEntry  // jobName → job entry with generation
-	lastGeneration map[string]uint64     // jobName → last known generation (persists across removals)
+	methods        []module.MethodConfig // Static methods from creator (ordered)
+	methodsByID    map[string]module.MethodConfig
+	jobs           map[string]*jobEntry // jobName → job entry with generation
+	lastGeneration map[string]uint64    // jobName → last known generation (persists across removals)
 }
 
 // jobEntry wraps a job with a generation number for race detection
@@ -50,9 +51,24 @@ func (r *moduleFuncRegistry) registerModule(name string, creator module.Creator)
 	r.modules[name] = &moduleFunc{
 		creator:        creator,
 		methods:        methods,
+		methodsByID:    indexMethods(methods),
 		jobs:           make(map[string]*jobEntry),
 		lastGeneration: make(map[string]uint64),
 	}
+}
+
+func indexMethods(methods []module.MethodConfig) map[string]module.MethodConfig {
+	if len(methods) == 0 {
+		return nil
+	}
+	idx := make(map[string]module.MethodConfig, len(methods))
+	for _, m := range methods {
+		if m.ID == "" {
+			continue
+		}
+		idx[m.ID] = m
+	}
+	return idx
 }
 
 // addJob is called when jobs start.
@@ -140,6 +156,22 @@ func (r *moduleFuncRegistry) getMethods(moduleName string) []module.MethodConfig
 		return nil
 	}
 	return mf.methods
+}
+
+// getMethod returns a method config by ID for a module.
+func (r *moduleFuncRegistry) getMethod(moduleName, methodID string) (*module.MethodConfig, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	mf, ok := r.modules[moduleName]
+	if !ok || mf.methodsByID == nil {
+		return nil, false
+	}
+	cfg, ok := mf.methodsByID[methodID]
+	if !ok {
+		return nil, false
+	}
+	return &cfg, true
 }
 
 // getJobNames returns job names in STABLE alphabetical order

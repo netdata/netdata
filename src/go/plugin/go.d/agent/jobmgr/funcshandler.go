@@ -15,38 +15,26 @@ import (
 )
 
 const (
-	paramMethod = "__method"
-	paramJob    = "__job"
-	paramSort   = "__sort"
+	paramJob = "__job"
 )
 
-// makeModuleFuncHandler creates a function handler for a module that provides methods
-func (m *Manager) makeModuleFuncHandler(moduleName string) func(functions.Function) {
+// makeMethodFuncHandler creates a function handler for a module+method function (module:method).
+func (m *Manager) makeMethodFuncHandler(moduleName, methodID string) func(functions.Function) {
 	return func(fn functions.Function) {
 		// Check for "info" request
 		if slices.Contains(fn.Args, "info") {
-			m.handleModuleFuncInfo(moduleName, fn)
+			m.handleMethodFuncInfo(moduleName, methodID, fn)
 			return
 		}
 
-		methods := m.moduleFuncs.getMethods(moduleName)
-		if len(methods) == 0 {
-			m.respondError(fn, 404, "no methods available for %s", moduleName)
+		methodCfg, ok := m.moduleFuncs.getMethod(moduleName, methodID)
+		if !ok {
+			m.respondError(fn, 404, "unknown method '%s' for module '%s'", methodID, moduleName)
 			return
 		}
 
 		payload := parsePayload(fn.Payload)
 		argValues := parseArgsParams(fn.Args)
-
-		methodParam := buildMethodParamConfig(methods)
-		methodValues := paramValues(argValues, payload, paramMethod)
-		resolvedMethod := funcapi.ResolveParam(methodParam, methodValues)
-		method := resolvedMethod.GetOne()
-		methodCfg := findMethod(methods, method)
-		if methodCfg == nil {
-			m.respondError(fn, 404, "unknown method '%s', available: %v", method, methodIDs(methods))
-			return
-		}
 
 		jobs := m.moduleFuncs.getJobNames(moduleName)
 		if len(jobs) == 0 {
@@ -70,15 +58,6 @@ func (m *Manager) makeModuleFuncHandler(moduleName string) func(functions.Functi
 			return
 		}
 
-		// Resolve method-specific required params
-		methodParamValues := make(map[string][]string, len(methodCfg.RequiredParams))
-		for _, paramCfg := range methodCfg.RequiredParams {
-			methodParamValues[paramCfg.ID] = paramValues(argValues, payload, paramCfg.ID)
-		}
-		resolvedParams := funcapi.ResolveParams(methodCfg.RequiredParams, methodParamValues)
-		resolvedParams[paramMethod] = resolvedMethod
-		resolvedParams[paramJob] = resolvedJob
-
 		// Create context with timeout from function request
 		// This ensures DB queries are cancelled if the function times out
 		// NOTE: fn.Timeout is already a time.Duration (set by parser as seconds)
@@ -100,8 +79,30 @@ func (m *Manager) makeModuleFuncHandler(moduleName string) func(functions.Functi
 			return
 		}
 
+		// Resolve method-specific required params (job-aware)
+		methodParams, paramsFromJob, err := m.resolveMethodParamsForJob(ctx, moduleName, methodID, methodCfg, job, creator)
+		if err != nil {
+			m.respondError(fn, 503, "job '%s' cannot provide parameters: %v", jobName, err)
+			return
+		}
+
+		// Validate provided param values when job-specific options are available
+		if paramsFromJob {
+			if err := validateParamValues(methodParams, argValues, payload, jobName); err != nil {
+				m.respondError(fn, 400, "%v", err)
+				return
+			}
+		}
+
+		methodParamValues := make(map[string][]string, len(methodParams))
+		for _, paramCfg := range methodParams {
+			methodParamValues[paramCfg.ID] = paramValues(argValues, payload, paramCfg.ID)
+		}
+		resolvedParams := funcapi.ResolveParams(methodParams, methodParamValues)
+		resolvedParams[paramJob] = resolvedJob
+
 		// Route to the module's handler - get DATA ONLY response
-		dataResp := creator.HandleMethod(ctx, job, method, resolvedParams)
+		dataResp := creator.HandleMethod(ctx, job, methodID, resolvedParams)
 
 		// RACE CONDITION MITIGATION: Verify job was not replaced during handler execution
 		// If a config reload replaced this job while we were querying, the response
@@ -114,18 +115,22 @@ func (m *Manager) makeModuleFuncHandler(moduleName string) func(functions.Functi
 		}
 
 		// Core injects required_params into the response before sending
-		m.respondWithParams(fn, moduleName, method, dataResp)
+		m.respondWithParams(fn, moduleName, dataResp, methodParams)
 	}
 }
 
-// handleModuleFuncInfo handles "info" requests for a module
-func (m *Manager) handleModuleFuncInfo(moduleName string, fn functions.Function) {
-	methods := m.moduleFuncs.getMethods(moduleName)
+// handleMethodFuncInfo handles "info" requests for a module:method function
+func (m *Manager) handleMethodFuncInfo(moduleName, methodID string, fn functions.Function) {
+	methodCfg, ok := m.moduleFuncs.getMethod(moduleName, methodID)
+	if !ok {
+		m.respondError(fn, 404, "unknown method '%s' for module '%s'", methodID, moduleName)
+		return
+	}
 
-	// Use first method for default sort options
-	var methodCfg *module.MethodConfig
-	if len(methods) > 0 {
-		methodCfg = &methods[0]
+	methodParams := m.unionMethodParams(moduleName, methodID, methodCfg, fn)
+	help := methodCfg.Help
+	if help == "" {
+		help = fmt.Sprintf("%s %s data function", moduleName, methodID)
 	}
 
 	resp := map[string]any{
@@ -133,16 +138,16 @@ func (m *Manager) handleModuleFuncInfo(moduleName string, fn functions.Function)
 		"status":          200,
 		"type":            "table",
 		"has_history":     false,
-		"help":            fmt.Sprintf("%s data functions", moduleName),
-		"accepted_params": buildAcceptedParams(methodCfg, nil),
-		"required_params": m.buildRequiredParams(moduleName, methodCfg, nil),
+		"help":            help,
+		"accepted_params": buildAcceptedParams(methodParams),
+		"required_params": m.buildRequiredParams(moduleName, methodParams),
 	}
 
 	m.respondJSON(fn, resp)
 }
 
 // respondWithParams wraps the module's data response with current required_params
-func (m *Manager) respondWithParams(fn functions.Function, moduleName, method string, dataResp *module.FunctionResponse) {
+func (m *Manager) respondWithParams(fn functions.Function, moduleName string, dataResp *module.FunctionResponse, methodParams []funcapi.ParamConfig) {
 	// Nil guard: if module returns nil, treat as internal error
 	if dataResp == nil {
 		m.respondError(fn, 500, "internal error: module returned nil response")
@@ -154,8 +159,10 @@ func (m *Manager) respondWithParams(fn functions.Function, moduleName, method st
 		return
 	}
 
-	methods := m.moduleFuncs.getMethods(moduleName)
-	methodCfg := findMethod(methods, method)
+	paramsForResponse := methodParams
+	if len(dataResp.RequiredParams) > 0 {
+		paramsForResponse = funcapi.MergeParamConfigs(paramsForResponse, dataResp.RequiredParams)
+	}
 
 	// Build the full response with injected required_params
 	// Use dynamic sort options from response if provided (reflects actual DB capabilities)
@@ -165,8 +172,8 @@ func (m *Manager) respondWithParams(fn functions.Function, moduleName, method st
 		"type":            "table",
 		"has_history":     false,
 		"help":            dataResp.Help,
-		"accepted_params": buildAcceptedParams(methodCfg, dataResp.RequiredParams),
-		"required_params": m.buildRequiredParams(moduleName, methodCfg, dataResp.RequiredParams),
+		"accepted_params": buildAcceptedParams(paramsForResponse),
+		"required_params": m.buildRequiredParams(moduleName, paramsForResponse),
 	}
 
 	// Only include data fields when present (avoid null values on errors)
@@ -204,28 +211,246 @@ func (m *Manager) respondError(fn functions.Function, status int, format string,
 }
 
 // buildRequiredParams creates the required_params array with current job list
-// overrideParams overrides static methodCfg.RequiredParams when provided (for DB-specific capabilities)
-func (m *Manager) buildRequiredParams(moduleName string, methodCfg *module.MethodConfig, overrideParams []funcapi.ParamConfig) []map[string]any {
-	methods := m.moduleFuncs.getMethods(moduleName)
+func (m *Manager) buildRequiredParams(moduleName string, methodParams []funcapi.ParamConfig) []map[string]any {
 	jobs := m.moduleFuncs.getJobNames(moduleName)
 
 	paramConfigs := []funcapi.ParamConfig{
-		buildMethodParamConfig(methods),
 		buildJobParamConfig(jobs),
 	}
-	if methodCfg != nil {
-		methodParams := methodCfg.RequiredParams
-		if len(overrideParams) > 0 {
-			methodParams = funcapi.MergeParamConfigs(methodParams, overrideParams)
-		}
-		paramConfigs = append(paramConfigs, methodParams...)
-	}
+	paramConfigs = append(paramConfigs, methodParams...)
 
 	required := make([]map[string]any, 0, len(paramConfigs))
 	for _, cfg := range paramConfigs {
 		required = append(required, cfg.RequiredParam())
 	}
 	return required
+}
+
+func (m *Manager) resolveMethodParamsForJob(ctx context.Context, moduleName, methodID string, methodCfg *module.MethodConfig, job *module.Job, creator module.Creator) ([]funcapi.ParamConfig, bool, error) {
+	methodParams := methodCfg.RequiredParams
+	if creator.MethodParams == nil {
+		return methodParams, false, nil
+	}
+
+	jobParams, err := creator.MethodParams(ctx, job, methodID)
+	if err != nil {
+		return nil, false, err
+	}
+	if len(jobParams) == 0 {
+		return methodParams, true, nil
+	}
+
+	return funcapi.MergeParamConfigs(methodParams, jobParams), true, nil
+}
+
+func (m *Manager) unionMethodParams(moduleName, methodID string, methodCfg *module.MethodConfig, fn functions.Function) []funcapi.ParamConfig {
+	baseParams := methodCfg.RequiredParams
+
+	creator, ok := m.moduleFuncs.getCreator(moduleName)
+	if !ok || creator.MethodParams == nil {
+		return baseParams
+	}
+
+	jobs := m.moduleFuncs.getJobNames(moduleName)
+	if len(jobs) == 0 {
+		return baseParams
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), fn.Timeout)
+	defer cancel()
+
+	union := []funcapi.ParamConfig{}
+	for _, jobName := range jobs {
+		job, ok := m.moduleFuncs.getJob(moduleName, jobName)
+		if !ok || job == nil {
+			continue
+		}
+		params, err := creator.MethodParams(ctx, job, methodID)
+		if err != nil {
+			m.Debugf("method params unavailable for %s:%s job '%s': %v", moduleName, methodID, jobName, err)
+			continue
+		}
+		if len(params) == 0 {
+			continue
+		}
+		union = mergeParamConfigsUnion(union, params)
+	}
+	if len(union) == 0 {
+		return baseParams
+	}
+
+	out := make([]funcapi.ParamConfig, 0, len(baseParams)+len(union))
+	baseIndex := make(map[string]bool, len(baseParams))
+	unionIndex := make(map[string]int, len(union))
+	for i, cfg := range union {
+		if cfg.ID != "" {
+			unionIndex[cfg.ID] = i
+		}
+	}
+
+	for _, cfg := range baseParams {
+		if cfg.ID != "" {
+			baseIndex[cfg.ID] = true
+		}
+		if i, ok := unionIndex[cfg.ID]; ok {
+			out = append(out, mergeParamConfigMetadata(cfg, union[i]))
+			continue
+		}
+		out = append(out, cfg)
+	}
+
+	for _, cfg := range union {
+		if cfg.ID == "" || baseIndex[cfg.ID] {
+			continue
+		}
+		out = append(out, cfg)
+	}
+	return out
+}
+
+func mergeParamConfigMetadata(base, add funcapi.ParamConfig) funcapi.ParamConfig {
+	out := add
+	if out.Name == "" {
+		out.Name = base.Name
+	}
+	if out.Help == "" {
+		out.Help = base.Help
+	}
+	if base.UniqueView {
+		out.UniqueView = true
+	}
+	return out
+}
+
+func validateParamValues(methodParams []funcapi.ParamConfig, argValues map[string][]string, payload map[string]any, jobName string) error {
+	for _, cfg := range methodParams {
+		values := paramValues(argValues, payload, cfg.ID)
+		if len(values) == 0 {
+			continue
+		}
+		if cfg.Selection == funcapi.ParamSelect && len(values) > 1 {
+			return fmt.Errorf("parameter '%s' expects a single value for job '%s'", cfg.ID, jobName)
+		}
+		allowed := allowedOptions(cfg.Options)
+		for _, val := range values {
+			if !allowed[val] {
+				return fmt.Errorf("parameter '%s' option '%s' is not supported by job '%s'", cfg.ID, val, jobName)
+			}
+		}
+	}
+	return nil
+}
+
+func allowedOptions(options []funcapi.ParamOption) map[string]bool {
+	allowed := make(map[string]bool, len(options))
+	for _, opt := range options {
+		if opt.ID == "" || opt.Disabled {
+			continue
+		}
+		allowed[opt.ID] = true
+	}
+	return allowed
+}
+
+func mergeParamConfigsUnion(base, add []funcapi.ParamConfig) []funcapi.ParamConfig {
+	if len(add) == 0 {
+		return base
+	}
+
+	out := make([]funcapi.ParamConfig, len(base))
+	copy(out, base)
+
+	index := make(map[string]int, len(out))
+	for i, cfg := range out {
+		if cfg.ID != "" {
+			index[cfg.ID] = i
+		}
+	}
+
+	for _, cfg := range add {
+		if cfg.ID == "" {
+			continue
+		}
+		if i, ok := index[cfg.ID]; ok {
+			out[i] = mergeParamConfigOptions(out[i], cfg)
+			continue
+		}
+		out = append(out, cfg)
+		index[cfg.ID] = len(out) - 1
+	}
+	return out
+}
+
+func mergeParamConfigOptions(base, add funcapi.ParamConfig) funcapi.ParamConfig {
+	out := base
+	if out.Name == "" {
+		out.Name = add.Name
+	}
+	if out.Help == "" {
+		out.Help = add.Help
+	}
+	if out.Selection == funcapi.ParamSelect && add.Selection == funcapi.ParamMultiSelect {
+		out.Selection = add.Selection
+	}
+	if add.UniqueView {
+		out.UniqueView = true
+	}
+
+	options := make([]funcapi.ParamOption, len(out.Options))
+	copy(options, out.Options)
+
+	optIndex := make(map[string]int, len(options))
+	for i, opt := range options {
+		if opt.ID != "" {
+			optIndex[opt.ID] = i
+		}
+	}
+
+	hasDefault := false
+	for _, opt := range options {
+		if opt.Default {
+			hasDefault = true
+			break
+		}
+	}
+
+	for _, opt := range add.Options {
+		if opt.ID == "" {
+			continue
+		}
+		if i, ok := optIndex[opt.ID]; ok {
+			merged := options[i]
+			if merged.Name == "" {
+				merged.Name = opt.Name
+			}
+			if merged.Sort == nil && opt.Sort != nil {
+				merged.Sort = opt.Sort
+			}
+			if merged.Column == "" {
+				merged.Column = opt.Column
+			}
+			if opt.Default && !hasDefault {
+				merged.Default = true
+				hasDefault = true
+			}
+			// Disabled should remain false if any job supports the option.
+			merged.Disabled = merged.Disabled && opt.Disabled
+			options[i] = merged
+			continue
+		}
+
+		if opt.Default && hasDefault {
+			opt.Default = false
+		}
+		options = append(options, opt)
+		optIndex[opt.ID] = len(options) - 1
+		if opt.Default {
+			hasDefault = true
+		}
+	}
+
+	out.Options = options
+	return out
 }
 
 // respondJSON sends a JSON response to the function request
@@ -358,28 +583,6 @@ func splitCSV(value string) []string {
 	return out
 }
 
-func buildMethodParamConfig(methods []module.MethodConfig) funcapi.ParamConfig {
-	options := make([]funcapi.ParamOption, 0, len(methods))
-	for i, m := range methods {
-		opt := funcapi.ParamOption{
-			ID:   m.ID,
-			Name: m.Name,
-		}
-		if i == 0 {
-			opt.Default = true
-		}
-		options = append(options, opt)
-	}
-	return funcapi.ParamConfig{
-		ID:         paramMethod,
-		Name:       "Method",
-		Help:       "Select the operation to perform",
-		Selection:  funcapi.ParamSelect,
-		Options:    options,
-		UniqueView: true,
-	}
-}
-
 func buildJobParamConfig(jobs []string) funcapi.ParamConfig {
 	options := make([]funcapi.ParamOption, 0, len(jobs))
 	if len(jobs) == 0 {
@@ -410,38 +613,12 @@ func buildJobParamConfig(jobs []string) funcapi.ParamConfig {
 	}
 }
 
-func buildAcceptedParams(methodCfg *module.MethodConfig, overrideParams []funcapi.ParamConfig) []string {
-	accepted := []string{paramMethod, paramJob}
-	if methodCfg == nil {
-		return accepted
-	}
-	params := methodCfg.RequiredParams
-	if len(overrideParams) > 0 {
-		params = funcapi.MergeParamConfigs(params, overrideParams)
-	}
-	for _, p := range params {
+func buildAcceptedParams(methodParams []funcapi.ParamConfig) []string {
+	accepted := []string{paramJob}
+	for _, p := range methodParams {
 		if !slices.Contains(accepted, p.ID) {
 			accepted = append(accepted, p.ID)
 		}
 	}
 	return accepted
-}
-
-// findMethod finds a method config by ID
-func findMethod(methods []module.MethodConfig, id string) *module.MethodConfig {
-	for i := range methods {
-		if methods[i].ID == id {
-			return &methods[i]
-		}
-	}
-	return nil
-}
-
-// methodIDs extracts method IDs for error messages
-func methodIDs(methods []module.MethodConfig) []string {
-	ids := make([]string, len(methods))
-	for i, m := range methods {
-		ids[i] = m.ID
-	}
-	return ids
 }

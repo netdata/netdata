@@ -125,23 +125,30 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 		// Register module-level function if this module provides methods
 		if creator.Methods != nil {
 			m.moduleFuncs.registerModule(name, creator)
-			m.FnReg.Register(name, m.makeModuleFuncHandler(name))
-
-			// Notify Netdata about this function so it appears in the functions API
 			methods := creator.Methods()
-			help := name + " data functions"
-			if len(methods) > 0 && methods[0].Help != "" {
-				help = methods[0].Help
+			for _, method := range methods {
+				if method.ID == "" {
+					m.Warningf("skipping function registration for module '%s': empty method ID", name)
+					continue
+				}
+				funcName := fmt.Sprintf("%s:%s", name, method.ID)
+				m.FnReg.Register(funcName, m.makeMethodFuncHandler(name, method.ID))
+
+				// Notify Netdata about this function so it appears in the functions API
+				help := method.Help
+				if help == "" {
+					help = fmt.Sprintf("%s %s data function", name, method.ID)
+				}
+				m.dyncfgApi.FunctionGlobal(netdataapi.FunctionGlobalOpts{
+					Name:     funcName,
+					Timeout:  60,
+					Help:     help,
+					Tags:     "top",
+					Access:   "0x0000",
+					Priority: 100,
+					Version:  3,
+				})
 			}
-			m.dyncfgApi.FunctionGlobal(netdataapi.FunctionGlobalOpts{
-				Name:     name,
-				Timeout:  60,
-				Help:     help,
-				Tags:     "top",
-				Access:   "0x0000",
-				Priority: 100,
-				Version:  3,
-			})
 		}
 	}
 
@@ -182,9 +189,14 @@ func (m *Manager) GetJobNames(moduleName string) []string {
 	return m.moduleFuncs.getJobNames(moduleName)
 }
 
-// ExecuteFunction executes a module function handler directly.
-func (m *Manager) ExecuteFunction(moduleName string, fn functions.Function) {
-	handler := m.makeModuleFuncHandler(moduleName)
+// ExecuteFunction executes a function handler directly (function name must be module:method).
+func (m *Manager) ExecuteFunction(functionName string, fn functions.Function) {
+	moduleName, methodID, err := functions.SplitFunctionName(functionName)
+	if err != nil {
+		m.respondError(fn, 400, "%v", err)
+		return
+	}
+	handler := m.makeMethodFuncHandler(moduleName, methodID)
 	handler(fn)
 }
 
@@ -348,7 +360,13 @@ func (m *Manager) cleanup() {
 	// Unregister module functions
 	for name, creator := range m.Modules {
 		if creator.Methods != nil {
-			m.FnReg.Unregister(name)
+			for _, method := range creator.Methods() {
+				if method.ID == "" {
+					continue
+				}
+				funcName := fmt.Sprintf("%s:%s", name, method.ID)
+				m.FnReg.Unregister(funcName)
+			}
 		}
 	}
 

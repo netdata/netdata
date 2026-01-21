@@ -237,6 +237,22 @@ func mongoMethods() []module.MethodConfig {
 	}}
 }
 
+func mongoMethodParams(ctx context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
+	collector, ok := job.Module().(*Collector)
+	if !ok {
+		return nil, fmt.Errorf("invalid module type")
+	}
+	if collector.conn == nil {
+		return nil, fmt.Errorf("collector is still initializing")
+	}
+	switch method {
+	case "top-queries":
+		return collector.topQueriesParams(ctx)
+	default:
+		return nil, fmt.Errorf("unknown method: %s", method)
+	}
+}
+
 // mongoHandleMethod handles function requests for MongoDB
 func mongoHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
 	collector, ok := job.Module().(*Collector)
@@ -432,27 +448,14 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	}
 
 	// Get list of databases to query
-	databases, err := c.conn.listDatabaseNames()
+	databases, err := c.topQueriesDatabases()
 	if err != nil {
 		return &module.FunctionResponse{
 			Status:  500,
 			Message: fmt.Sprintf("failed to list databases: %v", err),
 		}
 	}
-
-	// Filter databases
-	var filteredDBs []string
-	for _, dbName := range databases {
-		// Skip admin, local, config databases for profiling
-		if dbName == "admin" || dbName == "local" || dbName == "config" {
-			continue
-		}
-		// Apply database filter if configured
-		if c.dbSelector != nil && !c.dbSelector.MatchString(dbName) {
-			continue
-		}
-		filteredDBs = append(filteredDBs, dbName)
-	}
+	filteredDBs := databases
 
 	// Detect available fields (with caching)
 	availableFields, err := c.detectMongoProfileFields(ctx, filteredDBs)
@@ -636,6 +639,46 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		DefaultCharts:     topQueriesDefaultCharts(),
 		GroupBy:           topQueriesGroupBy(),
 	}
+}
+
+func (c *Collector) topQueriesDatabases() ([]string, error) {
+	databases, err := c.conn.listDatabaseNames()
+	if err != nil {
+		return nil, err
+	}
+
+	var filteredDBs []string
+	for _, dbName := range databases {
+		if dbName == "admin" || dbName == "local" || dbName == "config" {
+			continue
+		}
+		if c.dbSelector != nil && !c.dbSelector.MatchString(dbName) {
+			continue
+		}
+		filteredDBs = append(filteredDBs, dbName)
+	}
+
+	return filteredDBs, nil
+}
+
+func (c *Collector) topQueriesParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
+	if !c.Config.GetTopQueriesFunctionEnabled() {
+		return nil, fmt.Errorf("top queries function disabled")
+	}
+
+	databases, err := c.topQueriesDatabases()
+	if err != nil {
+		return nil, err
+	}
+
+	availableFields, err := c.detectMongoProfileFields(ctx, databases)
+	if err != nil {
+		return nil, err
+	}
+
+	availableCols := buildAvailableMongoColumns(availableFields)
+	sortParam := buildMongoSortParam(availableCols)
+	return []funcapi.ParamConfig{sortParam}, nil
 }
 
 // querySystemProfile queries the system.profile collection for a specific database

@@ -17,7 +17,7 @@ docker compose up -d
 cd ../../../
 src/go/go.d.plugin \
   --config-dir src/go/tools/functions-validation/config \
-  --function postgres \
+  --function postgres:top-queries \
   --function-args info
 ```
 
@@ -31,8 +31,7 @@ echo '{"status":200,"type":"table","columns":{},"data":[]}' | \
 ```
 src/go/go.d.plugin \
   --config-dir src/go/tools/functions-validation/config \
-  --function postgres \
-  --function-args __method:top-queries \
+  --function postgres:top-queries \
   --function-args __job:local \
   > /tmp/pg.json
 

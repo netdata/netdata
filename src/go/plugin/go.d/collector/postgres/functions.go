@@ -186,6 +186,22 @@ func pgMethods() []module.MethodConfig {
 	}}
 }
 
+func pgMethodParams(ctx context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
+	collector, ok := job.Module().(*Collector)
+	if !ok {
+		return nil, fmt.Errorf("invalid module type")
+	}
+	if collector.db == nil {
+		return nil, fmt.Errorf("collector is still initializing")
+	}
+	switch method {
+	case "top-queries":
+		return collector.topQueriesParams(ctx)
+	default:
+		return nil, fmt.Errorf("unknown method: %s", method)
+	}
+}
+
 // pgHandleMethod handles function requests for PostgreSQL
 func pgHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
 	collector, ok := job.Module().(*Collector)
@@ -276,15 +292,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	}
 
 	// Build dynamic sort options from available columns (only those actually detected)
-	sortOptions := c.buildDynamicSortOptions(queryCols)
-	sortParam := funcapi.ParamConfig{
-		ID:         paramSort,
-		Name:       "Filter By",
-		Help:       "Select the primary sort column",
-		Selection:  funcapi.ParamSelect,
-		Options:    sortOptions,
-		UniqueView: true,
-	}
+	sortParam, sortOptions := c.topQueriesSortParam(queryCols)
 
 	// Find default sort column UI key from metadata
 	defaultSort := ""
@@ -671,6 +679,42 @@ func (c *Collector) buildDynamicSortOptions(cols []pgColumnMeta) []funcapi.Param
 		}
 	}
 	return sortOpts
+}
+
+func (c *Collector) topQueriesSortParam(queryCols []pgColumnMeta) (funcapi.ParamConfig, []funcapi.ParamOption) {
+	sortOptions := c.buildDynamicSortOptions(queryCols)
+	sortParam := funcapi.ParamConfig{
+		ID:         paramSort,
+		Name:       "Filter By",
+		Help:       "Select the primary sort column",
+		Selection:  funcapi.ParamSelect,
+		Options:    sortOptions,
+		UniqueView: true,
+	}
+	return sortParam, sortOptions
+}
+
+func (c *Collector) topQueriesParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
+	available, err := c.checkPgStatStatements(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !available {
+		return nil, fmt.Errorf("pg_stat_statements extension is not installed")
+	}
+
+	availableCols, err := c.detectPgStatStatementsColumns(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	queryCols := c.buildAvailableColumns(availableCols)
+	if len(queryCols) == 0 {
+		return nil, fmt.Errorf("no queryable columns found in pg_stat_statements")
+	}
+
+	sortParam, _ := c.topQueriesSortParam(queryCols)
+	return []funcapi.ParamConfig{sortParam}, nil
 }
 
 // checkPgStatStatements checks if pg_stat_statements extension is available

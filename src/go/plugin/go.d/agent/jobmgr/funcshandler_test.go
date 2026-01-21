@@ -3,9 +3,13 @@
 package jobmgr
 
 import (
+	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/stretchr/testify/assert"
 )
@@ -17,14 +21,14 @@ func TestExtractParamValues(t *testing.T) {
 		expected []string
 	}{
 		"string value": {
-			payload:  map[string]any{"__method": "top-queries"},
-			key:      "__method",
-			expected: []string{"top-queries"},
+			payload:  map[string]any{"__job": "local"},
+			key:      "__job",
+			expected: []string{"local"},
 		},
 		"array value (single element)": {
-			payload:  map[string]any{"__method": []any{"top-queries"}},
-			key:      "__method",
-			expected: []string{"top-queries"},
+			payload:  map[string]any{"__job": []any{"local"}},
+			key:      "__job",
+			expected: []string{"local"},
 		},
 		"array value (multiple elements)": {
 			payload:  map[string]any{"__sort": []any{"calls", "total_time"}},
@@ -32,43 +36,43 @@ func TestExtractParamValues(t *testing.T) {
 			expected: []string{"calls", "total_time"},
 		},
 		"string array value": {
-			payload:  map[string]any{"__job": []string{"master-db"}},
+			payload:  map[string]any{"__job": []string{"local"}},
 			key:      "__job",
-			expected: []string{"master-db"},
+			expected: []string{"local"},
 		},
 		"missing key": {
-			payload:  map[string]any{"__method": "top-queries"},
-			key:      "__job",
+			payload:  map[string]any{"__job": "local"},
+			key:      "__sort",
 			expected: nil,
 		},
 		"empty payload": {
 			payload:  map[string]any{},
-			key:      "__method",
+			key:      "__job",
 			expected: nil,
 		},
 		"nil in array": {
-			payload:  map[string]any{"__method": []any{nil, "test"}},
-			key:      "__method",
+			payload:  map[string]any{"__job": []any{nil, "test"}},
+			key:      "__job",
 			expected: []string{"test"},
 		},
 		"empty array": {
-			payload:  map[string]any{"__method": []any{}},
-			key:      "__method",
+			payload:  map[string]any{"__job": []any{}},
+			key:      "__job",
 			expected: nil,
 		},
 		"non-string value": {
-			payload:  map[string]any{"__method": 123},
-			key:      "__method",
+			payload:  map[string]any{"__job": 123},
+			key:      "__job",
 			expected: nil,
 		},
 		"prefers selections": {
 			payload: map[string]any{
-				"__method": "root",
+				"__job": "root",
 				"selections": map[string]any{
-					"__method": []any{"selected"},
+					"__job": []any{"selected"},
 				},
 			},
-			key:      "__method",
+			key:      "__job",
 			expected: []string{"selected"},
 		},
 	}
@@ -81,130 +85,16 @@ func TestExtractParamValues(t *testing.T) {
 	}
 }
 
-func TestBuildMethodParamConfig(t *testing.T) {
-	tests := map[string]struct {
-		methods  []module.MethodConfig
-		expected []map[string]any
-	}{
-		"single method": {
-			methods: []module.MethodConfig{
-				{ID: "top-queries", Name: "Top Queries"},
-			},
-			expected: []map[string]any{
-				{"id": "top-queries", "name": "Top Queries", "defaultSelected": true},
-			},
-		},
-		"multiple methods": {
-			methods: []module.MethodConfig{
-				{ID: "top-queries", Name: "Top Queries"},
-				{ID: "slow-queries", Name: "Slow Queries"},
-			},
-			expected: []map[string]any{
-				{"id": "top-queries", "name": "Top Queries", "defaultSelected": true},
-				{"id": "slow-queries", "name": "Slow Queries"},
-			},
-		},
-		"empty methods": {
-			methods:  []module.MethodConfig{},
-			expected: []map[string]any{},
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			cfg := buildMethodParamConfig(tc.methods)
-			param := cfg.RequiredParam()
-			assert.Equal(t, "select", param["type"])
-			assert.Equal(t, "__method", param["id"])
-			assert.Equal(t, tc.expected, param["options"])
-		})
-	}
-}
-
 func TestBuildAcceptedParams(t *testing.T) {
 	sortDir := funcapi.FieldSortDescending
-	methodCfg := &module.MethodConfig{
-		RequiredParams: []funcapi.ParamConfig{
-			{ID: "__sort", Selection: funcapi.ParamSelect, Options: []funcapi.ParamOption{{ID: "calls", Name: "Calls", Sort: &sortDir}}},
-			{ID: "db"},
-		},
-	}
-
-	overrides := []funcapi.ParamConfig{
-		{ID: "__sort", Selection: funcapi.ParamSelect, Options: []funcapi.ParamOption{{ID: "time", Name: "Time", Sort: &sortDir}}},
+	methodParams := []funcapi.ParamConfig{
+		{ID: "__sort", Selection: funcapi.ParamSelect, Options: []funcapi.ParamOption{{ID: "calls", Name: "Calls", Sort: &sortDir}}},
+		{ID: "db"},
 		{ID: "extra"},
 	}
 
-	result := buildAcceptedParams(methodCfg, overrides)
-	assert.Equal(t, []string{"__method", "__job", "__sort", "db", "extra"}, result)
-}
-
-func TestFindMethod(t *testing.T) {
-	methods := []module.MethodConfig{
-		{ID: "top-queries", Name: "Top Queries"},
-		{ID: "slow-queries", Name: "Slow Queries"},
-	}
-
-	tests := map[string]struct {
-		id       string
-		expected *module.MethodConfig
-	}{
-		"found": {
-			id:       "top-queries",
-			expected: &methods[0],
-		},
-		"found second": {
-			id:       "slow-queries",
-			expected: &methods[1],
-		},
-		"not found": {
-			id:       "nonexistent",
-			expected: nil,
-		},
-		"empty id": {
-			id:       "",
-			expected: nil,
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			result := findMethod(methods, tc.id)
-			assert.Equal(t, tc.expected, result)
-		})
-	}
-}
-
-func TestMethodIDs(t *testing.T) {
-	tests := map[string]struct {
-		methods  []module.MethodConfig
-		expected []string
-	}{
-		"multiple methods": {
-			methods: []module.MethodConfig{
-				{ID: "top-queries"},
-				{ID: "slow-queries"},
-			},
-			expected: []string{"top-queries", "slow-queries"},
-		},
-		"single method": {
-			methods: []module.MethodConfig{
-				{ID: "top-queries"},
-			},
-			expected: []string{"top-queries"},
-		},
-		"empty methods": {
-			methods:  []module.MethodConfig{},
-			expected: []string{},
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			result := methodIDs(tc.methods)
-			assert.Equal(t, tc.expected, result)
-		})
-	}
+	result := buildAcceptedParams(methodParams)
+	assert.Equal(t, []string{"__job", "__sort", "db", "extra"}, result)
 }
 
 // TestBuildRequiredParams_TypeSelect verifies that all selectors use type "select" (single-select)
@@ -217,17 +107,6 @@ func TestBuildRequiredParams_TypeSelect(t *testing.T) {
 			return []module.MethodConfig{{
 				ID:   "top-queries",
 				Name: "Top Queries",
-				RequiredParams: []funcapi.ParamConfig{
-					{
-						ID:         "__sort",
-						Name:       "Filter By",
-						Selection:  funcapi.ParamSelect,
-						UniqueView: true,
-						Options: []funcapi.ParamOption{
-							{ID: "total_time", Name: "By Total Time", Default: true},
-						},
-					},
-				},
 			}}
 		},
 	})
@@ -237,12 +116,21 @@ func TestBuildRequiredParams_TypeSelect(t *testing.T) {
 	mgr := &Manager{moduleFuncs: r}
 
 	// Get required_params through the public method
-	methods := r.getMethods("postgres")
-	methodCfg := &methods[0]
-	params := mgr.buildRequiredParams("postgres", methodCfg, nil)
+	methodParams := []funcapi.ParamConfig{
+		{
+			ID:         "__sort",
+			Name:       "Filter By",
+			Selection:  funcapi.ParamSelect,
+			UniqueView: true,
+			Options: []funcapi.ParamOption{
+				{ID: "total_time", Name: "By Total Time", Default: true},
+			},
+		},
+	}
+	params := mgr.buildRequiredParams("postgres", methodParams)
 
 	// Verify structure
-	assert.Len(t, params, 3, "should have 3 required params: __method, __job, __sort")
+	assert.Len(t, params, 2, "should have 2 required params: __job, __sort")
 
 	// All params should have type: "select" (NOT "multiselect")
 	for _, param := range params {
@@ -262,7 +150,118 @@ func TestBuildRequiredParams_TypeSelect(t *testing.T) {
 	}
 
 	// Verify specific param IDs
-	assert.Equal(t, "__method", params[0]["id"])
-	assert.Equal(t, "__job", params[1]["id"])
-	assert.Equal(t, "__sort", params[2]["id"])
+	assert.Equal(t, "__job", params[0]["id"])
+	assert.Equal(t, "__sort", params[1]["id"])
+}
+
+func TestUnionMethodParams_JobOptionsOverrideStatic(t *testing.T) {
+	sortDir := funcapi.FieldSortDescending
+	baseParams := []funcapi.ParamConfig{
+		{
+			ID:         "__sort",
+			Name:       "Filter By",
+			Selection:  funcapi.ParamSelect,
+			UniqueView: true,
+			Options: []funcapi.ParamOption{
+				{ID: "a", Name: "A", Sort: &sortDir},
+				{ID: "b", Name: "B", Sort: &sortDir},
+			},
+		},
+		{
+			ID:        "mode",
+			Name:      "Mode",
+			Selection: funcapi.ParamSelect,
+			Options:   []funcapi.ParamOption{{ID: "x", Name: "X"}},
+		},
+	}
+
+	r := newModuleFuncRegistry()
+	r.registerModule("postgres", module.Creator{
+		Methods: func() []module.MethodConfig {
+			return []module.MethodConfig{{ID: "top-queries", RequiredParams: baseParams}}
+		},
+		MethodParams: func(ctx context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
+			switch job.Name() {
+			case "job1":
+				return []funcapi.ParamConfig{{
+					ID:         "__sort",
+					Name:       "Filter By",
+					Selection:  funcapi.ParamSelect,
+					UniqueView: true,
+					Options: []funcapi.ParamOption{
+						{ID: "b", Name: "B", Sort: &sortDir},
+						{ID: "c", Name: "C", Sort: &sortDir},
+					},
+				}}, nil
+			case "job2":
+				return []funcapi.ParamConfig{{
+					ID:         "__sort",
+					Name:       "Filter By",
+					Selection:  funcapi.ParamSelect,
+					UniqueView: true,
+					Options: []funcapi.ParamOption{
+						{ID: "c", Name: "C", Sort: &sortDir},
+						{ID: "d", Name: "D", Sort: &sortDir},
+					},
+				}}, nil
+			default:
+				return nil, nil
+			}
+		},
+	})
+	r.addJob("postgres", "job1", newTestModuleFuncsJob("job1"))
+	r.addJob("postgres", "job2", newTestModuleFuncsJob("job2"))
+
+	mgr := &Manager{moduleFuncs: r}
+	fn := functions.Function{Timeout: time.Second}
+
+	got := mgr.unionMethodParams("postgres", "top-queries", &module.MethodConfig{
+		ID:             "top-queries",
+		RequiredParams: baseParams,
+	}, fn)
+
+	assert.Len(t, got, 2)
+	assert.Equal(t, "__sort", got[0].ID)
+	assert.Equal(t, "mode", got[1].ID)
+
+	sortOpts := make(map[string]bool)
+	for _, opt := range got[0].Options {
+		sortOpts[opt.ID] = true
+	}
+	assert.False(t, sortOpts["a"], "static-only option should not be included when jobs provide options")
+	assert.True(t, sortOpts["b"])
+	assert.True(t, sortOpts["c"])
+	assert.True(t, sortOpts["d"])
+}
+
+func TestUnionMethodParams_FallbackToStaticOnAllErrors(t *testing.T) {
+	baseParams := []funcapi.ParamConfig{
+		{
+			ID:        "__sort",
+			Name:      "Sort",
+			Selection: funcapi.ParamSelect,
+			Options:   []funcapi.ParamOption{{ID: "a", Name: "A"}},
+		},
+	}
+
+	r := newModuleFuncRegistry()
+	r.registerModule("postgres", module.Creator{
+		Methods: func() []module.MethodConfig {
+			return []module.MethodConfig{{ID: "top-queries", RequiredParams: baseParams}}
+		},
+		MethodParams: func(ctx context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
+			return nil, errors.New("backend unavailable")
+		},
+	})
+	r.addJob("postgres", "job1", newTestModuleFuncsJob("job1"))
+
+	mgr := &Manager{moduleFuncs: r}
+	fn := functions.Function{Timeout: time.Second}
+
+	got := mgr.unionMethodParams("postgres", "top-queries", &module.MethodConfig{
+		ID:             "top-queries",
+		RequiredParams: baseParams,
+	}, fn)
+
+	assert.Equal(t, baseParams, got)
 }
