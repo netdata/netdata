@@ -359,7 +359,12 @@ void nd_log_queue_shutdown(void) {
     if (!__atomic_load_n(&log_ev.initialized, __ATOMIC_ACQUIRE))
         return;
 
-    // Send shutdown command and wait
+    // Signal shutdown via atomic flag FIRST - this guarantees the thread will
+    // see the shutdown request even if uv_async_send() fails or the handle is invalid.
+    // The thread checks this flag in its main loop.
+    __atomic_store_n(&log_ev.shutdown_requested, true, __ATOMIC_RELEASE);
+
+    // Send shutdown command for synchronization (allows waiting for completion)
     struct completion shutdown_complete;
     completion_init(&shutdown_complete);
 
@@ -369,6 +374,8 @@ void nd_log_queue_shutdown(void) {
     };
 
     if (cmd_pool_push(&log_ev.cmd_pool, &cmd)) {
+        // Wake the thread - if this fails (handle closed), the atomic flag above
+        // ensures the thread will still exit on its next loop iteration
         uv_async_send(&log_ev.async);
         if (!completion_timedwait_for(&shutdown_complete, ND_LOG_SHUTDOWN_TIMEOUT_S)) {
             // Timeout - logger thread may be dead, proceed with cleanup anyway
@@ -376,9 +383,7 @@ void nd_log_queue_shutdown(void) {
         }
     }
     else {
-        // Queue is full - signal shutdown directly via atomic flag.
-        // The logger thread checks this flag in its main loop and will exit.
-        __atomic_store_n(&log_ev.shutdown_requested, true, __ATOMIC_RELEASE);
+        // Queue is full - atomic flag is already set, just wake the thread
         uv_async_send(&log_ev.async);
     }
 
