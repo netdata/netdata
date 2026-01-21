@@ -209,7 +209,7 @@ Fast data access layer alerting.
 | [Memcached](/docs/src/go/plugin/go.d/collector/memcached/integrations/memcached.md) | Hit rate, memory, evictions |
 | [Elasticsearch](/docs/src/go/plugin/go.d/collector/elasticsearch/integrations/elasticsearch.md) | Cluster health, indices, search time |
 | [Consul](/docs/src/go/plugin/go.d/collector/consul/integrations/consul.md) | Raft leader, health checks, license |
-| [Etcd](/docs/src/go/plugin/go.d/collector/prometheus/integrations/etcd.md) | Leader, disk, RPC,瓦尔纳 |
+| [Etcd](/docs/src/go/plugin/go.d/collector/prometheus/integrations/etcd.md) | Leader, disk, RPC, WAL |
 | [ZooKeeper](/docs/src/go/plugin/go.d/collector/zookeeper/integrations/zookeeper.md) | Requests, connections, znodes |
 
 ### DNS & DHCP
