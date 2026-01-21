@@ -2,7 +2,7 @@
 
 Real-Time Conversations is a live, interactive interface for engaging in a back-and-forth dialogue with Netdata AI. Unlike Investigations and Insights reports that generate comprehensive async documents, Conversations are designed for the rapid-fire "what if" questions and quick exploration that happen in the heat of troubleshooting.
 
-![Real-Time Conversations interface](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/conversations.png)
+![Real-Time Conversations interface](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/conversations1.png)
 
 ## When to use it
 
