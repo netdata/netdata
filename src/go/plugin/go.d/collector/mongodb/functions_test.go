@@ -115,7 +115,7 @@ func TestBuildMongoColumnsFromMeta(t *testing.T) {
 	testCols := []mongoColumnMeta{
 		{id: "timestamp", dbField: "ts", name: "Timestamp", colType: ftTimestamp, visible: true, sortable: true, filter: filterRange, visualization: visValue, summary: summaryMax, transform: trDatetime, uniqueKey: true},
 		{id: "execution_time", dbField: "millis", name: "Execution Time", colType: ftDuration, visible: true, sortable: true, filter: filterRange, visualization: visBar, summary: summarySum, transform: trDuration, units: "seconds", decimalPoints: 3},
-		{id: "query", dbField: "command", name: "Query", colType: ftString, visible: true, sortable: false, fullWidth: true, wrap: true, filter: filterText, visualization: visValue, transform: trText},
+		{id: "query", dbField: "command", name: "Query", colType: ftString, visible: true, sortable: false, fullWidth: true, wrap: true, filter: filterMulti, visualization: visValue, transform: trText},
 	}
 
 	cols := buildMongoColumnsFromMeta(testCols)
