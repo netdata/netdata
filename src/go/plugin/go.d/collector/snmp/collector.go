@@ -69,6 +69,8 @@ func New() *Collector {
 		seenTableMetrics:  make(map[string]bool),
 		seenProfiles:      make(map[string]bool),
 
+		ifaceCache: newIfaceCache(),
+
 		newProber:     ping.NewProber,
 		newSnmpClient: gosnmp.NewHandler,
 		newDdSnmpColl: func(cfg ddsnmpcollector.Config) ddCollector {
@@ -88,6 +90,8 @@ type (
 		seenScalarMetrics map[string]bool
 		seenTableMetrics  map[string]bool
 		seenProfiles      map[string]bool
+
+		ifaceCache *ifaceCache // interface metrics cache for functions
 
 		prober    ping.Prober
 		newProber func(ping.ProberConfig, *logger.Logger) ping.Prober
