@@ -25,6 +25,7 @@ func TestFieldType_StringAndJSON(t *testing.T) {
 		{FieldTypeDuration, "duration"},
 		{FieldTypeTimestamp, "timestamp"},
 		{FieldTypeArray, "array"},
+		{FieldTypeFeedTemplate, "feedTemplate"},
 		{FieldType(250), "none"},
 	}
 
@@ -50,6 +51,7 @@ func TestFieldVisual_StringAndJSON(t *testing.T) {
 		{FieldVisualBar, "bar"},
 		{FieldVisualPill, "pill"},
 		{FieldVisualRichValue, "richValue"},
+		{FieldVisualFeedTemplate, "feedTemplate"},
 		{FieldVisualRowOptions, "rowOptions"},
 		{FieldVisual(250), "value"},
 	}

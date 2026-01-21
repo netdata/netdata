@@ -47,7 +47,6 @@ const (
 
 	filterRange = funcapi.FieldFilterRange
 	filterMulti = funcapi.FieldFilterMultiselect
-	filterText  = funcapi.FieldFilterText
 )
 
 // mongoColumnMeta defines metadata for a column in the response
@@ -78,7 +77,7 @@ var mongoAllColumns = []mongoColumnMeta{
 	{id: "timestamp", dbField: "ts", name: "Timestamp", colType: ftTimestamp, visible: true, sortable: true, filter: filterRange, visualization: visValue, summary: summaryMax, transform: trDatetime, uniqueKey: true},
 	{id: "namespace", dbField: "ns", name: "Namespace", colType: ftString, visible: true, sortable: false, sticky: true, filter: filterMulti, visualization: visValue, transform: trText, expandFilter: true},
 	{id: "operation", dbField: "op", name: "Operation", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},
-	{id: "query", dbField: "command", name: "Query", colType: ftString, visible: true, sortable: false, fullWidth: true, wrap: true, filter: filterText, visualization: visValue, transform: trText},
+	{id: "query", dbField: "command", name: "Query", colType: ftString, visible: true, sortable: false, fullWidth: true, wrap: true, filter: filterMulti, visualization: visValue, transform: trText},
 	{id: "execution_time", dbField: "millis", name: "Execution Time", colType: ftDuration, visible: true, sortable: true, filter: filterRange, visualization: visBar, summary: summarySum, transform: trDuration, units: "seconds", decimalPoints: 3},
 	{id: "docs_examined", dbField: "docsExamined", name: "Docs Examined", colType: ftInteger, visible: true, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber},
 	{id: "keys_examined", dbField: "keysExamined", name: "Keys Examined", colType: ftInteger, visible: true, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber},
@@ -101,12 +100,12 @@ var mongoAllColumns = []mongoColumnMeta{
 	{id: "replanned", dbField: "replanned", name: "Replanned", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},
 
 	// Version-specific fields (hidden by default)
-	{id: "query_hash", dbField: "queryHash", name: "Query Hash", colType: ftString, visible: false, sortable: false, filter: filterText, visualization: visValue, transform: trText},            // 4.2+
-	{id: "plan_cache_key", dbField: "planCacheKey", name: "Plan Cache Key", colType: ftString, visible: false, sortable: false, filter: filterText, visualization: visValue, transform: trText}, // 4.2+
+	{id: "query_hash", dbField: "queryHash", name: "Query Hash", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},            // 4.2+
+	{id: "plan_cache_key", dbField: "planCacheKey", name: "Plan Cache Key", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText}, // 4.2+
 	{id: "planning_time", dbField: "planningTimeMicros", name: "Planning Time", colType: ftDuration, visible: false, sortable: true, filter: filterRange, visualization: visBar, summary: summarySum, transform: trDuration, units: "seconds", decimalPoints: 3},
 	{id: "cpu_time", dbField: "cpuNanos", name: "CPU Time", colType: ftDuration, visible: false, sortable: true, filter: filterRange, visualization: visBar, summary: summarySum, transform: trDuration, units: "seconds", decimalPoints: 3},
-	{id: "query_framework", dbField: "queryFramework", name: "Query Framework", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},  // 7.0+
-	{id: "query_shape_hash", dbField: "queryShapeHash", name: "Query Shape Hash", colType: ftString, visible: false, sortable: false, filter: filterText, visualization: visValue, transform: trText}, // 8.0+
+	{id: "query_framework", dbField: "queryFramework", name: "Query Framework", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},   // 7.0+
+	{id: "query_shape_hash", dbField: "queryShapeHash", name: "Query Shape Hash", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText}, // 8.0+
 }
 
 // optionalDuration converts an optional int64 pointer to float64 seconds, returning nil if nil
@@ -168,6 +167,35 @@ func topQueriesGroupBy() map[string]module.GroupByConfig {
 			Name:    "Group by Operation Type",
 			Columns: []string{"operation"},
 		},
+	}
+}
+
+func buildMongoSortParam(cols []mongoColumnMeta) funcapi.ParamConfig {
+	var sortOptions []funcapi.ParamOption
+	sortDir := funcapi.FieldSortDescending
+	for _, col := range cols {
+		if !col.sortable {
+			continue
+		}
+		opt := funcapi.ParamOption{
+			ID:     col.id,
+			Column: col.dbField,
+			Name:   fmt.Sprintf("Top queries by %s", col.name),
+			Sort:   &sortDir,
+		}
+		if col.id == "execution_time" {
+			opt.Default = true
+		}
+		sortOptions = append(sortOptions, opt)
+	}
+
+	return funcapi.ParamConfig{
+		ID:         paramSort,
+		Name:       "Filter By",
+		Help:       "Select the primary sort column",
+		Selection:  funcapi.ParamSelect,
+		Options:    sortOptions,
+		UniqueView: true,
 	}
 }
 
@@ -433,6 +461,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	}
 	availableCols := buildAvailableMongoColumns(availableFields)
 	columns := buildMongoColumnsFromMeta(availableCols)
+	sortParam := buildMongoSortParam(availableCols)
 
 	// Query system.profile from each database
 	var allDocs []profileDocument
@@ -502,6 +531,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		Columns:           columns,
 		Data:              [][]any{},
 		DefaultSortColumn: "execution_time",
+		RequiredParams:    []funcapi.ParamConfig{sortParam},
 		Charts:            topQueriesCharts(),
 		DefaultCharts:     topQueriesDefaultCharts(),
 		GroupBy:           topQueriesGroupBy(),
@@ -601,6 +631,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		Columns:           columns,
 		Data:              data,
 		DefaultSortColumn: "execution_time",
+		RequiredParams:    []funcapi.ParamConfig{sortParam},
 		Charts:            topQueriesCharts(),
 		DefaultCharts:     topQueriesDefaultCharts(),
 		GroupBy:           topQueriesGroupBy(),

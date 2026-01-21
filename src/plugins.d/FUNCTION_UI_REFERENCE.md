@@ -776,6 +776,7 @@ To add aggregated count support to a function:
 | Type | Behavior | Notes |
 |------|----------|-------|
 | `boolean` | ValueCell | No special boolean UI |
+| `float` | ValueCell | Go functions may emit floats; UI falls back to default |
 | `detail-string` | ValueCell | No expandable functionality |
 | `array` | ValueCell | Works with `pill` visualization |
 | `none` | ValueCell | Avoid using |
@@ -805,6 +806,7 @@ To add aggregated count support to a function:
 | `datetime` | Epoch ms | Localized date/time | |
 | `datetime_usec` | Epoch μs | Localized date/time | For logs |
 | `xml` | XML string | Formatted XML | No specialized UI |
+| `text` | Any | Unchanged | UI falls back to default |
 
 ### Conditional Patterns and Dependencies
 

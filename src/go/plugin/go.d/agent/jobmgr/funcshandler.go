@@ -251,6 +251,11 @@ func (m *Manager) respondJSON(fn functions.Function, resp map[string]any) {
 		}
 	}
 
+	if m.FunctionJSONWriter != nil {
+		m.FunctionJSONWriter(data, code)
+		return
+	}
+
 	m.dyncfgApi.SendJSONWithCode(fn, string(data), code)
 }
 

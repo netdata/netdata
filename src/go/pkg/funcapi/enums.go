@@ -18,6 +18,7 @@ const (
 	FieldTypeDuration
 	FieldTypeTimestamp
 	FieldTypeArray
+	FieldTypeFeedTemplate
 )
 
 func (t FieldType) String() string {
@@ -40,6 +41,8 @@ func (t FieldType) String() string {
 		return "timestamp"
 	case FieldTypeArray:
 		return "array"
+	case FieldTypeFeedTemplate:
+		return "feedTemplate"
 	default:
 		return "none"
 	}
@@ -57,6 +60,7 @@ const (
 	FieldVisualBar
 	FieldVisualPill
 	FieldVisualRichValue
+	FieldVisualFeedTemplate
 	FieldVisualRowOptions
 )
 
@@ -68,6 +72,8 @@ func (v FieldVisual) String() string {
 		return "pill"
 	case FieldVisualRichValue:
 		return "richValue"
+	case FieldVisualFeedTemplate:
+		return "feedTemplate"
 	case FieldVisualRowOptions:
 		return "rowOptions"
 	default:

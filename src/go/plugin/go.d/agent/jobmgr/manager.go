@@ -57,6 +57,13 @@ func New() *Manager {
 	return mgr
 }
 
+// SetDyncfgResponder allows overriding the default responder (e.g., to silence output in CLI mode).
+func (m *Manager) SetDyncfgResponder(responder *dyncfg.Responder) {
+	if responder != nil {
+		m.dyncfgApi = responder
+	}
+}
+
 type Manager struct {
 	*logger.Logger
 
@@ -93,6 +100,9 @@ type Manager struct {
 	waitCfgOnOff string // block processing of discovered configs until "enable"/"disable" is received from Netdata
 
 	dyncfgApi *dyncfg.Responder
+
+	// FunctionJSONWriter, when set, bypasses Netdata protocol output and writes raw JSON.
+	FunctionJSONWriter func(payload []byte, code int)
 }
 
 func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
@@ -155,6 +165,27 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 
 	wg.Wait()
 	<-m.ctx.Done()
+}
+
+// WaitStarted blocks until Run has completed initialization or the context is canceled.
+func (m *Manager) WaitStarted(ctx context.Context) bool {
+	select {
+	case <-m.started:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+// GetJobNames returns the currently running job names for a module.
+func (m *Manager) GetJobNames(moduleName string) []string {
+	return m.moduleFuncs.getJobNames(moduleName)
+}
+
+// ExecuteFunction executes a module function handler directly.
+func (m *Manager) ExecuteFunction(moduleName string, fn functions.Function) {
+	handler := m.makeModuleFuncHandler(moduleName)
+	handler(fn)
 }
 
 func (m *Manager) runProcessConfGroups(in chan []*confgroup.Group) {
