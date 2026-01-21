@@ -185,3 +185,16 @@ func (a *API) CONFIGDELETE(id string) {
 func (a *API) CONFIGSTATUS(id, status string) {
 	_, _ = a.Write([]byte("CONFIG " + id + " status " + status + "\n\n"))
 }
+
+// FUNCTIONGLOBAL registers a global function with Netdata.
+// Format: FUNCTION GLOBAL "<name>" <timeout> "<help>" "<tags>" <access> <priority> <version>
+func (a *API) FUNCTIONGLOBAL(opts FunctionGlobalOpts) {
+	_, _ = a.Write([]byte("FUNCTION GLOBAL \"" +
+		opts.Name + "\" " +
+		strconv.Itoa(opts.Timeout) + " \"" +
+		opts.Help + "\" \"" +
+		opts.Tags + "\" " +
+		opts.Access + " " +
+		strconv.Itoa(opts.Priority) + " " +
+		strconv.Itoa(opts.Version) + "\n\n"))
+}

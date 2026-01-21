@@ -39,7 +39,9 @@ func (c *Collector) collectGlobalVariables() error {
 			case "max_connections":
 				c.varMaxConns = parseInt(value)
 			case "performance_schema":
+				c.varPerfSchemaMu.Lock()
 				c.varPerformanceSchema = value
+				c.varPerfSchemaMu.Unlock()
 			case "table_open_cache":
 				c.varTableOpenCache = parseInt(value)
 			}

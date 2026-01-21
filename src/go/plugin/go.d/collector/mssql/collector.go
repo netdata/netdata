@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
@@ -24,8 +25,11 @@ func init() {
 		Defaults: module.Defaults{
 			UpdateEvery: 10,
 		},
-		Create: func() module.Module { return New() },
-		Config: func() any { return &Config{} },
+		Create:       func() module.Module { return New() },
+		Config:       func() any { return &Config{} },
+		Methods:      mssqlMethods,
+		MethodParams: mssqlMethodParams,
+		HandleMethod: mssqlHandleMethod,
 	})
 }
 
@@ -52,6 +56,40 @@ type Config struct {
 	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
 	DSN         string           `yaml:"dsn" json:"dsn"`
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+
+	// QueryStoreTimeWindowDays controls how far back to look in Query Store
+	// Uses pointer to distinguish "unset" from explicit "0":
+	//   - nil (unset): Apply default of 7 days
+	//   - 0: Query ALL available data (not recommended for busy servers)
+	//   - N > 0: Query last N days
+	QueryStoreTimeWindowDays *int `yaml:"query_store_time_window_days,omitempty" json:"query_store_time_window_days"`
+
+	// QueryStoreFunctionEnabled controls whether the top-queries function is available
+	// Uses pointer to distinguish "unset" from explicit "false":
+	//   - nil (unset): Apply default of true (enabled)
+	//   - false: Explicitly disabled
+	//   - true: Explicitly enabled
+	// Default: true - MSSQL Query Store may contain unmasked PII in query text
+	QueryStoreFunctionEnabled *bool `yaml:"query_store_function_enabled,omitempty" json:"query_store_function_enabled"`
+
+	// TopQueriesLimit is the maximum number of queries to return
+	TopQueriesLimit int `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
+}
+
+// GetQueryStoreTimeWindowDays returns the time window for Query Store queries (default: 7)
+func (c *Config) GetQueryStoreTimeWindowDays() int {
+	if c.QueryStoreTimeWindowDays == nil {
+		return 7
+	}
+	return *c.QueryStoreTimeWindowDays
+}
+
+// GetQueryStoreFunctionEnabled returns whether the Query Store function is enabled (default: true)
+func (c *Config) GetQueryStoreFunctionEnabled() bool {
+	if c.QueryStoreFunctionEnabled == nil {
+		return true
+	}
+	return *c.QueryStoreFunctionEnabled
 }
 
 type Collector struct {
@@ -70,6 +108,10 @@ type Collector struct {
 	seenLockStatsTypes map[string]bool
 	seenJobs           map[string]bool
 	seenReplications   map[string]bool
+
+	// Query Store column cache (per-instance to handle different SQL Server versions)
+	queryStoreColsMu sync.RWMutex // protects queryStoreCols for concurrent access
+	queryStoreCols   map[string]bool
 }
 
 func (c *Collector) Configuration() any {

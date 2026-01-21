@@ -1,0 +1,88 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: netdata
+      POSTGRES_PASSWORD: netdata
+      POSTGRES_DB: netdata
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./seed/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netdata -d netdata"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+      MYSQL_DATABASE: netdata
+      MYSQL_USER: netdata
+      MYSQL_PASSWORD: netdata
+    command: ["--performance_schema=ON"]
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./seed/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD > /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Netdata123!"
+    ports:
+      - "1433:1433"
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -x /opt/mssql-tools18/bin/sqlcmd ]; then /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P $$MSSQL_SA_PASSWORD -Q \"SELECT 1\" > /dev/null; else /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P $$MSSQL_SA_PASSWORD -Q \"SELECT 1\" > /dev/null; fi"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  mssql-init:
+    image: mcr.microsoft.com/mssql-tools
+    depends_on:
+      mssql:
+        condition: service_healthy
+    environment:
+      MSSQL_SA_PASSWORD: "Netdata123!"
+    volumes:
+      - ./seed/mssql/init.sql:/seed/init.sql:ro
+      - ./seed/mssql/init.sh:/seed/init.sh:ro
+    entrypoint: ["/bin/bash", "/seed/init.sh"]
+
+  mongo:
+    image: mongo:6
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: rootpw
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./seed/mongodb/init.js:/docker-entrypoint-initdb.d/init.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--username", "root", "--password", "rootpw", "--authenticationDatabase", "admin", "--eval", "db.runCommand({ping:1})"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongo-init:
+    image: mongo:6
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: rootpw
+    volumes:
+      - ./seed/mongodb/init.js:/seed/init.js:ro
+      - ./seed/mongodb/init.sh:/seed/init.sh:ro
+    entrypoint: ["/bin/bash", "/seed/init.sh"]

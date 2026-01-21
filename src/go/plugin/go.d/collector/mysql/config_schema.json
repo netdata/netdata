@@ -40,6 +40,14 @@
         "title": "Vnode",
         "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
         "type": "string"
+      },
+      "top_queries_limit": {
+        "title": "Top Queries Limit",
+        "description": "Maximum number of queries to return in the top-queries function response.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 5000,
+        "default": 500
       }
     },
     "required": [
