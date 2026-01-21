@@ -367,37 +367,206 @@ Kernel network processing queue monitoring.
 
 ## 6.5 Hardware and Sensor Alerts
 
-Hardware monitoring provides visibility into infrastructure that is often neglected until failure occurs.
+Hardware monitoring protects physical infrastructure health: storage arrays, power supplies, cooling systems, and drive SMART status.
 
 :::note
 
-Hardware monitoring requires collector support for your specific hardware. Check that IPMI, SMART, and sensor collectors are enabled for your platform.
+Hardware monitoring requires collector support for your specific platform. Enable IPMI, SMART, and sensor collectors appropriate to your hardware.
 
 :::
 
-### RAID Monitoring
+### RAID Array Controllers
+
+Enterprise RAID controller health and disk status.
+
+| Integration | Alerts Covered |
+|------------|---------------|
+| [Adaptec RAID](/docs/src/go/plugin/go.d/collector/adaptecraid/integrations/adaptecraid.md) | Logical device health, physical disk state, battery backup |
+| [MegaRAID](/docs/src/go/plugin/go.d/collector/megacli/integrations/megacli.md) | Adapter health, BBU charge/recharge cycles, media/predictive errors |
+| [StorCLI](/docs/src/go/plugin/go.d/collector/storcli/integrations/storcli.md) | Controller health, battery status, disk errors, predictive failures |
+
+### Software RAID and MDADM
+
+Linux software RAID monitoring.
 
 | Alert | Description | Context | Thresholds |
 |-------|-------------|---------|------------|
-| **adaptec_raid_logical_device_status** | Fires when array has lost redundancy | `adaptecraid.logical_device_status` | CRIT > 0 (degraded) |
-| **adaptec_raid_physical_device_state** | Tracks individual disk failures within RAID arrays | `adaptecraid.physical_device_state` | CRIT > 0 (failed) |
+| **mdstat_disks** | Number of healthy disks in array | `mdstat.md` | CRIT degraded |
+| **mdstat_mismatch_cnt** | Resync mismatch count | `mdstat.md` | WARN > 0 |
+| **mdstat_nonredundant_last_collected** | Array running without redundancy | `mdstat.md` | CRIT non-redundant |
 
-### Power Monitoring
+### Storage Pools and Volume Managers
+
+LVM, BCACHE, and ZFS storage pool monitoring.
+
+| Integration | Alerts Covered |
+|------------|---------------|
+| [LVM](/docs/src/go/plugin/go.d/collector/lvm/integrations/lvm.md) | LV data space, metadata space utilization |
+| [BCACHE](/docs/src/go/plugin/go.d/collector/dmcache/integrations/dmcache.md) | Cache dirty data, cache errors |
+| [ZFS](/docs/src/health/health.d/zfs.conf) | Pool health state, space utilization, vdev health |
+
+### SSD and NVMe Monitoring
+
+NVMe drive health and SMART status.
 
 | Alert | Description | Context | Thresholds |
 |-------|-------------|---------|------------|
-| **apcupsd_ups_battery_charge** | Monitors remaining battery capacity | `apcupsd.ups_battery_charge` | WARN < 25%, CRIT < 10% |
-| **apcupsd_ups_status_onbatt** | Fires when mains power fails | `apcupsd.ups_status` | CRIT > 0 (on battery) |
-| **apcupsd_ups_load_capacity** | Tracks UPS load percentage | `apcupsd.ups_load_capacity_utilization` | WARN > 80%, CRIT > 90% |
-| **upsd_ups_battery_charge** | NUT UPS battery charge monitoring | `upsd.ups_battery_charge` | WARN < 25%, CRIT < 10% |
-| **upsd_10min_ups_load** | NUT UPS load percentage | `upsd.ups_load` | WARN > 80%, CRIT > 90% |
+| **nvme_device_critical_warnings_state** | Critical warning flags from NVMe SMART | `nvme.health` | CRIT > 0 |
 
-### BMC/IPMI Monitoring
+### SMART Disk Monitoring
+
+Drive self-monitoring and predictive failure indicators.
+
+| Integration | Alerts Covered |
+|------------|---------------|
+| [smartctl](/docs/src/go/plugin/go.d/collector/smartctl/integrations/smartctl.md) | Drive health, predictive failures, temperature |
+
+### Uninterruptible Power Supplies
+
+UPS battery and power status monitoring.
+
+#### APCUPSD (APC UPS)
 
 | Alert | Description | Context | Thresholds |
 |-------|-------------|---------|------------|
-| **ipmi_sensor_state** | Monitors BMC sensor states | `ipmi.sensor_state` | WARN/CRIT based on sensor type |
-| **ipmi_events** | Tracks IPMI event log entries | `ipmi.events` | Any events present |
+| **apcupsd_ups_battery_charge** | Remaining battery capacity | `apcupsd.ups_battery_charge` | WARN < 25%, CRIT < 10% |
+| **apcupsd_ups_status_onbatt** | Operating on battery power | `apcupsd.ups_status` | CRIT on battery |
+| **apcupsd_ups_status_lowbatt** | Low battery warning | `apcupsd.ups_status` | CRIT low battery |
+| **apcupsd_ups_load_capacity** | UPS load percentage | `apcupsd.ups_load_capacity_utilization` | WARN > 80%, CRIT > 90% |
+| **apcupsd_ups_status_commlost** | Communication lost with UPS | `apcupsd.ups_status` | CRIT comm lost |
+| **apcupsd_ups_selftest_warning** | UPS selftest warning | `apcupsd.ups` | WARN/C |
+| **apcupsd_last_collected_secs** | Stale data from UPS | `apcupsd.ups` | WARN > 300s |
+
+#### NUT (Network UPS Tools)
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **upsd_ups_battery_charge** | Battery charge level | `upsd.ups_battery_charge` | WARN < 25%, CRIT < 10% |
+| **upsd_10min_ups_load** | UPS load percentage | `upsd.ups_load` | WARN > 80%, CRIT > 90% |
+| **upsd_ups_last_collected_secs** | Stale data from UPS daemon | `upsd.ups` | WARN > 300s |
+
+### Baseboard Management Controller (BMC) and IPMI
+
+Server BMC/IPMI sensor monitoring.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **ipmi_sensor_state** | Individual BMC sensor states | `ipmi.sensor_state` | WARN/CRIT per sensor |
+| **ipmi_events** | IPMI event log entries | `ipmi.events` | Any events logged |
+
+### Hardware Sensors
+
+Temperature, fan speed, voltage, and environmental sensors.
+
+| Integration | Alerts Covered |
+|------------|---------------|
+| [Sensors](/docs/src/go/plugin/go.d/collector/sensors/integrations/sensors.md) | Temperature, fan speed, voltage alarms |
+| [LM-Sensors](/docs/src/go/plugin/go.d/collector/sensors/integrations/lm_sensors.md) | Core temp, ambient temp, fan speeds |
+| [NVidia SMI](/docs/src/go/plugin/go.d/collector/nvidia_smi/integrations/nvidia_smi.md) | GPU temperature, memory, utilization |
+| [Intel GPU](/docs/src/go/plugin/go.d/collector/intelgpu/integrations/intelgpu.md) | GPU frequency, temperature, render engines |
+
+### Hardware Memory and ECC
+
+ECC memory error counting and DIMM status.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **ecc_memory_mc_correctable** | Memory controller correctable errors | `ecc.mc` | Various |
+| **ecc_memory_mc_uncorrectable** | Memory controller uncorrectable errors | `ecc.mc` | Any uncorrectable |
+| **ecc_memory_dimm_correctable** | DIMM correctable ECC errors | `ecc.dimm` | Various |
+| **ecc_memory_dimm_uncorrectable** | DIMM uncorrectable ECC errors | `ecc.dimm` | Any uncorrectable |
+| **1hour_memory_hw_corrupted** | Memory region flagged corrupted | `hardware.corrupted` | CRIT > 0 |
+| **power_supply_capacity** | Power supply capacity utilization | `power_supply.capacity` | WARN > 90% |
+
+### VMware vCenter Server Appliance (VCSA)
+
+VMware VCSA health and resource monitoring.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **vcsa_system_health_crit** | Critical system health | `vcsa.applmgmt` | CRIT |
+| **vcsa_system_health_warn** | Warning system health | `vcsa.applmgmt` | WARN |
+| **vcsa_load_health_crit** | Critical load average | `vcsa.system` | CRIT |
+| **vcsa_load_health_warn** | Warning load average | `vcsa.system` | WARN |
+| **vcsa_mem_health_crit** | Critical memory usage | `vcsa.system` | CRIT |
+| **vcsa_mem_health_warn** | Warning memory usage | `vcsa.system` | WARN |
+| **vcsa_swap_health_crit** | Critical swap usage | `vcsa.system` | CRIT |
+| **vcsa_swap_health_warn** | Warning swap usage | `vcsa.system` | WARN |
+| **vcsa_storage_health_crit** | Critical storage | `vcsa.storage` | CRIT |
+| **vcsa_storage_health_warn** | Warning storage | `vcsa.storage` | WARN |
+| **vcsa_database_storage_health_crit** | Critical DB storage | `vcsa.database` | CRIT |
+| **vcsa_database_storage_health_warn** | Warning DB storage | `vcsa.database` | WARN |
+| **vcsa_software_packages_health_warn** | Software packages issues | `vcsa.software` | WARN |
+
+### IBM AS/400 System Monitoring
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **as400_cpu_utilization** | CPU utilization percentage | `as400.cpu` | WARN/C |
+| **as400_disk_busy_average** | Disk busy average | `as400.disk` | WARN/C |
+| **as400_job_queue_waiting** | Jobs waiting in queue | `as400.jobs` | WARN/C |
+| **as400_system_asp_usage** | Auxiliary storage pool usage | `as400.asp` | WARN/C |
+
+### BOINC Distributed Computing
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **boinc_active_tasks** | Number of active BOINC tasks | `boinc.tasks` | WARN/C |
+| **boinc_total_tasks** | Total BOINC tasks | `boinc.tasks` | WARN/C |
+| **boinc_compute_errors** | Computation errors | `boinc.errors` | WARN > 0 |
+| **boinc_upload_errors** | Upload failures | `boinc.upload` | WARN > 0 |
+
+### Systemd Unit Monitoring
+
+Service, socket, timer, and systemd unit health.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **systemd_service_unit_failed_state** | Service unit failed status | `systemd.units` | CRIT failed |
+| **systemd_socket_unit_failed_state** | Socket unit failed status | `systemd.units` | CRIT failed |
+| **systemd_timer_unit_failed_state** | Timer unit failed status | `systemd.units` | CRIT failed |
+| **systemd_mount_unit_failed_state** | Mount unit failed status | `systemd.units` | CRIT failed |
+| **systemd_swap_unit_failed_state** | Swap unit failed status | `systemd.units` | CRIT failed |
+| **systemd_automount_unit_failed_state** | Automount unit failed | `systemd.units` | CRIT failed |
+| **systemd_device_unit_failed_state** | Device unit failed status | `systemd.units` | CRIT failed |
+| **systemd_path_unit_failed_state** | Path unit failed status | `systemd.units` | CRIT failed |
+| **systemd_scope_unit_failed_state** | Scope unit failed status | `systemd.units` | CRIT failed |
+| **systemd_slice_unit_failed_state** | Slice unit failed status | `systemd.units` | CRIT failed |
+| **systemd_target_unit_failed_state** | Target unit failed status | `systemd.units` | CRIT failed |
+
+### Exporting and Streaming
+
+Metrics export and streaming pipeline health.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **exporting_last_buffering** | Last buffering timestamp | `exporting.buffer` | Stale > 5m |
+| **exporting_metrics_sent** | Export pipeline status | `exporting.sent` | Export failure |
+| **streaming_disconnected** | Upstream connection lost | `streaming.remote` | CRIT disconnected |
+| **streaming_never_connected** | Never connected upstream | `streaming.remote` | CRIT never connected |
+| **plugin_availability_status** | Collector plugin status | `plugins.available` | Disabled |
+| **plugin_data_collection_status** | Data collection failures | `plugins.collection` | Failures |
+| **python.d_job_last_collected_secs** | Python collector staleness | `python.d.job` | WARN > 300s |
+
+### BTRFS Filesystem
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **btrfs_allocated** | BTRFS space allocation | `btrfs.allocation` | WARN/C |
+| **btrfs_data** | BTRFS data pool status | `btrfs.data` | WARN/C |
+| **btrfs_metadata** | BTRFS metadata pool status | `btrfs.metadata` | WARN/C |
+| **btrfs_system** | BTRFS system pool status | `btrfs.system` | WARN/C |
+| **btrfs_device_corruption_errors** | Device corruption errors | `btrfs.device` | CRIT > 0 |
+| **btrfs_device_flush_errors** | Device flush errors | `btrfs.device` | CRIT > 0 |
+| **btrfs_device_generation_errors** | Generation errors | `btrfs.device` | CRIT > 0 |
+| **btrfs_device_read_errors** | Device read errors | `btrfs.device` | CRIT > 0 |
+| **btrfs_device_write_errors** | Device write errors | `btrfs.device` | CRIT > 0 |
+
+### CEPH Storage Cluster
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **ceph_cluster_physical_capacity_utilization** | Ceph cluster capacity utilization | `ceph.cluster` | WARN > 80%, CRIT > 90% |
 
 ## Related Sections
 
