@@ -826,67 +826,105 @@ typedef enum {
     STORE_CHART_LABELS,
 } label_store_type_t;
 
-// Context for label storage callback
-struct label_store_ctx {
-    sqlite3_stmt *stmt;
-    nd_uuid_t *uuid;
-    int stored;
-    int errors;
+// Structure to hold a single label entry for collection
+struct label_entry {
+    char *name;
+    char *value;
+    RRDLABEL_SRC ls;
 };
 
-// Unified callback for storing labels using prepared statements
-static int store_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data)
-{
-    struct label_store_ctx *ctx = data;
+// Context for label collection callback (no I/O, just data collection)
+struct label_collect_ctx {
+    struct label_entry *entries;
+    size_t count;
+    size_t capacity;
+};
 
-    if (unlikely(!ctx->stmt || !name || !value))
+#define LABEL_COLLECT_INITIAL_CAPACITY 32
+
+// Callback to collect labels into an array (no SQLite I/O while spinlock is held)
+static int collect_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data)
+{
+    struct label_collect_ctx *ctx = data;
+
+    if (unlikely(!name || !value))
         return 1;
 
-    int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(ctx->stmt, ++param, ctx->uuid, sizeof(*ctx->uuid), SQLITE_STATIC));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int(ctx->stmt, ++param, (int)(ls & ~(RRDLABEL_FLAG_INTERNAL))));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_text(ctx->stmt, ++param, name, -1, SQLITE_STATIC));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_text(ctx->stmt, ++param, value, -1, SQLITE_STATIC));
-
-    param = 0;
-    int rc = sqlite3_step_monitored(ctx->stmt);
-    if (likely(rc == SQLITE_DONE))
-        ctx->stored++;
-    else {
-        ctx->errors++;
-        error_report("Failed to store label '%s', rc = %d", name, rc);
+    // Grow array if needed
+    if (ctx->count >= ctx->capacity) {
+        ctx->capacity *= 2;
+        ctx->entries = reallocz(ctx->entries, ctx->capacity * sizeof(*ctx->entries));
     }
 
-done:
-    REPORT_BIND_FAIL(ctx->stmt, param);
-    SQLITE_RESET(ctx->stmt);
+    // Copy label data
+    ctx->entries[ctx->count].name = strdupz(name);
+    ctx->entries[ctx->count].value = strdupz(value);
+    ctx->entries[ctx->count].ls = ls;
+    ctx->count++;
+
     return 1;
 }
 
 // Store labels for a host or chart using prepared statements
+// Two-phase approach: collect labels first (while spinlock held), then execute SQLite (after spinlock released)
 static int store_labels(nd_uuid_t *uuid, RRDLABELS *labels, label_store_type_t type)
 {
     if (unlikely(!uuid || !labels))
         return 0;
 
-    sqlite3_stmt *stmt = NULL;
-    const char *sql = (type == STORE_HOST_LABELS) ? SQL_STORE_HOST_LABEL : SQL_STORE_CHART_LABEL;
-
-    if (!PREPARE_STATEMENT(db_meta, sql, &stmt))
-        return 1;
-
-    struct label_store_ctx ctx = {
-        .stmt = stmt,
-        .uuid = uuid,
-        .stored = 0,
-        .errors = 0,
+    // Phase 1: Collect labels while spinlock is held (fast, no I/O)
+    struct label_collect_ctx collect_ctx = {
+        .entries = mallocz(LABEL_COLLECT_INITIAL_CAPACITY * sizeof(*collect_ctx.entries)),
+        .count = 0,
+        .capacity = LABEL_COLLECT_INITIAL_CAPACITY,
     };
 
-    rrdlabels_walkthrough_read(labels, store_label_callback, &ctx);
+    rrdlabels_walkthrough_read(labels, collect_label_callback, &collect_ctx);
+    // Spinlock is now released
 
-    SQLITE_FINALIZE(stmt);
+    // Phase 2: Execute SQLite operations (no spinlock held)
+    int errors = 0;
 
-    return ctx.errors ? 1 : 0;
+    if (collect_ctx.count > 0) {
+        sqlite3_stmt *stmt = NULL;
+        const char *sql = (type == STORE_HOST_LABELS) ? SQL_STORE_HOST_LABEL : SQL_STORE_CHART_LABEL;
+
+        if (!PREPARE_STATEMENT(db_meta, sql, &stmt)) {
+            errors = 1;
+        } else {
+            for (size_t i = 0; i < collect_ctx.count; i++) {
+                struct label_entry *entry = &collect_ctx.entries[i];
+
+                int param = 0;
+                SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(stmt, ++param, uuid, sizeof(*uuid), SQLITE_STATIC));
+                SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(stmt, ++param, (int)(entry->ls & ~(RRDLABEL_FLAG_INTERNAL))));
+                SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(stmt, ++param, entry->name, -1, SQLITE_STATIC));
+                SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(stmt, ++param, entry->value, -1, SQLITE_STATIC));
+
+                param = 0;
+                int rc = sqlite3_step_monitored(stmt);
+                if (unlikely(rc != SQLITE_DONE)) {
+                    errors++;
+                    error_report("Failed to store label '%s', rc = %d", entry->name, rc);
+                }
+
+            bind_fail:
+                REPORT_BIND_FAIL(stmt, param);
+                SQLITE_RESET(stmt);
+            }
+
+            SQLITE_FINALIZE(stmt);
+        }
+    }
+
+    // Cleanup collected labels
+    for (size_t i = 0; i < collect_ctx.count; i++) {
+        freez(collect_ctx.entries[i].name);
+        freez(collect_ctx.entries[i].value);
+    }
+    freez(collect_ctx.entries);
+
+    return errors ? 1 : 0;
 }
 
 static int check_and_update_chart_labels(RRDSET *st)
