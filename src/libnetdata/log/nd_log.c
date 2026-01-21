@@ -236,7 +236,7 @@ static bool nd_logger_log_fields_async(FILE *fp __maybe_unused, bool limit, ND_L
     // Pre-format the message into a queue entry (no locks held)
     // Note: FILE* is looked up at write time from nd_log.sources[source] to handle log rotation
     struct nd_log_queue_entry entry = {
-        .source = source - nd_log.sources,  // Calculate source index
+        .source = (ND_LOG_SOURCES)(source - nd_log.sources),  // Calculate source index
         .priority = priority,
         .method = output,
         .format = source->format,
@@ -268,24 +268,24 @@ static bool nd_logger_log_fields_async(FILE *fp __maybe_unused, bool limit, ND_L
     size_t msg_len = buffer_strlen(wb);
     const char *msg = buffer_tostring(wb);
 
-    // Clamp to maximum size
+    // Clamp to maximum size (leaving room for null terminator)
     if(msg_len >= ND_LOG_QUEUE_MESSAGE_MAX_SIZE)
         msg_len = ND_LOG_QUEUE_MESSAGE_MAX_SIZE - 1;
 
     entry.message_len = msg_len;
 
-    // Decide: inline buffer or allocate
+    // Copy message and ensure null-termination (both branches explicitly add '\0')
     if(msg_len < ND_LOG_QUEUE_INLINE_SIZE) {
         // Fits in inline buffer
         memcpy(entry.message_inline, msg, msg_len);
-        entry.message_inline[msg_len] = '\0';
+        entry.message_inline[msg_len] = '\0';  // Explicit null-termination after truncated content
         entry.message_allocated = NULL;
     }
     else {
         // Need to allocate - use mallocz (will fatal on failure, which is acceptable)
         entry.message_allocated = mallocz(msg_len + 1);
         memcpy(entry.message_allocated, msg, msg_len);
-        entry.message_allocated[msg_len] = '\0';
+        entry.message_allocated[msg_len] = '\0';  // Explicit null-termination after truncated content
     }
 
     // Enqueue the entry (transfers ownership of allocated pointer)
