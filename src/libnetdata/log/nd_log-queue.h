@@ -73,7 +73,8 @@ struct nd_log_queue_stats {
 // Public API
 
 // Initialize the async logging queue and start the logger thread
-// Returns true on success, false on failure
+// On failure, the queue remains disabled and logging falls back to synchronous mode.
+// Use nd_log_queue_enabled() to check if async logging is active.
 void nd_log_queue_init(void);
 
 // Shutdown the async logging queue
