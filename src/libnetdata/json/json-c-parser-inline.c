@@ -6,7 +6,7 @@ int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
     buffer_reset(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     buffer_json_member_add_int64(wb, "status", code);
-    buffer_json_member_add_string(wb, "error_message", msg);
+    buffer_json_member_add_string(wb, "errorMessage", msg);
     buffer_json_finalize(wb);
     wb->date = now_realtime_sec();
     wb->expires = wb->date + 1;
