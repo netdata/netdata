@@ -220,19 +220,54 @@ With the Netdata Agent running, visit `http://NODE:19999/api/v3/info` in your br
 
 **Method 2: Command Line**
 
-You can also run `sudo netdatacli aclk-state` to get some diagnostic information about ACLK:
+You can also run `sudo netdatacli aclk-state` to get the full ACLK state via the `/api/v1/aclk` endpoint:
 
 ```bash
-ACLK Available: Yes
-ACLK Implementation: Next Generation
-New Cloud Protocol Support: Yes
-Claimed: Yes
-Claimed Id: 53aa76c2-8af5-448f-849a-b16872cc4ba1
-Online: Yes
-Used Cloud Protocol: New
+curl -s http://localhost:19999/api/v1/aclk | jq
 ```
 
-Use these keys and the information below to troubleshoot the ACLK.
+**Response fields:**
+
+| Field | Description |
+|-------|-------------|
+| `aclk-available` | Whether ACLK is compiled into this Agent |
+| `aclk-version` | ACLK protocol version (currently 2) |
+| `agent-claimed` | Whether the Agent has been claimed to a Space |
+| `claimed-id` | The Claimed ID UUID (only present if claimed) |
+| `online` | Whether the ACLK connection is currently online |
+| `aclk_proxy` | Configured proxy URL, or null |
+| `reconnect-count` | Number of reconnections since Agent start |
+| `banned-by-cloud` | Whether Cloud has disabled this Agent's ACLK |
+| `mqtt-version` | MQTT protocol version (5) |
+| `used-cloud-protocol` | Communication protocol ("Protobuf") |
+| `publish_latency_us` | Publish latency in microseconds |
+| `pending-mqtt-pubacks` | Messages waiting for acknowledgment |
+
+**Example response:**
+
+```json
+{
+  "aclk-available": true,
+  "aclk-version": 2,
+  "agent-claimed": true,
+  "claimed-id": "53aa76c2-8af5-448f-849a-b16872cc4ba1",
+  "online": true,
+  "aclk_proxy": null,
+  "reconnect-count": 0,
+  "banned-by-cloud": false,
+  "mqtt-version": 5,
+  "used-cloud-protocol": "Protobuf",
+  "publish_latency_us": 12345,
+  "pending-mqtt-pubacks": 0
+}
+```
+
+**Interpreting common states:**
+
+- **`online: false`**: Network connectivity issue or cloud-side ban
+- **`banned-by-cloud: true`**: Contact Netdata support - Agent was banned
+- **`agent-claimed: false`**: Agent not yet claimed, or claiming files deleted
+- **`pending-mqtt-pubacks` growing**: Indicates backpressure, may signal connectivity issues
 
 ### Common Issues
 
