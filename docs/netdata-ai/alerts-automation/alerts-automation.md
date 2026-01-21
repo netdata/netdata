@@ -1,10 +1,10 @@
-# AI-Powered Alert Configuration
+# Alerts Automation
 
 ## Overview
 
 Netdata has an incredibly powerful alerting engine that offers immense flexibility to build specific, intelligent alerts. However, mastering its syntax can feel like learning a new language.
 
-To ensure accessibility for every member on your engineering team, we created the AI-Powered Alert Configuration feature. A bridge between your intent and Netdata's syntax, letting you describe conditions in plain English while the AI handles the rest.
+To ensure accessibility for every member on your engineering team, we created Alerts Automation. A bridge between your intent and Netdata's syntax, letting you describe conditions in plain English while the AI handles the rest.
 
 ## Capabilities
 
