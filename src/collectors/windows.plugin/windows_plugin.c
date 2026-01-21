@@ -67,7 +67,7 @@ static struct proc_module {
 
     // the same is provided by PerflibProcessor, with more detailed analysis
     //{.name = "GetSystemCPU",        .dim = "GetSystemCPU",       .enabled = CONFIG_BOOLEAN_YES,
-    // .update_every = UPDATE_EVERY_MIN, .func = do_GetSystemCPU},
+    // .update_every = UPDATE_EVERY_MIN, .func = do_GetSystemCPU, .cleanup = do_GetSystemCPU_cleanup},
 
     {.name = "PerflibProcesses",
      .dim = "PerflibProcesses",
