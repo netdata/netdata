@@ -10,6 +10,7 @@ Session snapshots are gzipped JSON files (`{UUID}.json.gz`) containing complete 
 - All logs (including WRN/ERR)
 - Accounting entries
 - Nested sub-agent sessions (orchestration sessions under `steps[]`; tool_output full-chunked LLM ops under the tool_output child session’s `steps[]`)
+- tool_output read-grep runs as a child session with callPath appended to the parent (e.g., `parent:tool_output.read_grep`) and trace IDs linked to the parent
 
 Default location: `~/.ai-agent/sessions/`
 

@@ -10,6 +10,7 @@ import type { SessionNode } from '../../session-tree.js';
 import type { ToolOutputConfig, ToolOutputTarget } from '../../tool-output/types.js';
 import type { AIAgentEventCallbacks, AIAgentEventMeta, Configuration, LogEntry, TurnRequest, TurnResult } from '../../types.js';
 
+import { AIAgent } from '../../ai-agent.js';
 import { ToolOutputExtractor } from '../../tool-output/extractor.js';
 import { formatForGrep } from '../../tool-output/formatter.js';
 import { ToolOutputHandler } from '../../tool-output/handler.js';
@@ -23,6 +24,13 @@ const buildChildMeta = (): AIAgentEventMeta => ({
   handoffConfigured: false,
   sequence: 1,
 });
+
+const TOOL_OUTPUT_READ_GREP = 'tool_output.read_grep';
+const TOOL_OUTPUT_READ_GREP_CALL_PATH = `agent:${TOOL_OUTPUT_READ_GREP}`;
+const TOOL_OUTPUT_READ_GREP_TURN_PATH = 'root-turn-1.2';
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
 
 const buildChildLog = (): LogEntry => ({
   timestamp: Date.now(),
@@ -41,8 +49,8 @@ const buildChildLog = (): LogEntry => ({
 const buildChildSession = (): SessionNode => ({
   id: 'tool-output-child',
   traceId: 'trace-tool-output',
-  agentId: 'tool_output.read_grep',
-  callPath: 'tool_output.read_grep',
+  agentId: TOOL_OUTPUT_READ_GREP,
+  callPath: TOOL_OUTPUT_READ_GREP_CALL_PATH,
   sessionTitle: '',
   startedAt: Date.now(),
   turns: [],
@@ -247,8 +255,10 @@ describe('ToolOutputExtractor', () => {
       sessionTargets,
       sessionNonce: 'READGREPNONCE',
       sessionId: 'session-read-grep',
+      originTxnId: 'origin-read-grep',
       agentId: 'agent',
       callPath: 'agent',
+      turnPathPrefix: 'root-turn',
       toolResponseMaxBytes: 4000,
       temperature: null,
       topP: null,
@@ -275,12 +285,28 @@ describe('ToolOutputExtractor', () => {
       toolArgsJson: '{}',
       content: 'payload',
       stats: { bytes: 7, lines: 1, tokens: 2, avgLineBytes: 7 },
-    }, 'find value', 'read-grep', sessionTargets);
+    }, 'find value', 'read-grep', sessionTargets, { parentContext: { turn: 1, subturn: 2 } });
 
     expect(result.ok).toBe(true);
     expect(result.mode).toBe('read-grep');
     expect(result.text).toBe('read-grep-extracted');
     expect(result.childOpTree).toBeDefined();
+    expect(vi.mocked(AIAgent).create).toHaveBeenCalled();
+    const firstConfig = (vi.mocked(AIAgent).create as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]?.[0];
+    expect(isRecord(firstConfig)).toBe(true);
+    if (isRecord(firstConfig)) {
+      expect(firstConfig.agentId).toBe(TOOL_OUTPUT_READ_GREP);
+      expect(firstConfig.agentPath).toBe(TOOL_OUTPUT_READ_GREP_CALL_PATH);
+      expect(firstConfig.turnPathPrefix).toBe(TOOL_OUTPUT_READ_GREP_TURN_PATH);
+      const trace = firstConfig.trace;
+      expect(isRecord(trace)).toBe(true);
+      if (isRecord(trace)) {
+        expect(trace.callPath).toBe(TOOL_OUTPUT_READ_GREP_CALL_PATH);
+        expect(trace.originId).toBe('origin-read-grep');
+        expect(trace.parentId).toBe('session-read-grep');
+        expect(trace.turnPath).toBe(TOOL_OUTPUT_READ_GREP_TURN_PATH);
+      }
+    }
     cleanupTempRoot(root);
   });
 

@@ -128,6 +128,7 @@ export class ToolOutputProvider extends ToolProvider {
         {
           onChildOpTree: opts?.onChildOpTree,
           parentOpPath: opts?.parentOpPath,
+          parentContext: opts?.parentContext,
         },
       );
     } catch (error) {

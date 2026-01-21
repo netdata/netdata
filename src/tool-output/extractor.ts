@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 
 import type { TargetContextConfig } from '../context-guard.js';
 import type { LLMClient } from '../llm-client.js';
+import type { ToolExecutionContext } from '../tools/types.js';
 import type {
   AccountingEntry,
   AIAgentEventCallbacks,
@@ -21,7 +22,7 @@ import type { ToolOutputConfig, ToolOutputExtractionResult, ToolOutputMode, Tool
 import { SessionTreeBuilder, type SessionNode } from '../session-tree.js';
 import { stripLeadingThinkBlock } from '../think-tag-filter.js';
 import { TRUNCATE_PREVIEW_BYTES, buildTruncationPrefix, truncateToBytes, truncateToBytesWithInfo } from '../truncation.js';
-import { estimateMessagesBytes } from '../utils.js';
+import { appendCallPathSegment, estimateMessagesBytes } from '../utils.js';
 
 import { computeChunkCount, splitIntoChunks } from './chunking.js';
 
@@ -33,8 +34,11 @@ interface ToolOutputExtractionContext {
   sessionTargets: ToolOutputTarget[];
   sessionNonce: string;
   sessionId: string;
+  originTxnId?: string;
   agentId?: string;
   callPath?: string;
+  agentPath?: string;
+  turnPathPrefix?: string;
   toolResponseMaxBytes?: number;
   temperature?: number | null;
   topP?: number | null;
@@ -69,6 +73,7 @@ interface ExtractSource {
 interface ToolOutputExtractOptions {
   onChildOpTree?: (tree: SessionNode) => void;
   parentOpPath?: string;
+  parentContext?: ToolExecutionContext;
 }
 
 const NO_RELEVANT_DATA = 'NO RELEVANT DATA FOUND';
@@ -453,6 +458,30 @@ export class ToolOutputExtractor {
   ): Promise<ToolOutputExtractionResult> {
     const { name, config } = this.deps.buildFsServerConfig(this.deps.fsRootDir);
     const { AIAgent } = await import('../ai-agent.js');
+    const childAgentName = 'tool_output.read_grep';
+    const parentAgentPath = (() => {
+      const candidates = [this.deps.agentPath, this.deps.callPath, this.deps.agentId];
+      const match = candidates.find((value) => typeof value === 'string' && value.trim().length > 0);
+      return match ?? 'agent';
+    })();
+    const childAgentPath = appendCallPathSegment(parentAgentPath, childAgentName);
+    const inheritedTurnPath = (() => {
+      const prefix = typeof this.deps.turnPathPrefix === 'string' ? this.deps.turnPathPrefix : '';
+      const parentContext = opts?.parentContext;
+      if (parentContext !== undefined) {
+        const segment = `${String(parentContext.turn)}.${String(parentContext.subturn)}`;
+        return prefix.length > 0 ? `${prefix}-${segment}` : segment;
+      }
+      return prefix;
+    })();
+    const childTrace = {
+      selfId: crypto.randomUUID(),
+      originId: this.deps.originTxnId ?? this.deps.sessionId,
+      parentId: this.deps.sessionId,
+      callPath: childAgentPath,
+      agentPath: childAgentPath,
+      turnPath: inheritedTurnPath,
+    };
     const systemPrompt = buildReadGrepSystemPrompt({
       nonce: this.deps.sessionNonce,
     });
@@ -485,7 +514,10 @@ export class ToolOutputExtractor {
       traceMCP: this.deps.traceMCP,
       traceSdk: this.deps.traceSdk,
       verbose: this.deps.verbose,
-      agentId: 'tool_output.read_grep',
+      agentId: childAgentName,
+      trace: childTrace,
+      agentPath: childAgentPath,
+      turnPathPrefix: inheritedTurnPath,
       toolResponseMaxBytes: this.deps.toolResponseMaxBytes,
       toolOutput: { enabled: false },
       callbacks: this.wrapChildCallbacks(opts),
