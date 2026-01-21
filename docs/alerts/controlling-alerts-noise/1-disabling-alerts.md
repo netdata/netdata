@@ -95,5 +95,4 @@ See **9.4 Health Management API** for full documentation.
 ## What's Next
 
 - **[4.2 Silencing vs Disabling](2-silencing-vs-disabling.md)** - Understanding the differences
-- **[4.3 Silencing in Netdata Cloud](3-silencing-cloud.md)** - Cloud-based silencing
 - **[Chapter 8: Essential Alert Patterns](../essential-patterns/index.md)** - Hysteresis and patterns

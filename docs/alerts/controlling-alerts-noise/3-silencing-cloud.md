@@ -77,6 +77,5 @@ curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.'
 
 ## What's Next
 
-- **[4.4 Reducing Flapping](4-reducing-flapping.md)** - Delay and repeat techniques
 - **[8.1 Hysteresis](../essential-patterns/1-hysteresis.md)** - Status-based conditions
 - **[Chapter 5: Receiving Notifications](../receiving-notifications/index.md)** - Notification configuration
