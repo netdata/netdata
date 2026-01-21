@@ -112,6 +112,30 @@ Netdata supports many additional aggregation methods:
 | **Smoothing** | `ses`, `des` | Single/double exponential smoothing |
 | **Special** | `incremental_sum`, `countif`, `extremes` | Incremental sums, conditional counting, extreme values |
 
+### countif() Function
+
+Counts how many data points in the time window meet a condition:
+
+```conf
+lookup: countif(>0) -10m of errors
+```
+
+Condition operators: `>`, `>=`, `<`, `<=`, `=`, `==`, `!=`, `<>`
+
+**Examples:**
+```conf
+# Count error samples (non-zero) over 10 minutes
+lookup: countif(>0) -10m of errors
+
+# Count samples above 95% threshold
+lookup: countif(>=95) -5m of usage
+
+# Count failing health checks
+lookup: countif(!=0) -1m of failed_checks
+```
+
+Useful for creating thresholds based on sample counts rather than aggregated values.
+
 For the complete list with syntax details, refer to Netdata's `REFERENCE.md`.
 
 :::
