@@ -23,12 +23,24 @@ struct win_service {
 
 static DICTIONARY *win_services = NULL;
 
+static void win_service_cleanup(struct win_service *s)
+{
+    freez(s->service_name);
+    s->service_name = NULL;
+}
+
 void dict_win_service_insert_cb(const DICTIONARY_ITEM *item, void *value, void *data __maybe_unused)
 {
     struct win_service *ptr = value;
     const char *name = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
     ptr->service_name = strdupz(name);
+}
+
+void dict_win_service_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct win_service *s = value;
+    win_service_cleanup(s);
 }
 
 void do_GetServicesStatus_cleanup(void)
@@ -45,6 +57,7 @@ static void initialize(void)
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct win_service));
 
     dictionary_register_insert_callback(win_services, dict_win_service_insert_cb, NULL);
+    dictionary_register_delete_callback(win_services, dict_win_service_delete_cb, NULL);
 }
 
 static BOOL fill_dictionary_with_content()
