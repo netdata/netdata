@@ -293,6 +293,15 @@ static bool nd_logger_log_fields_async(FILE *fp __maybe_unused, bool limit, ND_L
     return nd_log_queue_enqueue(&entry);
 }
 
+// Detect when select_output() has remapped to a fallback FILE*.
+// This happens when the configured backend (journal/ETW/WEL) isn't initialized,
+// so select_output() falls back to stderr. For these sources, source->fp is NULL,
+// but the fallback fp points to stderr. The async path looks up fp from source->fp
+// at write time, so using async with a fallback would lose the message.
+static inline bool is_using_fallback_output(ND_LOG_METHOD output, FILE *fp, struct nd_log_source *source) {
+    return (output == NDLM_FILE && fp != source->fp);
+}
+
 // Main entry point - decides between sync and async logging
 static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LOG_FIELD_PRIORITY priority,
                                  ND_LOG_METHOD output, struct nd_log_source *source,
@@ -312,16 +321,10 @@ static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LO
         // For methods we support asynchronously
         // Note: NDLM_STDOUT/STDERR are remapped to NDLM_FILE by select_output()
         if(output == NDLM_FILE || output == NDLM_SYSLOG) {
-            // Skip async if using a fallback FILE* that differs from what the source provides.
-            // This happens when journal/ETW/WEL isn't initialized and select_output() remaps
-            // to stderr. The async path looks up fp from source->fp at write time, but for
-            // non-file sources that's NULL, so the message would be lost.
+            // Skip async if using a fallback - async looks up fp at write time from
+            // source->fp, which would be NULL for non-file sources.
             // SYSLOG is safe because write_entry() handles the fallback internally.
-            bool use_async = true;
-            if(output == NDLM_FILE && fp != source->fp) {
-                // Fallback FILE* - source->fp is NULL or different (e.g., journal->stderr)
-                use_async = false;
-            }
+            bool use_async = !is_using_fallback_output(output, fp, source);
 
             if(use_async && nd_logger_log_fields_async(fp, limit, priority, output, source, fields, fields_max))
                 return;  // Successfully queued
