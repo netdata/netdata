@@ -112,7 +112,7 @@ Docker container alerts monitor both the runtime state and resource consumption.
 
 | Alert | Description | Context | Thresholds |
 |-------|-------------|---------|------------|
-| **docker_container_unhealthy** | Tracks container health status from Docker daemon | `docker.container_health_status` | CRIT != 0 |
+| **docker_container_unhealthy** | Tracks container health status from Docker daemon | `docker.container_health_status` | WARN > 0 |
 | **docker_container_down** | Tracks running state of each container | `docker.container_state` | CRIT not running |
 
 ### Kubernetes Pod Alerts
