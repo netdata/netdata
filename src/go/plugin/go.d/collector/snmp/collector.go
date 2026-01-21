@@ -29,13 +29,16 @@ func init() {
 		Defaults: module.Defaults{
 			UpdateEvery: 10,
 		},
-		Create: func() module.Module { return New() },
-		Config: func() any { return &Config{} },
+		Create:       func() module.Module { return New() },
+		Config:       func() any { return &Config{} },
+		Methods:      snmpMethods,
+		MethodParams: snmpMethodParams,
+		HandleMethod: snmpHandleMethod,
 	})
 }
 
 func New() *Collector {
-	return &Collector{
+	c := &Collector{
 		Config: Config{
 			CreateVnode:              true,
 			VnodeDeviceDownThreshold: 3,
@@ -77,6 +80,10 @@ func New() *Collector {
 			return ddsnmpcollector.New(cfg)
 		},
 	}
+
+	c.funcIfaces = newFuncInterfaces(c.ifaceCache)
+
+	return c
 }
 
 type (
@@ -91,7 +98,8 @@ type (
 		seenTableMetrics  map[string]bool
 		seenProfiles      map[string]bool
 
-		ifaceCache *ifaceCache // interface metrics cache for functions
+		ifaceCache *ifaceCache     // interface metrics cache for functions
+		funcIfaces *funcInterfaces // interfaces function handler
 
 		prober    ping.Prober
 		newProber func(ping.ProberConfig, *logger.Logger) ping.Prober

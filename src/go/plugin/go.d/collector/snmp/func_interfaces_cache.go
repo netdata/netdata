@@ -23,22 +23,22 @@ var ifaceMetricNames = map[string]bool{
 // Tag keys used to identify interfaces.
 const (
 	tagInterface = "interface"
-	tagIfType    = "if_type"
+	tagIfType    = "_if_type"
 )
 
 // ifaceCache holds interface metrics between collections for function queries.
 type ifaceCache struct {
 	mu         sync.RWMutex
 	lastUpdate time.Time
-	updateTime time.Time                // current collection cycle time
-	interfaces map[string]*ifaceEntry   // key: interface name from m.Tags["interface"]
+	updateTime time.Time              // current collection cycle time
+	interfaces map[string]*ifaceEntry // key: interface name from m.Tags["interface"]
 }
 
 // ifaceEntry holds metrics for a single network interface.
 type ifaceEntry struct {
 	// Identity
 	name   string // interface name (from Tags["interface"])
-	ifType string // interface type (from Tags["if_type"])
+	ifType string // interface type (from Tags["_if_type"])
 
 	// Status (text values extracted from MultiValue)
 	adminStatus string
