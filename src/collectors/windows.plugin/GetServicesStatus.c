@@ -176,6 +176,9 @@ static int dict_win_services_charts_cb(const DICTIONARY_ITEM *item __maybe_unuse
             *update_every,
             RRDSET_TYPE_LINE);
 
+        if (unlikely(!p->st_service_state))
+            return 1;
+
         p->rd_service_state_running = rrddim_add(p->st_service_state, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
         p->rd_service_state_stopped = rrddim_add(p->st_service_state, "stopped", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
