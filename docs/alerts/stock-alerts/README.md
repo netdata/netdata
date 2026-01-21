@@ -152,43 +152,88 @@ Kubernetes node alerts available through kubelet metrics.
 
 ## 6.3 Application Alerts
 
-Application alerts cover common database, web server, cache, and message queue technologies.
+Application alerts cover databases, web servers, message queues, caching systems, and other infrastructure services. Each application integration includes domain-specific alerts for health, performance, and availability.
 
 :::note
 
-To see more application alerts, visit the [Collectors list](/docs/collecting-metrics/collectors-configuration) on learn.netdata.cloud.
+Each collector integration below documents all its available alerts. Visit the linked integration pages to see detailed alert configurations.
 
 :::
 
-### Database Alerts
+### Database Integrations
 
-| Alert | Description |
-|-------|-------------|
-| [MySQL & MariaDB](/docs/src/go/plugin/go.d/collector/mysql/README.md) | Replication lag, slow queries, connection utilization |
-| [PostgreSQL](/docs/src/go/plugin/go.d/collector/postgres/README.md) | Deadlocks, connection utilization, replication lag |
-| [MongoDB](/docs/src/go/plugin/go.d/collector/mongodb/README.md) | Query performance, connection pooling |
-| [Redis](/docs/src/go/plugin/go.d/collector/redis/README.md) | Memory pressure, eviction rates |
+Full alert catalogs for database systems.
 
-### Web Server Alerts
+| Integration | Alerts Covered |
+|------------|---------------|
+| [MySQL & MariaDB](/docs/src/go/plugin/go.d/collector/mysql/integrations/mysql.md) | Slow queries, table locks, connections, replication lag, Galera cluster |
+| [PostgreSQL](/docs/src/go/plugin/go.d/collector/postgres/integrations/postgres.md) | Connections, locks, deadlocks, cache IO, rollbacks, txid exhaustion |
+| [MongoDB](/docs/src/go/plugin/go.d/collector/mongodb/integrations/mongodb.md) | Connections, memory, operations, replication |
+| [Redis](/docs/src/go/plugin/go.d/collector/redis/integrations/redis.md) | Connected clients, memory, eviction, replication, persistence |
+| [ClickHouse](/docs/src/go/plugin/go.d/collector/clickhouse/integrations/clickhouse.md) | Delayed inserts, queries, partitions, replication |
+| [Cassandra](/docs/src/go/plugin/go.d/collector/cassandra/integrations/cassandra.md) | Key cache, row cache, compaction, threads |
+| [CockroachDB](/docs/src/go/plugin/go.d/collector/cockroachdb/integrations/cockroachdb.md) | File descriptors, ranges, storage |
 
-| Alert | Description |
-|-------|-------------|
-| [nginx](/docs/src/go/plugin/go.d/collector/nginx/README.md) | Request handling, connection states |
-| [Apache](/docs/src/go/plugin/go.d/collector/apache/README.md) | Request processing, worker utilization |
+### Web Server Integrations
 
-### Message Queue Alerts
+HTTP server and reverse proxy monitoring.
 
-| Alert | Description |
-|-------|-------------|
-| [RabbitMQ](/docs/src/go/plugin/go.d/collector/rabbitmq/README.md) | Queue depth, message rates |
-| [Kafka](/docs/src/go/plugin/go.d/collector/prometheus/integrations/kafka.md) | Consumer lag, partition health |
+| Integration | Alerts Covered |
+|------------|---------------|
+| [nginx](/docs/src/go/plugin/go.d/collector/nginx/integrations/nginx.md) | Requests, connections, response status |
+| [Apache](/docs/src/go/plugin/go.d/collector/apache/integrations/apache.md) | Requests, workers, idle workers, bytes |
+| [Traefik](/docs/src/go/plugin/go.d/collector/traefik/integrations/traefik.md) | Requests, response time, retries |
+| [HAProxy](/docs/src/go/plugin/go.d/collector/haproxy/integrations/haproxy.md) | Backend health, requests, sessions |
+| [Varnish](/docs/src/go/plugin/go.d/collector/varnish/integrations/varnish.md) | Client requests, backend fetches, cache hits |
+| [Envoy](/docs/src/go/plugin/go.d/collector/envoy/integrations/envoy.md) | Downstream/upstream connections, requests |
 
-### Proxy & Load Balancer Alerts
+### Message Queue & Streaming
 
-| Alert | Description |
-|-------|-------------|
-| [HAProxy](/docs/src/go/plugin/go.d/collector/haproxy/README.md) | Request rates, backend health |
-| [Traefik](/docs/src/go/plugin/go.d/collector/traefik/README.md) | Request handling, middleware health |
+Queues, pub/sub, and streaming platform alerts.
+
+| Integration | Alerts Covered |
+|------------|---------------|
+| [RabbitMQ](/docs/src/go/plugin/go.d/collector/rabbitmq/integrations/rabbitmq.md) | Queue depth, node health, memory, partition |
+| [Kafka](/docs/src/go/plugin/go.d/collector/prometheus/integrations/kafka.md) | Consumer lag, under-replicated partitions |
+| [Pulsar](/docs/src/go/plugin/go.d/collector/pulsar/integrations/pulsar.md) | Messages, subscriptions, ledgers |
+| [NATS](/docs/src/go/plugin/go.d/collector/nats/integrations/nats.md) | Connections, subs, pubs, errors |
+| [Vernemq](/docs/src/go/plugin/go.d/collector/vernemq/integrations/vernemq.md) | MQTT connections, publishes, drops |
+
+### Caching & Key-Value Stores
+
+Fast data access layer alerting.
+
+| Integration | Alerts Covered |
+|------------|---------------|
+| [Memcached](/docs/src/go/plugin/go.d/collector/memcached/integrations/memcached.md) | Hit rate, memory, evictions |
+| [Elasticsearch](/docs/src/go/plugin/go.d/collector/elasticsearch/integrations/elasticsearch.md) | Cluster health, indices, search time |
+| [Consul](/docs/src/go/plugin/go.d/collector/consul/integrations/consul.md) | Raft leader, health checks, license |
+| [Etcd](/docs/src/go/plugin/go.d/collector/prometheus/integrations/etcd.md) | Leader, disk, RPC,瓦尔纳 |
+| [ZooKeeper](/docs/src/go/plugin/go.d/collector/zookeeper/integrations/zookeeper.md) | Requests, connections, znodes |
+
+### DNS & DHCP
+
+Name resolution and address assignment.
+
+| Integration | Alerts Covered |
+|------------|---------------|
+| [DNS Query](/docs/src/go/plugin/go.d/collector/dnsquery/integrations/dnsquery.md) | Query status, resolution failures |
+| [Unbound](/docs/src/go/plugin/go.d/collector/unbound/integrations/unbound.md) | Request list, cache, threads |
+| [PowerDNS Recursor](/docs/src/go/plugin/go.d/collector/powerdns_recursor/integrations/powerdns_recursor.md) | Queries, cache, DNSSEC |
+| [ISC DHCP](/docs/src/go/plugin/go.d/collector/isc_dhcpd/integrations/isc_dhcpd.md) | Pool utilization, lease time |
+| [Dnsmasq](/docs/src/go/plugin/go.d/collector/dnsmasq/integrations/dnsmasq.md) | Cache, queries, DHCP |
+
+### Infrastructure Services
+
+Additional infrastructure monitoring.
+
+| Integration | Alerts Covered |
+|------------|---------------|
+| [ProxySQL](/docs/src/go/plugin/go.d/collector/proxysql/integrations/proxysql.md) | Backend connections, shunning |
+| [PgBouncer](/docs/src/go/plugin/go.d/collector/pgbouncer/integrations/pgbouncer.md) | Client connections, pooler stats |
+| [HDFS](/docs/src/go/plugin/go.d/collector/hdfs/integrations/hdfs.md) | Capacity, blocks, nodes |
+| [Prometheus](/docs/src/go/plugin/go.d/collector/prometheus/integrations/prometheus.md) | Remote write, queries, targets |
+| [SSH](/docs/src/go/plugin/go.d/collector/prometheus/integrations/ssh.md) | Connection, auth, sessions |
 
 ## 6.4 Network and Connectivity Alerts
 
