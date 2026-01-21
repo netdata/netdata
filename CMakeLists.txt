@@ -37,16 +37,20 @@ if(STATIC_BUILD)
 endif()
 
 set(CMAKE_INSTALL_MESSAGE LAZY)
-
-set(CMAKE_C_STANDARD 17)
-set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME "netdata")
+
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.21)
+    set(CMAKE_C_STANDARD 17)
+else()
+    set(CMAKE_C_STANDARD 11)
+endif()
+
+set(CMAKE_CXX_STANDARD 17)
 
 option(USE_CXX_11 "Use C++11 instead of C++17 (should only be used on legacy systems that cannot support C++17, may disable some features)" False)
 mark_as_advanced(USE_CXX_11)
 
 if(USE_CXX_11)
-    set(CMAKE_C_STANDARD 11)
     set(CMAKE_CXX_STANDARD 11)
 endif()
 
