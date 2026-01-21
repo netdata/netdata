@@ -234,6 +234,20 @@ Additional infrastructure monitoring.
 | [HDFS](/docs/src/go/plugin/go.d/collector/hdfs/integrations/hdfs.md) | Capacity, blocks, nodes |
 | [Prometheus](/docs/src/go/plugin/go.d/collector/prometheus/integrations/prometheus.md) | Remote write, queries, targets |
 | [SSH](/docs/src/go/plugin/go.d/collector/prometheus/integrations/ssh.md) | Connection, auth, sessions |
+| [Consul](/docs/src/go/plugin/go.d/collector/consul/integrations/consul.md) | Autopilot, raft leader, GC pause, health checks |
+| [ClickHouse](/docs/src/go/plugin/go.d/collector/clickhouse/integrations/clickhouse.md) | Inserts, distributed queries, replication lag, partitions |
+| [CockroachDB](/docs/src/go/plugin/go.d/collector/cockroachdb/integrations/cockroachdb.md) | File descriptors, unavailable/underreplicated ranges, storage |
+| [Beanstalk](/docs/src/go/plugin/go.d/collector/beanstalk/integrations/beanstalk.md) | Buried jobs |
+| [Gearman](/docs/src/go/plugin/go.d/collector/gearman/integrations/gearman.md) | Job queue status |
+| [Freeradius](/docs/src/go/plugin/go.d/collector/freeradius/integrations/freeradius.md) | Authentication requests, responses, rejects |
+| [IPFS](/docs/src/go/plugin/go.d/collector/ipfs/integrations/ipfs.md) | Datastore usage, bandwidth, peers |
+| [PostFix](/docs/src/go/plugin/go.d/collector/postfix/integrations/postfix.md) | Mail queue statistics |
+| [Squid](/docs/src/go/plugin/go.d/collector/squid/integrations/squid.md) | Cache utilization, HTTP traffic |
+| [Squid Logs](/docs/src/go/plugin/go.d/collector/squidlog/integrations/squidlog.md) | Access log parsing |
+| [LiteSpeed](/docs/src/go/plugin/go.d/collector/litespeed/integrations/litespeed.md) | Requests, connections, hit ratio |
+| [CoreDNS](/docs/src/go/plugin/go.d/collector/coredns/integrations/coredns.md) | DNS requests, responses, errors |
+| [Fail2Ban](/docs/src/go/plugin/go.d/collector/fail2ban/integrations/fail2ban.md) | Jail status, banned IPs |
+| [Supervisord](/docs/src/go/plugin/go.d/collector/supervisord/integrations/supervisord.md) | Supervised process health |
 
 ## 6.4 Network and Connectivity Alerts
 
