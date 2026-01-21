@@ -45,7 +45,10 @@ Memory monitoring balances three competing concerns: availability for new alloca
 | Alert | Description | Context | Thresholds |
 |-------|-------------|---------|------------|
 | **ram_in_use** | Tracks utilization percentage | `system.ram` | WARN > 80%, CRIT > 90% |
-| **ram_available** | Monitors actual available memory | `mem.available` | WARN < 20%, CRIT < 10% |
+| **ram_available** | Monitors actual available memory | `mem.available` | WARN < 15%, CRIT < 10% |
+| **oom_kill** | Number of OOM kills in the last 30 minutes | `mem.oom_kill` | WARN > 0 |
+| **30min_ram_swapped_out** | Percentage of RAM swapped in last 30 minutes | `mem.swapio` | WARN > 20%, CRIT > 30% |
+| **used_swap** | Swap memory utilization | `mem.swap` | WARN > 80%, CRIT > 90% |
 
 ### Disk Space Alerts
 
@@ -55,6 +58,42 @@ Disk space monitoring addresses space availability and inode exhaustion.
 |-------|-------------|---------|------------|
 | **disk_space_usage** | Tracks percentage of allocated space across filesystems | `disk.space` | WARN > 80%, CRIT > 90% |
 | **disk_inode_usage** | Tracks inode exhaustion for filesystems with many small files | `disk.inodes` | WARN > 80%, CRIT > 90% |
+| **10min_disk_utilization** | Average disk utilization over 10 minutes | `disk.util` | WARN > 68.6%, CRIT > 98% |
+| **10min_disk_backlog** | Average disk backlog over 10 minutes | `disk.backlog` | WARN > 3500ms, CRIT > 5000ms |
+| **out_of_disk_space_time** | Estimated hours until disk runs out of space | `disk.space` | WARN < 48h, CRIT < 24h |
+| **out_of_disk_inodes_time** | Estimated hours until disk runs out of inodes | `disk.inodes` | WARN < 48h, CRIT < 24h |
+
+### Load Average Alerts
+
+System load alerts for capacity planning.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **load_cpu_number** | Number of active CPU cores in the system | `system.load` | Calculation |
+| **load_average_15** | System load average for past 15 minutes | `system.load` | WARN > 175% of CPUs |
+| **load_average_5** | System load average for past 5 minutes | `system.load` | WARN > 350% of CPUs |
+| **load_average_1** | System load average for past 1 minute | `system.load` | WARN > 700% of CPUs |
+
+### Process Alerts
+
+Process and file descriptor monitoring.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **active_processes** | System PID space utilization | `system.active_processes` | WARN > 85%, CRIT > 90% |
+| **system_file_descriptors_utilization** | System file descriptors utilization | `system.file_descriptors` | WARN > 80%, CRIT > 90% |
+
+### Kernel and Synchronization Alerts
+
+Low-level kernel and time synchronization alerts.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **lowest_entropy** | Available entropy for cryptographic operations | `kernel.entropy` | WARN < 100 |
+| **system_clock_sync_state** | Clock synchronization status | `timex.ntp_offset` | Various |
+| **sync_freq** | System clock drift frequency adjustment | `timex.tick_mode` | Various |
+| **semaphores_used** | System V semaphores in use | `ipc.semaphore` | Various |
+| **semaphore_arrays_used** | System V semaphore arrays in use | `ipc.semaphore_array` | Various |
 
 ## 6.2 Container and Orchestration Alerts
 
