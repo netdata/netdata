@@ -310,6 +310,10 @@
       this.currentStatus = '';
       this.streamingContent = '';
       this.streamingMessageId = null;
+      this.statusMessage = 'Ready';
+      this.spinnerVisible = false;
+      this.metricsData = this.buildEmptyMetrics();
+      this.requestCompleted = false;
 
       // Double-buffer rendering state
       this.renderPending = false;
@@ -378,12 +382,6 @@
       });
 
       this.updateStatus('Ready');
-      // Clear ready status after a moment
-      setTimeout(() => {
-        if (this.statusText.textContent === 'Ready') {
-          this.updateStatus('');
-        }
-      }, 2000);
     }
 
     buildUI() {
@@ -613,15 +611,22 @@
       this.renderPending = false;
       this.lastRenderContent = '';
       this.userScrolledUp = false; // Reset scroll on new message
-      this.updateStatus('Connecting...');
+      this.requestCompleted = false;
+      this.currentStatus = '';
+      this.updateStatus('Working...');
+      this.resetMetrics();
       this.showSpinner();
 
       try {
         await this.chat.ask(message);
+        if (this.isLoading && !this.requestCompleted) {
+          this.handleStreamError('Error: Connection closed');
+        }
       } catch (err) {
-        this.hideSpinner();
-        this.updateStatus('Error: ' + err.message);
-        this.isLoading = false;
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!this.requestCompleted) {
+          this.handleStreamError(`Error: ${msg}`);
+        }
       }
     }
 
@@ -630,13 +635,9 @@
         case 'client':
           this.clientId = event.clientId;
           this.saveState();
-          // Clear "Connecting..." status on first client event
-          this.updateStatus('');
           break;
 
         case 'meta':
-          // Clear status on meta event (session started)
-          this.updateStatus('');
           break;
 
         case 'status':
@@ -644,6 +645,10 @@
           // Show spinner when receiving status updates (model is working)
           this.showSpinner();
           this.updateSpinnerStatus(this.currentStatus);
+          break;
+
+        case 'metrics':
+          this.updateMetrics(event.data);
           break;
 
         case 'report':
@@ -658,6 +663,7 @@
           break;
 
         case 'done':
+          this.requestCompleted = true;
           this.isLoading = false;
           this.hideSpinner();
 
@@ -674,14 +680,13 @@
 
           this.streamingMessageId = null;
           this.streamingContent = '';
-          this.updateStatus('');
+          this.updateStatus('Ready');
           this.saveState();
           break;
 
         case 'error':
-          this.isLoading = false;
-          this.hideSpinner();
-          this.updateStatus('Error: ' + event.error.message);
+          this.requestCompleted = true;
+          this.handleStreamError(`Error: ${event.error.message}`);
           break;
       }
     }
@@ -864,7 +869,7 @@
       this.clientId = null;
       this.storage.clear();
       this.messagesEl.textContent = ''; // Safe clear
-      this.updateStatus('');
+      this.updateStatus('Ready');
 
       // Reset chat client
       if (this.chat) {
@@ -879,8 +884,67 @@
       });
     }
 
+    buildEmptyMetrics() {
+      return {
+        elapsed: 0,
+        reasoningChars: 0,
+        outputChars: 0,
+        documentsChars: 0,
+        tools: 0,
+        agents: 0,
+      };
+    }
+
+    resetMetrics() {
+      this.metricsData = this.buildEmptyMetrics();
+      this.renderStatusBar();
+    }
+
+    updateMetrics(payload) {
+      this.metricsData = {
+        elapsed: typeof payload.elapsed === 'number' ? payload.elapsed : 0,
+        reasoningChars: typeof payload.reasoningChars === 'number' ? payload.reasoningChars : 0,
+        outputChars: typeof payload.outputChars === 'number' ? payload.outputChars : 0,
+        documentsChars: typeof payload.documentsChars === 'number' ? payload.documentsChars : 0,
+        tools: typeof payload.tools === 'number' ? payload.tools : 0,
+        agents: typeof payload.agents === 'number' ? payload.agents : 0,
+      };
+      this.renderStatusBar();
+    }
+
+    formatMetrics(metrics) {
+      const elapsed = typeof metrics.elapsed === 'number' ? metrics.elapsed : 0;
+      const formatNumber = (value) => (Number.isFinite(value) ? value.toLocaleString() : '0');
+      const separator = '\u00A0\u00A0│\u00A0\u00A0';
+      const parts = [
+        `⏱ ${(elapsed / 1000).toFixed(1)}s`,
+        `💭 ${formatNumber(metrics.reasoningChars)}ch`,
+        `📤 ${formatNumber(metrics.outputChars)}ch`,
+        `📄 ${formatNumber(metrics.documentsChars)}ch`,
+        `🔧 ${formatNumber(metrics.tools)}`,
+        `🤖 ${formatNumber(metrics.agents)}`,
+      ];
+      return parts.join(separator);
+    }
+
+    renderStatusBar() {
+      if (!this.statusText) return;
+      if (this.spinnerVisible) {
+        this.statusText.textContent = this.formatMetrics(this.metricsData);
+        return;
+      }
+      this.statusText.textContent = this.statusMessage;
+    }
+
     updateStatus(text) {
-      this.statusText.textContent = text;
+      this.statusMessage = text;
+      this.renderStatusBar();
+    }
+
+    handleStreamError(message) {
+      this.isLoading = false;
+      this.hideSpinner();
+      this.updateStatus(message);
     }
 
     showSpinner() {
@@ -899,8 +963,12 @@
       // Always move spinner to the end (after the last message)
       this.messagesEl.appendChild(spinner);
       const statusEl = spinner.querySelector(CSS_SPINNER_STATUS);
-      statusEl.textContent = this.currentStatus || '';
+      const hasStatus = this.currentStatus && this.currentStatus.length > 0;
+      statusEl.textContent = hasStatus ? this.currentStatus : '';
+      statusEl.classList.toggle(CSS_HIDDEN, !hasStatus);
       spinner.classList.remove(CSS_HIDDEN);
+      this.spinnerVisible = true;
+      this.renderStatusBar();
       this.scrollToBottom();
     }
 
@@ -909,7 +977,9 @@
       if (spinner) {
         const statusEl = spinner.querySelector(CSS_SPINNER_STATUS);
         if (statusEl) {
-          statusEl.textContent = status || '';
+          const hasStatus = status && status.length > 0;
+          statusEl.textContent = hasStatus ? status : '';
+          statusEl.classList.toggle(CSS_HIDDEN, !hasStatus);
         }
       }
     }
@@ -919,6 +989,8 @@
       if (spinner) {
         spinner.classList.add(CSS_HIDDEN);
       }
+      this.spinnerVisible = false;
+      this.renderStatusBar();
     }
 
     scrollToBottom(force = false) {

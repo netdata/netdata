@@ -720,6 +720,7 @@ export class AIAgentSession {
         llmTimeout: sessionConfig.llmTimeout,
         toolTimeout: sessionConfig.toolTimeout,
         caching: sessionConfig.caching,
+        stream: sessionConfig.stream,
         traceLLM: sessionConfig.traceLLM,
         traceMCP: sessionConfig.traceMCP,
         traceSdk: sessionConfig.traceSdk,

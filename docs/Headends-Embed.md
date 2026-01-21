@@ -217,6 +217,17 @@ data: {"chunk":"Here is your answer...","index":0}
 
 **Note**: Server sends only `chunk` and `index`. JavaScript client accumulates chunks into `report` field for convenience.
 
+### metrics
+
+Real-time progress metrics (sent ~4x/sec). Final update includes `"final": true`.
+Counts are characters (UTF-16 `string.length`), not bytes.
+Metrics are aggregated across all agents/subagents (unfiltered), not just streamed output.
+
+```
+event: metrics
+data: {"elapsed":6800,"reasoningChars":4212,"outputChars":2171,"documentsChars":890,"tools":5,"agents":3,"final":true}
+```
+
 ### done
 
 Completion event.
@@ -282,6 +293,9 @@ const chat = new AiAgentChat({
         break;
       case "report":
         document.getElementById("output").append(event.chunk);
+        break;
+      case "metrics":
+        console.log("Metrics:", event.data);
         break;
       case "done":
         console.log("Complete:", event.data);

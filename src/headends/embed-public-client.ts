@@ -49,11 +49,22 @@ interface EmbedDoneData {
   reportLength: number;
 }
 
+interface EmbedMetricsData {
+  elapsed: number;
+  reasoningChars: number;
+  outputChars: number;
+  documentsChars: number;
+  tools: number;
+  agents: number;
+  final?: boolean;
+}
+
 type EmbedClientEvent =
   | { type: 'client'; clientId: string; isNew: boolean }
   | { type: 'meta'; sessionId: string; turn?: number; agentId?: string }
   | { type: 'status'; data: EmbedStatusEventData }
   | { type: 'report'; chunk: string; report: string; index: number }
+  | { type: 'metrics'; data: EmbedMetricsData }
   | { type: 'done'; data: EmbedDoneData }
   | { type: 'error'; error: { code: string; message: string } }
   | { type: 'turn'; turn: number; isUser: boolean };
@@ -186,6 +197,11 @@ class AiAgentChat {
               const index = typeof payload.index === 'number' ? payload.index : report.length;
               this.emitEvent({ type: 'report', chunk, report, index });
             }
+            return;
+          }
+          if (eventName === 'metrics') {
+            const metricsPayload = payload as unknown as EmbedMetricsData;
+            this.emitEvent({ type: 'metrics', data: metricsPayload });
             return;
           }
           if (eventName === 'done') {

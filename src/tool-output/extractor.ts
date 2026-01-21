@@ -6,6 +6,7 @@ import type { ToolExecutionContext } from '../tools/types.js';
 import type {
   AccountingEntry,
   AIAgentEventCallbacks,
+  AIAgentEventMeta,
   AIAgentSessionConfig,
   CachingMode,
   Configuration,
@@ -50,6 +51,7 @@ interface ToolOutputExtractionContext {
   llmTimeout?: number;
   toolTimeout?: number;
   caching?: CachingMode;
+  stream?: boolean;
   traceLLM?: boolean;
   traceMCP?: boolean;
   traceSdk?: boolean;
@@ -265,9 +267,42 @@ const computeCost = (
 
 export class ToolOutputExtractor {
   private readonly deps: ToolOutputExtractionContext;
+  private eventSequence = 0;
 
   constructor(deps: ToolOutputExtractionContext) {
     this.deps = deps;
+  }
+
+  private nextEventSequence(): number {
+    this.eventSequence += 1;
+    return this.eventSequence;
+  }
+
+  private emitExtractionEvent(event: { type: 'output' | 'thinking'; text: string }): void {
+    if (this.deps.stream !== true) return;
+    if (event.text.length === 0) return;
+    const sink = this.deps.callbacks?.onEvent;
+    if (sink === undefined) return;
+    const meta: AIAgentEventMeta = {
+      agentId: this.deps.agentId,
+      callPath: this.deps.callPath,
+      sessionId: this.deps.sessionId,
+      parentId: undefined,
+      originId: this.deps.originTxnId ?? this.deps.sessionId,
+      headendId: undefined,
+      renderTarget: undefined,
+      isMaster: false,
+      isFinal: false,
+      pendingHandoffCount: 0,
+      handoffConfigured: false,
+      sequence: this.nextEventSequence(),
+      source: 'stream',
+    };
+    try {
+      sink(event, meta);
+    } catch {
+      // ignore event emission failures for internal tool_output streaming
+    }
   }
 
   async extract(
@@ -373,6 +408,14 @@ export class ToolOutputExtractor {
       return endFailure('full-chunked received empty content');
     }
 
+    const onChunk = (chunk: string, type: 'content' | 'thinking'): void => {
+      if (type === 'thinking') {
+        this.emitExtractionEvent({ type: 'thinking', text: chunk });
+        return;
+      }
+      this.emitExtractionEvent({ type: 'output', text: chunk });
+    };
+
     const chunkOutputs: string[] = [];
     // eslint-disable-next-line functional/no-loop-statements -- sequential map
     for (const chunk of chunks) {
@@ -391,7 +434,7 @@ export class ToolOutputExtractor {
         { role: 'system', content: system },
         { role: 'user', content: chunk.text },
       ];
-      const turnRequest = this.buildLlmRequest(messages, target);
+      const turnRequest = this.buildLlmRequest(messages, target, onChunk);
       let result: TurnResult;
       try {
         result = await this.deps.llmClient.executeTurn(turnRequest);
@@ -428,7 +471,7 @@ export class ToolOutputExtractor {
       { role: 'system', content: reduceSystem },
       { role: 'user', content: 'Synthesize the extracted content into a final answer.' },
     ];
-    const reduceRequest = this.buildLlmRequest(reduceMessages, target);
+    const reduceRequest = this.buildLlmRequest(reduceMessages, target, onChunk);
     let reduceResult: TurnResult;
     try {
       reduceResult = await this.deps.llmClient.executeTurn(reduceRequest);
@@ -498,6 +541,7 @@ export class ToolOutputExtractor {
       systemPrompt,
       userPrompt,
       outputFormat: 'pipe',
+      stream: this.deps.stream,
       maxTurns: 15,
       maxToolCallsPerTurn: 3,
       llmTimeout: this.deps.llmTimeout,
@@ -591,7 +635,11 @@ export class ToolOutputExtractor {
     return { text: content, warning };
   }
 
-  private buildLlmRequest(messages: ConversationMessage[], target: ToolOutputTarget): TurnRequest {
+  private buildLlmRequest(
+    messages: ConversationMessage[],
+    target: ToolOutputTarget,
+    onChunk?: (chunk: string, type: 'content' | 'thinking') => void,
+  ): TurnRequest {
     const toolExecutor = () => Promise.reject(new Error('tool_output extraction does not support tool calls'));
     return {
       messages,
@@ -604,12 +652,13 @@ export class ToolOutputExtractor {
       topK: this.deps.topK,
       maxOutputTokens: this.deps.maxOutputTokens,
       repeatPenalty: this.deps.repeatPenalty,
-      stream: false,
+      stream: this.deps.stream,
       llmTimeout: this.deps.llmTimeout,
       reasoningLevel: this.deps.reasoning,
       reasoningValue: this.deps.reasoningValue,
       caching: this.deps.caching,
       sdkTrace: this.deps.traceSdk,
+      onChunk,
     };
   }
 

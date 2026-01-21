@@ -212,7 +212,7 @@ type HeadendClosedEvent =
 
 **Features**:
 - `GET /ai-agent-public.js` serves the public JS client library
-- `POST /v1/chat` streams `status` and `report` events, finalizes with `done`
+- `POST /v1/chat` streams `status`, `report`, and `metrics` events, finalizes with `done` (metrics aggregate across all agents/subagents)
 - Stateless multi-turn (client sends history array)
 - Stable per-client UUID for follow-up questions + transcript persistence
 

@@ -139,6 +139,8 @@ When tool output is stored, it is automatically formatted to be grep-friendly fo
 - The `read-grep` mode uses grep to find content, which is line-based
 - Without formatting, minified JSON or long single-line content would be un-searchable
 - JSON validity is sacrificed for readability - the LLM doesn't need valid JSON
+- `read-grep` inherits the parent session's streaming flag; when streaming is on, output/thinking events are emitted for progress metrics (output is not forwarded to user-facing channels)
+- `full-chunked` inherits the parent session's streaming flag and streams chunk output/thinking internally when enabled (still not forwarded to user-facing channels)
 
 ---
 

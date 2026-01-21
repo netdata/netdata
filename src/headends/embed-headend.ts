@@ -393,6 +393,48 @@ export class EmbedHeadend implements Headend {
     const now = Date.now();
     let sessionActive = false;
     let sessionStartTs = now;
+    // Metrics state - accumulates within this HTTP request
+    let reasoningChars = 0;
+    let outputChars = 0;
+    let documentsChars = 0;
+    let toolsCount = 0;
+    let agentsCount = 0;
+    let metricsInterval: ReturnType<typeof setInterval> | undefined;
+    let lastMetricsEmitTs = 0;
+    let sseHeadersSent = false;
+    let metricsEmitted = false;
+
+    const cleanupMetrics = (): void => {
+      if (metricsInterval !== undefined) {
+        clearInterval(metricsInterval);
+        metricsInterval = undefined;
+      }
+    };
+
+    const emitMetrics = (isFinal: boolean): void => {
+      if (!sseHeadersSent || res.writableEnded || res.destroyed) return;
+      if (isFinal) {
+        if (metricsEmitted) return;
+        metricsEmitted = true;
+      } else {
+        const now = Date.now();
+        if (now - lastMetricsEmitTs < 250) return;
+        lastMetricsEmitTs = now;
+      }
+      writeSseEvent(res, 'metrics', {
+        elapsed: Date.now() - sessionStartTs,
+        reasoningChars,
+        outputChars,
+        documentsChars,
+        tools: toolsCount,
+        agents: agentsCount,
+        ...(isFinal ? { final: true } : {}),
+      });
+    };
+
+    const emitFinalMetrics = (): void => {
+      emitMetrics(true);
+    };
     try {
       if (this.globalStopRef?.stopping ?? false) {
         writeJson(res, 503, { error: 'server_stopping' });
@@ -435,7 +477,11 @@ export class EmbedHeadend implements Headend {
       const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
       const stopRef = { stopping: this.globalStopRef?.stopping ?? false, reason: this.globalStopRef?.reason };
       const abortController = new AbortController();
-      req.on('close', () => { abortController.abort(); });
+      const onRequestClose = (): void => {
+        abortController.abort();
+        cleanupMetrics();
+      };
+      req.on('close', onRequestClose);
       sessionStartTs = Date.now();
       sessionActive = true;
       this.metrics.recordSessionStart();
@@ -445,10 +491,15 @@ export class EmbedHeadend implements Headend {
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
       });
+      sseHeadersSent = true;
       const flushHeaders = (res as http.ServerResponse & { flushHeaders?: () => void }).flushHeaders;
       if (typeof flushHeaders === 'function') flushHeaders.call(res);
 
       writeSseEvent(res, 'client', { clientId, isNew: isNewClient });
+
+      metricsInterval = setInterval(() => {
+        emitMetrics(false);
+      }, 250);
 
       let sessionId: string | undefined;
       let currentTurn: number | undefined;
@@ -473,6 +524,8 @@ export class EmbedHeadend implements Headend {
           case 'agent_started': {
             const agentLabel = event.agentName ?? event.agentId;
             const message = event.reason ?? `Agent ${agentLabel} starting...`;
+            agentsCount += 1;
+            emitMetrics(false);
             statusEntries.push({ role: 'status', content: message });
             writeSseEvent(res, 'status', {
               eventType: 'agent_started',
@@ -531,6 +584,9 @@ export class EmbedHeadend implements Headend {
             return;
           }
           case 'tool_started':
+            toolsCount += 1;
+            emitMetrics(false);
+            return;
           case 'tool_finished':
             // Tool events are not forwarded to the UI - only agent events are visible
             return;
@@ -541,9 +597,11 @@ export class EmbedHeadend implements Headend {
         onEvent: (event: AIAgentEvent, meta: AIAgentEventMeta) => {
           switch (event.type) {
             case 'output': {
-              if (!shouldStreamOutput(event, meta)) return;
               const chunk = event.text;
               if (chunk.length === 0) return;
+              outputChars += chunk.length;
+              emitMetrics(false);
+              if (!shouldStreamOutput(event, meta)) return;
               if (meta.sessionId !== undefined && sessionId === undefined) {
                 sessionId = meta.sessionId;
                 maybeEmitMeta();
@@ -577,6 +635,13 @@ export class EmbedHeadend implements Headend {
               handleStatusEvent(progressEvent);
               return;
             }
+            case 'thinking': {
+              const chunk = event.text;
+              if (chunk.length === 0) return;
+              reasoningChars += chunk.length;
+              emitMetrics(false);
+              return;
+            }
             case 'status': {
               // avoid duplicate status handling (progress already includes agent_update)
               return;
@@ -597,7 +662,18 @@ export class EmbedHeadend implements Headend {
               return;
             }
             case 'accounting': {
-              accounting.push(event.entry);
+              const entry = event.entry;
+              accounting.push(entry);
+              if (entry.type === 'tool') {
+                const charsIn = typeof entry.charactersIn === 'number' ? entry.charactersIn : 0;
+                const charsOut = typeof entry.charactersOut === 'number' ? entry.charactersOut : 0;
+                outputChars += charsIn;
+                const isAgentTool = entry.mcpServer === 'agent' || entry.command.startsWith('agent__');
+                if (!isAgentTool) {
+                  documentsChars += charsOut;
+                }
+                emitMetrics(false);
+              }
               return;
             }
             default: {
@@ -640,6 +716,7 @@ export class EmbedHeadend implements Headend {
         reportBuffer = finalText;
         reportIndex += 1;
         this.metrics.recordReportChunk();
+        outputChars += finalText.length;
         writeSseEvent(res, 'report', { chunk: finalText, index: reportIndex });
       }
 
@@ -662,6 +739,8 @@ export class EmbedHeadend implements Headend {
         },
         reportLength,
       };
+      cleanupMetrics();
+      emitFinalMetrics();
       writeSseEvent(res, 'done', donePayload);
       res.end();
 
@@ -679,6 +758,8 @@ export class EmbedHeadend implements Headend {
       this.metrics.recordError(code);
       if (!res.writableEnded && !res.writableFinished) {
         if (res.getHeader(CONTENT_TYPE_HEADER) === EVENT_STREAM_CONTENT_TYPE) {
+          cleanupMetrics();
+          emitFinalMetrics();
           writeSseEvent(res, 'error', { code, message, recoverable: false });
           res.end();
         } else {
@@ -686,6 +767,7 @@ export class EmbedHeadend implements Headend {
         }
       }
     } finally {
+      cleanupMetrics();
       if (sessionActive) {
         const durationMs = Date.now() - sessionStartTs;
         this.metrics.recordSessionEnd(durationMs);

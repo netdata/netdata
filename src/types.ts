@@ -434,6 +434,16 @@ export interface EmbedMetricsConfig {
   path?: string;
 }
 
+export interface MetricsEventPayload {
+  elapsed: number;
+  reasoningChars: number;
+  outputChars: number;
+  documentsChars: number;
+  tools: number;
+  agents: number;
+  final?: boolean;
+}
+
 /** Per-profile embed configuration */
 export interface EmbedProfileConfig {
   /** Agents accessible via this profile. First is default. */

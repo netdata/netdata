@@ -28,6 +28,7 @@ const buildChildMeta = (): AIAgentEventMeta => ({
 const TOOL_OUTPUT_READ_GREP = 'tool_output.read_grep';
 const TOOL_OUTPUT_READ_GREP_CALL_PATH = `agent:${TOOL_OUTPUT_READ_GREP}`;
 const TOOL_OUTPUT_READ_GREP_TURN_PATH = 'root-turn-1.2';
+const FULL_CHUNKED_MODE = 'full-chunked';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -213,6 +214,7 @@ describe('ToolOutputExtractor', () => {
       llmTimeout: 0,
       toolTimeout: 0,
       caching: 'none',
+      stream: false,
       traceLLM: false,
       traceMCP: false,
       traceSdk: false,
@@ -232,16 +234,94 @@ describe('ToolOutputExtractor', () => {
       toolArgsJson: '{}',
       content: largeContent,
       stats: { bytes: 8000, lines: 1, tokens: 2000, avgLineBytes: 8000 },
-    }, 'find data', 'full-chunked', sessionTargets);
+    }, 'find data', FULL_CHUNKED_MODE, sessionTargets);
 
     expect(result.ok).toBe(true);
-    expect(result.mode).toBe('full-chunked');
+    expect(result.mode).toBe(FULL_CHUNKED_MODE);
     expect(result.text).toBe('final answer');
     expect(result.childOpTree).toBeDefined();
     const child = result.childOpTree;
     if (child === undefined) throw new Error('expected child opTree');
     expect(child.steps.length).toBe(1);
     expect(child.steps[0]?.kind).toBe('internal');
+    cleanupTempRoot(root);
+  });
+
+  it('streams full-chunked chunks when stream is enabled', async () => {
+    const root = makeTempDir();
+    const nonce = 'STREAMNONCE';
+    const events: { type: 'output' | 'thinking'; meta: AIAgentEventMeta }[] = [];
+    const llm = {
+      executeTurn: (request: TurnRequest): Promise<TurnResult> => {
+        request.onChunk?.('chunk-out', 'content');
+        request.onChunk?.('chunk-think', 'thinking');
+        const content = `<ai-agent-${nonce}-FINAL format="text">chunk found</ai-agent-${nonce}-FINAL>`;
+        return Promise.resolve({
+          status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+          latencyMs: 5,
+          messages: [{ role: 'assistant', content }],
+          tokens: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+        });
+      },
+    } as unknown as LLMClient;
+
+    const extractor = new ToolOutputExtractor({
+      config: buildConfig(root),
+      llmClient: llm,
+      targets: baseTargets,
+      computeMaxOutputTokens: () => 256,
+      sessionTargets,
+      sessionNonce: nonce,
+      sessionId: 'session-stream',
+      agentId: 'agent',
+      callPath: 'agent',
+      toolResponseMaxBytes: 4000,
+      temperature: null,
+      topP: null,
+      topK: null,
+      repeatPenalty: null,
+      maxOutputTokens: 256,
+      reasoning: undefined,
+      reasoningValue: undefined,
+      llmTimeout: 0,
+      toolTimeout: 0,
+      caching: 'none',
+      stream: true,
+      callbacks: {
+        onEvent: (event, meta) => {
+          if (event.type === 'output' || event.type === 'thinking') {
+            events.push({ type: event.type, meta });
+          }
+        },
+      },
+      traceLLM: false,
+      traceMCP: false,
+      traceSdk: false,
+      pricing: undefined,
+      countTokens: (text) => Math.ceil(text.length / 4),
+      fsRootDir: root,
+      buildFsServerConfig: (rootDir) => ({
+        name: 'tool_output_fs',
+        config: { ...baseConfiguration, mcpServers: { tool_output_fs: { type: 'stdio', command: process.execPath, args: [rootDir] } } },
+      }),
+    });
+
+    const result = await extractor.extract({
+      handle: 'handle-stream',
+      toolName: 'test__tool',
+      toolArgsJson: '{}',
+      content: 'X'.repeat(100),
+      stats: { bytes: 100, lines: 1, tokens: 10, avgLineBytes: 100 },
+    }, 'find data', FULL_CHUNKED_MODE, sessionTargets);
+
+    expect(result.ok).toBe(true);
+    expect(result.mode).toBe(FULL_CHUNKED_MODE);
+    expect(events.some((entry) => entry.type === 'output')).toBe(true);
+    expect(events.some((entry) => entry.type === 'thinking')).toBe(true);
+    events.forEach((entry) => {
+      expect(entry.meta.isMaster).toBe(false);
+      expect(entry.meta.source).toBe('stream');
+    });
     cleanupTempRoot(root);
   });
 
@@ -270,6 +350,7 @@ describe('ToolOutputExtractor', () => {
       llmTimeout: 0,
       toolTimeout: 0,
       caching: 'none',
+      stream: false,
       traceLLM: false,
       traceMCP: false,
       traceSdk: false,
@@ -335,6 +416,7 @@ describe('ToolOutputExtractor', () => {
       llmTimeout: 0,
       toolTimeout: 0,
       caching: 'none',
+      stream: false,
       traceLLM: false,
       traceMCP: false,
       traceSdk: false,
@@ -397,6 +479,7 @@ describe('ToolOutputProvider', () => {
       llmTimeout: 0,
       toolTimeout: 0,
       caching: 'none',
+      stream: false,
       traceLLM: false,
       traceMCP: false,
       traceSdk: false,

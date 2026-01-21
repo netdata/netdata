@@ -50,6 +50,7 @@ Serves the public JS client (cacheable).
 - `event: meta` → `{ sessionId, turn, agentId }`
 - `event: status` → `{ agent, agentPath, status, message, done, pending, now, timestamp }`
 - `event: report` → `{ chunk, index }` (final report only)
+- `event: metrics` → `{ elapsed, reasoningChars, outputChars, documentsChars, tools, agents, final? }` (aggregated across all agents/subagents; UTF-16 character counts)
 - `event: done` → `{ success, metrics, reportLength }`
 - `event: error` → `{ code, message, recoverable }`
 
