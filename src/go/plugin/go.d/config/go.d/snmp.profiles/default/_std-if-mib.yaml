@@ -70,6 +70,11 @@ metrics:
           OID: 1.3.6.1.2.1.2.2.1.3
           name: ifType
         mapping_ref: ifType
+      - tag: _if_type_group
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.3
+          name: ifType
+        mapping_ref: ifTypeGroup
 
   # =========================
   # IF-MIB::ifXTable (64-bit + extras)
@@ -111,6 +116,12 @@ metrics:
           OID: 1.3.6.1.2.1.2.2.1.3
           name: ifType
         mapping_ref: ifType
+      - tag: _if_type_group
+        table: ifTable
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.3
+          name: ifType
+        mapping_ref: ifTypeGroup
 
 virtual_metrics:
   # ======================
