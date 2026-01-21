@@ -120,16 +120,35 @@ Kubernetes pod alerts require the Netdata Kubernetes collector.
 
 | Alert | Description | Context | Thresholds |
 |-------|-------------|---------|------------|
-| **k8s_cgroup_10min_cpu_usage** | Fires when containers reach 90% of CPU limits | `cgroup.cpu_limit` | WARN > 90% of limit |
-| **k8s_cgroup_ram_in_use** | Fires when containers reach 90% of memory limits | `cgroup.mem_usage` | WARN > 90% of limit |
+| **cgroup_10min_cpu_usage** | Container CPU utilization over 10 minutes | `cgroup.cpu` | WARN/CRIT based on limits |
+| **cgroup_ram_in_use** | Container memory utilization | `cgroup.mem_usage` | WARN/CRIT based on limits |
+| **k8s_cgroup_10min_cpu_usage** | K8s container CPU usage approaching limit | `cgroup.cpu_limit` | WARN > 80%, CRIT > 90% |
+| **k8s_cgroup_ram_in_use** | K8s container memory usage approaching limit | `cgroup.mem_usage` | WARN > 80%, CRIT > 90% |
 
-### Kubernetes Node Alerts
+### Kubernetes State Alerts
+
+Alerts for Kubernetes workload health and deployment status.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **k8s_state_cronjob_last_execution_failed** | CronJob last execution status | `k8s_state.cronjob` | CRIT failed |
+| **k8s_state_deployment_condition_available** | Deployment availability condition | `k8s_state.deployment` | CRIT not available |
+
+### Kubernetes Node (Kubelet) Alerts
 
 Kubernetes node alerts available through kubelet metrics.
 
 | Alert | Description | Context | Thresholds |
 |-------|-------------|---------|------------|
 | **kubelet_node_config_error** | Kubelet node configuration error status | `k8s_kubelet.kubelet_node_config_error` | CRIT > 0 (config error) |
+| **kubelet_10s_pleg_relist_latency_quantile_05** | PLEG relist latency 50th percentile | `k8s_kubelet.pleg` | WARN/C |
+| **kubelet_10s_pleg_relist_latency_quantile_09** | PLEG relist latency 90th percentile | `k8s_kubelet.pleg` | WARN/C |
+| **kubelet_10s_pleg_relist_latency_quantile_099** | PLEG relist latency 99th percentile | `k8s_kubelet.pleg` | WARN/C |
+| **kubelet_1m_pleg_relist_latency_quantile_05** | PLEG relist latency 50th percentile (1m avg) | `k8s_kubelet.pleg` | WARN/C |
+| **kubelet_1m_pleg_relist_latency_quantile_09** | PLEG relist latency 90th percentile (1m avg) | `k8s_kubelet.pleg` | WARN/C |
+| **kubelet_1m_pleg_relist_latency_quantile_099** | PLEG relist latency 99th percentile (1m avg) | `k8s_kubelet.pleg` | WARN/C |
+| **kubelet_operations_error** | Kubelet operations error count | `k8s_kubelet.operations` | WARN > 0 |
+| **kubelet_token_requests** | Kubelet token request metrics | `k8s_kubelet.token` | Various |
 
 ## 6.3 Application Alerts
 
