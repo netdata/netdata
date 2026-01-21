@@ -17,7 +17,7 @@ Netdata AI doesn't just respond with text—it generates **Live Exhibits**. Thes
 
 This eliminates context-switching: you don't need to open new dashboards or manually search for the data the AI references. The evidence appears inline, right in the flow of your conversation.
 
-![Live Exhibits in conversations](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/live-exhibit.png)
+![Live Exhibits in conversations](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/conversations2.png)
 
 ## Example workflow
 
