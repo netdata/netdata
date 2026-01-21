@@ -193,7 +193,7 @@ Queues, pub/sub, and streaming platform alerts.
 
 | Integration | Alerts Covered |
 |------------|---------------|
-| [RabbitMQ](/docs/src/go/plugin/go.d/collector/rabbitmq/integrations/rabbitmq.md) | Queue depth, node health, memory, partition |
+| [RabbitMQ](/docs/src/go/plugin/go.d/collector/rabbitmq/integrations/rabbitmq.md) | Node down, network partition, memory/disk alarms, queue minority, unhealthy status |
 | [Kafka](/docs/src/go/plugin/go.d/collector/prometheus/integrations/kafka.md) | Consumer lag, under-replicated partitions |
 | [Pulsar](/docs/src/go/plugin/go.d/collector/pulsar/integrations/pulsar.md) | Messages, subscriptions, ledgers |
 | [NATS](/docs/src/go/plugin/go.d/collector/nats/integrations/nats.md) | Connections, subs, pubs, errors |
@@ -567,6 +567,73 @@ Metrics export and streaming pipeline health.
 | Alert | Description | Context | Thresholds |
 |-------|-------------|---------|------------|
 | **ceph_cluster_physical_capacity_utilization** | Ceph cluster capacity utilization | `ceph.cluster` | WARN > 80%, CRIT > 90% |
+
+## 6.6 Netdata Infrastructure and Special Monitors
+
+Specialized monitoring for Netdata internals, web logging, I/O latency, and additional platforms.
+
+:::note
+
+These are specialized monitoring categories that extend beyond standard infrastructure alerting.
+
+:::
+
+### Netdata Database Engine
+
+Monitoring for Netdata's own time-series database performance and health.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **10min_dbengine_global_fs_errors** | Filesystem errors affecting DB engine | `netdata.dbengine_global_errors` | CRIT > 0 |
+| **10min_dbengine_global_io_errors** | IO errors (CRC, disk, space) | `netdata.dbengine_global_errors` | CRIT > 0 |
+| **10min_dbengine_global_flushing_warnings** | Page cache flushing warnings | `netdata.dbengine_global_errors` | WARN > 0 |
+| **10min_dbengine_global_flushing_errors** | Page cache flushing errors | `netdata.dbengine_global_errors` | CRIT > 0 |
+| **zfs_memory_throttle** | ZFS memory throttling pressure | `zfs.arc` | WARN/C |
+
+### Web Server Access Log Monitoring
+
+Parse and alert on Apache, Nginx, and other web server access logs.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **web_log_1m_requests** | Requests per minute | `web_log.requests` | WARN/C |
+| **web_log_1m_successful** | Successful (2xx) requests | `web_log.responses` | WARN/C |
+| **web_log_1m_bad_requests** | Bad requests (4xx) | `web_log.responses` | WARN/C |
+| **web_log_1m_internal_errors** | Internal errors (5xx) | `web_log.responses` | CRIT > 0 |
+| **web_log_10m_response_time** | Response time percentiles | `web_log.latency` | WARN/C |
+| **web_log_5m_successful_old** | Legacy successful response check | `web_log.responses` | WARN/C |
+| **web_log_5m_requests_ratio** | Request ratio between sections | `web_log.requests` | WARN/C |
+| **web_log_1m_redirects** | Redirect responses (3xx) | `web_log.responses` | WARN/C |
+| **web_log_1m_unmatched** | Lines not matching log format | `web_log.unmatched` | WARN > 0 |
+
+### Disk I/O Latency Monitoring (IOPing)
+
+Block device latency measurements and thresholds.
+
+| Alert | Description | Context | Thresholds |
+|-------|-------------|---------|------------|
+| **ioping_disk_latency** | Average I/O latency | `ioping.latency` | WARN > 1s, CRIT > 5s |
+
+### Additional Platforms and Specialized Monitoring
+
+| Integration | Alerts Covered |
+|------------|---------------|
+| [Riak KV](/docs/src/go/plugin/go.d/collector/riakkv/integrations/riakkv.md) | KV get/put latency, slow ops, VM process count |
+| [Retroshare](/docs/src/go/plugin/go.d/collector/retroshare/integrations/retroshare.md) | DHT working status |
+| [Fail2Ban](/docs/src/go/plugin/go.d/collector/fail2ban/integrations/fail2ban.md) | Jail status, banned IPs |
+| [Supermicro IPMI](/docs/src/go/plugin/go.d/collector/sensors/integrations/supermicro_ipmi.md) | BMC sensor states |
+| [Supervisord](/docs/src/go/plugin/go.d/collector/supervisord/integrations/supervisord.md) | Supervised process health |
+| [Gearman](/docs/src/go/plugin/go.d/collector/gearman/integrations/gearman.md) | Gearman job queue status |
+| [Beanstalk](/docs/src/go/plugin/go.d/collector/beanstalk/integrations/beanstalk.md) | Buried jobs count |
+| [Monit](/docs/src/go/plugin/go.d/collector/monit/integrations/monit.md) | Monit service status |
+| [PostFix](/docs/src/go/plugin/go.d/collector/postfix/integrations/postfix.md) | Postfix queue statistics |
+| [Squid](/docs/src/go/plugin/go.d/collector/squid/integrations/squid.md) | Cache utilization, object count |
+| [Squid Logs](/docs/src/go/plugin/go.d/collector/squidlog/integrations/squidlog.md) | Squid access log parsing |
+| [IPFS](/docs/src/go/plugin/go.d/collector/ipfs/integrations/ipfs.md) | Datastore usage, bandwidth |
+| [Whois Query](/docs/src/go/plugin/go.d/collector/whoisquery/integrations/whoisquery.md) | Domain expiration tracking |
+| [WireGuard](/docs/src/go/plugin/go.d/collector/wireguard/integrations/wireguard.md) | WireGuard tunnel status |
+| [PostgreSQL FDW](/docs/src/go/plugin/go.d/collector/sql/integrations/sql.md) | Foreign data wrapper queries |
+| [Machine Learning](/docs/src/go/plugin/go.d/collector/prometheus/integrations/ml.md) | ML model anomalies (ml_1min_node_ar) |
 
 ## Related Sections
 
