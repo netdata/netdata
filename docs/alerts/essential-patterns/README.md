@@ -135,17 +135,17 @@ chart labels: unit_name=!*
 
 The exec script receives 33 positional arguments (not environment variables):
 
-| Position | Description |
-|----------|-------------|
+| Pos | Description |
+|-----|-------------|
 | 1 | recipient |
-| 2 | registry hostname |
+| 2 | registry_hostname |
 | 3 | unique_id |
 | 4 | alarm_id |
 | 5 | alarm_event_id |
 | 6 | when (Unix timestamp) |
 | 7 | alert_name |
 | 8 | alert_chart_name |
-| 9 | current_status |
+| 9 | old_status |
 | 10 | new_status (CLEAR, WARNING, CRITICAL) |
 | 11 | new_value |
 | 12 | old_value |
@@ -156,8 +156,8 @@ The exec script receives 33 positional arguments (not environment variables):
 | 17 | alert_info |
 | 18 | new_value_string |
 | 19 | old_value_string |
-| 20 | calc_expression |
-| 21 | calc_param_values |
+| 20 | calc_expression_source |
+| 21 | calc_expression_error |
 | 22 | n_warn |
 | 23 | n_crit |
 | 24 | warn_alarms |
