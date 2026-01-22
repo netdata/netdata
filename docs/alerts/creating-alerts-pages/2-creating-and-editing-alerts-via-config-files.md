@@ -155,6 +155,31 @@ Both use **dots** in their naming convention.
 - Dashboard: Hover over chart → check tooltip
 - API: `curl "http://localhost:19999/api/v1/charts" | jq '.charts[] | {id, context}'`
 
+### Targeting by Chart Labels
+
+Beyond contexts and specific chart IDs, you can also target instances by their labels. This is useful when instances share a logical characteristic (same mount point pattern, container type, etc.).
+
+```conf
+template: bulk_disk_space
+    on: disk.space
+chart labels: storage_class=bulk
+   lookup: max -1m percentage of avail
+    units: %
+    every: 1m
+     warn: $this < 10
+     crit: $this < 5
+```
+
+Use labels when:
+- Multiple instances share a label (easier than multiple alarms)
+- Chart IDs are dynamic or unpredictable
+- You want reusable configurations across similar resources
+
+View available labels on your system:
+```bash
+curl -s "http://localhost:19999/api/v1/charts" | jq '.charts[].labels' | head -20
+```
+
 :::
 
 :::note

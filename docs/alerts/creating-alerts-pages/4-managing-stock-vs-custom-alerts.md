@@ -23,7 +23,120 @@ All three sources **coexist** on your nodes:
 
 :::
 
-## 2.4.2 Common Management Patterns
+## 2.4.2 Key Concepts: Contexts, Instances, Templates, and Alarms
+
+Before diving into patterns, understand how Netdata's alerting model works.
+
+### Contexts vs Instances
+
+Every chart in Netdata has two identifiers:
+
+| Concept | What It Is | Example |
+|---------|------------|---------|
+| **Context** | What the metrics ARE—their semantic meaning and units | `disk.space` (disk space utilization in %), `system.cpu` (CPU utilization breakdown) |
+| **Instance** | A specific occurrence of that metric on your system | `disk_space./`, `disk_space./home`, `system.cpu` (per-node) |
+
+A **context** groups all instances that share the same metric definition. For example, the `disk.space` context includes every mounted filesystem on your system.
+
+```bash
+# View all chart contexts
+curl -s "http://localhost:19999/api/v1/charts" | jq '.charts[].type' | sort -u
+
+# View instances of a specific context (disks)
+curl -s "http://localhost:19999/api/v1/charts" | jq '.charts[] | select(.type == "disk.space") | .id'
+```
+
+### Templates vs Alarms
+
+Netdata provides two ways to define alerts that operate at different scopes:
+
+#### Template: Matches a Context
+
+Applies to **ALL instances** of a context automatically. Ideal when you want the same alert logic for every disk, every CPU, every network interface.
+
+```conf
+template: disk_space_usage
+      on: disk.space          # ← context: matches ALL instances
+   lookup: max -1m percentage of avail
+     warn: $this < 20
+     crit: $this < 10
+```
+
+When you define this template, it creates alerts for every disk on every node—no manual configuration per disk needed. When a new disk is mounted, it automatically inherits this alert.
+
+#### Alarm: Matches One Instance
+
+Applies to a **specific instance** only. Used when one particular resource needs different behavior than the norm.
+
+```conf
+alarm: disk_space_usage
+   on: disk_space._mnt_data     # ← specific chart ID (instance)
+   lookup: max -1m percentage of avail
+     warn: $this < 5
+     crit: $this < 2
+```
+
+Use alarms for exceptions—a data disk that runs fuller than others, a specific service with unique thresholds.
+
+**Key distinction:** The `on:` line specifies a **context** for templates, but a **chart ID** (instance) for alarms.
+
+### Precedence: Alarms Beat Templates (Same Name Required)
+
+Both a template and an alarm can coexist on the same context—their interaction follows clear rules:
+
+1. Precedence only applies when alerts have the **same name**
+2. Different names coexist independently on the same instance
+3. When names match: **Alarms win over templates**, **User config wins over stock**
+
+```conf
+# Stock template (applies to ALL disks, warn at 20%)
+template: disk_space_usage
+      on: disk.space
+   lookup: max -1m percentage of avail
+     warn: $this < 20
+     crit: $this < 10
+
+# User alarm (applies to ONE specific disk, warn at 5%)
+alarm: disk_space_usage        # same name = precedence applies
+   on: disk_space._mnt_data    # specific instance
+   lookup: max -1m percentage of avail
+     warn: $this < 5
+     crit: $this < 2
+```
+
+Result:
+- `/mnt/data` uses your alarm's 5%/2% thresholds
+- All other disks use the template's 20%/10% thresholds
+
+### Complete Precedence Order
+
+| Priority | Type | Source | Behavior |
+|----------|------|--------|----------|
+| 1 (highest) | Alarm | User config | Processed first for matching instance |
+| 2 | Alarm | Stock config | Falls through if user alarm doesn't match |
+| 3 | Template | User config | Applied if no alarm matched |
+| 4 (lowest) | Template | Stock config | Final fallback for unmatched instances |
+
+This ordering is **first-match-wins** within each precedence level for the same alert name.
+
+### File Shadowing
+
+If a file with the **same filename** exists in both user and stock directories, **only the user file is loaded**. The stock file is completely ignored:
+
+| User Config | Stock Config | Result |
+|-------------|-------------|--------|
+| `/etc/netdata/health.d/cpu.conf` | `/usr/lib/netdata/conf.d/health.d/cpu.conf` | Only user file loads |
+
+Unlike alert-level precedence, file shadowing skips the entire stock file—you must include ALL alerts you want from that file.
+
+### Dynamic Configuration Exception
+
+Alerts edited through the **Netdata UI or API** behave differently:
+
+- **UI/API overrides replace** any file-based definition with the same name
+- This is the only case where a definition completely overwrites another
+
+Editing an alert in the dashboard creates a dynamic configuration that takes precedence over all file-based configs. This allows quick adjustments without SSH access. To restore file-based control, remove the dynamic config through the UI or API.
 
 <details>
 <summary><strong>Pattern 1: Start with Stock, Add Custom for Special Cases</strong></summary>
@@ -68,28 +181,28 @@ Custom alerts handle:
 
 **How to override safely:**
 
-1. **Find the stock alert** you want to customize:
+1. **Find the stock alert** you want to customize (for example, `20min_steal_cpu`):
    ```bash
-   sudo less /usr/lib/netdata/conf.d/health.d/cpu.conf
+   sudo grep -n "20min_steal_cpu" /usr/lib/netdata/conf.d/health.d/*
    ```
 
-2. **Copy just the alert definition** you want to change:
+2. **Copy the alert definition** to your custom config:
    ```bash
-   sudo /etc/netdata/edit-config health.d/cpu_custom.conf
+   sudo /etc/netdata/edit-config health.d/my-overrides.conf
    ```
 
-3. **Paste and modify** the alert (keep the same `alarm:` or `template:` name):
+3. **Paste and modify** the alert (keep the same `template:` name):
    ```conf
-   # Override stock CPU alert with higher threshold for our workload
-   template: 10min_cpu_usage
+   # Override stock 20min_steal_cpu with lower thresholds for our workload
+   template: 20min_steal_cpu
        on: system.cpu
-   lookup: average -10m unaligned of user,system,softirq,irq,guest
+   lookup: average -20m unaligned of steal
     units: %
-    every: 1m
-     warn: $this > 90   # Stock default is 80
-     crit: $this > 98   # Stock default is 95
-     info: CPU utilization for the last 10 minutes (custom threshold)
-       to: sysadmin
+    every: 5m
+     warn: $this > (($status >= $WARNING) ? (3) : (5))
+     crit: $this > (($status >= $WARNING) ? (5) : (8))
+     info: CPU steal time over 20 minutes (custom thresholds)
+       to: ops_team
    ```
 
 4. **Reload health configuration:**
@@ -99,6 +212,7 @@ Custom alerts handle:
 
 **What happens:**
 - Your custom version **overrides** the stock alert (same name = precedence)
+- Only `20min_steal_cpu` is affected—all other alerts in stock files remain unchanged
 - Future Netdata upgrades won't affect your override
 - You still benefit from stock alert updates for alerts you **didn't** override
 
@@ -339,11 +453,39 @@ Look for:
 <details>
 <summary><strong>My custom override isn't working</strong></summary>
 
-**Check:**
-1. **Alert name matches exactly** (stock and custom must use the same name)
-2. **Custom alert loads after stock** (it's in `/etc/netdata/health.d/`, not `/usr/lib/...`)
-3. **No syntax errors** (check `/var/log/netdata/health.log`)
-4. **Health configuration reloaded** (`sudo netdatacli reload-health`)
+**Step-by-step diagnosis:**
+
+1. **Confirm reload worked:**
+   ```bash
+   sudo netdatacli reload-health
+   ```
+
+2. **Check which definition is active:**
+   ```bash
+   curl -s "http://localhost:19999/api/v1/alarms?all" | \
+     jq '.alarms | to_entries[] | select(.value.name == "YOUR_ALERT_NAME") | .value.source'
+   ```
+
+3. **Look for errors in logs:**
+   ```bash
+   # systemd-based systems (most modern Linux):
+   journalctl --namespace netdata -g health --no-pager | tail -30
+
+   # Fallback to log files:
+   grep -i health /var/log/netdata/error.log | tail -30
+   ```
+
+4. **Verify file permissions:**
+   ```bash
+   ls -la /etc/netdata/health.d/your-config.conf
+   # Should be readable by netdata user
+   ```
+
+5. **Validate syntax:**
+   ```bash
+   cat /etc/netdata/health.d/your-config.conf | python3 -c "import json, yaml, sys; yaml.safe_load(sys.stdin)"
+   # Basic YAML validation (doesn't catch all Netdata-specific errors)
+   ```
 
 </details>
 
