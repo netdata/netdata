@@ -106,7 +106,8 @@ fn chart_result_from_histogram(
 
     for (request, bucket_response) in &histogram_response.buckets {
         let timestamp = request.start;
-        let mut counts = Vec::with_capacity(raw_values.len());
+        let mut counts = Vec::with_capacity(raw_values.len() + 1);
+        let mut field_sum = 0usize;
 
         for raw_value in &raw_values {
             // Create FieldValuePair for lookup using raw (untransformed) value
@@ -118,8 +119,13 @@ fn chart_result_from_histogram(
                 .map(|(_, filtered)| *filtered)
                 .unwrap_or(0);
 
+            field_sum += count;
             counts.push([count, 0, 0]);
         }
+
+        // Calculate entries without this field (unset)
+        let unset_count = bucket_response.total_entries.1.saturating_sub(field_sum);
+        counts.push([unset_count, 0, 0]);
 
         data.push(DataPoint {
             timestamp: timestamp.0 as u64 * std::time::Duration::from_secs(1).as_millis() as u64,
@@ -133,6 +139,8 @@ fn chart_result_from_histogram(
         pa: 2,
     };
 
+    // Add "(unset)" label for entries without this field
+    labels.push(String::from("(unset)"));
     labels.insert(0, String::from("time"));
 
     ChartResult {
