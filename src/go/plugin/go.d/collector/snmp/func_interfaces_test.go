@@ -54,6 +54,8 @@ func TestFuncIfacesColumns(t *testing.T) {
 					"Traffic In", "Traffic Out",
 					"Unicast In", "Unicast Out",
 					"Broadcast In", "Broadcast Out",
+					"Errors In", "Errors Out",
+					"Discards In", "Discards Out",
 					"Multicast In", "Multicast Out",
 				}
 
@@ -91,6 +93,8 @@ func TestFuncIfacesColumns(t *testing.T) {
 					operStatus:  "up",
 					rates: ifaceRates{
 						trafficIn: &rate,
+						errorsIn:  &rate,
+						discardsIn: &rate,
 					},
 				}
 
@@ -110,6 +114,10 @@ func TestFuncIfacesColumns(t *testing.T) {
 					case "Type Group":
 						assert.Equal(t, "ethernet", col.value(entry))
 					case "Traffic In":
+						assert.Equal(t, rate, col.value(entry))
+					case "Errors In":
+						assert.Equal(t, rate, col.value(entry))
+					case "Discards In":
 						assert.Equal(t, rate, col.value(entry))
 					case "Admin Status":
 						assert.Equal(t, "up", col.value(entry))
@@ -175,17 +183,21 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				ifTypeGroup: "ethernet",
 				adminStatus: "up",
 				operStatus:  "up",
-				rates: ifaceRates{
-					trafficIn:    &rate1,
-					trafficOut:   &rate2,
-					ucastPktsIn:  &rate1,
-					ucastPktsOut: &rate2,
-					bcastPktsIn:  &rate1,
-					bcastPktsOut: &rate2,
-					mcastPktsIn:  &rate1,
-					mcastPktsOut: &rate2,
+					rates: ifaceRates{
+						trafficIn:    &rate1,
+						trafficOut:   &rate2,
+						ucastPktsIn:  &rate1,
+						ucastPktsOut: &rate2,
+						bcastPktsIn:  &rate1,
+						bcastPktsOut: &rate2,
+						errorsIn:     &rate1,
+						errorsOut:    &rate2,
+						discardsIn:   &rate1,
+						discardsOut:  &rate2,
+						mcastPktsIn:  &rate1,
+						mcastPktsOut: &rate2,
+					},
 				},
-			},
 			validate: func(t *testing.T, row []any) {
 				// Find column indices by key
 				nameIdx := findColIdx("Interface")

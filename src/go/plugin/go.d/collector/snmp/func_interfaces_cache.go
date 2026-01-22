@@ -16,6 +16,8 @@ var ifaceMetricNames = map[string]bool{
 	"ifPacketsUcast":     true,
 	"ifPacketsBroadcast": true,
 	"ifPacketsMulticast": true,
+	"ifErrors":           true,
+	"ifDiscards":         true,
 	"ifAdminStatus":      true,
 	"ifOperStatus":       true,
 }
@@ -71,6 +73,10 @@ type ifaceCounters struct {
 	bcastPktsOut int64
 	mcastPktsIn  int64
 	mcastPktsOut int64
+	errorsIn     int64
+	errorsOut    int64
+	discardsIn   int64
+	discardsOut  int64
 }
 
 // ifaceRates holds computed per-second rates.
@@ -83,6 +89,10 @@ type ifaceRates struct {
 	bcastPktsOut *float64
 	mcastPktsIn  *float64
 	mcastPktsOut *float64
+	errorsIn     *float64
+	errorsOut    *float64
+	discardsIn   *float64
+	discardsOut  *float64
 }
 
 // newIfaceCache creates a new interface cache.
@@ -174,6 +184,20 @@ func (c *Collector) updateIfaceCacheEntry(m ddsnmp.Metric) {
 		if v, ok := m.MultiValue["out"]; ok {
 			entry.counters.mcastPktsOut = v
 		}
+	case "ifErrors":
+		if v, ok := m.MultiValue["in"]; ok {
+			entry.counters.errorsIn = v
+		}
+		if v, ok := m.MultiValue["out"]; ok {
+			entry.counters.errorsOut = v
+		}
+	case "ifDiscards":
+		if v, ok := m.MultiValue["in"]; ok {
+			entry.counters.discardsIn = v
+		}
+		if v, ok := m.MultiValue["out"]; ok {
+			entry.counters.discardsOut = v
+		}
 	case "ifAdminStatus":
 		entry.adminStatus = extractStatus(m.MultiValue)
 	case "ifOperStatus":
@@ -211,6 +235,10 @@ func (c *Collector) finalizeIfaceCache() {
 			entry.rates.bcastPktsOut = calcRate(entry.counters.bcastPktsOut, entry.prevCounters.bcastPktsOut, elapsed)
 			entry.rates.mcastPktsIn = calcRate(entry.counters.mcastPktsIn, entry.prevCounters.mcastPktsIn, elapsed)
 			entry.rates.mcastPktsOut = calcRate(entry.counters.mcastPktsOut, entry.prevCounters.mcastPktsOut, elapsed)
+			entry.rates.errorsIn = calcRate(entry.counters.errorsIn, entry.prevCounters.errorsIn, elapsed)
+			entry.rates.errorsOut = calcRate(entry.counters.errorsOut, entry.prevCounters.errorsOut, elapsed)
+			entry.rates.discardsIn = calcRate(entry.counters.discardsIn, entry.prevCounters.discardsIn, elapsed)
+			entry.rates.discardsOut = calcRate(entry.counters.discardsOut, entry.prevCounters.discardsOut, elapsed)
 		}
 
 		entry.prevCounters = entry.counters

@@ -132,6 +132,8 @@ func TestIsIfaceMetric(t *testing.T) {
 		"ifPacketsUcast":     {name: "ifPacketsUcast", expected: true},
 		"ifPacketsBroadcast": {name: "ifPacketsBroadcast", expected: true},
 		"ifPacketsMulticast": {name: "ifPacketsMulticast", expected: true},
+		"ifErrors":           {name: "ifErrors", expected: true},
+		"ifDiscards":         {name: "ifDiscards", expected: true},
 		"ifAdminStatus":      {name: "ifAdminStatus", expected: true},
 		"ifOperStatus":       {name: "ifOperStatus", expected: true},
 		"sysUptime":          {name: "sysUptime", expected: false},
