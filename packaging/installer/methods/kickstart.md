@@ -37,14 +37,19 @@ To install and connect to Netdata Cloud in a single step from your terminal:
 
 <Tabs>
   <TabItem value="wget" label="wget">
-
-<OneLineInstallWget/>
-
+    <OneLineInstall
+      method="wget"
+      privacyLink="/docs/netdata-agent/configuration/anonymous-telemetry-events.md"
+      connectLink="https://github.com/netdata/netdata/blob/master/src/claim/README.md"
+    />
   </TabItem>
+
   <TabItem value="curl" label="curl">
-
-<OneLineInstallCurl/>
-
+    <OneLineInstall
+      method="curl"
+      privacyLink="/docs/netdata-agent/configuration/anonymous-telemetry-events.md"
+      connectLink="/blob/master/src/claim/README.md"
+    />
   </TabItem>
 </Tabs>
 
@@ -57,7 +62,6 @@ To install and connect to Netdata Cloud in a single step from your terminal:
 2. Navigate to your Space
 3. Go to **Space Settings** → **Nodes**
 4. Click **Add Node** → Copy Claim Token
-
 
 </details>
 
