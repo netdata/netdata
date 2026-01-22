@@ -6,35 +6,32 @@ Before configuring notifications, understand where they originate and how they f
 
 ```mermaid
 flowchart TB
-    subgraph Models["Notification Dispatch Models"]
-        direction TB
-        
-        subgraph M1["🔵 Agent-Dispatched"]
-            direction LR
-            HE["Health Engine"] -->|"Alert Event"| LN["Local Notification"]
-            LN --> DestA["Slack · Email · PagerDuty"]
-        end
-        
-        subgraph M2["🟢 Parent-Dispatched"]
-            direction LR
-            Child["Child Node"] -->|"Metrics"| Parent["Parent Node"]
-            Parent -->|"Health Engine"| PN["Parent Notification"]
-        end
-        
-        subgraph M3["🟡 Cloud-Dispatched"]
-            direction LR
-            AE["Alert Event"] --> Cloud["Netdata Cloud"]
-            Cloud --> CI["Cloud Integrations"]
-            CI --> DestC["Slack · Teams · Webhooks"]
-        end
+    subgraph M1("Agent-Dispatched")
+        direction LR
+        HE("Health Engine") -->|"Alert Event"| LN("Local Notification")
+        LN --> DestA("Slack·Email·PagerDuty")
+    end
     
-    classDef model fill:#2196F3,stroke:#000000,stroke-width:3px,color:#ffffff,font-size:16px
+    subgraph M2("Parent-Dispatched")
+        direction LR
+        Child("Child Node") -->|"Metrics"| Parent("Parent Node")
+        Parent -->|"Health Engine"| PN("Parent Notification")
+    end
+    
+    subgraph M3("Cloud-Dispatched")
+        direction LR
+        AE("Alert Event") --> Cloud("Netdata Cloud")
+        Cloud --> CI("Cloud Integrations")
+        CI --> DestC("Slack·Teams·Webhooks")
+    end
+    
+    classDef blue fill:#2196F3,stroke:#000000,stroke-width:3px,color:#ffffff,font-size:16px
     classDef yellow fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
     classDef green fill:#4caf50,stroke:#000000,stroke-width:3px,color:#ffffff,font-size:16px
     classDef white fill:#ffffff,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
     classDef orange fill:#ff9800,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
 
-    class M1,M2,M3 model
+    class M1,M2,M3 blue
     class HE,AE,Parent yellow
     class LN,PN,CI green
     class DestA,DestC,Child white
