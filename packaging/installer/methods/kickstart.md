@@ -1,4 +1,4 @@
-import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'
+import { OneLineInstall } from '@site/src/components/OneLineInstall/'
 import { Install, InstallBox } from '@site/src/components/Install/'
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
