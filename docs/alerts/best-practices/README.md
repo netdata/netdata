@@ -48,11 +48,15 @@ Techniques for reducing noise include setting appropriate hysteresis so alerts r
 
 As infrastructure grows, alert management becomes increasingly complex. Strategies for scaling include centralizing alert definitions in version control, using consistent patterns across environments, and implementing tiered escalation paths.
 
-## 11.0.4 What's Included
+## What's Included
 
-Sections in this chapter cover practical approaches to building effective alerting practices across different environments and team structures.
+This chapter is organized around three core themes:
 
-## 11.0.5 Related Sections
+- **Principles of Alert Design** — Foundations for creating alerts that drive action
+- **Reducing Noise and Flapping** — Techniques to maintain alert effectiveness
+- **Scaling Alert Management** — Approaches for growing infrastructure
+
+## Related Sections
 
 - **[4. Controlling Alerts and Noise](/docs/alerts/controlling-alerts-noise/README.md)** - Methods to reduce alert fatigue
 - **[5. Receiving Notifications](/docs/alerts/receiving-notifications/README.md)** - Configure destinations and routing

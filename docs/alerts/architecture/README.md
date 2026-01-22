@@ -57,11 +57,16 @@ Alert behavior varies depending on deployment topology.
 | **Parent-Child** | Parent aggregates metrics, evaluates alerts |
 | **Cloud-connected** | Cloud receives state changes, provides global view |
 
-## 12.0.5 What's Included
+## What's Included
 
-Each section in this chapter covers a specific aspect of alerts and notifications architecture.
+This chapter breaks down the architecture into four key areas:
 
-## 12.0.6 Related Sections
+- **The Alert Pipeline** — From metric collection to notification dispatch
+- **Configuration Layers** — How alert configs layer and override each other
+- **Alert Lifecycle** — States and transitions an alert goes through
+- **Scaling Topologies** — Alert behavior in standalone, parent-child, and cloud topologies
+
+## Related Sections
 
 - **[3. Alert Configuration Syntax](/docs/alerts/alert-configuration-syntax/README.md)** - Alert configuration syntax reference
 - **[9. APIs for Alerts and Events](/docs/alerts/apis-alerts-events/README.md)** - API endpoints for alert management
