@@ -366,6 +366,6 @@ The three alert sources are **complementary, not competing**. Use stock alerts a
 ## What's Next
 
 - **[2.5 Reloading and Validating Alert Configuration](5-reloading-and-validating-alert-configuration.md)** Deeper troubleshooting and validation techniques
-- **[Chapter 3: Alert Configuration Syntax](../alert-configuration-syntax/index.md)** Full syntax reference for writing alert definitions
-- **[Chapter 4: Controlling Alerts and Noise](../controlling-alerts-noise/index.md)** Silencing rules, delays, and hysteresis
-- **[Chapter 11: Stock Alerts Reference](../stock-alerts/index.md)** Catalog of stock alerts shipped with Netdata
+- **[Chapter 3: Alert Configuration Syntax](../alert-configuration-syntax/README.md)** Full syntax reference for writing alert definitions
+- **[Chapter 4: Controlling Alerts and Noise](../controlling-alerts-noise/README.md)** Silencing rules, delays, and hysteresis
+- **[Chapter 11: Stock Alerts Reference](../stock-alerts/README.md)** Catalog of stock alerts shipped with Netdata

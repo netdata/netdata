@@ -140,6 +140,6 @@ See **[8.1 Hysteresis and Status-Based Conditions](../essential-patterns/README.
 
 ## What's Next
 
-- **[Chapter 5: Receiving Notifications](../receiving-notifications/index.md)** - Configure notifications
-- **[Chapter 8: Essential Alert Patterns](../essential-patterns/index.md)** - Custom actions and performance
-- **[7. Troubleshooting Alerts](../troubleshooting-alerts/index.md)** - Debugging alert issues
+- **[Chapter 5: Receiving Notifications](../receiving-notifications/README.md)** - Configure notifications
+- **[Chapter 8: Essential Alert Patterns](../essential-patterns/README.md)** - Custom actions and performance
+- **[7. Troubleshooting Alerts](../troubleshooting-alerts/README.md)** - Debugging alert issues

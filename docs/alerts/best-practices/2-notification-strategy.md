@@ -69,10 +69,10 @@ Update alert configurations based on response patterns. Alerts that consistently
 - [12.3 Maintaining Configurations](./3-maintaining-configurations.md) - Version control and periodic reviews
 - [12.4 Large Environment Patterns](./4-scaling-large-environments.md) - Parent-based and distributed setups
 - [12.5 SLI and SLO Alerts](./5-sli-slo-alerts.md) - Connecting to business objectives
-- [13. Alerts and Notifications Architecture](../architecture/index.md) - Internal behavior
+- [13. Alerts and Notifications Architecture](../architecture/README.md) - Internal behavior
 
 ## See Also
 
-- [Receiving Notifications](../../receiving-notifications/index.md) - Notification configuration options
+- [Receiving Notifications](../../receiving-notifications/README.md) - Notification configuration options
 - [Silencing Rules](../../cloud-alert-features/README.md) - Cloud silencing rules
 - [Reducing Flapping and Noise](../controlling-alerts-noise/4-reducing-flapping.md) - Managing alert frequency

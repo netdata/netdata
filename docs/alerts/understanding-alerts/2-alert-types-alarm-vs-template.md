@@ -127,5 +127,5 @@ Or use `host:` labels to target a specific host's network interfaces.
 ## What's Next
 
 - **[1.3 Where Alerts Live (Files, Agent, Cloud)](3-where-alerts-live.md)** File locations for stock vs custom alerts, and how Cloud-defined alerts integrate with file-based configuration
-- **[Chapter 2: Creating and Managing Alerts](../creating-alerts-pages/index.md)** How to create/edit alert rules via config files and Netdata Cloud UI
-- **[Chapter 3: Alert Configuration Syntax](../alert-configuration-syntax/index.md)** The exact configuration lines and options for defining template-based alerts
+- **[Chapter 2: Creating and Managing Alerts](../creating-alerts-pages/README.md)** How to create/edit alert rules via config files and Netdata Cloud UI
+- **[Chapter 3: Alert Configuration Syntax](../alert-configuration-syntax/README.md)** The exact configuration lines and options for defining template-based alerts

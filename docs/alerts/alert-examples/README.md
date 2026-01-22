@@ -291,7 +291,7 @@ lookup: average -1m of inbound
 
 ## Related Sections
 
-- **[Chapter 2: Creating and Managing Alerts](../creating-alerts-pages/index.md)** - Creating and editing alerts via configuration files
-- **[Chapter 7: Troubleshooting Alerts](../troubleshooting-alerts/index.md)** - Debugging alert issues
-- **[Chapter 5: Receiving Notifications](../receiving-notifications/index.md)** - Configure alert delivery
-- **[Chapter 12: Best Practices for Alerting](../best-practices/index.md)** - Best practices for designing effective alerts
+- **[Chapter 2: Creating and Managing Alerts](../creating-alerts-pages/README.md)** - Creating and editing alerts via configuration files
+- **[Chapter 7: Troubleshooting Alerts](../troubleshooting-alerts/README.md)** - Debugging alert issues
+- **[Chapter 5: Receiving Notifications](../receiving-notifications/README.md)** - Configure alert delivery
+- **[Chapter 12: Best Practices for Alerting](../best-practices/README.md)** - Best practices for designing effective alerts

@@ -54,10 +54,10 @@ Connect alert thresholds to business objectives. For example, an HTTP error rate
 
 ## What's Next
 
-- [13. Alerts and Notifications Architecture](../architecture/index.md) - Deep-dive internals
+- [13. Alerts and Notifications Architecture](../architecture/README.md) - Deep-dive internals
 
 ## See Also
 
 - [Designing Useful Alerts](1-designing-useful-alerts.md) - Alert design principles
 - [Notification Strategy](2-notification-strategy.md) - Routing based on severity
-- [Alert Examples and Common Patterns](../alert-examples/index.md) - SLI-based alert templates
+- [Alert Examples and Common Patterns](../alert-examples/README.md) - SLI-based alert templates

@@ -716,6 +716,6 @@ Block device latency measurements and thresholds.
 
 ## Related Sections
 
-- **[Chapter 2: Creating and Managing Alerts](../creating-alerts-pages/index.md)** - Creating and editing alerts via configuration files
-- **[Chapter 12: Best Practices for Designing Effective Alerts](../best-practices/index.md)** - Best practices for designing effective alerts
-- **[Chapter 3: Alert Configuration Syntax](../alert-configuration-syntax/index.md)** - Alert configuration syntax reference
+- **[Chapter 2: Creating and Managing Alerts](../creating-alerts-pages/README.md)** - Creating and editing alerts via configuration files
+- **[Chapter 12: Best Practices for Designing Effective Alerts](../best-practices/README.md)** - Best practices for designing effective alerts
+- **[Chapter 3: Alert Configuration Syntax](../alert-configuration-syntax/README.md)** - Alert configuration syntax reference
