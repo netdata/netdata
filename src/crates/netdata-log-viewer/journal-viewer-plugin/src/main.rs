@@ -13,6 +13,13 @@ use tracing::{error, info};
 
 #[tokio::main]
 async fn main() {
+    // Install SIGBUS handler first, before any memory-mapped file operations,
+    // because systemd can rotate journal files at any time.
+    if let Err(e) = journal_core::install_sigbus_handler() {
+        eprintln!("failed to install SIGBUS handler: {}", e);
+        std::process::exit(1);
+    }
+
     println!("TRUST_DURATIONS 1");
 
     rt::init_tracing();
