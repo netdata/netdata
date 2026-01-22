@@ -74,6 +74,7 @@ For alerts on rapidly changing metrics, frequent evaluation catches brief anomal
 
 ## Related Sections
 
-- [13.2 Configuration Layers](/docs/alerts/architecture/README.md) - How configurations are merged
-- [13.4 Notification Dispatch](/docs/alerts/architecture/README.md) - How notifications are delivered
-- [13.5 Scaling Topologies](/docs/alerts/architecture/README.md) - Behavior in distributed setups
+- [12.2 Alert Lifecycle](/docs/alerts/architecture/2-alert-lifecycle.md) - How alerts transition states
+- [12.3 Notification Dispatch](/docs/alerts/architecture/3-notification-dispatch.md) - How notifications are delivered
+- [12.4 Configuration Layers](/docs/alerts/architecture/4-configuration-layers.md) - How configurations are merged
+- [12.5 Scaling Topologies](/docs/alerts/architecture/5-scaling-topologies.md) - Behavior in distributed setups

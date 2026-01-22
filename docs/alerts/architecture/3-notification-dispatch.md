@@ -55,6 +55,6 @@ Escalation policies route unacknowledged alerts to secondary recipients after ti
 
 ## Related Sections
 
-- [13.1 Evaluation Architecture](/docs/alerts/architecture/README.md) - Alert evaluation process
-- [13.5 Scaling Topologies](/docs/alerts/architecture/README.md) - Distributed notification handling
-- [Receiving Notifications](/docs/alerts/receiving-notifications/README.md) - Complete notification guide
+- [12.1 Evaluation Architecture](/docs/alerts/architecture/1-evaluation-architecture.md) - Alert evaluation process
+- [12.5 Scaling Topologies](/docs/alerts/architecture/5-scaling-topologies.md) - Distributed notification handling
+- [5. Receiving Notifications](/docs/alerts/receiving-notifications/README.md) - Complete notification guide

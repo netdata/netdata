@@ -40,6 +40,6 @@ Repeat intervals prevent notification storms while maintaining awareness of unre
 
 ## Related Sections
 
-- [13.4 Configuration Layers](/docs/alerts/architecture/README.md) - How configurations are merged
-- [13.3 Notification Dispatch](/docs/alerts/architecture/README.md) - How notifications are delivered
-- [13.5 Scaling Topologies](/docs/alerts/architecture/README.md) - Alert behavior in different topologies
+- [12.4 Configuration Layers](/docs/alerts/architecture/4-configuration-layers.md) - How configurations affect alert behavior
+- [12.3 Notification Dispatch](/docs/alerts/architecture/3-notification-dispatch.md) - Sending notifications on state changes
+- [12.5 Scaling Topologies](/docs/alerts/architecture/5-scaling-topologies.md) - Alert behavior in distributed setups

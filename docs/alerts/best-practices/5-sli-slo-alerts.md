@@ -54,7 +54,7 @@ Connect alert thresholds to business objectives. For example, an HTTP error rate
 
 ## What's Next
 
-- [13. Alerts and Notifications Architecture](/docs/alerts/architecture/README.md) - Deep-dive internals
+- [12. Alerts and Notifications Architecture](/docs/alerts/architecture/README.md) - Deep-dive internals
 
 ## See Also
 
