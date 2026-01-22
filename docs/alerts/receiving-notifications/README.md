@@ -14,8 +14,8 @@ Alert events are only useful if the right people see them. Netdata supports thre
 
 | Section | What It Covers |
 |---------|----------------|
-| **[5.1 Notification Concepts](1-notification-concepts.md)** | The three dispatch models and when to use each |
-| **[5.2 Agent and Parent Notifications](2-agent-parent-notifications.md)** | Configuring local notification methods (email, Slack, PagerDuty, etc.) |
-| **[5.3 Cloud Notifications](3-cloud-notifications.md)** | Setting up Cloud-integrated notifications with roles and routing |
-| **[5.4 Controlling Recipients](4-controlling-recipients.md)** | Mapping severities to people, using Cloud roles |
-| **[5.5 Testing and Troubleshooting](5-testing-troubleshooting.md)** | Verifying notifications work, common issues |
+| **[5.1 Notification Concepts](receiving-notifications/1-notification-concepts.md)** | The three dispatch models and when to use each |
+| **[5.2 Agent and Parent Notifications](receiving-notifications/2-agent-parent-notifications.md)** | Configuring local notification methods (email, Slack, PagerDuty, etc.) |
+| **[5.3 Cloud Notifications](receiving-notifications/3-cloud-notifications.md)** | Setting up Cloud-integrated notifications with roles and routing |
+| **[5.4 Controlling Recipients](receiving-notifications/4-controlling-recipients.md)** | Mapping severities to people, using Cloud roles |
+| **[5.5 Testing and Troubleshooting](receiving-notifications/5-testing-troubleshooting.md)** | Verifying notifications work, common issues |
