@@ -33,31 +33,31 @@ func (p ParamSelection) MarshalJSON() ([]byte, error) {
 // Column is not serialized and can be used for safe SQL mapping (e.g., __sort).
 type ParamOption struct {
 	// ID is the stable identifier returned in selected values.
-	ID       string
+	ID string
 	// Name is the label shown in the UI.
-	Name     string
+	Name string
 	// Default marks the option as the default selection (if none are set, the first option is used).
-	Default  bool
+	Default bool
 	// Disabled prevents selection in the UI.
 	Disabled bool
 	// Sort includes a sort directive with the option.
-	Sort     *FieldSort
+	Sort *FieldSort
 	// Column is not serialized and can be used for safe SQL mapping.
-	Column   string
+	Column string
 }
 
 // ParamConfig defines a required param and its available options.
 type ParamConfig struct {
 	// ID identifies the required param in requests.
-	ID         string
+	ID string
 	// Name is the label shown in the UI.
-	Name       string
+	Name string
 	// Help provides UI help text for the param.
-	Help       string
+	Help string
 	// Selection sets single or multi-select behavior.
-	Selection  ParamSelection
+	Selection ParamSelection
 	// Options supplies the available choices.
-	Options    []ParamOption
+	Options []ParamOption
 	// UniqueView requests unique view behavior for the param in the UI.
 	UniqueView bool
 }
@@ -115,7 +115,7 @@ func buildParamOptions(opts []ParamOption) []map[string]any {
 // ResolvedParam holds resolved values for a required param.
 type ResolvedParam struct {
 	// IDs contains selected option IDs in order.
-	IDs     []string
+	IDs []string
 	// Options contains selected option metadata in order.
 	Options []ParamOption
 }
