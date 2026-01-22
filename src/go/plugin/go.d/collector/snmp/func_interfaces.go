@@ -240,14 +240,17 @@ func (f *funcInterfaces) defaultSortColumn() string {
 }
 
 func matchesTypeGroup(group, filter string) bool {
-	switch filter {
-	case "ethernet", "aggregation", "virtual":
-		return group == filter
-	case "other":
-		return group == "" || (group != "ethernet" && group != "aggregation" && group != "virtual")
-	default:
-		return group == filter
+	knownGroups := map[string]bool{
+		"ethernet":    true,
+		"aggregation": true,
+		"virtual":     true,
 	}
+
+	if filter == "other" {
+		return !knownGroups[group]
+	}
+
+	return group == filter
 }
 
 // ptrToAny converts a *float64 to any, returning nil if the pointer is nil.
