@@ -27,10 +27,16 @@ This collector monitors the activity and performance of YugabyteDB servers.
 
 It sends HTTP requests to the YugabyteDB [metric endpoints](https://docs.yugabyte.com/preview/launch-and-manage/monitor-and-alert/metrics/#metric-endpoints).
 
+It also provides `top-queries` and `running-queries` functions using `pg_stat_statements` and `pg_stat_activity` from YSQL.
+
 
 This collector is supported on all platforms.
 
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+
+The `top-queries` function requires the `pg_stat_statements` extension to be installed in the target database.
+
+Viewing all running queries via `pg_stat_activity` may require elevated privileges (e.g., `pg_read_all_stats`).
 
 
 ### Default Behavior
@@ -370,6 +376,9 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | url | Target endpoint URL. | http://127.0.0.1:7000/prometheus-metrics | yes |
 |  | timeout | HTTP request timeout (seconds). | 1 | no |
+| **Query Functions** | dsn | SQL DSN used by `top-queries` and `running-queries` functions. |  | no |
+|  | sql_timeout | SQL query timeout (seconds) for query functions. | 1 | no |
+| **Limits** | top_queries_limit | Maximum number of rows returned by the `top-queries` and `running-queries` functions. | 500 | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
 |  | password | Password for Basic HTTP authentication. |  | no |
 |  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
@@ -441,6 +450,21 @@ jobs:
     # url: http://127.0.0.1:13000/prometheus-metrics  # YSQL
 
 ```
+###### Top queries
+
+Enable SQL query functions (YSQL).
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: local
+    url: http://127.0.0.1:7000/prometheus-metrics
+    dsn: postgres://yugabyte@127.0.0.1:5433/yugabyte?sslmode=disable
+
+```
+</details>
+
 ###### HTTP authentication
 
 Basic HTTP authentication.
