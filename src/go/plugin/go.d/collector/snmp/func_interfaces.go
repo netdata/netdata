@@ -308,6 +308,13 @@ func ptrToAny(p *float64) any {
 	return *p
 }
 
+func ptrToAnyScale(p *float64, scale float64) any {
+	if p == nil {
+		return nil
+	}
+	return *p / scale
+}
+
 // Package-level registration functions that delegate to funcInterfaces.
 
 func snmpMethods() []module.MethodConfig {
@@ -412,12 +419,13 @@ var funcIfacesColumns = []funcIfacesColumn{
 	{
 		key:        "Traffic In",
 		name:       "",
-		value:      func(e *ifaceEntry) any { return ptrToAny(e.rates.trafficIn) },
+		value:      func(e *ifaceEntry) any { return ptrToAnyScale(e.rates.trafficIn, 1_000_000) },
 		dataType:   funcapi.FieldTypeFloat,
-		units:      "bit/s",
+		units:      "Mbits",
 		visual:     funcapi.FieldVisualBar,
 		visible:    true,
 		transform:  funcapi.FieldTransformNumber,
+		decimals:   2,
 		sortDir:    funcapi.FieldSortDescending,
 		summary:    funcapi.FieldSummarySum,
 		filter:     funcapi.FieldFilterRange,
@@ -426,12 +434,13 @@ var funcIfacesColumns = []funcIfacesColumn{
 	{
 		key:        "Traffic Out",
 		name:       "",
-		value:      func(e *ifaceEntry) any { return ptrToAny(e.rates.trafficOut) },
+		value:      func(e *ifaceEntry) any { return ptrToAnyScale(e.rates.trafficOut, 1_000_000) },
 		dataType:   funcapi.FieldTypeFloat,
-		units:      "bit/s",
+		units:      "Mbits",
 		visual:     funcapi.FieldVisualBar,
 		visible:    true,
 		transform:  funcapi.FieldTransformNumber,
+		decimals:   2,
 		sortDir:    funcapi.FieldSortDescending,
 		summary:    funcapi.FieldSummarySum,
 		filter:     funcapi.FieldFilterRange,
@@ -440,12 +449,13 @@ var funcIfacesColumns = []funcIfacesColumn{
 	{
 		key:       "Unicast In",
 		name:      "",
-		value:     func(e *ifaceEntry) any { return ptrToAny(e.rates.ucastPktsIn) },
+		value:     func(e *ifaceEntry) any { return ptrToAnyScale(e.rates.ucastPktsIn, 1_000) },
 		dataType:  funcapi.FieldTypeFloat,
-		units:     "packets/s",
+		units:     "Kpps",
 		visual:    funcapi.FieldVisualBar,
 		visible:   true,
 		transform: funcapi.FieldTransformNumber,
+		decimals:  2,
 		sortDir:   funcapi.FieldSortDescending,
 		summary:   funcapi.FieldSummarySum,
 		filter:    funcapi.FieldFilterRange,
@@ -453,12 +463,13 @@ var funcIfacesColumns = []funcIfacesColumn{
 	{
 		key:       "Unicast Out",
 		name:      "",
-		value:     func(e *ifaceEntry) any { return ptrToAny(e.rates.ucastPktsOut) },
+		value:     func(e *ifaceEntry) any { return ptrToAnyScale(e.rates.ucastPktsOut, 1_000) },
 		dataType:  funcapi.FieldTypeFloat,
-		units:     "packets/s",
+		units:     "Kpps",
 		visual:    funcapi.FieldVisualBar,
 		visible:   true,
 		transform: funcapi.FieldTransformNumber,
+		decimals:  2,
 		sortDir:   funcapi.FieldSortDescending,
 		summary:   funcapi.FieldSummarySum,
 		filter:    funcapi.FieldFilterRange,
@@ -466,12 +477,13 @@ var funcIfacesColumns = []funcIfacesColumn{
 	{
 		key:       "Broadcast In",
 		name:      "",
-		value:     func(e *ifaceEntry) any { return ptrToAny(e.rates.bcastPktsIn) },
+		value:     func(e *ifaceEntry) any { return ptrToAnyScale(e.rates.bcastPktsIn, 1_000) },
 		dataType:  funcapi.FieldTypeFloat,
-		units:     "packets/s",
+		units:     "Kpps",
 		visual:    funcapi.FieldVisualBar,
 		visible:   false,
 		transform: funcapi.FieldTransformNumber,
+		decimals:  2,
 		sortDir:   funcapi.FieldSortDescending,
 		summary:   funcapi.FieldSummarySum,
 		filter:    funcapi.FieldFilterRange,
@@ -479,12 +491,13 @@ var funcIfacesColumns = []funcIfacesColumn{
 	{
 		key:       "Broadcast Out",
 		name:      "",
-		value:     func(e *ifaceEntry) any { return ptrToAny(e.rates.bcastPktsOut) },
+		value:     func(e *ifaceEntry) any { return ptrToAnyScale(e.rates.bcastPktsOut, 1_000) },
 		dataType:  funcapi.FieldTypeFloat,
-		units:     "packets/s",
+		units:     "Kpps",
 		visual:    funcapi.FieldVisualBar,
 		visible:   false,
 		transform: funcapi.FieldTransformNumber,
+		decimals:  2,
 		sortDir:   funcapi.FieldSortDescending,
 		summary:   funcapi.FieldSummarySum,
 		filter:    funcapi.FieldFilterRange,
@@ -544,12 +557,13 @@ var funcIfacesColumns = []funcIfacesColumn{
 	{
 		key:       "Multicast In",
 		name:      "",
-		value:     func(e *ifaceEntry) any { return ptrToAny(e.rates.mcastPktsIn) },
+		value:     func(e *ifaceEntry) any { return ptrToAnyScale(e.rates.mcastPktsIn, 1_000) },
 		dataType:  funcapi.FieldTypeFloat,
-		units:     "packets/s",
+		units:     "Kpps",
 		visual:    funcapi.FieldVisualBar,
 		visible:   false,
 		transform: funcapi.FieldTransformNumber,
+		decimals:  2,
 		sortDir:   funcapi.FieldSortDescending,
 		summary:   funcapi.FieldSummarySum,
 		filter:    funcapi.FieldFilterRange,
@@ -557,12 +571,13 @@ var funcIfacesColumns = []funcIfacesColumn{
 	{
 		key:       "Multicast Out",
 		name:      "",
-		value:     func(e *ifaceEntry) any { return ptrToAny(e.rates.mcastPktsOut) },
+		value:     func(e *ifaceEntry) any { return ptrToAnyScale(e.rates.mcastPktsOut, 1_000) },
 		dataType:  funcapi.FieldTypeFloat,
-		units:     "packets/s",
+		units:     "Kpps",
 		visual:    funcapi.FieldVisualBar,
 		visible:   false,
 		transform: funcapi.FieldTransformNumber,
+		decimals:  2,
 		sortDir:   funcapi.FieldSortDescending,
 		summary:   funcapi.FieldSummarySum,
 		filter:    funcapi.FieldFilterRange,

@@ -114,7 +114,7 @@ func TestFuncIfacesColumns(t *testing.T) {
 					case "Type Group":
 						assert.Equal(t, "ethernet", col.value(entry))
 					case "Traffic In":
-						assert.Equal(t, rate, col.value(entry))
+						assert.Equal(t, rate/1_000_000, col.value(entry))
 					case "Errors In":
 						assert.Equal(t, rate, col.value(entry))
 					case "Discards In":
@@ -221,8 +221,8 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				assert.Equal(t, "eth0", row[nameIdx])
 				assert.Equal(t, "ethernetCsmacd", row[typeIdx])
 				assert.Equal(t, "ethernet", row[typeGroupIdx])
-				assert.Equal(t, rate1, row[trafficInIdx])
-				assert.Equal(t, rate2, row[trafficOutIdx])
+				assert.Equal(t, rate1/1_000_000, row[trafficInIdx])
+				assert.Equal(t, rate2/1_000_000, row[trafficOutIdx])
 				assert.Equal(t, "up", row[adminIdx])
 				assert.Equal(t, "up", row[operIdx])
 				assert.Nil(t, row[rowOptionsIdx])
