@@ -39,16 +39,16 @@ To install and connect to Netdata Cloud in a single step from your terminal:
   <TabItem value="wget" label="wget">
     <OneLineInstall
       method="wget"
-      privacyLink="/docs/netdata-agent/configuration/anonymous-telemetry-events.md"
-      connectLink="/src/claim/README.md"
+      privacyLink="[privacy](/docs/netdata-agent/configuration/anonymous-telemetry-events.md)"
+      connectLink="[connect](/src/claim/README.md)"
     />
   </TabItem>
 
   <TabItem value="curl" label="curl">
     <OneLineInstall
       method="curl"
-      privacyLink="/docs/netdata-agent/configuration/anonymous-telemetry-events.md"
-      connectLink="/src/claim/README.md"
+      privacyLink="[privacy](/docs/netdata-agent/configuration/anonymous-telemetry-events.md)"
+      connectLink="[connect](/src/claim/README.md)"
     />
   </TabItem>
 </Tabs>
