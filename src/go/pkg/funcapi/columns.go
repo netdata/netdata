@@ -2,34 +2,56 @@
 
 package funcapi
 
-// ValueOptions defines per-column formatting settings.
+// ValueOptions defines how the UI should format values in this column.
 type ValueOptions struct {
-	Transform     FieldTransform
+	// Transform controls value formatting (number, duration, datetime, text, xml).
+	Transform FieldTransform
+	// DecimalPoints sets numeric precision when using number formatting.
 	DecimalPoints int
-	DefaultValue  any
+	// DefaultValue includes a default value in the UI response.
+	DefaultValue any
 }
 
 // Column defines a table column for function responses.
 type Column struct {
-	Index                 int
-	Name                  string
-	Type                  FieldType
-	Units                 string
-	Visualization         FieldVisual
-	Sort                  FieldSort
-	Sortable              bool
-	Sticky                bool
-	Summary               FieldSummary
-	Filter                FieldFilter
-	FullWidth             bool
-	Wrap                  bool
+	// Index is the 0-based position in each row array and must match data order.
+	Index int
+	// Name is the header label shown in the UI.
+	Name string
+	// Type controls the base data type and default rendering.
+	Type FieldType
+	// Units sets the unit label shown next to values (use for numeric columns).
+	Units string
+	// Visualization selects the visual style (value, pill, bar, rich content).
+	Visualization FieldVisual
+	// Sort sets the default sort direction.
+	Sort FieldSort
+	// Sortable allows users to change the sort order in the UI.
+	Sortable bool
+	// Sticky pins the column during horizontal scroll.
+	Sticky bool
+	// Summary defines how values aggregate when grouping rows.
+	Summary FieldSummary
+	// Filter selects the filter UI type (range for numbers, multiselect for categories, facet for logs).
+	Filter FieldFilter
+	// FullWidth lets the column expand to fill available width.
+	FullWidth bool
+	// Wrap enables text wrapping for long values.
+	Wrap bool
+	// DefaultExpandedFilter expands this filter by default.
 	DefaultExpandedFilter bool
-	UniqueKey             bool
-	Visible               bool
-	ValueOptions          ValueOptions
-	Max                   *float64
-	PointerTo             string
-	Dummy                 bool
+	// UniqueKey marks the unique row identifier column.
+	UniqueKey bool
+	// Visible shows the column by default.
+	Visible bool
+	// ValueOptions controls value formatting (transform, decimals, defaults).
+	ValueOptions ValueOptions
+	// Max sets the upper bound for bar-with-integer visuals.
+	Max *float64
+	// PointerTo includes a pointer target identifier in the UI response.
+	PointerTo string
+	// Dummy includes a dummy flag in the UI response.
+	Dummy bool
 }
 
 // BuildColumn converts a Column definition to the JSON map used by the UI.

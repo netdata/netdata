@@ -4,14 +4,17 @@ package funcapi
 
 import "encoding/json"
 
-// ParamSelection defines the selection mode for required params.
+// ParamSelection defines whether a required param allows single or multiple selections.
 type ParamSelection uint8
 
 const (
+	// ParamSelect allows a single choice.
 	ParamSelect ParamSelection = iota
+	// ParamMultiSelect allows multiple choices.
 	ParamMultiSelect
 )
 
+// String returns the UI keyword used for this selection mode.
 func (p ParamSelection) String() string {
 	switch p {
 	case ParamMultiSelect:
@@ -21,6 +24,7 @@ func (p ParamSelection) String() string {
 	}
 }
 
+// MarshalJSON encodes the selection mode as a UI keyword.
 func (p ParamSelection) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p.String())
 }
@@ -28,21 +32,33 @@ func (p ParamSelection) MarshalJSON() ([]byte, error) {
 // ParamOption defines a single option for a required param.
 // Column is not serialized and can be used for safe SQL mapping (e.g., __sort).
 type ParamOption struct {
-	ID       string
-	Name     string
-	Default  bool
+	// ID is the stable identifier returned in selected values.
+	ID string
+	// Name is the label shown in the UI.
+	Name string
+	// Default marks the option as the default selection (if none are set, the first option is used).
+	Default bool
+	// Disabled prevents selection in the UI.
 	Disabled bool
-	Sort     *FieldSort
-	Column   string
+	// Sort includes a sort directive with the option.
+	Sort *FieldSort
+	// Column is not serialized and can be used for safe SQL mapping.
+	Column string
 }
 
 // ParamConfig defines a required param and its available options.
 type ParamConfig struct {
-	ID         string
-	Name       string
-	Help       string
-	Selection  ParamSelection
-	Options    []ParamOption
+	// ID identifies the required param in requests.
+	ID string
+	// Name is the label shown in the UI.
+	Name string
+	// Help provides UI help text for the param.
+	Help string
+	// Selection sets single or multi-select behavior.
+	Selection ParamSelection
+	// Options supplies the available choices.
+	Options []ParamOption
+	// UniqueView requests unique view behavior for the param in the UI.
 	UniqueView bool
 }
 
@@ -98,7 +114,9 @@ func buildParamOptions(opts []ParamOption) []map[string]any {
 
 // ResolvedParam holds resolved values for a required param.
 type ResolvedParam struct {
-	IDs     []string
+	// IDs contains selected option IDs in order.
+	IDs []string
+	// Options contains selected option metadata in order.
 	Options []ParamOption
 }
 
@@ -156,7 +174,7 @@ func (p ResolvedParams) Column(id string) string {
 	return opt.ID
 }
 
-// ResolveParam resolves user values against a ParamConfig, applying defaults as needed.
+// ResolveParam resolves user values against a ParamConfig, applying defaults or the first option when needed.
 func ResolveParam(cfg ParamConfig, values []string) ResolvedParam {
 	byID := make(map[string]ParamOption, len(cfg.Options))
 	for _, opt := range cfg.Options {
