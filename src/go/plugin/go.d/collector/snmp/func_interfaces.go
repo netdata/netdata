@@ -381,7 +381,6 @@ var funcIfacesColumns = []funcIfacesColumn{
 		sortDir:     funcapi.FieldSortAscending,
 		summary:     funcapi.FieldSummaryCount,
 		filter:      funcapi.FieldFilterMultiselect,
-		sortOption:  "Sort by Interface Name",
 		defaultSort: true,
 		sticky:      true,
 	},
@@ -438,7 +437,6 @@ var funcIfacesColumns = []funcIfacesColumn{
 		sortDir:    funcapi.FieldSortDescending,
 		summary:    funcapi.FieldSummarySum,
 		filter:     funcapi.FieldFilterRange,
-		sortOption: "Top by Traffic In",
 	},
 	{
 		key:        "Traffic Out",
@@ -453,7 +451,6 @@ var funcIfacesColumns = []funcIfacesColumn{
 		sortDir:    funcapi.FieldSortDescending,
 		summary:    funcapi.FieldSummarySum,
 		filter:     funcapi.FieldFilterRange,
-		sortOption: "Top by Traffic Out",
 	},
 	{
 		key:       "Unicast In",

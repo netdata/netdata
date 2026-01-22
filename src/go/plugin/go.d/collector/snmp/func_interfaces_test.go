@@ -259,9 +259,7 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				assert.Nil(t, row[trafficOutIdx])
 				assert.Equal(t, "down", row[adminIdx])
 				assert.Equal(t, "down", row[operIdx])
-				rowOptions, ok := row[rowOptionsIdx].(map[string]any)
-				require.True(t, ok)
-				assert.Equal(t, "notice", rowOptions["severity"])
+				assert.Nil(t, row[rowOptionsIdx])
 			},
 		},
 		"down interface hides metrics": {
@@ -286,9 +284,7 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				assert.Nil(t, row[trafficInIdx])
 				assert.Nil(t, row[trafficOutIdx])
 				assert.Nil(t, row[errorsInIdx])
-				rowOptions, ok := row[rowOptionsIdx].(map[string]any)
-				require.True(t, ok)
-				assert.Equal(t, "notice", rowOptions["severity"])
+				assert.Nil(t, row[rowOptionsIdx])
 			},
 		},
 		"partial rates": {
@@ -315,9 +311,7 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				assert.Nil(t, row[trafficInIdx])
 				assert.Nil(t, row[trafficOutIdx])
 				assert.Nil(t, row[ucastInIdx])
-				rowOptions, ok := row[rowOptionsIdx].(map[string]any)
-				require.True(t, ok)
-				assert.Equal(t, "notice", rowOptions["severity"])
+				assert.Nil(t, row[rowOptionsIdx])
 			},
 		},
 	}
