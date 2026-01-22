@@ -8,7 +8,7 @@
 
 | Aspect | Description |
 |:-------|:------------|
-| Name | [[ entry.meta.module_name|capitalize ]]:[[ func.id ]] |
+| Name | `[[ entry.meta.module_name|capitalize ]]:[[ func.id ]]` |
 | Summary | [[ strfy(func.summary) ]] |
 | Behavior | [[ strfy(func.behavior) ]] |
 | Performance | [[ strfy(func.performance) ]] |
