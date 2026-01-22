@@ -95,4 +95,4 @@ See **9.4 Health Management API** for full documentation.
 ## What's Next
 
 - **[4.2 Silencing vs Disabling](/docs/alerts/controlling-alerts-noise/2-silencing-vs-disabling.md)** - Understanding the differences
-- **[Chapter 8: Essential Alert Patterns](/docs/alerts/essential-patterns/README.md)** - Hysteresis and patterns
+- **[8. Essential Alert Patterns](/docs/alerts/essential-patterns/README.md)** - Hysteresis and patterns

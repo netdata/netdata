@@ -63,7 +63,7 @@ Each section in this chapter covers a specific aspect of alerts and notification
 
 ## 13.0.6 Related Sections
 
-- **[Chapter 3: Alert Configuration Syntax](/docs/alerts/alert-configuration-syntax/README.md)** - Alert configuration syntax reference
-- **[Chapter 9: APIs for Alerts and Events](/docs/alerts/apis-alerts-events/README.md)** - API endpoints for alert management
-- **[Chapter 5: Receiving Notifications](/docs/alerts/receiving-notifications/README.md)** - Notification configuration
-- **[Chapter 7: Troubleshooting Alerts](/docs/alerts/troubleshooting-alerts/README.md)** - Diagnose and fix alert behavior
+- **[3. Alert Configuration Syntax](/docs/alerts/alert-configuration-syntax/README.md)** - Alert configuration syntax reference
+- **[9. APIs for Alerts and Events](/docs/alerts/apis-alerts-events/README.md)** - API endpoints for alert management
+- **[5. Receiving Notifications](/docs/alerts/receiving-notifications/README.md)** - Notification configuration
+- **[7. Troubleshooting Alerts](/docs/alerts/troubleshooting-alerts/README.md)** - Diagnose and fix alert behavior

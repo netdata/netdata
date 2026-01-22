@@ -204,7 +204,7 @@ To avoid inconsistent values (for example, `db`, `database`, `Database`), define
 
 ## 3.6.7 Example: Fully Annotated Alert
 
-Below is a complete example that pulls together all metadata fields with the configuration concepts from Chapter 3:
+Below is a complete example that pulls together all metadata fields with the configuration concepts from **section 3**:
 
 ```conf
 template: httpcheck_web_service_bad_status
@@ -241,6 +241,6 @@ Treat metadata as part of the design of your alerting system, not as an aftertho
 
 ## What's Next
 
-- **[Chapter 4: Controlling Alerts and Noise](/docs/alerts/controlling-alerts-noise/README.md)** explains how to disable or silence alerts and use delays/hysteresis to reduce noise
+- **[4. Controlling Alerts and Noise](/docs/alerts/controlling-alerts-noise/README.md)** explains how to disable or silence alerts and use delays/hysteresis to reduce noise
 - **[5.4 Controlling Who Gets Notified (Roles, Recipients, Severity)](/docs/alerts/receiving-notifications/4-controlling-recipients.md)** shows how metadata and alert properties influence notification routing
 - **[12.1 Designing Useful Alerts](/docs/alerts/best-practices/1-designing-useful-alerts.md)** and **[12.3 Maintaining Alert Configurations Over Time](/docs/alerts/best-practices/3-maintaining-configurations.md)** provide best practices for treating metadata as part of your alert design and lifecycle

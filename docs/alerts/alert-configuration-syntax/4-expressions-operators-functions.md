@@ -354,7 +354,7 @@ Example: using `||` instead of `&&`, or incorrect equality tests.
 
 :::tip
 
-For systematic debugging of alert behavior, see **Chapter 7: Troubleshooting Alert Behaviour**.
+For systematic debugging of alert behavior, see **7. Troubleshooting Alert Behaviour**.
 
 :::
 

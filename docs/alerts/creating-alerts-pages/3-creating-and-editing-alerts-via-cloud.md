@@ -223,7 +223,7 @@ To stop an alert from evaluating, while on the Health configuration view for the
 ### Temporarily Silencing Alerts
 
 If you want to temporarily stop notifications without disabling the alert:
-- Use **silencing rules** (see **Chapter 4: Controlling Alerts and Noise**)
+- Use **silencing rules** (see **4. Controlling Alerts and Noise**)
 
 ## 2.3.6 Cloud Alert Lifecycle and Propagation
 
@@ -343,5 +343,5 @@ Cloud-defined alerts provide **centralized management and instant rollout**. The
 
 - **[2.4 Managing Stock versus Custom Alerts](/docs/alerts/creating-alerts-pages/4-managing-stock-vs-custom-alerts.md)** Patterns for combining stock, custom, and Cloud-defined alerts
 - **[2.5 Reloading and Validating Alert Configuration](/docs/alerts/creating-alerts-pages/5-reloading-and-validating-alert-configuration.md)** Deeper troubleshooting and validation techniques
-- **[Chapter 4: Controlling Alerts and Noise](/docs/alerts/controlling-alerts-noise/README.md)** Silencing rules, delays, and hysteresis
-- **[Chapter 5: Receiving Notifications](/docs/alerts/receiving-notifications/README.md)** How to route alert events to Slack, PagerDuty, email, etc.
+- **[4. Controlling Alerts and Noise](/docs/alerts/controlling-alerts-noise/README.md)** Silencing rules, delays, and hysteresis
+- **[5. Receiving Notifications](/docs/alerts/receiving-notifications/README.md)** How to route alert events to Slack, PagerDuty, email, etc.

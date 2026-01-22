@@ -35,4 +35,4 @@ Because Netdata evaluates alerts locally on each Agent, you can still see alerts
 
 ## What's Next
 
-- **[Chapter 2: Creating Alerts](/docs/alerts/creating-alerts-pages/README.md)** - Learn to create and edit alerts
+- **[2. Creating Alerts](/docs/alerts/creating-alerts-pages/README.md)** - Learn to create and edit alerts

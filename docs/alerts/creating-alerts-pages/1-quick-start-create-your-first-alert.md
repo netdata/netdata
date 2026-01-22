@@ -58,7 +58,7 @@ This example uses a `template` which monitors **all filesystems**, not just root
 - New disks are monitored automatically without configuration changes
 - It matches Netdata's stock alert patterns
 
-If you only want to monitor a specific filesystem, see **Chapter 3: Alert Configuration Syntax** for how to create chart-specific `alarm` definitions.
+If you only want to monitor a specific filesystem, see **3. Alert Configuration Syntax** for how to create chart-specific `alarm` definitions.
 
 :::
 
@@ -123,7 +123,7 @@ To verify the alert fires, you can temporarily lower the threshold:
 **What's Next**
 
 - 2.2 Creating and Editing Alerts via Configuration Files Deep dive into file-based workflow, syntax, and best practices
-- Chapter 3: Alert Configuration Syntax Full reference for all alert definition lines (`lookup`, `calc`, `every`, etc.)
+- 3. Alert Configuration Syntax Full reference for all alert definition lines (`lookup`, `calc`, `every`, etc.)
 
 </details>
 
@@ -205,7 +205,7 @@ To verify the alert fires:
 **Next Steps**
 
 - 2.3 Creating and Editing Alerts via Netdata Cloud Full guide to the Alerts Configuration Manager, including advanced options and bulk operations
-- Chapter 5: Receiving Notifications How to configure notification integrations (Slack, PagerDuty, email, etc.)
+- 5. Receiving Notifications How to configure notification integrations (Slack, PagerDuty, email, etc.)
 
 </details>
 
@@ -258,7 +258,7 @@ Both workflows (file-based and Cloud UI) produce alerts that **run on your Agent
 - Network traffic (`net.net`)
 - Application metrics (databases, web servers, etc.)
 
-See **Chapter 6: Alert Examples and Common Patterns** for more ideas.
+See **6. Alert Examples and Common Patterns** for more ideas.
 
 **Note:** This Quick Start example monitors **all filesystems** using a `template`. To monitor only specific filesystems (like just root `/`), you'll need to use an `alarm` definition with a specific chart ID. See **3.1 Alert Definition Lines** for the difference between templates and alarms.
 
@@ -268,7 +268,7 @@ See **Chapter 6: Alert Examples and Common Patterns** for more ideas.
 
 Now that you have a working alert, you can:
 
-- **[Customize it further](/docs/alerts/alert-configuration-syntax/README.md)** Learn the full syntax in **Chapter 3: Alert Configuration Syntax**
+- **[Customize it further](/docs/alerts/alert-configuration-syntax/README.md)** Learn the full syntax in **3. Alert Configuration Syntax**
 - **[Create more alerts](/docs/alerts/creating-alerts-pages/2-creating-and-editing-alerts-via-config-files.md)** Follow detailed workflows in **2.2** (files) or **[2.3](/docs/alerts/creating-alerts-pages/3-creating-and-editing-alerts-via-cloud.md)** (Cloud UI)
-- **[Control notification noise](/docs/alerts/controlling-alerts-noise/README.md)** See **Chapter 4: Controlling Alerts and Noise**
-- **[Set up notifications](/docs/alerts/receiving-notifications/README.md)** See **Chapter 5: Receiving Notifications**
+- **[Control notification noise](/docs/alerts/controlling-alerts-noise/README.md)** See **4. Controlling Alerts and Noise**
+- **[Set up notifications](/docs/alerts/receiving-notifications/README.md)** See **5. Receiving Notifications**

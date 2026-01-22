@@ -161,4 +161,4 @@ curl -s "https://app.netdata.cloud/api/v2/events?space_id=YOUR_SPACE" \
 
 ## What's Next
 
-- **[Chapter 10: Cloud Alert Features](/docs/alerts/cloud-alert-features/README.md)** for more Cloud capabilities
+- **[10. Cloud Alert Features](/docs/alerts/cloud-alert-features/README.md)** for more Cloud capabilities

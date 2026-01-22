@@ -117,7 +117,7 @@ If you see your alert here, it is loaded and evaluating.
 
 :::tip
 
-For more advanced API usage including filtering, querying history, and inspecting variables, see **Chapter 9: APIs for Alerts and Events**.
+For more advanced API usage including filtering, querying history, and inspecting variables, see **9. APIs for Alerts and Events**.
 
 :::
 
@@ -159,7 +159,7 @@ sudo netdatacli reload-health
 
 :::tip
 
-Re-check logs until the reload is clean. For detailed troubleshooting of specific alert problems, see **Chapter 7: Troubleshooting Alert Behaviour**.
+Re-check logs until the reload is clean. For detailed troubleshooting of specific alert problems, see **7. Troubleshooting Alert Behaviour**.
 
 :::
 
@@ -226,7 +226,7 @@ Simulate the alert condition (for example, generate CPU load) and watch the Even
 - Alert not saved correctly in Cloud UI (check for validation errors)
 - Configuration not yet propagated (wait a few seconds, check logs)
 
-For detailed troubleshooting, see **2.3.7** and **Chapter 7: Troubleshooting Alert Behaviour**.
+For detailed troubleshooting, see **2.3.7** and **7. Troubleshooting Alert Behaviour**.
 
 </details>
 
@@ -261,6 +261,6 @@ Always validate after making changes. Use `netdatacli reload-health` for file ch
 
 ## What's Next
 
-- **[Chapter 3: Alert Configuration Syntax (Reference)](/docs/alerts/alert-configuration-syntax/README.md)** covers full syntax for `alarm` and `template` definitions
-- **[Chapter 4: Controlling Alerts and Noise](/docs/alerts/controlling-alerts-noise/README.md)** explains how to use silencing, delays, and hysteresis to reduce noise once alerts are active
-- **[Chapter 7: Troubleshooting Alert Behaviour](/docs/alerts/troubleshooting-alerts/README.md)** provides deeper debugging when alerts don't behave as expected
+- **[3. Alert Configuration Syntax (Reference)](/docs/alerts/alert-configuration-syntax/README.md)** covers full syntax for `alarm` and `template` definitions
+- **[4. Controlling Alerts and Noise](/docs/alerts/controlling-alerts-noise/README.md)** explains how to use silencing, delays, and hysteresis to reduce noise once alerts are active
+- **[7. Troubleshooting Alert Behaviour](/docs/alerts/troubleshooting-alerts/README.md)** provides deeper debugging when alerts don't behave as expected

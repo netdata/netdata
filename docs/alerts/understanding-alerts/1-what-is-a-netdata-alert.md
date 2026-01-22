@@ -77,7 +77,7 @@ Both types inspect metric values from charts in the same way; the difference is 
 
 :::note
 
-Detailed syntax for defining alarms vs templates is covered in **1.2 Alert Types: `alarm` vs `template`** and **Chapter 3: Alert Configuration Syntax**.
+Detailed syntax for defining alarms vs templates is covered in **1.2 Alert Types: `alarm` vs `template`** and **3. Alert Configuration Syntax**.
 
 :::
 
