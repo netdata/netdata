@@ -40,7 +40,7 @@ To install and connect to Netdata Cloud in a single step from your terminal:
     <OneLineInstall
       method="wget"
       privacyLink="/docs/netdata-agent/configuration/anonymous-telemetry-events.md"
-      connectLink="https://github.com/netdata/netdata/blob/master/src/claim/README.md"
+      connectLink="/src/claim/README.md"
     />
   </TabItem>
 
@@ -48,7 +48,7 @@ To install and connect to Netdata Cloud in a single step from your terminal:
     <OneLineInstall
       method="curl"
       privacyLink="/docs/netdata-agent/configuration/anonymous-telemetry-events.md"
-      connectLink="/blob/master/src/claim/README.md"
+      connectLink="/src/claim/README.md"
     />
   </TabItem>
 </Tabs>
