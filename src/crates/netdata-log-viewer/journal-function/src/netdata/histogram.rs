@@ -66,18 +66,20 @@ fn chart_from_histogram(
     field: &FieldName,
     transformations: &TransformationRegistry,
 ) -> Chart {
-    let result = chart_result_from_histogram(histogram_response, field, transformations);
-    let view = chart_view_from_histogram(histogram_response, field, &result.labels);
+    let (raw_values, result) = chart_result_from_histogram(histogram_response, field, transformations);
+    let view = chart_view_from_histogram(histogram_response, field, &raw_values, &result.labels);
 
     Chart { view, result }
 }
 
 /// Creates chart result data for the given field from a query histogram.
+///
+/// Returns both the raw values (for dimension IDs) and the ChartResult (with transformed labels).
 fn chart_result_from_histogram(
     histogram_response: &QueryHistogram,
     field: &FieldName,
     transformations: &TransformationRegistry,
-) -> ChartResult {
+) -> (Vec<String>, ChartResult) {
     let field_str = field.as_str();
 
     // Collect all unique values for the field across all buckets
@@ -106,7 +108,8 @@ fn chart_result_from_histogram(
 
     for (request, bucket_response) in &histogram_response.buckets {
         let timestamp = request.start;
-        let mut counts = Vec::with_capacity(raw_values.len());
+        let mut counts = Vec::with_capacity(raw_values.len() + 1);
+        let mut field_sum = 0usize;
 
         for raw_value in &raw_values {
             // Create FieldValuePair for lookup using raw (untransformed) value
@@ -118,8 +121,13 @@ fn chart_result_from_histogram(
                 .map(|(_, filtered)| *filtered)
                 .unwrap_or(0);
 
+            field_sum += count;
             counts.push([count, 0, 0]);
         }
+
+        // Calculate entries without this field (unset)
+        let unset_count = bucket_response.total_entries.1.saturating_sub(field_sum);
+        counts.push([unset_count, 0, 0]);
 
         data.push(DataPoint {
             timestamp: timestamp.0 as u64 * std::time::Duration::from_secs(1).as_millis() as u64,
@@ -133,23 +141,36 @@ fn chart_result_from_histogram(
         pa: 2,
     };
 
+    // Add "(unset)" for entries without this field
+    raw_values.push(String::from("(unset)"));
+    labels.push(String::from("(unset)"));
     labels.insert(0, String::from("time"));
 
-    ChartResult {
-        labels,
-        point,
-        data,
-    }
+    (
+        raw_values,
+        ChartResult {
+            labels,
+            point,
+            data,
+        },
+    )
 }
 
 /// Creates chart view metadata for the given field from a query histogram.
+///
+/// # Arguments
+/// * `histogram_response` - The query histogram
+/// * `field` - The field name
+/// * `raw_values` - Raw (untransformed) values for dimension IDs
+/// * `labels` - Transformed values for dimension names (first element is "time", skip it)
 fn chart_view_from_histogram(
     histogram_response: &QueryHistogram,
     field: &FieldName,
+    raw_values: &[String],
     labels: &[String],
 ) -> ChartView {
-    let ids: Vec<String> = labels.iter().skip(1).cloned().collect();
-    let names = ids.clone();
+    let ids = raw_values.to_vec();
+    let names: Vec<String> = labels.iter().skip(1).cloned().collect();
     let units = std::iter::repeat_n("events".to_string(), ids.len()).collect();
 
     let dimensions = ChartDimensions { ids, names, units };

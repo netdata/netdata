@@ -8,7 +8,7 @@ pub mod mmap;
 mod object;
 pub mod offset_array;
 pub mod reader;
-pub(crate) mod sigbus;
+pub mod sigbus;
 mod value_guard;
 pub mod writer;
 

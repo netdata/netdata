@@ -5,7 +5,7 @@
 
 use crate::{cache::FileIndexKey, error::Result, facets::Facets};
 use journal_core::collections::HashSet;
-use journal_index::{FieldName, FieldValuePair, FileIndex, Filter, Seconds};
+use journal_index::{Bitmap, FieldName, FieldValuePair, FileIndex, Filter, Seconds};
 use lru::LruCache;
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -100,6 +100,8 @@ pub struct BucketResponse {
     pub fv_counts: HashMap<FieldValuePair, (usize, usize)>,
     /// Set of fields that are not indexed
     pub unindexed_fields: HashSet<FieldName>,
+    /// Total entry counts (unfiltered, filtered) in this bucket across all files
+    pub total_entries: (usize, usize),
 }
 
 impl BucketResponse {
@@ -108,6 +110,7 @@ impl BucketResponse {
         Self {
             fv_counts: HashMap::default(),
             unindexed_fields: HashSet::default(),
+            total_entries: (0, 0),
         }
     }
 
@@ -283,6 +286,32 @@ impl HistogramEngine {
                     } else {
                         None
                     };
+
+                    // Count total entries in this file for this bucket's time range
+                    let all_entries =
+                        Bitmap::insert_range(0..file_index.total_entries() as u32);
+                    let unfiltered_total = file_index
+                        .count_entries_in_time_range(
+                            &all_entries,
+                            bucket_request.start,
+                            bucket_request.end,
+                        )
+                        .unwrap_or(0);
+
+                    let filtered_total = if let Some(ref filter_bitmap) = filter_bitmap {
+                        file_index
+                            .count_entries_in_time_range(
+                                filter_bitmap,
+                                bucket_request.start,
+                                bucket_request.end,
+                            )
+                            .unwrap_or(0)
+                    } else {
+                        unfiltered_total
+                    };
+
+                    response.total_entries.0 += unfiltered_total;
+                    response.total_entries.1 += filtered_total;
 
                     // Track unindexed fields
                     for field in file_index.fields() {
