@@ -315,6 +315,22 @@ func ptrToAnyScale(p *float64, scale float64) any {
 	return *p / scale
 }
 
+func sumRates(vals ...*float64) *float64 {
+	var sum float64
+	hasValue := false
+	for _, v := range vals {
+		if v == nil {
+			continue
+		}
+		sum += *v
+		hasValue = true
+	}
+	if !hasValue {
+		return nil
+	}
+	return &sum
+}
+
 // Package-level registration functions that delegate to funcInterfaces.
 
 func snmpMethods() []module.MethodConfig {
@@ -453,7 +469,7 @@ var funcIfacesColumns = []funcIfacesColumn{
 		dataType:  funcapi.FieldTypeFloat,
 		units:     "Kpps",
 		visual:    funcapi.FieldVisualBar,
-		visible:   true,
+		visible:   false,
 		transform: funcapi.FieldTransformNumber,
 		decimals:  2,
 		sortDir:   funcapi.FieldSortDescending,
@@ -467,7 +483,7 @@ var funcIfacesColumns = []funcIfacesColumn{
 		dataType:  funcapi.FieldTypeFloat,
 		units:     "Kpps",
 		visual:    funcapi.FieldVisualBar,
-		visible:   true,
+		visible:   false,
 		transform: funcapi.FieldTransformNumber,
 		decimals:  2,
 		sortDir:   funcapi.FieldSortDescending,
@@ -496,6 +512,34 @@ var funcIfacesColumns = []funcIfacesColumn{
 		units:     "Kpps",
 		visual:    funcapi.FieldVisualBar,
 		visible:   false,
+		transform: funcapi.FieldTransformNumber,
+		decimals:  2,
+		sortDir:   funcapi.FieldSortDescending,
+		summary:   funcapi.FieldSummarySum,
+		filter:    funcapi.FieldFilterRange,
+	},
+	{
+		key:       "Packets In",
+		name:      "",
+		value:     func(e *ifaceEntry) any { return ptrToAnyScale(sumRates(e.rates.ucastPktsIn, e.rates.bcastPktsIn, e.rates.mcastPktsIn), 1_000) },
+		dataType:  funcapi.FieldTypeFloat,
+		units:     "Kpps",
+		visual:    funcapi.FieldVisualBar,
+		visible:   true,
+		transform: funcapi.FieldTransformNumber,
+		decimals:  2,
+		sortDir:   funcapi.FieldSortDescending,
+		summary:   funcapi.FieldSummarySum,
+		filter:    funcapi.FieldFilterRange,
+	},
+	{
+		key:       "Packets Out",
+		name:      "",
+		value:     func(e *ifaceEntry) any { return ptrToAnyScale(sumRates(e.rates.ucastPktsOut, e.rates.bcastPktsOut, e.rates.mcastPktsOut), 1_000) },
+		dataType:  funcapi.FieldTypeFloat,
+		units:     "Kpps",
+		visual:    funcapi.FieldVisualBar,
+		visible:   true,
 		transform: funcapi.FieldTransformNumber,
 		decimals:  2,
 		sortDir:   funcapi.FieldSortDescending,

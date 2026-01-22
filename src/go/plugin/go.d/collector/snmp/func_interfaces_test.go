@@ -54,6 +54,7 @@ func TestFuncIfacesColumns(t *testing.T) {
 					"Traffic In", "Traffic Out",
 					"Unicast In", "Unicast Out",
 					"Broadcast In", "Broadcast Out",
+					"Packets In", "Packets Out",
 					"Errors In", "Errors Out",
 					"Discards In", "Discards Out",
 					"Multicast In", "Multicast Out",
@@ -115,6 +116,8 @@ func TestFuncIfacesColumns(t *testing.T) {
 						assert.Equal(t, "ethernet", col.value(entry))
 					case "Traffic In":
 						assert.Equal(t, rate/1_000_000, col.value(entry))
+					case "Packets In":
+						assert.Equal(t, rate/1_000, col.value(entry))
 					case "Errors In":
 						assert.Equal(t, rate, col.value(entry))
 					case "Discards In":
@@ -214,6 +217,8 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				typeGroupIdx := findColIdx("Type Group")
 				trafficInIdx := findColIdx("Traffic In")
 				trafficOutIdx := findColIdx("Traffic Out")
+				packetsInIdx := findColIdx("Packets In")
+				packetsOutIdx := findColIdx("Packets Out")
 				adminIdx := findColIdx("Admin Status")
 				operIdx := findColIdx("Oper Status")
 				rowOptionsIdx := len(funcIfacesColumns)
@@ -223,6 +228,8 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				assert.Equal(t, "ethernet", row[typeGroupIdx])
 				assert.Equal(t, rate1/1_000_000, row[trafficInIdx])
 				assert.Equal(t, rate2/1_000_000, row[trafficOutIdx])
+				assert.Equal(t, (rate1*3)/1_000, row[packetsInIdx])
+				assert.Equal(t, (rate2*3)/1_000, row[packetsOutIdx])
 				assert.Equal(t, "up", row[adminIdx])
 				assert.Equal(t, "up", row[operIdx])
 				assert.Nil(t, row[rowOptionsIdx])
