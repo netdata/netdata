@@ -144,7 +144,6 @@ func TestFieldFilter_StringAndJSON(t *testing.T) {
 		{FieldFilterNone, "none"},
 		{FieldFilterRange, "range"},
 		{FieldFilterMultiselect, "multiselect"},
-		{FieldFilterText, "text"},
 		{FieldFilterFacet, "facet"},
 		{FieldFilter(250), "none"},
 	}

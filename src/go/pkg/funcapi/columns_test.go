@@ -10,7 +10,7 @@ import (
 )
 
 func TestColumnBuildColumn_AllFields(t *testing.T) {
-	max := 99.5
+	maxVal := 99.5
 	col := Column{
 		Index:                 3,
 		Name:                  "CPU",
@@ -27,7 +27,7 @@ func TestColumnBuildColumn_AllFields(t *testing.T) {
 		DefaultExpandedFilter: true,
 		UniqueKey:             true,
 		Visible:               true,
-		Max:                   &max,
+		Max:                   &maxVal,
 		PointerTo:             "details",
 		Dummy:                 true,
 		ValueOptions: ValueOptions{
@@ -54,7 +54,7 @@ func TestColumnBuildColumn_AllFields(t *testing.T) {
 	assert.Equal(t, true, result["unique_key"])
 	assert.Equal(t, true, result["visible"])
 	assert.Equal(t, "ms", result["units"])
-	assert.Equal(t, max, result["max"])
+	assert.Equal(t, maxVal, result["max"])
 	assert.Equal(t, "details", result["pointer_to"])
 	assert.Equal(t, true, result["dummy"])
 
