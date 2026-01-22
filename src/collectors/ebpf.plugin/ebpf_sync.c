@@ -2,6 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_sync.h"
+#include "../ebpf_library.h"
 
 static char *sync_counter_dimension_name[NETDATA_SYNC_IDX_END] =
     {"sync", "syncfs", "msync", "fsync", "fdatasync", "sync_file_range"};
@@ -725,8 +726,8 @@ static void ebpf_create_sync_charts(int update_every)
 static void ebpf_sync_parse_syscalls()
 {
     for (int i = 0; local_syscalls[i].syscall; i++) {
-        local_syscalls[i].enabled = inicfg_get_boolean(&sync_config, NETDATA_SYNC_CONFIG_NAME,
-                                                          local_syscalls[i].syscall, CONFIG_BOOLEAN_YES);
+        local_syscalls[i].enabled =
+            inicfg_get_boolean(&sync_config, NETDATA_SYNC_CONFIG_NAME, local_syscalls[i].syscall, CONFIG_BOOLEAN_YES);
     }
 }
 

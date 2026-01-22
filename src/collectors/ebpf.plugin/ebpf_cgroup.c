@@ -4,6 +4,7 @@
 
 #include "ebpf.h"
 #include "ebpf_cgroup.h"
+#include "../ebpf_library.h"
 
 ebpf_cgroup_target_t *ebpf_cgroup_pids = NULL;
 static void *ebpf_mapped_memory = NULL;

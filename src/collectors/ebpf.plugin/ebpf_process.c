@@ -2,6 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_process.h"
+#include "../ebpf_library.h"
 
 /*****************************************************************
  *
@@ -14,11 +15,11 @@ static char *process_id_names[NETDATA_KEY_PUBLISH_PROCESS_END] = {"do_exit", "re
 static char *status[] = {"process", "zombie"};
 
 netdata_ebpf_targets_t process_targets[] = {
-        {.name = "release_task", .mode = EBPF_LOAD_TRAMPOLINE},
-        {.name = "__x64_sys_clone", .mode = EBPF_LOAD_TRAMPOLINE},
-        {.name = "__x64_sys_clone3", .mode = EBPF_LOAD_TRAMPOLINE},
-        {.name = "_do_fork", .mode = EBPF_LOAD_TRAMPOLINE},
-        {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+    {.name = "release_task", .mode = EBPF_LOAD_TRAMPOLINE},
+    {.name = "__x64_sys_clone", .mode = EBPF_LOAD_TRAMPOLINE},
+    {.name = "__x64_sys_clone3", .mode = EBPF_LOAD_TRAMPOLINE},
+    {.name = "_do_fork", .mode = EBPF_LOAD_TRAMPOLINE},
+    {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 static ebpf_local_maps_t process_maps[] = {
     {.name = "tbl_pid_stats",
@@ -98,14 +99,12 @@ static void ebpf_disable_tracepoints(struct process_bpf *obj)
 
 static void ebpf_set_trampoline_target(struct process_bpf *obj)
 {
-    bpf_program__set_attach_target(obj->progs.netdata_release_task_fentry, 0,
-                                   process_targets[PROCESS_RELEASE_TASK_NAME].name);
+    bpf_program__set_attach_target(
+        obj->progs.netdata_release_task_fentry, 0, process_targets[PROCESS_RELEASE_TASK_NAME].name);
 
-    bpf_program__set_attach_target(obj->progs.netdata_clone_fexit, 0,
-                                   process_targets[PROCESS_SYS_CLONE].name);
+    bpf_program__set_attach_target(obj->progs.netdata_clone_fexit, 0, process_targets[PROCESS_SYS_CLONE].name);
 
-    bpf_program__set_attach_target(obj->progs.netdata_clone3_fexit, 0,
-                                   process_targets[PROCESS_SYS_CLONE3].name);
+    bpf_program__set_attach_target(obj->progs.netdata_clone3_fexit, 0, process_targets[PROCESS_SYS_CLONE3].name);
 }
 
 /*
@@ -150,19 +149,19 @@ static inline void ebpf_adjust_process_fork(struct process_bpf *obj)
  */
 static inline int process_attach_kprobe_target(struct process_bpf *obj)
 {
-    obj->links.netdata_release_task_probe = bpf_program__attach_kprobe(obj->progs.netdata_release_task_probe,
-                                                                    false, process_targets[PROCESS_RELEASE_TASK_NAME].name);
+    obj->links.netdata_release_task_probe = bpf_program__attach_kprobe(
+        obj->progs.netdata_release_task_probe, false, process_targets[PROCESS_RELEASE_TASK_NAME].name);
     int ret = libbpf_get_error(obj->links.netdata_release_task_probe);
     if (ret)
         goto endakt;
 
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_9_16) {
-        obj->links.netdata_do_fork_probe = bpf_program__attach_kprobe(obj->progs.netdata_do_fork_probe,
-                                                                    false, process_targets[PROCESS_SYS_FORK].name);
+        obj->links.netdata_do_fork_probe =
+            bpf_program__attach_kprobe(obj->progs.netdata_do_fork_probe, false, process_targets[PROCESS_SYS_FORK].name);
         ret = libbpf_get_error(obj->links.netdata_do_fork_probe);
     } else {
-        obj->links.netdata_kernel_clone_probe = bpf_program__attach_kprobe(obj->progs.netdata_kernel_clone_probe,
-                                                                    false, process_targets[PROCESS_KERNEL_CLONE].name);
+        obj->links.netdata_kernel_clone_probe = bpf_program__attach_kprobe(
+            obj->progs.netdata_kernel_clone_probe, false, process_targets[PROCESS_KERNEL_CLONE].name);
         ret = libbpf_get_error(obj->links.netdata_kernel_clone_probe);
     }
 endakt:
@@ -206,10 +205,10 @@ static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_mod
         ebpf_disable_tracepoints(obj);
         ebpf_disable_trampoline(obj);
 
-        bpf_program__set_autoload((running_on_kernel <= NETDATA_EBPF_KERNEL_5_9_16) ?
-                                  obj->progs.netdata_kernel_clone_probe :
-                                  obj->progs.netdata_do_fork_probe,
-                                  false);
+        bpf_program__set_autoload(
+            (running_on_kernel <= NETDATA_EBPF_KERNEL_5_9_16) ? obj->progs.netdata_kernel_clone_probe :
+                                                                obj->progs.netdata_do_fork_probe,
+            false);
     } else { // Tracepoint
         ebpf_process_disable_probe(obj);
         ebpf_disable_trampoline(obj);

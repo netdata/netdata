@@ -2,6 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_vfs.h"
+#include "../ebpf_library.h"
 
 static char *vfs_dimension_names[NETDATA_KEY_PUBLISH_VFS_END] = {"delete", "read", "write", "fsync", "open", "create"};
 static char *vfs_id_names[NETDATA_KEY_PUBLISH_VFS_END] =

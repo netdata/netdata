@@ -4,6 +4,7 @@
 
 #include "ebpf.h"
 #include "ebpf_socket.h"
+#include "../ebpf_library.h"
 
 /*****************************************************************
  *
@@ -1849,7 +1850,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         rw_spinlock_write_unlock(&pid_ptr->socket_stats.rw_spinlock);
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
-    end_socket_loop: ;// the empty statement is here to allow code to be compiled by old compilers
+    end_socket_loop:; // the empty statement is here to allow code to be compiled by old compilers
         netdata_ebpf_pid_stats_t *local_pid =
             netdata_ebpf_get_shm_pointer_unsafe(key.pid, NETDATA_EBPF_PIDS_SOCKET_IDX);
         if (!local_pid)
@@ -2145,7 +2146,6 @@ void ebpf_socket_fill_publish_apps(ebpf_socket_publish_apps_t *curr, netdata_soc
     curr->call_udp_sent = ns->udp.call_udp_sent;
     curr->call_udp_received = ns->udp.call_udp_received;
 }
-
 
 /**
  * Sum PIDs

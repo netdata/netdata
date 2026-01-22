@@ -2,6 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_fd.h"
+#include "../ebpf_library.h"
 
 static char *fd_dimension_names[NETDATA_FD_SYSCALL_END] = {"open", "close"};
 static char *fd_id_names[NETDATA_FD_SYSCALL_END] = {"do_sys_open", "__close_fd"};

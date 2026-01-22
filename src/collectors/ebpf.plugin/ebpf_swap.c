@@ -2,6 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_swap.h"
+#include "../ebpf_library.h"
 
 static char *swap_dimension_name[NETDATA_SWAP_END] = {"read", "write"};
 static netdata_syscall_stat_t swap_aggregated_data[NETDATA_SWAP_END];
@@ -1188,16 +1189,18 @@ static int ebpf_swap_set_internal_value()
         address.function = swap_functions[i];
         ebpf_load_addresses(&address, -1);
         if (address.addr) {
-            int key =  (i < 2) ? NETDATA_KEY_SWAP_READPAGE_CALL: NETDATA_KEY_SWAP_WRITEPAGE_CALL;
+            int key = (i < 2) ? NETDATA_KEY_SWAP_READPAGE_CALL : NETDATA_KEY_SWAP_WRITEPAGE_CALL;
             swap_targets[key].name = address.function;
             address.addr = 0;
         }
     }
 
     if (!swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name || !swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name) {
-        netdata_log_error("%s (%s, %s) swap.", NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND,
-                          swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name,
-                          swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name);
+        netdata_log_error(
+            "%s (%s, %s) swap.",
+            NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND,
+            swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name,
+            swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name);
         return -1;
     }
 
