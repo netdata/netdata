@@ -51,23 +51,29 @@ const (
 
 // mongoColumnMeta defines metadata for a column in the response
 type mongoColumnMeta struct {
-	id            string                 // column ID in response (e.g., "execution_time")
-	dbField       string                 // MongoDB document field name (e.g., "millis")
-	name          string                 // display name (e.g., "Execution Time")
-	colType       funcapi.FieldType      // column type: integer, duration, timestamp, string, bool
-	visible       bool                   // default visibility
-	sortable      bool                   // can be used for sorting
-	fullWidth     bool                   // for query text columns
-	wrap          bool                   // wrap text
-	sticky        bool                   // sticky column
-	filter        funcapi.FieldFilter    // filter type: range, multiselect, text
-	visualization funcapi.FieldVisual    // visualization type: value, bar
-	summary       funcapi.FieldSummary   // summary type: sum, max, or empty
-	transform     funcapi.FieldTransform // value transform: number, duration, datetime, text
-	units         string                 // display units (e.g., "seconds")
-	decimalPoints int                    // decimal points for numeric display
-	uniqueKey     bool                   // unique key column
-	expandFilter  bool                   // default expanded filter
+	id             string                 // column ID in response (e.g., "execution_time")
+	dbField        string                 // MongoDB document field name (e.g., "millis")
+	name           string                 // display name (e.g., "Execution Time")
+	colType        funcapi.FieldType      // column type: integer, duration, timestamp, string, bool
+	visible        bool                   // default visibility
+	sortable       bool                   // can be used for sorting
+	fullWidth      bool                   // for query text columns
+	wrap           bool                   // wrap text
+	sticky         bool                   // sticky column
+	filter         funcapi.FieldFilter    // filter type: range, multiselect, text
+	visualization  funcapi.FieldVisual    // visualization type: value, bar
+	summary        funcapi.FieldSummary   // summary type: sum, max, or empty
+	transform      funcapi.FieldTransform // value transform: number, duration, datetime, text
+	units          string                 // display units (e.g., "seconds")
+	decimalPoints  int                    // decimal points for numeric display
+	uniqueKey      bool                   // unique key column
+	expandFilter   bool                   // default expanded filter
+	isLabel        bool                   // available for group-by
+	isPrimary      bool                   // primary label
+	isMetric       bool                   // chartable metric
+	chartGroup     string                 // chart group key
+	chartTitle     string                 // chart title
+	isDefaultChart bool                   // include in default charts
 }
 
 // mongoAllColumns defines all available columns from system.profile
@@ -75,24 +81,24 @@ type mongoColumnMeta struct {
 var mongoAllColumns = []mongoColumnMeta{
 	// Core fields (visible by default)
 	{id: "timestamp", dbField: "ts", name: "Timestamp", colType: ftTimestamp, visible: true, sortable: true, filter: filterRange, visualization: visValue, summary: summaryMax, transform: trDatetime, uniqueKey: true},
-	{id: "namespace", dbField: "ns", name: "Namespace", colType: ftString, visible: true, sortable: false, sticky: true, filter: filterMulti, visualization: visValue, transform: trText, expandFilter: true},
-	{id: "operation", dbField: "op", name: "Operation", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},
+	{id: "namespace", dbField: "ns", name: "Namespace", colType: ftString, visible: true, sortable: false, sticky: true, filter: filterMulti, visualization: visValue, transform: trText, expandFilter: true, isLabel: true, isPrimary: true},
+	{id: "operation", dbField: "op", name: "Operation", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText, isLabel: true},
 	{id: "query", dbField: "command", name: "Query", colType: ftString, visible: true, sortable: false, fullWidth: true, wrap: true, filter: filterMulti, visualization: visValue, transform: trText},
-	{id: "execution_time", dbField: "millis", name: "Execution Time", colType: ftDuration, visible: true, sortable: true, filter: filterRange, visualization: visBar, summary: summarySum, transform: trDuration, units: "seconds", decimalPoints: 3},
-	{id: "docs_examined", dbField: "docsExamined", name: "Docs Examined", colType: ftInteger, visible: true, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber},
-	{id: "keys_examined", dbField: "keysExamined", name: "Keys Examined", colType: ftInteger, visible: true, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber},
-	{id: "docs_returned", dbField: "nreturned", name: "Docs Returned", colType: ftInteger, visible: true, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber},
+	{id: "execution_time", dbField: "millis", name: "Execution Time", colType: ftDuration, visible: true, sortable: true, filter: filterRange, visualization: visBar, summary: summarySum, transform: trDuration, units: "seconds", decimalPoints: 3, isMetric: true, chartGroup: "Time", chartTitle: "Execution Time", isDefaultChart: true},
+	{id: "docs_examined", dbField: "docsExamined", name: "Docs Examined", colType: ftInteger, visible: true, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber, isMetric: true, chartGroup: "Docs", chartTitle: "Documents"},
+	{id: "keys_examined", dbField: "keysExamined", name: "Keys Examined", colType: ftInteger, visible: true, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber, isMetric: true, chartGroup: "Docs", chartTitle: "Documents"},
+	{id: "docs_returned", dbField: "nreturned", name: "Docs Returned", colType: ftInteger, visible: true, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber, isMetric: true, chartGroup: "Docs", chartTitle: "Documents"},
 	{id: "plan_summary", dbField: "planSummary", name: "Plan Summary", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},
 
 	// Secondary fields
-	{id: "client", dbField: "client", name: "Client", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},
-	{id: "user", dbField: "user", name: "User", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},
-	{id: "docs_deleted", dbField: "ndeleted", name: "Docs Deleted", colType: ftInteger, visible: false, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber},
-	{id: "docs_inserted", dbField: "ninserted", name: "Docs Inserted", colType: ftInteger, visible: false, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber},
-	{id: "docs_modified", dbField: "nModified", name: "Docs Modified", colType: ftInteger, visible: false, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber},
-	{id: "response_length", dbField: "responseLength", name: "Response Length", colType: ftInteger, visible: false, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber},
-	{id: "num_yield", dbField: "numYield", name: "Num Yield", colType: ftInteger, visible: false, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber},
-	{id: "app_name", dbField: "appName", name: "App Name", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},
+	{id: "client", dbField: "client", name: "Client", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText, isLabel: true},
+	{id: "user", dbField: "user", name: "User", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText, isLabel: true},
+	{id: "docs_deleted", dbField: "ndeleted", name: "Docs Deleted", colType: ftInteger, visible: false, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber, isMetric: true, chartGroup: "Docs", chartTitle: "Documents"},
+	{id: "docs_inserted", dbField: "ninserted", name: "Docs Inserted", colType: ftInteger, visible: false, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber, isMetric: true, chartGroup: "Docs", chartTitle: "Documents"},
+	{id: "docs_modified", dbField: "nModified", name: "Docs Modified", colType: ftInteger, visible: false, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber, isMetric: true, chartGroup: "Docs", chartTitle: "Documents"},
+	{id: "response_length", dbField: "responseLength", name: "Response Length", colType: ftInteger, visible: false, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber, isMetric: true, chartGroup: "Response", chartTitle: "Response Size"},
+	{id: "num_yield", dbField: "numYield", name: "Num Yield", colType: ftInteger, visible: false, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber, isMetric: true, chartGroup: "Yield", chartTitle: "Yield"},
+	{id: "app_name", dbField: "appName", name: "App Name", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText, isLabel: true},
 	{id: "cursor_exhausted", dbField: "cursorExhausted", name: "Cursor Exhausted", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},
 	{id: "has_sort_stage", dbField: "hasSortStage", name: "Has Sort Stage", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},
 	{id: "uses_disk", dbField: "usedDisk", name: "Uses Disk", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},
@@ -102,8 +108,8 @@ var mongoAllColumns = []mongoColumnMeta{
 	// Version-specific fields (hidden by default)
 	{id: "query_hash", dbField: "queryHash", name: "Query Hash", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},            // 4.2+
 	{id: "plan_cache_key", dbField: "planCacheKey", name: "Plan Cache Key", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText}, // 4.2+
-	{id: "planning_time", dbField: "planningTimeMicros", name: "Planning Time", colType: ftDuration, visible: false, sortable: true, filter: filterRange, visualization: visBar, summary: summarySum, transform: trDuration, units: "seconds", decimalPoints: 3},
-	{id: "cpu_time", dbField: "cpuNanos", name: "CPU Time", colType: ftDuration, visible: false, sortable: true, filter: filterRange, visualization: visBar, summary: summarySum, transform: trDuration, units: "seconds", decimalPoints: 3},
+	{id: "planning_time", dbField: "planningTimeMicros", name: "Planning Time", colType: ftDuration, visible: false, sortable: true, filter: filterRange, visualization: visBar, summary: summarySum, transform: trDuration, units: "seconds", decimalPoints: 3, isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
+	{id: "cpu_time", dbField: "cpuNanos", name: "CPU Time", colType: ftDuration, visible: false, sortable: true, filter: filterRange, visualization: visBar, summary: summarySum, transform: trDuration, units: "seconds", decimalPoints: 3, isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
 	{id: "query_framework", dbField: "queryFramework", name: "Query Framework", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},   // 7.0+
 	{id: "query_shape_hash", dbField: "queryShapeHash", name: "Query Shape Hash", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText}, // 8.0+
 }
@@ -128,46 +134,94 @@ func optionalBool(v *bool) any {
 }
 
 // topQueriesCharts returns the chart configuration for top queries responses
-func topQueriesCharts() map[string]module.ChartConfig {
-	return map[string]module.ChartConfig{
-		"Time": {
-			Name:    "Execution Time",
-			Type:    "stacked-bar",
-			Columns: []string{"execution_time"},
-		},
-		"DocsExamined": {
-			Name:    "Documents & Keys Examined",
-			Type:    "stacked-bar",
-			Columns: []string{"docs_examined", "keys_examined"},
-		},
-		"DocsReturned": {
-			Name:    "Documents Returned",
-			Type:    "stacked-bar",
-			Columns: []string{"docs_returned"},
-		},
+func topQueriesCharts(cols []mongoColumnMeta) map[string]module.ChartConfig {
+	charts := make(map[string]module.ChartConfig)
+	for _, col := range cols {
+		if !col.isMetric || col.chartGroup == "" {
+			continue
+		}
+		cfg, ok := charts[col.chartGroup]
+		if !ok {
+			title := col.chartTitle
+			if title == "" {
+				title = col.chartGroup
+			}
+			cfg = module.ChartConfig{Name: title, Type: "stacked-bar"}
+		}
+		cfg.Columns = append(cfg.Columns, col.id)
+		charts[col.chartGroup] = cfg
 	}
+	return charts
 }
 
 // topQueriesDefaultCharts returns the default chart configuration
-func topQueriesDefaultCharts() [][]string {
-	return [][]string{
-		{"Time", "namespace"},
-		{"DocsExamined", "namespace"},
+func topQueriesDefaultCharts(cols []mongoColumnMeta) [][]string {
+	label := primaryMongoLabel(cols)
+	if label == "" {
+		return nil
 	}
+	chartGroups := defaultMongoChartGroups(cols)
+	out := make([][]string, 0, len(chartGroups))
+	for _, group := range chartGroups {
+		out = append(out, []string{group, label})
+	}
+	return out
 }
 
 // topQueriesGroupBy returns the group by configuration for top queries responses
-func topQueriesGroupBy() map[string]module.GroupByConfig {
-	return map[string]module.GroupByConfig{
-		"namespace": {
-			Name:    "Group by Namespace",
-			Columns: []string{"namespace"},
-		},
-		"operation": {
-			Name:    "Group by Operation Type",
-			Columns: []string{"operation"},
-		},
+func topQueriesGroupBy(cols []mongoColumnMeta) map[string]module.GroupByConfig {
+	groupBy := make(map[string]module.GroupByConfig)
+	for _, col := range cols {
+		if !col.isLabel {
+			continue
+		}
+		groupBy[col.id] = module.GroupByConfig{
+			Name:    "Group by " + col.name,
+			Columns: []string{col.id},
+		}
 	}
+	return groupBy
+}
+
+func primaryMongoLabel(cols []mongoColumnMeta) string {
+	for _, col := range cols {
+		if col.isPrimary {
+			return col.id
+		}
+	}
+	for _, col := range cols {
+		if col.isLabel {
+			return col.id
+		}
+	}
+	return ""
+}
+
+func defaultMongoChartGroups(cols []mongoColumnMeta) []string {
+	groups := make([]string, 0)
+	seen := make(map[string]bool)
+	for _, col := range cols {
+		if !col.isMetric || col.chartGroup == "" || !col.isDefaultChart {
+			continue
+		}
+		if !seen[col.chartGroup] {
+			seen[col.chartGroup] = true
+			groups = append(groups, col.chartGroup)
+		}
+	}
+	if len(groups) > 0 {
+		return groups
+	}
+	for _, col := range cols {
+		if !col.isMetric || col.chartGroup == "" {
+			continue
+		}
+		if !seen[col.chartGroup] {
+			seen[col.chartGroup] = true
+			groups = append(groups, col.chartGroup)
+		}
+	}
+	return groups
 }
 
 func buildMongoSortParam(cols []mongoColumnMeta) funcapi.ParamConfig {
@@ -535,9 +589,9 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		Data:              [][]any{},
 		DefaultSortColumn: "execution_time",
 		RequiredParams:    []funcapi.ParamConfig{sortParam},
-		Charts:            topQueriesCharts(),
-		DefaultCharts:     topQueriesDefaultCharts(),
-		GroupBy:           topQueriesGroupBy(),
+		Charts:            topQueriesCharts(availableCols),
+		DefaultCharts:     topQueriesDefaultCharts(availableCols),
+		GroupBy:           topQueriesGroupBy(availableCols),
 	}
 
 	if len(allDocs) == 0 {
@@ -635,9 +689,9 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		Data:              data,
 		DefaultSortColumn: "execution_time",
 		RequiredParams:    []funcapi.ParamConfig{sortParam},
-		Charts:            topQueriesCharts(),
-		DefaultCharts:     topQueriesDefaultCharts(),
-		GroupBy:           topQueriesGroupBy(),
+		Charts:            topQueriesCharts(availableCols),
+		DefaultCharts:     topQueriesDefaultCharts(availableCols),
+		GroupBy:           topQueriesGroupBy(availableCols),
 	}
 }
 

@@ -23,13 +23,20 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors CockroachDB servers.
-        method_description: ""
+        method_description: |
+          It scrapes Prometheus metrics from the CockroachDB `/_status/vars` endpoint.
+
+          It also provides `top-queries` and `running-queries` functions using SQL statement statistics (`crdb_internal.cluster_statement_statistics`) and `SHOW CLUSTER STATEMENTS`.
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: |
+          The `top-queries` and `running-queries` functions require:
+
+          - A SQL user with `VIEWACTIVITY` (or `VIEWACTIVITYREDACTED`) privileges.
+          - Access to `crdb_internal.cluster_statement_statistics` (may require `SET allow_unsafe_internals = on` on newer versions).
       default_behavior:
         auto_detection:
           description: ""
@@ -71,6 +78,21 @@ modules:
               default_value: 1
               required: false
               group: Target
+            - name: dsn
+              description: SQL DSN used by `top-queries` and `running-queries` functions.
+              default_value: ""
+              required: false
+              group: Query Functions
+            - name: sql_timeout
+              description: SQL query timeout (seconds) for query functions.
+              default_value: 1
+              required: false
+              group: Query Functions
+            - name: top_queries_limit
+              description: Maximum number of rows returned by the `top-queries` and `running-queries` functions.
+              default_value: 500
+              required: false
+              group: Limits
 
             - name: username
               description: Username for Basic HTTP authentication.
@@ -167,6 +189,13 @@ modules:
                 jobs:
                   - name: local
                     url: http://127.0.0.1:8080/_status/vars
+            - name: Top queries
+              description: Enable SQL query functions.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8080/_status/vars
+                    dsn: postgres://root@127.0.0.1:26257/defaultdb?sslmode=disable
             - name: HTTP authentication
               description: Local server with basic HTTP authentication.
               config: |

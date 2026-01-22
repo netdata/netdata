@@ -24,6 +24,21 @@ Module: oracledb
 
 This collector monitors the health and performance of Oracle DB servers and collects general statistics, replication and user metrics.
 
+## Functions
+
+This collector provides the following function methods (useful in the Netdata Functions UI):
+
+- `top-queries`: Top SQL statements from `V$SQLSTATS` (sorted by a selected metric).
+- `running-queries`: Currently running SQL statements from `V$SESSION`.
+
+**Note:** Query text may contain unmasked literals (potential PII).
+Ensure access controls on the Netdata dashboard are appropriate.
+
+### Required privileges for functions
+
+The database user must be able to read `V$SQLSTATS` and `V$SESSION`.
+Grant `SELECT_CATALOG_ROLE` or explicit `SELECT` on these views.
+
 
 It establishes a connection to the Oracle DB instance via a TCP or UNIX socket and extracts metrics from the following database tables:
 
@@ -349,5 +364,4 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 ```bash
 docker logs netdata 2>&1 | grep oracledb
 ```
-
 

@@ -32,6 +32,14 @@
         "minimum": 0.5,
         "default": 2
       },
+      "top_queries_limit": {
+        "title": "Top Queries Limit",
+        "description": "Maximum number of queries to return in the top-queries function response.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 5000,
+        "default": 500
+      },
       "not_follow_redirects": {
         "title": "Not follow redirects",
         "description": "If set, the client will not follow HTTP redirects automatically.",

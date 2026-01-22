@@ -3,7 +3,6 @@ set -euo pipefail
 
 # Colors for output
 RED='\033[0;31m'
-GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 GRAY='\033[0;90m'
 NC='\033[0m' # No Color
@@ -11,10 +10,10 @@ NC='\033[0m' # No Color
 # Execute command with visibility
 run() {
   # Print the command being executed
-  printf >&2 "${GRAY}$(pwd) >${NC} "
-  printf >&2 "${YELLOW}"
+  printf >&2 '%s%s >%s ' "$GRAY" "$(pwd)" "$NC"
+  printf >&2 '%s' "$YELLOW"
   printf >&2 "%q " "$@"
-  printf >&2 "${NC}\n"
+  printf >&2 '%s\n' "$NC"
 
   # Execute the command
   set +e
@@ -31,113 +30,144 @@ run() {
   fi
 }
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
-WORKDIR="$(mktemp -d /tmp/netdata-functions-e2e.XXXXXX)"
-PROJECT_SUFFIX="$(basename "$WORKDIR")"
-PROJECT_SUFFIX="$(printf '%s' "$PROJECT_SUFFIX" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_-' '-')"
-PROJECT_SUFFIX="${PROJECT_SUFFIX%-}"
-PROJECT="netdata-func-e2e-$PROJECT_SUFFIX"
-COMPOSE=(docker compose -f "$WORKDIR/docker-compose.yml" -p "$PROJECT")
-COMPOSE_STARTED=""
-
-cleanup() {
-  local exit_code=$?
-  set +e
-  if [ -n "$COMPOSE_STARTED" ]; then
-    run "${COMPOSE[@]}" down -v --remove-orphans
-  fi
-  if [ "$exit_code" -eq 0 ]; then
-    run rm -rf "$WORKDIR"
-  else
-    echo "E2E failed. Keeping workspace: $WORKDIR" >&2
-  fi
-  exit $exit_code
+# Execute command in background with visibility
+LAST_BG_PID=""
+run_bg() {
+  printf >&2 '%s%s >%s ' "$GRAY" "$(pwd)" "$NC"
+  printf >&2 '%s' "$YELLOW"
+  printf >&2 "%q " "$@"
+  printf >&2 '%s\n' "$NC"
+  "$@" &
+  LAST_BG_PID=$!
 }
-trap cleanup EXIT
 
-wait_healthy() {
-  local service="$1"
-  local timeout="${2:-60}"
-  local start=$SECONDS
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+E2E_DIR="$SCRIPT_DIR/e2e"
 
-  while true; do
-    local cid
-    cid=$("${COMPOSE[@]}" ps -q "$service")
-    if [ -z "$cid" ]; then
-      if [ $((SECONDS - start)) -ge "$timeout" ]; then
-        echo "No container found for service: $service" >&2
-        return 1
+DBS=(postgres mysql mssql mongodb redis clickhouse elasticsearch couchbase proxysql cockroachdb yugabytedb oracledb rethinkdb)
+JOBS=1
+ONLY=""
+
+usage() {
+  cat <<'USAGE'
+Usage: ./e2e.sh [--only db1,db2] [--jobs N] [--list]
+
+Options:
+  --only   Comma-separated list of DBs to run (e.g. postgres,mysql)
+  --jobs   Max number of concurrent DB runs (default: 1)
+  --list   Show available DBs
+  --help   Show this help
+USAGE
+}
+
+list_dbs() {
+  printf '%s\n' "${DBS[@]}"
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --only)
+      ONLY="${2:-}"
+      if [ -z "$ONLY" ]; then
+        echo "--only requires a value" >&2
+        usage
+        exit 1
       fi
-      sleep 2
-      continue
-    fi
+      shift 2
+      ;;
+    --jobs)
+      JOBS="${2:-}"
+      if [ -z "$JOBS" ]; then
+        echo "--jobs requires a value" >&2
+        usage
+        exit 1
+      fi
+      shift 2
+      ;;
+    --list)
+      list_dbs
+      exit 0
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
 
-    local status
-    status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid")"
-    if [ "$status" = "healthy" ]; then
-      return 0
-    fi
-    if [ $((SECONDS - start)) -ge "$timeout" ]; then
-      echo "Timed out waiting for $service to be healthy" >&2
-      return 1
-    fi
-    sleep 2
+if ! [[ "$JOBS" =~ ^[0-9]+$ ]] || [ "$JOBS" -le 0 ]; then
+  echo "--jobs must be a positive integer" >&2
+  exit 1
+fi
+
+if [ -n "$ONLY" ]; then
+  IFS=',' read -r -a DBS <<< "${ONLY// /}"
+fi
+
+for db in "${DBS[@]}"; do
+  if [ ! -f "$E2E_DIR/${db}.sh" ]; then
+    echo "Unknown DB script: $db" >&2
+    exit 1
+  fi
+done
+
+pids=()
+names=()
+failures=()
+
+wait_for_any() {
+  local i pid status db
+  while true; do
+    for i in "${!pids[@]}"; do
+      pid="${pids[$i]}"
+      if ! kill -0 "$pid" 2>/dev/null; then
+        set +e
+        wait "$pid"
+        status=$?
+        set -e
+        db="${names[$i]}"
+        if [ $status -ne 0 ]; then
+          failures+=("$db")
+        fi
+        unset 'pids[i]' 'names[i]'
+        pids=("${pids[@]}")
+        names=("${names[@]}")
+        return 0
+      fi
+    done
+    sleep 0.2
   done
 }
 
-run cp -a "$SCRIPT_DIR/docker-compose.yml" "$SCRIPT_DIR/seed" "$SCRIPT_DIR/config" "$WORKDIR/"
-
-run "${COMPOSE[@]}" up -d
-COMPOSE_STARTED="yes"
-
-wait_healthy postgres 90
-wait_healthy mysql 90
-wait_healthy mssql 120
-wait_healthy mongo 90
-
-run "${COMPOSE[@]}" run --rm mongo-init
-
-run bash -c "cd \"$REPO_ROOT/src/go\" && go build -o \"$WORKDIR/go.d.plugin\" ./cmd/godplugin"
-
-validate() {
-  local input="$1"
-  shift
-  (cd "$REPO_ROOT/src/go" && run go run ./tools/functions-validation/validate --input "$input" "$@")
+start_job() {
+  local db="$1"
+  local script="$E2E_DIR/${db}.sh"
+  local pid
+  run_bg bash "$script"
+  pid="$LAST_BG_PID"
+  pids+=("$pid")
+  names+=("$db")
 }
 
-run_info() {
-  local module="$1"
-  local output="$WORKDIR/${module}-info.json"
-  run "$WORKDIR/go.d.plugin" \
-    --config-dir "$WORKDIR/config" \
-    --function "${module}:top-queries" \
-    --function-args info \
-    > "$output"
-  validate "$output"
-}
+for db in "${DBS[@]}"; do
+  start_job "$db"
+  while [ "${#pids[@]}" -ge "$JOBS" ]; do
+    wait_for_any
+  done
+done
 
-run_top_queries() {
-  local module="$1"
-  local output="$WORKDIR/${module}-top-queries.json"
-  run "$WORKDIR/go.d.plugin" \
-    --config-dir "$WORKDIR/config" \
-    --function "${module}:top-queries" \
-    --function-args __job:local \
-    > "$output"
-  validate "$output" --min-rows 1
-}
+while [ "${#pids[@]}" -gt 0 ]; do
+  wait_for_any
+done
 
-run_info postgres
-run_top_queries postgres
-
-run_info mysql
-run_top_queries mysql
-
-run_info mssql
-run_top_queries mssql
-
-run_info mongodb
-run_top_queries mongodb
+if [ "${#failures[@]}" -ne 0 ]; then
+  printf >&2 "%s\n" "E2E failures: ${failures[*]}"
+  exit 1
+fi
 
 echo "E2E checks passed." >&2

@@ -262,6 +262,10 @@ func (m *mockRethinkdbConn) stats() ([][]byte, error) {
 	return bytes.Split(bytes.TrimSpace(m.dataStats), []byte("\n")), nil
 }
 
+func (m *mockRethinkdbConn) jobs(ctx context.Context) ([]map[string]any, error) {
+	return []map[string]any{}, nil
+}
+
 func (m *mockRethinkdbConn) close() error {
 	m.disconnectCalled = true
 	return nil

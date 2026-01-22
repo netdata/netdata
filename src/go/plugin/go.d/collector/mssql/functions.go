@@ -62,6 +62,12 @@ type mssqlColumnMeta struct {
 	fullWidth      bool                   // Should column take full width
 	isIdentity     bool                   // Is this an identity column (query_hash, query_text, etc.)
 	needsAvg       bool                   // Needs weighted average calculation (avg_* columns)
+	isLabel        bool                   // Is this column a label for grouping
+	isPrimary      bool                   // Is this label the primary grouping
+	isMetric       bool                   // Is this column a chartable metric
+	chartGroup     string                 // Chart group key
+	chartTitle     string                 // Chart title
+	isDefaultChart bool                   // Include this chart group in defaults
 }
 
 // mssqlAllColumns defines ALL possible columns from Query Store
@@ -153,6 +159,33 @@ var mssqlAllColumns = []mssqlColumnMeta{
 	{dbColumn: "max_tempdb_space_used", uiKey: "maxTempdb", displayName: "Max TempDB (8KB pages)", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summaryMax, filter: filterRange},
 	{dbColumn: "stdev_tempdb_space_used", uiKey: "stdevTempdb", displayName: "StdDev TempDB", dataType: ftFloat, visible: false, transform: trNumber, sortDir: sortDesc, summary: summaryMax, filter: filterRange},
 }
+
+type mssqlChartGroup struct {
+	key          string
+	title        string
+	columns      []string
+	defaultChart bool
+}
+
+var mssqlChartGroups = []mssqlChartGroup{
+	{key: "Calls", title: "Number of Calls", columns: []string{"calls"}, defaultChart: true},
+	{key: "Time", title: "Execution Time", columns: []string{"totalTime", "avgTime", "lastTime", "minTime", "maxTime", "stdevTime"}, defaultChart: true},
+	{key: "CPU", title: "CPU Time", columns: []string{"avgCpu", "lastCpu", "minCpu", "maxCpu", "stdevCpu"}},
+	{key: "LogicalIO", title: "Logical I/O", columns: []string{"avgReads", "lastReads", "minReads", "maxReads", "stdevReads", "avgWrites", "lastWrites", "minWrites", "maxWrites", "stdevWrites"}},
+	{key: "PhysicalIO", title: "Physical Reads", columns: []string{"avgPhysReads", "lastPhysReads", "minPhysReads", "maxPhysReads", "stdevPhysReads"}},
+	{key: "CLR", title: "CLR Time", columns: []string{"avgClr", "lastClr", "minClr", "maxClr", "stdevClr"}},
+	{key: "DOP", title: "Parallelism", columns: []string{"avgDop", "lastDop", "minDop", "maxDop", "stdevDop"}},
+	{key: "Memory", title: "Memory Grant", columns: []string{"avgMemory", "lastMemory", "minMemory", "maxMemory", "stdevMemory"}},
+	{key: "Rows", title: "Rows", columns: []string{"avgRows", "lastRows", "minRows", "maxRows", "stdevRows"}},
+	{key: "LogBytes", title: "Log Bytes", columns: []string{"avgLogBytes", "lastLogBytes", "minLogBytes", "maxLogBytes", "stdevLogBytes"}},
+	{key: "TempDB", title: "TempDB Usage", columns: []string{"avgTempdb", "lastTempdb", "minTempdb", "maxTempdb", "stdevTempdb"}},
+}
+
+var mssqlLabelColumns = map[string]bool{
+	"database": true,
+}
+
+const mssqlPrimaryLabel = "database"
 
 // mssqlMethods returns the available function methods for MSSQL
 func mssqlMethods() []module.MethodConfig {
@@ -717,6 +750,8 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		defaultSort = sortOptions[0].ID
 	}
 
+	annotatedCols := decorateMSSQLColumns(cols)
+
 	return &module.FunctionResponse{
 		Status:            200,
 		Help:              "Top SQL queries from Query Store. WARNING: Query text may contain unmasked literals (potential PII).",
@@ -726,37 +761,131 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		RequiredParams:    []funcapi.ParamConfig{sortParam},
 
 		// Charts for aggregated visualization
-		Charts: map[string]module.ChartConfig{
-			"Calls": {
-				Name:    "Number of Calls",
-				Type:    "stacked-bar",
-				Columns: []string{"calls"},
-			},
-			"Time": {
-				Name:    "Execution Time",
-				Type:    "stacked-bar",
-				Columns: []string{"totalTime", "avgTime"},
-			},
-			"CPU": {
-				Name:    "CPU Time",
-				Type:    "stacked-bar",
-				Columns: []string{"avgCpu"},
-			},
-			"IO": {
-				Name:    "Logical I/O",
-				Type:    "stacked-bar",
-				Columns: []string{"avgReads", "avgWrites"},
-			},
-		},
-		DefaultCharts: [][]string{
-			{"Time", "database"},
-			{"Calls", "database"},
-		},
-		GroupBy: map[string]module.GroupByConfig{
-			"database": {
-				Name:    "Group by Database",
-				Columns: []string{"database"},
-			},
-		},
+		Charts:        mssqlTopQueriesCharts(annotatedCols),
+		DefaultCharts: mssqlTopQueriesDefaultCharts(annotatedCols),
+		GroupBy:       mssqlTopQueriesGroupBy(annotatedCols),
 	}
+}
+
+func decorateMSSQLColumns(cols []mssqlColumnMeta) []mssqlColumnMeta {
+	out := make([]mssqlColumnMeta, len(cols))
+	index := make(map[string]int, len(cols))
+	for i, col := range cols {
+		out[i] = col
+		index[col.uiKey] = i
+	}
+
+	for i := range out {
+		if mssqlLabelColumns[out[i].uiKey] {
+			out[i].isLabel = true
+			if out[i].uiKey == mssqlPrimaryLabel {
+				out[i].isPrimary = true
+			}
+		}
+	}
+
+	for _, group := range mssqlChartGroups {
+		for _, key := range group.columns {
+			idx, ok := index[key]
+			if !ok {
+				continue
+			}
+			out[idx].isMetric = true
+			out[idx].chartGroup = group.key
+			out[idx].chartTitle = group.title
+			if group.defaultChart {
+				out[idx].isDefaultChart = true
+			}
+		}
+	}
+
+	return out
+}
+
+func mssqlTopQueriesCharts(cols []mssqlColumnMeta) map[string]module.ChartConfig {
+	charts := make(map[string]module.ChartConfig)
+	for _, col := range cols {
+		if !col.isMetric || col.chartGroup == "" {
+			continue
+		}
+		cfg, ok := charts[col.chartGroup]
+		if !ok {
+			title := col.chartTitle
+			if title == "" {
+				title = col.chartGroup
+			}
+			cfg = module.ChartConfig{Name: title, Type: "stacked-bar"}
+		}
+		cfg.Columns = append(cfg.Columns, col.uiKey)
+		charts[col.chartGroup] = cfg
+	}
+	return charts
+}
+
+func mssqlTopQueriesDefaultCharts(cols []mssqlColumnMeta) [][]string {
+	label := primaryMSSQLLabel(cols)
+	if label == "" {
+		return nil
+	}
+	chartGroups := defaultMSSQLChartGroups(cols)
+	out := make([][]string, 0, len(chartGroups))
+	for _, group := range chartGroups {
+		out = append(out, []string{group, label})
+	}
+	return out
+}
+
+func mssqlTopQueriesGroupBy(cols []mssqlColumnMeta) map[string]module.GroupByConfig {
+	groupBy := make(map[string]module.GroupByConfig)
+	for _, col := range cols {
+		if !col.isLabel {
+			continue
+		}
+		groupBy[col.uiKey] = module.GroupByConfig{
+			Name:    "Group by " + col.displayName,
+			Columns: []string{col.uiKey},
+		}
+	}
+	return groupBy
+}
+
+func primaryMSSQLLabel(cols []mssqlColumnMeta) string {
+	for _, col := range cols {
+		if col.isPrimary {
+			return col.uiKey
+		}
+	}
+	for _, col := range cols {
+		if col.isLabel {
+			return col.uiKey
+		}
+	}
+	return ""
+}
+
+func defaultMSSQLChartGroups(cols []mssqlColumnMeta) []string {
+	groups := make([]string, 0)
+	seen := make(map[string]bool)
+	for _, col := range cols {
+		if !col.isMetric || col.chartGroup == "" || !col.isDefaultChart {
+			continue
+		}
+		if !seen[col.chartGroup] {
+			seen[col.chartGroup] = true
+			groups = append(groups, col.chartGroup)
+		}
+	}
+	if len(groups) > 0 {
+		return groups
+	}
+	for _, col := range cols {
+		if !col.isMetric || col.chartGroup == "" {
+			continue
+		}
+		if !seen[col.chartGroup] {
+			seen[col.chartGroup] = true
+			groups = append(groups, col.chartGroup)
+		}
+	}
+	return groups
 }

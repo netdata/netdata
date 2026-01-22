@@ -24,6 +24,9 @@ func init() {
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
+		Methods:         proxysqlMethods,
+		MethodParams:    proxysqlMethodParams,
+		HandleMethod:    proxysqlHandleMethod,
 	})
 }
 
@@ -51,6 +54,7 @@ type Config struct {
 	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	DSN                string           `yaml:"dsn" json:"dsn"`
 	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	TopQueriesLimit    int              `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
 }
 
 type Collector struct {
@@ -63,6 +67,9 @@ type Collector struct {
 
 	once  *sync.Once
 	cache *cache
+
+	queryDigestCols   map[string]bool
+	queryDigestColsMu sync.RWMutex
 }
 
 func (c *Collector) Configuration() any {

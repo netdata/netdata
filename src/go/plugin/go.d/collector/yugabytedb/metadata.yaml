@@ -28,6 +28,8 @@ modules:
           This collector monitors the activity and performance of YugabyteDB servers.
         method_description: |
           It sends HTTP requests to the YugabyteDB [metric endpoints](https://docs.yugabyte.com/preview/launch-and-manage/monitor-and-alert/metrics/#metric-endpoints).
+
+          It also provides `top-queries` and `running-queries` functions using `pg_stat_statements` and `pg_stat_activity` from YSQL.
       default_behavior:
         auto_detection:
           description: |
@@ -43,7 +45,10 @@ modules:
         performance_impact:
           description: ""
       additional_permissions:
-        description: ""
+        description: |
+          The `top-queries` function requires the `pg_stat_statements` extension to be installed in the target database.
+
+          Viewing all running queries via `pg_stat_activity` may require elevated privileges (e.g., `pg_read_all_stats`).
       multi_instance: true
       supported_platforms:
         include: []
@@ -82,6 +87,21 @@ modules:
               default_value: 1
               required: false
               group: Target
+            - name: dsn
+              description: SQL DSN used by `top-queries` and `running-queries` functions.
+              default_value: ""
+              required: false
+              group: Query Functions
+            - name: sql_timeout
+              description: SQL query timeout (seconds) for query functions.
+              default_value: 1
+              required: false
+              group: Query Functions
+            - name: top_queries_limit
+              description: Maximum number of rows returned by the `top-queries` and `running-queries` functions.
+              default_value: 500
+              required: false
+              group: Limits
 
             - name: username
               description: Username for Basic HTTP authentication.
@@ -183,6 +203,13 @@ modules:
                     # url: http://127.0.0.1:9000/prometheus-metrics   # Tablet Server
                     # url: http://127.0.0.1:12000/prometheus-metrics  # YCQL
                     # url: http://127.0.0.1:13000/prometheus-metrics  # YSQL
+            - name: Top queries
+              description: Enable SQL query functions (YSQL).
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:7000/prometheus-metrics
+                    dsn: postgres://yugabyte@127.0.0.1:5433/yugabyte?sslmode=disable
             - name: HTTP authentication
               description: Basic HTTP authentication.
               config: |

@@ -4,6 +4,7 @@ package cockroachdb
 
 import (
 	"context"
+	"database/sql"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -28,8 +29,11 @@ func init() {
 		Defaults: module.Defaults{
 			UpdateEvery: dbSamplingInterval,
 		},
-		Create: func() module.Module { return New() },
-		Config: func() any { return &Config{} },
+		Methods:      cockroachMethods,
+		MethodParams: cockroachMethodParams,
+		HandleMethod: cockroachHandleMethod,
+		Create:       func() module.Module { return New() },
+		Config:       func() any { return &Config{} },
 	})
 }
 
@@ -44,15 +48,19 @@ func New() *Collector {
 					Timeout: confopt.Duration(time.Second),
 				},
 			},
+			SQLTimeout: confopt.Duration(time.Second),
 		},
 		charts: charts.Copy(),
 	}
 }
 
 type Config struct {
-	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	Vnode              string           `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	DSN                string           `yaml:"dsn,omitempty" json:"dsn,omitempty"`
+	SQLTimeout         confopt.Duration `yaml:"sql_timeout,omitempty" json:"sql_timeout,omitempty"`
+	TopQueriesLimit    int              `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
 	web.HTTPConfig     `yaml:",inline" json:""`
 }
 
@@ -63,6 +71,8 @@ type Collector struct {
 	charts *Charts
 
 	prom prometheus.Prometheus
+
+	db *sql.DB
 }
 
 func (c *Collector) Configuration() any {
@@ -119,5 +129,8 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 func (c *Collector) Cleanup(context.Context) {
 	if c.prom != nil && c.prom.HTTPClient() != nil {
 		c.prom.HTTPClient().CloseIdleConnections()
+	}
+	if c.db != nil {
+		_ = c.db.Close()
 	}
 }

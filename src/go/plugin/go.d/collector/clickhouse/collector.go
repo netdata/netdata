@@ -23,6 +23,9 @@ func init() {
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
 		JobConfigSchema: configSchema,
+		Methods:         clickhouseMethods,
+		MethodParams:    clickhouseMethodParams,
+		HandleMethod:    clickhouseHandleMethod,
 	})
 }
 
@@ -49,6 +52,7 @@ type Config struct {
 	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	web.HTTPConfig     `yaml:",inline" json:""`
+	TopQueriesLimit    int `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
 }
 
 type (
