@@ -1,270 +1,347 @@
 # Overriding Stock Alerts
 
-This guide explains how to customize Netdata's stock alerts without modifying the original files. User configurations survive Netdata upgrades, making this the recommended approach for customization.
+This guide explains how to customize Netdata's stock alerts. User configurations survive upgrades, making this the recommended approach.
 
-## Why Override Instead of Edit
+## Quick Reference
 
-Stock alert files live in the **stock health config directory** (`[directories]` → `stock health config`, default `/usr/lib/netdata/conf.d/health.d/`). These files are replaced during upgrades, so direct edits will be lost.
+| Goal | Method |
+|------|--------|
+| Change thresholds for ALL instances | Create a template with the same name |
+| Change thresholds for ONE instance | Create an alarm with the same name |
+| Disable an alert completely | Use `enabled alarms` in netdata.conf |
+| Silence notifications only | Set `to: silent` |
 
-User overrides belong in the **user health config directory** (`[directories]` → `health config`, default `/etc/netdata/health.d/`), which is preserved across upgrades.
+## Understanding Overrides
 
-If your install uses a different prefix (e.g., `/opt`), these paths will differ. Use your `netdata.conf` `[directories]` section or `edit-config` output to confirm the exact paths on your system.
+Netdata's alerting uses **templates** (match all instances of a context) and **alarms** (match one specific instance). Stock alerts are mostly templates—they apply to all disks, all CPUs, etc.
 
-## Method 1: File-Level Override
+To override, create an alert with the **same name**. User definitions are processed before stock definitions, so yours wins.
 
-Copy the entire stock file to your user configuration directory (from your Netdata config dir, default `/etc/netdata`):
+See [Alert Configuration Ordering](alert-configuration-ordering.md) for the full conceptual explanation.
 
-```bash
-sudo ./edit-config health.d/cpu.conf
+## Where to Put Your Overrides
+
+**User config directory** (default): `/etc/netdata/health.d/`
+
+Files here survive upgrades. Stock files in `/usr/lib/netdata/conf.d/health.d/` are replaced during updates.
+
+Check your `netdata.conf` `[directories]` section for exact paths on your system.
+
+## Method 1: Override All Instances (Template)
+
+Create a template with the same name to change thresholds for ALL instances.
+
+**Example: Raise CPU steal thresholds globally**
+
+Stock alert in `/usr/lib/netdata/conf.d/health.d/cpu.conf`:
+```yaml
+template: 20min_steal_cpu
+      on: system.cpu
+  lookup: average -20m unaligned of steal
+   units: %
+   every: 5m
+    warn: $this > (($status >= $WARNING) ? (5) : (10))
 ```
 
-Or manually (using default paths):
-
-```bash
-sudo cp /usr/lib/netdata/conf.d/health.d/cpu.conf /etc/netdata/health.d/cpu.conf
-sudo nano /etc/netdata/health.d/cpu.conf
+Your override in `/etc/netdata/health.d/my-overrides.conf`:
+```yaml
+template: 20min_steal_cpu
+      on: system.cpu
+  lookup: average -20m unaligned of steal
+   units: %
+   every: 5m
+    warn: $this > (($status >= $WARNING) ? (10) : (20))
 ```
 
-**Important:** When a file with the same name exists in both directories, Netdata only loads the user configuration file. The stock file is completely ignored.
+**Why it works:** Same name + same context. Your template is processed first, creating the alert. The stock template is then skipped.
 
-This means you must include **all** alert definitions you want from that file. If the stock file has 10 alerts and you only want to modify 1, your user file must still contain all 10 (with your modification to the one).
+> **Note:** Most stock alerts are templates. If a stock alert is an alarm (rare), you must override it with an alarm, not a template—alarms are always processed before templates.
 
-**When to use this method:**
-- You want to modify most or all alerts in a stock file
-- You want complete control over the file's contents
-- You want to remove alerts that exist in the stock file
+## Method 2: Override One Instance (Alarm)
 
-## Method 2: Alert-Name Override (Recommended)
-
-Create a new configuration file with just the alerts you want to override:
-
-```bash
-sudo nano /etc/netdata/health.d/my-overrides.conf
-```
-
-Define an alert with the **same name** as the stock alert you want to override:
-
-**Example: Override the `cpu_steal` threshold**
-
-Stock alert (in the stock health config directory, default `/usr/lib/netdata/conf.d/health.d/cpu.conf`):
-```
-alarm: cpu_steal
-   on: system.cpu
-class: Utilization
- type: System
-component: CPU
-   lookup: average -10m percentage of steal
-    units: %
-    every: 5m
-     warn: $this > 30
-     crit: $this > 50
-```
-
-Your override (in `/etc/netdata/health.d/my-overrides.conf`):
-```
-alarm: cpu_steal
-   on: system.cpu
-class: Utilization
- type: System
-component: CPU
-   lookup: average -10m percentage of steal
-    units: %
-    every: 5m
-     warn: $this > 50
-     crit: $this > 80
-```
-
-**How it works:** User configuration files are loaded before stock files. Your `cpu_steal` definition creates the alert first. When the stock definition is processed, an alert named `cpu_steal` already exists for `system.cpu`, so the stock definition is skipped.
-
-**When to use this method:**
-- You want to modify specific alerts while keeping other stock alerts unchanged
-- You want to maintain a single file with all your customizations
-- You want minimal configuration maintenance
-
-## Override a Template for a Specific Instance
-
-Templates apply to all charts matching a context (e.g., all disks). To override a template for just **one specific instance**, create an `alarm` (not a template) with the same name:
+Create an alarm to override thresholds for ONE specific instance while keeping stock thresholds for others.
 
 **Example: Different disk space threshold for `/mnt/data`**
 
 Stock template (applies to all disks):
-```
+```yaml
 template: disk_space_usage
       on: disk.space
    lookup: max -1m percentage of avail
-    units: %
-    every: 1m
      warn: $this < 20
      crit: $this < 10
 ```
 
-Your override (in `/etc/netdata/health.d/my-overrides.conf`):
-```
+Your override in `/etc/netdata/health.d/my-overrides.conf`:
+```yaml
 alarm: disk_space_usage
-   on: disk_space._mnt_data   # example: mount point "/mnt/data" becomes a sanitized chart id
+   on: disk_space._mnt_data
    lookup: max -1m percentage of avail
-    units: %
-    every: 1m
      warn: $this < 5
      crit: $this < 2
 ```
 
-**How it works:**
-1. Alarms are processed before templates
-2. Your alarm matches `disk_space.<mount_id>` and creates an alert
-3. The stock template matches all `disk.space.*` charts, including `/mnt/data`
-4. For `/mnt/data`: An alert named `disk_space_usage` already exists, so the template is skipped
-5. For all other disks: The template creates alerts normally
+**Why it works:**
+- Both have the **same name** (`disk_space_usage`)
+- Your **alarm** targets the specific chart ID `disk_space._mnt_data`
+- Alarms are processed before templates (when names match)
+- For `/mnt/data`: your alarm creates the alert, stock template is skipped
+- For all other disks: stock template creates alerts normally
 
-**Key difference:** The `on` line in your alarm uses the **specific chart ID** (type `disk_space` + sanitized mount ID), not the context (`disk.space`).
+**Key difference:** Templates use `on:` with a **context** (`disk.space`). Alarms use `on:` with a **chart ID** (`disk_space._mnt_data`).
 
-To find the exact chart ID, check the Netdata dashboard or use:
+### Finding Chart IDs
+
+To find the exact chart ID for an instance:
+
 ```bash
 curl -s "http://localhost:19999/api/v1/charts" | grep -o '"id":"disk_space[^"]*"'
 ```
 
+Or check the chart title in the Netdata dashboard—the chart ID is shown in the URL when you click on a chart.
+
 ### Alternative: Using Chart Labels
 
-If charts have labels attached, you can use `chart labels:` to filter which instances a template applies to:
+Instead of chart IDs, you can match by labels:
 
-```
-# Override for disks with mount_point label = /mnt/data
+```yaml
 template: disk_space_usage
       on: disk.space
 chart labels: mount_point=/mnt/data
    lookup: max -1m percentage of avail
-    units: %
-    every: 1m
      warn: $this < 5
      crit: $this < 2
 ```
 
-**When to use chart labels:**
-- When multiple charts share a common label value you want to target
-- When you want to apply the same override to a group of instances
-- When chart IDs are dynamic or unpredictable
+Use labels when:
+- You want to target multiple instances sharing a label
+- Chart IDs are dynamic or unpredictable
 
-**When to use specific chart ID (alarm method):**
-- When you need to override exactly one specific instance
-- When the chart ID is stable and predictable
-- When the chart doesn't have useful labels
+## Method 3: Copy Entire Stock File
 
-## Disabling Stock Alerts
-
-### Option A: Global Disable in netdata.conf
-
-Disable specific alerts for all charts:
+If you want to modify many alerts in one stock file, copy it entirely:
 
 ```bash
-sudo nano /etc/netdata/netdata.conf
+cd /etc/netdata
+sudo ./edit-config health.d/cpu.conf
 ```
+
+**Important:** When a file with the same name exists in both directories, Netdata loads **only** the user file. The stock file is completely ignored.
+
+This means your copy must include ALL alerts you want—not just the ones you're changing.
+
+## Disabling Alerts
+
+### Option A: Global Disable
+
+In `/etc/netdata/netdata.conf`:
 
 ```ini
 [health]
-    enabled alarms = !cpu_steal !disk_space_usage *
+    enabled alarms = !20min_steal_cpu !disk_space_usage *
 ```
 
-This disables `cpu_steal` and `disk_space_usage` while keeping all other alerts (`*`).
+This disables `20min_steal_cpu` and `disk_space_usage` while keeping all other alerts (`*`).
 
-### Option B: Per-Alert Disable Using Pattern Matching (trick used in stock configs)
+### Option B: Per-Alert Disable
 
-Create an override that can never match any host:
+Create an override that never matches:
 
-```
-alarm: cpu_steal
-   on: system.cpu
+```yaml
+template: 20min_steal_cpu
+      on: system.cpu
 host labels: _hostname=!*
 ```
 
-This uses a **special disable shortcut** handled by the health config parser: `!*` (or `!* *`) marks the alert as disabled. This pattern is used in stock configs (e.g., for selectively disabled alerts).
+The pattern `!*` is a special disable shortcut—the health config parser recognizes it and disables the alert.
 
 ### Option C: Silence Notifications Only
 
 Keep the alert monitoring but stop notifications:
 
-```
-alarm: cpu_steal
-   on: system.cpu
-class: Utilization
- type: System
-component: CPU
-   lookup: average -10m percentage of steal
-    units: %
-    every: 5m
-     warn: $this > 30
-     crit: $this > 50
+```yaml
+template: 20min_steal_cpu
+      on: system.cpu
+  lookup: average -20m unaligned of steal
+   units: %
+   every: 5m
+    warn: $this > (($status >= $WARNING) ? (5) : (10))
       to: silent
 ```
 
-The alert still appears in the dashboard and API, but no notifications are sent.
+The alert still appears in the dashboard but sends no notifications.
 
-## Verifying Your Override
+## Applying Changes
 
-After reloading health configuration, verify your override is active:
+Reload the health configuration:
 
 ```bash
 sudo netdatacli reload-health
 ```
 
-If `netdatacli` is not available on your system, you can send `SIGUSR2` to the Netdata daemon instead.
+If `netdatacli` isn't available, send `SIGUSR2` to the Netdata process.
 
-### Check via API
+### Verify Your Override
 
+Check via API:
 ```bash
-# List all active alerts
-curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.alarms | keys'
-
-# Check specific alert details
-curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.alarms["cpu_steal"]'
+curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.alarms | to_entries[] | select(.value.name == "20min_steal_cpu") | .value'
 ```
 
-### Check via Dashboard
+Key fields to check:
+- `source`: confirms which config file is active (user override vs stock)
+- `lookup_*`: data query parameters
+- `warn`, `crit`: threshold expressions
 
-Navigate to the Alerts tab in the Netdata dashboard. Find your alert and verify the thresholds match your override.
+Or navigate to the Alerts tab in the dashboard and verify thresholds match your override.
 
-### Check Configuration Loading
+### Check for Errors
 
-Review the Netdata error log for configuration parsing messages:
+If your override isn't working, check the logs:
 
 ```bash
-grep -i "health" /var/log/netdata/error.log | tail -50
+# systemd journal (most Linux distributions):
+journalctl --namespace netdata -g health --no-pager | tail -20
+
+# Log files (if journal not available):
+grep -i health /var/log/netdata/error.log | tail -20
 ```
+
+Common issues:
+- Syntax errors in configuration
+- Alert name doesn't match exactly (case-sensitive)
+- File permissions prevent Netdata from reading your config
 
 ## Troubleshooting
 
 ### Override Not Taking Effect
 
-1. **Verify file permissions:** The netdata user must be able to read your configuration file
-   ```bash
-   ls -la /etc/netdata/health.d/my-overrides.conf
-   ```
-
-2. **Check for syntax errors:** Look for parsing errors in the log
-   ```bash
-   grep -i "health.*error\|health.*warning" /var/log/netdata/error.log
-   ```
-
-3. **Verify alert name matches exactly:** The name is case-sensitive
-
-4. **Reload health configuration:**
-   ```bash
-   sudo netdatacli reload-health
-   ```
+1. **Reload configuration**: `sudo netdatacli reload-health`
+2. **Check file permissions**: Netdata must be able to read your file
+3. **Verify exact name match**: Alert names are case-sensitive
+4. **Check for syntax errors**: Look in error.log
 
 ### Both Stock and Override Alerts Appear
 
-This happens when the matching criteria don't overlap. For example:
+This happens when matching criteria don't overlap. For example:
 - Your override has `host labels: production`
 - Stock alert has no host labels restriction
-- Result: Both can create alerts on different hosts
 
-Ensure your override matches the same charts as the stock alert, or uses broader matching criteria.
+Both can create alerts on different hosts. Ensure your override matches at least the same scope as the stock alert.
 
-### UI Edit Replaced My File-Based Config
+### UI Edit Replaced My Config
 
-When you edit an alert through the Netdata dashboard UI, it creates a dynamic configuration (DYNCFG) that **completely replaces** any file-based definition with the same name. This is different from file-based configs, which coexist in a linked list.
+Editing an alert through the dashboard UI creates a dynamic configuration that **replaces** any file-based definition. To restore file-based behavior, remove the dynamic config through the UI or API.
 
-To restore file-based behavior, remove the dynamic configuration through the UI or API.
+## FAQ
+
+### Do I need to copy all fields when overriding an alert?
+
+Yes. Your override is a complete alert definition, not a "patch" on the stock alert. Include all fields: `lookup`, `calc`, `warn`, `crit`, `units`, etc.
+
+If you omit a field, the alert uses its default value—not the stock alert's value.
+
+### How do I override the same alert differently on different hosts?
+
+Use `host labels` to create host-specific overrides:
+
+```yaml
+# Production servers: stricter thresholds
+template: cpu_usage
+      on: system.cpu
+host labels: environment=production
+     warn: $this > 70
+
+# Development servers: relaxed thresholds
+template: cpu_usage
+      on: system.cpu
+host labels: environment=development
+     warn: $this > 90
+```
+
+Both can coexist because they match different hosts.
+
+### How do I find what stock alerts exist?
+
+List all stock alert files:
+```bash
+ls /usr/lib/netdata/conf.d/health.d/
+```
+
+View a specific stock alert:
+```bash
+cat /usr/lib/netdata/conf.d/health.d/cpu.conf
+```
+
+Or use the API to list all alert names:
+```bash
+curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.alarms | to_entries[].value.name' | sort -u
+```
+
+### Can I add new alerts without affecting stock alerts?
+
+Yes. Create alerts with **different names** than stock alerts. They'll coexist independently.
+
+```yaml
+# This is a NEW alert, not an override
+template: my_custom_disk_alert
+      on: disk.space
+   lookup: max -5m percentage of avail
+     warn: $this < 15
+```
+
+### What happens to my overrides after a Netdata upgrade?
+
+User config files in `/etc/netdata/health.d/` are preserved. Stock files in `/usr/lib/netdata/conf.d/health.d/` are replaced.
+
+Your overrides continue working. However, if a stock alert is renamed or removed in a new version, your override may become orphaned (still works, but no longer overriding anything).
+
+### How do I override for multiple specific instances?
+
+Option 1: Create multiple alarms (one per instance):
+```yaml
+alarm: disk_space_usage
+   on: disk_space._mnt_data
+     warn: $this < 5
+
+alarm: disk_space_usage
+   on: disk_space._mnt_backup
+     warn: $this < 5
+```
+
+Option 2: Use chart labels if instances share a label:
+```yaml
+template: disk_space_usage
+      on: disk.space
+chart labels: storage_tier=bulk
+     warn: $this < 5
+```
+
+### Can I see what overrides are currently active?
+
+Check which config files Netdata loaded:
+```bash
+# systemd journal:
+journalctl --namespace netdata -g "health.*load\|health.*read" --no-pager
+
+# Log files:
+grep -iE "health.*(load|read)" /var/log/netdata/error.log
+```
+
+Compare your active alert config vs stock:
+```bash
+# Your override
+cat /etc/netdata/health.d/my-overrides.conf
+
+# Stock definition
+cat /usr/lib/netdata/conf.d/health.d/disks.conf
+```
+
+### Why does editing an alert in the UI override my file-based config?
+
+UI edits create dynamic configurations that take precedence over all file-based configs. This is by design—it allows quick adjustments without SSH access.
+
+To restore file-based control, remove the dynamic config through the UI (reset to default) or via the API.
 
 ## Related Documentation
 

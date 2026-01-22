@@ -1,156 +1,186 @@
 # Alert Configuration Ordering
 
-This document explains how Netdata loads and processes alert configurations, including the precedence rules that determine which alert definition "wins" when multiple definitions could apply to the same chart.
+This document explains how Netdata's alerting system is designed and how it determines which alert definition applies when multiple definitions could match the same data.
+
+## The Problem: Alerts at Scale
+
+Netdata monitors infrastructure that can range from a single server to thousands of nodes, each with dozens of components: disks, network interfaces, databases, containers, and more.
+
+The challenge: How do you configure alerts that automatically apply to all Redis instances, all disks, or all network interfaces—without manually defining alerts for each one? And when one specific instance needs different thresholds, how do you override just that one predictably?
+
+## The Solution: Contexts and Instances
+
+Netdata's alerting system is built around two concepts:
+
+| Concept | What it is | Example |
+|---------|------------|---------|
+| **Context** | Defines what the metrics ARE—their meaning and units | `disk.space` (disk space utilization in %) |
+| **Instance** | An individual component being monitored | `/mnt/data`, `/home`, `/var` |
+
+A context groups all instances that share the same metric definition. For example, the `disk.space` context includes every mounted filesystem on the system.
+
+## Templates vs Alarms
+
+Netdata provides two ways to define alerts:
+
+### Templates: Match by Context
+
+A **template** applies to ALL instances of a context automatically.
+
+```yaml
+template: disk_space_usage
+      on: disk.space              # matches the CONTEXT
+   lookup: max -1m percentage of avail
+     warn: $this < 20
+     crit: $this < 10
+```
+
+This single definition creates alerts for every disk on every node—automatically. When a new disk is mounted, it gets this alert. No manual configuration needed.
+
+### Alarms: Match by Instance
+
+An **alarm** applies to ONE specific instance.
+
+```yaml
+alarm: disk_space_usage
+   on: disk_space._mnt_data       # matches a specific INSTANCE (chart ID)
+   lookup: max -1m percentage of avail
+     warn: $this < 5
+     crit: $this < 2
+```
+
+Use alarms when a specific instance needs different treatment—like a data disk that's expected to run fuller than others.
+
+**Key difference**: The `on:` line specifies a **context** for templates, but a **chart ID** (specific instance) for alarms.
+
+## Precedence: Same Name Required
+
+Multiple alerts with **different names** can coexist on the same instance. You can have `disk_space_usage`, `disk_io_latency`, and `disk_errors` all monitoring the same disk.
+
+The precedence rules only apply when alerts have the **same name**. In that case, only one alert with that name can exist per instance:
+
+| Priority | Type | What it matches |
+|----------|------|-----------------|
+| 1 (higher) | Alarm | Specific instance |
+| 2 (lower) | Template | All instances of a context |
+
+**Example scenario:**
+
+1. Stock template `disk_space_usage` on context `disk.space` → warn at 20%
+2. User alarm `disk_space_usage` on instance `disk_space._mnt_data` → warn at 5%
+
+Both have the **same name** (`disk_space_usage`), so precedence applies:
+- `/mnt/data` gets the alarm's thresholds (warn at 5%)
+- All other disks get the template's thresholds (warn at 20%)
 
 ## Configuration Loading Order
 
-Netdata loads alert configuration files from two directories (name + default path shown; these can differ by package/prefix):
+Netdata loads alert configurations from two directories:
 
-1. **User health config directory** (`[directories]` → `health config`, loaded first): default `/etc/netdata/health.d/`
-2. **Stock health config directory** (`[directories]` → `stock health config`, loaded second): default `/usr/lib/netdata/conf.d/health.d/`
+1. **User config** (loaded first): `/etc/netdata/health.d/` (default)
+2. **Stock config** (loaded second): `/usr/lib/netdata/conf.d/health.d/` (default)
 
-If your install uses a different prefix (e.g., `/opt`), these paths change. Use your `netdata.conf` `[directories]` section or `edit-config` output to confirm the exact paths on your system.
+These paths can vary by installation. Check your `netdata.conf` `[directories]` section for exact paths.
 
-### File and Directory Shadowing
+### File Shadowing
 
-If a file or subdirectory with the **same name** exists in both directories, only the user configuration is loaded. The stock counterpart is completely ignored.
+If a file with the **same name** exists in both directories, only the user file is loaded. The stock file is completely ignored.
 
-**Example (defaults):**
-- Stock file: `/usr/lib/netdata/conf.d/health.d/cpu.conf`
-- User file: `/etc/netdata/health.d/cpu.conf`
-- Result: Only `/etc/netdata/health.d/cpu.conf` is loaded
+**Example:**
+- Stock: `/usr/lib/netdata/conf.d/health.d/cpu.conf`
+- User: `/etc/netdata/health.d/cpu.conf`
+- Result: Only the user file is loaded
 
-This also applies to subdirectories - a user subdirectory shadows the entire stock subdirectory tree.
+This means if you copy a stock file to override it, you must include **all** alerts you want from that file, not just the ones you're modifying.
 
-This means if you copy a stock file to the user directory, you must include **all** alert definitions you want from that file, not just the ones you want to modify.
+### Complete Precedence
 
-### File Order Within a Directory
+Combining type precedence with source precedence:
 
-Files within each directory are loaded in the order returned by `readdir()`, which varies by filesystem and operating system. This order is **non-deterministic**.
+| Priority | Type | Source |
+|----------|------|--------|
+| 1 (highest) | Alarm | User config |
+| 2 | Alarm | Stock config |
+| 3 | Template | User config |
+| 4 (lowest) | Template | Stock config |
 
-**Implication:** If you have multiple user configuration files that define alerts with the same name for the same chart, which one "wins" depends on filesystem-specific ordering. To avoid surprises:
-- Keep all overrides for the same alert in a single file
-- Or use different alert names
+## First-Match-Wins (Same Name Only)
 
-## Alert Processing Order
+Only **one** alert can exist per (instance, alert_name) pair. When multiple definitions **with the same name** could apply to an instance:
 
-When Netdata applies alert definitions to charts, it processes them in this order:
+1. The first matching definition (by precedence) creates the alert
+2. Later definitions with the same name are skipped for that instance
 
-1. **Alarms** (non-templates) - processed first
-2. **Templates** - processed second
+This is why overriding works: create an alert with the same name, and yours is processed first.
 
-Within each type, definitions from user configuration files are processed before those from stock configuration files.
+## Dynamic Configuration Exception
 
-### Complete Precedence Table
+Alerts created or modified through the Netdata UI or API behave differently:
 
-| Priority | Type | Source | Example Location |
-|----------|------|--------|------------------|
-| 1 (highest) | Alarm | User config | `/etc/netdata/health.d/*.conf` (default) |
-| 2 | Alarm | Stock config | `/usr/lib/netdata/conf.d/health.d/*.conf` (default) |
-| 3 | Template | User config | `/etc/netdata/health.d/*.conf` (default) |
-| 4 (lowest) | Template | Stock config | `/usr/lib/netdata/conf.d/health.d/*.conf` (default) |
+- **UI/API changes replace** any existing definition with the same name
+- This is the only case where a definition overwrites another
 
-## First-Match-Wins Behavior
+When you edit an alert through the dashboard, it completely replaces any file-based definition with that name.
 
-Only **one** alert can exist per (chart, alert_name) pair at runtime. When multiple alert definitions with the same name could apply to a chart:
+## Summary
 
-1. The **first** matching definition creates the active alert (RRDCALC)
-2. All subsequent same-named definitions that match the same chart are **silently skipped**
+| Goal | Use |
+|------|-----|
+| Alert on ALL instances of a type | Template matching a context |
+| Alert on ONE specific instance | Alarm matching a chart ID |
+| Override a stock alert globally | User template with same name |
+| Override for just one instance | User alarm with same name |
 
-### Example
+## FAQ
 
-Consider these definitions:
+### Can I have multiple alerts monitoring the same instance?
 
-```
-# User config file (user health config directory, default /etc/netdata/health.d/my-alerts.conf)
-alarm: disk_space_usage
-   on: disk_space._mnt_data   # example: mount point "/mnt/data" becomes a sanitized chart id
- warn: $this > 95
+Yes. Different alert names create independent alerts. You can have `disk_space_usage`, `disk_io_latency`, and `disk_write_errors` all monitoring the same disk simultaneously.
 
-# Stock config file (stock health config directory, default /usr/lib/netdata/conf.d/health.d/disks.conf)
-template: disk_space_usage
-      on: disk.space
-    warn: $this > 80
-```
+The "only one alert per instance" rule applies only to alerts **with the same name**.
 
-For the chart `disk_space._mnt_data`:
-1. The user `alarm` is processed first (higher priority)
-2. It matches the chart and creates an alert with `warn: $this > 95`
-3. When the stock `template` is processed, it also matches this chart
-4. However, an alert named `disk_space_usage` already exists for this chart
-5. The template is silently skipped for this chart
+### What happens if I define the same alert name twice in my user config?
 
-For all other `disk.space.*` charts:
-- No user alarm matches
-- The stock template creates alerts with `warn: $this > 80`
+The first one processed wins. Since file loading order within a directory is non-deterministic (depends on filesystem), keep all definitions for the same alert name in a single file to avoid surprises.
 
-## Same-Name Alert Storage
+### How do I know which alert definition is currently active?
 
-When multiple alert definitions share the same name from configuration files, they are stored in a linked list rather than replaced. This means:
-
-- All definitions with the same name coexist in memory
-- The processing order determines which one creates alerts for each chart
-- Definitions with non-overlapping matching criteria can all create alerts
-
-### Example with Non-Overlapping Criteria
-
-```
-# Definition 1: matches Linux hosts only
-template: memory_usage
-      on: system.ram
-      os: linux
-    warn: $this > 80
-
-# Definition 2: matches FreeBSD hosts only
-template: memory_usage
-      on: system.ram
-      os: freebsd
-    warn: $this > 75
+Query the API:
+```bash
+curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.alarms | to_entries[] | select(.value.name == "alert_name") | .value'
 ```
 
-Both definitions exist and both can create alerts, because they target different operating systems and will never match the same chart.
+Key fields to check:
+- `source`: which config file is active
+- `lookup_*`: data query parameters
+- `warn`, `crit`: threshold expressions
 
-## Dynamic Configuration (DYNCFG) Exception
+Or check the Alerts tab in the dashboard—click on an alert to see its current configuration.
 
-Alerts created or modified through the Netdata UI or API (dynamic configuration) behave differently:
+### Why isn't my override working?
 
-- **DYNCFG alerts REPLACE** existing definitions with the same name, rather than appending to the linked list
-- This is the only case where a same-named alert definition overwrites another
+Common causes:
+1. **Name mismatch**: Alert names are case-sensitive
+2. **Not reloaded**: Run `sudo netdatacli reload-health`
+3. **File permissions**: Netdata must be able to read your config file
+4. **Syntax error**: Check logs with `journalctl --namespace netdata -g health` or `grep -i health /var/log/netdata/error.log`
 
-When you click "Edit" on an alert in the dashboard, the resulting configuration completely replaces any file-based definition with that name.
+### What's the difference between context and chart ID?
 
-## Practical Implications
+- **Context** (`disk.space`): The metric type—shared by all instances
+- **Chart ID** (`disk_space._mnt_data`): A specific instance
 
-### To Override a Stock Alert
+Templates use contexts. Alarms use chart IDs.
 
-Create an alert with the **same name** in a user configuration file. Since user configs are processed first, your definition will create the alert before the stock definition is processed.
+### Do user configs completely replace stock configs?
 
-See [Overriding Stock Alerts](overriding-stock-alerts.md) for detailed examples.
+No. User configs are processed **before** stock configs, but both are loaded (unless file shadowing applies). Your alert with the same name wins because it's processed first, but you're not deleting the stock definition—just preempting it.
 
-### To Disable a Stock Alert
+### What is file shadowing?
 
-You have several options:
+If a file with the **same filename** exists in both user and stock directories, only the user file is loaded. The stock file is completely ignored.
 
-1. **Global disable** in `netdata.conf`:
-   ```
-   [health]
-       enabled alarms = !alert_name *
-   ```
-
-2. **Per-alert disable** using pattern matching (trick used in stock configs):
-   ```
-   alarm: stock_alert_name
-      on: the.chart
-   host labels: _hostname=!*
-   ```
-   This uses a **special disable shortcut** handled by the health config parser: `!*` (or `!* *`) marks the alert as disabled.
-
-3. **Silence notifications only** (alert still monitors):
-   ```
-   alarm: stock_alert_name
-      on: the.chart
-      to: silent
-   ```
+This is different from alert-level overriding. With shadowing, you must include ALL alerts you want from that file.
 
 ## Related Documentation
 
