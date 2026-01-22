@@ -17,11 +17,11 @@ Both approaches produce alerts that **run on your Agents or Parents**, not in Cl
 
 | Section | What You'll Learn |
 |---------|-------------------|
-| **[2.1 Quick Start: Create Your First Alert](creating-alerts-pages/1-quick-start-create-your-first-alert.md)** | A minimal, step-by-step path to get one alert working fast (file-based or Cloud UI) |
-| **[2.2 Creating and Editing Alerts via Configuration Files](creating-alerts-pages/2-creating-and-editing-alerts-via-config-files.md)** | How to locate, edit, and reload health configuration files on disk |
-| **[2.3 Creating and Editing Alerts via Netdata Cloud](creating-alerts-pages/3-creating-and-editing-alerts-via-cloud.md)** | How to use the Cloud Alerts Configuration Manager to define alerts visually |
-| **[2.4 Managing Stock versus Custom Alerts](creating-alerts-pages/4-managing-stock-vs-custom-alerts.md)** | How to safely customize or override Netdata's stock alerts |
-| **[2.5 Reloading and Validating Alert Configuration](creating-alerts-pages/5-reloading-and-validating-alert-configuration.md)** | How to apply changes and confirm alerts loaded correctly |
+| **[2.1 Quick Start: Create Your First Alert](/docs/alerts/creating-alerts-pages/1-quick-start-create-your-first-alert.md)** | A minimal, step-by-step path to get one alert working fast (file-based or Cloud UI) |
+| **[2.2 Creating and Editing Alerts via Configuration Files](/docs/alerts/creating-alerts-pages/2-creating-and-editing-alerts-via-config-files.md)** | How to locate, edit, and reload health configuration files on disk |
+| **[2.3 Creating and Editing Alerts via Netdata Cloud](/docs/alerts/creating-alerts-pages/3-creating-and-editing-alerts-via-cloud.md)** | How to use the Cloud Alerts Configuration Manager to define alerts visually |
+| **[2.4 Managing Stock versus Custom Alerts](/docs/alerts/creating-alerts-pages/4-managing-stock-vs-custom-alerts.md)** | How to safely customize or override Netdata's stock alerts |
+| **[2.5 Reloading and Validating Alert Configuration](/docs/alerts/creating-alerts-pages/5-reloading-and-validating-alert-configuration.md)** | How to apply changes and confirm alerts loaded correctly |
 
 ## Which Workflow Should You Use?
 

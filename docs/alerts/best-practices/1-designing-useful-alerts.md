@@ -83,4 +83,3 @@ Group related alerts by service or component. This helps responders find relevan
 
 - [Creating and Managing Alerts](/docs/alerts/creating-alerts-pages/README.md) - Practical alert creation
 - [Controlling Alerts and Noise](/docs/alerts/controlling-alerts-noise/README.md) - Reducing alert noise
-- [Stock Alerts Reference](/docs/alerts/stock-alerts/README.md) - Stock alerts to build upon

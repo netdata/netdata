@@ -153,12 +153,12 @@ curl -s "https://app.netdata.cloud/api/v2/events?space_id=YOUR_SPACE" \
 
 ## Related Sections
 
-  - **[Variables Not Found](/docs/troubleshooting-alerts/README.md)** for troubleshooting
-  - **[Variables and Special Symbols](/docs/alert-configuration-syntax/5-variables-and-special-symbols.md)** for reference
-  - **[Disabling Alerts](/docs/controlling-alerts-noise/1-disabling-alerts.md)** for configuration-based disabling
-- **[Events Feed](/docs/cloud-alert-features/README.md)** for Cloud UI features
-  - **[Cloud Notifications](/docs/receiving-notifications/3-cloud-notifications.md)** for Cloud routing
+  - **[Variables Not Found](/docs/alerts/troubleshooting-alerts/README.md)** for troubleshooting
+  - **[Variables and Special Symbols](/docs/alerts/alert-configuration-syntax/5-variables-and-special-symbols.md)** for reference
+  - **[Disabling Alerts](/docs/alerts/controlling-alerts-noise/1-disabling-alerts.md)** for configuration-based disabling
+  - **[Events Feed](/docs/alerts/cloud-alert-features/README.md)** for Cloud UI features
+  - **[Cloud Notifications](/docs/alerts/receiving-notifications/3-cloud-notifications.md)** for Cloud routing
 
 ## What's Next
 
-- **[Chapter 10: Cloud Alert Features](/docs/cloud-alert-features/README.md)** for more Cloud capabilities
+- **[Chapter 10: Cloud Alert Features](/docs/alerts/cloud-alert-features/README.md)** for more Cloud capabilities

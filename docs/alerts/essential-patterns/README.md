@@ -221,8 +221,8 @@ lookup: average -1m unaligned of user,system
 
 ## Related Sections
 
-- **[4.4 Reducing Flapping](/docs/controlling-alerts-noise/4-reducing-flapping.md)** - Delay and repeat techniques
-- **[5.2.6 Custom Scripts](/docs/receiving-notifications/2-agent-parent-notifications.md)** - Exec and webhook examples
-- **[7.3 Alert Flapping](/docs/troubleshooting-alerts/README.md)** - Debugging alert flapping issues
-- **[10.4 Room-Based Alerting](/docs/cloud-alert-features/README.md)** - Using labels in Cloud
-- **[13.1 Evaluation Architecture](/docs/architecture/1-evaluation-architecture.md)** - Alert evaluation internals
+- **[4.4 Reducing Flapping](/docs/alerts/controlling-alerts-noise/4-reducing-flapping.md)** - Delay and repeat techniques
+- **[5.2.6 Custom Scripts](/docs/alerts/receiving-notifications/2-agent-parent-notifications.md)** - Exec and webhook examples
+- **[7.3 Alert Flapping](/docs/alerts/troubleshooting-alerts/README.md)** - Debugging alert flapping issues
+- **[10.4 Room-Based Alerting](/docs/alerts/cloud-alert-features/README.md)** - Using labels in Cloud
+- **[13.1 Evaluation Architecture](/docs/alerts/architecture/1-evaluation-architecture.md)** - Alert evaluation internals
