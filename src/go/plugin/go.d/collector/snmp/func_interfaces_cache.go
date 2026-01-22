@@ -24,6 +24,7 @@ var ifaceMetricNames = map[string]bool{
 const (
 	tagInterface = "interface"
 	tagIfType    = "_if_type"
+	tagIfTypeGrp = "_if_type_group"
 )
 
 // ifaceCache holds interface metrics between collections for function queries.
@@ -37,8 +38,9 @@ type ifaceCache struct {
 // ifaceEntry holds metrics for a single network interface.
 type ifaceEntry struct {
 	// Identity
-	name   string // interface name (from Tags["interface"])
-	ifType string // interface type (from Tags["_if_type"])
+	name        string // interface name (from Tags["interface"])
+	ifType      string // interface type (from Tags["_if_type"])
+	ifTypeGroup string // interface type group (from Tags["_if_type_group"])
 
 	// Status (text values extracted from MultiValue)
 	adminStatus string
@@ -138,6 +140,9 @@ func (c *Collector) updateIfaceCacheEntry(m ddsnmp.Metric) {
 
 	if ifType := m.Tags[tagIfType]; ifType != "" {
 		entry.ifType = ifType
+	}
+	if ifTypeGroup := m.Tags[tagIfTypeGrp]; ifTypeGroup != "" {
+		entry.ifTypeGroup = ifTypeGroup
 	}
 
 	switch m.Name {

@@ -23,32 +23,21 @@ func newFuncInterfaces(cache *ifaceCache) *funcInterfaces {
 
 // methods returns the method configurations for this function.
 func (f *funcInterfaces) methods() []module.MethodConfig {
-	var sortOptions []funcapi.ParamOption
-
-	for _, col := range funcIfacesColumns {
-		if col.sortOption != "" {
-			sd := col.sortDir
-			sortOptions = append(sortOptions, funcapi.ParamOption{
-				ID:      col.key,
-				Column:  col.key,
-				Name:    col.sortOption,
-				Default: col.defaultSort,
-				Sort:    &sd,
-			})
-		}
-	}
-
 	return []module.MethodConfig{{
 		ID:   "interfaces",
 		Name: "Network Interfaces",
 		Help: "Network interface traffic and status metrics",
 		RequiredParams: []funcapi.ParamConfig{{
-			ID:         funcIfacesParamSort,
-			Name:       "Sort By",
-			Help:       "Select sort order",
-			Selection:  funcapi.ParamSelect,
-			Options:    sortOptions,
-			UniqueView: true,
+			ID:        funcIfacesParamTypeGroup,
+			Name:      "Type Group",
+			Help:      "Filter by interface type group",
+			Selection: funcapi.ParamSelect,
+			Options: []funcapi.ParamOption{
+				{ID: "ethernet", Name: "Ethernet", Default: true},
+				{ID: "aggregation", Name: "Aggregation"},
+				{ID: "virtual", Name: "Virtual"},
+				{ID: "other", Name: "Other"},
+			},
 		}},
 	}}
 }
@@ -82,16 +71,23 @@ func (f *funcInterfaces) handle(method string, params funcapi.ResolvedParams) *m
 	f.cache.mu.RLock()
 	defer f.cache.mu.RUnlock()
 
+	typeGroupFilter := params.GetOne(funcIfacesParamTypeGroup)
+	if typeGroupFilter == "" {
+		typeGroupFilter = "ethernet"
+	}
+
 	// Build data rows from cache
 	data := make([][]any, 0, len(f.cache.interfaces))
 	for _, entry := range f.cache.interfaces {
+		if !matchesTypeGroup(entry.ifTypeGroup, typeGroupFilter) {
+			continue
+		}
 		row := f.buildRow(entry)
 		data = append(data, row)
 	}
 
 	// Sort data based on params
-	sortColumn := params.Column(funcIfacesParamSort)
-	f.sortData(data, sortColumn)
+	f.sortData(data, f.defaultSortColumn())
 
 	return &module.FunctionResponse{
 		Status:            200,
@@ -243,6 +239,17 @@ func (f *funcInterfaces) defaultSortColumn() string {
 	return "name"
 }
 
+func matchesTypeGroup(group, filter string) bool {
+	switch filter {
+	case "ethernet", "aggregation", "virtual":
+		return group == filter
+	case "other":
+		return group == "" || (group != "ethernet" && group != "aggregation" && group != "virtual")
+	default:
+		return group == filter
+	}
+}
+
 // ptrToAny converts a *float64 to any, returning nil if the pointer is nil.
 func ptrToAny(p *float64) any {
 	if p == nil {
@@ -273,8 +280,8 @@ func snmpHandleMethod(_ context.Context, job *module.Job, method string, params 
 	return c.funcIfaces.handle(method, params)
 }
 
-// funcIfacesParamSort is the parameter ID for sort selection.
-const funcIfacesParamSort = "__sort"
+// funcIfacesParamTypeGroup is the parameter ID for type group filtering.
+const funcIfacesParamTypeGroup = "if_type_group"
 
 // funcIfacesColumn defines a column with its metadata and value extractor.
 // The value function extracts the column's data from an ifaceEntry.
@@ -315,6 +322,16 @@ var funcIfacesColumns = []funcIfacesColumn{
 		key:      "type",
 		name:     "Type",
 		value:    func(e *ifaceEntry) any { return e.ifType },
+		dataType: funcapi.FieldTypeString,
+		visible:  true,
+		sortDir:  funcapi.FieldSortAscending,
+		summary:  funcapi.FieldSummaryCount,
+		filter:   funcapi.FieldFilterMultiselect,
+	},
+	{
+		key:      "typeGroup",
+		name:     "Type Group",
+		value:    func(e *ifaceEntry) any { return e.ifTypeGroup },
 		dataType: funcapi.FieldTypeString,
 		visible:  true,
 		sortDir:  funcapi.FieldSortAscending,

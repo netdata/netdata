@@ -19,27 +19,27 @@ func TestSnmpMethods(t *testing.T) {
 	assert.Equal(t, "Network Interfaces", methods[0].Name)
 	require.NotEmpty(t, methods[0].RequiredParams)
 
-	// Verify sort param exists
-	var sortParam *funcapi.ParamConfig
+	// Verify type group param exists
+	var typeGroupParam *funcapi.ParamConfig
 	for i := range methods[0].RequiredParams {
-		if methods[0].RequiredParams[i].ID == "__sort" {
-			sortParam = &methods[0].RequiredParams[i]
+		if methods[0].RequiredParams[i].ID == "if_type_group" {
+			typeGroupParam = &methods[0].RequiredParams[i]
 			break
 		}
 	}
-	require.NotNil(t, sortParam, "expected __sort required param")
-	require.NotEmpty(t, sortParam.Options)
+	require.NotNil(t, typeGroupParam, "expected if_type_group required param")
+	require.NotEmpty(t, typeGroupParam.Options)
 
-	// Verify default sort option exists
+	// Verify default type group option exists
 	hasDefault := false
-	for _, opt := range sortParam.Options {
+	for _, opt := range typeGroupParam.Options {
 		if opt.Default {
 			hasDefault = true
-			assert.Equal(t, "name", opt.ID)
+			assert.Equal(t, "ethernet", opt.ID)
 			break
 		}
 	}
-	assert.True(t, hasDefault, "should have a default sort option")
+	assert.True(t, hasDefault, "should have a default type group option")
 }
 
 func TestFuncIfacesColumns(t *testing.T) {
@@ -49,7 +49,7 @@ func TestFuncIfacesColumns(t *testing.T) {
 		"has required columns": {
 			validate: func(t *testing.T) {
 				requiredKeys := []string{
-					"name", "type",
+					"name", "type", "typeGroup",
 					"trafficIn", "trafficOut",
 					"ucastPktsIn", "ucastPktsOut",
 					"bcastPktsIn", "bcastPktsOut",
@@ -87,6 +87,7 @@ func TestFuncIfacesColumns(t *testing.T) {
 				entry := &ifaceEntry{
 					name:        "eth0",
 					ifType:      "ethernetCsmacd",
+					ifTypeGroup: "ethernet",
 					adminStatus: "up",
 					operStatus:  "up",
 					rates: ifaceRates{
@@ -107,6 +108,8 @@ func TestFuncIfacesColumns(t *testing.T) {
 						assert.Equal(t, "eth0", col.value(entry))
 					case "type":
 						assert.Equal(t, "ethernetCsmacd", col.value(entry))
+					case "typeGroup":
+						assert.Equal(t, "ethernet", col.value(entry))
 					case "trafficIn":
 						assert.Equal(t, rate, col.value(entry))
 					case "adminStatus":
@@ -120,6 +123,7 @@ func TestFuncIfacesColumns(t *testing.T) {
 				entry := &ifaceEntry{
 					name:        "eth0",
 					ifType:      "ethernetCsmacd",
+					ifTypeGroup: "ethernet",
 					adminStatus: "up",
 					operStatus:  "up",
 				}
@@ -169,6 +173,7 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 			entry: &ifaceEntry{
 				name:        "eth0",
 				ifType:      "ethernetCsmacd",
+				ifTypeGroup: "ethernet",
 				adminStatus: "up",
 				operStatus:  "up",
 				rates: ifaceRates{
@@ -186,6 +191,7 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				// Find column indices by key
 				nameIdx := findColIdx("name")
 				typeIdx := findColIdx("type")
+				typeGroupIdx := findColIdx("typeGroup")
 				trafficInIdx := findColIdx("trafficIn")
 				trafficOutIdx := findColIdx("trafficOut")
 				adminIdx := findColIdx("adminStatus")
@@ -193,6 +199,7 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 
 				assert.Equal(t, "eth0", row[nameIdx])
 				assert.Equal(t, "ethernetCsmacd", row[typeIdx])
+				assert.Equal(t, "ethernet", row[typeGroupIdx])
 				assert.Equal(t, rate1, row[trafficInIdx])
 				assert.Equal(t, rate2, row[trafficOutIdx])
 				assert.Equal(t, "up", row[adminIdx])
@@ -203,6 +210,7 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 			entry: &ifaceEntry{
 				name:        "eth1",
 				ifType:      "other",
+				ifTypeGroup: "other",
 				adminStatus: "down",
 				operStatus:  "down",
 				rates:       ifaceRates{}, // all nil
@@ -227,6 +235,7 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 			entry: &ifaceEntry{
 				name:        "eth2",
 				ifType:      "",
+				ifTypeGroup: "",
 				adminStatus: "up",
 				operStatus:  "unknown",
 				rates: ifaceRates{
@@ -386,7 +395,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 				return newFuncInterfaces(newIfaceCache())
 			},
 			method: "interfaces",
-			params: funcapi.ResolvedParams{},
+			params: resolveIfaceParams(nil),
 			validate: func(t *testing.T, resp *module.FunctionResponse) {
 				assert.Equal(t, 200, resp.Status)
 				assert.NotNil(t, resp.Columns)
@@ -403,6 +412,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 				cache.interfaces["eth0"] = &ifaceEntry{
 					name:        "eth0",
 					ifType:      "ethernetCsmacd",
+					ifTypeGroup: "ethernet",
 					adminStatus: "up",
 					operStatus:  "up",
 					rates: ifaceRates{
@@ -413,20 +423,21 @@ func TestFuncInterfaces_handle(t *testing.T) {
 				cache.interfaces["eth1"] = &ifaceEntry{
 					name:        "eth1",
 					ifType:      "other",
+					ifTypeGroup: "virtual",
 					adminStatus: "down",
 					operStatus:  "down",
 				}
 				return newFuncInterfaces(cache)
 			},
 			method: "interfaces",
-			params: funcapi.ResolvedParams{},
+			params: resolveIfaceParams(nil),
 			validate: func(t *testing.T, resp *module.FunctionResponse) {
 				assert.Equal(t, 200, resp.Status)
 				assert.Equal(t, "name", resp.DefaultSortColumn)
 
 				data, ok := resp.Data.([][]any)
 				require.True(t, ok)
-				assert.Len(t, data, 2)
+				assert.Len(t, data, 1)
 
 				// Verify Charts
 				require.NotNil(t, resp.Charts)
@@ -436,13 +447,65 @@ func TestFuncInterfaces_handle(t *testing.T) {
 
 				// Verify DefaultCharts
 				require.NotEmpty(t, resp.DefaultCharts)
-				assert.Equal(t, [][]string{{"Traffic", "type"}}, resp.DefaultCharts)
+				assert.Equal(t, [][]string{{"Traffic", "type"}, {"OperationalStatus", "operStatus"}}, resp.DefaultCharts)
 
 				// Verify GroupBy
 				require.NotNil(t, resp.GroupBy)
 				assert.Contains(t, resp.GroupBy, "type")
-				assert.Contains(t, resp.GroupBy, "operStatus")
-				assert.Contains(t, resp.GroupBy, "adminStatus")
+			},
+		},
+		"filter other includes non-target groups": {
+			setup: func() *funcInterfaces {
+				cache := newIfaceCache()
+				cache.interfaces["eth0"] = &ifaceEntry{
+					name:        "eth0",
+					ifType:      "ethernetCsmacd",
+					ifTypeGroup: "ethernet",
+					adminStatus: "up",
+					operStatus:  "up",
+				}
+				cache.interfaces["lo0"] = &ifaceEntry{
+					name:        "lo0",
+					ifType:      "loopback",
+					ifTypeGroup: "virtual",
+					adminStatus: "up",
+					operStatus:  "up",
+				}
+				cache.interfaces["vlan0"] = &ifaceEntry{
+					name:        "vlan0",
+					ifType:      "l2vlan",
+					ifTypeGroup: "virtual",
+					adminStatus: "up",
+					operStatus:  "up",
+				}
+				cache.interfaces["tun0"] = &ifaceEntry{
+					name:        "tun0",
+					ifType:      "tunnel",
+					ifTypeGroup: "",
+					adminStatus: "up",
+					operStatus:  "up",
+				}
+				cache.interfaces["wlan0"] = &ifaceEntry{
+					name:        "wlan0",
+					ifType:      "ieee80211",
+					ifTypeGroup: "wireless",
+					adminStatus: "up",
+					operStatus:  "up",
+				}
+				return newFuncInterfaces(cache)
+			},
+			method: "interfaces",
+			params: resolveIfaceParams(map[string][]string{"if_type_group": {"other"}}),
+			validate: func(t *testing.T, resp *module.FunctionResponse) {
+				assert.Equal(t, 200, resp.Status)
+
+				data, ok := resp.Data.([][]any)
+				require.True(t, ok)
+				assert.Len(t, data, 2)
+
+				nameIdx := findColIdx("name")
+				names := []string{data[0][nameIdx].(string), data[1][nameIdx].(string)}
+				assert.ElementsMatch(t, []string{"tun0", "wlan0"}, names)
 			},
 		},
 	}
@@ -496,4 +559,13 @@ func findColIdx(key string) int {
 		}
 	}
 	return -1
+}
+
+func resolveIfaceParams(values map[string][]string) funcapi.ResolvedParams {
+	f := &funcInterfaces{}
+	params, err := f.methodParams("interfaces")
+	if err != nil {
+		return nil
+	}
+	return funcapi.ResolveParams(params, values)
 }
