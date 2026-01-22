@@ -198,6 +198,13 @@
 - Use static buffer for saving daemon status ([#21593](https://github.com/netdata/netdata/issues/21593))
 - Remove Ubuntu 25.04 from CI and package builds. ([#21519](https://github.com/netdata/netdata/issues/21519))
 - Docs: Add unclaim/reclaim node guide ([#21539](https://github.com/netdata/netdata/issues/21539))
+- Updating ai docs ([#21594](https://github.com/netdata/netdata/issues/21594))
+- Use only major version for repo URL in RHEL 9/10. ([#21596](https://github.com/netdata/netdata/issues/21596))
+- Feat(go.d): add Top Queries Functions framework with PostgreSQL, MySQL, MSSQL, and MongoDB support ([#21595](https://github.com/netdata/netdata/issues/21595))
+- Make function error message key camel case ([#21602](https://github.com/netdata/netdata/issues/21602))
+- Prevent race condition during thread exit cleanup ([#21603](https://github.com/netdata/netdata/issues/21603))
+- Adjust Windows plugin ([#21597](https://github.com/netdata/netdata/issues/21597))
+- Chore(go.d/snmp): add ifTypeGroup mapping for interface type categorization ([#21605](https://github.com/netdata/netdata/issues/21605))
 
 ## [2.8.0] - 2025-11-19
 
