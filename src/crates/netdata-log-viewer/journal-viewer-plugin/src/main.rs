@@ -15,8 +15,18 @@ use tracing::{error, info};
 ///
 /// Returns a guard that must be kept alive for the duration of the program.
 fn init_sentry() -> Option<sentry::ClientInitGuard> {
+    // Check DISABLE_TELEMETRY env var
     if std::env::var("DISABLE_TELEMETRY").is_ok() {
         return None;
+    }
+
+    // Check .opt-out-from-anonymous-statistics file in config directory
+    if let Ok(config_dir) = std::env::var("NETDATA_USER_CONFIG_DIR") {
+        let opt_out_file =
+            std::path::Path::new(&config_dir).join(".opt-out-from-anonymous-statistics");
+        if opt_out_file.exists() {
+            return None;
+        }
     }
 
     let dsn =
