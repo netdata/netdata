@@ -60,6 +60,13 @@
   }
 
   // ---------------------------------------------------------------------------
+  // UI Text Constants
+  // ---------------------------------------------------------------------------
+
+  const TEXT_WORKING = 'Working...';
+  const TEXT_TYPE_MESSAGE = 'Type a message...';
+
+  // ---------------------------------------------------------------------------
   // Icons (SVG) - Static trusted content
   // ---------------------------------------------------------------------------
 
@@ -67,6 +74,7 @@
     chat: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`,
     close: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
     send: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`,
+    stop: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect></svg>`,
     // Clipboard icon - board with clip at top
     clipboard: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>`,
     // Copy icon - two overlapping documents
@@ -78,6 +86,13 @@
     x: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
     maximize: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>`,
     minimize: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>`,
+    // Stats icons (monochrome)
+    clock: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`,
+    brain: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"></path><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"></path></svg>`,
+    output: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>`,
+    file: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>`,
+    wrench: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>`,
+    users: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`,
   };
 
   // ---------------------------------------------------------------------------
@@ -178,6 +193,7 @@
   class MarkdownRenderer {
     constructor() {
       this.md = null;
+      this.mdUser = null;
       this.mermaidInitialized = false;
     }
 
@@ -186,18 +202,29 @@
       if (!window.markdownit) {
         await this.waitFor(() => window.markdownit, 5000);
       }
-      // html:true allows HTML in markdown (needed for some content)
+
+      const highlightFn = (str, lang) => {
+        // Use escapeHtml to prevent XSS in code blocks
+        const escapedCode = escapeHtml(str);
+        const escapedLang = escapeHtml(lang || 'text');
+        return `<pre class="ai-agent-code-block" data-lang="${escapedLang}"><code>${escapedCode}</code></pre>`;
+      };
+
+      // Assistant messages: html:true allows HTML/SVG in markdown
       // typographer:false prevents (C) -> © conversion (problematic for DevOps)
       this.md = window.markdownit({
         html: true,
         linkify: true,
         typographer: false,
-        highlight: (str, lang) => {
-          // Use escapeHtml to prevent XSS in code blocks
-          const escapedCode = escapeHtml(str);
-          const escapedLang = escapeHtml(lang || 'text');
-          return `<pre class="ai-agent-code-block" data-lang="${escapedLang}"><code>${escapedCode}</code></pre>`;
-        },
+        highlight: highlightFn,
+      });
+
+      // User messages: html:false - plain markdown only, no HTML allowed
+      this.mdUser = window.markdownit({
+        html: false,
+        linkify: true,
+        typographer: false,
+        highlight: highlightFn,
       });
     }
 
@@ -216,6 +243,13 @@
         return `<p>${escapeHtml(markdown)}</p>`;
       }
       return this.md.render(markdown);
+    }
+
+    renderUser(markdown) {
+      if (!this.mdUser) {
+        return `<p>${escapeHtml(markdown)}</p>`;
+      }
+      return this.mdUser.render(markdown);
     }
 
     async renderMermaid(container) {
@@ -518,14 +552,22 @@
     }
 
     setupEventListeners() {
-      // Send message
-      this.sendBtn.addEventListener('click', () => this.sendMessage());
+      // Send/Stop button - sends message or aborts request
+      this.sendBtn.addEventListener('click', () => {
+        if (this.isLoading) {
+          this.abortRequest();
+        } else {
+          this.sendMessage();
+        }
+      });
 
       // Input handling
       this.inputEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
-          this.sendMessage();
+          if (!this.isLoading) {
+            this.sendMessage();
+          }
         }
       });
 
@@ -584,7 +626,37 @@
 
     autoExpandInput() {
       this.inputEl.style.height = 'auto';
-      this.inputEl.style.height = Math.min(this.inputEl.scrollHeight, 150) + 'px';
+      const maxHeight = Math.floor(window.innerHeight / 3); // 1/3 of screen height
+      this.inputEl.style.height = Math.min(this.inputEl.scrollHeight, maxHeight) + 'px';
+    }
+
+    updateInputState() {
+      // Update input disabled state and placeholder
+      this.inputEl.disabled = this.isLoading;
+      this.inputEl.classList.toggle('ai-agent-input-disabled', this.isLoading);
+      this.inputEl.placeholder = this.isLoading ? TEXT_WORKING : TEXT_TYPE_MESSAGE;
+
+      // Update button icon and title
+      if (this.isLoading) {
+        this.sendBtn.innerHTML = icons.stop;
+        this.sendBtn.title = 'Stop';
+        this.sendBtn.classList.add('ai-agent-send-stop');
+      } else {
+        this.sendBtn.innerHTML = icons.send;
+        this.sendBtn.title = 'Send';
+        this.sendBtn.classList.remove('ai-agent-send-stop');
+      }
+    }
+
+    abortRequest() {
+      if (!this.isLoading || !this.chat) return;
+      this.chat.abort();
+      this.requestCompleted = true;
+      this.isLoading = false;
+      this.clearInactivityTimer();
+      this.hideSpinner();
+      this.updateInputState();
+      this.updateStatus('Stopped');
     }
 
     async sendMessage() {
@@ -613,7 +685,9 @@
       this.userScrolledUp = false; // Reset scroll on new message
       this.requestCompleted = false;
       this.currentStatus = '';
-      this.updateStatus('Working...');
+      this.inactivityTimer = null;
+      this.updateInputState();
+      this.updateStatus(TEXT_WORKING);
       this.resetMetrics();
       this.showSpinner();
 
@@ -624,6 +698,10 @@
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
+        // Ignore abort errors - they're expected when user clicks stop
+        if (err instanceof Error && err.name === 'AbortError') {
+          return;
+        }
         if (!this.requestCompleted) {
           this.handleStreamError(`Error: ${msg}`);
         }
@@ -641,7 +719,8 @@
           break;
 
         case 'status':
-          this.currentStatus = event.data.message || event.data.status || '';
+          // Use only the "now" field from simplified status updates
+          this.currentStatus = event.data.now || '';
           // Show spinner when receiving status updates (model is working)
           this.showSpinner();
           this.updateSpinnerStatus(this.currentStatus);
@@ -660,12 +739,16 @@
           this.hideSpinner();
           this.streamingContent = event.report;
           this.updateStreamingMessage(this.streamingContent);
+          // Start inactivity timer - show spinner again if no content for 2s
+          this.startInactivityTimer();
           break;
 
         case 'done':
           this.requestCompleted = true;
           this.isLoading = false;
+          this.clearInactivityTimer();
           this.hideSpinner();
+          this.updateInputState();
 
           // Finalize the message
           if (this.streamingMessageId) {
@@ -676,6 +759,12 @@
             }
             this.renderMessage(this.streamingMessageId);
             this.renderer.renderMermaid(this.messagesEl);
+
+            // Add stats footer to the completed message (not saved in history)
+            const msgEl = this.messagesEl.querySelector(`[data-message-id="${this.streamingMessageId}"]`);
+            if (msgEl) {
+              this.addMessageFooter(msgEl, this.streamingMessageId, { ...this.metricsData });
+            }
           }
 
           this.streamingMessageId = null;
@@ -686,6 +775,7 @@
 
         case 'error':
           this.requestCompleted = true;
+          this.clearInactivityTimer();
           this.handleStreamError(`Error: ${event.error.message}`);
           break;
       }
@@ -710,6 +800,11 @@
       this.messagesEl.textContent = ''; // Safe clear
       for (const msg of this.messages) {
         this.renderMessage(msg.id);
+        // Add footer for assistant messages from history (no stats available)
+        if (msg.role === 'assistant') {
+          const el = this.messagesEl.querySelector(`[data-message-id="${msg.id}"]`);
+          if (el) this.addMessageFooter(el, msg.id, null);
+        }
       }
       this.renderer.renderMermaid(this.messagesEl);
     }
@@ -730,11 +825,20 @@
       el.textContent = '';
 
       if (msg.role === 'user') {
-        // User messages: render markdown (preserves newlines, supports formatting)
-        // Note: markdown-it processes the content; user input is their own
+        // User messages: render markdown without HTML support (plain markdown only)
         const contentDiv = createElement('div', 'ai-agent-message-content');
-        contentDiv.innerHTML = this.renderer.render(msg.content);
+        contentDiv.innerHTML = this.renderer.renderUser(msg.content);
         el.appendChild(contentDiv);
+        // User message actions (copy button on right)
+        const actionsDiv = createElement('div', 'ai-agent-message-actions');
+        const copyBtn = createElement('button', 'ai-agent-copy-btn', {
+          'data-copy-type': 'message',
+          'data-message-id': id,
+          title: 'Copy'
+        });
+        copyBtn.innerHTML = icons.copy;
+        actionsDiv.appendChild(copyBtn);
+        el.appendChild(actionsDiv);
       } else if (msg.isStreaming) {
         // Streaming assistant messages: double-buffer with two content divs
         const contentA = createElement('div', 'ai-agent-message-content ai-agent-buffer-a');
@@ -749,18 +853,62 @@
         el.appendChild(contentDiv);
         // Add copy buttons to code blocks
         this.addCodeBlockCopyButtons(el);
+        // Footer is added separately: with stats in 'done' event, without stats for history
+      }
+    }
+
+    addMessageFooter(el, messageId, metrics) {
+      // Remove existing footer if any
+      const existingFooter = el.querySelector('.ai-agent-message-footer');
+      if (existingFooter) existingFooter.remove();
+
+      const footer = createElement('div', 'ai-agent-message-footer');
+
+      // Add stats if provided (not saved in history, only shown for current session)
+      if (metrics) {
+        const statsDiv = createElement('div', 'ai-agent-message-stats');
+        const formatNumber = (value) => (Number.isFinite(value) ? value.toLocaleString() : '0');
+        const formatTime = (ms) => {
+          const totalSeconds = ms / 1000;
+          if (totalSeconds >= 60) {
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = (totalSeconds % 60).toFixed(1);
+            return `${minutes}:${seconds.padStart(4, '0')}`;
+          }
+          return totalSeconds.toFixed(1) + 's';
+        };
+
+        const statItems = [
+          { value: formatTime(metrics.elapsed), icon: icons.clock, title: 'The duration since this request started' },
+          { value: formatNumber(metrics.reasoningChars), icon: icons.brain, title: 'The size of models\' reasoning/thinking' },
+          { value: formatNumber(metrics.outputChars), icon: icons.output, title: 'The size of models\' output' },
+          { value: formatNumber(metrics.documentsChars), icon: icons.file, title: 'The size of documents read by the models' },
+          { value: formatNumber(metrics.tools), icon: icons.wrench, title: 'The number of tools executed' },
+          { value: formatNumber(metrics.llmCalls), icon: icons.chat, title: 'The number of LLM calls made' },
+        ];
+
+        statItems.forEach(item => {
+          const statEl = createElement('span', 'ai-agent-stat-item', { title: item.title });
+          statEl.innerHTML = item.icon;
+          const valueEl = createElement('span', 'ai-agent-stat-value');
+          valueEl.textContent = item.value;
+          statEl.appendChild(valueEl);
+          statsDiv.appendChild(statEl);
+        });
+
+        footer.appendChild(statsDiv);
       }
 
-      // Message actions (copy button)
-      const actionsDiv = createElement('div', 'ai-agent-message-actions');
+      // Copy button
       const copyBtn = createElement('button', 'ai-agent-copy-btn', {
         'data-copy-type': 'message',
-        'data-message-id': id,
-        title: 'Copy'
+        'data-message-id': messageId,
+        title: 'Copy response'
       });
       copyBtn.innerHTML = icons.copy;
-      actionsDiv.appendChild(copyBtn);
-      el.appendChild(actionsDiv);
+      footer.appendChild(copyBtn);
+
+      el.appendChild(footer);
     }
 
     addCodeBlockCopyButtons(el) {
@@ -891,7 +1039,7 @@
         outputChars: 0,
         documentsChars: 0,
         tools: 0,
-        agents: 0,
+        llmCalls: 0,
       };
     }
 
@@ -907,32 +1055,18 @@
         outputChars: typeof payload.outputChars === 'number' ? payload.outputChars : 0,
         documentsChars: typeof payload.documentsChars === 'number' ? payload.documentsChars : 0,
         tools: typeof payload.tools === 'number' ? payload.tools : 0,
-        agents: typeof payload.agents === 'number' ? payload.agents : 0,
+        llmCalls: typeof payload.llmCalls === 'number' ? payload.llmCalls : 0,
       };
+      // Update spinner stats if visible
+      if (this.spinnerVisible) {
+        this.updateSpinnerStats();
+      }
       this.renderStatusBar();
-    }
-
-    formatMetrics(metrics) {
-      const elapsed = typeof metrics.elapsed === 'number' ? metrics.elapsed : 0;
-      const formatNumber = (value) => (Number.isFinite(value) ? value.toLocaleString() : '0');
-      const separator = '\u00A0\u00A0│\u00A0\u00A0';
-      const parts = [
-        `⏱ ${(elapsed / 1000).toFixed(1)}s`,
-        `💭 ${formatNumber(metrics.reasoningChars)}ch`,
-        `📤 ${formatNumber(metrics.outputChars)}ch`,
-        `📄 ${formatNumber(metrics.documentsChars)}ch`,
-        `🔧 ${formatNumber(metrics.tools)}`,
-        `🤖 ${formatNumber(metrics.agents)}`,
-      ];
-      return parts.join(separator);
     }
 
     renderStatusBar() {
       if (!this.statusText) return;
-      if (this.spinnerVisible) {
-        this.statusText.textContent = this.formatMetrics(this.metricsData);
-        return;
-      }
+      // Stats are shown in spinner when visible, so just show status message
       this.statusText.textContent = this.statusMessage;
     }
 
@@ -944,6 +1078,7 @@
     handleStreamError(message) {
       this.isLoading = false;
       this.hideSpinner();
+      this.updateInputState();
       this.updateStatus(message);
     }
 
@@ -953,11 +1088,32 @@
         spinner = createElement('div', 'ai-agent-spinner');
 
         const workingSpan = createElement('span', 'ai-agent-spinner-working');
-        workingSpan.textContent = 'Working...';
+        workingSpan.textContent = TEXT_WORKING;
+
+        // Stats row with SVG icons (static trusted content from icons object)
+        const statsDiv = createElement('div', 'ai-agent-spinner-stats');
+        const statItems = [
+          { key: 'elapsed', icon: icons.clock, title: 'The duration since this request started' },
+          { key: 'reasoningChars', icon: icons.brain, title: 'The size of models\' reasoning/thinking' },
+          { key: 'outputChars', icon: icons.output, title: 'The size of models\' output' },
+          { key: 'documentsChars', icon: icons.file, title: 'The size of documents read by the models' },
+          { key: 'tools', icon: icons.wrench, title: 'The number of tools executed' },
+          { key: 'llmCalls', icon: icons.chat, title: 'The number of LLM calls made' },
+        ];
+        statItems.forEach(item => {
+          const statEl = createElement('span', 'ai-agent-stat-item', { 'data-stat': item.key, title: item.title });
+          // Static trusted SVG from icons object (not user input)
+          statEl.innerHTML = item.icon;
+          const valueEl = createElement('span', 'ai-agent-stat-value');
+          valueEl.textContent = '0';
+          statEl.appendChild(valueEl);
+          statsDiv.appendChild(statEl);
+        });
 
         const statusSpan = createElement('span', 'ai-agent-spinner-status');
 
         spinner.appendChild(workingSpan);
+        spinner.appendChild(statsDiv);
         spinner.appendChild(statusSpan);
       }
       // Always move spinner to the end (after the last message)
@@ -968,6 +1124,8 @@
       statusEl.classList.toggle(CSS_HIDDEN, !hasStatus);
       spinner.classList.remove(CSS_HIDDEN);
       this.spinnerVisible = true;
+      // Update stats in spinner
+      this.updateSpinnerStats();
       this.renderStatusBar();
       this.scrollToBottom();
     }
@@ -984,6 +1142,42 @@
       }
     }
 
+    updateSpinnerStats() {
+      const spinner = this.messagesEl.querySelector(CSS_SPINNER);
+      if (!spinner) return;
+
+      const formatNumber = (value) => (Number.isFinite(value) ? value.toLocaleString() : '0');
+      const metrics = this.metricsData;
+
+      // Update elapsed time (M:SS.S when >= 60s, otherwise SS.Ss)
+      const elapsedEl = spinner.querySelector('[data-stat="elapsed"] .ai-agent-stat-value');
+      if (elapsedEl) {
+        const totalSeconds = metrics.elapsed / 1000;
+        if (totalSeconds >= 60) {
+          const minutes = Math.floor(totalSeconds / 60);
+          const seconds = (totalSeconds % 60).toFixed(1);
+          elapsedEl.textContent = `${minutes}:${seconds.padStart(4, '0')}`;
+        } else {
+          elapsedEl.textContent = totalSeconds.toFixed(1) + 's';
+        }
+      }
+
+      // Update other stats
+      const statMappings = [
+        { key: 'reasoningChars', suffix: '' },
+        { key: 'outputChars', suffix: '' },
+        { key: 'documentsChars', suffix: '' },
+        { key: 'tools', suffix: '' },
+        { key: 'llmCalls', suffix: '' },
+      ];
+      statMappings.forEach(mapping => {
+        const el = spinner.querySelector(`[data-stat="${mapping.key}"] .ai-agent-stat-value`);
+        if (el) {
+          el.textContent = formatNumber(metrics[mapping.key]) + mapping.suffix;
+        }
+      });
+    }
+
     hideSpinner() {
       const spinner = this.messagesEl.querySelector(CSS_SPINNER);
       if (spinner) {
@@ -991,6 +1185,24 @@
       }
       this.spinnerVisible = false;
       this.renderStatusBar();
+    }
+
+    startInactivityTimer() {
+      // Clear any existing timer
+      this.clearInactivityTimer();
+      // Show spinner again after 2s of no content
+      this.inactivityTimer = setTimeout(() => {
+        if (this.isLoading && !this.requestCompleted) {
+          this.showSpinner();
+        }
+      }, 2000);
+    }
+
+    clearInactivityTimer() {
+      if (this.inactivityTimer) {
+        clearTimeout(this.inactivityTimer);
+        this.inactivityTimer = null;
+      }
     }
 
     scrollToBottom(force = false) {

@@ -132,15 +132,15 @@ export class InternalToolProvider extends ToolProvider {
               },
               done: {
                 type: 'string',
-                description: 'What has been completed so far (up to 15 words)'
+                description: 'What has been completed so far (up to 15 words). MUST be in the user\'s language - this is visible to users.'
               },
               pending: {
                 type: 'string',
-                description: 'What remains to be done (up to 15 words)'
+                description: 'What remains to be done (up to 15 words). MUST be in the user\'s language - this is visible to users.'
               },
               now: {
                 type: 'string',
-                description: 'Your immediate step - what you want to achieve with the tools you call now? (up to 15 words)'
+                description: 'Your immediate step - what you want to achieve with the tools you call now? (up to 15 words). MUST be in the user\'s language - this is visible to users.'
               },
               ready_for_final_report: {
                 type: 'boolean',

@@ -343,6 +343,46 @@
     height: 0.875em;
   }
 
+  /* Message Footer (stats + copy for assistant messages) */
+  .ai-agent-message-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    margin-top: 0.75em;
+    padding: 0.5em clamp(0.5em, 5cqi, 5em) 0;
+    border-top: 1px solid var(--ai-border-color);
+    font-size: 0.8125em;
+  }
+
+  .ai-agent-message-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75em;
+    color: var(--ai-text-secondary);
+    font-variant-numeric: tabular-nums;
+    flex: 1;
+  }
+
+  .ai-agent-message-footer .ai-agent-stat-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+  }
+
+  .ai-agent-message-footer .ai-agent-stat-item svg {
+    width: 0.875em;
+    height: 0.875em;
+    opacity: 0.7;
+  }
+
+  .ai-agent-message-footer .ai-agent-stat-value {
+    opacity: 0.9;
+  }
+
+  .ai-agent-message-footer .ai-agent-copy-btn {
+    flex-shrink: 0;
+  }
+
   /* -------------------------------------------------------------------------
      Markdown Content Styling
      ------------------------------------------------------------------------- */
@@ -510,7 +550,7 @@
   .ai-agent-input {
     flex: 1;
     min-height: 2.5em;
-    max-height: 9.375em;
+    max-height: 33vh;
     padding: 0.625em 0.875em;
     border: 1px solid var(--ai-border-color);
     border-radius: 1.25em;
@@ -531,6 +571,21 @@
 
   .ai-agent-input::placeholder {
     color: var(--ai-text-secondary);
+  }
+
+  /* Input scrollbar - theme aware */
+  .ai-agent-input::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .ai-agent-input::-webkit-scrollbar-track {
+    background: var(--ai-scrollbar-track);
+    border-radius: 3px;
+  }
+
+  .ai-agent-input::-webkit-scrollbar-thumb {
+    background: var(--ai-scrollbar-thumb);
+    border-radius: 3px;
   }
 
   .ai-agent-send {
@@ -559,6 +614,21 @@
   .ai-agent-send svg {
     width: 1.125em;
     height: 1.125em;
+  }
+
+  /* Stop button state */
+  .ai-agent-send-stop {
+    background: #dc3545;
+  }
+
+  .ai-agent-send-stop:hover {
+    background: #c82333;
+  }
+
+  /* Disabled input state */
+  .ai-agent-input-disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   /* -------------------------------------------------------------------------
@@ -621,10 +691,9 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.375em;
+    gap: 0.5em;
     /* Match assistant message content padding */
     padding: 0.75em clamp(0.5em, 5cqi, 5em);
-    animation: ai-agent-fadeIn 0.2s ease-out;
   }
 
   .ai-agent-spinner-working {
@@ -651,6 +720,34 @@
     to {
       transform: rotate(360deg);
     }
+  }
+
+  /* Spinner Stats Row */
+  .ai-agent-spinner-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75em;
+    padding-left: 1.375em;
+    color: var(--ai-text-secondary);
+    font-size: 0.8125em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ai-agent-stat-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+  }
+
+  .ai-agent-stat-item svg {
+    width: 0.9em;
+    height: 0.9em;
+    opacity: 0.7;
+    flex-shrink: 0;
+  }
+
+  .ai-agent-stat-value {
+    min-width: 1.5em;
   }
 
   .ai-agent-spinner-status {

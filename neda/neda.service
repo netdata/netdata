@@ -29,8 +29,9 @@ ExecStart=/opt/neda/bin/neda \
   --verbose
 
 # Restart policy
+TimeoutStopSec=5
 Restart=always
-RestartSec=10
+RestartSec=5
 
 # Logging
 StandardOutput=journal

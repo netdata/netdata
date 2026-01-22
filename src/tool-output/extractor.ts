@@ -567,6 +567,7 @@ export class ToolOutputExtractor {
       callbacks: this.wrapChildCallbacks(opts),
       headendId: 'tool_output',
       isMaster: false,
+      headendWantsProgressUpdates: false, // read-grep has no user interaction, disable task_status
     };
 
     const session = AIAgent.create(childConfig);

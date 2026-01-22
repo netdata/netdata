@@ -398,7 +398,7 @@ export class EmbedHeadend implements Headend {
     let outputChars = 0;
     let documentsChars = 0;
     let toolsCount = 0;
-    let agentsCount = 0;
+    let llmCalls = 0;
     let metricsInterval: ReturnType<typeof setInterval> | undefined;
     let lastMetricsEmitTs = 0;
     let sseHeadersSent = false;
@@ -427,7 +427,7 @@ export class EmbedHeadend implements Headend {
         outputChars,
         documentsChars,
         tools: toolsCount,
-        agents: agentsCount,
+        llmCalls,
         ...(isFinal ? { final: true } : {}),
       });
     };
@@ -519,76 +519,40 @@ export class EmbedHeadend implements Headend {
       };
 
       const handleStatusEvent = (event: ProgressEvent): void => {
-        // Forward all progress events to the client as status updates
+        // Forward only essential progress events to the client
+        // Agent started/finished events are tracked internally but not sent to UI
         switch (event.type) {
           case 'agent_started': {
-            const agentLabel = event.agentName ?? event.agentId;
-            const message = event.reason ?? `Agent ${agentLabel} starting...`;
-            agentsCount += 1;
-            emitMetrics(false);
-            statusEntries.push({ role: 'status', content: message });
-            writeSseEvent(res, 'status', {
-              eventType: 'agent_started',
-              agent: agentLabel,
-              agentPath: event.agentPath,
-              message,
-              timestamp: event.timestamp,
-            });
+            // Agent count no longer tracked - we track LLM calls instead
             return;
           }
           case 'agent_update': {
+            // Only send "now" field from taskStatus - simplified progress updates
+            if (event.taskStatus?.now === undefined || event.taskStatus.now.length === 0) {
+              return;
+            }
             const agentLabel = event.agentName ?? event.agentId;
-            const statusPayload: Record<string, unknown> = {
+            const nowMessage = event.taskStatus.now;
+            statusEntries.push({ role: 'status', content: nowMessage });
+            writeSseEvent(res, 'status', {
               eventType: 'agent_update',
               agent: agentLabel,
               agentPath: event.agentPath,
-              message: event.message,
-              timestamp: event.timestamp,
-            };
-            // Include taskStatus fields if present
-            if (event.taskStatus !== undefined) {
-              statusPayload.status = event.taskStatus.status;
-              statusPayload.done = event.taskStatus.done;
-              statusPayload.pending = event.taskStatus.pending;
-              statusPayload.now = event.taskStatus.now;
-            }
-            statusEntries.push({ role: 'status', content: event.message });
-            writeSseEvent(res, 'status', statusPayload);
-            return;
-          }
-          case 'agent_finished': {
-            const agentLabel = event.agentName ?? event.agentId;
-            const message = `Agent ${agentLabel} completed`;
-            statusEntries.push({ role: 'status', content: message });
-            writeSseEvent(res, 'status', {
-              eventType: 'agent_finished',
-              agent: agentLabel,
-              agentPath: event.agentPath,
-              message,
+              now: nowMessage,
               timestamp: event.timestamp,
             });
             return;
           }
-          case 'agent_failed': {
-            const agentLabel = event.agentName ?? event.agentId;
-            const message = event.error ?? `Agent ${agentLabel} failed`;
-            statusEntries.push({ role: 'status', content: message });
-            writeSseEvent(res, 'status', {
-              eventType: 'agent_failed',
-              agent: agentLabel,
-              agentPath: event.agentPath,
-              message,
-              error: event.error,
-              timestamp: event.timestamp,
-            });
+          case 'agent_finished':
+          case 'agent_failed':
+            // Don't emit these to client - tracked internally only
             return;
-          }
           case 'tool_started':
             toolsCount += 1;
             emitMetrics(false);
             return;
           case 'tool_finished':
-            // Tool events are not forwarded to the UI - only agent events are visible
+            // Tool events are not forwarded to the UI
             return;
         }
       };
@@ -613,6 +577,8 @@ export class EmbedHeadend implements Headend {
               return;
             }
             case 'turn_started': {
+              llmCalls += 1;
+              emitMetrics(false);
               if (!shouldStreamTurnStarted(meta)) return;
               currentTurn = event.turn;
               maybeEmitMeta();
