@@ -25,11 +25,19 @@ Module: cockroachdb
 This collector monitors CockroachDB servers.
 
 
+It scrapes Prometheus metrics from the CockroachDB `/_status/vars` endpoint.
+
+It also provides `top-queries` and `running-queries` functions using SQL statement statistics (`crdb_internal.cluster_statement_statistics`) and `SHOW CLUSTER STATEMENTS`.
 
 
 This collector is supported on all platforms.
 
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+
+The `top-queries` and `running-queries` functions require:
+
+- A SQL user with `VIEWACTIVITY` (or `VIEWACTIVITYREDACTED`) privileges.
+- Access to `crdb_internal.cluster_statement_statistics` (may require `SET allow_unsafe_internals = on` on newer versions).
 
 
 ### Default Behavior
@@ -179,6 +187,9 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | url | Target endpoint URL. | http://127.0.0.1:8080/_status/vars | yes |
 |  | timeout | HTTP request timeout (seconds). | 1 | no |
+| **Query Functions** | dsn | SQL DSN used by `top-queries` and `running-queries` functions. |  | no |
+|  | sql_timeout | SQL query timeout (seconds) for query functions. | 1 | no |
+| **Limits** | top_queries_limit | Maximum number of rows returned by the `top-queries` and `running-queries` functions. | 500 | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
 |  | password | Password for Basic HTTP authentication. |  | no |
 |  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
@@ -247,6 +258,21 @@ An example configuration.
 jobs:
   - name: local
     url: http://127.0.0.1:8080/_status/vars
+
+```
+</details>
+
+###### Top queries
+
+Enable SQL query functions.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: local
+    url: http://127.0.0.1:8080/_status/vars
+    dsn: postgres://root@127.0.0.1:26257/defaultdb?sslmode=disable
 
 ```
 </details>
