@@ -436,14 +436,13 @@ void aral_unmark_allocation(struct aral *ar, void *ptr);
 void gorilla_writer_aral_unmark(const gorilla_writer_t *gw, struct aral *ar)
 {
     const gorilla_buffer_t *curr_gbuf = __atomic_load_n(&gw->head_buffer, __ATOMIC_ACQUIRE);
-    do {
+    while (curr_gbuf) {
         const gorilla_buffer_t *next_gbuf = __atomic_load_n(&curr_gbuf->header.next, __ATOMIC_ACQUIRE);
 
-        // Call the C function here
         aral_unmark_allocation(ar, const_cast<void*>(static_cast<const void*>(curr_gbuf)));
 
         curr_gbuf = next_gbuf;
-    } while (curr_gbuf);
+    }
 }
 
 /*
