@@ -257,6 +257,33 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				assert.Equal(t, "notice", rowOptions["severity"])
 			},
 		},
+		"down interface hides metrics": {
+			entry: &ifaceEntry{
+				name:        "eth3",
+				ifType:      "ethernetCsmacd",
+				ifTypeGroup: "ethernet",
+				adminStatus: "up",
+				operStatus:  "down",
+				rates: ifaceRates{
+					trafficIn:  &rate1,
+					trafficOut: &rate2,
+					errorsIn:   &rate1,
+				},
+			},
+			validate: func(t *testing.T, row []any) {
+				trafficInIdx := findColIdx("Traffic In")
+				trafficOutIdx := findColIdx("Traffic Out")
+				errorsInIdx := findColIdx("Errors In")
+				rowOptionsIdx := len(funcIfacesColumns)
+
+				assert.Nil(t, row[trafficInIdx])
+				assert.Nil(t, row[trafficOutIdx])
+				assert.Nil(t, row[errorsInIdx])
+				rowOptions, ok := row[rowOptionsIdx].(map[string]any)
+				require.True(t, ok)
+				assert.Equal(t, "notice", rowOptions["severity"])
+			},
+		},
 		"partial rates": {
 			entry: &ifaceEntry{
 				name:        "eth2",
@@ -278,8 +305,8 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				rowOptionsIdx := len(funcIfacesColumns)
 
 				assert.Equal(t, "eth2", row[nameIdx])
-				assert.Equal(t, rate1, row[trafficInIdx])
-				assert.Equal(t, rate2, row[trafficOutIdx])
+				assert.Nil(t, row[trafficInIdx])
+				assert.Nil(t, row[trafficOutIdx])
 				assert.Nil(t, row[ucastInIdx])
 				rowOptions, ok := row[rowOptionsIdx].(map[string]any)
 				require.True(t, ok)

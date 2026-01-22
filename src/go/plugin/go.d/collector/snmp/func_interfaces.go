@@ -193,6 +193,13 @@ func (f *funcInterfaces) buildRow(entry *ifaceEntry) []any {
 	for i, col := range funcIfacesColumns {
 		row[i] = col.value(entry)
 	}
+	if isIfaceDown(entry) {
+		for i, col := range funcIfacesColumns {
+			if col.dataType == funcapi.FieldTypeFloat {
+				row[i] = nil
+			}
+		}
+	}
 	row[len(funcIfacesColumns)] = rowOptionsForIface(entry)
 	return row
 }
@@ -264,12 +271,19 @@ func rowOptionsForIface(entry *ifaceEntry) any {
 	if entry == nil {
 		return nil
 	}
-	if entry.adminStatus != "up" || entry.operStatus != "up" {
+	if isIfaceDown(entry) {
 		return map[string]any{
 			"severity": "notice",
 		}
 	}
 	return nil
+}
+
+func isIfaceDown(entry *ifaceEntry) bool {
+	if entry == nil {
+		return false
+	}
+	return entry.adminStatus != "up" || entry.operStatus != "up"
 }
 
 func matchesTypeGroup(group, filter string) bool {
