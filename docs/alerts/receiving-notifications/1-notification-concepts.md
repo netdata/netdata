@@ -6,10 +6,10 @@ Before configuring notifications, understand where they originate and how they f
 
 ```mermaid
 flowchart TD
-    H[Health Engine] --> E[Alert Event]
+    H(Health Engine) -->|"Alert Event"| E(Alert Event)
     
     subgraph M1["Agent-Dispatched"]
-        E --> LN[Local Notification]
+        E --> LN(Local Notification)
         LN --> DestA[Slack·Email·PagerDuty]
     end
     
