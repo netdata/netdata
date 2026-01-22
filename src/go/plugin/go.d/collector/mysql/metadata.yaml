@@ -236,10 +236,6 @@ modules:
         - id: top-queries
           name: Top Queries
           summary: Top SQL queries from performance_schema.
-          discovery: |
-            Open the dashboard Top tab. In the upper-right function list, find the MySQL functions.
-          invocation: |
-            Select `MySQL:top-queries` from the function list to run it (for example, `SNMP:interfaces`).
           parameters:
             - id: __sort
               name: Filter By

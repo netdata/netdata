@@ -418,14 +418,6 @@
                       "type": "string",
                       "description": "Short summary of what the function returns."
                     },
-                    "discovery": {
-                      "type": "string",
-                      "description": "How to locate the function in the UI."
-                    },
-                    "invocation": {
-                      "type": "string",
-                      "description": "How to run the function in the UI."
-                    },
                     "parameters": {
                       "type": "array",
                       "description": "Function parameters and their descriptions.",
@@ -561,8 +553,6 @@
                     "id",
                     "name",
                     "summary",
-                    "discovery",
-                    "invocation",
                     "parameters",
                     "returns",
                     "behavior",

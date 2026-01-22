@@ -6,19 +6,15 @@
 [% for func in entry.functions.list %]
 ### [[ func.name ]]
 
-ID: `[[ func.id ]]`
-
-#### Discovery
-
-[[ func.discovery ]]
-
-#### Invocation
-
-[[ func.invocation ]]
-
-#### Summary
-
-[[ func.summary ]]
+| Aspect | Description |
+|:-------|:------------|
+| Name | [[ entry.meta.module_name|capitalize ]]:[[ func.id ]] |
+| Summary | [[ strfy(func.summary) ]] |
+| Behavior | [[ strfy(func.behavior) ]] |
+| Performance | [[ strfy(func.performance) ]] |
+| Security | [[ strfy(func.security) ]] |
+| Requirements | [[ strfy(func.requirements) ]] |
+| Availability | [[ strfy(func.availability) ]] |
 
 #### Parameters
 
@@ -41,26 +37,6 @@ This function has no parameters.
 [% for col in func.returns.columns %]
 | [[ strfy(col.name) ]] | [[ strfy(col.type) ]] | [[ strfy(col.description) ]] |
 [% endfor %]
-
-#### Behavior
-
-[[ func.behavior ]]
-
-#### Performance
-
-[[ func.performance ]]
-
-#### Security
-
-[[ func.security ]]
-
-#### Requirements
-
-[[ func.requirements ]]
-
-#### Availability
-
-[[ func.availability ]]
 
 [% endfor %]
 [% endif %]

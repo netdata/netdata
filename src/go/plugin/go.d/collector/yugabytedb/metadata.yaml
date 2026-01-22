@@ -248,10 +248,6 @@ modules:
         - id: top-queries
           name: Top Queries
           summary: "Top SQL queries from pg_stat_statements. WARNING: Query text may contain unmasked literals (potential PII)."
-          discovery: |
-            Open the dashboard Top tab. In the upper-right function list, find the YugabyteDB functions.
-          invocation: |
-            Select `YugabyteDB:top-queries` from the function list to run it (for example, `SNMP:interfaces`).
           parameters:
             - id: __sort
               name: Filter By
@@ -309,10 +305,6 @@ modules:
         - id: running-queries
           name: Running Queries
           summary: "Currently running SQL statements from pg_stat_activity. WARNING: Query text may contain unmasked literals (potential PII)."
-          discovery: |
-            Open the dashboard Top tab. In the upper-right function list, find the YugabyteDB functions.
-          invocation: |
-            Select `YugabyteDB:running-queries` from the function list to run it (for example, `SNMP:interfaces`).
           parameters:
             - id: __sort
               name: Filter By

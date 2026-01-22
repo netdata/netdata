@@ -283,10 +283,6 @@ modules:
         - id: top-queries
           name: Top Queries
           summary: Running queries from the Elasticsearch Tasks API.
-          discovery: |
-            Open the dashboard Top tab. In the upper-right function list, find the Elasticsearch functions.
-          invocation: |
-            Select `Elasticsearch:top-queries` from the function list to run it (for example, `SNMP:interfaces`).
           parameters:
             - id: __sort
               name: Filter By

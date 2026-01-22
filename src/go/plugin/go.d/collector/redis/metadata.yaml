@@ -191,10 +191,6 @@ modules:
         - id: top-queries
           name: Top Queries
           summary: "Slow commands from Redis SLOWLOG. WARNING: Command arguments may contain unmasked literals (potential PII)."
-          discovery: |
-            Open the dashboard Top tab. In the upper-right function list, find the Redis functions.
-          invocation: |
-            Select `Redis:top-queries` from the function list to run it (for example, `SNMP:interfaces`).
           parameters:
             - id: __sort
               name: Filter By

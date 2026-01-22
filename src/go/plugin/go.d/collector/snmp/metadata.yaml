@@ -490,10 +490,6 @@ modules:
         - id: interfaces
           name: Network Interfaces
           summary: Network interface traffic and status metrics.
-          discovery: |
-            Open the dashboard Top tab. In the upper-right function list, find the SNMP functions.
-          invocation: |
-            Select `SNMP:interfaces` from the function list to run it.
           parameters:
             - id: if_type_group
               name: Type Group

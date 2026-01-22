@@ -140,10 +140,6 @@ modules:
         - id: running-queries
           name: Running Queries
           summary: "Currently running queries from rethinkdb.jobs. WARNING: Query text may contain unmasked literals (potential PII)."
-          discovery: |
-            Open the dashboard Top tab. In the upper-right function list, find the RethinkDB functions.
-          invocation: |
-            Select `RethinkDB:running-queries` from the function list to run it (for example, `SNMP:interfaces`).
           parameters:
             - id: __sort
               name: Filter By
