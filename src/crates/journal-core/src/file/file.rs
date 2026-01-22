@@ -18,6 +18,15 @@ use crate::file::value_guard::ValueGuard;
 // Size to pad objects to (8 bytes)
 const OBJECT_ALIGNMENT: u64 = 8;
 
+/// Validates that an offset is properly aligned for journal objects.
+/// Journal objects must be 8-byte aligned.
+fn validate_offset_alignment(offset: NonZeroU64) -> Result<()> {
+    if offset.get() % OBJECT_ALIGNMENT != 0 {
+        return Err(JournalError::MisalignedOffset(offset.get()));
+    }
+    Ok(())
+}
+
 pub trait BucketVisitor<'a> {
     type Object: JournalObject<&'a [u8]> + HashableObject;
     type Output;
@@ -398,16 +407,19 @@ impl<M: MemoryMap> JournalFile<M> {
     }
 
     pub fn object_header_ref(&self, position: NonZeroU64) -> Result<&ObjectHeader> {
+        validate_offset_alignment(position)?;
         let size_needed = std::mem::size_of::<ObjectHeader>() as u64;
         let window_manager = self.window_manager.borrow_mut_checked()?;
         let header_slice = window_manager.get_slice(position.get(), size_needed)?;
-        Ok(ObjectHeader::ref_from_bytes(header_slice).unwrap())
+        ObjectHeader::ref_from_bytes(header_slice).map_err(|_| JournalError::ZerocopyFailure)
     }
 
     fn journal_object_ref<'a, T>(&'a self, offset: NonZeroU64) -> Result<ValueGuard<'a, T>>
     where
         T: JournalObject<&'a [u8]>,
     {
+        validate_offset_alignment(offset)?;
+
         let is_compact = self
             .journal_header_ref()
             .has_incompatible_flag(HeaderIncompatibleFlags::Compact);
@@ -417,7 +429,8 @@ impl<M: MemoryMap> JournalFile<M> {
             let size_needed = {
                 let header_slice =
                     wm.get_slice(offset.get(), std::mem::size_of::<ObjectHeader>() as u64)?;
-                let header = ObjectHeader::ref_from_bytes(header_slice).unwrap();
+                let header = ObjectHeader::ref_from_bytes(header_slice)
+                    .map_err(|_| JournalError::ZerocopyFailure)?;
                 header.size
             };
 
@@ -838,10 +851,11 @@ impl<M: MemoryMapMut> JournalFile<M> {
 
     #[allow(clippy::mut_from_ref)]
     fn object_header_mut(&self, offset: NonZeroU64) -> Result<&mut ObjectHeader> {
+        validate_offset_alignment(offset)?;
         let size_needed = std::mem::size_of::<ObjectHeader>() as u64;
         let window_manager = self.window_manager.borrow_mut_checked()?;
         let header_slice = window_manager.get_slice_mut(offset.get(), size_needed)?;
-        Ok(ObjectHeader::mut_from_bytes(header_slice).unwrap())
+        ObjectHeader::mut_from_bytes(header_slice).map_err(|_| JournalError::ZerocopyFailure)
     }
 
     fn journal_object_mut<'a, T>(
@@ -853,6 +867,8 @@ impl<M: MemoryMapMut> JournalFile<M> {
     where
         T: JournalObjectMut<&'a mut [u8]>,
     {
+        validate_offset_alignment(offset)?;
+
         let is_compact = self
             .journal_header_ref()
             .has_incompatible_flag(HeaderIncompatibleFlags::Compact);
@@ -864,7 +880,8 @@ impl<M: MemoryMapMut> JournalFile<M> {
                     // Setting object header for a new object
                     let header_slice =
                         wm.get_slice_mut(offset.get(), std::mem::size_of::<ObjectHeader>() as u64)?;
-                    let header = ObjectHeader::mut_from_bytes(header_slice).unwrap();
+                    let header = ObjectHeader::mut_from_bytes(header_slice)
+                        .map_err(|_| JournalError::ZerocopyFailure)?;
                     header.type_ = type_ as u8;
                     header.size = size;
                     size
@@ -873,7 +890,8 @@ impl<M: MemoryMapMut> JournalFile<M> {
                     // Reading existing object header
                     let header_slice =
                         wm.get_slice(offset.get(), std::mem::size_of::<ObjectHeader>() as u64)?;
-                    let header = ObjectHeader::ref_from_bytes(header_slice).unwrap();
+                    let header = ObjectHeader::ref_from_bytes(header_slice)
+                        .map_err(|_| JournalError::ZerocopyFailure)?;
                     if header.type_ != type_ as u8 {
                         return Err(JournalError::InvalidObjectType);
                     }
