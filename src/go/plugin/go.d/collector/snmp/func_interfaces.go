@@ -163,16 +163,37 @@ func (f *funcInterfaces) buildColumns() map[string]any {
 		columns[col.key] = colDef.BuildColumn()
 	}
 
+	rowOptions := funcapi.Column{
+		Index:         len(funcIfacesColumns),
+		Name:          "rowOptions",
+		Type:          funcapi.FieldTypeNone,
+		Visualization: funcapi.FieldVisualRowOptions,
+		Sort:          funcapi.FieldSortAscending,
+		Sortable:      false,
+		Sticky:        false,
+		Summary:       funcapi.FieldSummaryCount,
+		Filter:        funcapi.FieldFilterNone,
+		Visible:       false,
+		Dummy:         true,
+		ValueOptions: funcapi.ValueOptions{
+			Transform:     funcapi.FieldTransformNone,
+			DecimalPoints: 0,
+			DefaultValue:  nil,
+		},
+	}
+	columns["rowOptions"] = rowOptions.BuildColumn()
+
 	return columns
 }
 
 // buildRow builds a data row from an interface entry.
 // Column order is determined by funcIfacesColumns - each column's value() extracts the data.
 func (f *funcInterfaces) buildRow(entry *ifaceEntry) []any {
-	row := make([]any, len(funcIfacesColumns))
+	row := make([]any, len(funcIfacesColumns)+1)
 	for i, col := range funcIfacesColumns {
 		row[i] = col.value(entry)
 	}
+	row[len(funcIfacesColumns)] = rowOptionsForIface(entry)
 	return row
 }
 
@@ -237,6 +258,18 @@ func (f *funcInterfaces) defaultSortColumn() string {
 		}
 	}
 	return "Interface"
+}
+
+func rowOptionsForIface(entry *ifaceEntry) any {
+	if entry == nil {
+		return nil
+	}
+	if entry.adminStatus != "up" || entry.operStatus != "up" {
+		return map[string]any{
+			"severity": "notice",
+		}
+	}
+	return nil
 }
 
 func matchesTypeGroup(group, filter string) bool {

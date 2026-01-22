@@ -136,7 +136,7 @@ func TestFuncIfacesColumns(t *testing.T) {
 				}
 				f := &funcInterfaces{}
 				row := f.buildRow(entry)
-				assert.Len(t, row, len(funcIfacesColumns), "row length must match column count")
+				assert.Len(t, row, len(funcIfacesColumns)+1, "row length must match column count")
 			},
 		},
 	}
@@ -153,7 +153,7 @@ func TestFuncInterfaces_buildColumns(t *testing.T) {
 	columns := f.buildColumns()
 
 	require.NotEmpty(t, columns)
-	assert.Len(t, columns, len(funcIfacesColumns))
+	assert.Len(t, columns, len(funcIfacesColumns)+1)
 
 	// Verify all columns are present
 	for _, col := range funcIfacesColumns {
@@ -166,6 +166,15 @@ func TestFuncInterfaces_buildColumns(t *testing.T) {
 		require.True(t, ok, "column %s should be a map", col.key)
 		assert.Equal(t, col.name, colMap["name"])
 	}
+
+	rowOptions, ok := columns["rowOptions"]
+	require.True(t, ok, "rowOptions column should be in result")
+	rowOptionsMap, ok := rowOptions.(map[string]any)
+	require.True(t, ok, "rowOptions column should be a map")
+	assert.Equal(t, "rowOptions", rowOptionsMap["name"])
+	assert.Equal(t, "none", rowOptionsMap["type"])
+	assert.Equal(t, "rowOptions", rowOptionsMap["visualization"])
+
 }
 
 func TestFuncInterfaces_buildRow(t *testing.T) {
@@ -207,6 +216,7 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				trafficOutIdx := findColIdx("Traffic Out")
 				adminIdx := findColIdx("Admin Status")
 				operIdx := findColIdx("Oper Status")
+				rowOptionsIdx := len(funcIfacesColumns)
 
 				assert.Equal(t, "eth0", row[nameIdx])
 				assert.Equal(t, "ethernetCsmacd", row[typeIdx])
@@ -215,6 +225,7 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				assert.Equal(t, rate2, row[trafficOutIdx])
 				assert.Equal(t, "up", row[adminIdx])
 				assert.Equal(t, "up", row[operIdx])
+				assert.Nil(t, row[rowOptionsIdx])
 			},
 		},
 		"nil rates produce nil values": {
@@ -233,6 +244,7 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				trafficOutIdx := findColIdx("Traffic Out")
 				adminIdx := findColIdx("Admin Status")
 				operIdx := findColIdx("Oper Status")
+				rowOptionsIdx := len(funcIfacesColumns)
 
 				assert.Equal(t, "eth1", row[nameIdx])
 				assert.Equal(t, "other", row[typeIdx])
@@ -240,6 +252,9 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				assert.Nil(t, row[trafficOutIdx])
 				assert.Equal(t, "down", row[adminIdx])
 				assert.Equal(t, "down", row[operIdx])
+				rowOptions, ok := row[rowOptionsIdx].(map[string]any)
+				require.True(t, ok)
+				assert.Equal(t, "notice", rowOptions["severity"])
 			},
 		},
 		"partial rates": {
@@ -260,11 +275,15 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				trafficInIdx := findColIdx("Traffic In")
 				trafficOutIdx := findColIdx("Traffic Out")
 				ucastInIdx := findColIdx("Unicast In")
+				rowOptionsIdx := len(funcIfacesColumns)
 
 				assert.Equal(t, "eth2", row[nameIdx])
 				assert.Equal(t, rate1, row[trafficInIdx])
 				assert.Equal(t, rate2, row[trafficOutIdx])
 				assert.Nil(t, row[ucastInIdx])
+				rowOptions, ok := row[rowOptionsIdx].(map[string]any)
+				require.True(t, ok)
+				assert.Equal(t, "notice", rowOptions["severity"])
 			},
 		},
 	}
@@ -273,7 +292,7 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			f := &funcInterfaces{}
 			row := f.buildRow(tc.entry)
-			require.Len(t, row, len(funcIfacesColumns))
+			require.Len(t, row, len(funcIfacesColumns)+1)
 			tc.validate(t, row)
 		})
 	}
@@ -286,7 +305,7 @@ func TestFuncInterfaces_sortData(t *testing.T) {
 
 	// Helper to build a test row with name and trafficIn
 	buildTestRow := func(name string, trafficIn *float64) []any {
-		row := make([]any, len(funcIfacesColumns))
+		row := make([]any, len(funcIfacesColumns)+1)
 		for i, col := range funcIfacesColumns {
 			switch col.key {
 			case "Interface":
@@ -303,6 +322,7 @@ func TestFuncInterfaces_sortData(t *testing.T) {
 				}
 			}
 		}
+		row[len(funcIfacesColumns)] = nil
 		return row
 	}
 
@@ -410,7 +430,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 			validate: func(t *testing.T, resp *module.FunctionResponse) {
 				assert.Equal(t, 200, resp.Status)
 				assert.NotNil(t, resp.Columns)
-				assert.Len(t, resp.Columns, len(funcIfacesColumns))
+				assert.Len(t, resp.Columns, len(funcIfacesColumns)+1)
 
 				data, ok := resp.Data.([][]any)
 				require.True(t, ok)
