@@ -27,6 +27,7 @@ type Defaults struct {
 type MethodConfig struct {
 	ID             string                // Method ID (e.g., "top-queries")
 	Name           string                // Display name (e.g., "Top Queries")
+	UpdateEvery    int                   // Default UI refresh interval
 	Help           string                // Description for UI
 	RequiredParams []funcapi.ParamConfig // Required parameters for this method (including __sort if used)
 }

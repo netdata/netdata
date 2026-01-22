@@ -133,8 +133,14 @@ func (m *Manager) handleMethodFuncInfo(moduleName, methodID string, fn functions
 		help = fmt.Sprintf("%s %s data function", moduleName, methodID)
 	}
 
+	updateEvery := 1
+	if methodCfg.UpdateEvery > 1 {
+		updateEvery = methodCfg.UpdateEvery
+	}
+
 	resp := map[string]any{
 		"v":               3,
+		"update_every":    updateEvery,
 		"status":          200,
 		"type":            "table",
 		"has_history":     false,

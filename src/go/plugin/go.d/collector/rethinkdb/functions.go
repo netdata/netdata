@@ -75,19 +75,23 @@ var rethinkRunningColumns = []rethinkColumnMeta{
 
 func rethinkdbMethods() []module.MethodConfig {
 	sortOptions := buildRethinkSortOptions(rethinkRunningColumns)
-	return []module.MethodConfig{{
-		ID:   "running-queries",
-		Name: "Running Queries",
-		Help: "Currently running queries from rethinkdb.jobs. WARNING: Query text may contain unmasked literals (potential PII).",
-		RequiredParams: []funcapi.ParamConfig{{
-			ID:         paramSort,
-			Name:       "Filter By",
-			Help:       "Select the primary sort column",
-			Selection:  funcapi.ParamSelect,
-			Options:    sortOptions,
-			UniqueView: true,
-		}},
-	}}
+	return []module.MethodConfig{
+		{
+			UpdateEvery: 10,
+			ID:          "running-queries",
+			Name:        "Running Queries",
+			Help:        "Currently running queries from rethinkdb.jobs. WARNING: Query text may contain unmasked literals (potential PII).",
+			RequiredParams: []funcapi.ParamConfig{
+				{
+					ID:         paramSort,
+					Name:       "Filter By",
+					Help:       "Select the primary sort column",
+					Selection:  funcapi.ParamSelect,
+					Options:    sortOptions,
+					UniqueView: true,
+				}},
+		},
+	}
 }
 
 func rethinkdbMethodParams(_ context.Context, _ *module.Job, method string) ([]funcapi.ParamConfig, error) {

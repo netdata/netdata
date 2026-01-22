@@ -23,23 +23,26 @@ func newFuncInterfaces(cache *ifaceCache) *funcInterfaces {
 
 // methods returns the method configurations for this function.
 func (f *funcInterfaces) methods() []module.MethodConfig {
-	return []module.MethodConfig{{
-		ID:   "interfaces",
-		Name: "Network Interfaces",
-		Help: "Network interface traffic and status metrics",
-		RequiredParams: []funcapi.ParamConfig{{
-			ID:        funcIfacesParamTypeGroup,
-			Name:      "Type Group",
-			Help:      "Filter by interface type group",
-			Selection: funcapi.ParamSelect,
-			Options: []funcapi.ParamOption{
-				{ID: "ethernet", Name: "Ethernet", Default: true},
-				{ID: "aggregation", Name: "Aggregation"},
-				{ID: "virtual", Name: "Virtual"},
-				{ID: "other", Name: "Other"},
-			},
-		}},
-	}}
+	return []module.MethodConfig{
+		{
+			UpdateEvery: 10,
+			ID:          "interfaces",
+			Name:        "Network Interfaces",
+			Help:        "Network interface traffic and status metrics",
+			RequiredParams: []funcapi.ParamConfig{{
+				ID:        funcIfacesParamTypeGroup,
+				Name:      "Type Group",
+				Help:      "Filter by interface type group",
+				Selection: funcapi.ParamSelect,
+				Options: []funcapi.ParamOption{
+					{ID: "ethernet", Name: "Ethernet", Default: true},
+					{ID: "aggregation", Name: "Aggregation"},
+					{ID: "virtual", Name: "Virtual"},
+					{ID: "other", Name: "Other"},
+				},
+			}},
+		},
+	}
 }
 
 // methodParams returns params for the given method.

@@ -212,21 +212,24 @@ func pgMethods() []module.MethodConfig {
 		}
 	}
 
-	return []module.MethodConfig{{
-		ID:   "top-queries",
-		Name: "Top Queries",
-		Help: "Top SQL queries from pg_stat_statements",
-		RequiredParams: []funcapi.ParamConfig{
-			{
-				ID:         paramSort,
-				Name:       "Filter By",
-				Help:       "Select the primary sort column",
-				Selection:  funcapi.ParamSelect,
-				Options:    sortOptions,
-				UniqueView: true,
+	return []module.MethodConfig{
+		{
+			UpdateEvery: 10,
+			ID:          "top-queries",
+			Name:        "Top Queries",
+			Help:        "Top SQL queries from pg_stat_statements",
+			RequiredParams: []funcapi.ParamConfig{
+				{
+					ID:         paramSort,
+					Name:       "Filter By",
+					Help:       "Select the primary sort column",
+					Selection:  funcapi.ParamSelect,
+					Options:    sortOptions,
+					UniqueView: true,
+				},
 			},
 		},
-	}}
+	}
 }
 
 func pgMethodParams(ctx context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
