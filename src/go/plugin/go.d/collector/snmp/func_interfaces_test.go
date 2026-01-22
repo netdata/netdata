@@ -92,8 +92,8 @@ func TestFuncIfacesColumns(t *testing.T) {
 					adminStatus: "up",
 					operStatus:  "up",
 					rates: ifaceRates{
-						trafficIn: &rate,
-						errorsIn:  &rate,
+						trafficIn:  &rate,
+						errorsIn:   &rate,
 						discardsIn: &rate,
 					},
 				}
@@ -183,21 +183,21 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				ifTypeGroup: "ethernet",
 				adminStatus: "up",
 				operStatus:  "up",
-					rates: ifaceRates{
-						trafficIn:    &rate1,
-						trafficOut:   &rate2,
-						ucastPktsIn:  &rate1,
-						ucastPktsOut: &rate2,
-						bcastPktsIn:  &rate1,
-						bcastPktsOut: &rate2,
-						errorsIn:     &rate1,
-						errorsOut:    &rate2,
-						discardsIn:   &rate1,
-						discardsOut:  &rate2,
-						mcastPktsIn:  &rate1,
-						mcastPktsOut: &rate2,
-					},
+				rates: ifaceRates{
+					trafficIn:    &rate1,
+					trafficOut:   &rate2,
+					ucastPktsIn:  &rate1,
+					ucastPktsOut: &rate2,
+					bcastPktsIn:  &rate1,
+					bcastPktsOut: &rate2,
+					errorsIn:     &rate1,
+					errorsOut:    &rate2,
+					discardsIn:   &rate1,
+					discardsOut:  &rate2,
+					mcastPktsIn:  &rate1,
+					mcastPktsOut: &rate2,
 				},
+			},
 			validate: func(t *testing.T, row []any) {
 				// Find column indices by key
 				nameIdx := findColIdx("Interface")
