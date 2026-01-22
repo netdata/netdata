@@ -1,4 +1,4 @@
-* Thu Jan 22 2026 Austin Hemmelgarn <austin@netdata.cloud>
+* Thu Jan 22 2026 Austin Hemmelgarn <austin@netdata.cloud> 5-4
 - Fix logic for usage of $releasever_major.
 * Tue Jan 20 2026 Austin Hemmelgarn <austin@netdata.cloud> 5-3
 - Use $releasever_major instead of $releasever in repo URLs when supported.
