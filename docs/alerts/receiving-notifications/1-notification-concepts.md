@@ -5,37 +5,36 @@ Before configuring notifications, understand where they originate and how they f
 ## 5.1.1 The Three Dispatch Models
 
 ```mermaid
-flowchart TB
-    subgraph M1("Agent-Dispatched")
-        direction LR
-        HE("Health Engine") -->|"Alert Event"| LN("Local Notification")
-        LN --> DestA("Slack·Email·PagerDuty")
+flowchart TD
+    H[Health Engine] --> E[Alert Event]
+    
+    subgraph M1["Agent-Dispatched"]
+        E --> LN[Local Notification]
+        LN --> DestA[Slack·Email·PagerDuty]
     end
     
-    subgraph M2("Parent-Dispatched")
-        direction LR
-        Child("Child Node") -->|"Metrics"| Parent("Parent Node")
-        Parent -->|"Health Engine"| PN("Parent Notification")
+    subgraph M2["Parent-Dispatched"]
+        Child[Child Node] -->|"Metrics"| Parent[Parent]
+        Parent --> PN[Parent Notification]
     end
     
-    subgraph M3("Cloud-Dispatched")
-        direction LR
-        AE("Alert Event") --> Cloud("Netdata Cloud")
-        Cloud --> CI("Cloud Integrations")
-        CI --> DestC("Slack·Teams·Webhooks")
+    subgraph M3["Cloud-Dispatched"]
+        E --> C[Netdata Cloud]
+        C --> CI[Cloud Integrations]
+        CI --> DestC[Slack·Teams·Webhooks]
     end
     
-    classDef blue fill:#2196F3,stroke:#000000,stroke-width:3px,color:#ffffff,font-size:16px
+    classDef model fill:#2196F3,stroke:#000000,stroke-width:3px,color:#ffffff,font-size:16px
     classDef yellow fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
     classDef green fill:#4caf50,stroke:#000000,stroke-width:3px,color:#ffffff,font-size:16px
     classDef white fill:#ffffff,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
     classDef orange fill:#ff9800,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
 
-    class M1,M2,M3 blue
-    class HE,AE,Parent yellow
+    class M1,M2,M3 model
+    class H,E,Parent yellow
     class LN,PN,CI green
     class DestA,DestC,Child white
-    class Cloud orange
+    class C orange
 ```
 
 **1. Agent-Dispatched Notifications**
