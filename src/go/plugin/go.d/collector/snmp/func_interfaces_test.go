@@ -49,12 +49,12 @@ func TestFuncIfacesColumns(t *testing.T) {
 		"has required columns": {
 			validate: func(t *testing.T) {
 				requiredKeys := []string{
-					"name", "type", "typeGroup",
-					"trafficIn", "trafficOut",
-					"ucastPktsIn", "ucastPktsOut",
-					"bcastPktsIn", "bcastPktsOut",
-					"mcastPktsIn", "mcastPktsOut",
-					"adminStatus", "operStatus",
+					"Interface", "Type", "Type Group",
+					"Admin Status", "Oper Status",
+					"Traffic In", "Traffic Out",
+					"Unicast In", "Unicast Out",
+					"Broadcast In", "Broadcast Out",
+					"Multicast In", "Multicast Out",
 				}
 
 				keys := make(map[string]bool)
@@ -71,7 +71,6 @@ func TestFuncIfacesColumns(t *testing.T) {
 			validate: func(t *testing.T) {
 				for _, col := range funcIfacesColumns {
 					assert.NotEmpty(t, col.key, "column must have key")
-					assert.NotEmpty(t, col.name, "column %s must have name", col.key)
 					assert.NotEqual(t, funcapi.FieldTypeNone, col.dataType, "column %s must have dataType", col.key)
 					assert.NotNil(t, col.value, "column %s must have value extractor", col.key)
 
@@ -104,15 +103,15 @@ func TestFuncIfacesColumns(t *testing.T) {
 				// Verify specific values
 				for _, col := range funcIfacesColumns {
 					switch col.key {
-					case "name":
+					case "Interface":
 						assert.Equal(t, "eth0", col.value(entry))
-					case "type":
+					case "Type":
 						assert.Equal(t, "ethernetCsmacd", col.value(entry))
-					case "typeGroup":
+					case "Type Group":
 						assert.Equal(t, "ethernet", col.value(entry))
-					case "trafficIn":
+					case "Traffic In":
 						assert.Equal(t, rate, col.value(entry))
-					case "adminStatus":
+					case "Admin Status":
 						assert.Equal(t, "up", col.value(entry))
 					}
 				}
@@ -189,13 +188,13 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 			},
 			validate: func(t *testing.T, row []any) {
 				// Find column indices by key
-				nameIdx := findColIdx("name")
-				typeIdx := findColIdx("type")
-				typeGroupIdx := findColIdx("typeGroup")
-				trafficInIdx := findColIdx("trafficIn")
-				trafficOutIdx := findColIdx("trafficOut")
-				adminIdx := findColIdx("adminStatus")
-				operIdx := findColIdx("operStatus")
+				nameIdx := findColIdx("Interface")
+				typeIdx := findColIdx("Type")
+				typeGroupIdx := findColIdx("Type Group")
+				trafficInIdx := findColIdx("Traffic In")
+				trafficOutIdx := findColIdx("Traffic Out")
+				adminIdx := findColIdx("Admin Status")
+				operIdx := findColIdx("Oper Status")
 
 				assert.Equal(t, "eth0", row[nameIdx])
 				assert.Equal(t, "ethernetCsmacd", row[typeIdx])
@@ -216,12 +215,12 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				rates:       ifaceRates{}, // all nil
 			},
 			validate: func(t *testing.T, row []any) {
-				nameIdx := findColIdx("name")
-				typeIdx := findColIdx("type")
-				trafficInIdx := findColIdx("trafficIn")
-				trafficOutIdx := findColIdx("trafficOut")
-				adminIdx := findColIdx("adminStatus")
-				operIdx := findColIdx("operStatus")
+				nameIdx := findColIdx("Interface")
+				typeIdx := findColIdx("Type")
+				trafficInIdx := findColIdx("Traffic In")
+				trafficOutIdx := findColIdx("Traffic Out")
+				adminIdx := findColIdx("Admin Status")
+				operIdx := findColIdx("Oper Status")
 
 				assert.Equal(t, "eth1", row[nameIdx])
 				assert.Equal(t, "other", row[typeIdx])
@@ -245,10 +244,10 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				},
 			},
 			validate: func(t *testing.T, row []any) {
-				nameIdx := findColIdx("name")
-				trafficInIdx := findColIdx("trafficIn")
-				trafficOutIdx := findColIdx("trafficOut")
-				ucastInIdx := findColIdx("ucastPktsIn")
+				nameIdx := findColIdx("Interface")
+				trafficInIdx := findColIdx("Traffic In")
+				trafficOutIdx := findColIdx("Traffic Out")
+				ucastInIdx := findColIdx("Unicast In")
 
 				assert.Equal(t, "eth2", row[nameIdx])
 				assert.Equal(t, rate1, row[trafficInIdx])
@@ -278,11 +277,11 @@ func TestFuncInterfaces_sortData(t *testing.T) {
 		row := make([]any, len(funcIfacesColumns))
 		for i, col := range funcIfacesColumns {
 			switch col.key {
-			case "name":
+			case "Interface":
 				row[i] = name
-			case "trafficIn":
+			case "Traffic In":
 				row[i] = ptrToAny(trafficIn)
-			case "trafficOut":
+			case "Traffic Out":
 				row[i] = ptrToAny(trafficIn) // reuse for simplicity
 			default:
 				if col.dataType == funcapi.FieldTypeString {
@@ -306,7 +305,7 @@ func TestFuncInterfaces_sortData(t *testing.T) {
 				buildTestRow("eth0", nil),
 				buildTestRow("eth1", nil),
 			},
-			sortColumn: "name",
+			sortColumn: "Interface",
 			expected:   []string{"eth0", "eth1", "eth2"},
 		},
 		"sort by trafficIn descending": {
@@ -315,7 +314,7 @@ func TestFuncInterfaces_sortData(t *testing.T) {
 				buildTestRow("eth1", &rate300),
 				buildTestRow("eth2", &rate200),
 			},
-			sortColumn: "trafficIn",
+			sortColumn: "Traffic In",
 			expected:   []string{"eth1", "eth2", "eth0"},
 		},
 		"nil values go to end": {
@@ -324,7 +323,7 @@ func TestFuncInterfaces_sortData(t *testing.T) {
 				buildTestRow("eth1", &rate300),
 				buildTestRow("eth2", &rate100),
 			},
-			sortColumn: "trafficIn",
+			sortColumn: "Traffic In",
 			expected:   []string{"eth1", "eth2", "eth0"},
 		},
 		"unknown column defaults to name": {
@@ -338,7 +337,7 @@ func TestFuncInterfaces_sortData(t *testing.T) {
 		},
 		"empty data": {
 			data:       [][]any{},
-			sortColumn: "name",
+			sortColumn: "Interface",
 			expected:   nil,
 		},
 	}
@@ -348,7 +347,7 @@ func TestFuncInterfaces_sortData(t *testing.T) {
 			f := &funcInterfaces{}
 			f.sortData(tc.data, tc.sortColumn)
 
-			nameIdx := findColIdx("name")
+			nameIdx := findColIdx("Interface")
 			var names []string
 			for _, row := range tc.data {
 				names = append(names, row[nameIdx].(string))
@@ -433,7 +432,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 			params: resolveIfaceParams(nil),
 			validate: func(t *testing.T, resp *module.FunctionResponse) {
 				assert.Equal(t, 200, resp.Status)
-				assert.Equal(t, "name", resp.DefaultSortColumn)
+				assert.Equal(t, "Interface", resp.DefaultSortColumn)
 
 				data, ok := resp.Data.([][]any)
 				require.True(t, ok)
@@ -443,15 +442,15 @@ func TestFuncInterfaces_handle(t *testing.T) {
 				require.NotNil(t, resp.Charts)
 				assert.Contains(t, resp.Charts, "Traffic")
 				assert.Contains(t, resp.Charts, "UnicastPackets")
-				assert.Equal(t, []string{"trafficIn", "trafficOut"}, resp.Charts["Traffic"].Columns)
+				assert.Equal(t, []string{"Traffic In", "Traffic Out"}, resp.Charts["Traffic"].Columns)
 
 				// Verify DefaultCharts
 				require.NotEmpty(t, resp.DefaultCharts)
-				assert.Equal(t, [][]string{{"Traffic", "type"}, {"OperationalStatus", "operStatus"}}, resp.DefaultCharts)
+				assert.Equal(t, [][]string{{"Traffic", "Type"}, {"OperationalStatus", "Oper Status"}}, resp.DefaultCharts)
 
 				// Verify GroupBy
 				require.NotNil(t, resp.GroupBy)
-				assert.Contains(t, resp.GroupBy, "type")
+				assert.Contains(t, resp.GroupBy, "Type")
 			},
 		},
 		"filter other includes non-target groups": {
@@ -503,7 +502,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 				require.True(t, ok)
 				assert.Len(t, data, 2)
 
-				nameIdx := findColIdx("name")
+				nameIdx := findColIdx("Interface")
 				names := []string{data[0][nameIdx].(string), data[1][nameIdx].(string)}
 				assert.ElementsMatch(t, []string{"tun0", "wlan0"}, names)
 			},
@@ -521,7 +520,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 
 func TestFuncInterfaces_defaultSortColumn(t *testing.T) {
 	f := &funcInterfaces{}
-	assert.Equal(t, "name", f.defaultSortColumn())
+	assert.Equal(t, "Interface", f.defaultSortColumn())
 }
 
 func TestPtrToAny(t *testing.T) {

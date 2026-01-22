@@ -101,37 +101,37 @@ func (f *funcInterfaces) handle(method string, params funcapi.ResolvedParams) *m
 			"Traffic": {
 				Name:    "Traffic",
 				Type:    "stacked-bar",
-				Columns: []string{"trafficIn", "trafficOut"},
+				Columns: []string{"Traffic In", "Traffic Out"},
 			},
 			"UnicastPackets": {
 				Name:    "Unicast Packets",
 				Type:    "stacked-bar",
-				Columns: []string{"ucastPktsIn", "ucastPktsOut"},
+				Columns: []string{"Unicast In", "Unicast Out"},
 			},
 			"BroadcastPackets": {
 				Name:    "Broadcast Packets",
 				Type:    "stacked-bar",
-				Columns: []string{"bcastPktsIn", "bcastPktsOut"},
+				Columns: []string{"Broadcast In", "Broadcast Out"},
 			},
 			"MulticastPackets": {
 				Name:    "Multicast Packets",
 				Type:    "stacked-bar",
-				Columns: []string{"mcastPktsIn", "mcastPktsOut"},
+				Columns: []string{"Multicast In", "Multicast Out"},
 			},
 			"OperationalStatus": {
 				Name:    "Operational Status",
 				Type:    "stacked-bar",
-				Columns: []string{"operStatus"},
+				Columns: []string{"Oper Status"},
 			},
 		},
 		DefaultCharts: [][]string{
-			{"Traffic", "type"},
-			{"OperationalStatus", "operStatus"},
+			{"Traffic", "Type"},
+			{"OperationalStatus", "Oper Status"},
 		},
 		GroupBy: map[string]module.GroupByConfig{
-			"type": {
+			"Type": {
 				Name:    "Group by Type",
-				Columns: []string{"type"},
+				Columns: []string{"Type"},
 			},
 		},
 	}
@@ -236,7 +236,7 @@ func (f *funcInterfaces) defaultSortColumn() string {
 			return col.key
 		}
 	}
-	return "name"
+	return "Interface"
 }
 
 func matchesTypeGroup(group, filter string) bool {
@@ -289,8 +289,8 @@ const funcIfacesParamTypeGroup = "if_type_group"
 // funcIfacesColumn defines a column with its metadata and value extractor.
 // The value function extracts the column's data from an ifaceEntry.
 type funcIfacesColumn struct {
-	key         string                 // unique column identifier
-	name        string                 // display name
+	key         string                 // column header value (must be unique)
+	name        string                 // tooltip value
 	value       func(*ifaceEntry) any  // extracts value from entry
 	dataType    funcapi.FieldType      // string, float, etc.
 	units       string                 // display units (bytes/s, packets/s)
@@ -309,8 +309,8 @@ type funcIfacesColumn struct {
 // Each column includes its value extractor - single source of truth.
 var funcIfacesColumns = []funcIfacesColumn{
 	{
-		key:         "name",
-		name:        "Interface",
+		key:         "Interface",
+		name:        "",
 		value:       func(e *ifaceEntry) any { return e.name },
 		dataType:    funcapi.FieldTypeString,
 		visible:     true,
@@ -322,8 +322,8 @@ var funcIfacesColumns = []funcIfacesColumn{
 		sticky:      true,
 	},
 	{
-		key:      "type",
-		name:     "Type",
+		key:      "Type",
+		name:     "IANA ifType (IF-MIB)",
 		value:    func(e *ifaceEntry) any { return e.ifType },
 		dataType: funcapi.FieldTypeString,
 		visible:  true,
@@ -332,8 +332,8 @@ var funcIfacesColumns = []funcIfacesColumn{
 		filter:   funcapi.FieldFilterMultiselect,
 	},
 	{
-		key:      "typeGroup",
-		name:     "Type Group",
+		key:      "Type Group",
+		name:     "Custom mapping of IANA ifType into groups",
 		value:    func(e *ifaceEntry) any { return e.ifTypeGroup },
 		dataType: funcapi.FieldTypeString,
 		visible:  true,
@@ -342,8 +342,8 @@ var funcIfacesColumns = []funcIfacesColumn{
 		filter:   funcapi.FieldFilterMultiselect,
 	},
 	{
-		key:      "adminStatus",
-		name:     "Admin Status",
+		key:      "Admin Status",
+		name:     "Administrative status: up, down, testing",
 		value:    func(e *ifaceEntry) any { return e.adminStatus },
 		dataType: funcapi.FieldTypeString,
 		visible:  true,
@@ -352,8 +352,8 @@ var funcIfacesColumns = []funcIfacesColumn{
 		filter:   funcapi.FieldFilterMultiselect,
 	},
 	{
-		key:      "operStatus",
-		name:     "Oper Status",
+		key:      "Oper Status",
+		name:     "Operational status: up, down, testing, unknown, dormant, notPresent, lowerLayerDown",
 		value:    func(e *ifaceEntry) any { return e.operStatus },
 		dataType: funcapi.FieldTypeString,
 		visible:  true,
@@ -362,8 +362,8 @@ var funcIfacesColumns = []funcIfacesColumn{
 		filter:   funcapi.FieldFilterMultiselect,
 	},
 	{
-		key:        "trafficIn",
-		name:       "Traffic In",
+		key:        "Traffic In",
+		name:       "",
 		value:      func(e *ifaceEntry) any { return ptrToAny(e.rates.trafficIn) },
 		dataType:   funcapi.FieldTypeFloat,
 		units:      "bit/s",
@@ -375,8 +375,8 @@ var funcIfacesColumns = []funcIfacesColumn{
 		sortOption: "Top by Traffic In",
 	},
 	{
-		key:        "trafficOut",
-		name:       "Traffic Out",
+		key:        "Traffic Out",
+		name:       "",
 		value:      func(e *ifaceEntry) any { return ptrToAny(e.rates.trafficOut) },
 		dataType:   funcapi.FieldTypeFloat,
 		units:      "bit/s",
@@ -388,8 +388,8 @@ var funcIfacesColumns = []funcIfacesColumn{
 		sortOption: "Top by Traffic Out",
 	},
 	{
-		key:       "ucastPktsIn",
-		name:      "Unicast In",
+		key:       "Unicast In",
+		name:      "",
 		value:     func(e *ifaceEntry) any { return ptrToAny(e.rates.ucastPktsIn) },
 		dataType:  funcapi.FieldTypeFloat,
 		units:     "packets/s",
@@ -400,8 +400,8 @@ var funcIfacesColumns = []funcIfacesColumn{
 		filter:    funcapi.FieldFilterRange,
 	},
 	{
-		key:       "ucastPktsOut",
-		name:      "Unicast Out",
+		key:       "Unicast Out",
+		name:      "",
 		value:     func(e *ifaceEntry) any { return ptrToAny(e.rates.ucastPktsOut) },
 		dataType:  funcapi.FieldTypeFloat,
 		units:     "packets/s",
@@ -412,8 +412,8 @@ var funcIfacesColumns = []funcIfacesColumn{
 		filter:    funcapi.FieldFilterRange,
 	},
 	{
-		key:       "bcastPktsIn",
-		name:      "Broadcast In",
+		key:       "Broadcast In",
+		name:      "",
 		value:     func(e *ifaceEntry) any { return ptrToAny(e.rates.bcastPktsIn) },
 		dataType:  funcapi.FieldTypeFloat,
 		units:     "packets/s",
@@ -424,8 +424,8 @@ var funcIfacesColumns = []funcIfacesColumn{
 		filter:    funcapi.FieldFilterRange,
 	},
 	{
-		key:       "bcastPktsOut",
-		name:      "Broadcast Out",
+		key:       "Broadcast Out",
+		name:      "",
 		value:     func(e *ifaceEntry) any { return ptrToAny(e.rates.bcastPktsOut) },
 		dataType:  funcapi.FieldTypeFloat,
 		units:     "packets/s",
@@ -436,8 +436,8 @@ var funcIfacesColumns = []funcIfacesColumn{
 		filter:    funcapi.FieldFilterRange,
 	},
 	{
-		key:       "mcastPktsIn",
-		name:      "Multicast In",
+		key:       "Multicast In",
+		name:      "",
 		value:     func(e *ifaceEntry) any { return ptrToAny(e.rates.mcastPktsIn) },
 		dataType:  funcapi.FieldTypeFloat,
 		units:     "packets/s",
@@ -448,8 +448,8 @@ var funcIfacesColumns = []funcIfacesColumn{
 		filter:    funcapi.FieldFilterRange,
 	},
 	{
-		key:       "mcastPktsOut",
-		name:      "Multicast Out",
+		key:       "Multicast Out",
+		name:      "",
 		value:     func(e *ifaceEntry) any { return ptrToAny(e.rates.mcastPktsOut) },
 		dataType:  funcapi.FieldTypeFloat,
 		units:     "packets/s",
