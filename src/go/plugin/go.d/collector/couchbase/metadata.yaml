@@ -191,6 +191,71 @@ modules:
       problems:
         list: []
     alerts: []
+    functions:
+      description: |
+        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+      list:
+        - id: top-queries
+          name: Top Queries
+          summary: Top N1QL requests from system:completed_requests.
+          discovery: |
+            Open the dashboard Top tab. In the upper-right function list, find the Couchbase functions.
+          invocation: |
+            Select `Couchbase:top-queries` from the function list to run it (for example, `SNMP:interfaces`).
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column (options are derived from sortable columns in the response).
+              type: select
+              required: true
+              default: elapsedTime
+              options: []
+          returns:
+            description: Completed N1QL request statistics.
+            columns:
+              - name: Request ID
+                type: string
+                description: ""
+              - name: Request Time
+                type: timestamp
+                description: ""
+              - name: Statement
+                type: string
+                description: ""
+              - name: Elapsed Time
+                type: duration
+                description: ""
+              - name: Service Time
+                type: duration
+                description: ""
+              - name: Result Count
+                type: integer
+                description: ""
+              - name: Result Size
+                type: integer
+                description: ""
+              - name: Error Count
+                type: integer
+                description: ""
+              - name: Warning Count
+                type: integer
+                description: ""
+              - name: User
+                type: string
+                description: ""
+              - name: Client Context ID
+                type: string
+                description: ""
+          behavior: |
+            Queries the system:completed_requests keyspace and returns the top entries sorted by the selected column.
+          performance: |
+            Runs N1QL queries against system keyspaces; use top_queries_limit to control response size.
+          security: |
+            Query text may include sensitive literals depending on workload.
+          requirements: |
+            Requires access to the system:completed_requests keyspace and N1QL service.
+          availability: |
+            Available when the collector can query system keyspaces; returns 503 until the collector is initialized.
     metrics:
       folding:
         title: Metrics

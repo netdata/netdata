@@ -391,6 +391,193 @@
               "availability",
               "scopes"
             ]
+          },
+          "functions": {
+            "type": "object",
+            "description": "Real-time function documentation for this collector.",
+            "properties": {
+              "description": {
+                "type": "string",
+                "description": "High-level description of available functions."
+              },
+              "list": {
+                "type": "array",
+                "description": "List of functions exposed by the collector.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Function method ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Function display name."
+                    },
+                    "summary": {
+                      "type": "string",
+                      "description": "Short summary of what the function returns."
+                    },
+                    "discovery": {
+                      "type": "string",
+                      "description": "How to locate the function in the UI."
+                    },
+                    "invocation": {
+                      "type": "string",
+                      "description": "How to run the function in the UI."
+                    },
+                    "parameters": {
+                      "type": "array",
+                      "description": "Function parameters and their descriptions.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Parameter ID."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Parameter display name."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Parameter description."
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "Parameter type (e.g. select, string)."
+                          },
+                          "required": {
+                            "type": "boolean",
+                            "description": "Whether the parameter is required."
+                          },
+                          "default": {
+                            "type": "string",
+                            "description": "Default value, if applicable."
+                          },
+                          "options": {
+                            "type": "array",
+                            "description": "Allowed parameter options (for select parameters).",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "description": "Option ID."
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "description": "Option display name."
+                                },
+                                "description": {
+                                  "type": "string",
+                                  "description": "Option description."
+                                },
+                                "default": {
+                                  "type": "boolean",
+                                  "description": "Whether this option is the default."
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "description",
+                          "type",
+                          "required",
+                          "default",
+                          "options"
+                        ]
+                      }
+                    },
+                    "returns": {
+                      "type": "object",
+                      "description": "Return shape and columns for the function response.",
+                      "properties": {
+                        "description": {
+                          "type": "string",
+                          "description": "Return description."
+                        },
+                        "columns": {
+                          "type": "array",
+                          "description": "List of returned columns.",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "Column name."
+                              },
+                              "type": {
+                                "type": "string",
+                                "description": "Column type."
+                              },
+                              "description": {
+                                "type": "string",
+                                "description": "Column description."
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "type"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "description",
+                        "columns"
+                      ]
+                    },
+                    "behavior": {
+                      "type": "string",
+                      "description": "How the function works internally."
+                    },
+                    "performance": {
+                      "type": "string",
+                      "description": "Performance considerations."
+                    },
+                    "security": {
+                      "type": "string",
+                      "description": "Security/PII considerations."
+                    },
+                    "requirements": {
+                      "type": "string",
+                      "description": "Prerequisites and required permissions."
+                    },
+                    "availability": {
+                      "type": "string",
+                      "description": "Availability and enablement notes."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "summary",
+                    "discovery",
+                    "invocation",
+                    "parameters",
+                    "returns",
+                    "behavior",
+                    "performance",
+                    "security",
+                    "requirements",
+                    "availability"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "description",
+              "list"
+            ]
           }
         },
         "required": [

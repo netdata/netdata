@@ -252,6 +252,86 @@ modules:
         metric: clickhouse.distributed_files_to_insert
         info: ClickHouse high number of pending files to process for asynchronous insertion into Distributed tables
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf
+    functions:
+      description: |
+        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+      list:
+        - id: top-queries
+          name: Top Queries
+          summary: Top SQL queries from ClickHouse system.query_log.
+          discovery: |
+            Open the dashboard Top tab. In the upper-right function list, find the ClickHouse functions.
+          invocation: |
+            Select `ClickHouse:top-queries` from the function list to run it (for example, `SNMP:interfaces`).
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column (options are derived from sortable columns in the response).
+              type: select
+              required: true
+              default: totalTime
+              options: []
+          returns:
+            description: Aggregated query statistics from system.query_log.
+            columns:
+              - name: Query ID
+                type: string
+                description: ""
+              - name: Query
+                type: string
+                description: ""
+              - name: Database
+                type: string
+                description: ""
+              - name: User
+                type: string
+                description: ""
+              - name: Calls
+                type: integer
+                description: ""
+              - name: Total Time
+                type: duration
+                description: ""
+              - name: Avg Time
+                type: duration
+                description: ""
+              - name: Min Time
+                type: duration
+                description: ""
+              - name: Max Time
+                type: duration
+                description: ""
+              - name: Read Rows
+                type: integer
+                description: ""
+              - name: Read Bytes
+                type: integer
+                description: ""
+              - name: Written Rows
+                type: integer
+                description: ""
+              - name: Written Bytes
+                type: integer
+                description: ""
+              - name: Result Rows
+                type: integer
+                description: ""
+              - name: Result Bytes
+                type: integer
+                description: ""
+              - name: Max Memory
+                type: float
+                description: ""
+          behavior: |
+            Queries system.query_log, aggregates by query, and returns the top entries sorted by the selected column.
+          performance: |
+            Uses system.query_log and can be expensive on busy systems. Use limits to control response size.
+          security: |
+            Query text may include sensitive literals depending on server settings.
+          requirements: |
+            Requires access to system.query_log on the target ClickHouse instance.
+          availability: |
+            Available when the collector can query system tables; returns 503 if system.query_log is not available.
     metrics:
       folding:
         title: Metrics

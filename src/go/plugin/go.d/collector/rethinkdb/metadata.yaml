@@ -133,6 +133,62 @@ modules:
       problems:
         list: []
     alerts: []
+    functions:
+      description: |
+        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+      list:
+        - id: running-queries
+          name: Running Queries
+          summary: "Currently running queries from rethinkdb.jobs. WARNING: Query text may contain unmasked literals (potential PII)."
+          discovery: |
+            Open the dashboard Top tab. In the upper-right function list, find the RethinkDB functions.
+          invocation: |
+            Select `RethinkDB:running-queries` from the function list to run it (for example, `SNMP:interfaces`).
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column (options are derived from sortable columns in the response).
+              type: select
+              required: true
+              default: durationMs
+              options: []
+          returns:
+            description: Snapshot of running queries from rethinkdb.jobs.
+            columns:
+              - name: Job ID
+                type: string
+                description: ""
+              - name: Query
+                type: string
+                description: ""
+              - name: Duration
+                type: duration
+                description: ""
+              - name: Type
+                type: string
+                description: ""
+              - name: User
+                type: string
+                description: ""
+              - name: Client Address
+                type: string
+                description: ""
+              - name: Client Port
+                type: integer
+                description: ""
+              - name: Servers
+                type: string
+                description: ""
+          behavior: |
+            Queries rethinkdb.jobs and returns running queries sorted by the selected column.
+          performance: |
+            Uses system tables and may be expensive on busy clusters.
+          security: |
+            Query text may contain unmasked literals (potential PII).
+          requirements: |
+            Requires admin access to rethinkdb.jobs and a working connection.
+          availability: |
+            Available when the collector is initialized; returns 503 if the collector is still connecting.
     metrics:
       folding:
         title: Metrics

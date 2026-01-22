@@ -222,6 +222,164 @@ modules:
         metric: postgres.index_bloat_size_perc
         info: bloat size percentage in db ${label:database} table ${label:table} index ${label:index}
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf
+    functions:
+      description: |
+        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+      list:
+        - id: top-queries
+          name: Top Queries
+          summary: Top SQL queries from pg_stat_statements.
+          discovery: |
+            Open the dashboard Top tab. In the upper-right function list, find the PostgreSQL functions.
+          invocation: |
+            Select `PostgreSQL:top-queries` from the function list to run it (for example, `SNMP:interfaces`).
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column (options are derived from sortable columns in the response).
+              type: select
+              required: true
+              default: totalTime
+              options: []
+          returns:
+            description: Aggregated query statistics from pg_stat_statements.
+            columns:
+              - name: Query ID
+                type: string
+                description: ""
+              - name: Query
+                type: string
+                description: ""
+              - name: Database
+                type: string
+                description: ""
+              - name: User
+                type: string
+                description: ""
+              - name: Calls
+                type: integer
+                description: ""
+              - name: Total Time
+                type: duration
+                description: ""
+              - name: Mean Time
+                type: duration
+                description: ""
+              - name: Min Time
+                type: duration
+                description: ""
+              - name: Max Time
+                type: duration
+                description: ""
+              - name: Stddev Time
+                type: duration
+                description: ""
+              - name: Plans
+                type: integer
+                description: ""
+              - name: Total Plan Time
+                type: duration
+                description: ""
+              - name: Mean Plan Time
+                type: duration
+                description: ""
+              - name: Min Plan Time
+                type: duration
+                description: ""
+              - name: Max Plan Time
+                type: duration
+                description: ""
+              - name: Stddev Plan Time
+                type: duration
+                description: ""
+              - name: Rows
+                type: integer
+                description: ""
+              - name: Shared Blocks Hit
+                type: integer
+                description: ""
+              - name: Shared Blocks Read
+                type: integer
+                description: ""
+              - name: Shared Blocks Dirtied
+                type: integer
+                description: ""
+              - name: Shared Blocks Written
+                type: integer
+                description: ""
+              - name: Local Blocks Hit
+                type: integer
+                description: ""
+              - name: Local Blocks Read
+                type: integer
+                description: ""
+              - name: Local Blocks Dirtied
+                type: integer
+                description: ""
+              - name: Local Blocks Written
+                type: integer
+                description: ""
+              - name: Temp Blocks Read
+                type: integer
+                description: ""
+              - name: Temp Blocks Written
+                type: integer
+                description: ""
+              - name: Block Read Time
+                type: duration
+                description: ""
+              - name: Block Write Time
+                type: duration
+                description: ""
+              - name: WAL Records
+                type: integer
+                description: ""
+              - name: WAL Full Page Images
+                type: integer
+                description: ""
+              - name: WAL Bytes
+                type: integer
+                description: ""
+              - name: JIT Functions
+                type: integer
+                description: ""
+              - name: JIT Generation Time
+                type: duration
+                description: ""
+              - name: JIT Inlining Count
+                type: integer
+                description: ""
+              - name: JIT Inlining Time
+                type: duration
+                description: ""
+              - name: JIT Optimization Count
+                type: integer
+                description: ""
+              - name: JIT Optimization Time
+                type: duration
+                description: ""
+              - name: JIT Emission Count
+                type: integer
+                description: ""
+              - name: JIT Emission Time
+                type: duration
+                description: ""
+              - name: Temp Block Read Time
+                type: duration
+                description: ""
+              - name: Temp Block Write Time
+                type: duration
+                description: ""
+          behavior: |
+            Reads pg_stat_statements and returns the top entries sorted by the selected column.
+          performance: |
+            Requires pg_stat_statements and can be expensive on busy servers.
+          security: |
+            Query text may contain unmasked literals (potential PII).
+          requirements: |
+            Requires the pg_stat_statements extension installed and enabled.
+          availability: |
+            Available when pg_stat_statements is available and the collector is initialized.
     metrics:
       folding:
         title: Metrics

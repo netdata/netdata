@@ -182,6 +182,8 @@ endmeta-->
 
             if integration.get("metrics"):
                 md += f"\n{integration['metrics']}\n"
+            if integration.get("functions"):
+                md += f"\n{integration['functions']}\n"
             if integration.get("alerts"):
                 md += f"\n{integration['alerts']}\n"
             if integration.get("setup"):

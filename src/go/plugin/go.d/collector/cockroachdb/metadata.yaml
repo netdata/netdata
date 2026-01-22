@@ -247,6 +247,159 @@ modules:
         metric: cockroachdb.process_file_descriptors
         info: "open file descriptors utilization (against softlimit)"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf
+    functions:
+      description: |
+        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+      list:
+        - id: top-queries
+          name: Top Queries
+          summary: Top SQL statements from crdb_internal.cluster_statement_statistics.
+          discovery: |
+            Open the dashboard Top tab. In the upper-right function list, find the CockroachDB functions.
+          invocation: |
+            Select `CockroachDB:top-queries` from the function list to run it (for example, `SNMP:interfaces`).
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column (options are derived from sortable columns in the response).
+              type: select
+              required: true
+              default: totalTime
+              options: []
+          returns:
+            description: Aggregated SQL statement statistics.
+            columns:
+              - name: Fingerprint ID
+                type: string
+                description: ""
+              - name: Query
+                type: string
+                description: ""
+              - name: Database
+                type: string
+                description: ""
+              - name: Application
+                type: string
+                description: ""
+              - name: Statement Type
+                type: string
+                description: ""
+              - name: Distributed
+                type: string
+                description: ""
+              - name: Full Scan
+                type: string
+                description: ""
+              - name: Implicit Txn
+                type: string
+                description: ""
+              - name: Vectorized
+                type: string
+                description: ""
+              - name: Executions
+                type: integer
+                description: ""
+              - name: Total Time
+                type: duration
+                description: ""
+              - name: Mean Time
+                type: duration
+                description: ""
+              - name: Run Time
+                type: duration
+                description: ""
+              - name: Plan Time
+                type: duration
+                description: ""
+              - name: Parse Time
+                type: duration
+                description: ""
+              - name: Rows Read
+                type: integer
+                description: ""
+              - name: Rows Written
+                type: integer
+                description: ""
+              - name: Rows Returned
+                type: integer
+                description: ""
+              - name: Bytes Read
+                type: integer
+                description: ""
+              - name: Max Retries
+                type: integer
+                description: ""
+          behavior: |
+            Queries crdb_internal.cluster_statement_statistics and returns the top entries sorted by the selected column.
+          performance: |
+            Executes SQL queries against system tables and may be expensive on busy clusters.
+          security: |
+            Query text may contain unmasked literals (potential PII).
+          requirements: |
+            Requires a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to crdb_internal.cluster_statement_statistics.
+          availability: |
+            Requires SQL DSN configuration and access to system tables; returns errors if DSN is missing or SQL is unavailable.
+        - id: running-queries
+          name: Running Queries
+          summary: Currently running SQL statements from SHOW CLUSTER STATEMENTS.
+          discovery: |
+            Open the dashboard Top tab. In the upper-right function list, find the CockroachDB functions.
+          invocation: |
+            Select `CockroachDB:running-queries` from the function list to run it (for example, `SNMP:interfaces`).
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column (options are derived from sortable columns in the response).
+              type: select
+              required: true
+              default: elapsedMs
+              options: []
+          returns:
+            description: Snapshot of currently running SQL statements.
+            columns:
+              - name: Query ID
+                type: string
+                description: ""
+              - name: Query
+                type: string
+                description: ""
+              - name: User
+                type: string
+                description: ""
+              - name: Application
+                type: string
+                description: ""
+              - name: Client Address
+                type: string
+                description: ""
+              - name: Node ID
+                type: string
+                description: ""
+              - name: Session ID
+                type: string
+                description: ""
+              - name: Phase
+                type: string
+                description: ""
+              - name: Distributed
+                type: string
+                description: ""
+              - name: Start Time
+                type: string
+                description: ""
+              - name: Elapsed
+                type: duration
+                description: ""
+          behavior: |
+            Queries SHOW CLUSTER STATEMENTS and returns running statements sorted by the selected column.
+          performance: |
+            Executes SQL queries against system tables and may be expensive on busy clusters.
+          security: |
+            Query text may contain unmasked literals (potential PII).
+          requirements: |
+            Requires a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to system tables.
+          availability: |
+            Requires SQL DSN configuration and access to system tables; returns errors if DSN is missing or SQL is unavailable.
     metrics:
       folding:
         title: Metrics
