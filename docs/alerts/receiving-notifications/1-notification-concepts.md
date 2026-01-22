@@ -10,18 +10,18 @@ flowchart TD
     
     subgraph M1["Agent-Dispatched"]
         E --> LN(Local Notification)
-        LN --> DestA[Slack·Email·PagerDuty]
+        LN --> DestA(Slack·Email·PagerDuty)
     end
     
     subgraph M2["Parent-Dispatched"]
-        Child[Child Node] -->|"Metrics"| Parent[Parent]
-        Parent --> PN[Parent Notification]
+        Child(Child Node) -->|"Metrics"| Parent(Parent Node)
+        Parent --> PN(Parent Notification)
     end
     
     subgraph M3["Cloud-Dispatched"]
-        E --> C[Netdata Cloud]
-        C --> CI[Cloud Integrations]
-        CI --> DestC[Slack·Teams·Webhooks]
+        E --> C(Netdata Cloud)
+        C --> CI(Cloud Integrations)
+        CI --> DestC(Slack·Teams·Webhooks)
     end
     
     classDef model fill:#2196F3,stroke:#000000,stroke-width:3px,color:#ffffff,font-size:16px
