@@ -674,6 +674,22 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     };
 
     const asString = (v: unknown): string | undefined => typeof v === 'string' ? v : undefined;
+    const parseHttpStatus = (value: unknown): number | undefined => {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        const rounded = Math.trunc(value);
+        if (rounded >= 100 && rounded <= 599) return rounded;
+      }
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed.length === 0) return undefined;
+        const numeric = Number(trimmed);
+        if (Number.isFinite(numeric)) {
+          const rounded = Math.trunc(numeric);
+          if (rounded >= 100 && rounded <= 599) return rounded;
+        }
+      }
+      return undefined;
+    };
     // const asNumber = (v: unknown): number | undefined => typeof v === 'number' && Number.isFinite(v) ? v : undefined;
 
     // Unwrap common wrapper errors (e.g., RetryError with lastError, nested causes)
@@ -700,7 +716,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
     const primary = unwrap(err);
 
-    const status = (firstDefined(primary.statusCode, primary.status, nested(primary, ['response', 'status'])) as number | undefined) ?? 0;
+    let status = (firstDefined(primary.statusCode, primary.status, nested(primary, ['response', 'status'])) as number | undefined) ?? 0;
     const statusTextCandidate = firstDefined(
       // common locations
       nested(primary, ['statusText']),
@@ -766,6 +782,11 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       } catch (e) { try { warn(`provider traced fetch failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
     }
 
+    if (status === 0) {
+      const statusFromCode = parseHttpStatus(codeStr);
+      if (statusFromCode !== undefined) status = statusFromCode;
+    }
+
     const nameVal = (primary as { name?: unknown }).name;
     const name = typeof nameVal === 'string' ? nameVal : 'Error';
 
@@ -807,6 +828,9 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
     const classificationMessage = providerMessageRaw ?? providerMessage;
     const errorKind = classifyLlmErrorKind({ status, name, code: codeStr, message: classificationMessage });
+
+    const httpStatus = parseHttpStatus(status);
+    const withHttpStatus = (value: TurnStatus): TurnStatus => (httpStatus !== undefined ? { ...value, httpStatus } : value);
 
     // Rate limit errors
     if (errorKind === 'rate_limit') {
@@ -948,39 +972,39 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         return `${origin}=${valueStr}`;
       };
       const sources = winner !== undefined ? [formatSource(winner.origin, winner.rawValue)] : undefined;
-      return { type: 'rate_limit', retryAfterMs, sources };
+      return withHttpStatus({ type: 'rate_limit', retryAfterMs, sources });
     }
 
     // Authentication errors
     if (errorKind === 'auth_error') {
-      return { type: 'auth_error', message: composedMessage };
+      return withHttpStatus({ type: 'auth_error', message: composedMessage });
     }
 
     // Quota exceeded
     if (errorKind === 'quota_exceeded') {
-      return { type: 'quota_exceeded', message: composedMessage };
+      return withHttpStatus({ type: 'quota_exceeded', message: composedMessage });
     }
 
     // Model errors
     if (errorKind === 'model_error') {
       const retryable = isRetryableModelError({ name, code: codeStr, message: classificationMessage });
       this.logModelErrorDiagnostics(error, { composedMessage, name, status, codeStr, providerMessage, source: 'explicit' });
-      return { type: 'model_error', message: composedMessage, retryable };
+      return withHttpStatus({ type: 'model_error', message: composedMessage, retryable });
     }
 
     // Timeout errors
     if (errorKind === 'timeout') {
-      return { type: 'timeout', message: composedMessage };
+      return withHttpStatus({ type: 'timeout', message: composedMessage });
     }
 
     // Network errors
     if (errorKind === 'network_error') {
-      return { type: 'network_error', message: composedMessage, retryable: true };
+      return withHttpStatus({ type: 'network_error', message: composedMessage, retryable: true });
     }
 
     // Default to model error with retryable flag
     this.logModelErrorDiagnostics(error, { composedMessage, name, status, codeStr, providerMessage, source: 'default' });
-    return { type: 'model_error', message: composedMessage, retryable: true };
+    return withHttpStatus({ type: 'model_error', message: composedMessage, retryable: true });
   }
 
   protected extractTokenUsage(usage: Record<string, unknown> | undefined): TokenUsage {

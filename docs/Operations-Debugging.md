@@ -326,7 +326,7 @@ CONTEXT_DEBUG=true ai-agent --agent myagent.ai "query"
 
 ### Provider Errors (401, 429, 500)
 
-**Error**: `Authentication error: <provider message>. Skipping provider <provider>.`
+**Error**: `Non-200 response (<status>) from <provider:model>; skipping provider/model pair.`
 
 **Debug**:
 

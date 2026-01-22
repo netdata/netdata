@@ -258,6 +258,25 @@ fi
 
 log_info "Setting up Netdata repositories directory..."
 
+# Create public-facing symlink structure for source code access
+# This provides clean paths like github.com/netdata/netdata pointing to actual repos
+NETDATA_REPOS_PUBLIC="$NEDA_HOME/netdata-repos-public"
+
+log_info "Creating public repository symlink structure at $NETDATA_REPOS_PUBLIC..."
+
+run mkdir -p "$NETDATA_REPOS_PUBLIC/github.com/netdata"
+run mkdir -p "$NETDATA_REPOS_PUBLIC/learn.netdata.cloud"
+
+# Create symlinks using ln -sfn for atomic replacement (no disruption to running queries)
+# -s = symbolic link, -f = force (replace), -n = no-dereference (don't follow existing symlink)
+run ln -sfn ../../../netdata-repos/netdata "$NETDATA_REPOS_PUBLIC/github.com/netdata/netdata"
+run ln -sfn ../../netdata-repos/learn/docs "$NETDATA_REPOS_PUBLIC/learn.netdata.cloud/docs"
+run ln -sfn ../netdata-repos/website/content "$NETDATA_REPOS_PUBLIC/www.netdata.cloud"
+
+run chown -R "$NEDA_USER:$NEDA_GROUP" "$NETDATA_REPOS_PUBLIC"
+
+log_info "Public repository structure created"
+
 # Copy GitHub App sync script
 if [ -f "neda/sync-netdata-repos.sh" ]; then
     log_info "Installing GitHub App repository sync script..."
@@ -459,6 +478,7 @@ log_info "  ✓ Installation directory: $NEDA_HOME"
 log_info "  ✓ All neda files copied from source"
 log_info "  ✓ Google Cloud SDK installed"
 log_info "  ✓ Repository sync script created"
+log_info "  ✓ Public repository symlinks created"
 log_info "  ✓ MCP-GSC installed"
 log_info "  ✓ Playwright browsers installed"
 log_info "  ✓ Systemd service files created (not installed)"

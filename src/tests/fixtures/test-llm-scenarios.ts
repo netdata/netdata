@@ -1173,7 +1173,7 @@ const SCENARIOS: ScenarioDefinition[] = [
   },
   {
     id: 'run-test-21',
-    description: 'Rate limit handling with backoff.',
+    description: 'Rate limit handling skips the current target.',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
     turns: [
       {
@@ -1988,7 +1988,7 @@ const SCENARIOS: ScenarioDefinition[] = [
   },
   {
     id: 'run-test-37',
-    description: 'Rate limit error triggers retry.',
+    description: 'Rate limit error skips the current target.',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
     turns: [
       {

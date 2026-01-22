@@ -63,6 +63,100 @@
         }
       }
     },
+    "minimax": {
+      "type": "openai-compatible",
+      "apiKey": "${MINIMAX_API_KEY}",
+      "baseUrl": "https://api.minimax.io/v1",
+      "openaiMode": "chat",
+      "contextWindow": 196608,
+      "stringSchemaFormatsAllowed": [
+        "*"
+      ],
+      "stringSchemaFormatsDenied": [
+        "uri"
+      ],
+      "models": {
+        "MiniMax-M2.1": {
+          "contextWindow": 196608,
+          "reasoning": null,
+          "interleaved": true,
+          "overrides": {
+          }
+        }
+      }
+    },
+    "zen": {
+      "type": "openai-compatible",
+      "apiKey": "public",
+      "baseUrl": "https://opencode.ai/zen/v1",
+      "openaiMode": "chat",
+      "contextWindow": 196608,
+      "stringSchemaFormatsAllowed": [
+        "*"
+      ],
+      "stringSchemaFormatsDenied": [
+        "uri"
+      ],
+      "models": {
+        "minimax-m2.1-free": {
+          "contextWindow": 196608,
+          "reasoning": null,
+          "interleaved": true,
+          "overrides": {
+          }
+        },
+        "glm-4.7-free": {
+          "contextWindow": 202752,
+          "reasoning": null,
+          "interleaved": true,
+          "overrides": {
+          }
+        }
+      }
+    },
+    "zai": {
+      "type": "openai-compatible",
+      "apiKey": "${ZAI_API_KEY}",
+      "baseUrl": "https://api.z.ai/api/coding/paas/v4",
+      "openaiMode": "chat",
+      "contextWindow": 131072,
+      "stringSchemaFormatsAllowed": [
+        "*"
+      ],
+      "stringSchemaFormatsDenied": [
+        "uri"
+      ],
+      "models": {
+        "glm-4.7": {
+          "contextWindow": 202752,
+          "reasoning": null,
+          "interleaved": true,
+          "overrides": {
+          }
+        },
+        "glm-4.6": {
+          "contextWindow": 202752,
+          "reasoning": null,
+          "interleaved": false,
+          "overrides": {
+          }
+        },
+        "glm-4.5": {
+          "contextWindow": 131072,
+          "reasoning": null,
+          "interleaved": false,
+          "overrides": {
+          }
+        },
+        "glm-4.5-air": {
+          "contextWindow": 131072,
+          "reasoning": null,
+          "interleaved": false,
+          "overrides": {
+          }
+        }
+      }
+    },
     "vllm1": {
       "type": "openai-compatible",
       "apiKey": "vllm",
@@ -771,9 +865,22 @@
       "command": "node",
       "args": [
         "/opt/ai-agent/mcp/fs/fs-mcp-server.js",
-        "${NETDATA_REPOS_DIR}",
+        "/opt/neda/netdata-repos",
         "--no-rgrep-root",
         "--no-tree-root"
+      ],
+      "enabled": true,
+      "toolsAllowed": [
+        "*"
+      ],
+      "toolsDenied": []
+    },
+    "filesystem_repos_public": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/opt/ai-agent/mcp/fs/fs-mcp-server.js",
+        "/opt/neda/netdata-repos-public"
       ],
       "enabled": true,
       "toolsAllowed": [

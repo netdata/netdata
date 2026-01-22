@@ -263,12 +263,12 @@ for turn in 0..maxTurns:
         case 'rate_limit':
         case 'network_error':
         case 'timeout':
-          // Try next provider/model pair
+          // Skip current provider/model pair on non-200; otherwise retry/continue
           continue;
           
         case 'auth_error':
         case 'quota_exceeded':
-          // Skip this provider entirely
+          // Skip this provider/model pair
           break;
           
         case 'model_error':
@@ -292,7 +292,7 @@ for turn in 0..maxTurns:
 2. **Status-based**: Switching logic based on specific error types
 3. **Retry isolation**: Provider failures don't affect other providers
 4. **Max attempts**: 3 retries per turn across all combinations
-5. **Smart skipping**: Skip providers with auth/quota issues
+5. **Smart skipping**: Skip provider/model pairs on non-200 responses and auth/quota issues
 
 ## Session Lifecycle
 

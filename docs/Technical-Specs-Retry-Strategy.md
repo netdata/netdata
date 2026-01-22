@@ -104,26 +104,29 @@ These errors trigger retry with backoff.
 
 | Status             | Condition          | Backoff                                     | Behavior        |
 | ------------------ | ------------------ | ------------------------------------------- | --------------- |
-| `rate_limit`       | Too many requests  | Yes (provider-specified or linear fallback) | Wait then retry |
+| `rate_limit`       | Too many requests  | Conditional (only when retrying)            | Wait then retry |
 | `network_error`    | Connection failed  | Yes (linear, max 30s)                       | Wait then retry |
 | `timeout`          | Request timeout    | Yes (linear, max 30s)                       | Wait then retry |
 | `invalid_response` | Malformed response | No                                          | Immediate retry |
+
+Note: If the LLM response includes an HTTP status and it is non‑200, we skip the current provider/model pair instead of retrying (this includes 429s).
 
 ---
 
 ## Provider Cycling
 
-### Skip-Provider Errors
+### Skip-Target Errors
 
-These errors skip the current provider but continue with others.
+These errors skip the current provider/model pair but continue with others.
 
-| Status           | Condition                         | Action                |
-| ---------------- | --------------------------------- | --------------------- |
-| `auth_error`     | Invalid API key                   | Skip to next provider |
-| `quota_exceeded` | Account quota hit                 | Skip to next provider |
-| `model_error`    | Model unavailable (non-retryable) | Skip to next provider |
+| Status / Rule          | Condition                         | Action                           |
+| ---------------------- | --------------------------------- | -------------------------------- |
+| `http_status != 200`   | Non‑200 HTTP response             | Skip to next provider/model pair |
+| `auth_error`           | Invalid API key                   | Skip to next provider/model pair |
+| `quota_exceeded`       | Account quota hit                 | Skip to next provider/model pair |
+| `model_error`          | Model unavailable (non-retryable) | Skip to next provider/model pair |
 
-Note: `auth_error` and `quota_exceeded` trigger skip-provider action to try next available provider. The `abort` action exists in the type definition but is not used in current implementation.
+Note: `auth_error` and `quota_exceeded` trigger skip-provider action to try next available provider/model pair. The `abort` action exists in the type definition but is not used in current implementation.
 
 Note: `model_error` with `retryable: true` continues with same provider (immediate retry).
 
@@ -154,14 +157,14 @@ graph LR
 
 ```
 target = targets[pairCursor % targets.length]
-// pairCursor incremented when skip-provider action triggered
+// pairCursor incremented when skip-provider (target skip) action triggered
 ```
 
 **Behavior**:
 
 - Cycles through all configured targets
 - Wraps around when array exhausted
-- Each attempt increments cursor for skip-provider, not for normal retries
+- Each attempt increments cursor for skip-provider (target skip), not for normal retries
 - Continues until `maxRetries` exhausted
 
 ### Rate Limit Tracking

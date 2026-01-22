@@ -74,13 +74,14 @@ When a final report fails schema validation:
 
 ## Error Classification
 
-### Fatal Errors (No Retry)
-**Stop session immediately**:
+### Skip-Target Errors (No Retry)
+**Skip the current provider/model pair**:
 
-| Status | Condition | Exit Code |
-|--------|-----------|-----------|
-| `auth_error` | Invalid API key | EXIT-AUTH-FAILURE |
-| `quota_exceeded` | Account quota hit | EXIT-QUOTA-EXCEEDED |
+| Status / Rule        | Condition             | Behavior                         |
+|----------------------|-----------------------|----------------------------------|
+| `auth_error`         | Invalid API key        | Skip provider/model pair         |
+| `quota_exceeded`     | Account quota hit      | Skip provider/model pair         |
+| `http_status != 200` | Non-200 HTTP response  | Skip provider/model pair         |
 
 ### Retryable Errors
 **Try next provider/model**:
@@ -93,8 +94,10 @@ When a final report fails schema validation:
 | `timeout` | Request timeout | None |
 | `invalid_response` | Malformed response | None |
 
-### Skip-Provider Errors
-**Move to next provider in targets**:
+Note: Non‑200 HTTP responses skip the current provider/model pair before retry directives apply.
+
+### Skip-Target Errors
+**Move to next provider/model pair in targets**:
 
 | Condition | Action |
 |-----------|--------|
@@ -336,7 +339,7 @@ a final report/answer, so a turn has been wasted without any progress on your ta
 ## Business Logic Coverage (Verified 2025-12-23)
 
 - **Cycle-scoped rate-limit waits**: `rateLimitedInCycle` counts per-target failures and waits only after *every* provider in the rotation returns `rate_limit`, preventing unnecessary sleeps when at least one path remains (`src/session-turn-runner.ts`).
-- **Fallback retry directives**: When providers omit retry guidance, `buildFallbackRetryDirective` maps error types to deterministic actions (`retry`, `skip-provider`, `abort`) and optional backoff windows (`src/session-turn-runner.ts`).
+- **Fallback retry directives**: When providers omit retry guidance, `buildFallbackRetryDirective` maps error types to deterministic actions (`retry`, `skip-provider`, `abort`) and optional backoff windows (`src/session-turn-runner.ts`). `skip-provider` means skip the current provider/model pair.
 - **Backoff cancellation**: All waits use `sleepWithAbort`, which returns `'aborted_stop'`/`'aborted_cancel'` markers so the loop can exit instead of sleeping when users stop sessions (`src/session-turn-runner.ts`).
 - **Retry-after harmonization**: Provider metadata can supply `retryAfterMs`; the loop selects the maximum observed delay per cycle and logs it before waiting (`src/session-turn-runner.ts`).
 - **TURN-FAILED persistence**: Retry-triggering invalid responses push TURN-FAILED guidance into the conversation so the model sees the failure reasons on subsequent attempts (malformed tool payloads are excluded and are returned as tool failures).

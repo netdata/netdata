@@ -751,10 +751,7 @@ su neda -c '/opt/neda/github.ai "find open issues in netdata/netdata" --verbose'
 **Type**: MCP Server (stdio)
 **Purpose**: Local filesystem access to Netdata repositories
 **Source**: Custom fs-mcp-server.js (included in ai-agent)
-**Required Environment Variables**:
-```bash
-NETDATA_REPOS_DIR=/opt/neda/repos  # Path to synced Netdata repositories
-```
+**Required Environment Variables**: None
 **Setup**: 
 - Repositories are automatically synced by sync-netdata-repos.sh cron job
 - Default path: `/opt/neda/repos` (contains all Netdata GitHub repositories)
@@ -873,9 +870,6 @@ INTERCOM_API_KEY=
 
 # Ticketing & Code Access
 GITHUB_PERSONAL_ACCESS_TOKEN=
-
-# Development & Monitoring
-NETDATA_REPOS_DIR=
 
 # Google Services
 GSC_CREDENTIALS=

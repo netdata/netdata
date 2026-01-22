@@ -123,10 +123,10 @@ for turn = 1 to maxTurns:
       - success with tools: execute tools, continue turn
       - success with final_report: finalize
       - success without tools: retry (synthetic failure)
-      - rate_limit: backoff and retry
-      - auth_error: fatal, abort
-      - quota_exceeded: fatal, abort
-      - model_error: skip provider or retry
+      - rate_limit: skip provider/model pair on non-200; otherwise backoff and retry
+      - auth_error: skip provider/model pair
+      - quota_exceeded: skip provider/model pair
+      - model_error: skip provider/model pair or retry
       - network_error: retry
       - timeout: retry
       - invalid_response: retry
@@ -143,13 +143,13 @@ for turn = 1 to maxTurns:
 **Retry Logic**:
 - `maxRetries` is global cap per turn (default: 3)
 - Provider cycling: round-robin through targets array
-- Backoff for rate limits: exponential with max wait
+- Backoff for rate limits: only when retrying (no non-200 skip)
 - Synthetic retries: content without tools triggers retry
 - Final turn enforcement: last turn allows final_report (plus `router__handoff-to` when router destinations are configured)
 
 **Context Guard**:
 - Before each LLM request: evaluate projected token usage
-- If exceeds limit: enforce final turn or skip provider
+- If exceeds limit: enforce final turn or skip provider/model pair
 - Post-shrink warning if still over limit after enforcement
 
 ### 6. Turn Execution (`executeSingleTurn`)

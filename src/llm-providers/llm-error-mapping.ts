@@ -179,6 +179,7 @@ export const classifyLlmErrorKindFromMessage = (message: string | undefined): Ll
 };
 
 export const classifyLlmErrorKind = (input: { status: number; name: string; code?: string; message?: string }): LlmErrorKind | undefined => {
+  if (input.status >= 500 && input.status !== 0) return 'network_error';
   const statusKind = STATUS_KIND_MAP.get(input.status);
   const nameKey = normalize(input.name);
   const codeKey = normalize(input.code);
@@ -194,7 +195,6 @@ export const classifyLlmErrorKind = (input: { status: number; name: string; code
   if (matches('model_error')) return 'model_error';
   if (matches('timeout')) return 'timeout';
   if (matches('network_error')) return 'network_error';
-  if (input.status >= 500 && input.status !== 0) return 'network_error';
   return undefined;
 };
 

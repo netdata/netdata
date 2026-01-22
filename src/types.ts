@@ -5,15 +5,24 @@ import type { PreloadedSubAgent } from './subagent-registry.js';
 import type { ToolOutputConfigInput } from './tool-output/types.js';
 import type { ReasoningOutput } from 'ai';
 // Core status interfaces for clear decision making
-export type TurnStatus = 
-  | { type: 'success'; hasToolCalls: boolean; finalAnswer: boolean }
-  | { type: 'rate_limit'; retryAfterMs?: number; sources?: string[] }
+export type TurnStatus =
+  ({
+    type: 'success';
+    hasToolCalls: boolean;
+    finalAnswer: boolean;
+  }
+  | {
+    type: 'rate_limit';
+    retryAfterMs?: number;
+    sources?: string[];
+  }
   | { type: 'auth_error'; message: string }
   | { type: 'model_error'; message: string; retryable: boolean }
   | { type: 'network_error'; message: string; retryable: boolean }
   | { type: 'timeout'; message: string }
   | { type: 'invalid_response'; message: string }
-  | { type: 'quota_exceeded'; message: string };
+  | { type: 'quota_exceeded'; message: string })
+  & { httpStatus?: number };
 
 export type ReasoningLevel = 'minimal' | 'low' | 'medium' | 'high';
 

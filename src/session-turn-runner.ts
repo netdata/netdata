@@ -1717,22 +1717,51 @@ export class TurnRunner {
                         const directive = this.buildFallbackRetryDirective({ status: turnResult.status, remoteId, attempt: attempts });
                         if (directive !== undefined) {
                             if (directive.action === RETRY_ACTION_SKIP_PROVIDER) {
-                            const skipEntry = {
-                                timestamp: Date.now(),
-                                severity: 'WRN' as const,
-                                turn: currentTurn,
-                                subturn: 0,
+                                if (turnResult.status.type === 'rate_limit') {
+                                    const sources = turnResult.status.sources;
+                                    const sourceDetails = Array.isArray(sources) && sources.length > 0
+                                        ? ` Sources: ${sources.join(' | ')}`
+                                        : '';
+                                    const retryAfterMs = typeof turnResult.status.retryAfterMs === 'number' && Number.isFinite(turnResult.status.retryAfterMs)
+                                        ? Math.round(turnResult.status.retryAfterMs)
+                                        : undefined;
+                                    const rateLimitEntry = {
+                                        timestamp: Date.now(),
+                                        severity: 'WRN' as const,
+                                        turn: currentTurn,
+                                        subturn: 0,
+                                        direction: 'response' as const,
+                                        type: 'llm' as const,
+                                        remoteIdentifier: remoteId,
+                                        fatal: false,
+                                        message: `Rate limited; skipping target ${remoteId} due to non-200 response.${sourceDetails}`,
+                                        details: {
+                                            event: LOG_EVENTS.LLM_RATE_LIMIT,
+                                            provider,
+                                            model,
+                                            ...(typeof retryAfterMs === 'number' ? { retry_after_ms: retryAfterMs } : {}),
+                                            ...(Array.isArray(sources) && sources.length > 0 ? { sources: sources.join(' | ') } : {}),
+                                            ...(typeof turnResult.status.httpStatus === 'number' ? { http_status: turnResult.status.httpStatus } : {}),
+                                        },
+                                    };
+                                    this.log(rateLimitEntry);
+                                }
+                                const skipEntry = {
+                                    timestamp: Date.now(),
+                                    severity: 'WRN' as const,
+                                    turn: currentTurn,
+                                    subturn: 0,
                                     direction: 'response' as const,
                                     type: 'llm' as const,
                                     remoteIdentifier: remoteId,
                                     fatal: false,
-                                message: directive.logMessage ?? `Skipping provider ${remoteId}`,
-                            };
-                            this.log(skipEntry);
-                            logAttemptFailure();
-                            pairCursor += 1;
-                            // Skip this provider and continue to next
-                            continue;
+                                    message: directive.logMessage ?? `Skipping target ${remoteId}`,
+                                };
+                                this.log(skipEntry);
+                                logAttemptFailure();
+                                pairCursor += 1;
+                                // Skip this target and continue to next
+                                continue;
                             }
                             if (directive.action === 'retry') {
                                 // Special handling for rate_limit: track across cycle
@@ -2943,6 +2972,12 @@ export class TurnRunner {
     }
     private buildFallbackRetryDirective(input: { status: TurnStatus; remoteId: string; attempt: number }): TurnRetryDirective | undefined {
         const { status, remoteId, attempt } = input;
+        if (typeof status.httpStatus === 'number' && status.httpStatus !== 200) {
+            return {
+                action: RETRY_ACTION_SKIP_PROVIDER,
+                logMessage: `Non-200 response (${String(status.httpStatus)}) from ${remoteId}; skipping provider/model pair.`,
+            };
+        }
         if (status.type === 'rate_limit') {
             const wait = typeof status.retryAfterMs === 'number' && Number.isFinite(status.retryAfterMs)
                 ? status.retryAfterMs
@@ -2957,13 +2992,13 @@ export class TurnRunner {
         if (status.type === 'auth_error') {
             return {
                 action: RETRY_ACTION_SKIP_PROVIDER,
-                logMessage: `Authentication error: ${status.message}. Skipping provider ${remoteId}.`,
+                logMessage: `Authentication error: ${status.message}. Skipping provider/model pair ${remoteId}.`,
             };
         }
         if (status.type === 'quota_exceeded') {
             return {
                 action: RETRY_ACTION_SKIP_PROVIDER,
-                logMessage: `Quota exceeded for ${remoteId}; moving to next provider.`,
+                logMessage: `Quota exceeded for ${remoteId}; moving to next provider/model pair.`,
             };
         }
         if (status.type === 'timeout' || status.type === 'network_error') {
@@ -2981,7 +3016,7 @@ export class TurnRunner {
                 return undefined;
             return {
                 action: RETRY_ACTION_SKIP_PROVIDER,
-                logMessage: `Non-retryable model error from ${remoteId}; skipping provider.`,
+                logMessage: `Non-retryable model error from ${remoteId}; skipping provider/model pair.`,
             };
         }
         return undefined;

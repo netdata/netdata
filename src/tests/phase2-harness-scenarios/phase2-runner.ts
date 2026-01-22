@@ -1008,8 +1008,6 @@ function expectLlmLogContext(
 
 const rateLimitWarningExpected = (scenarioId: string): string => `Rate limit warning expected for ${scenarioId}.`;
 const rateLimitMessageMismatch = (scenarioId: string): string => `Rate limit log message mismatch for ${scenarioId}.`;
-const retryBackoffExpected = (scenarioId: string): string => `Retry backoff log expected for ${scenarioId}.`;
-const retryBackoffMessageMismatch = (scenarioId: string): string => `Retry backoff message mismatch for ${scenarioId}.`;
 
 function getPrivateMethod(instance: object, key: string): (...args: unknown[]) => unknown {
   const value = Reflect.get(instance as Record<string, unknown>, key);
@@ -3141,9 +3139,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const rateLimitCandidate = findLogByEvent(result.logs, LOG_EVENTS.LLM_RATE_LIMIT);
       const rateLimitLog = expectLlmLogContext(rateLimitCandidate, RUN_TEST_21, { message: rateLimitWarningExpected(RUN_TEST_21), severity: 'WRN', remote: PRIMARY_REMOTE });
       invariant(getLogDetail(rateLimitLog, 'event') === LOG_EVENTS.LLM_RATE_LIMIT, rateLimitMessageMismatch(RUN_TEST_21));
-      const retryCandidate = findLogByEvent(result.logs, LOG_EVENTS.LLM_RATE_LIMIT_BACKOFF, (entry) => entry.remoteIdentifier === RETRY_REMOTE);
-      const retryLog = expectLlmLogContext(retryCandidate, RUN_TEST_21, { message: retryBackoffExpected(RUN_TEST_21), severity: 'WRN', remote: RETRY_REMOTE });
-      invariant(getLogDetail(retryLog, 'event') === LOG_EVENTS.LLM_RATE_LIMIT_BACKOFF, retryBackoffMessageMismatch(RUN_TEST_21));
     },
   },
   {
@@ -3604,15 +3599,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       sessionConfig.maxRetries = 2;
     },
     expect: (result) => {
-      invariant(result.success, `Scenario ${RUN_TEST_37} expected success after rate limit retry.`);
+      invariant(result.success, `Scenario ${RUN_TEST_37} expected success after rate limit skip.`);
       const finalReport = result.finalReport!;
       invariant(result.success === true, 'Final report should indicate success for run-test-37.');
       const rateLimitCandidate = findLogByEvent(result.logs, LOG_EVENTS.LLM_RATE_LIMIT);
       const rateLimitLog = expectLlmLogContext(rateLimitCandidate, RUN_TEST_37, { message: rateLimitWarningExpected(RUN_TEST_37), severity: 'WRN', remote: PRIMARY_REMOTE });
       invariant(getLogDetail(rateLimitLog, 'event') === LOG_EVENTS.LLM_RATE_LIMIT, rateLimitMessageMismatch(RUN_TEST_37));
-      const retryCandidate = findLogByEvent(result.logs, LOG_EVENTS.LLM_RATE_LIMIT_BACKOFF, (entry) => entry.remoteIdentifier === RETRY_REMOTE);
-      const retryLog = expectLlmLogContext(retryCandidate, RUN_TEST_37, { message: retryBackoffExpected(RUN_TEST_37), severity: 'WRN', remote: RETRY_REMOTE });
-      invariant(getLogDetail(retryLog, 'event') === LOG_EVENTS.LLM_RATE_LIMIT_BACKOFF, retryBackoffMessageMismatch(RUN_TEST_37));
     },
   },
   {
