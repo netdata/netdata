@@ -81,12 +81,12 @@ Monitor the relationship between alert behavior and workload changes. When signi
 
 ## What's Next
 
-- [12.4 Large Environment Patterns](../README.md) - Parent-based and distributed setups
-- [12.5 SLI and SLO Alerts](../README.md) - Connecting to business objectives
-- [13. Alerts and Notifications Architecture](/docs/architecture/README.md) - Deep-dive internals
+- [12.4 Large Environment Patterns](/docs/alerts/best-practices/README.md) - Parent-based and distributed setups
+- [12.5 SLI and SLO Alerts](/docs/alerts/best-practices/README.md) - Connecting to business objectives
+- [13. Alerts and Notifications Architecture](/docs/alerts/architecture/README.md) - Deep-dive internals
 
 ## See Also
 
-- [Creating and Editing Alerts via Config Files](/docs/creating-alerts-pages/2-creating-and-editing-alerts-via-config-files.md) - File-based editing
-- [Reloading and Validating Configuration](/docs/creating-alerts-pages/5-reloading-and-validating-alert-configuration.md) - Validation procedures
-- [Disabling Alerts](/docs/controlling-alerts-noise/1-disabling-alerts.md) - How to temporarily disable alerts
+- [Creating and Editing Alerts via Config Files](/docs/alerts/creating-alerts-pages/2-creating-and-editing-alerts-via-config-files.md) - File-based editing
+- [Reloading and Validating Configuration](/docs/alerts/creating-alerts-pages/5-reloading-and-validating-alert-configuration.md) - Validation procedures
+- [Disabling Alerts](/docs/alerts/controlling-alerts-noise/1-disabling-alerts.md) - How to temporarily disable alerts

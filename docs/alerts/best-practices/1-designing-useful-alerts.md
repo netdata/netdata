@@ -74,13 +74,13 @@ Group related alerts by service or component. This helps responders find relevan
 
 ## What's Next
 
-- [12.2 Notification Strategy](../README.md) - Routing alerts to the right people
-- [12.3 Maintaining Configurations](../README.md) - Ongoing upkeep
-- [12.4 Large Environment Patterns](../README.md) - Scaling best practices
-- [12.5 SLI and SLO Alerts](../README.md) - Connecting alerts to business objectives
+- [12.2 Notification Strategy](/docs/alerts/best-practices/README.md) - Routing alerts to the right people
+- [12.3 Maintaining Configurations](/docs/alerts/best-practices/README.md) - Ongoing upkeep
+- [12.4 Large Environment Patterns](/docs/alerts/best-practices/README.md) - Scaling best practices
+- [12.5 SLI and SLO Alerts](/docs/alerts/best-practices/README.md) - Connecting alerts to business objectives
 
 ## See Also
 
-- [Creating and Managing Alerts](/docs/creating-alerts-pages/README.md) - Practical alert creation
-- [Controlling Alerts and Noise](/docs/controlling-alerts-noise/README.md) - Reducing alert noise
-- [Stock Alerts Reference](/docs/stock-alerts/README.md) - Stock alerts to build upon
+- [Creating and Managing Alerts](/docs/alerts/creating-alerts-pages/README.md) - Practical alert creation
+- [Controlling Alerts and Noise](/docs/alerts/controlling-alerts-noise/README.md) - Reducing alert noise
+- [Stock Alerts Reference](/docs/alerts/stock-alerts/README.md) - Stock alerts to build upon

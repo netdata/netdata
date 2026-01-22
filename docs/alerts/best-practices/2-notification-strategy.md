@@ -66,13 +66,13 @@ Update alert configurations based on response patterns. Alerts that consistently
 
 ## What's Next
 
-- [12.3 Maintaining Configurations](../README.md) - Version control and periodic reviews
-- [12.4 Large Environment Patterns](../README.md) - Parent-based and distributed setups
-- [12.5 SLI and SLO Alerts](../README.md) - Connecting to business objectives
-- [13. Alerts and Notifications Architecture](/docs/architecture/README.md) - Internal behavior
+- [12.3 Maintaining Configurations](/docs/alerts/best-practices/README.md) - Version control and periodic reviews
+- [12.4 Large Environment Patterns](/docs/alerts/best-practices/README.md) - Parent-based and distributed setups
+- [12.5 SLI and SLO Alerts](/docs/alerts/best-practices/README.md) - Connecting to business objectives
+- [13. Alerts and Notifications Architecture](/docs/alerts/architecture/README.md) - Internal behavior
 
 ## See Also
 
-- [Receiving Notifications](/docs/receiving-notifications/README.md) - Notification configuration options
-- [Silencing Rules](/docs/cloud-alert-features/README.md) - Cloud silencing rules
-- [Reducing Flapping and Noise](/docs/controlling-alerts-noise/4-reducing-flapping.md) - Managing alert frequency
+- [Receiving Notifications](/docs/alerts/receiving-notifications/README.md) - Notification configuration options
+- [Silencing Rules](/docs/alerts/cloud-alert-features/README.md) - Cloud silencing rules
+- [Reducing Flapping and Noise](/docs/alerts/controlling-alerts-noise/4-reducing-flapping.md) - Managing alert frequency

@@ -261,6 +261,6 @@ Always validate after making changes. Use `netdatacli reload-health` for file ch
 
 ## What's Next
 
-- **[Chapter 3: Alert Configuration Syntax (Reference)](/docs/alert-configuration-syntax/README.md)** covers full syntax for `alarm` and `template` definitions
-- **[Chapter 4: Controlling Alerts and Noise](/docs/controlling-alerts-noise/README.md)** explains how to use silencing, delays, and hysteresis to reduce noise once alerts are active
-- **[Chapter 7: Troubleshooting Alert Behaviour](/docs/troubleshooting-alerts/README.md)** provides deeper debugging when alerts don't behave as expected
+- **[Chapter 3: Alert Configuration Syntax (Reference)](/docs/alerts/alert-configuration-syntax/README.md)** covers full syntax for `alarm` and `template` definitions
+- **[Chapter 4: Controlling Alerts and Noise](/docs/alerts/controlling-alerts-noise/README.md)** explains how to use silencing, delays, and hysteresis to reduce noise once alerts are active
+- **[Chapter 7: Troubleshooting Alert Behaviour](/docs/alerts/troubleshooting-alerts/README.md)** provides deeper debugging when alerts don't behave as expected

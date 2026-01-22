@@ -603,7 +603,7 @@ When writing alerts, always use the `alarm_variables` API to discover exact vari
 
 ## What's Next
 
-- **[3.6 Optional Metadata: class, type, component, and labels](6-optional-metadata.md)** explains how to classify and organize alerts for filtering and UI display
-- **[Chapter 4: Controlling Alerts and Noise](/docs/controlling-alerts-noise/README.md)** covers disabling, silencing, and reducing alert noise
-- **[9.3 Inspect Alert Variables (alarm_variables API)](/docs/apis-alerts-events/README.md)** provides detailed API documentation with advanced filtering and debugging techniques
-- **[8.1 Hysteresis and Status-Based Conditions](/docs/essential-patterns/README.md)** shows patterns using `$status` and status constants for alert logic
+- **[3.6 Optional Metadata: class, type, component, and labels](/docs/alerts/alert-configuration-syntax/6-optional-metadata.md)** explains how to classify and organize alerts for filtering and UI display
+- **[Chapter 4: Controlling Alerts and Noise](/docs/alerts/controlling-alerts-noise/README.md)** covers disabling, silencing, and reducing alert noise
+- **[9.3 Inspect Alert Variables (alarm_variables API)](/docs/alerts/apis-alerts-events/README.md)** provides detailed API documentation with advanced filtering and debugging techniques
+- **[8.1 Hysteresis and Status-Based Conditions](/docs/alerts/essential-patterns/README.md)** shows patterns using `$status` and status constants for alert logic

@@ -69,11 +69,11 @@ Automate alert deployment and testing. When alert configurations change, automat
 
 ## What's Next
 
-- [12.5 SLI and SLO Alerts](../README.md) - Connecting alerts to business objectives
-- [13. Alerts and Notifications Architecture](/docs/architecture/README.md) - Internal behavior details
+- [12.5 SLI and SLO Alerts](/docs/alerts/best-practices/README.md) - Connecting alerts to business objectives
+- [13. Alerts and Notifications Architecture](/docs/alerts/architecture/README.md) - Internal behavior details
 
 ## See Also
 
-- [Scaling Topologies](/docs/architecture/5-scaling-topologies.md) - Technical implementation details
-- [Configuration Layers](/docs/architecture/4-configuration-layers.md) - How configurations work hierarchically
-- [Maintaining Configurations](3-maintaining-configurations.md) - Operational maintenance procedures
+- [Scaling Topologies](/docs/alerts/architecture/5-scaling-topologies.md) - Technical implementation details
+- [Configuration Layers](/docs/alerts/architecture/4-configuration-layers.md) - How configurations work hierarchically
+- [Maintaining Configurations](/docs/alerts/best-practices/3-maintaining-configurations.md) - Operational maintenance procedures

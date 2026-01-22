@@ -40,6 +40,6 @@ Netdata Cloud supports multiple notification tiers:
 
 ## 5.3.5 Related Sections
 
-- **[5.1 Notification Concepts](1-notification-concepts.md)** - Dispatch model overview
-- **[5.4 Controlling Recipients](4-controlling-recipients.md)** - Severity routing
-- **[10.2 Silencing Rules Manager](/docs/cloud-alert-features/README.md)** - Cloud silencing features
+- **[5.1 Notification Concepts](/docs/alerts/receiving-notifications/1-notification-concepts.md)** - Dispatch model overview
+- **[5.4 Controlling Recipients](/docs/alerts/receiving-notifications/4-controlling-recipients.md)** - Severity routing
+- **[10.2 Silencing Rules Manager](/docs/alerts/cloud-alert-features/README.md)** - Cloud silencing features

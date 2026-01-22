@@ -72,6 +72,6 @@ chart labels: unit_name=!*
 
 ## 5.4.4 Related Sections
 
-- **[5.2 Agent and Parent Notifications](2-agent-parent-notifications.md)** - Local routing
-- **[5.5 Testing and Troubleshooting](5-testing-troubleshooting.md)** - Debugging delivery issues
-- **[12.2 Notification Strategy and On-Call Hygiene](/docs/best-practices/2-notification-strategy.md)** - On-call best practices
+- **[5.2 Agent and Parent Notifications](/docs/alerts/receiving-notifications/2-agent-parent-notifications.md)** - Local routing
+- **[5.5 Testing and Troubleshooting](/docs/alerts/receiving-notifications/5-testing-troubleshooting.md)** - Debugging delivery issues
+- **[12.2 Notification Strategy and On-Call Hygiene](/docs/alerts/best-practices/2-notification-strategy.md)** - On-call best practices

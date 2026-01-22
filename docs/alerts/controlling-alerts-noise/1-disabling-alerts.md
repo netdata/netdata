@@ -12,7 +12,7 @@ Disable an alert when:
 - **The monitored service is retired** and the alert will never fire correctly
 - **You want a permanent solution** rather than temporary silencing
 
-For temporary quiet periods, see **[4.3 Silencing in Netdata Cloud](3-silencing-cloud.md)** instead.
+For temporary quiet periods, see **[4.3 Silencing in Netdata Cloud](/docs/alerts/controlling-alerts-noise/3-silencing-cloud.md)** instead.
 
 </details>
 
@@ -88,11 +88,11 @@ See **9.4 Health Management API** for full documentation.
 
 ## 4.1.4 Related Sections
 
-- **[4.2 Silencing vs Disabling](2-silencing-vs-disabling.md)** - Understand the critical difference
-- **[4.3 Silencing in Netdata Cloud](3-silencing-cloud.md)** - Cloud-managed silencing rules
-- **[4.4 Reducing Flapping and Noise](4-reducing-flapping.md)** - Techniques for preventing flapping
+- **[4.2 Silencing vs Disabling](/docs/alerts/controlling-alerts-noise/2-silencing-vs-disabling.md)** - Understand the critical difference
+- **[4.3 Silencing in Netdata Cloud](/docs/alerts/controlling-alerts-noise/3-silencing-cloud.md)** - Cloud-managed silencing rules
+- **[4.4 Reducing Flapping and Noise](/docs/alerts/controlling-alerts-noise/4-reducing-flapping.md)** - Techniques for preventing flapping
 
 ## What's Next
 
-- **[4.2 Silencing vs Disabling](2-silencing-vs-disabling.md)** - Understanding the differences
-- **[Chapter 8: Essential Alert Patterns](/docs/essential-patterns/README.md)** - Hysteresis and patterns
+- **[4.2 Silencing vs Disabling](/docs/alerts/controlling-alerts-noise/2-silencing-vs-disabling.md)** - Understanding the differences
+- **[Chapter 8: Essential Alert Patterns](/docs/alerts/essential-patterns/README.md)** - Hysteresis and patterns

@@ -71,11 +71,11 @@ curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.'
 
 ## 4.3.5 Related Sections
 
-- **[4.1 Disabling Alerts](1-disabling-alerts.md)** - Permanent alert removal
-- **[4.2 Silencing vs Disabling](2-silencing-vs-disabling.md)** - Conceptual differences
-- **[4.4 Reducing Flapping and Noise](4-reducing-flapping.md)** - Using delays for stability
+- **[4.1 Disabling Alerts](/docs/alerts/controlling-alerts-noise/1-disabling-alerts.md)** - Permanent alert removal
+- **[4.2 Silencing vs Disabling](/docs/alerts/controlling-alerts-noise/2-silencing-vs-disabling.md)** - Conceptual differences
+- **[4.4 Reducing Flapping and Noise](/docs/alerts/controlling-alerts-noise/4-reducing-flapping.md)** - Using delays for stability
 
 ## What's Next
 
-- **[8.1 Hysteresis](/docs/essential-patterns/README.md)** - Status-based conditions
-- **[Chapter 5: Receiving Notifications](/docs/receiving-notifications/README.md)** - Notification configuration
+- **[8.1 Hysteresis](/docs/alerts/essential-patterns/README.md)** - Status-based conditions
+- **[Chapter 5: Receiving Notifications](/docs/alerts/receiving-notifications/README.md)** - Notification configuration
