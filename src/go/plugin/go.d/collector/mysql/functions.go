@@ -41,24 +41,30 @@ const (
 
 // mysqlColumnMeta defines metadata for a single column
 type mysqlColumnMeta struct {
-	dbColumn      string                 // Column name in database (e.g., "SUM_TIMER_WAIT")
-	uiKey         string                 // Canonical name used everywhere: SQL alias, UI key, sort key
-	displayName   string                 // Display name in UI (e.g., "Total Time")
-	dataType      funcapi.FieldType      // "string", "integer", "float", "duration"
-	units         string                 // Unit for duration/numeric types (e.g., "seconds")
-	visible       bool                   // Default visibility
-	transform     funcapi.FieldTransform // Transform for value_options (e.g., "duration", "number", "none")
-	decimalPoints int                    // Decimal points for display
-	sortDir       funcapi.FieldSort      // Sort direction: "ascending" or "descending"
-	summary       funcapi.FieldSummary   // Summary function: "sum", "count", "max", "min", "mean" (UI aggregations)
-	filter        funcapi.FieldFilter    // Filter type: "multiselect" or "range"
-	isPicoseconds bool                   // Needs picoseconds to seconds conversion
-	isSortOption  bool                   // Show in sort dropdown
-	sortLabel     string                 // Label for sort option
-	isDefaultSort bool                   // Is this the default sort option
-	isUniqueKey   bool                   // Is this column a unique key
-	isSticky      bool                   // Is this column sticky in UI
-	fullWidth     bool                   // Should column take full width
+	dbColumn       string                 // Column name in database (e.g., "SUM_TIMER_WAIT")
+	uiKey          string                 // Canonical name used everywhere: SQL alias, UI key, sort key
+	displayName    string                 // Display name in UI (e.g., "Total Time")
+	dataType       funcapi.FieldType      // "string", "integer", "float", "duration"
+	units          string                 // Unit for duration/numeric types (e.g., "seconds")
+	visible        bool                   // Default visibility
+	transform      funcapi.FieldTransform // Transform for value_options (e.g., "duration", "number", "none")
+	decimalPoints  int                    // Decimal points for display
+	sortDir        funcapi.FieldSort      // Sort direction: "ascending" or "descending"
+	summary        funcapi.FieldSummary   // Summary function: "sum", "count", "max", "min", "mean" (UI aggregations)
+	filter         funcapi.FieldFilter    // Filter type: "multiselect" or "range"
+	isPicoseconds  bool                   // Needs picoseconds to seconds conversion
+	isSortOption   bool                   // Show in sort dropdown
+	sortLabel      string                 // Label for sort option
+	isDefaultSort  bool                   // Is this the default sort option
+	isUniqueKey    bool                   // Is this column a unique key
+	isSticky       bool                   // Is this column sticky in UI
+	fullWidth      bool                   // Should column take full width
+	isLabel        bool                   // Is this column a label for grouping
+	isPrimary      bool                   // Is this label the primary grouping
+	isMetric       bool                   // Is this column a chartable metric
+	chartGroup     string                 // Chart group key
+	chartTitle     string                 // Chart title
+	isDefaultChart bool                   // Include this chart group in defaults
 }
 
 // mysqlAllColumns defines ALL possible columns from events_statements_summary_by_digest
@@ -132,6 +138,35 @@ var mysqlAllColumns = []mysqlColumnMeta{
 	{dbColumn: "MAX_CONTROLLED_MEMORY", uiKey: "maxControlledMemory", displayName: "Max Controlled Memory", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summaryMax, filter: filterRange, isSortOption: true, sortLabel: "Top queries by Max Controlled Memory"},
 	{dbColumn: "MAX_TOTAL_MEMORY", uiKey: "maxTotalMemory", displayName: "Max Total Memory", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summaryMax, filter: filterRange, isSortOption: true, sortLabel: "Top queries by Max Total Memory"},
 }
+
+type mysqlChartGroup struct {
+	key          string
+	title        string
+	columns      []string
+	defaultChart bool
+}
+
+var mysqlChartGroups = []mysqlChartGroup{
+	{key: "Calls", title: "Number of Calls", columns: []string{"calls"}, defaultChart: true},
+	{key: "Time", title: "Execution Time", columns: []string{"totalTime", "avgTime", "minTime", "maxTime"}, defaultChart: true},
+	{key: "Percentiles", title: "Execution Time Percentiles", columns: []string{"p95Time", "p99Time", "p999Time"}},
+	{key: "LockTime", title: "Lock Time", columns: []string{"lockTime"}},
+	{key: "Errors", title: "Errors & Warnings", columns: []string{"errors", "warnings"}},
+	{key: "Rows", title: "Rows", columns: []string{"rowsSent", "rowsExamined", "rowsAffected"}},
+	{key: "TempTables", title: "Temp Tables", columns: []string{"tmpDiskTables", "tmpTables"}},
+	{key: "Joins", title: "Join Operations", columns: []string{"fullJoin", "fullRangeJoin", "selectRange", "selectRangeCheck", "selectScan"}},
+	{key: "Sort", title: "Sort Operations", columns: []string{"sortMergePasses", "sortRange", "sortRows", "sortScan"}},
+	{key: "Index", title: "Index Usage", columns: []string{"noIndexUsed", "noGoodIndexUsed"}},
+	{key: "CPU", title: "CPU Time", columns: []string{"cpuTime"}},
+	{key: "Memory", title: "Memory", columns: []string{"maxControlledMemory", "maxTotalMemory"}},
+	{key: "Sample", title: "Sample Time", columns: []string{"sampleTime"}},
+}
+
+var mysqlLabelColumns = map[string]bool{
+	"schema": true,
+}
+
+const mysqlPrimaryLabel = "schema"
 
 // mysqlMethods returns the available function methods for MySQL
 func mysqlMethods() []module.MethodConfig {
@@ -558,6 +593,8 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		defaultSort = sortOptions[0].ID
 	}
 
+	annotatedCols := decorateMySQLColumns(cols)
+
 	return &module.FunctionResponse{
 		Status:            200,
 		Help:              "Top SQL queries from performance_schema.events_statements_summary_by_digest",
@@ -567,39 +604,133 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		RequiredParams:    []funcapi.ParamConfig{sortParam},
 
 		// Charts for aggregated visualization
-		Charts: map[string]module.ChartConfig{
-			"Calls": {
-				Name:    "Number of Calls",
-				Type:    "stacked-bar",
-				Columns: []string{"calls"},
-			},
-			"Time": {
-				Name:    "Execution Time",
-				Type:    "stacked-bar",
-				Columns: []string{"totalTime", "avgTime"},
-			},
-			"Rows": {
-				Name:    "Rows",
-				Type:    "stacked-bar",
-				Columns: []string{"rowsSent", "rowsExamined", "rowsAffected"},
-			},
-			"Errors": {
-				Name:    "Errors & Warnings",
-				Type:    "stacked-bar",
-				Columns: []string{"errors", "warnings"},
-			},
-		},
-		DefaultCharts: [][]string{
-			{"Time", "schema"},
-			{"Calls", "schema"},
-		},
-		GroupBy: map[string]module.GroupByConfig{
-			"schema": {
-				Name:    "Group by Schema",
-				Columns: []string{"schema"},
-			},
-		},
+		Charts:        mysqlTopQueriesCharts(annotatedCols),
+		DefaultCharts: mysqlTopQueriesDefaultCharts(annotatedCols),
+		GroupBy:       mysqlTopQueriesGroupBy(annotatedCols),
 	}
+}
+
+func decorateMySQLColumns(cols []mysqlColumnMeta) []mysqlColumnMeta {
+	out := make([]mysqlColumnMeta, len(cols))
+	index := make(map[string]int, len(cols))
+	for i, col := range cols {
+		out[i] = col
+		index[col.uiKey] = i
+	}
+
+	for i := range out {
+		if mysqlLabelColumns[out[i].uiKey] {
+			out[i].isLabel = true
+			if out[i].uiKey == mysqlPrimaryLabel {
+				out[i].isPrimary = true
+			}
+		}
+	}
+
+	for _, group := range mysqlChartGroups {
+		for _, key := range group.columns {
+			idx, ok := index[key]
+			if !ok {
+				continue
+			}
+			out[idx].isMetric = true
+			out[idx].chartGroup = group.key
+			out[idx].chartTitle = group.title
+			if group.defaultChart {
+				out[idx].isDefaultChart = true
+			}
+		}
+	}
+
+	return out
+}
+
+func mysqlTopQueriesCharts(cols []mysqlColumnMeta) map[string]module.ChartConfig {
+	charts := make(map[string]module.ChartConfig)
+	for _, col := range cols {
+		if !col.isMetric || col.chartGroup == "" {
+			continue
+		}
+		cfg, ok := charts[col.chartGroup]
+		if !ok {
+			title := col.chartTitle
+			if title == "" {
+				title = col.chartGroup
+			}
+			cfg = module.ChartConfig{Name: title, Type: "stacked-bar"}
+		}
+		cfg.Columns = append(cfg.Columns, col.uiKey)
+		charts[col.chartGroup] = cfg
+	}
+	return charts
+}
+
+func mysqlTopQueriesDefaultCharts(cols []mysqlColumnMeta) [][]string {
+	label := primaryMySQLLabel(cols)
+	if label == "" {
+		return nil
+	}
+	chartGroups := defaultMySQLChartGroups(cols)
+	out := make([][]string, 0, len(chartGroups))
+	for _, group := range chartGroups {
+		out = append(out, []string{group, label})
+	}
+	return out
+}
+
+func mysqlTopQueriesGroupBy(cols []mysqlColumnMeta) map[string]module.GroupByConfig {
+	groupBy := make(map[string]module.GroupByConfig)
+	for _, col := range cols {
+		if !col.isLabel {
+			continue
+		}
+		groupBy[col.uiKey] = module.GroupByConfig{
+			Name:    "Group by " + col.displayName,
+			Columns: []string{col.uiKey},
+		}
+	}
+	return groupBy
+}
+
+func primaryMySQLLabel(cols []mysqlColumnMeta) string {
+	for _, col := range cols {
+		if col.isPrimary {
+			return col.uiKey
+		}
+	}
+	for _, col := range cols {
+		if col.isLabel {
+			return col.uiKey
+		}
+	}
+	return ""
+}
+
+func defaultMySQLChartGroups(cols []mysqlColumnMeta) []string {
+	groups := make([]string, 0)
+	seen := make(map[string]bool)
+	for _, col := range cols {
+		if !col.isMetric || col.chartGroup == "" || !col.isDefaultChart {
+			continue
+		}
+		if !seen[col.chartGroup] {
+			seen[col.chartGroup] = true
+			groups = append(groups, col.chartGroup)
+		}
+	}
+	if len(groups) > 0 {
+		return groups
+	}
+	for _, col := range cols {
+		if !col.isMetric || col.chartGroup == "" {
+			continue
+		}
+		if !seen[col.chartGroup] {
+			seen[col.chartGroup] = true
+			groups = append(groups, col.chartGroup)
+		}
+	}
+	return groups
 }
 
 // checkPerformanceSchema checks if performance_schema is enabled (cached)

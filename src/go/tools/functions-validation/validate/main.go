@@ -3,7 +3,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -41,8 +40,13 @@ func main() {
 		exitErr("parse input JSON: %v", err)
 	}
 
+	var schemaDoc any
+	if err := json.Unmarshal(schemaBytes, &schemaDoc); err != nil {
+		exitErr("parse schema JSON: %v", err)
+	}
+
 	compiler := jsonschema.NewCompiler()
-	if err := compiler.AddResource("schema.json", bytes.NewReader(schemaBytes)); err != nil {
+	if err := compiler.AddResource("schema.json", schemaDoc); err != nil {
 		exitErr("add schema resource: %v", err)
 	}
 	schema, err := compiler.Compile("schema.json")

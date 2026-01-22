@@ -20,6 +20,9 @@ func init() {
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
+		Methods:         rethinkdbMethods,
+		MethodParams:    rethinkdbMethodParams,
+		HandleMethod:    rethinkdbHandleMethod,
 	})
 }
 
@@ -44,6 +47,7 @@ type Config struct {
 	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 	Username           string           `yaml:"username,omitempty" json:"username"`
 	Password           string           `yaml:"password,omitempty" json:"password"`
+	TopQueriesLimit    int              `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
 }
 
 type Collector struct {

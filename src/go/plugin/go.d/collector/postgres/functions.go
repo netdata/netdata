@@ -77,6 +77,18 @@ type pgColumnMeta struct {
 	isSticky bool
 	// Whether this column should take full width
 	fullWidth bool
+	// Whether this column is a label for grouping
+	isLabel bool
+	// Whether this label is the primary grouping
+	isPrimary bool
+	// Whether this column is a chartable metric
+	isMetric bool
+	// Chart group key
+	chartGroup string
+	// Chart title
+	chartTitle string
+	// Include this chart group in defaults
+	isDefaultChart bool
 }
 
 // pgAllColumns defines ALL possible columns from pg_stat_statements
@@ -150,6 +162,37 @@ var pgAllColumns = []pgColumnMeta{
 	{dbColumn: "s.temp_blk_read_time", uiKey: "tempBlkReadTime", displayName: "Temp Block Read Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
 	{dbColumn: "s.temp_blk_write_time", uiKey: "tempBlkWriteTime", displayName: "Temp Block Write Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
 }
+
+type pgChartGroup struct {
+	key          string
+	title        string
+	columns      []string
+	defaultChart bool
+}
+
+var pgChartGroups = []pgChartGroup{
+	{key: "Calls", title: "Number of Calls", columns: []string{"calls"}, defaultChart: true},
+	{key: "Time", title: "Execution Time", columns: []string{"totalTime", "meanTime", "minTime", "maxTime", "stddevTime"}, defaultChart: true},
+	{key: "PlanTime", title: "Planning Time", columns: []string{"totalPlanTime", "meanPlanTime", "minPlanTime", "maxPlanTime", "stddevPlanTime"}},
+	{key: "Plans", title: "Plans", columns: []string{"plans"}},
+	{key: "Rows", title: "Rows Returned", columns: []string{"rows"}},
+	{key: "SharedBlocks", title: "Shared Blocks", columns: []string{"sharedBlksHit", "sharedBlksRead", "sharedBlksDirtied", "sharedBlksWritten"}},
+	{key: "LocalBlocks", title: "Local Blocks", columns: []string{"localBlksHit", "localBlksRead", "localBlksDirtied", "localBlksWritten"}},
+	{key: "TempBlocks", title: "Temp Blocks", columns: []string{"tempBlksRead", "tempBlksWritten"}},
+	{key: "IOTime", title: "Block I/O Time", columns: []string{"blkReadTime", "blkWriteTime"}},
+	{key: "WALRecords", title: "WAL Records", columns: []string{"walRecords", "walFpi"}},
+	{key: "WALBytes", title: "WAL Bytes", columns: []string{"walBytes"}},
+	{key: "JITCounts", title: "JIT Counts", columns: []string{"jitFunctions", "jitInliningCount", "jitOptimizationCount", "jitEmissionCount"}},
+	{key: "JITTime", title: "JIT Time", columns: []string{"jitGenerationTime", "jitInliningTime", "jitOptimizationTime", "jitEmissionTime"}},
+	{key: "TempIOTime", title: "Temp Block I/O Time", columns: []string{"tempBlkReadTime", "tempBlkWriteTime"}},
+}
+
+var pgLabelColumns = map[string]bool{
+	"database": true,
+	"user":     true,
+}
+
+const pgPrimaryLabel = "database"
 
 // pgMethods returns the available function methods for PostgreSQL
 // Sort options are built dynamically based on available columns
@@ -307,6 +350,8 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		defaultSort = sortOptions[0].ID
 	}
 
+	annotatedCols := decoratePgColumns(queryCols)
+
 	return &module.FunctionResponse{
 		Status:            200,
 		Help:              "Top SQL queries from pg_stat_statements",
@@ -316,43 +361,133 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		RequiredParams:    []funcapi.ParamConfig{sortParam},
 
 		// Charts for aggregated visualization
-		Charts: map[string]module.ChartConfig{
-			"Calls": {
-				Name:    "Number of Calls",
-				Type:    "stacked-bar",
-				Columns: []string{"calls"},
-			},
-			"Time": {
-				Name:    "Execution Time",
-				Type:    "stacked-bar",
-				Columns: []string{"totalTime", "meanTime"},
-			},
-			"Rows": {
-				Name:    "Rows Returned",
-				Type:    "stacked-bar",
-				Columns: []string{"rows"},
-			},
-			"IO": {
-				Name:    "Block I/O",
-				Type:    "stacked-bar",
-				Columns: []string{"sharedBlksHit", "sharedBlksRead"},
-			},
-		},
-		DefaultCharts: [][]string{
-			{"Time", "database"},
-			{"Calls", "database"},
-		},
-		GroupBy: map[string]module.GroupByConfig{
-			"database": {
-				Name:    "Group by Database",
-				Columns: []string{"database"},
-			},
-			"user": {
-				Name:    "Group by User",
-				Columns: []string{"user"},
-			},
-		},
+		Charts:        pgTopQueriesCharts(annotatedCols),
+		DefaultCharts: pgTopQueriesDefaultCharts(annotatedCols),
+		GroupBy:       pgTopQueriesGroupBy(annotatedCols),
 	}
+}
+
+func decoratePgColumns(cols []pgColumnMeta) []pgColumnMeta {
+	out := make([]pgColumnMeta, len(cols))
+	index := make(map[string]int, len(cols))
+	for i, col := range cols {
+		out[i] = col
+		index[col.uiKey] = i
+	}
+
+	for i := range out {
+		if pgLabelColumns[out[i].uiKey] {
+			out[i].isLabel = true
+			if out[i].uiKey == pgPrimaryLabel {
+				out[i].isPrimary = true
+			}
+		}
+	}
+
+	for _, group := range pgChartGroups {
+		for _, key := range group.columns {
+			idx, ok := index[key]
+			if !ok {
+				continue
+			}
+			out[idx].isMetric = true
+			out[idx].chartGroup = group.key
+			out[idx].chartTitle = group.title
+			if group.defaultChart {
+				out[idx].isDefaultChart = true
+			}
+		}
+	}
+
+	return out
+}
+
+func pgTopQueriesCharts(cols []pgColumnMeta) map[string]module.ChartConfig {
+	charts := make(map[string]module.ChartConfig)
+	for _, col := range cols {
+		if !col.isMetric || col.chartGroup == "" {
+			continue
+		}
+		cfg, ok := charts[col.chartGroup]
+		if !ok {
+			title := col.chartTitle
+			if title == "" {
+				title = col.chartGroup
+			}
+			cfg = module.ChartConfig{Name: title, Type: "stacked-bar"}
+		}
+		cfg.Columns = append(cfg.Columns, col.uiKey)
+		charts[col.chartGroup] = cfg
+	}
+	return charts
+}
+
+func pgTopQueriesDefaultCharts(cols []pgColumnMeta) [][]string {
+	label := primaryPgLabel(cols)
+	if label == "" {
+		return nil
+	}
+	chartGroups := defaultPgChartGroups(cols)
+	out := make([][]string, 0, len(chartGroups))
+	for _, group := range chartGroups {
+		out = append(out, []string{group, label})
+	}
+	return out
+}
+
+func pgTopQueriesGroupBy(cols []pgColumnMeta) map[string]module.GroupByConfig {
+	groupBy := make(map[string]module.GroupByConfig)
+	for _, col := range cols {
+		if !col.isLabel {
+			continue
+		}
+		groupBy[col.uiKey] = module.GroupByConfig{
+			Name:    "Group by " + col.displayName,
+			Columns: []string{col.uiKey},
+		}
+	}
+	return groupBy
+}
+
+func primaryPgLabel(cols []pgColumnMeta) string {
+	for _, col := range cols {
+		if col.isPrimary {
+			return col.uiKey
+		}
+	}
+	for _, col := range cols {
+		if col.isLabel {
+			return col.uiKey
+		}
+	}
+	return ""
+}
+
+func defaultPgChartGroups(cols []pgColumnMeta) []string {
+	groups := make([]string, 0)
+	seen := make(map[string]bool)
+	for _, col := range cols {
+		if !col.isMetric || col.chartGroup == "" || !col.isDefaultChart {
+			continue
+		}
+		if !seen[col.chartGroup] {
+			seen[col.chartGroup] = true
+			groups = append(groups, col.chartGroup)
+		}
+	}
+	if len(groups) > 0 {
+		return groups
+	}
+	for _, col := range cols {
+		if !col.isMetric || col.chartGroup == "" {
+			continue
+		}
+		if !seen[col.chartGroup] {
+			seen[col.chartGroup] = true
+			groups = append(groups, col.chartGroup)
+		}
+	}
+	return groups
 }
 
 // detectPgStatStatementsColumns queries the database to find available columns

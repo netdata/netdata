@@ -5,7 +5,7 @@
 - Use `go.d.plugin --function` with the configs in `./config`.
 - Config files live under `./config/go.d`.
 - Validate output against the embedded schema.
-- Use `./e2e.sh` for automated end-to-end checks in `/tmp`.
+- Use `./e2e.sh` for automated end-to-end checks in `/tmp` (runs per-DB scripts).
 
 ## Start containers
 ```
@@ -42,9 +42,24 @@ src/go/go.d.plugin \
 ```
 ./e2e.sh
 ```
+```
+./e2e.sh --jobs 4
+```
+```
+./e2e.sh --only postgres,mysql
+```
+```
+./e2e.sh --list
+```
+
+## Per-DB E2E (single DB)
+```
+./e2e/postgres.sh
+```
 
 ### Behavior
-- Creates a workspace under `/tmp` and runs Docker Compose there.
+- Each DB script creates a workspace under `/tmp` and runs Docker Compose there.
+- Ports are auto-selected per run to avoid collisions.
 - Builds `go.d.plugin` into the `/tmp` workspace.
 - Validates schema **and** that data rows are returned for top-queries.
 - Cleans up the `/tmp` workspace on success; keeps it on failure for debugging.

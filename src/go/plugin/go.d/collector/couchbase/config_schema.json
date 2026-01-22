@@ -25,12 +25,26 @@
         "default": "http://127.0.0.1:8091",
         "format": "uri"
       },
+      "query_url": {
+        "title": "Query URL",
+        "description": "Optional. The URL of the Couchbase Query (N1QL) service. If not set, defaults to the same host as URL on port 8093.",
+        "type": "string",
+        "format": "uri"
+      },
       "timeout": {
         "title": "Timeout",
         "description": "The timeout in seconds for the HTTP request.",
         "type": "number",
         "minimum": 0.5,
         "default": 1
+      },
+      "top_queries_limit": {
+        "title": "Top Queries Limit",
+        "description": "Maximum number of queries to return in the top-queries function response.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 5000,
+        "default": 500
       },
       "not_follow_redirects": {
         "title": "Not follow redirects",
@@ -138,8 +152,10 @@
             "update_every",
             "autodetection_retry",
             "url",
+            "query_url",
             "timeout",
             "not_follow_redirects",
+            "top_queries_limit",
             "vnode"
           ]
         },

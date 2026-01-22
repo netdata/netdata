@@ -22,6 +22,9 @@ func init() {
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
+		Methods:         oracleMethods,
+		MethodParams:    oracleMethodParams,
+		HandleMethod:    oracleHandleMethod,
 	})
 }
 
@@ -42,6 +45,7 @@ type Config struct {
 	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	DSN                string           `json:"dsn" yaml:"dsn"`
 	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	TopQueriesLimit    int              `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
 
 	charts *module.Charts
 

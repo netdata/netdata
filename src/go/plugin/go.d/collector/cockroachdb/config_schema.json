@@ -32,6 +32,26 @@
         "minimum": 0.5,
         "default": 1
       },
+      "dsn": {
+        "title": "SQL DSN",
+        "description": "CockroachDB SQL Data Source Name for query functions (top-queries, running-queries).",
+        "type": "string"
+      },
+      "sql_timeout": {
+        "title": "SQL Timeout",
+        "description": "Timeout in seconds for SQL query functions.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 1
+      },
+      "top_queries_limit": {
+        "title": "Top Queries Limit",
+        "description": "Maximum number of rows returned by the top-queries and running-queries functions.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 5000,
+        "default": 500
+      },
       "not_follow_redirects": {
         "title": "Not follow redirects",
         "description": "If set, the client will not follow HTTP redirects automatically.",
@@ -144,6 +164,14 @@
           ]
         },
         {
+          "title": "SQL",
+          "fields": [
+            "dsn",
+            "sql_timeout",
+            "top_queries_limit"
+          ]
+        },
+        {
           "title": "Auth",
           "fields": [
             "username",
@@ -198,6 +226,13 @@
       "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
     "timeout": {
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "dsn": {
+      "ui:help": "Format is `postgres://username:password@host:port/dbname?sslmode=disable`.",
+      "ui:placeholder": "postgres://username:password@host:port/defaultdb?sslmode=disable"
+    },
+    "sql_timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
     },
     "username": {

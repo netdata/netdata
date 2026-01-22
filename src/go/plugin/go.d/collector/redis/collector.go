@@ -33,6 +33,9 @@ func init() {
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
+		Methods:         redisMethods,
+		MethodParams:    redisMethodParams,
+		HandleMethod:    redisHandleMethod,
 	})
 }
 
@@ -62,6 +65,7 @@ type Config struct {
 	Password           string           `yaml:"password,omitempty" json:"password"`
 	tlscfg.TLSConfig   `yaml:",inline" json:""`
 	PingSamples        int `yaml:"ping_samples" json:"ping_samples"`
+	TopQueriesLimit    int `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
 }
 
 type (
@@ -84,6 +88,7 @@ type (
 	redisClient interface {
 		Info(ctx context.Context, section ...string) *redis.StringCmd
 		Ping(context.Context) *redis.StatusCmd
+		SlowLogGet(ctx context.Context, num int64) *redis.SlowLogCmd
 		Close() error
 	}
 )
