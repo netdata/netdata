@@ -5,30 +5,40 @@ Before configuring notifications, understand where they originate and how they f
 ## 5.1.1 The Three Dispatch Models
 
 ```mermaid
-flowchart TD
-    subgraph Agent["Agent / Parent"]
-        H[Health Engine] --> E[Alert Event]
-    end
+flowchart TB
+    subgraph Models["Notification Dispatch Models"]
+        direction TB
+        
+        subgraph M1["🔵 Agent-Dispatched"]
+            direction LR
+            HE["Health Engine"] -->|"Alert Event"| LN["Local Notification"]
+            LN --> DestA["Slack · Email · PagerDuty"]
+        end
+        
+        subgraph M2["🟢 Parent-Dispatched"]
+            direction LR
+            Child["Child Node"] -->|"Metrics"| Parent["Parent Node"]
+            Parent -->|"Health Engine"| PN["Parent Notification"]
+        end
+        
+        subgraph M3["🟡 Cloud-Dispatched"]
+            direction LR
+            AE["Alert Event"] --> Cloud["Netdata Cloud"]
+            Cloud --> CI["Cloud Integrations"]
+            CI --> DestC["Slack · Teams · Webhooks"]
+        end
+    
+    classDef model fill:#2196F3,stroke:#000000,stroke-width:3px,color:#ffffff,font-size:16px
+    classDef yellow fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
+    classDef green fill:#4caf50,stroke:#000000,stroke-width:3px,color:#ffffff,font-size:16px
+    classDef white fill:#ffffff,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
+    classDef orange fill:#ff9800,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
 
-    subgraph Model1["Agent-Dispatched"]
-        E --> L1[Local Notification]
-        L1 --> S1[Slack, Email, PagerDuty]
-    end
-
-    subgraph Model2["Parent-Dispatched"]
-        C1[Child Node] -->|Streams metrics| P[Parent]
-        P --> E2[Parent Health Engine]
-        E2 --> L2[Parent Notification]
-    end
-
-    subgraph Model3["Cloud-Dispatched"]
-        E --> C[Netdata Cloud]
-        C --> R[Cloud Integrations]
-        R --> S3[Slack, Teams, Webhooks]
-    end
-
-    classDef model fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    class Model1,Model2,Model3 model
+    class M1,M2,M3 model
+    class HE,AE,Parent yellow
+    class LN,PN,CI green
+    class DestA,DestC,Child white
+    class Cloud orange
 ```
 
 **1. Agent-Dispatched Notifications**
