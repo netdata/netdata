@@ -83,10 +83,10 @@ Monitor the relationship between alert behavior and workload changes. When signi
 
 - [12.4 Large Environment Patterns](./4-scaling-large-environments.md) - Parent-based and distributed setups
 - [12.5 SLI and SLO Alerts](./5-sli-slo-alerts.md) - Connecting to business objectives
-- [13. Alerts and Notifications Architecture](../architecture/README.md) - Deep-dive internals
+- [13. Alerts and Notifications Architecture](/docs/architecture/README.md) - Deep-dive internals
 
 ## See Also
 
-- [Creating and Editing Alerts via Config Files](../creating-alerts-pages/2-creating-and-editing-alerts-via-config-files.md) - File-based editing
-- [Reloading and Validating Configuration](../creating-alerts-pages/5-reloading-and-validating-alert-configuration.md) - Validation procedures
-- [Disabling Alerts](../controlling-alerts-noise/1-disabling-alerts.md) - How to temporarily disable alerts
+- [Creating and Editing Alerts via Config Files](/docs/creating-alerts-pages/2-creating-and-editing-alerts-via-config-files.md) - File-based editing
+- [Reloading and Validating Configuration](/docs/creating-alerts-pages/5-reloading-and-validating-alert-configuration.md) - Validation procedures
+- [Disabling Alerts](/docs/controlling-alerts-noise/1-disabling-alerts.md) - How to temporarily disable alerts

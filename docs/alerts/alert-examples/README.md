@@ -4,7 +4,7 @@ This chapter provides **practical alert templates** you can adapt for common mon
 
 :::tip
 
-These examples follow the structure established in **[2.1 Quick Start: Create Your First Alert](../creating-alerts-pages/1-quick-start-create-your-first-alert.md)**. Use the Cloud UI or configuration files as preferred.
+These examples follow the structure established in **[2.1 Quick Start: Create Your First Alert](/docs/creating-alerts-pages/1-quick-start-create-your-first-alert.md)**. Use the Cloud UI or configuration files as preferred.
 
 :::
 
@@ -141,7 +141,7 @@ To see more application alerts, visit the [Collectors list](/docs/collecting-met
 
 ### 6.3.1 MySQL Alerts
 
-- [MySQL & MariaDB](../../src/go/plugin/go.d/collector/mysql/README.md) - replication lag, slow queries, connection utilization
+- [MySQL & MariaDB](/docs/src/go/plugin/go.d/collector/mysql/README.md) - replication lag, slow queries, connection utilization
 
 ```conf
 template: mysql_10s_slow_queries
@@ -157,7 +157,7 @@ lookup: sum -10s of slow_queries
 
 ### 6.3.2 PostgreSQL Alerts
 
-- [PostgreSQL](../../src/go/plugin/go.d/collector/postgres/README.md) - deadlocks, connection utilization, replication lag
+- [PostgreSQL](/docs/src/go/plugin/go.d/collector/postgres/README.md) - deadlocks, connection utilization, replication lag
 
 ```conf
 template: postgres_db_deadlocks_rate
@@ -171,7 +171,7 @@ lookup: average -5m of deadlocks
 
 ### 6.3.3 Redis Alerts
 
-- [Redis](../../src/go/plugin/go.d/collector/redis/README.md) - memory pressure, eviction rates
+- [Redis](/docs/src/go/plugin/go.d/collector/redis/README.md) - memory pressure, eviction rates
 
 ```conf
 template: redis_connections_rejected
@@ -291,7 +291,7 @@ lookup: average -1m of inbound
 
 ## Related Sections
 
-- **[Chapter 2: Creating and Managing Alerts](../creating-alerts-pages/README.md)** - Creating and editing alerts via configuration files
-- **[Chapter 7: Troubleshooting Alerts](../troubleshooting-alerts/README.md)** - Debugging alert issues
-- **[Chapter 5: Receiving Notifications](../receiving-notifications/README.md)** - Configure alert delivery
-- **[Chapter 12: Best Practices for Alerting](../best-practices/README.md)** - Best practices for designing effective alerts
+- **[Chapter 2: Creating and Managing Alerts](/docs/creating-alerts-pages/README.md)** - Creating and editing alerts via configuration files
+- **[Chapter 7: Troubleshooting Alerts](/docs/troubleshooting-alerts/README.md)** - Debugging alert issues
+- **[Chapter 5: Receiving Notifications](/docs/receiving-notifications/README.md)** - Configure alert delivery
+- **[Chapter 12: Best Practices for Alerting](/docs/best-practices/README.md)** - Best practices for designing effective alerts

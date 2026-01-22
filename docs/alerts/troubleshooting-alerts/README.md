@@ -72,7 +72,7 @@ calc: $this / ($var - $var2)
 calc: ($this / ($var - $var2)) * ($var > $var2 ? 1 : 0)
 ```
 
-See **[3.3 Calculations and Transformations](../alert-configuration-syntax/3-calculations-and-transformations.md)** for expression details.
+See **[3.3 Calculations and Transformations](/docs/alert-configuration-syntax/3-calculations-and-transformations.md)** for expression details.
 
 ## 7.3 Alert Flapping
 
@@ -157,6 +157,6 @@ curl -s "http://localhost:19999/api/v1/alarms" | jq '.alerts.your_alert_name'
 
 ## Related Sections
 
-- **[4.4 Reducing Flapping and Noise](../controlling-alerts-noise/4-reducing-flapping.md)** - Delay and repeat techniques
-- **[5.5 Testing and Troubleshooting](../receiving-notifications/5-testing-troubleshooting.md)** - Delivery verification
-- **[8.1 Hysteresis and Status-Based Conditions](../essential-patterns/README.md)** - Status-dependent thresholds
+- **[4.4 Reducing Flapping and Noise](/docs/controlling-alerts-noise/4-reducing-flapping.md)** - Delay and repeat techniques
+- **[5.5 Testing and Troubleshooting](/docs/receiving-notifications/5-testing-troubleshooting.md)** - Delivery verification
+- **[8.1 Hysteresis and Status-Based Conditions](/docs/essential-patterns/README.md)** - Status-dependent thresholds

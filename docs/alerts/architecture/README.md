@@ -8,7 +8,7 @@ Alert evaluation is local to each Agent. Netdata Cloud receives state changes bu
 
 :::
 
-## 13.0.1 The Alert Pipeline
+## 13.0.1 The Alert Pipeline {#the-alert-pipeline}
 
 Alerts progress through several stages from metric collection to notification dispatch.
 
@@ -20,7 +20,7 @@ Alerts progress through several stages from metric collection to notification di
 | **State Management** | Alert status transitions through defined states |
 | **Notification** | Dispatch alerts to configured recipients |
 
-## 13.0.2 Configuration Layers
+## 13.0.2 Configuration Layers {#configuration-layers}
 
 Alert configuration exists in multiple layers with defined precedence.
 
@@ -69,7 +69,7 @@ Alert behavior varies depending on deployment topology.
 
 ## 13.0.6 Related Sections
 
-- **[Chapter 3: Alert Configuration Syntax](../alert-configuration-syntax/README.md)** - Alert configuration syntax reference
-- **[Chapter 9: APIs for Alerts and Events](../apis-alerts-events/README.md)** - API endpoints for alert management
-- **[Chapter 5: Receiving Notifications](../receiving-notifications/README.md)** - Notification configuration
-- **[Chapter 7: Troubleshooting Alerts](../troubleshooting-alerts/README.md)** - Diagnose and fix alert behavior
+- **[Chapter 3: Alert Configuration Syntax](/docs/alert-configuration-syntax/README.md)** - Alert configuration syntax reference
+- **[Chapter 9: APIs for Alerts and Events](/docs/apis-alerts-events/README.md)** - API endpoints for alert management
+- **[Chapter 5: Receiving Notifications](/docs/receiving-notifications/README.md)** - Notification configuration
+- **[Chapter 7: Troubleshooting Alerts](/docs/troubleshooting-alerts/README.md)** - Diagnose and fix alert behavior

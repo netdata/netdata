@@ -46,6 +46,6 @@ sudo tail -n 100 /var/log/netdata/health.log | grep -i notification
 
 ## 5.5.5 Related Sections
 
-- **[7.5 Notifications Not Being Sent](../troubleshooting-alerts/README.md)** - Debugging guide
-- **[9.1 Query Current Alerts](../apis-alerts-events/README.md)** - API-based verification
-- **[12.2 Notification Strategy and On-Call Hygiene](../best-practices/2-notification-strategy.md)** - Best practices
+- **[7.5 Notifications Not Being Sent](/docs/troubleshooting-alerts/README.md)** - Debugging guide
+- **[9.1 Query Current Alerts](/docs/apis-alerts-events/README.md)** - API-based verification
+- **[12.2 Notification Strategy and On-Call Hygiene](/docs/best-practices/2-notification-strategy.md)** - Best practices

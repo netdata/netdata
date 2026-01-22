@@ -39,4 +39,4 @@ Silencing is like putting a "Do Not Disturb" sign on an alert—it keeps working
 ## What's Next
 
 - **[4.3 Silencing in Netdata Cloud](3-silencing-cloud.md)** - Cloud-based silencing rules
-- **[8.1 Hysteresis](../essential-patterns/README.md)** - Status-based conditions
+- **[8.1 Hysteresis](/docs/essential-patterns/README.md)** - Status-based conditions

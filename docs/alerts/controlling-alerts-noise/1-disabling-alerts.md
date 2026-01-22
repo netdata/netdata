@@ -95,4 +95,4 @@ See **9.4 Health Management API** for full documentation.
 ## What's Next
 
 - **[4.2 Silencing vs Disabling](2-silencing-vs-disabling.md)** - Understanding the differences
-- **[Chapter 8: Essential Alert Patterns](../essential-patterns/README.md)** - Hysteresis and patterns
+- **[Chapter 8: Essential Alert Patterns](/docs/essential-patterns/README.md)** - Hysteresis and patterns

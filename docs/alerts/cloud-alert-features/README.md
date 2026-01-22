@@ -84,8 +84,8 @@ When the same alert fires across multiple nodes, Cloud groups them into one acti
 
 ### 10.3.3 Related Sections
 
-- **[12.4 Large Environment Patterns](../best-practices/4-scaling-large-environments.md)** for multi-node setups
-- **[13.5 Scaling Topologies](../architecture/5-scaling-topologies.md)** for complex topologies
+- **[12.4 Large Environment Patterns](/docs/best-practices/4-scaling-large-environments.md)** for multi-node setups
+- **[13.5 Scaling Topologies](/docs/architecture/5-scaling-topologies.md)** for complex topologies
 
 ## 10.4 Room-Based Alerting
 
@@ -119,5 +119,5 @@ By default, alerts apply only to the selected node. Use room filters to apply th
 
 ### 10.4.3 Related Sections
 
-- **[8.3 Host, Chart, and Label-Based Targeting](../essential-patterns/README.md#83-host-chart-and-label-based-targeting)** for label usage
-- **[12.4 Large Environment Patterns](../best-practices/4-scaling-large-environments.md)** for multi-room strategies
+- **[8.3 Host, Chart, and Label-Based Targeting](/docs/essential-patterns/README.md#83-host-chart-and-label-based-targeting)** for label usage
+- **[12.4 Large Environment Patterns](/docs/best-practices/4-scaling-large-environments.md)** for multi-room strategies

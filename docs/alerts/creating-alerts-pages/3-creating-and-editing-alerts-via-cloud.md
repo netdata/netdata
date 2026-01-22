@@ -343,5 +343,5 @@ Cloud-defined alerts provide **centralized management and instant rollout**. The
 
 - **[2.4 Managing Stock versus Custom Alerts](4-managing-stock-vs-custom-alerts.md)** Patterns for combining stock, custom, and Cloud-defined alerts
 - **[2.5 Reloading and Validating Alert Configuration](5-reloading-and-validating-alert-configuration.md)** Deeper troubleshooting and validation techniques
-- **[Chapter 4: Controlling Alerts and Noise](../controlling-alerts-noise/README.md)** Silencing rules, delays, and hysteresis
-- **[Chapter 5: Receiving Notifications](../receiving-notifications/README.md)** How to route alert events to Slack, PagerDuty, email, etc.
+- **[Chapter 4: Controlling Alerts and Noise](/docs/controlling-alerts-noise/README.md)** Silencing rules, delays, and hysteresis
+- **[Chapter 5: Receiving Notifications](/docs/receiving-notifications/README.md)** How to route alert events to Slack, PagerDuty, email, etc.

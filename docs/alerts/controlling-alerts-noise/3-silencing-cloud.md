@@ -77,5 +77,5 @@ curl -s "http://localhost:19999/api/v1/alarms?all" | jq '.'
 
 ## What's Next
 
-- **[8.1 Hysteresis](../essential-patterns/README.md)** - Status-based conditions
-- **[Chapter 5: Receiving Notifications](../receiving-notifications/README.md)** - Notification configuration
+- **[8.1 Hysteresis](/docs/essential-patterns/README.md)** - Status-based conditions
+- **[Chapter 5: Receiving Notifications](/docs/receiving-notifications/README.md)** - Notification configuration
