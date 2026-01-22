@@ -54,6 +54,6 @@ Sections in this chapter cover practical approaches to building effective alerti
 
 ## 11.0.5 Related Sections
 
-- **Chapter 4**: Controlling alert noise and reducing flapping
-- **Chapter 5**: Notification dispatch and routing
-- **Chapter 7**: Troubleshooting alert behavior
+- **[4. Controlling Alerts and Noise](/docs/alerts/controlling-alerts-noise/README.md)** - Methods to reduce alert fatigue
+- **[5. Receiving Notifications](/docs/alerts/receiving-notifications/README.md)** - Configure destinations and routing
+- **[7. Troubleshooting Alert Behaviour](/docs/alerts/troubleshooting-alerts/README.md)** - Diagnose and resolve alert issues
