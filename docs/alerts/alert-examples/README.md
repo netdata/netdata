@@ -141,7 +141,7 @@ To see more application alerts, visit the [Collectors list](/docs/collecting-met
 
 ### 6.3.1 MySQL Alerts
 
-- [MySQL & MariaDB](/docs/src/go/plugin/go.d/collector/mysql/README.md) - replication lag, slow queries, connection utilization
+- [MySQL & MariaDB](../../src/go/plugin/go.d/collector/mysql/README.md) - replication lag, slow queries, connection utilization
 
 ```conf
 template: mysql_10s_slow_queries
@@ -157,7 +157,7 @@ lookup: sum -10s of slow_queries
 
 ### 6.3.2 PostgreSQL Alerts
 
-- [PostgreSQL](/docs/src/go/plugin/go.d/collector/postgres/README.md) - deadlocks, connection utilization, replication lag
+- [PostgreSQL](../../src/go/plugin/go.d/collector/postgres/README.md) - deadlocks, connection utilization, replication lag
 
 ```conf
 template: postgres_db_deadlocks_rate
@@ -171,7 +171,7 @@ lookup: average -5m of deadlocks
 
 ### 6.3.3 Redis Alerts
 
-- [Redis](/docs/src/go/plugin/go.d/collector/redis/README.md) - memory pressure, eviction rates
+- [Redis](../../src/go/plugin/go.d/collector/redis/README.md) - memory pressure, eviction rates
 
 ```conf
 template: redis_connections_rejected

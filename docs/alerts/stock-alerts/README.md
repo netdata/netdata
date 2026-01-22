@@ -167,13 +167,13 @@ Full alert catalogs for database systems.
 
 | Integration | Alerts Covered |
 |------------|---------------|
-| [MySQL & MariaDB](/docs/src/go/plugin/go.d/collector/mysql/integrations/mysql.md) | Slow queries, table locks, connections, replication lag, Galera cluster |
-| [PostgreSQL](/docs/src/go/plugin/go.d/collector/postgres/integrations/postgres.md) | Connections, locks, deadlocks, cache IO, rollbacks, txid exhaustion |
-| [MongoDB](/docs/src/go/plugin/go.d/collector/mongodb/integrations/mongodb.md) | Connections, memory, operations, replication |
-| [Redis](/docs/src/go/plugin/go.d/collector/redis/integrations/redis.md) | Connected clients, memory, eviction, replication, persistence |
-| [ClickHouse](/docs/src/go/plugin/go.d/collector/clickhouse/integrations/clickhouse.md) | Delayed inserts, queries, partitions, replication |
-| [Cassandra](/docs/src/go/plugin/go.d/collector/cassandra/integrations/cassandra.md) | Key cache, row cache, compaction, threads |
-| [CockroachDB](/docs/src/go/plugin/go.d/collector/cockroachdb/integrations/cockroachdb.md) | File descriptors, ranges, storage |
+| [MySQL & MariaDB](../../src/go/plugin/go.d/collector/mysql/integrations/mysql.md) | Slow queries, table locks, connections, replication lag, Galera cluster |
+| [PostgreSQL](../../src/go/plugin/go.d/collector/postgres/integrations/postgres.md) | Connections, locks, deadlocks, cache IO, rollbacks, txid exhaustion |
+| [MongoDB](../../src/go/plugin/go.d/collector/mongodb/integrations/mongodb.md) | Connections, memory, operations, replication |
+| [Redis](../../src/go/plugin/go.d/collector/redis/integrations/redis.md) | Connected clients, memory, eviction, replication, persistence |
+| [ClickHouse](../../src/go/plugin/go.d/collector/clickhouse/integrations/clickhouse.md) | Delayed inserts, queries, partitions, replication |
+| [Cassandra](../../src/go/plugin/go.d/collector/cassandra/integrations/cassandra.md) | Key cache, row cache, compaction, threads |
+| [CockroachDB](../../src/go/plugin/go.d/collector/cockroachdb/integrations/cockroachdb.md) | File descriptors, ranges, storage |
 
 ### Web Server Integrations
 
@@ -181,12 +181,12 @@ HTTP server and reverse proxy monitoring.
 
 | Integration | Alerts Covered |
 |------------|---------------|
-| [nginx](/docs/src/go/plugin/go.d/collector/nginx/integrations/nginx.md) | Requests, connections, response status |
-| [Apache](/docs/src/go/plugin/go.d/collector/apache/integrations/apache.md) | Requests, workers, idle workers, bytes |
-| [Traefik](/docs/src/go/plugin/go.d/collector/traefik/integrations/traefik.md) | Requests, response time, retries |
-| [HAProxy](/docs/src/go/plugin/go.d/collector/haproxy/integrations/haproxy.md) | Backend health, requests, sessions |
-| [Varnish](/docs/src/go/plugin/go.d/collector/varnish/integrations/varnish.md) | Client requests, backend fetches, cache hits |
-| [Envoy](/docs/src/go/plugin/go.d/collector/envoy/integrations/envoy.md) | Downstream/upstream connections, requests |
+| [nginx](../../src/go/plugin/go.d/collector/nginx/integrations/nginx.md) | Requests, connections, response status |
+| [Apache](../../src/go/plugin/go.d/collector/apache/integrations/apache.md) | Requests, workers, idle workers, bytes |
+| [Traefik](../../src/go/plugin/go.d/collector/traefik/integrations/traefik.md) | Requests, response time, retries |
+| [HAProxy](../../src/go/plugin/go.d/collector/haproxy/integrations/haproxy.md) | Backend health, requests, sessions |
+| [Varnish](../../src/go/plugin/go.d/collector/varnish/integrations/varnish.md) | Client requests, backend fetches, cache hits |
+| [Envoy](../../src/go/plugin/go.d/collector/envoy/integrations/envoy.md) | Downstream/upstream connections, requests |
 
 ### Message Queue & Streaming
 
@@ -194,11 +194,11 @@ Queues, pub/sub, and streaming platform alerts.
 
 | Integration | Alerts Covered |
 |------------|---------------|
-| [RabbitMQ](/docs/src/go/plugin/go.d/collector/rabbitmq/integrations/rabbitmq.md) | Node down, network partition, memory/disk alarms, queue minority, unhealthy status |
-| [Kafka](/docs/src/go/plugin/go.d/collector/prometheus/integrations/kafka.md) | Consumer lag, under-replicated partitions |
-| [Pulsar](/docs/src/go/plugin/go.d/collector/pulsar/integrations/pulsar.md) | Messages, subscriptions, ledgers |
-| [NATS](/docs/src/go/plugin/go.d/collector/nats/integrations/nats.md) | Connections, subs, pubs, errors |
-| [Vernemq](/docs/src/go/plugin/go.d/collector/vernemq/integrations/vernemq.md) | MQTT connections, publishes, drops |
+| [RabbitMQ](../../src/go/plugin/go.d/collector/rabbitmq/integrations/rabbitmq.md) | Node down, network partition, memory/disk alarms, queue minority, unhealthy status |
+| [Kafka](../../src/go/plugin/go.d/collector/prometheus/integrations/kafka.md) | Consumer lag, under-replicated partitions |
+| [Pulsar](../../src/go/plugin/go.d/collector/pulsar/integrations/pulsar.md) | Messages, subscriptions, ledgers |
+| [NATS](../../src/go/plugin/go.d/collector/nats/integrations/nats.md) | Connections, subs, pubs, errors |
+| [Vernemq](../../src/go/plugin/go.d/collector/vernemq/integrations/vernemq.md) | MQTT connections, publishes, drops |
 
 ### Caching & Key-Value Stores
 
@@ -206,11 +206,11 @@ Fast data access layer alerting.
 
 | Integration | Alerts Covered |
 |------------|---------------|
-| [Memcached](/docs/src/go/plugin/go.d/collector/memcached/integrations/memcached.md) | Hit rate, memory, evictions |
-| [Elasticsearch](/docs/src/go/plugin/go.d/collector/elasticsearch/integrations/elasticsearch.md) | Cluster health, indices, search time |
-| [Consul](/docs/src/go/plugin/go.d/collector/consul/integrations/consul.md) | Raft leader, health checks, license |
-| [Etcd](/docs/src/go/plugin/go.d/collector/prometheus/integrations/etcd.md) | Leader, disk, RPC, WAL |
-| [ZooKeeper](/docs/src/go/plugin/go.d/collector/zookeeper/integrations/zookeeper.md) | Requests, connections, znodes |
+| [Memcached](../../src/go/plugin/go.d/collector/memcached/integrations/memcached.md) | Hit rate, memory, evictions |
+| [Elasticsearch](../../src/go/plugin/go.d/collector/elasticsearch/integrations/elasticsearch.md) | Cluster health, indices, search time |
+| [Consul](../../src/go/plugin/go.d/collector/consul/integrations/consul.md) | Raft leader, health checks, license |
+| [Etcd](../../src/go/plugin/go.d/collector/prometheus/integrations/etcd.md) | Leader, disk, RPC, WAL |
+| [ZooKeeper](../../src/go/plugin/go.d/collector/zookeeper/integrations/zookeeper.md) | Requests, connections, znodes |
 
 ### DNS & DHCP
 
@@ -218,11 +218,11 @@ Name resolution and address assignment.
 
 | Integration | Alerts Covered |
 |------------|---------------|
-| [DNS Query](/docs/src/go/plugin/go.d/collector/dnsquery/integrations/dnsquery.md) | Query status, resolution failures |
-| [Unbound](/docs/src/go/plugin/go.d/collector/unbound/integrations/unbound.md) | Request list, cache, threads |
-| [PowerDNS Recursor](/docs/src/go/plugin/go.d/collector/powerdns_recursor/integrations/powerdns_recursor.md) | Queries, cache, DNSSEC |
-| [ISC DHCP](/docs/src/go/plugin/go.d/collector/isc_dhcpd/integrations/isc_dhcpd.md) | Pool utilization, lease time |
-| [Dnsmasq](/docs/src/go/plugin/go.d/collector/dnsmasq/integrations/dnsmasq.md) | Cache, queries, DHCP |
+| [DNS Query](../../src/go/plugin/go.d/collector/dnsquery/integrations/dnsquery.md) | Query status, resolution failures |
+| [Unbound](../../src/go/plugin/go.d/collector/unbound/integrations/unbound.md) | Request list, cache, threads |
+| [PowerDNS Recursor](../../src/go/plugin/go.d/collector/powerdns_recursor/integrations/powerdns_recursor.md) | Queries, cache, DNSSEC |
+| [ISC DHCP](../../src/go/plugin/go.d/collector/isc_dhcpd/integrations/isc_dhcpd.md) | Pool utilization, lease time |
+| [Dnsmasq](../../src/go/plugin/go.d/collector/dnsmasq/integrations/dnsmasq.md) | Cache, queries, DHCP |
 
 ### Infrastructure Services
 
@@ -230,25 +230,25 @@ Additional infrastructure monitoring.
 
 | Integration | Alerts Covered |
 |------------|---------------|
-| [ProxySQL](/docs/src/go/plugin/go.d/collector/proxysql/integrations/proxysql.md) | Backend connections, shunning |
-| [PgBouncer](/docs/src/go/plugin/go.d/collector/pgbouncer/integrations/pgbouncer.md) | Client connections, pooler stats |
-| [HDFS](/docs/src/go/plugin/go.d/collector/hdfs/integrations/hdfs.md) | Capacity, blocks, nodes |
-| [Prometheus](/docs/src/go/plugin/go.d/collector/prometheus/integrations/prometheus.md) | Remote write, queries, targets |
-| [SSH](/docs/src/go/plugin/go.d/collector/prometheus/integrations/ssh.md) | Connection, auth, sessions |
-| [Consul](/docs/src/go/plugin/go.d/collector/consul/integrations/consul.md) | Autopilot, raft leader, GC pause, health checks |
-| [ClickHouse](/docs/src/go/plugin/go.d/collector/clickhouse/integrations/clickhouse.md) | Inserts, distributed queries, replication lag, partitions |
-| [CockroachDB](/docs/src/go/plugin/go.d/collector/cockroachdb/integrations/cockroachdb.md) | File descriptors, unavailable/underreplicated ranges, storage |
-| [Beanstalk](/docs/src/go/plugin/go.d/collector/beanstalk/integrations/beanstalk.md) | Buried jobs |
-| [Gearman](/docs/src/go/plugin/go.d/collector/gearman/integrations/gearman.md) | Job queue status |
-| [Freeradius](/docs/src/go/plugin/go.d/collector/freeradius/integrations/freeradius.md) | Authentication requests, responses, rejects |
-| [IPFS](/docs/src/go/plugin/go.d/collector/ipfs/integrations/ipfs.md) | Datastore usage, bandwidth, peers |
-| [PostFix](/docs/src/go/plugin/go.d/collector/postfix/integrations/postfix.md) | Mail queue statistics |
-| [Squid](/docs/src/go/plugin/go.d/collector/squid/integrations/squid.md) | Cache utilization, HTTP traffic |
-| [Squid Logs](/docs/src/go/plugin/go.d/collector/squidlog/integrations/squidlog.md) | Access log parsing |
-| [LiteSpeed](/docs/src/go/plugin/go.d/collector/litespeed/integrations/litespeed.md) | Requests, connections, hit ratio |
-| [CoreDNS](/docs/src/go/plugin/go.d/collector/coredns/integrations/coredns.md) | DNS requests, responses, errors |
-| [Fail2Ban](/docs/src/go/plugin/go.d/collector/fail2ban/integrations/fail2ban.md) | Jail status, banned IPs |
-| [Supervisord](/docs/src/go/plugin/go.d/collector/supervisord/integrations/supervisord.md) | Supervised process health |
+| [ProxySQL](../../src/go/plugin/go.d/collector/proxysql/integrations/proxysql.md) | Backend connections, shunning |
+| [PgBouncer](../../src/go/plugin/go.d/collector/pgbouncer/integrations/pgbouncer.md) | Client connections, pooler stats |
+| [HDFS](../../src/go/plugin/go.d/collector/hdfs/integrations/hdfs.md) | Capacity, blocks, nodes |
+| [Prometheus](../../src/go/plugin/go.d/collector/prometheus/integrations/prometheus.md) | Remote write, queries, targets |
+| [SSH](../../src/go/plugin/go.d/collector/prometheus/integrations/ssh.md) | Connection, auth, sessions |
+| [Consul](../../src/go/plugin/go.d/collector/consul/integrations/consul.md) | Autopilot, raft leader, GC pause, health checks |
+| [ClickHouse](../../src/go/plugin/go.d/collector/clickhouse/integrations/clickhouse.md) | Inserts, distributed queries, replication lag, partitions |
+| [CockroachDB](../../src/go/plugin/go.d/collector/cockroachdb/integrations/cockroachdb.md) | File descriptors, unavailable/underreplicated ranges, storage |
+| [Beanstalk](../../src/go/plugin/go.d/collector/beanstalk/integrations/beanstalk.md) | Buried jobs |
+| [Gearman](../../src/go/plugin/go.d/collector/gearman/integrations/gearman.md) | Job queue status |
+| [Freeradius](../../src/go/plugin/go.d/collector/freeradius/integrations/freeradius.md) | Authentication requests, responses, rejects |
+| [IPFS](../../src/go/plugin/go.d/collector/ipfs/integrations/ipfs.md) | Datastore usage, bandwidth, peers |
+| [PostFix](../../src/go/plugin/go.d/collector/postfix/integrations/postfix.md) | Mail queue statistics |
+| [Squid](../../src/go/plugin/go.d/collector/squid/integrations/squid.md) | Cache utilization, HTTP traffic |
+| [Squid Logs](../../src/go/plugin/go.d/collector/squidlog/integrations/squidlog.md) | Access log parsing |
+| [LiteSpeed](../../src/go/plugin/go.d/collector/litespeed/integrations/litespeed.md) | Requests, connections, hit ratio |
+| [CoreDNS](../../src/go/plugin/go.d/collector/coredns/integrations/coredns.md) | DNS requests, responses, errors |
+| [Fail2Ban](../../src/go/plugin/go.d/collector/fail2ban/integrations/fail2ban.md) | Jail status, banned IPs |
+| [Supervisord](../../src/go/plugin/go.d/collector/supervisord/integrations/supervisord.md) | Supervised process health |
 
 ## 11.4 Network and Connectivity Alerts
 
@@ -396,9 +396,9 @@ Enterprise RAID controller health and disk status.
 
 | Integration | Alerts Covered |
 |------------|---------------|
-| [Adaptec RAID](/docs/src/go/plugin/go.d/collector/adaptecraid/integrations/adaptecraid.md) | Logical device health, physical disk state, battery backup |
-| [MegaRAID](/docs/src/go/plugin/go.d/collector/megacli/integrations/megacli.md) | Adapter health, BBU charge/recharge cycles, media/predictive errors |
-| [StorCLI](/docs/src/go/plugin/go.d/collector/storcli/integrations/storcli.md) | Controller health, battery status, disk errors, predictive failures |
+| [Adaptec RAID](../../src/go/plugin/go.d/collector/adaptecraid/integrations/adaptecraid.md) | Logical device health, physical disk state, battery backup |
+| [MegaRAID](../../src/go/plugin/go.d/collector/megacli/integrations/megacli.md) | Adapter health, BBU charge/recharge cycles, media/predictive errors |
+| [StorCLI](../../src/go/plugin/go.d/collector/storcli/integrations/storcli.md) | Controller health, battery status, disk errors, predictive failures |
 
 ### Software RAID and MDADM
 
@@ -416,9 +416,9 @@ LVM, BCACHE, and ZFS storage pool monitoring.
 
 | Integration | Alerts Covered |
 |------------|---------------|
-| [LVM](/docs/src/go/plugin/go.d/collector/lvm/integrations/lvm.md) | LV data space, metadata space utilization |
-| [BCACHE](/docs/src/go/plugin/go.d/collector/dmcache/integrations/dmcache.md) | Cache dirty data, cache errors |
-| [ZFS](/docs/src/health/health.d/zfs.conf) | Pool health state, space utilization, vdev health |
+| [LVM](../../src/go/plugin/go.d/collector/lvm/integrations/lvm.md) | LV data space, metadata space utilization |
+| [BCACHE](../../src/go/plugin/go.d/collector/dmcache/integrations/dmcache.md) | Cache dirty data, cache errors |
+| [ZFS](../../src/health/health.d/zfs.conf) | Pool health state, space utilization, vdev health |
 
 ### SSD and NVMe Monitoring
 
@@ -434,7 +434,7 @@ Drive self-monitoring and predictive failure indicators.
 
 | Integration | Alerts Covered |
 |------------|---------------|
-| [smartctl](/docs/src/go/plugin/go.d/collector/smartctl/integrations/smartctl.md) | Drive health, predictive failures, temperature |
+| [smartctl](../../src/go/plugin/go.d/collector/smartctl/integrations/smartctl.md) | Drive health, predictive failures, temperature |
 
 ### Uninterruptible Power Supplies
 
@@ -475,10 +475,10 @@ Temperature, fan speed, voltage, and environmental sensors.
 
 | Integration | Alerts Covered |
 |------------|---------------|
-| [Sensors](/docs/src/go/plugin/go.d/collector/sensors/integrations/sensors.md) | Temperature, fan speed, voltage alarms |
-| [LM-Sensors](/docs/src/go/plugin/go.d/collector/sensors/integrations/lm_sensors.md) | Core temp, ambient temp, fan speeds |
-| [NVidia SMI](/docs/src/go/plugin/go.d/collector/nvidia_smi/integrations/nvidia_smi.md) | GPU temperature, memory, utilization |
-| [Intel GPU](/docs/src/go/plugin/go.d/collector/intelgpu/integrations/intelgpu.md) | GPU frequency, temperature, render engines |
+| [Sensors](../../src/go/plugin/go.d/collector/sensors/integrations/sensors.md) | Temperature, fan speed, voltage alarms |
+| [LM-Sensors](../../src/go/plugin/go.d/collector/sensors/integrations/lm_sensors.md) | Core temp, ambient temp, fan speeds |
+| [NVidia SMI](../../src/go/plugin/go.d/collector/nvidia_smi/integrations/nvidia_smi.md) | GPU temperature, memory, utilization |
+| [Intel GPU](../../src/go/plugin/go.d/collector/intelgpu/integrations/intelgpu.md) | GPU frequency, temperature, render engines |
 
 ### Hardware Memory and ECC
 
@@ -633,86 +633,86 @@ Block device latency measurements and thresholds.
 
 | Integration | Alerts Covered |
 |------------|---------------|
-| [Riak KV](/docs/src/go/plugin/go.d/collector/riakkv/integrations/riakkv.md) | KV get/put latency, slow ops, VM process count |
-| [Retroshare](/docs/src/go/plugin/go.d/collector/retroshare/integrations/retroshare.md) | DHT working status |
-| [Monit](/docs/src/go/plugin/go.d/collector/monit/integrations/monit.md) | Monit service status |
-| [Whois Query](/docs/src/go/plugin/go.d/collector/whoisquery/integrations/whoisquery.md) | Domain expiration tracking |
-| [WireGuard](/docs/src/go/plugin/go.d/collector/wireguard/integrations/wireguard.md) | WireGuard tunnel status |
-| [Machine Learning](/docs/src/go/plugin/go.d/collector/prometheus/integrations/ml.md) | ML model anomalies (ml_1min_node_ar) |
-| [PHP-FPM](/docs/src/go/plugin/go.d/collector/phpfpm/integrations/phpfpm.md) | Process manager, requests, performance |
-| [PHP Daemon](/docs/src/go/plugin/go.d/collector/phpdaemon/integrations/phpdaemon.md) | Workers, uptime, memory |
-| [Tor](/docs/src/go/plugin/go.d/collector/tor/integrations/tor.md) | Bandwidth, circuits, relay status |
-| [Spigot MC](/docs/src/go/plugin/go.d/collector/spigotmc/integrations/spigotmc.md) | Minecraft player count, latency |
-| [BOINC](/docs/src/go/plugin/go.d/collector/boinc/integrations/boinc.md) | Active tasks, compute/upload errors |
-| [SMB/CIFS](/docs/src/go/plugin/go.d/collector/samba/integrations/samba.md) | SMB shares, connections, guest access |
-| [vSphere](/docs/src/go/plugin/go.d/collector/vsphere/integrations/vsphere.md) | ESXi hosts, VM CPU/memory utilization |
-| [WebSphere PMI](/docs/src/go/plugin/go.d/collector/websphere_pmi/integrations/websphere_pmi.md) | JDBC pool, thread pool, JMS queues |
-| [WebSphere JMX](/docs/src/go/plugin/go.d/collector/websphere_jmx/integrations/websphere_jmx.md) | JVM heap, application response, JDBC wait |
-| [WebSphere MP](/docs/src/go/plugin/go.d/collector/websphere_mp/integrations/websphere_mp.md) | REST response time, thread pool, heap |
-| [NSDNS](/docs/src/go/plugin/go.d/collector/nsd/integrations/nsd.md) | NSD zone transfers, query statistics |
-| [Chrony](/docs/src/go/plugin/go.d/collector/chrony/integrations/chrony.md) | Clock stratum, offset, sync status |
-| [NTPD](/docs/src/go/plugin/go.d/collector/ntpd/integrations/ntpd.md) | NTP daemon, poll interval, dispersion |
-| [PowerDNS](/docs/src/go/plugin/go.d/collector/powerdns/integrations/powerdns.md) | Queries, cache, DNSSEC validations |
-| [NTPdate](/docs/src/go/plugin/go.d/collector/prometheus/integrations/ntpdate.md) | NTP sync status, offset |
-| [Icecast](/docs/src/go/plugin/go.d/collector/icecast/integrations/icecast.md) | Icecast streams, listeners, source stats |
-| [Dovecot](/docs/src/go/plugin/go.d/collector/dovecot/integrations/dovecot.md) | IMAP/POP3 sessions, commands, read/write |
-| [Exim](/docs/src/go/plugin/go.d/collector/exim/integrations/exim.md) | Mail queue, frozen messages, SMTP stats |
-| [Rspamd](/docs/src/go/plugin/go.d/collector/rspamd/integrations/rspamd.md) | Actions, scores, learn/block actions |
-| [OpenLDAP](/docs/src/go/plugin/go.d/collector/openldap/integrations/openldap.md) | Bind operations, entries, referrals |
-| [NGINX Unit](/docs/src/go/plugin/go.d/collector/nginxunit/integrations/nginxunit.md) | Applications, routes, listener status |
-| [NGINX VTS](/docs/src/go/plugin/go.d/collector/nginxvts/integrations/nginxvts.md) | Server zones, upstream peers, requests |
-| [NGINX Plus](/docs/src/go/plugin/go.d/collector/nginxplus/integrations/nginxplus.md) | HTTP upstreams, SSL certificates |
-| [Tengine](/docs/src/go/plugin/go.d/collector/tengine/integrations/tengine.md) | Requests, connections, cache status |
-| [Envoy](/docs/src/go/plugin/go.d/collector/envoy/integrations/envoy.md) | Downstream/upstream connections, requests |
-| [Varnish](/docs/src/go/plugin/go.d/collector/varnish/integrations/varnish.md) | Client requests, backend fetches, cache hits |
-| [UWSGI](/docs/src/go/plugin/go.d/collector/uwsgi/integrations/uwsgi.md) | Requests, rss, total runtime |
-| [Tomcat](/docs/src/go/plugin/go.d/collector/tomcat/integrations/tomcat.md) | JSPs, servlets, thread pool |
-| [Spring Boot](/docs/src/go/plugin/go.d/collector/spring_boot/integrations/spring_boot.md) | Heap, gc pauses, HTTP requests |
-| [Activemq](/docs/src/go/plugin/go.d/collector/activemq/integrations/activemq.md) | Topics, queues, producers, consumers |
-| [Typesense](/docs/src/go/plugin/go.d/collector/typesense/integrations/typesense.md) | Search requests,latency, memory |
-| [YugaByte DB](/docs/src/go/plugin/go.d/collector/yugabytedb/integrations/yugabytedb.md) | YSQL connections, tablet servers |
-| [MaxScale](/docs/src/go/plugin/go.d/collector/maxscale/integrations/maxscale.md) | MaxScale routers, connections, threads |
-| [Oracledb](/docs/src/go/plugin/go.d/collector/oracledb/integrations/oracledb.md) | PDB status, ASM disk groups |
-| [Pika](/docs/src/go/plugin/go.d/collector/pika/integrations/pika.md) | Compaction, memory, compression |
-| [Pulsar](/docs/src/go/plugin/go.d/collector/pulsar/integrations/pulsar.md) | Messages published, replication lag |
-| [Solr](/docs/src/go/plugin/go.d/collector/solr/integrations/solr.md) | Solr core stats, request latency |
-| [SolrCloud](/docs/src/go/plugin/go.d/collector/solr/integrations/solrcloud.md) | SolrCloud collections, shards |
-| [Cassandra](/docs/src/go/plugin/go.d/collector/cassandra/integrations/cassandra.md) | Key/row cache, compaction, threads |
-| [Couchbase](/docs/src/go/plugin/go.d/collector/couchbase/integrations/couchbase.md) | Bucket quota, views, XDCR |
-| [CouchDB](/docs/src/go/plugin/go.d/collector/couchdb/integrations/couchdb.md) | Request methods, status codes |
-| [InfluxDB](/docs/src/go/plugin/go.d/collector/influxdb/integrations/influxdb.md) | InfluxDB write throughput, query latency |
-| [Druid](/docs/src/go/plugin/go.d/collector/druid/integrations/druid.md) | Broker/Historical/Realtime services |
-| [QuestDB](/docs/src/go/plugin/go.d/collector/questdb/integrations/questdb.md) | QuestDB TCP/JVM metrics |
-| [TDEngine](/docs/src/go/plugin/go.d/collector/tdengine/integrations/tdengine.md) | TDEngine insert, queries, vgroups |
-| [VictoriaMetrics](/docs/src/go/plugin/go.d/collector/victoriametrics/integrations/victoriametrics.md) | vminsert/vmselect efficiency |
-| [TimescaleDB](/docs/src/go/plugin/go.d/collector/prometheus/integrations/timescaledb.md) | Compression, bgw jobs, tuples |
-| [Crushmap](/docs/src/go/plugin/go.d/collector/crushmap/integrations/crushmap.md) | Crush map rule analysis |
-| [ScaleIO](/docs/src/go/plugin/go.d/collector/scaleio/integrations/scaleio.md) | SDC/MDM connection, storage pools |
-| [EMC PowerPath](/docs/src/go/plugin/go.d/collector/emcpower/integrations/emcpower.md) | PowerPath device paths |
-| [NetApp](/docs/src/go/plugin/go.d/collector/netapp/integrations/netapp.md) | Aggregate, lun, volume utilization |
-| [Oracle AX](/docs/src/go/plugin/go.d/collector/oracle/integrations/oracle.md) | Oracle DB tablespace, sessions |
-| [Spring Cloud](/docs/src/go/plugin/go.d/collector/spring_cloud/integrations/spring_cloud.md) | Eureka services, Zuul routes |
-| [Istio](/docs/src/go/plugin/go.d/collector/istio/integrations/istio.md) | Mesh traffic, request durations |
-| [Linkerd](/docs/src/go/plugin/go.d/collector/linkerd/integrations/linkerd.md) | Linkerd proxy, destination services |
-| [Kong](/docs/src/go/plugin/go.d/collector/kong/integrations/kong.md) | Kong requests, database connections |
-| [Traefik](/docs/src/go/plugin/go.d/collector/traefik/integrations/traefik.md) | Requests, retries, error codes |
-| [Cilium](/docs/src/go/plugin/go.d/collector/cilium/integrations/cilium.md) | Endpoints, identity, BPF maps |
-| [CNI Metrics](/docs/src/go/plugin/go.d/collector/cni/integrations/cni.md) | CNI bandwidth, errors, drops |
-| [NVIDIA DCGM](/docs/src/go/plugin/go.d/collector/dcgm/integrations/dcgm.md) | GPU utilization, memory, temperature |
-| [AMD ROCm](/docs/src/go/plugin/go.d/collector/amdgpu/integrations/amdgpu.md) | GPU memory, engine usage |
-| [OpenVPN](/docs/src/go/plugin/go.d/collector/openvpn/integrations/openvpn.md) | Traffic, link quality, session count |
-| [OpenVPN Status](/docs/src/go/plugin/go.d/collector/openvpn_status_log/integrations/openvpn_status_log.md) | VPN client connections, bandwidth |
-| [WireGuard](/docs/src/go/plugin/go.d/collector/wireguard/integrations/wireguard.md) | Tunnel status, handshake, traffic |
-| [DNSCrypt](/docs/src/go/plugin/go.d/collector/dnscrypt/integrations/dnscrypt.md) | DNSCrypt resolver queries |
-| [NDP](/docs/src/go/plugin/go.d/collector/ndp/integrations/ndp.md) | NDP neighbor discovery |
-| [Bird](/docs/src/go/plugin/go.d/collector/bird/integrations/bird.md) | BGP routes, protocols, communities |
-| [FRR](/docs/src/go/plugin/go.d/collector/frr/integrations/frr.md) | FRRouting BGP/OSPF neighbors |
-| [Quagga](/docs/src/go/plugin/go.d/collector/quagga/integrations/quagga.md) | Zebra routing daemon |
-| [Exabgp](/docs/src/go/plugin/go.d/collector/exabgp/integrations/exabgp.md) | ExaBGP session, updates |
-| [DHCP Relay](/docs/src/go/plugin/go.d/collector/dhcrelay/integrations/dhcrelay.md) | DHCP relay packets |
-| [KeA DHCP](/docs/src/go/plugin/go.d/collector/kea/integrations/kea.md) | Kea DHCP leases, DDNS updates |
-| [Go.D CoAP](/docs/src/go/plugin/go.d/collector/coap/integrations/coap.md) | CoAP server requests, payload size |
-| [SigNoz](/docs/src/go/plugin/go.d/collector/signoz/integrations/signoz.md) | SigNoz traces, spans |
+| [Riak KV](../../src/go/plugin/go.d/collector/riakkv/integrations/riakkv.md) | KV get/put latency, slow ops, VM process count |
+| [Retroshare](../../src/go/plugin/go.d/collector/retroshare/integrations/retroshare.md) | DHT working status |
+| [Monit](../../src/go/plugin/go.d/collector/monit/integrations/monit.md) | Monit service status |
+| [Whois Query](../../src/go/plugin/go.d/collector/whoisquery/integrations/whoisquery.md) | Domain expiration tracking |
+| [WireGuard](../../src/go/plugin/go.d/collector/wireguard/integrations/wireguard.md) | WireGuard tunnel status |
+| [Machine Learning](../../src/go/plugin/go.d/collector/prometheus/integrations/ml.md) | ML model anomalies (ml_1min_node_ar) |
+| [PHP-FPM](../../src/go/plugin/go.d/collector/phpfpm/integrations/phpfpm.md) | Process manager, requests, performance |
+| [PHP Daemon](../../src/go/plugin/go.d/collector/phpdaemon/integrations/phpdaemon.md) | Workers, uptime, memory |
+| [Tor](../../src/go/plugin/go.d/collector/tor/integrations/tor.md) | Bandwidth, circuits, relay status |
+| [Spigot MC](../../src/go/plugin/go.d/collector/spigotmc/integrations/spigotmc.md) | Minecraft player count, latency |
+| [BOINC](../../src/go/plugin/go.d/collector/boinc/integrations/boinc.md) | Active tasks, compute/upload errors |
+| [SMB/CIFS](../../src/go/plugin/go.d/collector/samba/integrations/samba.md) | SMB shares, connections, guest access |
+| [vSphere](../../src/go/plugin/go.d/collector/vsphere/integrations/vsphere.md) | ESXi hosts, VM CPU/memory utilization |
+| [WebSphere PMI](../../src/go/plugin/go.d/collector/websphere_pmi/integrations/websphere_pmi.md) | JDBC pool, thread pool, JMS queues |
+| [WebSphere JMX](../../src/go/plugin/go.d/collector/websphere_jmx/integrations/websphere_jmx.md) | JVM heap, application response, JDBC wait |
+| [WebSphere MP](../../src/go/plugin/go.d/collector/websphere_mp/integrations/websphere_mp.md) | REST response time, thread pool, heap |
+| [NSDNS](../../src/go/plugin/go.d/collector/nsd/integrations/nsd.md) | NSD zone transfers, query statistics |
+| [Chrony](../../src/go/plugin/go.d/collector/chrony/integrations/chrony.md) | Clock stratum, offset, sync status |
+| [NTPD](../../src/go/plugin/go.d/collector/ntpd/integrations/ntpd.md) | NTP daemon, poll interval, dispersion |
+| [PowerDNS](../../src/go/plugin/go.d/collector/powerdns/integrations/powerdns.md) | Queries, cache, DNSSEC validations |
+| [NTPdate](../../src/go/plugin/go.d/collector/prometheus/integrations/ntpdate.md) | NTP sync status, offset |
+| [Icecast](../../src/go/plugin/go.d/collector/icecast/integrations/icecast.md) | Icecast streams, listeners, source stats |
+| [Dovecot](../../src/go/plugin/go.d/collector/dovecot/integrations/dovecot.md) | IMAP/POP3 sessions, commands, read/write |
+| [Exim](../../src/go/plugin/go.d/collector/exim/integrations/exim.md) | Mail queue, frozen messages, SMTP stats |
+| [Rspamd](../../src/go/plugin/go.d/collector/rspamd/integrations/rspamd.md) | Actions, scores, learn/block actions |
+| [OpenLDAP](../../src/go/plugin/go.d/collector/openldap/integrations/openldap.md) | Bind operations, entries, referrals |
+| [NGINX Unit](../../src/go/plugin/go.d/collector/nginxunit/integrations/nginxunit.md) | Applications, routes, listener status |
+| [NGINX VTS](../../src/go/plugin/go.d/collector/nginxvts/integrations/nginxvts.md) | Server zones, upstream peers, requests |
+| [NGINX Plus](../../src/go/plugin/go.d/collector/nginxplus/integrations/nginxplus.md) | HTTP upstreams, SSL certificates |
+| [Tengine](../../src/go/plugin/go.d/collector/tengine/integrations/tengine.md) | Requests, connections, cache status |
+| [Envoy](../../src/go/plugin/go.d/collector/envoy/integrations/envoy.md) | Downstream/upstream connections, requests |
+| [Varnish](../../src/go/plugin/go.d/collector/varnish/integrations/varnish.md) | Client requests, backend fetches, cache hits |
+| [UWSGI](../../src/go/plugin/go.d/collector/uwsgi/integrations/uwsgi.md) | Requests, rss, total runtime |
+| [Tomcat](../../src/go/plugin/go.d/collector/tomcat/integrations/tomcat.md) | JSPs, servlets, thread pool |
+| [Spring Boot](../../src/go/plugin/go.d/collector/spring_boot/integrations/spring_boot.md) | Heap, gc pauses, HTTP requests |
+| [Activemq](../../src/go/plugin/go.d/collector/activemq/integrations/activemq.md) | Topics, queues, producers, consumers |
+| [Typesense](../../src/go/plugin/go.d/collector/typesense/integrations/typesense.md) | Search requests,latency, memory |
+| [YugaByte DB](../../src/go/plugin/go.d/collector/yugabytedb/integrations/yugabytedb.md) | YSQL connections, tablet servers |
+| [MaxScale](../../src/go/plugin/go.d/collector/maxscale/integrations/maxscale.md) | MaxScale routers, connections, threads |
+| [Oracledb](../../src/go/plugin/go.d/collector/oracledb/integrations/oracledb.md) | PDB status, ASM disk groups |
+| [Pika](../../src/go/plugin/go.d/collector/pika/integrations/pika.md) | Compaction, memory, compression |
+| [Pulsar](../../src/go/plugin/go.d/collector/pulsar/integrations/pulsar.md) | Messages published, replication lag |
+| [Solr](../../src/go/plugin/go.d/collector/solr/integrations/solr.md) | Solr core stats, request latency |
+| [SolrCloud](../../src/go/plugin/go.d/collector/solr/integrations/solrcloud.md) | SolrCloud collections, shards |
+| [Cassandra](../../src/go/plugin/go.d/collector/cassandra/integrations/cassandra.md) | Key/row cache, compaction, threads |
+| [Couchbase](../../src/go/plugin/go.d/collector/couchbase/integrations/couchbase.md) | Bucket quota, views, XDCR |
+| [CouchDB](../../src/go/plugin/go.d/collector/couchdb/integrations/couchdb.md) | Request methods, status codes |
+| [InfluxDB](../../src/go/plugin/go.d/collector/influxdb/integrations/influxdb.md) | InfluxDB write throughput, query latency |
+| [Druid](../../src/go/plugin/go.d/collector/druid/integrations/druid.md) | Broker/Historical/Realtime services |
+| [QuestDB](../../src/go/plugin/go.d/collector/questdb/integrations/questdb.md) | QuestDB TCP/JVM metrics |
+| [TDEngine](../../src/go/plugin/go.d/collector/tdengine/integrations/tdengine.md) | TDEngine insert, queries, vgroups |
+| [VictoriaMetrics](../../src/go/plugin/go.d/collector/victoriametrics/integrations/victoriametrics.md) | vminsert/vmselect efficiency |
+| [TimescaleDB](../../src/go/plugin/go.d/collector/prometheus/integrations/timescaledb.md) | Compression, bgw jobs, tuples |
+| [Crushmap](../../src/go/plugin/go.d/collector/crushmap/integrations/crushmap.md) | Crush map rule analysis |
+| [ScaleIO](../../src/go/plugin/go.d/collector/scaleio/integrations/scaleio.md) | SDC/MDM connection, storage pools |
+| [EMC PowerPath](../../src/go/plugin/go.d/collector/emcpower/integrations/emcpower.md) | PowerPath device paths |
+| [NetApp](../../src/go/plugin/go.d/collector/netapp/integrations/netapp.md) | Aggregate, lun, volume utilization |
+| [Oracle AX](../../src/go/plugin/go.d/collector/oracle/integrations/oracle.md) | Oracle DB tablespace, sessions |
+| [Spring Cloud](../../src/go/plugin/go.d/collector/spring_cloud/integrations/spring_cloud.md) | Eureka services, Zuul routes |
+| [Istio](../../src/go/plugin/go.d/collector/istio/integrations/istio.md) | Mesh traffic, request durations |
+| [Linkerd](../../src/go/plugin/go.d/collector/linkerd/integrations/linkerd.md) | Linkerd proxy, destination services |
+| [Kong](../../src/go/plugin/go.d/collector/kong/integrations/kong.md) | Kong requests, database connections |
+| [Traefik](../../src/go/plugin/go.d/collector/traefik/integrations/traefik.md) | Requests, retries, error codes |
+| [Cilium](../../src/go/plugin/go.d/collector/cilium/integrations/cilium.md) | Endpoints, identity, BPF maps |
+| [CNI Metrics](../../src/go/plugin/go.d/collector/cni/integrations/cni.md) | CNI bandwidth, errors, drops |
+| [NVIDIA DCGM](../../src/go/plugin/go.d/collector/dcgm/integrations/dcgm.md) | GPU utilization, memory, temperature |
+| [AMD ROCm](../../src/go/plugin/go.d/collector/amdgpu/integrations/amdgpu.md) | GPU memory, engine usage |
+| [OpenVPN](../../src/go/plugin/go.d/collector/openvpn/integrations/openvpn.md) | Traffic, link quality, session count |
+| [OpenVPN Status](../../src/go/plugin/go.d/collector/openvpn_status_log/integrations/openvpn_status_log.md) | VPN client connections, bandwidth |
+| [WireGuard](../../src/go/plugin/go.d/collector/wireguard/integrations/wireguard.md) | Tunnel status, handshake, traffic |
+| [DNSCrypt](../../src/go/plugin/go.d/collector/dnscrypt/integrations/dnscrypt.md) | DNSCrypt resolver queries |
+| [NDP](../../src/go/plugin/go.d/collector/ndp/integrations/ndp.md) | NDP neighbor discovery |
+| [Bird](../../src/go/plugin/go.d/collector/bird/integrations/bird.md) | BGP routes, protocols, communities |
+| [FRR](../../src/go/plugin/go.d/collector/frr/integrations/frr.md) | FRRouting BGP/OSPF neighbors |
+| [Quagga](../../src/go/plugin/go.d/collector/quagga/integrations/quagga.md) | Zebra routing daemon |
+| [Exabgp](../../src/go/plugin/go.d/collector/exabgp/integrations/exabgp.md) | ExaBGP session, updates |
+| [DHCP Relay](../../src/go/plugin/go.d/collector/dhcrelay/integrations/dhcrelay.md) | DHCP relay packets |
+| [KeA DHCP](../../src/go/plugin/go.d/collector/kea/integrations/kea.md) | Kea DHCP leases, DDNS updates |
+| [Go.D CoAP](../../src/go/plugin/go.d/collector/coap/integrations/coap.md) | CoAP server requests, payload size |
+| [SigNoz](../../src/go/plugin/go.d/collector/signoz/integrations/signoz.md) | SigNoz traces, spans |
 
 ## Related Sections
 
