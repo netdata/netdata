@@ -1,4 +1,4 @@
-# 12: Best Practices for Alerting
+# 11: Best Practices for Alerting
 
 Effective alerting balances detection speed against noise. This chapter provides guidance derived from operational experience across thousands of Netdata deployments, helping you create alerts that drive meaningful action without alert fatigue.
 
@@ -8,7 +8,7 @@ Before creating any alert, complete this sentence: "When this alert fires, **[sp
 
 :::
 
-## 12.0.1 Principles of Alert Design
+## 11.0.1 Principles of Alert Design
 
 Effective alerts share characteristics that distinguish them from alerts generating noise without value.
 
@@ -38,23 +38,22 @@ Every additional alert creates maintenance burden and potential noise. Before ad
 
 Use templates over duplication. Rather than creating identical alerts for multiple instances of the same service, create one template that applies to all instances. This reduces configuration complexity and ensures consistent behavior.
 
-## 12.0.2 Reducing Noise and Flapping
+## 11.0.2 Reducing Noise and Flapping
 
 Alert noise erodes trust. When responders learn to assume alerts are noise, they begin ignoring them—including the alerts representing genuine problems.
 
 Techniques for reducing noise include setting appropriate hysteresis so alerts require sustained conditions before changing status, using delays to require conditions to hold for a defined period, and configuring repeat intervals to prevent notification spam for sustained conditions.
 
-## 12.0.3 Scaling Alert Management
+## 11.0.3 Scaling Alert Management
 
 As infrastructure grows, alert management becomes increasingly complex. Strategies for scaling include centralizing alert definitions in version control, using consistent patterns across environments, and implementing tiered escalation paths.
 
-## 12.0.4 What's Included
+## 11.0.4 What's Included
 
 Sections in this chapter cover practical approaches to building effective alerting practices across different environments and team structures.
 
-## 12.0.5 Related Sections
+## 11.0.5 Related Sections
 
-- **Chapter 11**: Built-in alerts as reference implementations
 - **Chapter 4**: Controlling alert noise and reducing flapping
 - **Chapter 5**: Notification dispatch and routing
 - **Chapter 7**: Troubleshooting alert behavior

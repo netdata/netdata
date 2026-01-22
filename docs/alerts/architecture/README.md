@@ -1,4 +1,4 @@
-# 13: Alerts and Notifications Architecture
+# 12: Alerts and Notifications Architecture
 
 Understanding how alerts work under the hood helps with troubleshooting, optimization, and designing effective notification strategies. This chapter covers the evaluation pipeline, state machine, and how alerts interact with the broader Netdata ecosystem.
 
@@ -8,7 +8,7 @@ Alert evaluation is local to each Agent. Netdata Cloud receives state changes bu
 
 :::
 
-## 13.0.1 The Alert Pipeline {#the-alert-pipeline}
+## 12.0.1 The Alert Pipeline {#the-alert-pipeline}
 
 Alerts progress through several stages from metric collection to notification dispatch.
 
@@ -20,7 +20,7 @@ Alerts progress through several stages from metric collection to notification di
 | **State Management** | Alert status transitions through defined states |
 | **Notification** | Dispatch alerts to configured recipients |
 
-## 13.0.2 Configuration Layers {#configuration-layers}
+## 12.0.2 Configuration Layers {#configuration-layers}
 
 Alert configuration exists in multiple layers with defined precedence.
 
@@ -32,7 +32,7 @@ Alert configuration exists in multiple layers with defined precedence.
 
 Custom alerts override stock alerts with the same name. Cloud alerts are stored separately and synchronized to nodes.
 
-## 13.0.3 Alert Lifecycle
+## 12.0.3 Alert Lifecycle
 
 Each alert instance moves through a defined lifecycle from creation to removal.
 
@@ -47,7 +47,7 @@ Each alert instance moves through a defined lifecycle from creation to removal.
 
 Status transitions trigger notifications and update the alert history.
 
-## 13.0.4 Scaling Topologies
+## 12.0.4 Scaling Topologies
 
 Alert behavior varies depending on deployment topology.
 
@@ -57,11 +57,11 @@ Alert behavior varies depending on deployment topology.
 | **Parent-Child** | Parent aggregates metrics, evaluates alerts |
 | **Cloud-connected** | Cloud receives state changes, provides global view |
 
-## 13.0.5 What's Included
+## 12.0.5 What's Included
 
 Each section in this chapter covers a specific aspect of alerts and notifications architecture.
 
-## 13.0.6 Related Sections
+## 12.0.6 Related Sections
 
 - **[3. Alert Configuration Syntax](/docs/alerts/alert-configuration-syntax/README.md)** - Alert configuration syntax reference
 - **[9. APIs for Alerts and Events](/docs/alerts/apis-alerts-events/README.md)** - API endpoints for alert management

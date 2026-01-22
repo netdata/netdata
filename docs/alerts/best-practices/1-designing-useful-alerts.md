@@ -1,4 +1,4 @@
-# 12.1 Designing Useful Alerts
+# 11.1 Designing Useful Alerts
 
 Effective alerting requires balancing multiple concerns: detecting problems quickly, avoiding noise that causes fatigue, and ensuring that alerts drive meaningful action. This chapter provides guidance derived from operational experience across thousands of Netdata deployments.
 
@@ -8,11 +8,11 @@ Before creating any alert, complete this sentence: "When this alert fires, **[sp
 
 :::
 
-## 12.1.1 Principles of Effective Alert Design
+## 11.1.1 Principles of Effective Alert Design
 
 Effective alerts share characteristics that distinguish them from alerts generating noise without value.
 
-### 12.1.1.1 Alerts Should Drive Action
+### 11.1.1.1 Alerts Should Drive Action
 
 Every alert should represent a situation requiring someone to take action. Alerts that fire automatically resolve, fire on expected conditions, or fire on conditions no one plans to address create noise without purpose.
 
@@ -25,7 +25,7 @@ Every alert should represent a situation requiring someone to take action. Alert
 
 Actionable alerts have clear ownership. Someone is responsible for investigating each alert that fires. When alerts fire in off-hours, the on-call rotation includes escalation paths. When alerts fire during business hours, the responsible team has bandwidth to respond.
 
-### 12.1.1.2 Alerting on Symptoms Rather Than Causes
+### 11.1.1.2 Alerting on Symptoms Rather Than Causes
 
 Alert on symptoms rather than causes when possible. A symptom alert like "response time degraded" points directly to user impact. A cause alert like "CPU at 90%" requires investigation to determine if it relates to the response time degradation.
 
@@ -36,13 +36,13 @@ Alert on symptoms rather than causes when possible. A symptom alert like "respon
 
 Symptoms are conditions that users experience. Causes are technical conditions that may or may not affect users. Prioritizing symptoms ensures alerts represent genuine problems.
 
-### 12.1.1.3 Keep Alert Rules Minimal
+### 11.1.1.3 Keep Alert Rules Minimal
 
 Every additional alert creates maintenance burden and potential noise. Before adding an alert, consider whether existing alerts cover the same concern.
 
 Use templates over duplication. Rather than creating identical alerts for multiple instances of the same service, create one template that applies to all instances. This reduces configuration complexity and ensures consistent behavior.
 
-### 12.1.1.4 Minimize False Positives
+### 11.1.1.4 Minimize False Positives
 
 False positives train responders to ignore alerts. The first few times an alert fires for a non-problem, responders investigate. After dozens of false activations, responders learn to assume alerts are noise and begin ignoring them.
 
@@ -50,7 +50,7 @@ Minimizing false positives does not mean making alerts less sensitive. It means 
 
 Use multiple thresholds for the same metric. A warning threshold triggers investigation; a critical threshold triggers immediate response. This graduated response helps operators prioritize.
 
-### 12.1.1.5 Alerts Should Be Specific and Diagnosable
+### 11.1.1.5 Alerts Should Be Specific and Diagnosable
 
 Vague alerts waste time. An alert stating "system problem" requires investigation to identify the issue. An alert stating "disk space on /var below 5%" enables immediate action.
 
@@ -58,7 +58,7 @@ Diagnosable alerts include context. When firing, an alert should state what is w
 
 Include relevant values in alert messages. When a threshold is exceeded, include the actual value that triggered the alert. This helps responders prioritize and provides starting points for investigation.
 
-## 12.1.2 Naming Conventions
+## 11.1.2 Naming Conventions
 
 Consistent naming conventions make alerts searchable and filterable.
 

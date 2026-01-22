@@ -1,4 +1,4 @@
-# 13.1 Alert Evaluation Architecture
+# 12.1 Alert Evaluation Architecture
 
 Alert evaluation is the process of checking metric values against configured conditions and determining alert status. This process happens entirely on the Agent or Parent node that owns the metrics.
 
@@ -8,7 +8,7 @@ Alert evaluation is local to each Agent. Netdata Cloud receives state changes bu
 
 :::
 
-## 13.1.1 Metric Collection Pipeline
+## 12.1.1 Metric Collection Pipeline
 
 Metrics flow from collectors through the Netdata database and into the health engine. Collectors gather raw data from system APIs, application endpoints, or external services. This raw data is formatted as dimension values and stored in the round-robin database.
 
@@ -23,7 +23,7 @@ The database maintains per-second resolution for recent time windows and aggrega
 
 The health engine runs on a configurable interval, typically every second. Each iteration evaluates all enabled alerts against recent metric values.
 
-## 13.1.2 The Alert State Machine
+## 12.1.2 The Alert State Machine
 
 Every alert instance exists in one of several states defined by the health state machine.
 
@@ -48,7 +48,7 @@ The `UNDEFINED` state indicates that the alert encountered an error during evalu
 
 The `REMOVED` state indicates that the alert has been deleted or the configuration has been removed.
 
-## 13.1.3 Evaluation Scope
+## 12.1.3 Evaluation Scope
 
 Alert evaluation occurs within a scope defined by the alert configuration. The `on` line specifies which chart the alert applies to. The `lookup` line defines which dimensions and time windows to evaluate.
 
@@ -60,7 +60,7 @@ Alert evaluation occurs within a scope defined by the alert configuration. The `
 
 Single-host alerts apply only to the local host. Template alerts apply to all charts matching a context.
 
-## 13.1.4 Evaluation Frequency Control
+## 12.1.4 Evaluation Frequency Control
 
 The `every` line controls evaluation frequency. Balance between responsiveness and resource usage.
 
