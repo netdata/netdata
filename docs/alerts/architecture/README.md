@@ -8,63 +8,15 @@ Alert evaluation is local to each Agent. Netdata Cloud receives state changes bu
 
 :::
 
-## 12.0.1 The Alert Pipeline {#the-alert-pipeline}
-
-Alerts progress through several stages from metric collection to notification dispatch.
-
-| Stage | Description |
-|-------|-------------|
-| **Collection** | Collectors gather raw metrics from system APIs and applications |
-| **Storage** | Metrics stored in the round-robin database |
-| **Evaluation** | Health engine checks conditions against configured thresholds |
-| **State Management** | Alert status transitions through defined states |
-| **Notification** | Dispatch alerts to configured recipients |
-
-## 12.0.2 Configuration Layers {#configuration-layers}
-
-Alert configuration exists in multiple layers with defined precedence.
-
-| Layer | Location | Purpose |
-|-------|----------|---------|
-| **Stock** | `/usr/lib/netdata/conf.d/health.d/` | Built-in alerts from packages |
-| **Custom** | `/etc/netdata/health.d/` | User-defined alerts |
-| **Cloud** | Netdata Cloud | Cloud-pushed alerts via UI |
-
-Custom alerts override stock alerts with the same name. Cloud alerts are stored separately and synchronized to nodes.
-
-## 12.0.3 Alert Lifecycle
-
-Each alert instance moves through a defined lifecycle from creation to removal.
-
-| State | Description |
-|-------|-------------|
-| **UNINITIALIZED** | Insufficient data to evaluate |
-| **CLEAR** | Conditions acceptable |
-| **WARNING** | Exceeded warning threshold |
-| **CRITICAL** | Exceeded critical threshold |
-| **UNDEFINED** | Evaluation error |
-| **REMOVED** | Alert deleted |
-
-Status transitions trigger notifications and update the alert history.
-
-## 12.0.4 Scaling Topologies
-
-Alert behavior varies depending on deployment topology.
-
-| Topology | Description |
-|----------|-------------|
-| **Standalone** | Single Agent, local evaluation only |
-| **Parent-Child** | Parent aggregates metrics, evaluates alerts |
-| **Cloud-connected** | Cloud receives state changes, provides global view |
-
 ## What's Included
 
-This chapter breaks down the architecture into four key areas:
+This chapter covers five deep-dive areas:
 
-- **The Alert Pipeline** — From metric collection to notification dispatch
-- **Configuration Layers** — How alert configs layer and override each other
-- **Alert Lifecycle** — States and transitions an alert goes through
-- **Scaling Topologies** — Alert behavior in standalone, parent-child, and cloud topologies
+- **[12.1 Evaluation Architecture](/docs/alerts/architecture/1-evaluation-architecture.md)** — How alerts check metrics against thresholds
+- **[12.2 Alert Lifecycle](/docs/alerts/architecture/2-alert-lifecycle.md)** — States and transitions (UNINITIALIZED → CLEAR → WARNING → CRITICAL)
+- **[12.3 Notification Dispatch](/docs/alerts/architecture/3-notification-dispatch.md)** — Queues, methods, and delivery reliability
+- **[12.4 Configuration Layers](/docs/alerts/architecture/4-configuration-layers.md)** — Stock, custom, and Cloud-based configs
+- **[12.5 Scaling Topologies](/docs/alerts/architecture/5-scaling-topologies.md)** — Agent-only, parent-child, and multi-region setups
 
 ## Related Sections
 
