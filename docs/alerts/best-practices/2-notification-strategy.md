@@ -66,9 +66,9 @@ Update alert configurations based on response patterns. Alerts that consistently
 
 ## What's Next
 
-- [12.3 Maintaining Configurations](/docs/alerts/best-practices/README.md) - Version control and periodic reviews
-- [12.4 Large Environment Patterns](/docs/alerts/best-practices/README.md) - Parent-based and distributed setups
-- [12.5 SLI and SLO Alerts](/docs/alerts/best-practices/README.md) - Connecting to business objectives
+- [12.3 Maintaining Configurations](/docs/alerts/best-practices/3-maintaining-configurations.md) - Version control and periodic reviews
+- [12.4 Large Environment Patterns](/docs/alerts/best-practices/4-scaling-large-environments.md) - Parent-based and distributed setups
+- [12.5 SLI and SLO Alerts](/docs/alerts/best-practices/5-sli-slo-alerts.md) - Connecting to business objectives
 - [13. Alerts and Notifications Architecture](/docs/alerts/architecture/README.md) - Internal behavior
 
 ## See Also
