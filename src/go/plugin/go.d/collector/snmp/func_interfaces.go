@@ -268,14 +268,7 @@ func (f *funcInterfaces) defaultSortColumn() string {
 }
 
 func rowOptionsForIface(entry *ifaceEntry) any {
-	if entry == nil {
-		return nil
-	}
-	if isIfaceDown(entry) {
-		return map[string]any{
-			"severity": "notice",
-		}
-	}
+	// TODO: Re-enable row coloring once the UI supports more severity options.
 	return nil
 }
 
