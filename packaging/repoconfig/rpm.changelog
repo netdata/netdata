@@ -1,4 +1,6 @@
-* Tue Jan 20 2025 Austin Hemmelgarn <austin@netdata.cloud> 5-3
+* Thu Jan 22 2026 Austin Hemmelgarn <austin@netdata.cloud>
+- Fix logic for usage of $releasever_major.
+* Tue Jan 20 2026 Austin Hemmelgarn <austin@netdata.cloud> 5-3
 - Use $releasever_major instead of $releasever in repo URLs when supported.
 * Thu Nov 13 2025 Austin Hemmelgarn <austin@netdata.cloud> 5-2
 - Fix repository URLs for openSUSE Tumbleweed.
