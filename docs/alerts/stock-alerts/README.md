@@ -167,7 +167,7 @@ Full alert catalogs for database systems.
 
 | Integration | Alerts Covered |
 |------------|---------------|
-| [MySQL & MariaDB](/docs/src/go/plugin/go.d/collector/mysql/integrations/mysql.md) | Slow queries, table locks, connections, replication lag, Galera cluster |
+| [MySQL & MariaDB](/src/go/plugin/go.d/collector/mysql/integrations/mysql.md) | Slow queries, table locks, connections, replication lag, Galera cluster |
 | [PostgreSQL](/docs/src/go/plugin/go.d/collector/postgres/integrations/postgres.md) | Connections, locks, deadlocks, cache IO, rollbacks, txid exhaustion |
 | [MongoDB](/docs/src/go/plugin/go.d/collector/mongodb/integrations/mongodb.md) | Connections, memory, operations, replication |
 | [Redis](/docs/src/go/plugin/go.d/collector/redis/integrations/redis.md) | Connected clients, memory, eviction, replication, persistence |
