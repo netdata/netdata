@@ -106,5 +106,5 @@ For a given alert definition applied to a given chart instance, there is one **a
 
 ## What's Next
 
-- **[1.2 Alert Types: `alarm` vs `template`](2-alert-types-alarm-vs-template.md)** Detailed explanation of chart-specific vs context-based rules
-- **[1.3 Where Alerts Live](3-where-alerts-live.md)** File paths, stock vs custom alerts, Cloud integration
+- **[1.2 Alert Types: `alarm` vs `template`](/docs/alerts/understanding-alerts/2-alert-types-alarm-vs-template.md)** Detailed explanation of chart-specific vs context-based rules
+- **[1.3 Where Alerts Live](/docs/alerts/understanding-alerts/3-where-alerts-live.md)** File paths, stock vs custom alerts, Cloud integration
