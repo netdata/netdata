@@ -69,7 +69,7 @@ Automate alert deployment and testing. When alert configurations change, automat
 
 ## What's Next
 
-- [12.5 SLI and SLO Alerts](./5-sli-slo-alerts.md) - Connecting alerts to business objectives
+- [12.5 SLI and SLO Alerts](../README.md) - Connecting alerts to business objectives
 - [13. Alerts and Notifications Architecture](/docs/architecture/README.md) - Internal behavior details
 
 ## See Also
