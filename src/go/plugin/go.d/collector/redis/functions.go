@@ -82,19 +82,22 @@ var redisAllColumns = []redisColumnMeta{
 
 func redisMethods() []module.MethodConfig {
 	sortOptions := buildRedisSortOptions(redisAllColumns)
-	return []module.MethodConfig{{
-		ID:   "top-queries",
-		Name: "Top Queries",
-		Help: "Slow commands from Redis SLOWLOG. WARNING: Command arguments may contain unmasked literals (potential PII).",
-		RequiredParams: []funcapi.ParamConfig{{
-			ID:         paramSort,
-			Name:       "Filter By",
-			Help:       "Select the primary sort column",
-			Selection:  funcapi.ParamSelect,
-			Options:    sortOptions,
-			UniqueView: true,
-		}},
-	}}
+	return []module.MethodConfig{
+		{
+			UpdateEvery: 10,
+			ID:          "top-queries",
+			Name:        "Top Queries",
+			Help:        "Slow commands from Redis SLOWLOG. WARNING: Command arguments may contain unmasked literals (potential PII).",
+			RequiredParams: []funcapi.ParamConfig{{
+				ID:         paramSort,
+				Name:       "Filter By",
+				Help:       "Select the primary sort column",
+				Selection:  funcapi.ParamSelect,
+				Options:    sortOptions,
+				UniqueView: true,
+			}},
+		},
+	}
 }
 
 func redisMethodParams(_ context.Context, _ *module.Job, method string) ([]funcapi.ParamConfig, error) {

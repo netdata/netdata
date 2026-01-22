@@ -130,19 +130,22 @@ type cbRow struct {
 
 func couchbaseMethods() []module.MethodConfig {
 	sortOptions := buildCouchbaseSortOptions(couchbaseAllColumns)
-	return []module.MethodConfig{{
-		ID:   "top-queries",
-		Name: "Top Queries",
-		Help: "Top N1QL requests from system:completed_requests",
-		RequiredParams: []funcapi.ParamConfig{{
-			ID:         paramSort,
-			Name:       "Filter By",
-			Help:       "Select the primary sort column",
-			Selection:  funcapi.ParamSelect,
-			Options:    sortOptions,
-			UniqueView: true,
-		}},
-	}}
+	return []module.MethodConfig{
+		{
+			UpdateEvery: 10,
+			ID:          "top-queries",
+			Name:        "Top Queries",
+			Help:        "Top N1QL requests from system:completed_requests",
+			RequiredParams: []funcapi.ParamConfig{{
+				ID:         paramSort,
+				Name:       "Filter By",
+				Help:       "Select the primary sort column",
+				Selection:  funcapi.ParamSelect,
+				Options:    sortOptions,
+				UniqueView: true,
+			}},
+		},
+	}
 }
 
 func couchbaseMethodParams(_ context.Context, _ *module.Job, method string) ([]funcapi.ParamConfig, error) {

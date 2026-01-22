@@ -275,9 +275,10 @@ func mongoMethods() []module.MethodConfig {
 	}
 
 	return []module.MethodConfig{{
-		ID:   "top-queries",
-		Name: "Top Queries",
-		Help: topQueriesHelpText,
+		UpdateEvery: 10,
+		ID:          "top-queries",
+		Name:        "Top Queries",
+		Help:        topQueriesHelpText,
 		RequiredParams: []funcapi.ParamConfig{
 			{
 				ID:         paramSort,
