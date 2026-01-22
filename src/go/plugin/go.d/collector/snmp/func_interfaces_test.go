@@ -93,9 +93,10 @@ func TestFuncIfacesColumns(t *testing.T) {
 					adminStatus: "up",
 					operStatus:  "up",
 					rates: ifaceRates{
-						trafficIn:  &rate,
-						errorsIn:   &rate,
-						discardsIn: &rate,
+						trafficIn:   &rate,
+						ucastPktsIn: &rate,
+						errorsIn:    &rate,
+						discardsIn:  &rate,
 					},
 				}
 
