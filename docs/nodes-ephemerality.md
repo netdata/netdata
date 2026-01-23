@@ -53,8 +53,15 @@ Netdata Cloud automatically removes inactive nodes to keep your dashboards clean
 | Node Type                    | Offline Duration | Description                                                                                                                        |
 |------------------------------|------------------|------------------------------------------------------------------------------------------------------------------------------------|
 | **Child nodes**              | 48 hours         | Nodes that connect through a Parent node. Deleted when:<br />• The child node goes offline, OR<br />• The Parent node goes offline |
-| **Directly connected nodes** | 60 days          | Nodes claimed directly to Netdata Cloud without going through a Parent.                                                            |
+| **Directly connected nodes** | 7 days           | Nodes claimed directly to Netdata Cloud without going through a Parent.                                                            |
 | **Ephemeral nodes**          | Custom           | Temporary nodes (containers, auto-scaling VMs) with configurable cleanup periods. See configuration below.                         |
+| **Unseen nodes**             | 48 hours         | Nodes that were claimed but have never connected to Netdata Cloud.                                                                 |
+
+:::tip
+
+**Stale nodes are NOT automatically deleted.** Only Offline and Unseen nodes are subject to automatic cleanup. A Stale node has historical data available via a Parent, so it's preserved until the Parent goes offline or the data expires.
+
+:::
 
 :::info Important
 
@@ -163,5 +170,6 @@ flowchart TD
 
 ## See Also
 
+- [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md) - Comprehensive reference for node states (Live, Stale, Offline, Unseen) and transition triggers
 - [Node Identities](/docs/learn/node-identities.md) - Understand how node identity works alongside ephemerality
 - [VM Templates](/docs/learn/vm-templates.md) - Configure ephemerality in VM templates for auto-scaling groups
