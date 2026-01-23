@@ -59,9 +59,9 @@ Metrics grouped by *scope*.
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
 - WireTiger metrics are available only if [WiredTiger](https://docs.mongodb.com/v6.0/core/wiredtiger/) is used as the
-  storage engine.
+storage engine.
 - Sharding metrics are available on shards only
-  for [mongos](https://www.mongodb.com/docs/manual/reference/program/mongos/).
+for [mongos](https://www.mongodb.com/docs/manual/reference/program/mongos/).
 
 
 ### Per MongoDB instance
@@ -212,15 +212,25 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Top Queries
 
+Top queries from MongoDB Profiler (system.profile). WARNING: Query text may contain unmasked literals (potential PII).
+
+Reads from system.profile and returns the top profiled queries sorted by the selected column.
+
+
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Mongodb:top-queries` |
-| Summary | Top queries from MongoDB Profiler (system.profile). WARNING: Query text may contain unmasked literals (potential PII). |
-| Behavior | Reads from system.profile and returns the top profiled queries sorted by the selected column. |
 | Performance | Requires profiling and reads from system.profile; may add load on busy systems. |
 | Security | Query text may contain unmasked literals (potential PII). |
-| Requirements | Requires MongoDB profiling enabled on target databases and top_queries_function_enabled set to true. |
 | Availability | Available when profiling is enabled and the collector is initialized; returns 403 if disabled in config. |
+
+#### Prerequisites
+
+##### Enable MongoDB profiling
+
+Enable profiling on the target databases and set top_queries_function_enabled to true.
+
+
 
 #### Parameters
 
@@ -232,36 +242,36 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 Profiled query statistics from system.profile.
 
-| Column | Type | Description |
-|:-------|:-----|:------------|
-| Timestamp | timestamp |  |
-| Namespace | string |  |
-| Operation | string |  |
-| Query | string |  |
-| Execution Time | duration |  |
-| Docs Examined | integer |  |
-| Keys Examined | integer |  |
-| Docs Returned | integer |  |
-| Plan Summary | string |  |
-| Client | string |  |
-| User | string |  |
-| Docs Deleted | integer |  |
-| Docs Inserted | integer |  |
-| Docs Modified | integer |  |
-| Response Length | integer |  |
-| Num Yield | integer |  |
-| App Name | string |  |
-| Cursor Exhausted | string |  |
-| Has Sort Stage | string |  |
-| Uses Disk | string |  |
-| From Multi Planner | string |  |
-| Replanned | string |  |
-| Query Hash | string |  |
-| Plan Cache Key | string |  |
-| Planning Time | duration |  |
-| CPU Time | duration |  |
-| Query Framework | string |  |
-| Query Shape Hash | string |  |
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Timestamp | timestamp |  |  |  |
+| Namespace | string |  |  |  |
+| Operation | string |  |  |  |
+| Query | string |  |  |  |
+| Execution Time | duration | seconds |  |  |
+| Docs Examined | integer |  |  |  |
+| Keys Examined | integer |  |  |  |
+| Docs Returned | integer |  |  |  |
+| Plan Summary | string |  |  |  |
+| Client | string |  |  |  |
+| User | string |  |  |  |
+| Docs Deleted | integer |  | hidden |  |
+| Docs Inserted | integer |  | hidden |  |
+| Docs Modified | integer |  | hidden |  |
+| Response Length | integer |  | hidden |  |
+| Num Yield | integer |  | hidden |  |
+| App Name | string |  |  |  |
+| Cursor Exhausted | string |  | hidden |  |
+| Has Sort Stage | string |  | hidden |  |
+| Uses Disk | string |  | hidden |  |
+| From Multi Planner | string |  | hidden |  |
+| Replanned | string |  | hidden |  |
+| Query Hash | string |  | hidden |  |
+| Plan Cache Key | string |  | hidden |  |
+| Planning Time | duration | seconds | hidden |  |
+| CPU Time | duration | seconds | hidden |  |
+| Query Framework | string |  | hidden |  |
+| Query Shape Hash | string |  | hidden |  |
 
 
 
@@ -304,13 +314,13 @@ Create a read-only user for Netdata in the admin database.
 
   ```bash
   db.createUser({
-    "user":"netdata",
-    "pwd": "<UNIQUE_PASSWORD>",
-    "roles" : [
-      {role: 'read', db: 'admin' },
-      {role: 'clusterMonitor', db: 'admin'},
-      {role: 'read', db: 'local' }
-    ]
+  "user":"netdata",
+  "pwd": "<UNIQUE_PASSWORD>",
+  "roles" : [
+  {role: 'read', db: 'admin' },
+  {role: 'clusterMonitor', db: 'admin'},
+  {role: 'read', db: 'local' }
+  ]
   })
   ```
 

@@ -340,15 +340,25 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Top Queries
 
+Top SQL queries from pg_stat_statements. WARNING: Query text may contain unmasked literals (potential PII).
+
+Reads pg_stat_statements and returns the top entries sorted by the selected column.
+
+
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Yugabytedb:top-queries` |
-| Summary | Top SQL queries from pg_stat_statements. WARNING: Query text may contain unmasked literals (potential PII). |
-| Behavior | Reads pg_stat_statements and returns the top entries sorted by the selected column. |
 | Performance | Executes SQL queries and may be expensive on busy clusters; use top_queries_limit and sql_timeout. |
 | Security | Query text may contain unmasked literals (potential PII). |
-| Requirements | Requires pg_stat_statements installed and a SQL DSN configured for YSQL. |
 | Availability | Available when YSQL is accessible; returns errors if the SQL connection is unavailable. |
+
+#### Prerequisites
+
+##### Enable pg_stat_statements for YSQL
+
+Install and enable pg_stat_statements and configure a YSQL DSN.
+
+
 
 #### Parameters
 
@@ -360,31 +370,41 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 Aggregated query statistics from pg_stat_statements.
 
-| Column | Type | Description |
-|:-------|:-----|:------------|
-| Query ID | string |  |
-| Query | string |  |
-| Database | string |  |
-| User | string |  |
-| Calls | integer |  |
-| Total Time | duration |  |
-| Mean Time | duration |  |
-| Min Time | duration |  |
-| Max Time | duration |  |
-| Rows | integer |  |
-| Stddev Time | duration |  |
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Query ID | string |  | hidden |  |
+| Query | string |  |  |  |
+| Database | string |  |  |  |
+| User | string |  |  |  |
+| Calls | integer |  |  |  |
+| Total Time | duration | milliseconds |  |  |
+| Mean Time | duration | milliseconds |  |  |
+| Min Time | duration | milliseconds | hidden |  |
+| Max Time | duration | milliseconds | hidden |  |
+| Rows | integer |  |  |  |
+| Stddev Time | duration | milliseconds | hidden |  |
 
 ### Running Queries
+
+Currently running SQL statements from pg_stat_activity. WARNING: Query text may contain unmasked literals (potential PII).
+
+Reads pg_stat_activity and returns running statements sorted by the selected column.
+
 
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Yugabytedb:running-queries` |
-| Summary | Currently running SQL statements from pg_stat_activity. WARNING: Query text may contain unmasked literals (potential PII). |
-| Behavior | Reads pg_stat_activity and returns running statements sorted by the selected column. |
 | Performance | Executes SQL queries and may be expensive on busy clusters; use top_queries_limit and sql_timeout. |
 | Security | Query text may contain unmasked literals (potential PII). |
-| Requirements | Requires a SQL DSN configured for YSQL and access to pg_stat_activity. |
 | Availability | Available when YSQL is accessible; returns errors if the SQL connection is unavailable. |
+
+#### Prerequisites
+
+##### Grant access to pg_stat_activity
+
+Configure a YSQL DSN and grant access to pg_stat_activity.
+
+
 
 #### Parameters
 
@@ -396,19 +416,19 @@ Aggregated query statistics from pg_stat_statements.
 
 Snapshot of currently running SQL statements.
 
-| Column | Type | Description |
-|:-------|:-----|:------------|
-| PID | string |  |
-| Query | string |  |
-| Database | string |  |
-| User | string |  |
-| State | string |  |
-| Wait Event Type | string |  |
-| Wait Event | string |  |
-| Application | string |  |
-| Client Address | string |  |
-| Query Start | string |  |
-| Elapsed | duration |  |
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| PID | string |  | hidden |  |
+| Query | string |  |  |  |
+| Database | string |  |  |  |
+| User | string |  |  |  |
+| State | string |  |  |  |
+| Wait Event Type | string |  | hidden |  |
+| Wait Event | string |  | hidden |  |
+| Application | string |  | hidden |  |
+| Client Address | string |  | hidden |  |
+| Query Start | string |  | hidden |  |
+| Elapsed | duration | milliseconds |  |  |
 
 
 

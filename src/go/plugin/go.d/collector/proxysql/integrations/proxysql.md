@@ -176,15 +176,25 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Top Queries
 
+Top SQL queries from ProxySQL query digest stats.
+
+Queries stats_mysql_query_digest and returns the top entries sorted by the selected column.
+
+
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Proxysql:top-queries` |
-| Summary | Top SQL queries from ProxySQL query digest stats. |
-| Behavior | Queries stats_mysql_query_digest and returns the top entries sorted by the selected column. |
 | Performance | Uses ProxySQL stats tables and can be expensive on busy systems. |
 | Security | Query text may contain unmasked literals (potential PII). |
-| Requirements | Requires access to stats_mysql_query_digest in ProxySQL. |
 | Availability | Available when the collector can query ProxySQL stats; returns errors if the SQL connection is unavailable. |
+
+#### Prerequisites
+
+##### Grant access to stats_mysql_query_digest
+
+Ensure the ProxySQL user can read stats_mysql_query_digest.
+
+
 
 #### Parameters
 
@@ -196,24 +206,24 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 Query digest statistics from ProxySQL.
 
-| Column | Type | Description |
-|:-------|:-----|:------------|
-| Digest | string |  |
-| Query | string |  |
-| Schema | string |  |
-| User | string |  |
-| Hostgroup | integer |  |
-| Calls | integer |  |
-| Total Time | duration |  |
-| Avg Time | duration |  |
-| Min Time | duration |  |
-| Max Time | duration |  |
-| Rows Affected | integer |  |
-| Rows Sent | integer |  |
-| Errors | integer |  |
-| Warnings | integer |  |
-| First Seen | string |  |
-| Last Seen | string |  |
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Digest | string |  | hidden |  |
+| Query | string |  |  |  |
+| Schema | string |  |  |  |
+| User | string |  | hidden |  |
+| Hostgroup | integer |  | hidden |  |
+| Calls | integer |  |  |  |
+| Total Time | duration | milliseconds |  |  |
+| Avg Time | duration | milliseconds |  |  |
+| Min Time | duration | milliseconds | hidden |  |
+| Max Time | duration | milliseconds | hidden |  |
+| Rows Affected | integer |  |  |  |
+| Rows Sent | integer |  |  |  |
+| Errors | integer |  |  |  |
+| Warnings | integer |  |  |  |
+| First Seen | string |  | hidden |  |
+| Last Seen | string |  | hidden |  |
 
 
 

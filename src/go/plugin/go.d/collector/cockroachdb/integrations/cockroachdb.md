@@ -142,15 +142,25 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Top Queries
 
+Top SQL statements from crdb_internal.cluster_statement_statistics.
+
+Queries crdb_internal.cluster_statement_statistics and returns the top entries sorted by the selected column.
+
+
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Cockroachdb:top-queries` |
-| Summary | Top SQL statements from crdb_internal.cluster_statement_statistics. |
-| Behavior | Queries crdb_internal.cluster_statement_statistics and returns the top entries sorted by the selected column. |
 | Performance | Executes SQL queries against system tables and may be expensive on busy clusters. |
 | Security | Query text may contain unmasked literals (potential PII). |
-| Requirements | Requires a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to crdb_internal.cluster_statement_statistics. |
 | Availability | Requires SQL DSN configuration and access to system tables; returns errors if DSN is missing or SQL is unavailable. |
+
+#### Prerequisites
+
+##### Grant VIEWACTIVITY access to cluster statement stats
+
+Use a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to crdb_internal.cluster_statement_statistics.
+
+
 
 #### Parameters
 
@@ -162,40 +172,50 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 Aggregated SQL statement statistics.
 
-| Column | Type | Description |
-|:-------|:-----|:------------|
-| Fingerprint ID | string |  |
-| Query | string |  |
-| Database | string |  |
-| Application | string |  |
-| Statement Type | string |  |
-| Distributed | string |  |
-| Full Scan | string |  |
-| Implicit Txn | string |  |
-| Vectorized | string |  |
-| Executions | integer |  |
-| Total Time | duration |  |
-| Mean Time | duration |  |
-| Run Time | duration |  |
-| Plan Time | duration |  |
-| Parse Time | duration |  |
-| Rows Read | integer |  |
-| Rows Written | integer |  |
-| Rows Returned | integer |  |
-| Bytes Read | integer |  |
-| Max Retries | integer |  |
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Fingerprint ID | string |  | hidden |  |
+| Query | string |  |  |  |
+| Database | string |  |  |  |
+| Application | string |  |  |  |
+| Statement Type | string |  | hidden |  |
+| Distributed | string |  | hidden |  |
+| Full Scan | string |  | hidden |  |
+| Implicit Txn | string |  | hidden |  |
+| Vectorized | string |  | hidden |  |
+| Executions | integer |  |  |  |
+| Total Time | duration | milliseconds |  |  |
+| Mean Time | duration | milliseconds |  |  |
+| Run Time | duration | milliseconds | hidden |  |
+| Plan Time | duration | milliseconds | hidden |  |
+| Parse Time | duration | milliseconds | hidden |  |
+| Rows Read | integer |  |  |  |
+| Rows Written | integer |  |  |  |
+| Rows Returned | integer |  |  |  |
+| Bytes Read | integer |  | hidden |  |
+| Max Retries | integer |  | hidden |  |
 
 ### Running Queries
+
+Currently running SQL statements from SHOW CLUSTER STATEMENTS.
+
+Queries SHOW CLUSTER STATEMENTS and returns running statements sorted by the selected column.
+
 
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Cockroachdb:running-queries` |
-| Summary | Currently running SQL statements from SHOW CLUSTER STATEMENTS. |
-| Behavior | Queries SHOW CLUSTER STATEMENTS and returns running statements sorted by the selected column. |
 | Performance | Executes SQL queries against system tables and may be expensive on busy clusters. |
 | Security | Query text may contain unmasked literals (potential PII). |
-| Requirements | Requires a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to system tables. |
 | Availability | Requires SQL DSN configuration and access to system tables; returns errors if DSN is missing or SQL is unavailable. |
+
+#### Prerequisites
+
+##### Grant VIEWACTIVITY access to system tables
+
+Use a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to system tables.
+
+
 
 #### Parameters
 
@@ -207,19 +227,19 @@ Aggregated SQL statement statistics.
 
 Snapshot of currently running SQL statements.
 
-| Column | Type | Description |
-|:-------|:-----|:------------|
-| Query ID | string |  |
-| Query | string |  |
-| User | string |  |
-| Application | string |  |
-| Client Address | string |  |
-| Node ID | string |  |
-| Session ID | string |  |
-| Phase | string |  |
-| Distributed | string |  |
-| Start Time | string |  |
-| Elapsed | duration |  |
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Query ID | string |  | hidden |  |
+| Query | string |  |  |  |
+| User | string |  |  |  |
+| Application | string |  |  |  |
+| Client Address | string |  | hidden |  |
+| Node ID | string |  | hidden |  |
+| Session ID | string |  | hidden |  |
+| Phase | string |  |  |  |
+| Distributed | string |  | hidden |  |
+| Start Time | string |  | hidden |  |
+| Elapsed | duration | milliseconds |  |  |
 
 
 

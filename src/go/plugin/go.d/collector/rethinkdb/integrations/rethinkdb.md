@@ -104,15 +104,25 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Running Queries
 
+Currently running queries from rethinkdb.jobs. WARNING: Query text may contain unmasked literals (potential PII).
+
+Queries rethinkdb.jobs and returns running queries sorted by the selected column.
+
+
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Rethinkdb:running-queries` |
-| Summary | Currently running queries from rethinkdb.jobs. WARNING: Query text may contain unmasked literals (potential PII). |
-| Behavior | Queries rethinkdb.jobs and returns running queries sorted by the selected column. |
 | Performance | Uses system tables and may be expensive on busy clusters. |
 | Security | Query text may contain unmasked literals (potential PII). |
-| Requirements | Requires admin access to rethinkdb.jobs and a working connection. |
 | Availability | Available when the collector is initialized; returns 503 if the collector is still connecting. |
+
+#### Prerequisites
+
+##### Grant admin access to rethinkdb.jobs
+
+Use an admin user with access to rethinkdb.jobs and ensure the connection is working.
+
+
 
 #### Parameters
 
@@ -124,16 +134,16 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 Snapshot of running queries from rethinkdb.jobs.
 
-| Column | Type | Description |
-|:-------|:-----|:------------|
-| Job ID | string |  |
-| Query | string |  |
-| Duration | duration |  |
-| Type | string |  |
-| User | string |  |
-| Client Address | string |  |
-| Client Port | integer |  |
-| Servers | string |  |
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Job ID | string |  | hidden |  |
+| Query | string |  |  |  |
+| Duration | duration | milliseconds |  |  |
+| Type | string |  |  |  |
+| User | string |  |  |  |
+| Client Address | string |  | hidden |  |
+| Client Port | integer |  | hidden |  |
+| Servers | string |  | hidden |  |
 
 
 

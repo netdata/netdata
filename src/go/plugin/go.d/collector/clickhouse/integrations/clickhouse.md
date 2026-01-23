@@ -178,15 +178,25 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Top Queries
 
+Top SQL queries from ClickHouse system.query_log.
+
+Queries system.query_log, aggregates by query, and returns the top entries sorted by the selected column.
+
+
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Clickhouse:top-queries` |
-| Summary | Top SQL queries from ClickHouse system.query_log. |
-| Behavior | Queries system.query_log, aggregates by query, and returns the top entries sorted by the selected column. |
 | Performance | Uses system.query_log and can be expensive on busy systems. Use limits to control response size. |
 | Security | Query text may include sensitive literals depending on server settings. |
-| Requirements | Requires access to system.query_log on the target ClickHouse instance. |
 | Availability | Available when the collector can query system tables; returns 503 if system.query_log is not available. |
+
+#### Prerequisites
+
+##### Grant access to system.query_log
+
+Ensure the Netdata user can read system.query_log on the target ClickHouse instance.
+
+
 
 #### Parameters
 
@@ -198,24 +208,24 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 Aggregated query statistics from system.query_log.
 
-| Column | Type | Description |
-|:-------|:-----|:------------|
-| Query ID | string |  |
-| Query | string |  |
-| Database | string |  |
-| User | string |  |
-| Calls | integer |  |
-| Total Time | duration |  |
-| Avg Time | duration |  |
-| Min Time | duration |  |
-| Max Time | duration |  |
-| Read Rows | integer |  |
-| Read Bytes | integer |  |
-| Written Rows | integer |  |
-| Written Bytes | integer |  |
-| Result Rows | integer |  |
-| Result Bytes | integer |  |
-| Max Memory | float |  |
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Query ID | string |  | hidden |  |
+| Query | string |  |  |  |
+| Database | string |  |  |  |
+| User | string |  |  |  |
+| Calls | integer |  |  |  |
+| Total Time | duration | milliseconds |  |  |
+| Avg Time | duration | milliseconds |  |  |
+| Min Time | duration | milliseconds | hidden |  |
+| Max Time | duration | milliseconds | hidden |  |
+| Read Rows | integer |  |  |  |
+| Read Bytes | integer |  |  |  |
+| Written Rows | integer |  | hidden |  |
+| Written Bytes | integer |  | hidden |  |
+| Result Rows | integer |  |  |  |
+| Result Bytes | integer |  | hidden |  |
+| Max Memory | float |  | hidden |  |
 
 
 

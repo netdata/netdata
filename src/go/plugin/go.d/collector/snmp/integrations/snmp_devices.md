@@ -95,9 +95,9 @@ The configuration file name is [go.d/sd/snmp.conf](https://github.com/netdata/ne
 You can edit the configuration file using the edit-config script from the Netdata [config directory](https://learn.netdata.cloud/docs/netdata-agent/configuration#the-netdata-config-directory).
 
 ```bash
- cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
- sudo ./edit-config go.d/sd/snmp.conf
- ```
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config go.d/sd/snmp.conf
+```
 
 
 #### Limits
@@ -117,7 +117,7 @@ Metrics and charts are **defined by the matched SNMP profile(s)** at runtime. Th
 
 :::tip
 
- To understand the structure of these profiles (metrics, tags, virtual metrics, etc.), see **[SNMP Profile Format](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/snmp/profile-format.md)**.
+To understand the structure of these profiles (metrics, tags, virtual metrics, etc.), see **[SNMP Profile Format](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/snmp/profile-format.md)**.
 
 :::
 
@@ -132,15 +132,21 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Network Interfaces
 
+Network interface traffic and status metrics.
+
+Uses the latest cached SNMP interface data, filters by the selected type group, and sorts by the default column.
+
+
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Snmp:interfaces` |
-| Summary | Network interface traffic and status metrics. |
-| Behavior | Uses the latest cached SNMP interface data, filters by the selected type group, and sorts by the default column. |
 | Performance | Uses cached data only and does not trigger additional SNMP requests. Large devices may return many rows. |
 | Security | Exposes interface names and counters only. |
-| Requirements | Requires successful SNMP collection so interface data is cached. |
 | Availability | Available after the collector has completed at least one data collection; returns 503 until cache is ready. |
+
+#### Prerequisites
+
+No additional configuration is required.
 
 #### Parameters
 
@@ -152,27 +158,27 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 Table of interface traffic and status from cached SNMP data.
 
-| Column | Type | Description |
-|:-------|:-----|:------------|
-| Interface | string |  |
-| Type | string |  |
-| Type Group | string |  |
-| Admin Status | string |  |
-| Oper Status | string |  |
-| Traffic In | float |  |
-| Traffic Out | float |  |
-| Unicast In | float |  |
-| Unicast Out | float |  |
-| Broadcast In | float |  |
-| Broadcast Out | float |  |
-| Packets In | float |  |
-| Packets Out | float |  |
-| Errors In | float |  |
-| Errors Out | float |  |
-| Discards In | float |  |
-| Discards Out | float |  |
-| Multicast In | float |  |
-| Multicast Out | float |  |
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Interface | string |  |  |  |
+| Type | string |  |  |  |
+| Type Group | string |  |  |  |
+| Admin Status | string |  |  |  |
+| Oper Status | string |  |  |  |
+| Traffic In | float | Mbits |  |  |
+| Traffic Out | float | Mbits |  |  |
+| Unicast In | float | Kpps | hidden |  |
+| Unicast Out | float | Kpps | hidden |  |
+| Broadcast In | float | Kpps | hidden |  |
+| Broadcast Out | float | Kpps | hidden |  |
+| Packets In | float | Kpps |  |  |
+| Packets Out | float | Kpps |  |  |
+| Errors In | float | packets/s | hidden |  |
+| Errors Out | float | packets/s | hidden |  |
+| Discards In | float | packets/s |  |  |
+| Discards Out | float | packets/s |  |  |
+| Multicast In | float | Kpps | hidden |  |
+| Multicast Out | float | Kpps | hidden |  |
 
 
 
