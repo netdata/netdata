@@ -191,57 +191,63 @@ modules:
         - id: top-queries
           name: Top Queries
           description: |
-            Slow commands from Redis SLOWLOG. WARNING: Command arguments may contain unmasked literals (potential PII).
-            
-            Reads Redis SLOWLOG and returns the top entries sorted by the selected column.
+            Provides performance analysis for slow commands logged in Redis [SLOWLOG](https://redis.io/docs/latest/commands/slowlog/).
+            This function queries the Redis [SLOWLOG](https://redis.io/docs/latest/commands/slowlog/) file to retrieve entries of commands that exceeded the configured execution time threshold. It presents results in a sortable, filterable table for identifying performance bottlenecks and inefficient command usage.
+            Use cases:
+            - Identify slow commands that may indicate optimization opportunities in application code or Redis usage patterns
+            - Analyze command execution frequency to detect performance hotspots and caching opportunities
+            - Investigate client address patterns to identify sources of slow commands or problematic clients
+            - Monitor slow command duration over time to detect performance degradation or improvements
+            - Track which commands are most frequently appearing in slow logs for resource planning
+            Note: Command arguments may contain unmasked literal values including potentially sensitive data. Exercise caution when reviewing or sharing slowlog contents.
           parameters:
             - id: __sort
               name: Filter By
-              description: Select the primary sort column (options are derived from sortable columns in the response).
+              description: Select the primary sort column. The available options depend on your configuration and include metrics like execution duration, command type, and execution count. Default is Duration to focus on slowest commands.
               type: select
               required: true
               default: duration
               options: []
           returns:
-            description: Slowlog entries with command timing and metadata.
+            description: Slowlog entries with command timing and client metadata, providing insight into Redis performance patterns. Each row represents a single slow command execution that exceeded the configured threshold.
             columns:
               - name: ID
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Unique identifier for the slowlog entry. Allows tracking individual command executions.
               - name: Timestamp
                 type: timestamp
                 unit: ""
-                description: ""
+                description: Date and time when the slow command was executed. Useful for correlating slow commands with application events or system changes.
               - name: Command
                 type: string
                 unit: ""
-                description: ""
+                description: The Redis command that was executed (e.g., SET, GET, HGETS, ZADD). Critical for identifying command type performance characteristics.
               - name: Command Name
                 type: string
                 unit: ""
-                description: ""
+                description: Full command text including all arguments passed to the command. May contain sensitive data (keys, values) depending on application implementation.
               - name: Duration
                 type: duration
                 unit: "milliseconds"
-                description: ""
+                description: Execution time that exceeded the slowlog threshold. Higher values indicate slower commands that may need optimization or investigation.
               - name: Client Address
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: IP address of the client that executed the slow command. Useful for identifying problematic clients or network segments.
               - name: Client Name
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Client identifier or name reported by Redis. Useful for identifying specific applications or services generating slow commands.
           performance: |
-            Uses SLOWLOG GET and may return many entries; use top_queries_limit to control size.
+            Reads SLOWLOG file directly from disk; minimal overhead.<br/>• Returns limited entries based on top_queries_limit configuration<br/>• Large SLOWLOG files may take longer to read and process
           security: |
-            Command arguments may contain unmasked literals (potential PII).
+            Command arguments may contain unmasked literal values including potentially sensitive data.<br/>• Redis keys, values, or cache keys in arguments<br/>• Application-specific identifiers or session tokens<br/>• Access should be restricted to authorized personnel only due to potential PII exposure
           availability: |
-            Available when the collector is initialized; returns 503 if the collector is still connecting.
+            Available when SLOWLOG is enabled and collector has completed at least one data collection cycle.<br/>• Requires slowlog-log-slower-than configuration option to be set<br/>• Returns HTTP 503 if collector is still connecting to Redis<br/>• Returns HTTP 403 if top_queries_limit is set to 0
     metrics:
       folding:
         title: Metrics
