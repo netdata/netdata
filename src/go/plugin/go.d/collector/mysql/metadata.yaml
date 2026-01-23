@@ -453,8 +453,7 @@ modules:
                   ```
 
                   The following consumers should be enabled:
-                  - `events_statements_history`
-                  - `events_statements_history_long`
+                  - `events_statements_current`
                   - `events_statements_summary_by_digest`
 
                   Enable statement consumers if needed:
