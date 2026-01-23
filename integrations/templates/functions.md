@@ -17,7 +17,7 @@
 
 #### Prerequisites
 
-[% if func.prerequisites.list %]
+[% if func.prerequisites and func.prerequisites.list %]
 [% for req in func.prerequisites.list %]
 ##### [[ req.title ]]
 
