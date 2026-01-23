@@ -432,7 +432,7 @@ modules:
                 unit: ""
                 description: "Maximum total memory used by this query pattern including both controlled and uncontrolled allocations. Available in MySQL 8.0.31+."
           performance: |
-            Minimal overhead when properly configured. On busy servers with high query throughput, digest table can contain many rows and queries may take longer. • Default limit of 500 rows balances usefulness with performance<br/>• Adjust `top_queries_limit` configuration option if needed<br/>• Performance Schema overhead typically 1-3% CPU for collecting statement statistics<br/>• Consider disabling statement instrumentation during peak load periods if performance impact is a concern
+            Minimal overhead when properly configured. On busy servers with high query throughput, digest table can contain many rows and queries may take longer.<br/>• Default limit of 500 rows balances usefulness with performance<br/>• Adjust `top_queries_limit` configuration option if needed<br/>• Performance Schema overhead typically 1-3% CPU for collecting statement statistics<br/>• Consider disabling statement instrumentation during peak load periods if performance impact is a concern
           security: |
             Query text may contain unmasked literal values including potentially sensitive data. • Personal information (names, emails, phone numbers)<br/>• Authentication credentials (if improperly handled by application)<br/>• Proprietary business data<br/>• Session identifiers or tokens<br/>• Access should be restricted to authorized personnel only<br/>• Consider implementing data masking in applications to prevent sensitive literals from appearing in query text
           prerequisites:
@@ -441,9 +441,45 @@ modules:
                 description: |
                   Performance Schema must be enabled and statement instrumentation must be configured to collect digest statistics.
 
-                  Check if Performance Schema is enabled:
+                  1. Check if Performance Schema is enabled:
                   ```sql
                   SELECT @@performance_schema;
+                  ```
+
+                  2. Check statement instrumentation configuration:
+                  ```sql
+                  SELECT * FROM performance_schema.setup_consumers
+                  WHERE NAME LIKE '%statement%';
+                  ```
+
+                  The following consumers should be enabled:
+                  - `events_statements_current`
+                  - `events_statements_summary_by_digest`
+
+                  3. Enable statement consumers if needed:
+                  ```sql
+                  UPDATE performance_schema.setup_consumers
+                  SET ENABLED = 'YES'
+                  WHERE NAME LIKE 'events_statements%';
+                  ```
+
+                  Note: Changes to `setup_consumers` take effect immediately without requiring a server restart.
+
+                  MariaDB Note: MariaDB also supports `events_statements_summary_by_digest` table. The `setup_consumers.ENABLED` column is writable in MariaDB, or you can enable consumers at startup using `performance-schema-consumer-events_statements_summary_by_digest=ON` in your configuration file. Exact consumer names may vary by MariaDB version, so checking `setup_consumers` first as shown above is recommended.
+
+                  4. Verify digest table contains data:
+                  ```sql
+                  SELECT COUNT(*) FROM performance_schema.events_statements_summary_by_digest;
+                  ```
+
+                  Note: Statement digest data is accumulated since server startup or since the table was last truncated. To reset statistics:
+                  ```sql
+                  TRUNCATE TABLE performance_schema.events_statements_summary_by_digest;
+                  ```
+
+                  For MySQL versions before 8.0, ensure `performance-schema-instrument` includes statement instruments. This mainly applies to MySQL 5.6 or specific locked-down configurations, as statement instruments are typically enabled by default in MySQL 5.7+:
+                  ```ini
+                  performance-schema-instrument='statement/%=ON'
                   ```
 
                   Check statement instrumentation configuration:
@@ -453,7 +489,8 @@ modules:
                   ```
 
                   The following consumers should be enabled:
-                  - `events_statements_current`
+                  - `events_statements_history`
+                  - `events_statements_history_long`
                   - `events_statements_summary_by_digest`
 
                   Enable statement consumers if needed:
