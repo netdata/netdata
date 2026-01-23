@@ -2,7 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_hardirq.h"
-#include "../ebpf_library.h"
+#include "ebpf_library.h"
 
 struct config hardirq_config = APPCONFIG_INITIALIZER;
 

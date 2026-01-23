@@ -2,7 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_sync.h"
-#include "../ebpf_library.h"
+#include "ebpf_library.h"
 
 static char *sync_counter_dimension_name[NETDATA_SYNC_IDX_END] =
     {"sync", "syncfs", "msync", "fsync", "fdatasync", "sync_file_range"};

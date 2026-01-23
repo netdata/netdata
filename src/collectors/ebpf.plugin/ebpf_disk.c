@@ -5,7 +5,7 @@
 
 #include "ebpf.h"
 #include "ebpf_disk.h"
-#include "../ebpf_library.h"
+#include "ebpf_library.h"
 
 struct config disk_config = APPCONFIG_INITIALIZER;
 

@@ -2,7 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_mdflush.h"
-#include "../ebpf_library.h"
+#include "ebpf_library.h"
 
 struct config mdflush_config = APPCONFIG_INITIALIZER;
 

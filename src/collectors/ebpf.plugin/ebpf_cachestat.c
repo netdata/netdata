@@ -2,7 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_cachestat.h"
-#include "../ebpf_library.h"
+#include "ebpf_library.h"
 
 static char *cachestat_counter_dimension_name[NETDATA_CACHESTAT_END] = {"ratio", "dirty", "hit", "miss"};
 static netdata_syscall_stat_t cachestat_counter_aggregated_data[NETDATA_CACHESTAT_END];

@@ -2,7 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_process.h"
-#include "../ebpf_library.h"
+#include "ebpf_library.h"
 
 /*****************************************************************
  *
