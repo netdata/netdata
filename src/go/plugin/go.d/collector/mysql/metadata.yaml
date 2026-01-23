@@ -238,7 +238,7 @@ modules:
           description: |
             Retrieves and aggregates SQL query performance metrics from MySQL Performance Schema statement digest tables.
 
-            This function queries the `performance_schema.events_statements_summary_by_digest` table, which contains aggregated
+            This function queries the [performance_schema.events_statements_summary_by_digest](https://dev.mysql.com/doc/refman/8.4/en/performance-schema-statement-summary-tables.html) table, which contains aggregated
             statistics for SQL statements grouped by their digest (normalized query pattern). The function dynamically detects
             available columns based on your MySQL/MariaDB version and returns the top entries sorted by a user-selected metric.
 
