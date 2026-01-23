@@ -551,11 +551,11 @@ modules:
             Uses Query Store and can be expensive on busy instances.
           security: |
             Query Store may contain unmasked literals (potential PII).
-          requirements:
+          prerequisites:
             list:
-              - title: Requirement
+              - title: Enable Query Store functions
                 description: |
-                  Requires Query Store enabled and query_store_function_enabled set to true.
+                  Enable Query Store and set query_store_function_enabled to true.
           availability: |
             Available when Query Store is enabled and the collector is initialized; returns 403 if disabled in config.
     metrics:

@@ -321,11 +321,11 @@ modules:
             Executes SQL queries and may be expensive on busy clusters; use top_queries_limit and sql_timeout.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements:
+          prerequisites:
             list:
-              - title: Requirement
+              - title: Enable pg_stat_statements for YSQL
                 description: |
-                  Requires pg_stat_statements installed and a SQL DSN configured for YSQL.
+                  Install and enable pg_stat_statements and configure a YSQL DSN.
           availability: |
             Available when YSQL is accessible; returns errors if the SQL connection is unavailable.
         - id: running-queries
@@ -404,11 +404,11 @@ modules:
             Executes SQL queries and may be expensive on busy clusters; use top_queries_limit and sql_timeout.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements:
+          prerequisites:
             list:
-              - title: Requirement
+              - title: Grant access to pg_stat_activity
                 description: |
-                  Requires a SQL DSN configured for YSQL and access to pg_stat_activity.
+                  Configure a YSQL DSN and grant access to pg_stat_activity.
           availability: |
             Available when YSQL is accessible; returns errors if the SQL connection is unavailable.
     metrics:

@@ -357,11 +357,11 @@ modules:
             Uses system.query_log and can be expensive on busy systems. Use limits to control response size.
           security: |
             Query text may include sensitive literals depending on server settings.
-          requirements:
+          prerequisites:
             list:
-              - title: Requirement
+              - title: Grant access to system.query_log
                 description: |
-                  Requires access to system.query_log on the target ClickHouse instance.
+                  Ensure the Netdata user can read system.query_log on the target ClickHouse instance.
           availability: |
             Available when the collector can query system tables; returns 503 if system.query_log is not available.
     metrics:

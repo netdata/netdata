@@ -612,11 +612,6 @@ modules:
             Uses cached data only and does not trigger additional SNMP requests. Large devices may return many rows.
           security: |
             Exposes interface names and counters only.
-          requirements:
-            list:
-              - title: Requirement
-                description: |
-                  Requires successful SNMP collection so interface data is cached.
           availability: |
             Available after the collector has completed at least one data collection; returns 503 until cache is ready.
     metrics:

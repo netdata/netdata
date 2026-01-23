@@ -457,11 +457,11 @@ modules:
             Requires pg_stat_statements and can be expensive on busy servers.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements:
+          prerequisites:
             list:
-              - title: Requirement
+              - title: Enable pg_stat_statements
                 description: |
-                  Requires the pg_stat_statements extension installed and enabled.
+                  Install and enable the pg_stat_statements extension.
           availability: |
             Available when pg_stat_statements is available and the collector is initialized.
     metrics:

@@ -372,11 +372,11 @@ modules:
             Executes SQL queries against system tables and may be expensive on busy clusters.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements:
+          prerequisites:
             list:
-              - title: Requirement
+              - title: Grant VIEWACTIVITY access to cluster statement stats
                 description: |
-                  Requires a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to crdb_internal.cluster_statement_statistics.
+                  Use a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to crdb_internal.cluster_statement_statistics.
           availability: |
             Requires SQL DSN configuration and access to system tables; returns errors if DSN is missing or SQL is unavailable.
         - id: running-queries
@@ -455,11 +455,11 @@ modules:
             Executes SQL queries against system tables and may be expensive on busy clusters.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements:
+          prerequisites:
             list:
-              - title: Requirement
+              - title: Grant VIEWACTIVITY access to system tables
                 description: |
-                  Requires a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to system tables.
+                  Use a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to system tables.
           availability: |
             Requires SQL DSN configuration and access to system tables; returns errors if DSN is missing or SQL is unavailable.
     metrics:

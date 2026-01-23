@@ -228,11 +228,11 @@ modules:
             Uses ProxySQL stats tables and can be expensive on busy systems.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements:
+          prerequisites:
             list:
-              - title: Requirement
+              - title: Grant access to stats_mysql_query_digest
                 description: |
-                  Requires access to stats_mysql_query_digest in ProxySQL.
+                  Ensure the ProxySQL user can read stats_mysql_query_digest.
           availability: |
             Available when the collector can query ProxySQL stats; returns errors if the SQL connection is unavailable.
     metrics:

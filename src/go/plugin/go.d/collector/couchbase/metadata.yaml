@@ -271,11 +271,11 @@ modules:
             Runs N1QL queries against system keyspaces; use top_queries_limit to control response size.
           security: |
             Query text may include sensitive literals depending on workload.
-          requirements:
+          prerequisites:
             list:
-              - title: Requirement
+              - title: Grant access to system:completed_requests
                 description: |
-                  Requires access to the system:completed_requests keyspace and N1QL service.
+                  Ensure the user can query system:completed_requests and the N1QL service is available.
           availability: |
             Available when the collector can query system keyspaces; returns 503 until the collector is initialized.
     metrics:

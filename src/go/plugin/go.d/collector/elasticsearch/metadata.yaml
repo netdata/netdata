@@ -351,11 +351,6 @@ modules:
             Queries the Tasks API; on large clusters this may return many rows.
           security: |
             Task descriptions may include query details.
-          requirements:
-            list:
-              - title: Requirement
-                description: |
-                  Requires access to the Tasks API on the target Elasticsearch node.
           availability: |
             Available when the collector can query the Tasks API; returns 503 until the collector is initialized.
     metrics:

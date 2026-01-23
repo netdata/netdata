@@ -444,11 +444,11 @@ modules:
             Requires performance_schema and can be expensive on busy servers.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements:
+          prerequisites:
             list:
-              - title: Requirement
+              - title: Enable performance_schema digest tables
                 description: |
-                  Requires performance_schema enabled and access to events_statements_summary_by_digest.
+                  Enable performance_schema and grant access to events_statements_summary_by_digest.
           availability: |
             Available when performance_schema tables are accessible and the collector is initialized.
     metrics:

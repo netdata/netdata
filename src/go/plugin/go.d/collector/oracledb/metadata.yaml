@@ -245,11 +245,11 @@ modules:
             Queries system views and may be expensive on busy databases.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements:
+          prerequisites:
             list:
-              - title: Requirement
+              - title: Grant access to V$SQLSTATS
                 description: |
-                  Requires access to V$SQLSTATS and a working SQL connection.
+                  Use a SQL user with access to V$SQLSTATS and a working SQL connection.
           availability: |
             Available when the collector can query Oracle system views; returns errors if SQL is unavailable.
         - id: running-queries
@@ -333,11 +333,11 @@ modules:
             Queries system views and may be expensive on busy databases.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements:
+          prerequisites:
             list:
-              - title: Requirement
+              - title: Grant access to V$SESSION
                 description: |
-                  Requires access to V$SESSION and a working SQL connection.
+                  Use a SQL user with access to V$SESSION and a working SQL connection.
           availability: |
             Available when the collector can query Oracle system views; returns errors if SQL is unavailable.
     metrics:

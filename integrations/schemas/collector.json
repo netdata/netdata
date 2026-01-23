@@ -550,23 +550,23 @@
                       "type": "string",
                       "description": "Security/PII considerations."
                     },
-                    "requirements": {
+                    "prerequisites": {
                       "type": "object",
                       "description": "Prerequisites and required permissions.",
                       "properties": {
                         "list": {
                           "type": "array",
-                          "description": "List of requirements.",
+                          "description": "List of prerequisites.",
                           "items": {
                             "type": "object",
                             "properties": {
                               "title": {
                                 "type": "string",
-                                "description": "Short requirement title."
+                                "description": "Short prerequisite title."
                               },
                               "description": {
                                 "type": "string",
-                                "description": "Requirement description."
+                                "description": "Prerequisite description."
                               }
                             },
                             "required": [
@@ -593,7 +593,7 @@
                     "returns",
                     "performance",
                     "security",
-                    "requirements",
+                    "prerequisites",
                     "availability"
                   ]
                 }

@@ -198,11 +198,11 @@ modules:
             Uses system tables and may be expensive on busy clusters.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements:
+          prerequisites:
             list:
-              - title: Requirement
+              - title: Grant admin access to rethinkdb.jobs
                 description: |
-                  Requires admin access to rethinkdb.jobs and a working connection.
+                  Use an admin user with access to rethinkdb.jobs and ensure the connection is working.
           availability: |
             Available when the collector is initialized; returns 503 if the collector is still connecting.
     metrics:

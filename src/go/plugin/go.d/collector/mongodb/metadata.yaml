@@ -330,11 +330,11 @@ modules:
             Requires profiling and reads from system.profile; may add load on busy systems.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements:
+          prerequisites:
             list:
-              - title: Requirement
+              - title: Enable MongoDB profiling
                 description: |
-                  Requires MongoDB profiling enabled on target databases and top_queries_function_enabled set to true.
+                  Enable profiling on the target databases and set top_queries_function_enabled to true.
           availability: |
             Available when profiling is enabled and the collector is initialized; returns 403 if disabled in config.
     metrics:

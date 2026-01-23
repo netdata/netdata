@@ -15,17 +15,17 @@
 | Security | [[ strfy(func.security) ]] |
 | Availability | [[ strfy(func.availability) ]] |
 
-#### Requirements
+#### Prerequisites
 
-[% if func.requirements.list %]
-[% for req in func.requirements.list %]
+[% if func.prerequisites.list %]
+[% for req in func.prerequisites.list %]
 ##### [[ req.title ]]
 
 [[ req.description ]]
 
 [% endfor %]
 [% else %]
-No additional requirements.
+No additional configuration is required.
 [% endif %]
 
 #### Parameters
