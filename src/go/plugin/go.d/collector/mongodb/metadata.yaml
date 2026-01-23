@@ -52,24 +52,24 @@ modules:
 
               - Authenticate as the admin user:
 
-              ```bash
-              use admin
-              db.auth("admin", "<MONGODB_ADMIN_PASSWORD>")
-              ```
+                ```bash
+                use admin
+                db.auth("admin", "<MONGODB_ADMIN_PASSWORD>")
+                ```
 
               - Create a user:
 
-              ```bash
-              db.createUser({
-              "user":"netdata",
-              "pwd": "<UNIQUE_PASSWORD>",
-              "roles" : [
-              {role: 'read', db: 'admin' },
-              {role: 'clusterMonitor', db: 'admin'},
-              {role: 'read', db: 'local' }
-              ]
-              })
-              ```
+                ```bash
+                db.createUser({
+                "user":"netdata",
+                "pwd": "<UNIQUE_PASSWORD>",
+                "roles" : [
+                {role: 'read', db: 'admin' },
+                {role: 'clusterMonitor', db: 'admin'},
+                {role: 'read', db: 'local' }
+                ]
+                })
+                ```
       configuration:
         file:
           name: go.d/mongodb.conf
