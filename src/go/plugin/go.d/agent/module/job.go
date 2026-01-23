@@ -12,6 +12,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -151,6 +152,9 @@ type Job struct {
 	isStock bool
 
 	module Module
+
+	// running tracks whether the job's main loop is active (set in Start, cleared in Start's defer)
+	running atomic.Bool
 
 	initialized bool
 	panicked    bool
@@ -323,10 +327,26 @@ func (j *Job) Tick(clock int) {
 	}
 }
 
+// IsRunning returns true if the job's main loop is currently running.
+// This is safe to call from any goroutine.
+func (j *Job) IsRunning() bool {
+	return j.running.Load()
+}
+
+// Module returns the underlying module instance.
+// This allows function handlers to access the collector for querying data.
+func (j *Job) Module() Module {
+	return j.module
+}
+
 // Start starts job main loop.
 func (j *Job) Start() {
+	j.running.Store(true)
 	j.Infof("started, data collection interval %ds", j.updateEvery)
-	defer func() { j.Info("stopped") }()
+	defer func() {
+		j.running.Store(false)
+		j.Info("stopped")
+	}()
 
 LOOP:
 	for {

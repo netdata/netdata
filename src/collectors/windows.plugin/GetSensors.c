@@ -208,9 +208,9 @@ static struct win_sensor_config {
     {
         .title = "Electrical resistence",
         .units = "Ohms",
-        .context = "system.hw.sensor.resistence.input",
-        .family = "Resistence",
-        .priority = NETDATA_CHART_PRIO_SENSOR_RESISTENCE,
+        .context = "system.hw.sensor.resistance.input",
+        .family = "Resistance",
+        .priority = NETDATA_CHART_PRIO_SENSOR_RESISTANCE,
     },
     {
         .title = "Electrical capacitance",

@@ -32,3 +32,6 @@ pub use file::{
     BucketUtilization, Direction, JournalCursor, JournalFile, JournalFileOptions, JournalReader,
     JournalWriter, Location,
 };
+
+// SIGBUS handler for memory-mapped file access
+pub use file::sigbus::install_handler as install_sigbus_handler;

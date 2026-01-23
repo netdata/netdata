@@ -229,7 +229,7 @@ static void netdata_exchange_active_ping_cmd(COUNTER_DATA *value, int update_eve
             RRDSET_TYPE_LINE);
 
         rd_exchange_active_ping_cmds =
-            rrddim_add(st_exchange_active_ping_cmds, "pending", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_exchange_active_ping_cmds, "pending", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -693,18 +693,18 @@ static void netdata_exchange_proxy_mailbox_server_locator(struct exchange_proxy 
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_proxy_%s_mailbox_server_locator_avg_latency_sec", proxy);
 
         ep->st_exchange_http_proxy_server_location_avg_latency = rrdset_create_localhost(
-                "exchange",
-                id,
-                NULL,
-                "proxy",
-                "exchange.http_proxy_mailbox_server_locator_avg_latency_sec",
-                "Average latency of MailboxServerLocator web service calls.",
-                "seconds",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibExchange",
-                PRIO_EXCHANGE_PROXY_SERVER_LOCATOR_AVG_LATENCY,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "exchange",
+            id,
+            NULL,
+            "proxy",
+            "exchange.http_proxy_mailbox_server_locator_avg_latency_sec",
+            "Average latency of MailboxServerLocator web service calls.",
+            "seconds",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_PROXY_SERVER_LOCATOR_AVG_LATENCY,
+            update_every,
+            RRDSET_TYPE_LINE);
 
         ep->rd_exchange_http_proxy_server_location_avg_latency = rrddim_add(
             ep->st_exchange_http_proxy_server_location_avg_latency, "latency", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
@@ -761,18 +761,18 @@ static void netdata_exchange_proxy_request_total(struct exchange_proxy *ep, char
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_proxy_%s_requests_total", proxy);
 
         ep->st_exchange_http_proxy_requests_total = rrdset_create_localhost(
-                "exchange",
-                id,
-                NULL,
-                "proxy",
-                "exchange.http_proxy_requests",
-                "Number of proxy requests processed each second.",
-                "requests",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibExchange",
-                PRIO_EXCHANGE_PROXY_REQUESTS_TOTAL,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "exchange",
+            id,
+            NULL,
+            "proxy",
+            "exchange.http_proxy_requests",
+            "Number of proxy requests processed each second.",
+            "requests",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_PROXY_REQUESTS_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
 
         ep->rd_exchange_http_proxy_requests_total =
             rrddim_add(ep->st_exchange_http_proxy_requests_total, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -912,7 +912,7 @@ static void netdata_exchange_workload_queued_tasks(struct exchange_workload *ew,
             RRDSET_TYPE_LINE);
 
         ew->rd_exchange_workload_queued_tasks =
-            rrddim_add(ew->st_exchange_workload_queued_tasks, "queued", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(ew->st_exchange_workload_queued_tasks, "queued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
         rrdlabels_add(ew->st_exchange_workload_queued_tasks->rrdlabels, "workload", workload, RRDLABEL_SRC_AUTO);
     }
@@ -1068,7 +1068,8 @@ static void netdata_exchange_queue_active_mailbox(struct exchange_queue *eq, cha
     rrdset_done(eq->st_exchange_queue_active_mailbox);
 }
 
-static void netdata_exchange_queue_external_active_remote_delivery(struct exchange_queue *eq, char *mailbox, int update_every)
+static void
+netdata_exchange_queue_external_active_remote_delivery(struct exchange_queue *eq, char *mailbox, int update_every)
 {
     if (unlikely(!eq->st_exchange_queue_external_active_remote_delivery)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -1088,10 +1089,11 @@ static void netdata_exchange_queue_external_active_remote_delivery(struct exchan
             update_every,
             RRDSET_TYPE_LINE);
 
-        eq->rd_exchange_queue_external_active_remote_delivery =
-            rrddim_add(eq->st_exchange_queue_external_active_remote_delivery, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        eq->rd_exchange_queue_external_active_remote_delivery = rrddim_add(
+            eq->st_exchange_queue_external_active_remote_delivery, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-        rrdlabels_add(eq->st_exchange_queue_external_active_remote_delivery->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(
+            eq->st_exchange_queue_external_active_remote_delivery->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
@@ -1101,36 +1103,38 @@ static void netdata_exchange_queue_external_active_remote_delivery(struct exchan
     rrdset_done(eq->st_exchange_queue_external_active_remote_delivery);
 }
 
-static void netdata_exchange_queue_internal_active_remote_delivery(struct exchange_queue *eq, char *mailbox, int update_every)
+static void
+netdata_exchange_queue_internal_active_remote_delivery(struct exchange_queue *eq, char *mailbox, int update_every)
 {
     if (unlikely(!eq->st_exchange_queue_internal_active_remote_delivery)) {
         char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_internal_active_remote_delivery", mailbox);
 
         eq->st_exchange_queue_internal_active_remote_delivery = rrdset_create_localhost(
-                "exchange",
-                id,
-                NULL,
-                "queue",
-                "exchange.transport_queues_internal_active_remote_delivery",
-                "Internal Active Remote Delivery Queue length.",
-                "messages",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibExchange",
-                PRIO_EXCHANGE_QUEUE_INTERNAL_ACTIVE_REMOTE_DELIVERY,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "exchange",
+            id,
+            NULL,
+            "queue",
+            "exchange.transport_queues_internal_active_remote_delivery",
+            "Internal Active Remote Delivery Queue length.",
+            "messages",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_QUEUE_INTERNAL_ACTIVE_REMOTE_DELIVERY,
+            update_every,
+            RRDSET_TYPE_LINE);
 
-        eq->rd_exchange_queue_internal_active_remote_delivery =
-                rrddim_add(eq->st_exchange_queue_internal_active_remote_delivery, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        eq->rd_exchange_queue_internal_active_remote_delivery = rrddim_add(
+            eq->st_exchange_queue_internal_active_remote_delivery, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-        rrdlabels_add(eq->st_exchange_queue_internal_active_remote_delivery->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(
+            eq->st_exchange_queue_internal_active_remote_delivery->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
-            eq->st_exchange_queue_internal_active_remote_delivery,
-            eq->rd_exchange_queue_internal_active_remote_delivery,
-            (collected_number)eq->exchangeTransportQueuesInternalActiveRemoteDelivery.current.Data);
+        eq->st_exchange_queue_internal_active_remote_delivery,
+        eq->rd_exchange_queue_internal_active_remote_delivery,
+        (collected_number)eq->exchangeTransportQueuesInternalActiveRemoteDelivery.current.Data);
     rrdset_done(eq->st_exchange_queue_internal_active_remote_delivery);
 }
 
@@ -1141,29 +1145,29 @@ static void netdata_exchange_queue_unreachable(struct exchange_queue *eq, char *
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_unreachable", mailbox);
 
         eq->st_exchange_queue_unreachable = rrdset_create_localhost(
-                "exchange",
-                id,
-                NULL,
-                "queue",
-                "exchange.transport_queues_unreachable",
-                "Unreachable Queue length.",
-                "messages",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibExchange",
-                PRIO_EXCHANGE_QUEUE_UNREACHABLE,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "exchange",
+            id,
+            NULL,
+            "queue",
+            "exchange.transport_queues_unreachable",
+            "Unreachable Queue length.",
+            "messages",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_QUEUE_UNREACHABLE,
+            update_every,
+            RRDSET_TYPE_LINE);
 
         eq->rd_exchange_queue_unreachable =
-                rrddim_add(eq->st_exchange_queue_unreachable, "unreachable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(eq->st_exchange_queue_unreachable, "unreachable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
         rrdlabels_add(eq->st_exchange_queue_unreachable->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
-            eq->st_exchange_queue_unreachable,
-            eq->rd_exchange_queue_unreachable,
-            (collected_number)eq->exchangeTransportQueuesUnreachable.current.Data);
+        eq->st_exchange_queue_unreachable,
+        eq->rd_exchange_queue_unreachable,
+        (collected_number)eq->exchangeTransportQueuesUnreachable.current.Data);
     rrdset_done(eq->st_exchange_queue_unreachable);
 }
 
@@ -1174,29 +1178,29 @@ static void netdata_exchange_queue_poison(struct exchange_queue *eq, char *mailb
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_poison", mailbox);
 
         eq->st_exchange_queue_poison = rrdset_create_localhost(
-                "exchange",
-                id,
-                NULL,
-                "queue",
-                "exchange.transport_queues_poison",
-                "Poison Queue Length.",
-                "messages",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibExchange",
-                PRIO_EXCHANGE_QUEUE_POISON,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "exchange",
+            id,
+            NULL,
+            "queue",
+            "exchange.transport_queues_poison",
+            "Poison Queue Length.",
+            "messages",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_QUEUE_POISON,
+            update_every,
+            RRDSET_TYPE_LINE);
 
         eq->rd_exchange_queue_poison =
-                rrddim_add(eq->st_exchange_queue_poison, "poison", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(eq->st_exchange_queue_poison, "poison", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
         rrdlabels_add(eq->st_exchange_queue_poison->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
-            eq->st_exchange_queue_poison,
-            eq->rd_exchange_queue_poison,
-            (collected_number)eq->exchangeTransportQueuesPoison.current.Data);
+        eq->st_exchange_queue_poison,
+        eq->rd_exchange_queue_poison,
+        (collected_number)eq->exchangeTransportQueuesPoison.current.Data);
     rrdset_done(eq->st_exchange_queue_poison);
 }
 

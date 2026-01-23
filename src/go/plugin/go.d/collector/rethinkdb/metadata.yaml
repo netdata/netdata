@@ -27,6 +27,7 @@ modules:
           For each server, it offers similar metrics.
         method_description: |
           The data is gathered by querying the stats table in RethinkDB, which stores real-time statistics related to the cluster and its individual servers.
+          It also provides a `running-queries` function using the `rethinkdb.jobs` system table (admin-only).
       supported_platforms:
         include: []
         exclude: []
@@ -75,6 +76,11 @@ modules:
               default_value: 1
               required: false
               group: Target
+            - name: top_queries_limit
+              description: Maximum number of rows returned by the `running-queries` function.
+              default_value: 500
+              required: false
+              group: Limits
 
             - name: username
               description: Username for authentication.

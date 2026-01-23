@@ -2,7 +2,12 @@
 
 package module
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+)
 
 const (
 	UpdateEvery        = 1
@@ -18,13 +23,72 @@ type Defaults struct {
 	Disabled           bool
 }
 
+// MethodConfig describes a function method provided by a module.
+type MethodConfig struct {
+	ID             string                // Method ID (e.g., "top-queries")
+	Name           string                // Display name (e.g., "Top Queries")
+	UpdateEvery    int                   // Default UI refresh interval
+	Help           string                // Description for UI
+	RequiredParams []funcapi.ParamConfig // Required parameters for this method (including __sort if used)
+}
+
+// FunctionResponse is the response from a module's HandleMethod.
+type FunctionResponse struct {
+	Status            int            // HTTP-like status code (200, 400, 403, 500, 503)
+	Message           string         // Error message (if Status != 200)
+	Help              string         // Help text for this response
+	Columns           map[string]any // Column definitions for the table
+	Data              any            // Row data: [][]any (array of arrays, ordered by column index)
+	DefaultSortColumn string         // Default sort column ID
+
+	// Optional dynamic required params (override MethodConfig.RequiredParams)
+	RequiredParams []funcapi.ParamConfig
+
+	// Chart configuration for visualization
+	Charts        map[string]ChartConfig   // Chart definitions (chartID -> config)
+	DefaultCharts [][]string               // Default charts: [[chartID, groupByID], ...]
+	GroupBy       map[string]GroupByConfig // Group-by options (groupByID -> config)
+}
+
+// ChartConfig defines a chart for visualization.
+type ChartConfig struct {
+	Name    string   `json:"name"`
+	Type    string   `json:"type"`    // "stacked-bar", "line", etc.
+	Columns []string `json:"columns"` // Column IDs to include in chart
+}
+
+// GroupByConfig defines a grouping option for function responses.
+type GroupByConfig struct {
+	Name    string   `json:"name"`
+	Columns []string `json:"columns"` // Columns to group by
+}
+
 type (
 	// Creator is a Job builder.
+	// Optional function fields (Methods/HandleMethod) enable the FunctionProvider pattern:
+	// modules that set these fields can expose data functions to the UI.
 	Creator struct {
 		Defaults
 		Create          func() Module
 		JobConfigSchema string
 		Config          func() any
+
+		// Optional: FunctionProvider fields for exposing data functions
+		// If Methods is non-nil, this module provides functions
+		Methods func() []MethodConfig
+
+		// Optional: MethodParams returns dynamic required params for a job+method.
+		// Use this to provide job-specific options (e.g., based on DB capabilities).
+		// When nil, MethodConfig.RequiredParams is used as-is.
+		MethodParams func(ctx context.Context, job *Job, method string) ([]funcapi.ParamConfig, error)
+
+		// HandleMethod handles a function request for a specific job
+		// ctx: context with timeout from function request
+		// job: the job instance to query
+		// method: the method name (e.g., "top-queries")
+		// params: resolved required params (includes __sort)
+		// Returns: FunctionResponse with data or error
+		HandleMethod func(ctx context.Context, job *Job, method string, params funcapi.ResolvedParams) *FunctionResponse
 	}
 	// Registry is a collection of Creators.
 	Registry map[string]Creator

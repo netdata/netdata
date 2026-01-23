@@ -38,6 +38,8 @@ It establishes a connection to the Oracle DB instance via a TCP or UNIX socket a
 - `dba_tablespaces`
 - `v$temp_space_header`
 
+It also provides `top-queries` and `running-queries` functions using `V$SQLSTATS` and `V$SESSION`.
+
 
 This collector is supported on all platforms.
 
@@ -171,6 +173,8 @@ GRANT CONNECT TO netdata;
 GRANT SELECT_CATALOG_ROLE TO netdata;
 ```
 
+The `top-queries` and `running-queries` functions require access to `V$SQLSTATS` and `V$SESSION`.
+
 
 
 ### Configuration
@@ -190,6 +194,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | dsn | Oracle server DSN (Data Source Name). Format: `oracle://username:password@host:port/service?param1=value1&...&paramN=valueN`. |  | yes |
 |  | timeout | Query timeout (seconds). | 1 | no |
+| **Limits** | top_queries_limit | Maximum number of rows returned by the `top-queries` and `running-queries` functions. | 500 | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 

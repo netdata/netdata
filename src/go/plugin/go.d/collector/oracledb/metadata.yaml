@@ -38,6 +38,8 @@ modules:
           - `dba_temp_files`
           - `dba_tablespaces`
           - `v$temp_space_header`
+          
+          It also provides `top-queries` and `running-queries` functions using `V$SQLSTATS` and `V$SESSION`.
       default_behavior:
         auto_detection:
           description: |
@@ -71,6 +73,8 @@ modules:
               GRANT CONNECT TO netdata;
               GRANT SELECT_CATALOG_ROLE TO netdata;
               ```
+
+              The `top-queries` and `running-queries` functions require access to `V$SQLSTATS` and `V$SESSION`.
       configuration:
         file:
           name: go.d/oracledb.conf
@@ -102,6 +106,11 @@ modules:
               default_value: 1
               required: false
               group: Target
+            - name: top_queries_limit
+              description: Maximum number of rows returned by the `top-queries` and `running-queries` functions.
+              default_value: 500
+              required: false
+              group: Limits
 
             - name: vnode
               description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).

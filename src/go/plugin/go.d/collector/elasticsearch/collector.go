@@ -25,8 +25,11 @@ func init() {
 		Defaults: module.Defaults{
 			UpdateEvery: 5,
 		},
-		Create: func() module.Module { return New() },
-		Config: func() any { return &Config{} },
+		Create:       func() module.Module { return New() },
+		Config:       func() any { return &Config{} },
+		Methods:      elasticsearchMethods,
+		MethodParams: elasticsearchMethodParams,
+		HandleMethod: elasticsearchHandleMethod,
 	})
 }
 
@@ -67,6 +70,7 @@ type Config struct {
 	DoClusterHealth    bool `yaml:"collect_cluster_health" json:"collect_cluster_health"`
 	DoClusterStats     bool `yaml:"collect_cluster_stats" json:"collect_cluster_stats"`
 	DoIndicesStats     bool `yaml:"collect_indices_stats" json:"collect_indices_stats"`
+	TopQueriesLimit    int  `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
 }
 
 type Collector struct {

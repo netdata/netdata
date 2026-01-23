@@ -27,6 +27,7 @@ For each server, it offers similar metrics.
 
 
 The data is gathered by querying the stats table in RethinkDB, which stores real-time statistics related to the cluster and its individual servers.
+It also provides a `running-queries` function using the `rethinkdb.jobs` system table (admin-only).
 
 
 This collector is supported on all platforms.
@@ -139,6 +140,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | address | RethinkDB server address (IP:PORT). | 127.0.0.1:28015 | yes |
 |  | timeout | Connection, read, and write timeout duration (seconds). Includes name resolution. | 1 | no |
+| **Limits** | top_queries_limit | Maximum number of rows returned by the `running-queries` function. | 500 | no |
 | **Auth** | username | Username for authentication. |  | no |
 |  | password | Password for authentication. |  | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |

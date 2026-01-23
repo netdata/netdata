@@ -311,6 +311,8 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | dsn | SQL Server DSN (Data Source Name). See [DSN syntax](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn). | sqlserver://localhost:1433 | yes |
 |  | timeout | Query timeout (seconds). | 5 | no |
+| **Query Store** | query_store_function_enabled | Enable the Query Store function to expose top queries via Netdata Functions. **WARNING**: Query Store may contain unmasked literal values (customer names, emails, IDs). Only enable after ensuring proper access controls to the Netdata dashboard. | no | no |
+|  | query_store_time_window_days | Number of days of Query Store data to analyze. Set to 0 to include all available data. Smaller values improve query performance but show less history. | 7 | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
@@ -426,6 +428,26 @@ jobs:
 
   - name: development
     dsn: "sqlserver://netdata_user:password@dev-sql:1433"
+
+```
+</details>
+
+###### With Query Store function
+
+Enable the Query Store function to view top queries in the Netdata dashboard.
+
+> **Warning**: Query Store may contain unmasked literal values (PII).
+> Only enable in environments with proper access controls.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: local
+    dsn: "sqlserver://netdata_user:password@localhost:1433"
+    query_store_function_enabled: true
+    query_store_time_window_days: 7
 
 ```
 </details>

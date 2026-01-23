@@ -55,3 +55,14 @@ type ConfigOpts struct {
 	Source            string
 	SupportedCommands string
 }
+
+// FunctionGlobalOpts contains options for registering a global function with Netdata
+type FunctionGlobalOpts struct {
+	Name     string // Function name
+	Timeout  int    // Timeout in seconds
+	Help     string // Help text
+	Tags     string // Tags (e.g., "top")
+	Access   string // Access permissions in hex format (e.g., "0x0000")
+	Priority int    // Priority (higher = more important)
+	Version  int    // Function version
+}

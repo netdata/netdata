@@ -166,6 +166,8 @@ https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/not
 https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-alert-notification-silencing-rules.md,Manage alert notification silencing rules,Published,Alerts & Notifications/Notifications/Centralized Cloud Notifications,,Master Netdata alert management via notification silencing rules for efficient and focused monitoring.
 cloud_notifications_integrations,,,,,
 https://github.com/netdata/netdata/edit/master/src/health/REFERENCE.md,Alert Configuration Reference,Published,Alerts & Notifications,,
+https://github.com/netdata/netdata/edit/master/src/health/alert-configuration-ordering.md,Alert Configuration Ordering,Published,Alerts & Notifications,"alerts,health,ordering,precedence,templates,alarms",
+https://github.com/netdata/netdata/edit/master/src/health/overriding-stock-alerts.md,Overriding Stock Alerts,Published,Alerts & Notifications,"alerts,health,override,stock,templates,alarms",
 https://github.com/netdata/netdata/edit/master/src/web/api/health/README.md,Health API Calls,Published,Alerts & Notifications,,
 ,,,,,
 https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md,Netdata AI,Published,Netdata AI,,

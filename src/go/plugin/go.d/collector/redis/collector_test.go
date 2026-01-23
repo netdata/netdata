@@ -395,6 +395,12 @@ func (m *mockRedisClient) Ping(_ context.Context) (cmd *redis.StatusCmd) {
 	return redis.NewStatusResult("PONG", nil)
 }
 
+func (m *mockRedisClient) SlowLogGet(ctx context.Context, num int64) *redis.SlowLogCmd {
+	cmd := redis.NewSlowLogCmd(ctx, "slowlog", "get", num)
+	cmd.SetVal([]redis.SlowLog{})
+	return cmd
+}
+
 func (m *mockRedisClient) Close() error {
 	m.calledClose = true
 	return nil

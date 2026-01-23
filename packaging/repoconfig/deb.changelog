@@ -1,3 +1,9 @@
+@PKG_NAME@ (5-4) unstable; urgency=medium
+
+  * Version bump to keep in sync with RPM repo packages
+
+ -- Austin Hemmelgarn <austin@netdata.cloud>  Thu, 22 Jan 2026 07:21:00 -0500
+
 @PKG_NAME@ (5-3) unstable; urgency=medium
 
   * Version bump to keep in sync with RPM repo packages
