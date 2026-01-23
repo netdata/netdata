@@ -1349,8 +1349,12 @@ Whether you're monitoring a single server or a global infrastructure, Netdata's 
 - **Community**: https://community.netdata.cloud
 - **Discord**: https://discord.com/invite/2mEmfW735j
 - **Pricing**: https://netdata.cloud/pricing
+- **ROI Calculator**: https://www.netdata.cloud/value/roi/
+- **Sales**: https://www.netdata.cloud/contact-sales/
 - **Enterprise**: https://netdata.cloud/request-enterprise/
 - **Support**: https://netdata.cloud/support/
+- **Partnerships**: https://www.netdata.cloud/partnerships/
+- **Referral Program**: https://www.netdata.cloud/referral/
 
 **Start Your Free Trial**: https://app.netdata.cloud
 
