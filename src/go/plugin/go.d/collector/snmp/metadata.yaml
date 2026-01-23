@@ -491,7 +491,7 @@ modules:
           name: Network Interfaces
           description: |
             Network interface traffic and status metrics.
-            
+
             Uses the latest cached SNMP interface data, filters by the selected type group, and sorts by the default column.
           parameters:
             - id: if_type_group

@@ -247,7 +247,7 @@ modules:
           name: Running Queries
           description: |
             Currently running SQL statements from V$SESSION. WARNING: Query text may contain unmasked literals (potential PII).
-            
+
             Queries V$SESSION and returns running statements sorted by the selected column.
           parameters:
             - id: __sort

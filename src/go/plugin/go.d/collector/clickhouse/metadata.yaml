@@ -260,7 +260,7 @@ modules:
           name: Top Queries
           description: |
             Top SQL queries from ClickHouse system.query_log.
-            
+
             Queries system.query_log, aggregates by query, and returns the top entries sorted by the selected column.
           parameters:
             - id: __sort

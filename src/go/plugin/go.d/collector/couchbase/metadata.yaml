@@ -199,7 +199,7 @@ modules:
           name: Top Queries
           description: |
             Top N1QL requests from system:completed_requests.
-            
+
             Queries the system:completed_requests keyspace and returns the top entries sorted by the selected column.
           parameters:
             - id: __sort

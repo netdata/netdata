@@ -23,9 +23,9 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors MongoDB servers.
-          
+
           Executed queries:
-          
+
           - [serverStatus](https://docs.mongodb.com/manual/reference/command/serverStatus/)
           - [dbStats](https://docs.mongodb.com/manual/reference/command/dbStats/)
           - [replSetGetStatus](https://www.mongodb.com/docs/manual/reference/command/replSetGetStatus/)
@@ -173,7 +173,7 @@ modules:
           name: Top Queries
           description: |
             Top queries from MongoDB Profiler (system.profile). WARNING: Query text may contain unmasked literals (potential PII).
-            
+
             Reads from system.profile and returns the top profiled queries sorted by the selected column.
           parameters:
             - id: __sort

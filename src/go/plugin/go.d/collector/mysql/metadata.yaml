@@ -237,7 +237,7 @@ modules:
           name: Top Queries
           description: |
             Top SQL queries from performance_schema.
-            
+
             Reads performance_schema statement digest tables and returns the top entries sorted by the selected column.
           parameters:
             - id: __sort

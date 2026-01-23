@@ -131,7 +131,7 @@ modules:
           name: Top Queries
           description: |
             Top SQL queries from ProxySQL query digest stats.
-            
+
             Queries stats_mysql_query_digest and returns the top entries sorted by the selected column.
           parameters:
             - id: __sort
