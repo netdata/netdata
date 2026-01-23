@@ -75,6 +75,49 @@ Metrics:
 
 
 
+## Functions
+
+This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+
+
+### Top Queries
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Couchbase:top-queries` |
+| Summary | Top N1QL requests from system:completed_requests. |
+| Behavior | Queries the system:completed_requests keyspace and returns the top entries sorted by the selected column. |
+| Performance | Runs N1QL queries against system keyspaces; use top_queries_limit to control response size. |
+| Security | Query text may include sensitive literals depending on workload. |
+| Requirements | Requires access to the system:completed_requests keyspace and N1QL service. |
+| Availability | Available when the collector can query system keyspaces; returns 503 until the collector is initialized. |
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | elapsedTime |  |
+
+#### Returns
+
+Completed N1QL request statistics.
+
+| Column | Type | Description |
+|:-------|:-----|:------------|
+| Request ID | string |  |
+| Request Time | timestamp |  |
+| Statement | string |  |
+| Elapsed Time | duration |  |
+| Service Time | duration |  |
+| Result Count | integer |  |
+| Result Size | integer |  |
+| Error Count | integer |  |
+| Warning Count | integer |  |
+| User | string |  |
+| Client Context ID | string |  |
+
+
+
 ## Alerts
 
 There are no alerts configured by default for this integration.

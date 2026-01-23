@@ -125,6 +125,57 @@ If `ping.enabled` is true, ICMP latency/packet-loss charts are also provided (or
 
 
 
+## Functions
+
+This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+
+
+### Network Interfaces
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Snmp:interfaces` |
+| Summary | Network interface traffic and status metrics. |
+| Behavior | Uses the latest cached SNMP interface data, filters by the selected type group, and sorts by the default column. |
+| Performance | Uses cached data only and does not trigger additional SNMP requests. Large devices may return many rows. |
+| Security | Exposes interface names and counters only. |
+| Requirements | Requires successful SNMP collection so interface data is cached. |
+| Availability | Available after the collector has completed at least one data collection; returns 503 until cache is ready. |
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Type Group | select | Filter by interface type group. | yes | ethernet | Ethernet (default), Aggregation, Virtual, Other |
+
+#### Returns
+
+Table of interface traffic and status from cached SNMP data.
+
+| Column | Type | Description |
+|:-------|:-----|:------------|
+| Interface | string |  |
+| Type | string |  |
+| Type Group | string |  |
+| Admin Status | string |  |
+| Oper Status | string |  |
+| Traffic In | float |  |
+| Traffic Out | float |  |
+| Unicast In | float |  |
+| Unicast Out | float |  |
+| Broadcast In | float |  |
+| Broadcast Out | float |  |
+| Packets In | float |  |
+| Packets Out | float |  |
+| Errors In | float |  |
+| Errors Out | float |  |
+| Discards In | float |  |
+| Discards Out | float |  |
+| Multicast In | float |  |
+| Multicast Out | float |  |
+
+
+
 ## Alerts
 
 There are no alerts configured by default for this integration.

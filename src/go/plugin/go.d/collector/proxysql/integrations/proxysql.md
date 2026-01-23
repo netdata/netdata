@@ -169,6 +169,54 @@ Metrics:
 
 
 
+## Functions
+
+This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+
+
+### Top Queries
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Proxysql:top-queries` |
+| Summary | Top SQL queries from ProxySQL query digest stats. |
+| Behavior | Queries stats_mysql_query_digest and returns the top entries sorted by the selected column. |
+| Performance | Uses ProxySQL stats tables and can be expensive on busy systems. |
+| Security | Query text may contain unmasked literals (potential PII). |
+| Requirements | Requires access to stats_mysql_query_digest in ProxySQL. |
+| Availability | Available when the collector can query ProxySQL stats; returns errors if the SQL connection is unavailable. |
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | totalTime |  |
+
+#### Returns
+
+Query digest statistics from ProxySQL.
+
+| Column | Type | Description |
+|:-------|:-----|:------------|
+| Digest | string |  |
+| Query | string |  |
+| Schema | string |  |
+| User | string |  |
+| Hostgroup | integer |  |
+| Calls | integer |  |
+| Total Time | duration |  |
+| Avg Time | duration |  |
+| Min Time | duration |  |
+| Max Time | duration |  |
+| Rows Affected | integer |  |
+| Rows Sent | integer |  |
+| Errors | integer |  |
+| Warnings | integer |  |
+| First Seen | string |  |
+| Last Seen | string |  |
+
+
+
 ## Alerts
 
 

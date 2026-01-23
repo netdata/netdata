@@ -205,6 +205,66 @@ Metrics:
 
 
 
+## Functions
+
+This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+
+
+### Top Queries
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Mongodb:top-queries` |
+| Summary | Top queries from MongoDB Profiler (system.profile). WARNING: Query text may contain unmasked literals (potential PII). |
+| Behavior | Reads from system.profile and returns the top profiled queries sorted by the selected column. |
+| Performance | Requires profiling and reads from system.profile; may add load on busy systems. |
+| Security | Query text may contain unmasked literals (potential PII). |
+| Requirements | Requires MongoDB profiling enabled on target databases and top_queries_function_enabled set to true. |
+| Availability | Available when profiling is enabled and the collector is initialized; returns 403 if disabled in config. |
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | execution_time |  |
+
+#### Returns
+
+Profiled query statistics from system.profile.
+
+| Column | Type | Description |
+|:-------|:-----|:------------|
+| Timestamp | timestamp |  |
+| Namespace | string |  |
+| Operation | string |  |
+| Query | string |  |
+| Execution Time | duration |  |
+| Docs Examined | integer |  |
+| Keys Examined | integer |  |
+| Docs Returned | integer |  |
+| Plan Summary | string |  |
+| Client | string |  |
+| User | string |  |
+| Docs Deleted | integer |  |
+| Docs Inserted | integer |  |
+| Docs Modified | integer |  |
+| Response Length | integer |  |
+| Num Yield | integer |  |
+| App Name | string |  |
+| Cursor Exhausted | string |  |
+| Has Sort Stage | string |  |
+| Uses Disk | string |  |
+| From Multi Planner | string |  |
+| Replanned | string |  |
+| Query Hash | string |  |
+| Plan Cache Key | string |  |
+| Planning Time | duration |  |
+| CPU Time | duration |  |
+| Query Framework | string |  |
+| Query Shape Hash | string |  |
+
+
+
 ## Alerts
 
 There are no alerts configured by default for this integration.

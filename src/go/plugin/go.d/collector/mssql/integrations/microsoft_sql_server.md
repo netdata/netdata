@@ -234,6 +234,98 @@ Metrics:
 
 
 
+## Functions
+
+This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+
+
+### Top Queries
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Mssql:top-queries` |
+| Summary | Top SQL queries from Query Store. |
+| Behavior | Queries Query Store runtime statistics and returns the top entries sorted by the selected column. |
+| Performance | Uses Query Store and can be expensive on busy instances. |
+| Security | Query Store may contain unmasked literals (potential PII). |
+| Requirements | Requires Query Store enabled and query_store_function_enabled set to true. |
+| Availability | Available when Query Store is enabled and the collector is initialized; returns 403 if disabled in config. |
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | totalTime |  |
+
+#### Returns
+
+Query Store statistics for top queries.
+
+| Column | Type | Description |
+|:-------|:-----|:------------|
+| Query Hash | string |  |
+| Query | string |  |
+| Database | string |  |
+| Calls | integer |  |
+| Total Time | duration |  |
+| Avg Time | duration |  |
+| Last Time | duration |  |
+| Min Time | duration |  |
+| Max Time | duration |  |
+| StdDev Time | duration |  |
+| Avg CPU | duration |  |
+| Last CPU | duration |  |
+| Min CPU | duration |  |
+| Max CPU | duration |  |
+| StdDev CPU | duration |  |
+| Avg Logical Reads | float |  |
+| Last Logical Reads | integer |  |
+| Min Logical Reads | integer |  |
+| Max Logical Reads | integer |  |
+| StdDev Logical Reads | float |  |
+| Avg Logical Writes | float |  |
+| Last Logical Writes | integer |  |
+| Min Logical Writes | integer |  |
+| Max Logical Writes | integer |  |
+| StdDev Logical Writes | float |  |
+| Avg Physical Reads | float |  |
+| Last Physical Reads | integer |  |
+| Min Physical Reads | integer |  |
+| Max Physical Reads | integer |  |
+| StdDev Physical Reads | float |  |
+| Avg CLR Time | duration |  |
+| Last CLR Time | duration |  |
+| Min CLR Time | duration |  |
+| Max CLR Time | duration |  |
+| StdDev CLR Time | duration |  |
+| Avg DOP | float |  |
+| Last DOP | integer |  |
+| Min DOP | integer |  |
+| Max DOP | integer |  |
+| StdDev DOP | float |  |
+| Avg Memory (8KB pages) | float |  |
+| Last Memory (8KB pages) | integer |  |
+| Min Memory (8KB pages) | integer |  |
+| Max Memory (8KB pages) | integer |  |
+| StdDev Memory | float |  |
+| Avg Rows | float |  |
+| Last Rows | integer |  |
+| Min Rows | integer |  |
+| Max Rows | integer |  |
+| StdDev Rows | float |  |
+| Avg Log Bytes | float |  |
+| Last Log Bytes | integer |  |
+| Min Log Bytes | integer |  |
+| Max Log Bytes | integer |  |
+| StdDev Log Bytes | float |  |
+| Avg TempDB (8KB pages) | float |  |
+| Last TempDB (8KB pages) | integer |  |
+| Min TempDB (8KB pages) | integer |  |
+| Max TempDB (8KB pages) | integer |  |
+| StdDev TempDB | float |  |
+
+
+
 ## Alerts
 
 There are no alerts configured by default for this integration.

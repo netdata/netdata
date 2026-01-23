@@ -135,6 +135,94 @@ Metrics:
 
 
 
+## Functions
+
+This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+
+
+### Top Queries
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Cockroachdb:top-queries` |
+| Summary | Top SQL statements from crdb_internal.cluster_statement_statistics. |
+| Behavior | Queries crdb_internal.cluster_statement_statistics and returns the top entries sorted by the selected column. |
+| Performance | Executes SQL queries against system tables and may be expensive on busy clusters. |
+| Security | Query text may contain unmasked literals (potential PII). |
+| Requirements | Requires a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to crdb_internal.cluster_statement_statistics. |
+| Availability | Requires SQL DSN configuration and access to system tables; returns errors if DSN is missing or SQL is unavailable. |
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | totalTime |  |
+
+#### Returns
+
+Aggregated SQL statement statistics.
+
+| Column | Type | Description |
+|:-------|:-----|:------------|
+| Fingerprint ID | string |  |
+| Query | string |  |
+| Database | string |  |
+| Application | string |  |
+| Statement Type | string |  |
+| Distributed | string |  |
+| Full Scan | string |  |
+| Implicit Txn | string |  |
+| Vectorized | string |  |
+| Executions | integer |  |
+| Total Time | duration |  |
+| Mean Time | duration |  |
+| Run Time | duration |  |
+| Plan Time | duration |  |
+| Parse Time | duration |  |
+| Rows Read | integer |  |
+| Rows Written | integer |  |
+| Rows Returned | integer |  |
+| Bytes Read | integer |  |
+| Max Retries | integer |  |
+
+### Running Queries
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Cockroachdb:running-queries` |
+| Summary | Currently running SQL statements from SHOW CLUSTER STATEMENTS. |
+| Behavior | Queries SHOW CLUSTER STATEMENTS and returns running statements sorted by the selected column. |
+| Performance | Executes SQL queries against system tables and may be expensive on busy clusters. |
+| Security | Query text may contain unmasked literals (potential PII). |
+| Requirements | Requires a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to system tables. |
+| Availability | Requires SQL DSN configuration and access to system tables; returns errors if DSN is missing or SQL is unavailable. |
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | elapsedMs |  |
+
+#### Returns
+
+Snapshot of currently running SQL statements.
+
+| Column | Type | Description |
+|:-------|:-----|:------------|
+| Query ID | string |  |
+| Query | string |  |
+| User | string |  |
+| Application | string |  |
+| Client Address | string |  |
+| Node ID | string |  |
+| Session ID | string |  |
+| Phase | string |  |
+| Distributed | string |  |
+| Start Time | string |  |
+| Elapsed | duration |  |
+
+
+
 ## Alerts
 
 
