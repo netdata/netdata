@@ -526,7 +526,7 @@ modules:
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: Minimum tempdb space observed. Helps identify tempdb-efficient queries and baseline temporary object requirements for common operations. 8KB pages = 65,536 bytes per query.
+                description: Minimum tempdb space observed. Helps identify tempdb-efficient queries and baseline temporary object requirements for common operations. 8KB pages = 8,192 bytes per query.
               - name: Max TempDB (8KB pages)
                 type: integer
                 unit: ""
