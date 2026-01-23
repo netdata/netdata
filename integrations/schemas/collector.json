@@ -414,9 +414,9 @@
                       "type": "string",
                       "description": "Function display name."
                     },
-                    "summary": {
+                    "description": {
                       "type": "string",
-                      "description": "Short summary of what the function returns."
+                      "description": "Detailed description of what the function does and returns."
                     },
                     "parameters": {
                       "type": "array",
@@ -514,11 +514,23 @@
                               "description": {
                                 "type": "string",
                                 "description": "Column description."
+                              },
+                              "unit": {
+                                "type": "string",
+                                "description": "Column unit, if applicable."
+                              },
+                              "visibility": {
+                                "type": "string",
+                                "description": "Whether the column is shown by default.",
+                                "enum": [
+                                  "hidden"
+                                ]
                               }
                             },
                             "required": [
                               "name",
-                              "type"
+                              "type",
+                              "unit"
                             ]
                           }
                         }
@@ -528,10 +540,6 @@
                         "columns"
                       ]
                     },
-                    "behavior": {
-                      "type": "string",
-                      "description": "How the function works internally."
-                    },
                     "performance": {
                       "type": "string",
                       "description": "Performance considerations."
@@ -540,9 +548,35 @@
                       "type": "string",
                       "description": "Security/PII considerations."
                     },
-                    "requirements": {
-                      "type": "string",
-                      "description": "Prerequisites and required permissions."
+                    "prerequisites": {
+                      "type": "object",
+                      "description": "Prerequisites and required permissions.",
+                      "properties": {
+                        "list": {
+                          "type": "array",
+                          "description": "List of prerequisites.",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "title": {
+                                "type": "string",
+                                "description": "Short prerequisite title."
+                              },
+                              "description": {
+                                "type": "string",
+                                "description": "Prerequisite description."
+                              }
+                            },
+                            "required": [
+                              "title",
+                              "description"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "list"
+                      ]
                     },
                     "availability": {
                       "type": "string",
@@ -552,13 +586,11 @@
                   "required": [
                     "id",
                     "name",
-                    "summary",
+                    "description",
                     "parameters",
                     "returns",
-                    "behavior",
                     "performance",
                     "security",
-                    "requirements",
                     "availability"
                   ]
                 }

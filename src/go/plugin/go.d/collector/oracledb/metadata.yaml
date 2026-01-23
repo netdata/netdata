@@ -156,7 +156,10 @@ modules:
       list:
         - id: top-queries
           name: Top Queries
-          summary: "Top SQL statements from V$SQLSTATS. WARNING: Query text may contain unmasked literals (potential PII)."
+          description: |
+            Top SQL statements from V$SQLSTATS. WARNING: Query text may contain unmasked literals (potential PII).
+            
+            Queries V$SQLSTATS and returns the top entries sorted by the selected column.
           parameters:
             - id: __sort
               name: Filter By
@@ -170,59 +173,82 @@ modules:
             columns:
               - name: SQL ID
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Query
                 type: string
+                unit: ""
                 description: ""
               - name: Schema
                 type: string
+                unit: ""
                 description: ""
               - name: Executions
                 type: integer
+                unit: ""
                 description: ""
               - name: Total Time
                 type: duration
+                unit: "milliseconds"
                 description: ""
               - name: Avg Time
                 type: duration
+                unit: "milliseconds"
                 description: ""
               - name: CPU Time
                 type: duration
+                unit: "milliseconds"
                 description: ""
               - name: Buffer Gets
                 type: integer
+                unit: ""
                 description: ""
               - name: Disk Reads
                 type: integer
+                unit: ""
                 description: ""
               - name: Rows Processed
                 type: integer
+                unit: ""
                 description: ""
               - name: Parse Calls
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Module
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Action
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Last Active
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
-          behavior: |
-            Queries V$SQLSTATS and returns the top entries sorted by the selected column.
           performance: |
             Queries system views and may be expensive on busy databases.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements: |
-            Requires access to V$SQLSTATS and a working SQL connection.
+          prerequisites:
+            list:
+              - title: Grant access to V$SQLSTATS
+                description: |
+                  Use a SQL user with access to V$SQLSTATS and a working SQL connection.
           availability: |
             Available when the collector can query Oracle system views; returns errors if SQL is unavailable.
         - id: running-queries
           name: Running Queries
-          summary: "Currently running SQL statements from V$SESSION. WARNING: Query text may contain unmasked literals (potential PII)."
+          description: |
+            Currently running SQL statements from V$SESSION. WARNING: Query text may contain unmasked literals (potential PII).
+
+            Queries V$SESSION and returns running statements sorted by the selected column.
           parameters:
             - id: __sort
               name: Filter By
@@ -236,48 +262,68 @@ modules:
             columns:
               - name: Session
                 type: string
+                unit: ""
                 description: ""
               - name: User
                 type: string
+                unit: ""
                 description: ""
               - name: Status
                 type: string
+                unit: ""
                 description: ""
               - name: Type
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: SQL ID
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Query
                 type: string
+                unit: ""
                 description: ""
               - name: Elapsed
                 type: duration
+                unit: "milliseconds"
                 description: ""
               - name: SQL Exec Start
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Module
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Action
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Program
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Machine
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
-          behavior: |
-            Queries V$SESSION and returns running statements sorted by the selected column.
           performance: |
             Queries system views and may be expensive on busy databases.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements: |
-            Requires access to V$SESSION and a working SQL connection.
+          prerequisites:
+            list:
+              - title: Grant access to V$SESSION
+                description: |
+                  Use a SQL user with access to V$SESSION and a working SQL connection.
           availability: |
             Available when the collector can query Oracle system views; returns errors if SQL is unavailable.
     metrics:

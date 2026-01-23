@@ -52,7 +52,7 @@ modules:
         auto_detection:
           description: |
             By default, it detects instances running on localhost by attempting to connect to port 9200:
-            
+
             - http://127.0.0.1:9200
             - https://127.0.0.1:9200
         limits:
@@ -243,7 +243,7 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
@@ -282,7 +282,10 @@ modules:
       list:
         - id: top-queries
           name: Top Queries
-          summary: Running queries from the Elasticsearch Tasks API.
+          description: |
+            Running queries from the Elasticsearch Tasks API.
+            
+            Calls the Tasks API and returns running task details sorted by the selected column.
           parameters:
             - id: __sort
               name: Filter By
@@ -296,42 +299,52 @@ modules:
             columns:
               - name: Task ID
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Node ID
                 type: string
+                unit: ""
                 description: ""
               - name: Node Name
                 type: string
+                unit: ""
                 description: ""
               - name: Action
                 type: string
+                unit: ""
                 description: ""
               - name: Type
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Description
                 type: string
+                unit: ""
                 description: ""
               - name: Start Time
                 type: timestamp
+                unit: ""
                 description: ""
               - name: Running Time
                 type: duration
+                unit: "milliseconds"
                 description: ""
               - name: Cancellable
                 type: boolean
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Cancelled
                 type: boolean
+                unit: ""
+                visibility: hidden
                 description: ""
-          behavior: |
-            Calls the Tasks API and returns running task details sorted by the selected column.
           performance: |
             Queries the Tasks API; on large clusters this may return many rows.
           security: |
             Task descriptions may include query details.
-          requirements: |
-            Requires access to the Tasks API on the target Elasticsearch node.
           availability: |
             Available when the collector can query the Tasks API; returns 503 until the collector is initialized.
     metrics:

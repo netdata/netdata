@@ -236,9 +236,9 @@ modules:
             You can edit the configuration file using the edit-config script from the Netdata [config directory](https://learn.netdata.cloud/docs/netdata-agent/configuration#the-netdata-config-directory).
 
             ```bash
-             cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-             sudo ./edit-config go.d/sd/snmp.conf
-             ```
+            cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+            sudo ./edit-config go.d/sd/snmp.conf
+            ```
         limits:
           description: ""
         performance_impact:
@@ -489,7 +489,10 @@ modules:
       list:
         - id: interfaces
           name: Network Interfaces
-          summary: Network interface traffic and status metrics.
+          description: |
+            Network interface traffic and status metrics.
+
+            Uses the latest cached SNMP interface data, filters by the selected type group, and sorts by the default column.
           parameters:
             - id: if_type_group
               name: Type Group
@@ -512,69 +515,92 @@ modules:
             columns:
               - name: Interface
                 type: string
+                unit: ""
                 description: ""
               - name: Type
                 type: string
+                unit: ""
                 description: ""
               - name: Type Group
                 type: string
+                unit: ""
                 description: ""
               - name: Admin Status
                 type: string
+                unit: ""
                 description: ""
               - name: Oper Status
                 type: string
+                unit: ""
                 description: ""
               - name: Traffic In
                 type: float
+                unit: "Mbits"
                 description: ""
               - name: Traffic Out
                 type: float
+                unit: "Mbits"
                 description: ""
               - name: Unicast In
                 type: float
+                unit: "Kpps"
+                visibility: hidden
                 description: ""
               - name: Unicast Out
                 type: float
+                unit: "Kpps"
+                visibility: hidden
                 description: ""
               - name: Broadcast In
                 type: float
+                unit: "Kpps"
+                visibility: hidden
                 description: ""
               - name: Broadcast Out
                 type: float
+                unit: "Kpps"
+                visibility: hidden
                 description: ""
               - name: Packets In
                 type: float
+                unit: "Kpps"
                 description: ""
               - name: Packets Out
                 type: float
+                unit: "Kpps"
                 description: ""
               - name: Errors In
                 type: float
+                unit: "packets/s"
+                visibility: hidden
                 description: ""
               - name: Errors Out
                 type: float
+                unit: "packets/s"
+                visibility: hidden
                 description: ""
               - name: Discards In
                 type: float
+                unit: "packets/s"
                 description: ""
               - name: Discards Out
                 type: float
+                unit: "packets/s"
                 description: ""
               - name: Multicast In
                 type: float
+                unit: "Kpps"
+                visibility: hidden
                 description: ""
               - name: Multicast Out
                 type: float
+                unit: "Kpps"
+                visibility: hidden
                 description: ""
-          behavior: |
-            Uses the latest cached SNMP interface data, filters by the selected type group, and sorts by the default column.
           performance: |
             Uses cached data only and does not trigger additional SNMP requests. Large devices may return many rows.
           security: |
             Exposes interface names and counters only.
-          requirements: |
-            Requires successful SNMP collection so interface data is cached.
           availability: |
             Available after the collector has completed at least one data collection; returns 503 until cache is ready.
     metrics:
@@ -586,7 +612,7 @@ modules:
 
         :::tip
 
-         To understand the structure of these profiles (metrics, tags, virtual metrics, etc.), see **[SNMP Profile Format](/src/go/plugin/go.d/collector/snmp/profile-format.md)**.
+        To understand the structure of these profiles (metrics, tags, virtual metrics, etc.), see **[SNMP Profile Format](/src/go/plugin/go.d/collector/snmp/profile-format.md)**.
 
         :::
 

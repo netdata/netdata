@@ -39,7 +39,7 @@ modules:
         auto_detection:
           description: |
             By default, it detects instances running on localhost by trying to connect as root and netdata using known PostgreSQL TCP and UNIX sockets:
-            
+
             - 127.0.0.1:5432
             - /var/run/postgresql/
         limits:
@@ -60,14 +60,14 @@ modules:
             description: |
               Create a user with granted `pg_monitor`
               or `pg_read_all_stat` [built-in role](https://www.postgresql.org/docs/current/predefined-roles.html).
-              
+
               To create the `netdata` user with these permissions, execute the following in the psql session, as a user with CREATEROLE privileges:
-              
+
               ```postgresql
               CREATE USER netdata;
               GRANT pg_monitor TO netdata;
               ```
-              
+
               After creating the new user, restart the Netdata Agent with `sudo systemctl restart netdata`, or
               the [appropriate method](/docs/netdata-agent/start-stop-restart.md) for your
               system.
@@ -153,7 +153,7 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Local and remote instances.
               config: |
                 jobs:
@@ -228,7 +228,10 @@ modules:
       list:
         - id: top-queries
           name: Top Queries
-          summary: Top SQL queries from pg_stat_statements.
+          description: |
+            Top SQL queries from pg_stat_statements.
+
+            Reads pg_stat_statements and returns the top entries sorted by the selected column.
           parameters:
             - id: __sort
               name: Filter By
@@ -242,138 +245,210 @@ modules:
             columns:
               - name: Query ID
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Query
                 type: string
+                unit: ""
                 description: ""
               - name: Database
                 type: string
+                unit: ""
                 description: ""
               - name: User
                 type: string
+                unit: ""
                 description: ""
               - name: Calls
                 type: integer
+                unit: ""
                 description: ""
               - name: Total Time
                 type: duration
+                unit: "milliseconds"
                 description: ""
               - name: Mean Time
                 type: duration
+                unit: "milliseconds"
                 description: ""
               - name: Min Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Max Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Stddev Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Plans
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Total Plan Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Mean Plan Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Min Plan Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Max Plan Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Stddev Plan Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Rows
                 type: integer
+                unit: ""
                 description: ""
               - name: Shared Blocks Hit
                 type: integer
+                unit: ""
                 description: ""
               - name: Shared Blocks Read
                 type: integer
+                unit: ""
                 description: ""
               - name: Shared Blocks Dirtied
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Shared Blocks Written
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Local Blocks Hit
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Local Blocks Read
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Local Blocks Dirtied
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Local Blocks Written
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Temp Blocks Read
                 type: integer
+                unit: ""
                 description: ""
               - name: Temp Blocks Written
                 type: integer
+                unit: ""
                 description: ""
               - name: Block Read Time
                 type: duration
+                unit: "milliseconds"
                 description: ""
               - name: Block Write Time
                 type: duration
+                unit: "milliseconds"
                 description: ""
               - name: WAL Records
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: WAL Full Page Images
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: WAL Bytes
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: JIT Functions
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: JIT Generation Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: JIT Inlining Count
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: JIT Inlining Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: JIT Optimization Count
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: JIT Optimization Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: JIT Emission Count
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: JIT Emission Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Temp Block Read Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Temp Block Write Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
-          behavior: |
-            Reads pg_stat_statements and returns the top entries sorted by the selected column.
           performance: |
             Requires pg_stat_statements and can be expensive on busy servers.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements: |
-            Requires the pg_stat_statements extension installed and enabled.
+          prerequisites:
+            list:
+              - title: Enable pg_stat_statements
+                description: |
+                  Install and enable the pg_stat_statements extension.
           availability: |
             Available when pg_stat_statements is available and the collector is initialized.
     metrics:

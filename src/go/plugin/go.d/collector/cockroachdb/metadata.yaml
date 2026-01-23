@@ -214,7 +214,7 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
@@ -253,7 +253,10 @@ modules:
       list:
         - id: top-queries
           name: Top Queries
-          summary: Top SQL statements from crdb_internal.cluster_statement_statistics.
+          description: |
+            Top SQL statements from crdb_internal.cluster_statement_statistics.
+            
+            Queries crdb_internal.cluster_statement_statistics and returns the top entries sorted by the selected column.
           parameters:
             - id: __sort
               name: Filter By
@@ -267,77 +270,112 @@ modules:
             columns:
               - name: Fingerprint ID
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Query
                 type: string
+                unit: ""
                 description: ""
               - name: Database
                 type: string
+                unit: ""
                 description: ""
               - name: Application
                 type: string
+                unit: ""
                 description: ""
               - name: Statement Type
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Distributed
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Full Scan
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Implicit Txn
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Vectorized
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Executions
                 type: integer
+                unit: ""
                 description: ""
               - name: Total Time
                 type: duration
+                unit: "milliseconds"
                 description: ""
               - name: Mean Time
                 type: duration
+                unit: "milliseconds"
                 description: ""
               - name: Run Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Plan Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Parse Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Rows Read
                 type: integer
+                unit: ""
                 description: ""
               - name: Rows Written
                 type: integer
+                unit: ""
                 description: ""
               - name: Rows Returned
                 type: integer
+                unit: ""
                 description: ""
               - name: Bytes Read
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Max Retries
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
-          behavior: |
-            Queries crdb_internal.cluster_statement_statistics and returns the top entries sorted by the selected column.
           performance: |
             Executes SQL queries against system tables and may be expensive on busy clusters.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements: |
-            Requires a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to crdb_internal.cluster_statement_statistics.
+          prerequisites:
+            list:
+              - title: Grant VIEWACTIVITY access to cluster statement stats
+                description: |
+                  Use a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to crdb_internal.cluster_statement_statistics.
           availability: |
             Requires SQL DSN configuration and access to system tables; returns errors if DSN is missing or SQL is unavailable.
         - id: running-queries
           name: Running Queries
-          summary: Currently running SQL statements from SHOW CLUSTER STATEMENTS.
+          description: |
+            Currently running SQL statements from SHOW CLUSTER STATEMENTS.
+            
+            Queries SHOW CLUSTER STATEMENTS and returns running statements sorted by the selected column.
           parameters:
             - id: __sort
               name: Filter By
@@ -351,45 +389,63 @@ modules:
             columns:
               - name: Query ID
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Query
                 type: string
+                unit: ""
                 description: ""
               - name: User
                 type: string
+                unit: ""
                 description: ""
               - name: Application
                 type: string
+                unit: ""
                 description: ""
               - name: Client Address
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Node ID
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Session ID
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Phase
                 type: string
+                unit: ""
                 description: ""
               - name: Distributed
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Start Time
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Elapsed
                 type: duration
+                unit: "milliseconds"
                 description: ""
-          behavior: |
-            Queries SHOW CLUSTER STATEMENTS and returns running statements sorted by the selected column.
           performance: |
             Executes SQL queries against system tables and may be expensive on busy clusters.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements: |
-            Requires a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to system tables.
+          prerequisites:
+            list:
+              - title: Grant VIEWACTIVITY access to system tables
+                description: |
+                  Use a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to system tables.
           availability: |
             Requires SQL DSN configuration and access to system tables; returns errors if DSN is missing or SQL is unavailable.
     metrics:

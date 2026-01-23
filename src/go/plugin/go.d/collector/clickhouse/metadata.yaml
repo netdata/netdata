@@ -258,7 +258,10 @@ modules:
       list:
         - id: top-queries
           name: Top Queries
-          summary: Top SQL queries from ClickHouse system.query_log.
+          description: |
+            Top SQL queries from ClickHouse system.query_log.
+
+            Queries system.query_log, aggregates by query, and returns the top entries sorted by the selected column.
           parameters:
             - id: __sort
               name: Filter By
@@ -272,60 +275,84 @@ modules:
             columns:
               - name: Query ID
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Query
                 type: string
+                unit: ""
                 description: ""
               - name: Database
                 type: string
+                unit: ""
                 description: ""
               - name: User
                 type: string
+                unit: ""
                 description: ""
               - name: Calls
                 type: integer
+                unit: ""
                 description: ""
               - name: Total Time
                 type: duration
+                unit: "milliseconds"
                 description: ""
               - name: Avg Time
                 type: duration
+                unit: "milliseconds"
                 description: ""
               - name: Min Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Max Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Read Rows
                 type: integer
+                unit: ""
                 description: ""
               - name: Read Bytes
                 type: integer
+                unit: ""
                 description: ""
               - name: Written Rows
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Written Bytes
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Result Rows
                 type: integer
+                unit: ""
                 description: ""
               - name: Result Bytes
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Max Memory
                 type: float
+                unit: ""
+                visibility: hidden
                 description: ""
-          behavior: |
-            Queries system.query_log, aggregates by query, and returns the top entries sorted by the selected column.
           performance: |
             Uses system.query_log and can be expensive on busy systems. Use limits to control response size.
           security: |
             Query text may include sensitive literals depending on server settings.
-          requirements: |
-            Requires access to system.query_log on the target ClickHouse instance.
+          prerequisites:
+            list:
+              - title: Grant access to system.query_log
+                description: |
+                  Ensure the Netdata user can read system.query_log on the target ClickHouse instance.
           availability: |
             Available when the collector can query system tables; returns 503 if system.query_log is not available.
     metrics:

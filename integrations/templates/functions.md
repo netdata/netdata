@@ -6,15 +6,27 @@
 [% for func in entry.functions.list %]
 ### [[ func.name ]]
 
+[[ func.description ]]
+
 | Aspect | Description |
 |:-------|:------------|
-| Name | `[[ entry.meta.module_name|capitalize ]]:[[ func.id ]]` |
-| Summary | [[ strfy(func.summary) ]] |
-| Behavior | [[ strfy(func.behavior) ]] |
+| Name | `[[ strfy(entry.meta.module_name)|capitalize ]]:[[ strfy(func.id) ]]` |
 | Performance | [[ strfy(func.performance) ]] |
 | Security | [[ strfy(func.security) ]] |
-| Requirements | [[ strfy(func.requirements) ]] |
 | Availability | [[ strfy(func.availability) ]] |
+
+#### Prerequisites
+
+[% if func.prerequisites and func.prerequisites.list %]
+[% for req in func.prerequisites.list %]
+##### [[ req.title ]]
+
+[[ req.description ]]
+
+[% endfor %]
+[% else %]
+No additional configuration is required.
+[% endif %]
 
 #### Parameters
 
@@ -32,10 +44,10 @@ This function has no parameters.
 
 [[ func.returns.description ]]
 
-| Column | Type | Description |
-|:-------|:-----|:------------|
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
 [% for col in func.returns.columns %]
-| [[ strfy(col.name) ]] | [[ strfy(col.type) ]] | [[ strfy(col.description) ]] |
+| [[ strfy(col.name) ]] | [[ strfy(col.type) ]] | [[ strfy(col.unit) ]] | [[ strfy(col.visibility) ]] | [[ strfy(col.description) ]] |
 [% endfor %]
 
 [% endfor %]
