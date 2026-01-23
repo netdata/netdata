@@ -534,15 +534,15 @@ modules:
               - name: Type Group
                 type: string
                 unit: ""
-                description: Custom categorization mapping IANA interface types into practical groups: Ethernet (physical Ethernet interfaces), Aggregation (LAG/port-channels, bond), Virtual (VLANs, loopbacks), or Other (all remaining types)
+                description: "Custom categorization mapping IANA interface types into practical groups: Ethernet (physical Ethernet interfaces), Aggregation (LAG/port-channels, bond), Virtual (VLANs, loopbacks), or Other (all remaining types)"
               - name: Admin Status
                 type: string
                 unit: ""
-                description: Administrative state configured on the interface: up (enabled for use), down (administratively disabled), or testing (currently in test mode). Different from operational status.
+                description: "Administrative state configured on the interface: up (enabled for use), down (administratively disabled), or testing (currently in test mode). Different from operational status."
               - name: Oper Status
                 type: string
                 unit: ""
-                description: Current operational state of the interface: up (operational and passing traffic), down (not operational), testing (in test mode), unknown (status cannot be determined), dormant (waiting for external actions), notPresent (interface removed but configuration remains), or lowerLayerDown (interface down due to lower-layer issues)
+                description: "Current operational state of the interface: up (operational and passing traffic), down (not operational), testing (in test mode), unknown (status cannot be determined), dormant (waiting for external actions), notPresent (interface removed but configuration remains), or lowerLayerDown (interface down due to lower-layer issues)"
               - name: Traffic In
                 type: float
                 unit: "Mbits"
