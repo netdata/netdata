@@ -236,199 +236,266 @@ modules:
         - id: top-queries
           name: Top Queries
           description: |
-            Top SQL queries from performance_schema.
+            Retrieves and aggregates SQL query performance metrics from MySQL Performance Schema statement digest tables.
 
-            Reads performance_schema statement digest tables and returns the top entries sorted by the selected column.
+            This function queries the `performance_schema.events_statements_summary_by_digest` table, which contains aggregated
+            statistics for SQL statements grouped by their digest (normalized query pattern). The function dynamically detects
+            available columns based on your MySQL/MariaDB version and returns the top entries sorted by a user-selected metric.
+
+            Use cases:
+            - Identify slow queries that consume the most execution time
+            - Find frequently executed queries that may benefit from caching or optimization
+            - Detect queries with high lock time, errors, or warnings
+            - Analyze row operation patterns to optimize joins and indexes
+            - Monitor resource usage including temporary tables and disk I/O
+            - Track query performance over time with first/last seen timestamps
+
+            The function automatically converts timer metrics from picoseconds (stored in Performance Schema) to milliseconds
+            for easier interpretation. Query text is truncated at 4096 characters for display purposes.
           parameters:
             - id: __sort
               name: Filter By
-              description: Select the primary sort column (options are derived from sortable columns in the response).
+              description: Select the primary sort column. The available options depend on your MySQL/MariaDB version and include metrics like total execution time, number of calls, lock time, errors, rows examined, and more. Defaults to total execution time.
               type: select
               required: true
               default: totalTime
               options: []
           returns:
-            description: Aggregated statement statistics from performance_schema.
+            description: Aggregated statement statistics from Performance Schema, grouped by query digest. Each row represents a unique query pattern with cumulative metrics across all executions.
             columns:
               - name: Digest
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Unique hash identifier for the normalized query pattern. Queries with the same structure (different literal values) share the same digest."
               - name: Query
                 type: string
                 unit: ""
-                description: ""
+                description: "Normalized SQL query text with literals replaced by placeholders (e.g., '?' for values). Truncated to 4096 characters."
               - name: Schema
                 type: string
                 unit: ""
-                description: ""
+                description: "Database schema name where the query was executed. Empty string for queries without a schema context."
               - name: Calls
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total number of times this query pattern has been executed since server startup or since the digest table was last truncated."
               - name: Total Time
                 type: duration
                 unit: "milliseconds"
-                description: ""
+                description: "Cumulative execution time across all executions. High values indicate queries that consume significant server resources."
               - name: Min Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Minimum execution time observed for a single execution. Helps identify variability in query performance."
               - name: Avg Time
                 type: duration
                 unit: "milliseconds"
-                description: ""
+                description: "Average execution time (total time divided by calls). Use this to compare performance across different query patterns."
               - name: Max Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Maximum execution time observed for a single execution. Large gaps between min and max may indicate performance instability."
               - name: Lock Time
                 type: duration
                 unit: "milliseconds"
-                description: ""
+                description: "Total time spent waiting for table locks across all executions. High lock time may indicate contention from concurrent transactions."
               - name: Errors
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total number of times this query pattern resulted in an error. Non-zero values require investigation into the underlying issue."
               - name: Warnings
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total number of times this query pattern generated warnings. Warnings may indicate data type conversions, NULL handling issues, or other non-critical problems."
               - name: Rows Affected
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total number of rows modified by INSERT, UPDATE, DELETE, or REPLACE statements. Useful for tracking write workloads."
               - name: Rows Sent
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total number of rows returned to the client by SELECT statements. High values may indicate result sets that are too large."
               - name: Rows Examined
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total number of rows read during query execution. A high ratio of rows examined to rows sent suggests missing or inefficient indexes."
               - name: Temp Disk Tables
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total number of temporary tables created on disk across all executions. Disk-based temporary tables are significantly slower than in-memory tables and may indicate memory pressure or complex operations requiring sorting/grouping."
               - name: Temp Tables
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total number of temporary tables created (both in-memory and on-disk). High values suggest frequent sorting, grouping, or DISTINCT operations."
               - name: Full Joins
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total number of joins that performed a full table scan without using an index. These are typically very expensive operations that should be optimized."
               - name: Full Range Joins
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Total number of joins that used a range scan on the first table. Less efficient than indexed joins but better than full scans."
               - name: Select Range
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Total number of joins that used a range on the first table for row selection."
               - name: Select Range Check
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Total number of joins that checked each row after scanning for key ranges. Very inefficient operation."
               - name: Select Scan
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total number of joins that performed a full scan of the first table. Indicates missing indexes or suboptimal join order."
               - name: Sort Merge Passes
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Total number of merge passes performed during sort operations. More passes indicate larger datasets that exceed sort buffer size."
               - name: Sort Range
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Total number of sorts that used a range scan."
               - name: Sort Rows
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total number of rows sorted across all executions. High values indicate frequent sorting operations on large datasets."
               - name: Sort Scan
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Total number of sorts that required a full table scan."
               - name: No Index Used
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total number of executions where no index was used for table access. These queries are prime candidates for index optimization."
               - name: No Good Index Used
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Total number of executions where a non-optimal index was used. Indicates that while an index exists, a better one might improve performance."
               - name: First Seen
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Timestamp when this query pattern was first observed. Helps identify new queries that may have been introduced by application changes."
               - name: Last Seen
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Timestamp when this query pattern was last executed. Can help identify stale queries that are no longer in use."
               - name: P95 Time
                 type: duration
                 unit: "milliseconds"
-                description: ""
+                description: "95th percentile execution time. 95% of executions completed within this time. Available in MySQL 8.0+. Useful for understanding typical performance."
               - name: P99 Time
                 type: duration
                 unit: "milliseconds"
-                description: ""
+                description: "99th percentile execution time. 99% of executions completed within this time. Available in MySQL 8.0+. Helps identify outlier slow executions."
               - name: P99.9 Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "99.9th percentile execution time. Available in MySQL 8.0+. Identifies extreme outliers in query performance."
               - name: Sample Query
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Example of an actual query execution with literal values preserved. Available in MySQL 8.0+. Helpful for understanding the exact queries being executed."
               - name: Sample Seen
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Timestamp when the sample query was captured. Available in MySQL 8.0+."
               - name: Sample Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Execution time of the captured sample query. Available in MySQL 8.0+."
               - name: CPU Time
                 type: duration
                 unit: "milliseconds"
-                description: ""
+                description: "Total CPU time consumed across all executions. Available in MySQL 8.0.28+. Helps identify CPU-intensive queries."
               - name: Max Controlled Memory
                 type: integer
                 unit: ""
-                description: ""
+                description: "Maximum memory controlled by the query executor for this query pattern. Available in MySQL 8.0.31+. Helps identify memory-intensive operations."
               - name: Max Total Memory
                 type: integer
                 unit: ""
-                description: ""
+                description: "Maximum total memory used by this query pattern including both controlled and uncontrolled allocations. Available in MySQL 8.0.31+."
           performance: |
-            Requires performance_schema and can be expensive on busy servers.
+            Minimal overhead when properly configured. On busy servers with high query throughput, digest table can contain many rows and queries may take longer. • Default limit of 500 rows balances usefulness with performance<br/>• Adjust `top_queries_limit` configuration option if needed<br/>• Performance Schema overhead typically 1-3% CPU for collecting statement statistics<br/>• Consider disabling statement instrumentation during peak load periods if performance impact is a concern
           security: |
-            Query text may contain unmasked literals (potential PII).
+            Query text may contain unmasked literal values including potentially sensitive data. • Personal information (names, emails, phone numbers)<br/>• Authentication credentials (if improperly logged in application)<br/>• Proprietary business data<br/>• Session identifiers or tokens<br/>• Access should be restricted to authorized personnel only<br/>• Consider implementing data masking in applications to prevent sensitive literals from appearing in query text
           prerequisites:
             list:
-              - title: Enable performance_schema digest tables
+              - title: Enable performance_schema statement digest collection
                 description: |
-                  Enable performance_schema and grant access to events_statements_summary_by_digest.
+                  Performance Schema must be enabled and statement instrumentation must be configured to collect digest statistics.
+
+                  Check if Performance Schema is enabled:
+                  ```sql
+                  SELECT @@performance_schema;
+                  ```
+
+                  Check statement instrumentation configuration:
+                  ```sql
+                  SELECT * FROM performance_schema.setup_consumers
+                  WHERE NAME LIKE '%statement%';
+                  ```
+
+                  The following consumers should be enabled:
+                  - `events_statements_history`
+                  - `events_statements_history_long`
+                  - `events_statements_summary_by_digest`
+
+                  Enable statement consumers if needed:
+                  ```sql
+                  UPDATE performance_schema.setup_consumers
+                  SET ENABLED = 'YES'
+                  WHERE NAME LIKE 'events_statements%';
+                  ```
+
+                  Verify the digest table contains data:
+                  ```sql
+                  SELECT COUNT(*) FROM performance_schema.events_statements_summary_by_digest;
+                  ```
+
+                  **Note**: Statement digest data is accumulated since server startup or since the table was last truncated. To reset statistics:
+                  ```sql
+                  TRUNCATE TABLE performance_schema.events_statements_summary_by_digest;
+                  ```
+
+                  For MySQL versions before 8.0, ensure `performance-schema-instrument` includes statement instruments:
+                  ```ini
+                  performance-schema-instrument = 'statement/%=ON'
+                  ```
+              - title: Grant SELECT permission on Performance Schema tables
+                description: |
+                  The netdata user must have SELECT permission on Performance Schema tables. The standard collector permissions
+                  (USAGE, REPLICATION CLIENT, PROCESS) do not automatically include Performance Schema access.
+
+                  Grant the required permission:
+                  ```sql
+                  GRANT SELECT ON performance_schema.* TO 'netdata'@'localhost';
+                  FLUSH PRIVILEGES;
+                  ```
+
+                  Verify access:
+                  ```sql
+                  -- As the netdata user:
+                  SELECT COUNT(*) FROM performance_schema.events_statements_summary_by_digest;
+                  ```
           availability: |
-            Available when performance_schema tables are accessible and the collector is initialized.
+            Available when: • Performance Schema is enabled and accessible<br/>• Statement digest collection is configured<br/>• The collector has completed its initial data collection<br/>• Columns are dynamically detected based on MySQL/MariaDB version<br/>• Some metrics (percentiles, sample queries, CPU time, memory) only available in MySQL 8.0+<br/>• Returns HTTP 503 if Performance Schema is not enabled<br/>• Returns HTTP 500 if digest table is not accessible or contains no available columns
     metrics:
       folding:
         title: Metrics
