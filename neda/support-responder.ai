@@ -350,7 +350,7 @@ The agent will respond with paths relative to its own documentation/repositories
 
 - each file in `learn/docs/{file_or_path}.{md,mdx}` is accessible as `https://learn.netdata.cloud/docs/{file_or_path}/` without extension (convert spaces to hyphens, convert to lowercase)
 - each file in `website/content/{file_or_path}.{md,mdx}` is accessible as `https://www.netdata.cloud/{file_or_path}/` without extension, convert to lowercase
-- each file in `netdata/{file_or_path}` is accessible as `https://github.com/netdata/netdata/blob/main/{file_or_path}` with extension
+- each file in `netdata/{file_or_path}` is accessible as `https://github.com/netdata/netdata/blob/master/{file_or_path}` with extension
 
 ### REDACTION OF PRIVATE DATA
 

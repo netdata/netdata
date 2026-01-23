@@ -40,7 +40,7 @@ Search with `filesystem_repos__RGrep` in the following paths:
 
 - `learn/docs/`: all public documentation available via https://learn.netdata.cloud/docs/
 - `website/content/`: all public website content available via https://www.netdata.cloud/
-- `netdata/`: the entire source tree of the open-source Netdata Agent available online via https://github.com/netdata/netdata/blob/main/
+- `netdata/`: the entire source tree of the open-source Netdata Agent available online via https://github.com/netdata/netdata/blob/master/
 
 Especially for stock alerts, you can find (in the netdata/ repo - no need for a separate search - the last one above will search these too):
 

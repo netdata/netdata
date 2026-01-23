@@ -274,7 +274,7 @@ Always map `learn/docs` and `website/content/` like this:
 
 For all other files (public and private), the top level directory is the repo and the remaining is the relative path inside the repo:
 
-- `{repo}/{file_or_path}` is accessible as `https://github.com/netdata/{repo}/blob/main/{file_or_path}` with extension
+- `{repo}/{file_or_path}` is accessible as `https://github.com/netdata/{repo}/blob/master/{file_or_path}` with extension
 
 #### Double Check Paths Rewritting Requirement
 
@@ -291,7 +291,7 @@ When converting paths to URLs you need to double check the converted URLs:
   - Remove extension
   - Convert to lowercase
 
-- Everything else found on disk should in the form `{repo}/{file_or_path}` and should be converted to `https://github.com/netdata/{repo}/blob/main/{file_or_path}`
+- Everything else found on disk should in the form `{repo}/{file_or_path}` and should be converted to `https://github.com/netdata/{repo}/blob/master/{file_or_path}`
   - Keep the extension
   - Convert space to `%20` (url encoded)
 

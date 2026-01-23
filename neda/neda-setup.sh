@@ -270,6 +270,7 @@ run mkdir -p "$NETDATA_REPOS_PUBLIC/learn.netdata.cloud"
 # Create symlinks using ln -sfn for atomic replacement (no disruption to running queries)
 # -s = symbolic link, -f = force (replace), -n = no-dereference (don't follow existing symlink)
 run ln -sfn ../../../netdata-repos/netdata "$NETDATA_REPOS_PUBLIC/github.com/netdata/netdata"
+run ln -sfn ../../../netdata-repos/helmchart "$NETDATA_REPOS_PUBLIC/github.com/netdata/helmchart"
 run ln -sfn ../../netdata-repos/learn/docs "$NETDATA_REPOS_PUBLIC/learn.netdata.cloud/docs"
 run ln -sfn ../netdata-repos/website/content "$NETDATA_REPOS_PUBLIC/www.netdata.cloud"
 
