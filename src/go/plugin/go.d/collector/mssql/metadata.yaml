@@ -226,6 +226,214 @@ modules:
               The monitoring user needs VIEW SERVER STATE permission.
               Grant it with: `GRANT VIEW SERVER STATE TO netdata_user;`
     alerts: []
+    functions:
+      description: |
+        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+      list:
+        - id: top-queries
+          name: Top Queries
+          summary: Top SQL queries from Query Store.
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column (options are derived from sortable columns in the response).
+              type: select
+              required: true
+              default: totalTime
+              options: []
+          returns:
+            description: Query Store statistics for top queries.
+            columns:
+              - name: Query Hash
+                type: string
+                description: ""
+              - name: Query
+                type: string
+                description: ""
+              - name: Database
+                type: string
+                description: ""
+              - name: Calls
+                type: integer
+                description: ""
+              - name: Total Time
+                type: duration
+                description: ""
+              - name: Avg Time
+                type: duration
+                description: ""
+              - name: Last Time
+                type: duration
+                description: ""
+              - name: Min Time
+                type: duration
+                description: ""
+              - name: Max Time
+                type: duration
+                description: ""
+              - name: StdDev Time
+                type: duration
+                description: ""
+              - name: Avg CPU
+                type: duration
+                description: ""
+              - name: Last CPU
+                type: duration
+                description: ""
+              - name: Min CPU
+                type: duration
+                description: ""
+              - name: Max CPU
+                type: duration
+                description: ""
+              - name: StdDev CPU
+                type: duration
+                description: ""
+              - name: Avg Logical Reads
+                type: float
+                description: ""
+              - name: Last Logical Reads
+                type: integer
+                description: ""
+              - name: Min Logical Reads
+                type: integer
+                description: ""
+              - name: Max Logical Reads
+                type: integer
+                description: ""
+              - name: StdDev Logical Reads
+                type: float
+                description: ""
+              - name: Avg Logical Writes
+                type: float
+                description: ""
+              - name: Last Logical Writes
+                type: integer
+                description: ""
+              - name: Min Logical Writes
+                type: integer
+                description: ""
+              - name: Max Logical Writes
+                type: integer
+                description: ""
+              - name: StdDev Logical Writes
+                type: float
+                description: ""
+              - name: Avg Physical Reads
+                type: float
+                description: ""
+              - name: Last Physical Reads
+                type: integer
+                description: ""
+              - name: Min Physical Reads
+                type: integer
+                description: ""
+              - name: Max Physical Reads
+                type: integer
+                description: ""
+              - name: StdDev Physical Reads
+                type: float
+                description: ""
+              - name: Avg CLR Time
+                type: duration
+                description: ""
+              - name: Last CLR Time
+                type: duration
+                description: ""
+              - name: Min CLR Time
+                type: duration
+                description: ""
+              - name: Max CLR Time
+                type: duration
+                description: ""
+              - name: StdDev CLR Time
+                type: duration
+                description: ""
+              - name: Avg DOP
+                type: float
+                description: ""
+              - name: Last DOP
+                type: integer
+                description: ""
+              - name: Min DOP
+                type: integer
+                description: ""
+              - name: Max DOP
+                type: integer
+                description: ""
+              - name: StdDev DOP
+                type: float
+                description: ""
+              - name: Avg Memory (8KB pages)
+                type: float
+                description: ""
+              - name: Last Memory (8KB pages)
+                type: integer
+                description: ""
+              - name: Min Memory (8KB pages)
+                type: integer
+                description: ""
+              - name: Max Memory (8KB pages)
+                type: integer
+                description: ""
+              - name: StdDev Memory
+                type: float
+                description: ""
+              - name: Avg Rows
+                type: float
+                description: ""
+              - name: Last Rows
+                type: integer
+                description: ""
+              - name: Min Rows
+                type: integer
+                description: ""
+              - name: Max Rows
+                type: integer
+                description: ""
+              - name: StdDev Rows
+                type: float
+                description: ""
+              - name: Avg Log Bytes
+                type: float
+                description: ""
+              - name: Last Log Bytes
+                type: integer
+                description: ""
+              - name: Min Log Bytes
+                type: integer
+                description: ""
+              - name: Max Log Bytes
+                type: integer
+                description: ""
+              - name: StdDev Log Bytes
+                type: float
+                description: ""
+              - name: Avg TempDB (8KB pages)
+                type: float
+                description: ""
+              - name: Last TempDB (8KB pages)
+                type: integer
+                description: ""
+              - name: Min TempDB (8KB pages)
+                type: integer
+                description: ""
+              - name: Max TempDB (8KB pages)
+                type: integer
+                description: ""
+              - name: StdDev TempDB
+                type: float
+                description: ""
+          behavior: |
+            Queries Query Store runtime statistics and returns the top entries sorted by the selected column.
+          performance: |
+            Uses Query Store and can be expensive on busy instances.
+          security: |
+            Query Store may contain unmasked literals (potential PII).
+          requirements: |
+            Requires Query Store enabled and query_store_function_enabled set to true.
+          availability: |
+            Available when Query Store is enabled and the collector is initialized; returns 403 if disabled in config.
     metrics:
       folding:
         title: Metrics

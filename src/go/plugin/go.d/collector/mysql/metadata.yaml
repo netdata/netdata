@@ -229,6 +229,148 @@ modules:
         metric: mysql.galera_cluster_status
         info: galera node is part of a nonoperational component. This occurs in cases of multiple membership changes that result in a loss of Quorum or in cases of split-brain situations.
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf
+    functions:
+      description: |
+        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+      list:
+        - id: top-queries
+          name: Top Queries
+          summary: Top SQL queries from performance_schema.
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column (options are derived from sortable columns in the response).
+              type: select
+              required: true
+              default: totalTime
+              options: []
+          returns:
+            description: Aggregated statement statistics from performance_schema.
+            columns:
+              - name: Digest
+                type: string
+                description: ""
+              - name: Query
+                type: string
+                description: ""
+              - name: Schema
+                type: string
+                description: ""
+              - name: Calls
+                type: integer
+                description: ""
+              - name: Total Time
+                type: duration
+                description: ""
+              - name: Min Time
+                type: duration
+                description: ""
+              - name: Avg Time
+                type: duration
+                description: ""
+              - name: Max Time
+                type: duration
+                description: ""
+              - name: Lock Time
+                type: duration
+                description: ""
+              - name: Errors
+                type: integer
+                description: ""
+              - name: Warnings
+                type: integer
+                description: ""
+              - name: Rows Affected
+                type: integer
+                description: ""
+              - name: Rows Sent
+                type: integer
+                description: ""
+              - name: Rows Examined
+                type: integer
+                description: ""
+              - name: Temp Disk Tables
+                type: integer
+                description: ""
+              - name: Temp Tables
+                type: integer
+                description: ""
+              - name: Full Joins
+                type: integer
+                description: ""
+              - name: Full Range Joins
+                type: integer
+                description: ""
+              - name: Select Range
+                type: integer
+                description: ""
+              - name: Select Range Check
+                type: integer
+                description: ""
+              - name: Select Scan
+                type: integer
+                description: ""
+              - name: Sort Merge Passes
+                type: integer
+                description: ""
+              - name: Sort Range
+                type: integer
+                description: ""
+              - name: Sort Rows
+                type: integer
+                description: ""
+              - name: Sort Scan
+                type: integer
+                description: ""
+              - name: No Index Used
+                type: integer
+                description: ""
+              - name: No Good Index Used
+                type: integer
+                description: ""
+              - name: First Seen
+                type: string
+                description: ""
+              - name: Last Seen
+                type: string
+                description: ""
+              - name: P95 Time
+                type: duration
+                description: ""
+              - name: P99 Time
+                type: duration
+                description: ""
+              - name: P99.9 Time
+                type: duration
+                description: ""
+              - name: Sample Query
+                type: string
+                description: ""
+              - name: Sample Seen
+                type: string
+                description: ""
+              - name: Sample Time
+                type: duration
+                description: ""
+              - name: CPU Time
+                type: duration
+                description: ""
+              - name: Max Controlled Memory
+                type: integer
+                description: ""
+              - name: Max Total Memory
+                type: integer
+                description: ""
+          behavior: |
+            Reads performance_schema statement digest tables and returns the top entries sorted by the selected column.
+          performance: |
+            Requires performance_schema and can be expensive on busy servers.
+          security: |
+            Query text may contain unmasked literals (potential PII).
+          requirements: |
+            Requires performance_schema enabled and access to events_statements_summary_by_digest.
+          availability: |
+            Available when performance_schema tables are accessible and the collector is initialized.
     metrics:
       folding:
         title: Metrics

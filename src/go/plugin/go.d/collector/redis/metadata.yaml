@@ -184,6 +184,55 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf
         metric: redis.master_link_down_since_time
         info: time elapsed since the link between master and slave is down
+    functions:
+      description: |
+        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+      list:
+        - id: top-queries
+          name: Top Queries
+          summary: "Slow commands from Redis SLOWLOG. WARNING: Command arguments may contain unmasked literals (potential PII)."
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column (options are derived from sortable columns in the response).
+              type: select
+              required: true
+              default: duration
+              options: []
+          returns:
+            description: Slowlog entries with command timing and metadata.
+            columns:
+              - name: ID
+                type: integer
+                description: ""
+              - name: Timestamp
+                type: timestamp
+                description: ""
+              - name: Command
+                type: string
+                description: ""
+              - name: Command Name
+                type: string
+                description: ""
+              - name: Duration
+                type: duration
+                description: ""
+              - name: Client Address
+                type: string
+                description: ""
+              - name: Client Name
+                type: string
+                description: ""
+          behavior: |
+            Reads Redis SLOWLOG and returns the top entries sorted by the selected column.
+          performance: |
+            Uses SLOWLOG GET and may return many entries; use top_queries_limit to control size.
+          security: |
+            Command arguments may contain unmasked literals (potential PII).
+          requirements: |
+            Requires access to the Redis SLOWLOG and a working connection.
+          availability: |
+            Available when the collector is initialized; returns 503 if the collector is still connecting.
     metrics:
       folding:
         title: Metrics

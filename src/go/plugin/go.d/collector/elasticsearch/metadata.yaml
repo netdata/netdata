@@ -276,6 +276,64 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf
         metric: elasticsearch.node_index_health
         info: node index $label:index health status is red.
+    functions:
+      description: |
+        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+      list:
+        - id: top-queries
+          name: Top Queries
+          summary: Running queries from the Elasticsearch Tasks API.
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column (options are derived from sortable columns in the response).
+              type: select
+              required: true
+              default: runningTime
+              options: []
+          returns:
+            description: Snapshot of running tasks from the Tasks API.
+            columns:
+              - name: Task ID
+                type: string
+                description: ""
+              - name: Node ID
+                type: string
+                description: ""
+              - name: Node Name
+                type: string
+                description: ""
+              - name: Action
+                type: string
+                description: ""
+              - name: Type
+                type: string
+                description: ""
+              - name: Description
+                type: string
+                description: ""
+              - name: Start Time
+                type: timestamp
+                description: ""
+              - name: Running Time
+                type: duration
+                description: ""
+              - name: Cancellable
+                type: boolean
+                description: ""
+              - name: Cancelled
+                type: boolean
+                description: ""
+          behavior: |
+            Calls the Tasks API and returns running task details sorted by the selected column.
+          performance: |
+            Queries the Tasks API; on large clusters this may return many rows.
+          security: |
+            Task descriptions may include query details.
+          requirements: |
+            Requires access to the Tasks API on the target Elasticsearch node.
+          availability: |
+            Available when the collector can query the Tasks API; returns 503 until the collector is initialized.
     metrics:
       folding:
         title: Metrics

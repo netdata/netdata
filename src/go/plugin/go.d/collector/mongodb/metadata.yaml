@@ -165,6 +165,118 @@ modules:
       problems:
         list: []
     alerts: []
+    functions:
+      description: |
+        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+      list:
+        - id: top-queries
+          name: Top Queries
+          summary: "Top queries from MongoDB Profiler (system.profile). WARNING: Query text may contain unmasked literals (potential PII)."
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column (options are derived from sortable columns in the response).
+              type: select
+              required: true
+              default: execution_time
+              options: []
+          returns:
+            description: Profiled query statistics from system.profile.
+            columns:
+              - name: Timestamp
+                type: timestamp
+                description: ""
+              - name: Namespace
+                type: string
+                description: ""
+              - name: Operation
+                type: string
+                description: ""
+              - name: Query
+                type: string
+                description: ""
+              - name: Execution Time
+                type: duration
+                description: ""
+              - name: Docs Examined
+                type: integer
+                description: ""
+              - name: Keys Examined
+                type: integer
+                description: ""
+              - name: Docs Returned
+                type: integer
+                description: ""
+              - name: Plan Summary
+                type: string
+                description: ""
+              - name: Client
+                type: string
+                description: ""
+              - name: User
+                type: string
+                description: ""
+              - name: Docs Deleted
+                type: integer
+                description: ""
+              - name: Docs Inserted
+                type: integer
+                description: ""
+              - name: Docs Modified
+                type: integer
+                description: ""
+              - name: Response Length
+                type: integer
+                description: ""
+              - name: Num Yield
+                type: integer
+                description: ""
+              - name: App Name
+                type: string
+                description: ""
+              - name: Cursor Exhausted
+                type: string
+                description: ""
+              - name: Has Sort Stage
+                type: string
+                description: ""
+              - name: Uses Disk
+                type: string
+                description: ""
+              - name: From Multi Planner
+                type: string
+                description: ""
+              - name: Replanned
+                type: string
+                description: ""
+              - name: Query Hash
+                type: string
+                description: ""
+              - name: Plan Cache Key
+                type: string
+                description: ""
+              - name: Planning Time
+                type: duration
+                description: ""
+              - name: CPU Time
+                type: duration
+                description: ""
+              - name: Query Framework
+                type: string
+                description: ""
+              - name: Query Shape Hash
+                type: string
+                description: ""
+          behavior: |
+            Reads from system.profile and returns the top profiled queries sorted by the selected column.
+          performance: |
+            Requires profiling and reads from system.profile; may add load on busy systems.
+          security: |
+            Query text may contain unmasked literals (potential PII).
+          requirements: |
+            Requires MongoDB profiling enabled on target databases and top_queries_function_enabled set to true.
+          availability: |
+            Available when profiling is enabled and the collector is initialized; returns 403 if disabled in config.
     metrics:
       folding:
         title: Metrics

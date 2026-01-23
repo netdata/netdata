@@ -123,6 +123,82 @@ modules:
         metric: proxysql.backend_status
         info: ProxySQL backend OFFLINE_HARD (${label:host}:${label:port} hostgroup ${label:hostgroup})
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf
+    functions:
+      description: |
+        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+      list:
+        - id: top-queries
+          name: Top Queries
+          summary: Top SQL queries from ProxySQL query digest stats.
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column (options are derived from sortable columns in the response).
+              type: select
+              required: true
+              default: totalTime
+              options: []
+          returns:
+            description: Query digest statistics from ProxySQL.
+            columns:
+              - name: Digest
+                type: string
+                description: ""
+              - name: Query
+                type: string
+                description: ""
+              - name: Schema
+                type: string
+                description: ""
+              - name: User
+                type: string
+                description: ""
+              - name: Hostgroup
+                type: integer
+                description: ""
+              - name: Calls
+                type: integer
+                description: ""
+              - name: Total Time
+                type: duration
+                description: ""
+              - name: Avg Time
+                type: duration
+                description: ""
+              - name: Min Time
+                type: duration
+                description: ""
+              - name: Max Time
+                type: duration
+                description: ""
+              - name: Rows Affected
+                type: integer
+                description: ""
+              - name: Rows Sent
+                type: integer
+                description: ""
+              - name: Errors
+                type: integer
+                description: ""
+              - name: Warnings
+                type: integer
+                description: ""
+              - name: First Seen
+                type: string
+                description: ""
+              - name: Last Seen
+                type: string
+                description: ""
+          behavior: |
+            Queries stats_mysql_query_digest and returns the top entries sorted by the selected column.
+          performance: |
+            Uses ProxySQL stats tables and can be expensive on busy systems.
+          security: |
+            Query text may contain unmasked literals (potential PII).
+          requirements: |
+            Requires access to stats_mysql_query_digest in ProxySQL.
+          availability: |
+            Available when the collector can query ProxySQL stats; returns errors if the SQL connection is unavailable.
     metrics:
       folding:
         title: Metrics

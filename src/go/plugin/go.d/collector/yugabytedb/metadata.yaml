@@ -241,6 +241,124 @@ modules:
       problems:
         list: []
     alerts: []
+    functions:
+      description: |
+        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+      list:
+        - id: top-queries
+          name: Top Queries
+          summary: "Top SQL queries from pg_stat_statements. WARNING: Query text may contain unmasked literals (potential PII)."
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column (options are derived from sortable columns in the response).
+              type: select
+              required: true
+              default: totalTime
+              options: []
+          returns:
+            description: Aggregated query statistics from pg_stat_statements.
+            columns:
+              - name: Query ID
+                type: string
+                description: ""
+              - name: Query
+                type: string
+                description: ""
+              - name: Database
+                type: string
+                description: ""
+              - name: User
+                type: string
+                description: ""
+              - name: Calls
+                type: integer
+                description: ""
+              - name: Total Time
+                type: duration
+                description: ""
+              - name: Mean Time
+                type: duration
+                description: ""
+              - name: Min Time
+                type: duration
+                description: ""
+              - name: Max Time
+                type: duration
+                description: ""
+              - name: Rows
+                type: integer
+                description: ""
+              - name: Stddev Time
+                type: duration
+                description: ""
+          behavior: |
+            Reads pg_stat_statements and returns the top entries sorted by the selected column.
+          performance: |
+            Executes SQL queries and may be expensive on busy clusters; use top_queries_limit and sql_timeout.
+          security: |
+            Query text may contain unmasked literals (potential PII).
+          requirements: |
+            Requires pg_stat_statements installed and a SQL DSN configured for YSQL.
+          availability: |
+            Available when YSQL is accessible; returns errors if the SQL connection is unavailable.
+        - id: running-queries
+          name: Running Queries
+          summary: "Currently running SQL statements from pg_stat_activity. WARNING: Query text may contain unmasked literals (potential PII)."
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column (options are derived from sortable columns in the response).
+              type: select
+              required: true
+              default: elapsedMs
+              options: []
+          returns:
+            description: Snapshot of currently running SQL statements.
+            columns:
+              - name: PID
+                type: string
+                description: ""
+              - name: Query
+                type: string
+                description: ""
+              - name: Database
+                type: string
+                description: ""
+              - name: User
+                type: string
+                description: ""
+              - name: State
+                type: string
+                description: ""
+              - name: Wait Event Type
+                type: string
+                description: ""
+              - name: Wait Event
+                type: string
+                description: ""
+              - name: Application
+                type: string
+                description: ""
+              - name: Client Address
+                type: string
+                description: ""
+              - name: Query Start
+                type: string
+                description: ""
+              - name: Elapsed
+                type: duration
+                description: ""
+          behavior: |
+            Reads pg_stat_activity and returns running statements sorted by the selected column.
+          performance: |
+            Executes SQL queries and may be expensive on busy clusters; use top_queries_limit and sql_timeout.
+          security: |
+            Query text may contain unmasked literals (potential PII).
+          requirements: |
+            Requires a SQL DSN configured for YSQL and access to pg_stat_activity.
+          availability: |
+            Available when YSQL is accessible; returns errors if the SQL connection is unavailable.
     metrics:
       folding:
         title: Metrics

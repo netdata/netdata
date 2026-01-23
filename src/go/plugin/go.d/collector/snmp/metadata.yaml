@@ -483,6 +483,100 @@ modules:
                       priv_proto: aes256
                       priv_key: priv_protocol_passphrase
     alerts: []
+    functions:
+      description: |
+        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+      list:
+        - id: interfaces
+          name: Network Interfaces
+          summary: Network interface traffic and status metrics.
+          parameters:
+            - id: if_type_group
+              name: Type Group
+              description: Filter by interface type group.
+              type: select
+              required: true
+              default: ethernet
+              options:
+                - id: ethernet
+                  name: Ethernet
+                  default: true
+                - id: aggregation
+                  name: Aggregation
+                - id: virtual
+                  name: Virtual
+                - id: other
+                  name: Other
+          returns:
+            description: Table of interface traffic and status from cached SNMP data.
+            columns:
+              - name: Interface
+                type: string
+                description: ""
+              - name: Type
+                type: string
+                description: ""
+              - name: Type Group
+                type: string
+                description: ""
+              - name: Admin Status
+                type: string
+                description: ""
+              - name: Oper Status
+                type: string
+                description: ""
+              - name: Traffic In
+                type: float
+                description: ""
+              - name: Traffic Out
+                type: float
+                description: ""
+              - name: Unicast In
+                type: float
+                description: ""
+              - name: Unicast Out
+                type: float
+                description: ""
+              - name: Broadcast In
+                type: float
+                description: ""
+              - name: Broadcast Out
+                type: float
+                description: ""
+              - name: Packets In
+                type: float
+                description: ""
+              - name: Packets Out
+                type: float
+                description: ""
+              - name: Errors In
+                type: float
+                description: ""
+              - name: Errors Out
+                type: float
+                description: ""
+              - name: Discards In
+                type: float
+                description: ""
+              - name: Discards Out
+                type: float
+                description: ""
+              - name: Multicast In
+                type: float
+                description: ""
+              - name: Multicast Out
+                type: float
+                description: ""
+          behavior: |
+            Uses the latest cached SNMP interface data, filters by the selected type group, and sorts by the default column.
+          performance: |
+            Uses cached data only and does not trigger additional SNMP requests. Large devices may return many rows.
+          security: |
+            Exposes interface names and counters only.
+          requirements: |
+            Requires successful SNMP collection so interface data is cached.
+          availability: |
+            Available after the collector has completed at least one data collection; returns 503 until cache is ready.
     metrics:
       folding:
         title: Metrics
