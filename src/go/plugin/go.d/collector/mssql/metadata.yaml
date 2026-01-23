@@ -444,7 +444,7 @@ modules:
               - name: Avg Memory (8KB pages)
                 type: float
                 unit: ""
-                description: Average memory grant (in 8KB pages) per execution. High values indicate memory-intensive queries that may benefit from index optimization, reduced result sets, or query tuning to reduce working memory usage. 8KB pages = 65,536 bytes per query.
+                description: Average memory grant (in 8KB pages) per execution. High values indicate memory-intensive queries that may benefit from index optimization, reduced result sets, or query tuning to reduce working memory usage. 8KB pages = 8,192 bytes per query.
               - name: Last Memory (8KB pages)
                 type: integer
                 unit: ""
