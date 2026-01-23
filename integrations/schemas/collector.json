@@ -414,9 +414,9 @@
                       "type": "string",
                       "description": "Function display name."
                     },
-                    "summary": {
+                    "description": {
                       "type": "string",
-                      "description": "Short summary of what the function returns."
+                      "description": "Detailed description of what the function does and returns."
                     },
                     "parameters": {
                       "type": "array",
@@ -542,10 +542,6 @@
                         "columns"
                       ]
                     },
-                    "behavior": {
-                      "type": "string",
-                      "description": "How the function works internally."
-                    },
                     "performance": {
                       "type": "string",
                       "description": "Performance considerations."
@@ -592,10 +588,9 @@
                   "required": [
                     "id",
                     "name",
-                    "summary",
+                    "description",
                     "parameters",
                     "returns",
-                    "behavior",
                     "performance",
                     "security",
                     "requirements",

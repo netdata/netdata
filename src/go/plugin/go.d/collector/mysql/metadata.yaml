@@ -235,7 +235,10 @@ modules:
       list:
         - id: top-queries
           name: Top Queries
-          summary: Top SQL queries from performance_schema.
+          description: |
+            Top SQL queries from performance_schema.
+            
+            Reads performance_schema statement digest tables and returns the top entries sorted by the selected column.
           parameters:
             - id: __sort
               name: Filter By
@@ -437,8 +440,6 @@ modules:
                 unit: ""
                 visibility: shown
                 description: ""
-          behavior: |
-            Reads performance_schema statement digest tables and returns the top entries sorted by the selected column.
           performance: |
             Requires performance_schema and can be expensive on busy servers.
           security: |

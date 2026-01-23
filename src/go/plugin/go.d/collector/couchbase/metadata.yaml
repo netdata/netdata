@@ -197,7 +197,10 @@ modules:
       list:
         - id: top-queries
           name: Top Queries
-          summary: Top N1QL requests from system:completed_requests.
+          description: |
+            Top N1QL requests from system:completed_requests.
+            
+            Queries the system:completed_requests keyspace and returns the top entries sorted by the selected column.
           parameters:
             - id: __sort
               name: Filter By
@@ -264,8 +267,6 @@ modules:
                 unit: ""
                 visibility: hidden
                 description: ""
-          behavior: |
-            Queries the system:completed_requests keyspace and returns the top entries sorted by the selected column.
           performance: |
             Runs N1QL queries against system keyspaces; use top_queries_limit to control response size.
           security: |

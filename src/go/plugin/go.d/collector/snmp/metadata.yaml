@@ -489,7 +489,10 @@ modules:
       list:
         - id: interfaces
           name: Network Interfaces
-          summary: Network interface traffic and status metrics.
+          description: |
+            Network interface traffic and status metrics.
+            
+            Uses the latest cached SNMP interface data, filters by the selected type group, and sorts by the default column.
           parameters:
             - id: if_type_group
               name: Type Group
@@ -605,8 +608,6 @@ modules:
                 unit: "Kpps"
                 visibility: hidden
                 description: ""
-          behavior: |
-            Uses the latest cached SNMP interface data, filters by the selected type group, and sorts by the default column.
           performance: |
             Uses cached data only and does not trigger additional SNMP requests. Large devices may return many rows.
           security: |

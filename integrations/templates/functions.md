@@ -6,9 +6,7 @@
 [% for func in entry.functions.list %]
 ### [[ func.name ]]
 
-[[ func.summary ]][% if func.summary and func.behavior %]
-
-[% endif %][[ func.behavior ]]
+[[ func.description ]]
 
 | Aspect | Description |
 |:-------|:------------|

@@ -139,7 +139,10 @@ modules:
       list:
         - id: running-queries
           name: Running Queries
-          summary: "Currently running queries from rethinkdb.jobs. WARNING: Query text may contain unmasked literals (potential PII)."
+          description: |
+            Currently running queries from rethinkdb.jobs. WARNING: Query text may contain unmasked literals (potential PII).
+            
+            Queries rethinkdb.jobs and returns running queries sorted by the selected column.
           parameters:
             - id: __sort
               name: Filter By
@@ -191,8 +194,6 @@ modules:
                 unit: ""
                 visibility: hidden
                 description: ""
-          behavior: |
-            Queries rethinkdb.jobs and returns running queries sorted by the selected column.
           performance: |
             Uses system tables and may be expensive on busy clusters.
           security: |

@@ -190,7 +190,10 @@ modules:
       list:
         - id: top-queries
           name: Top Queries
-          summary: "Slow commands from Redis SLOWLOG. WARNING: Command arguments may contain unmasked literals (potential PII)."
+          description: |
+            Slow commands from Redis SLOWLOG. WARNING: Command arguments may contain unmasked literals (potential PII).
+            
+            Reads Redis SLOWLOG and returns the top entries sorted by the selected column.
           parameters:
             - id: __sort
               name: Filter By
@@ -237,8 +240,6 @@ modules:
                 unit: ""
                 visibility: hidden
                 description: ""
-          behavior: |
-            Reads Redis SLOWLOG and returns the top entries sorted by the selected column.
           performance: |
             Uses SLOWLOG GET and may return many entries; use top_queries_limit to control size.
           security: |

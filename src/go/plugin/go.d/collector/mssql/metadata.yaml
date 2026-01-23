@@ -232,7 +232,10 @@ modules:
       list:
         - id: top-queries
           name: Top Queries
-          summary: Top SQL queries from Query Store.
+          description: |
+            Top SQL queries from Query Store.
+            
+            Queries Query Store runtime statistics and returns the top entries sorted by the selected column.
           parameters:
             - id: __sort
               name: Filter By
@@ -544,8 +547,6 @@ modules:
                 unit: ""
                 visibility: hidden
                 description: ""
-          behavior: |
-            Queries Query Store runtime statistics and returns the top entries sorted by the selected column.
           performance: |
             Uses Query Store and can be expensive on busy instances.
           security: |

@@ -282,7 +282,10 @@ modules:
       list:
         - id: top-queries
           name: Top Queries
-          summary: Running queries from the Elasticsearch Tasks API.
+          description: |
+            Running queries from the Elasticsearch Tasks API.
+            
+            Calls the Tasks API and returns running task details sorted by the selected column.
           parameters:
             - id: __sort
               name: Filter By
@@ -344,8 +347,6 @@ modules:
                 unit: ""
                 visibility: hidden
                 description: ""
-          behavior: |
-            Calls the Tasks API and returns running task details sorted by the selected column.
           performance: |
             Queries the Tasks API; on large clusters this may return many rows.
           security: |

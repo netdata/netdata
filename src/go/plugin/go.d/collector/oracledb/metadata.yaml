@@ -156,7 +156,10 @@ modules:
       list:
         - id: top-queries
           name: Top Queries
-          summary: "Top SQL statements from V$SQLSTATS. WARNING: Query text may contain unmasked literals (potential PII)."
+          description: |
+            Top SQL statements from V$SQLSTATS. WARNING: Query text may contain unmasked literals (potential PII).
+            
+            Queries V$SQLSTATS and returns the top entries sorted by the selected column.
           parameters:
             - id: __sort
               name: Filter By
@@ -238,8 +241,6 @@ modules:
                 unit: ""
                 visibility: hidden
                 description: ""
-          behavior: |
-            Queries V$SQLSTATS and returns the top entries sorted by the selected column.
           performance: |
             Queries system views and may be expensive on busy databases.
           security: |
@@ -253,7 +254,10 @@ modules:
             Available when the collector can query Oracle system views; returns errors if SQL is unavailable.
         - id: running-queries
           name: Running Queries
-          summary: "Currently running SQL statements from V$SESSION. WARNING: Query text may contain unmasked literals (potential PII)."
+          description: |
+            Currently running SQL statements from V$SESSION. WARNING: Query text may contain unmasked literals (potential PII).
+            
+            Queries V$SESSION and returns running statements sorted by the selected column.
           parameters:
             - id: __sort
               name: Filter By
@@ -325,8 +329,6 @@ modules:
                 unit: ""
                 visibility: hidden
                 description: ""
-          behavior: |
-            Queries V$SESSION and returns running statements sorted by the selected column.
           performance: |
             Queries system views and may be expensive on busy databases.
           security: |

@@ -258,7 +258,10 @@ modules:
       list:
         - id: top-queries
           name: Top Queries
-          summary: Top SQL queries from ClickHouse system.query_log.
+          description: |
+            Top SQL queries from ClickHouse system.query_log.
+            
+            Queries system.query_log, aggregates by query, and returns the top entries sorted by the selected column.
           parameters:
             - id: __sort
               name: Filter By
@@ -350,8 +353,6 @@ modules:
                 unit: ""
                 visibility: hidden
                 description: ""
-          behavior: |
-            Queries system.query_log, aggregates by query, and returns the top entries sorted by the selected column.
           performance: |
             Uses system.query_log and can be expensive on busy systems. Use limits to control response size.
           security: |

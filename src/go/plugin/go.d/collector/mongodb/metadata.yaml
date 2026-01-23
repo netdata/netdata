@@ -171,7 +171,10 @@ modules:
       list:
         - id: top-queries
           name: Top Queries
-          summary: "Top queries from MongoDB Profiler (system.profile). WARNING: Query text may contain unmasked literals (potential PII)."
+          description: |
+            Top queries from MongoDB Profiler (system.profile). WARNING: Query text may contain unmasked literals (potential PII).
+            
+            Reads from system.profile and returns the top profiled queries sorted by the selected column.
           parameters:
             - id: __sort
               name: Filter By
@@ -323,8 +326,6 @@ modules:
                 unit: ""
                 visibility: hidden
                 description: ""
-          behavior: |
-            Reads from system.profile and returns the top profiled queries sorted by the selected column.
           performance: |
             Requires profiling and reads from system.profile; may add load on busy systems.
           security: |

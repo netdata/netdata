@@ -228,7 +228,10 @@ modules:
       list:
         - id: top-queries
           name: Top Queries
-          summary: Top SQL queries from pg_stat_statements.
+          description: |
+            Top SQL queries from pg_stat_statements.
+            
+            Reads pg_stat_statements and returns the top entries sorted by the selected column.
           parameters:
             - id: __sort
               name: Filter By
@@ -450,8 +453,6 @@ modules:
                 unit: "milliseconds"
                 visibility: hidden
                 description: ""
-          behavior: |
-            Reads pg_stat_statements and returns the top entries sorted by the selected column.
           performance: |
             Requires pg_stat_statements and can be expensive on busy servers.
           security: |
