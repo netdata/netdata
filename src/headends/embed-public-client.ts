@@ -85,6 +85,8 @@ interface AiAgentChatConfig {
   };
   supportsMermaid?: boolean;
   onEvent?: (event: EmbedClientEvent) => void;
+  maxHistoryPairs?: number;  // Max user-assistant pairs to send (default 5)
+  maxInputBytes?: number;    // Max input message size in bytes (default 10240)
 }
 
 class AiAgentChat {
@@ -113,11 +115,27 @@ class AiAgentChat {
     if (trimmed.length === 0) {
       throw new Error('message_required');
     }
+
+    // Validate input size (default 10KB)
+    const maxBytes = typeof this.config.maxInputBytes === 'number' ? this.config.maxInputBytes : 10240;
+    const encoder = new TextEncoder();
+    const messageBytes = encoder.encode(trimmed).length;
+    if (messageBytes > maxBytes) {
+      throw new Error(`message_too_large: ${String(messageBytes)} bytes exceeds ${String(maxBytes)} byte limit`);
+    }
+
     this.loading = true;
     const controller = new AbortController();
     this.abortController = controller;
 
-    const historyPayload = this.history.filter((entry) => entry.role === 'user' || entry.role === 'assistant');
+    // Filter to user/assistant messages and limit to last N pairs (default 5)
+    const maxPairs = typeof this.config.maxHistoryPairs === 'number' ? this.config.maxHistoryPairs : 5;
+    const conversationHistory = this.history.filter((entry) => entry.role === 'user' || entry.role === 'assistant');
+    const maxMessages = maxPairs * 2;
+    const historyPayload = conversationHistory.length > maxMessages
+      ? conversationHistory.slice(-maxMessages)
+      : conversationHistory;
+
     const body = {
       message: trimmed,
       clientId: this.clientId ?? undefined,
@@ -237,8 +255,18 @@ class AiAgentChat {
         }
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'unknown error';
-      this.emitEvent({ type: 'error', error: { code: 'request_failed', message: msg } });
+      const isAbort = err instanceof Error && err.name === 'AbortError';
+      if (isAbort) {
+        // On abort, save partial conversation so context is preserved
+        this.history.push(userEntry);
+        if (report.length > 0) {
+          // Append stop indicator so model knows response was cut off
+          this.history.push({ role: 'assistant', content: report + '\n\n[OUTPUT STOPPED BY THE USER]' });
+        }
+      } else {
+        const msg = err instanceof Error ? err.message : 'unknown error';
+        this.emitEvent({ type: 'error', error: { code: 'request_failed', message: msg } });
+      }
       throw err;
     } finally {
       this.loading = false;

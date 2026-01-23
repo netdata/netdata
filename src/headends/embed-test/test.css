@@ -66,6 +66,18 @@
   --ai-shadow-light: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
+/* Mermaid dark theme: brighten connector lines and arrows */
+.ai-agent-wrapper[data-theme="dark"] .ai-agent-mermaid-diagram .flowchart-link,
+.ai-agent-wrapper[data-theme="dark"] .ai-agent-mermaid-diagram .edgePath path,
+.ai-agent-wrapper[data-theme="dark"] .ai-agent-mermaid-diagram .relation,
+.ai-agent-wrapper[data-theme="dark"] .ai-agent-mermaid-diagram path.path {
+  stroke: #888888 !important;
+}
+
+.ai-agent-wrapper[data-theme="dark"] .ai-agent-mermaid-diagram marker path {
+  fill: #888888 !important;
+}
+
 /* ===========================================================================
    Base Container (outside @scope for initial setup)
    =========================================================================== */
@@ -226,18 +238,31 @@
     container-type: inline-size;  /* Enable container queries for child elements */
   }
 
-  /* Custom Scrollbar */
-  .ai-agent-messages::-webkit-scrollbar {
-    width: 6px;
+  /* Global Scrollbar Styles - applies to all scrollable elements */
+  :scope *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
   }
 
-  .ai-agent-messages::-webkit-scrollbar-track {
+  :scope *::-webkit-scrollbar-track {
     background: var(--ai-scrollbar-track);
+    border-radius: 4px;
   }
 
-  .ai-agent-messages::-webkit-scrollbar-thumb {
+  :scope *::-webkit-scrollbar-thumb {
     background: var(--ai-scrollbar-thumb);
-    border-radius: 3px;
+    border-radius: 4px;
+  }
+
+  :scope *::-webkit-scrollbar-thumb:hover {
+    background: var(--ai-scrollbar-thumb);
+    filter: brightness(0.9);
+  }
+
+  /* Firefox scrollbar */
+  :scope * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--ai-scrollbar-thumb) var(--ai-scrollbar-track);
   }
 
   /* -------------------------------------------------------------------------
@@ -534,6 +559,21 @@
     height: auto;
   }
 
+  /* SVG Diagrams (from ```svg code blocks) */
+  .ai-agent-svg-diagram {
+    margin: 0.75em 0;
+    padding: 1em;
+    background: var(--ai-bg-secondary);
+    border-radius: 8px;
+    overflow-x: auto;
+    text-align: center;
+  }
+
+  .ai-agent-svg-diagram svg {
+    max-width: 100%;
+    height: auto;
+  }
+
   /* -------------------------------------------------------------------------
      Input Area
      ------------------------------------------------------------------------- */
@@ -571,21 +611,6 @@
 
   .ai-agent-input::placeholder {
     color: var(--ai-text-secondary);
-  }
-
-  /* Input scrollbar - theme aware */
-  .ai-agent-input::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  .ai-agent-input::-webkit-scrollbar-track {
-    background: var(--ai-scrollbar-track);
-    border-radius: 3px;
-  }
-
-  .ai-agent-input::-webkit-scrollbar-thumb {
-    background: var(--ai-scrollbar-thumb);
-    border-radius: 3px;
   }
 
   .ai-agent-send {
@@ -629,6 +654,16 @@
   .ai-agent-input-disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+
+  /* Input size limit warning flash */
+  .ai-agent-input-limit-warning {
+    animation: ai-agent-limit-flash 0.3s ease-in-out;
+  }
+
+  @keyframes ai-agent-limit-flash {
+    0%, 100% { border-color: var(--ai-border-color); }
+    50% { border-color: #ff6b6b; box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.3); }
   }
 
   /* -------------------------------------------------------------------------

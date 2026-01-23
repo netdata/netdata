@@ -36,6 +36,8 @@
     icon: null,
     position: 'bottom-right',
     storageKey: 'ai-agent-chat',
+    maxInputBytes: 10240,    // 10KB max input size
+    maxHistoryPairs: 5,      // Send last 5 user-assistant pairs
   };
 
   function getConfig() {
@@ -210,16 +212,17 @@
         return `<pre class="ai-agent-code-block" data-lang="${escapedLang}"><code>${escapedCode}</code></pre>`;
       };
 
-      // Assistant messages: html:true allows HTML/SVG in markdown
+      // Both assistant and user messages: html:false for security
+      // SVG is handled separately via ```svg code blocks
       // typographer:false prevents (C) -> © conversion (problematic for DevOps)
       this.md = window.markdownit({
-        html: true,
+        html: false,
         linkify: true,
         typographer: false,
         highlight: highlightFn,
       });
 
-      // User messages: html:false - plain markdown only, no HTML allowed
+      // User messages use same config
       this.mdUser = window.markdownit({
         html: false,
         linkify: true,
@@ -280,6 +283,73 @@
           console.warn('Mermaid rendering failed:', err);
         }
       }
+    }
+
+    renderSvg(container) {
+      const svgBlocks = container.querySelectorAll('pre.ai-agent-code-block[data-lang="svg"]');
+      for (const block of svgBlocks) {
+        const code = block.textContent.trim();
+        try {
+          const sanitized = this.sanitizeSvg(code);
+          if (sanitized) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'ai-agent-svg-diagram';
+            wrapper.innerHTML = sanitized;
+            block.replaceWith(wrapper);
+          }
+        } catch (err) {
+          // eslint-disable-next-line no-console -- client-side debug logging
+          console.warn('SVG rendering failed:', err);
+        }
+      }
+    }
+
+    sanitizeSvg(svgString) {
+      // Parse as XML to validate structure
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgString, 'image/svg+xml');
+
+      // Check for parse errors
+      const parseError = doc.querySelector('parsererror');
+      if (parseError) {
+        // eslint-disable-next-line no-console -- client-side debug logging
+        console.warn('SVG parse error:', parseError.textContent);
+        return null;
+      }
+
+      const svg = doc.documentElement;
+      if (svg.tagName.toLowerCase() !== 'svg') {
+        return null;
+      }
+
+      // Remove dangerous elements
+      const dangerousTags = ['script', 'foreignObject', 'iframe', 'object', 'embed', 'use'];
+      for (const tag of dangerousTags) {
+        const elements = svg.querySelectorAll(tag);
+        for (const el of elements) {
+          el.remove();
+        }
+      }
+
+      // Remove dangerous attributes from all elements
+      const allElements = svg.querySelectorAll('*');
+      for (const el of [svg, ...allElements]) {
+        // Remove event handlers (on*)
+        const attrs = [...el.attributes];
+        for (const attr of attrs) {
+          const name = attr.name.toLowerCase();
+          if (name.startsWith('on') || name === 'href' && attr.value.trim().toLowerCase().startsWith('javascript:')) {
+            el.removeAttribute(attr.name);
+          }
+        }
+        // Remove xlink:href with javascript:
+        const xlinkHref = el.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
+        if (xlinkHref && xlinkHref.trim().toLowerCase().startsWith('javascript:')) {
+          el.removeAttributeNS('http://www.w3.org/1999/xlink', 'href');
+        }
+      }
+
+      return svg.outerHTML;
     }
   }
 
@@ -412,6 +482,8 @@
         agentId: this.config.agentId,
         format: this.config.format,
         clientId: this.clientId,
+        maxHistoryPairs: this.config.maxHistoryPairs,
+        maxInputBytes: this.config.maxInputBytes,
         onEvent: (event) => this.handleChatEvent(event),
       });
 
@@ -574,19 +646,34 @@
       // Auto-expand textarea
       this.inputEl.addEventListener('input', () => this.autoExpandInput());
 
-      // Paste handling - convert HTML to markdown
+      // Paste handling - convert HTML to markdown, enforce size limit
       this.inputEl.addEventListener('paste', (e) => {
+        e.preventDefault();
         const html = e.clipboardData.getData('text/html');
-        if (html) {
-          e.preventDefault();
-          const markdown = htmlToMarkdown(html);
-          const start = this.inputEl.selectionStart;
-          const end = this.inputEl.selectionEnd;
-          const text = this.inputEl.value;
-          this.inputEl.value = text.substring(0, start) + markdown + text.substring(end);
-          this.inputEl.selectionStart = this.inputEl.selectionEnd = start + markdown.length;
-          this.autoExpandInput();
+        const plain = e.clipboardData.getData('text/plain');
+        let pasteContent = html ? htmlToMarkdown(html) : plain;
+
+        const start = this.inputEl.selectionStart;
+        const end = this.inputEl.selectionEnd;
+        const before = this.inputEl.value.substring(0, start);
+        const after = this.inputEl.value.substring(end);
+
+        // Enforce max input size
+        const maxBytes = this.config.maxInputBytes || 10240;
+        const encoder = new TextEncoder();
+        const existingBytes = encoder.encode(before + after).length;
+        const availableBytes = Math.max(0, maxBytes - existingBytes);
+        const pasteBytes = encoder.encode(pasteContent).length;
+
+        if (pasteBytes > availableBytes) {
+          // Truncate paste content to fit within limit
+          pasteContent = this.truncateToBytes(pasteContent, availableBytes);
+          this.showInputLimitWarning();
         }
+
+        this.inputEl.value = before + pasteContent + after;
+        this.inputEl.selectionStart = this.inputEl.selectionEnd = start + pasteContent.length;
+        this.autoExpandInput();
       });
 
       // Clear conversation
@@ -630,6 +717,23 @@
       this.inputEl.style.height = Math.min(this.inputEl.scrollHeight, maxHeight) + 'px';
     }
 
+    truncateToBytes(str, maxBytes) {
+      const encoder = new TextEncoder();
+      const decoder = new TextDecoder();
+      const bytes = encoder.encode(str);
+      if (bytes.length <= maxBytes) return str;
+      // Truncate and decode - this handles multi-byte chars safely
+      return decoder.decode(bytes.slice(0, maxBytes));
+    }
+
+    showInputLimitWarning() {
+      // Brief visual feedback that input was truncated
+      this.inputEl.classList.add('ai-agent-input-limit-warning');
+      setTimeout(() => {
+        this.inputEl.classList.remove('ai-agent-input-limit-warning');
+      }, 1500);
+    }
+
     updateInputState() {
       // Update input disabled state and placeholder
       this.inputEl.disabled = this.isLoading;
@@ -657,6 +761,21 @@
       this.hideSpinner();
       this.updateInputState();
       this.updateStatus('Stopped');
+
+      // Finalize the streaming message with stop indicator
+      if (this.streamingMessageId) {
+        const msg = this.messages.find(m => m.id === this.streamingMessageId);
+        if (msg) {
+          // Append stop indicator so the model knows the response was cut off
+          const stopIndicator = '\n\n[OUTPUT STOPPED BY THE USER]';
+          msg.content = this.streamingContent + stopIndicator;
+          msg.isStreaming = false;
+        }
+        this.renderMessage(this.streamingMessageId);
+        this.streamingMessageId = null;
+        this.streamingContent = '';
+        this.saveState();
+      }
     }
 
     async sendMessage() {
@@ -759,6 +878,7 @@
             }
             this.renderMessage(this.streamingMessageId);
             this.renderer.renderMermaid(this.messagesEl);
+            this.renderer.renderSvg(this.messagesEl);
 
             // Add stats footer to the completed message (not saved in history)
             const msgEl = this.messagesEl.querySelector(`[data-message-id="${this.streamingMessageId}"]`);
@@ -807,6 +927,7 @@
         }
       }
       this.renderer.renderMermaid(this.messagesEl);
+      this.renderer.renderSvg(this.messagesEl);
     }
 
     renderMessage(id) {
