@@ -457,12 +457,14 @@ modules:
                   - `events_statements_history_long`
                   - `events_statements_summary_by_digest`
 
-                  Enable statement consumers if needed:
+                   Enable statement consumers if needed:
                   ```sql
                   UPDATE performance_schema.setup_consumers
                   SET ENABLED = 'YES'
                   WHERE NAME LIKE 'events_statements%';
                   ```
+
+                  **MariaDB Note**: MariaDB also supports the `events_statements_summary_by_digest` table. The `setup_consumers.ENABLED` column is writable in MariaDB, or you can enable consumers at startup using `performance-schema-consumer-events_statements_summary_by_digest=ON` in your configuration file. Exact consumer names may vary by MariaDB version, so checking `setup_consumers` first as shown above is recommended.
 
                   Verify the digest table contains data:
                   ```sql
