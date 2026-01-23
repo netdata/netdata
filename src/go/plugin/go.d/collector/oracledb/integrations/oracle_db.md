@@ -136,6 +136,89 @@ Metrics:
 
 
 
+## Functions
+
+This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+
+
+### Top Queries
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Oracledb:top-queries` |
+| Summary | Top SQL statements from V$SQLSTATS. WARNING: Query text may contain unmasked literals (potential PII). |
+| Behavior | Queries V$SQLSTATS and returns the top entries sorted by the selected column. |
+| Performance | Queries system views and may be expensive on busy databases. |
+| Security | Query text may contain unmasked literals (potential PII). |
+| Requirements | Requires access to V$SQLSTATS and a working SQL connection. |
+| Availability | Available when the collector can query Oracle system views; returns errors if SQL is unavailable. |
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | totalTime |  |
+
+#### Returns
+
+Aggregated SQL statistics from V$SQLSTATS.
+
+| Column | Type | Description |
+|:-------|:-----|:------------|
+| SQL ID | string |  |
+| Query | string |  |
+| Schema | string |  |
+| Executions | integer |  |
+| Total Time | duration |  |
+| Avg Time | duration |  |
+| CPU Time | duration |  |
+| Buffer Gets | integer |  |
+| Disk Reads | integer |  |
+| Rows Processed | integer |  |
+| Parse Calls | integer |  |
+| Module | string |  |
+| Action | string |  |
+| Last Active | string |  |
+
+### Running Queries
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Oracledb:running-queries` |
+| Summary | Currently running SQL statements from V$SESSION. WARNING: Query text may contain unmasked literals (potential PII). |
+| Behavior | Queries V$SESSION and returns running statements sorted by the selected column. |
+| Performance | Queries system views and may be expensive on busy databases. |
+| Security | Query text may contain unmasked literals (potential PII). |
+| Requirements | Requires access to V$SESSION and a working SQL connection. |
+| Availability | Available when the collector can query Oracle system views; returns errors if SQL is unavailable. |
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | lastCallMs |  |
+
+#### Returns
+
+Snapshot of currently running SQL sessions.
+
+| Column | Type | Description |
+|:-------|:-----|:------------|
+| Session | string |  |
+| User | string |  |
+| Status | string |  |
+| Type | string |  |
+| SQL ID | string |  |
+| Query | string |  |
+| Elapsed | duration |  |
+| SQL Exec Start | string |  |
+| Module | string |  |
+| Action | string |  |
+| Program | string |  |
+| Machine | string |  |
+
+
+
 ## Alerts
 
 There are no alerts configured by default for this integration.

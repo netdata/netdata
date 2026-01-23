@@ -227,6 +227,80 @@ Metrics:
 
 
 
+## Functions
+
+This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+
+
+### Top Queries
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Postgres:top-queries` |
+| Summary | Top SQL queries from pg_stat_statements. |
+| Behavior | Reads pg_stat_statements and returns the top entries sorted by the selected column. |
+| Performance | Requires pg_stat_statements and can be expensive on busy servers. |
+| Security | Query text may contain unmasked literals (potential PII). |
+| Requirements | Requires the pg_stat_statements extension installed and enabled. |
+| Availability | Available when pg_stat_statements is available and the collector is initialized. |
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | totalTime |  |
+
+#### Returns
+
+Aggregated query statistics from pg_stat_statements.
+
+| Column | Type | Description |
+|:-------|:-----|:------------|
+| Query ID | string |  |
+| Query | string |  |
+| Database | string |  |
+| User | string |  |
+| Calls | integer |  |
+| Total Time | duration |  |
+| Mean Time | duration |  |
+| Min Time | duration |  |
+| Max Time | duration |  |
+| Stddev Time | duration |  |
+| Plans | integer |  |
+| Total Plan Time | duration |  |
+| Mean Plan Time | duration |  |
+| Min Plan Time | duration |  |
+| Max Plan Time | duration |  |
+| Stddev Plan Time | duration |  |
+| Rows | integer |  |
+| Shared Blocks Hit | integer |  |
+| Shared Blocks Read | integer |  |
+| Shared Blocks Dirtied | integer |  |
+| Shared Blocks Written | integer |  |
+| Local Blocks Hit | integer |  |
+| Local Blocks Read | integer |  |
+| Local Blocks Dirtied | integer |  |
+| Local Blocks Written | integer |  |
+| Temp Blocks Read | integer |  |
+| Temp Blocks Written | integer |  |
+| Block Read Time | duration |  |
+| Block Write Time | duration |  |
+| WAL Records | integer |  |
+| WAL Full Page Images | integer |  |
+| WAL Bytes | integer |  |
+| JIT Functions | integer |  |
+| JIT Generation Time | duration |  |
+| JIT Inlining Count | integer |  |
+| JIT Inlining Time | duration |  |
+| JIT Optimization Count | integer |  |
+| JIT Optimization Time | duration |  |
+| JIT Emission Count | integer |  |
+| JIT Emission Time | duration |  |
+| Temp Block Read Time | duration |  |
+| Temp Block Write Time | duration |  |
+
+
+
 ## Alerts
 
 

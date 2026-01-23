@@ -183,6 +183,76 @@ Metrics:
 
 
 
+## Functions
+
+This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+
+
+### Top Queries
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Mysql:top-queries` |
+| Summary | Top SQL queries from performance_schema. |
+| Behavior | Reads performance_schema statement digest tables and returns the top entries sorted by the selected column. |
+| Performance | Requires performance_schema and can be expensive on busy servers. |
+| Security | Query text may contain unmasked literals (potential PII). |
+| Requirements | Requires performance_schema enabled and access to events_statements_summary_by_digest. |
+| Availability | Available when performance_schema tables are accessible and the collector is initialized. |
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | totalTime |  |
+
+#### Returns
+
+Aggregated statement statistics from performance_schema.
+
+| Column | Type | Description |
+|:-------|:-----|:------------|
+| Digest | string |  |
+| Query | string |  |
+| Schema | string |  |
+| Calls | integer |  |
+| Total Time | duration |  |
+| Min Time | duration |  |
+| Avg Time | duration |  |
+| Max Time | duration |  |
+| Lock Time | duration |  |
+| Errors | integer |  |
+| Warnings | integer |  |
+| Rows Affected | integer |  |
+| Rows Sent | integer |  |
+| Rows Examined | integer |  |
+| Temp Disk Tables | integer |  |
+| Temp Tables | integer |  |
+| Full Joins | integer |  |
+| Full Range Joins | integer |  |
+| Select Range | integer |  |
+| Select Range Check | integer |  |
+| Select Scan | integer |  |
+| Sort Merge Passes | integer |  |
+| Sort Range | integer |  |
+| Sort Rows | integer |  |
+| Sort Scan | integer |  |
+| No Index Used | integer |  |
+| No Good Index Used | integer |  |
+| First Seen | string |  |
+| Last Seen | string |  |
+| P95 Time | duration |  |
+| P99 Time | duration |  |
+| P99.9 Time | duration |  |
+| Sample Query | string |  |
+| Sample Seen | string |  |
+| Sample Time | duration |  |
+| CPU Time | duration |  |
+| Max Controlled Memory | integer |  |
+| Max Total Memory | integer |  |
+
+
+
 ## Alerts
 
 

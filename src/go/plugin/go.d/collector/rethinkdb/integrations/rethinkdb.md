@@ -97,6 +97,46 @@ Metrics:
 
 
 
+## Functions
+
+This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+
+
+### Running Queries
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Rethinkdb:running-queries` |
+| Summary | Currently running queries from rethinkdb.jobs. WARNING: Query text may contain unmasked literals (potential PII). |
+| Behavior | Queries rethinkdb.jobs and returns running queries sorted by the selected column. |
+| Performance | Uses system tables and may be expensive on busy clusters. |
+| Security | Query text may contain unmasked literals (potential PII). |
+| Requirements | Requires admin access to rethinkdb.jobs and a working connection. |
+| Availability | Available when the collector is initialized; returns 503 if the collector is still connecting. |
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | durationMs |  |
+
+#### Returns
+
+Snapshot of running queries from rethinkdb.jobs.
+
+| Column | Type | Description |
+|:-------|:-----|:------------|
+| Job ID | string |  |
+| Query | string |  |
+| Duration | duration |  |
+| Type | string |  |
+| User | string |  |
+| Client Address | string |  |
+| Client Port | integer |  |
+| Servers | string |  |
+
+
+
 ## Alerts
 
 There are no alerts configured by default for this integration.

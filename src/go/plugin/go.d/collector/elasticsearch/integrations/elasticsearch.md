@@ -166,6 +166,48 @@ Metrics:
 
 
 
+## Functions
+
+This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+
+
+### Top Queries
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Elasticsearch:top-queries` |
+| Summary | Running queries from the Elasticsearch Tasks API. |
+| Behavior | Calls the Tasks API and returns running task details sorted by the selected column. |
+| Performance | Queries the Tasks API; on large clusters this may return many rows. |
+| Security | Task descriptions may include query details. |
+| Requirements | Requires access to the Tasks API on the target Elasticsearch node. |
+| Availability | Available when the collector can query the Tasks API; returns 503 until the collector is initialized. |
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | runningTime |  |
+
+#### Returns
+
+Snapshot of running tasks from the Tasks API.
+
+| Column | Type | Description |
+|:-------|:-----|:------------|
+| Task ID | string |  |
+| Node ID | string |  |
+| Node Name | string |  |
+| Action | string |  |
+| Type | string |  |
+| Description | string |  |
+| Start Time | timestamp |  |
+| Running Time | duration |  |
+| Cancellable | boolean |  |
+| Cancelled | boolean |  |
+
+
+
 ## Alerts
 
 

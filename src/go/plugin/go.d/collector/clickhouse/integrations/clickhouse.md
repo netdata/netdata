@@ -171,6 +171,54 @@ Metrics:
 
 
 
+## Functions
+
+This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+
+
+### Top Queries
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Clickhouse:top-queries` |
+| Summary | Top SQL queries from ClickHouse system.query_log. |
+| Behavior | Queries system.query_log, aggregates by query, and returns the top entries sorted by the selected column. |
+| Performance | Uses system.query_log and can be expensive on busy systems. Use limits to control response size. |
+| Security | Query text may include sensitive literals depending on server settings. |
+| Requirements | Requires access to system.query_log on the target ClickHouse instance. |
+| Availability | Available when the collector can query system tables; returns 503 if system.query_log is not available. |
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | totalTime |  |
+
+#### Returns
+
+Aggregated query statistics from system.query_log.
+
+| Column | Type | Description |
+|:-------|:-----|:------------|
+| Query ID | string |  |
+| Query | string |  |
+| Database | string |  |
+| User | string |  |
+| Calls | integer |  |
+| Total Time | duration |  |
+| Avg Time | duration |  |
+| Min Time | duration |  |
+| Max Time | duration |  |
+| Read Rows | integer |  |
+| Read Bytes | integer |  |
+| Written Rows | integer |  |
+| Written Bytes | integer |  |
+| Result Rows | integer |  |
+| Result Bytes | integer |  |
+| Max Memory | float |  |
+
+
+
 ## Alerts
 
 
