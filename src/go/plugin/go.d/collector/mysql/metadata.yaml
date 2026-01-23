@@ -495,7 +495,7 @@ modules:
                   SELECT COUNT(*) FROM performance_schema.events_statements_summary_by_digest;
                   ```
           availability: |
-            Available when: • Performance Schema is enabled and accessible<br/>• Statement digest collection is configured<br/>• The collector has completed its initial data collection<br/>• Columns are dynamically detected based on MySQL/MariaDB version<br/>• Some metrics (percentiles, sample queries, CPU time, memory) only available in MySQL 8.0+<br/>• Returns HTTP 503 if Performance Schema is not enabled<br/>• Returns HTTP 500 if digest table is not accessible or contains no available columns
+            Available when:<br/>• Performance Schema is enabled and accessible<br/>• Statement digest collection is configured<br/>• The collector has completed its initial data collection<br/>• Columns are dynamically detected based on MySQL/MariaDB version<br/>• Some metrics (percentiles, sample queries, CPU time, memory) only available in MySQL 8.0+<br/>• Returns HTTP 503 if Performance Schema is not enabled<br/>• Returns HTTP 500 if digest table is not accessible or contains no available columns
     metrics:
       folding:
         title: Metrics
