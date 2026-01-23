@@ -490,13 +490,23 @@ modules:
         - id: interfaces
           name: Network Interfaces
           description: |
-            Network interface traffic and status metrics.
+            Provides detailed network interface traffic and status metrics from SNMP-enabled devices.
 
-            Uses the latest cached SNMP interface data, filters by the selected type group, and sorts by the default column.
+            This function queries cached SNMP interface data collected during regular polling cycles and presents it in a sortable, filterable table. Each row represents a network interface on the monitored SNMP device, with comprehensive metrics for traffic analysis, error monitoring, and operational status tracking.
+
+            Use cases:
+            - Identify top bandwidth-consuming interfaces on routers, switches, and access points
+            - Monitor interface operational and administrative status for network health
+            - Analyze traffic patterns to detect usage spikes and plan capacity
+            - Investigate packet errors, discards, and unusual broadcast/multicast traffic
+            - Track unicast, broadcast, and multicast packet rates for traffic profiling
+            - Troubleshoot interface performance issues with detailed directional metrics
+
+            Data is sourced from the IF-MIB (RFC 2863) interface counters and is cached from the last successful SNMP collection. No additional SNMP requests are triggered when calling this function.
           parameters:
             - id: if_type_group
               name: Type Group
-              description: Filter by interface type group.
+              description: Filter interfaces by their type classification group. Custom mapping categorizes IANA interface types into practical groups for easier filtering.
               type: select
               required: true
               default: ethernet
@@ -511,98 +521,98 @@ modules:
                 - id: other
                   name: Other
           returns:
-            description: Table of interface traffic and status from cached SNMP data.
+            description: Network interface metrics from cached SNMP data, including traffic rates, packet statistics, operational status, and error counters. Each row represents one physical or virtual interface.
             columns:
               - name: Interface
                 type: string
                 unit: ""
-                description: ""
+                description: Network interface name or identifier (e.g., eth0, GigabitEthernet1/0/1, Vlan100)
               - name: Type
                 type: string
                 unit: ""
-                description: ""
+                description: IANA-assigned interface type from IF-MIB (e.g., ethernetCsmacd, ieee80211, softwareLoopback)
               - name: Type Group
                 type: string
                 unit: ""
-                description: ""
+                description: Custom categorization mapping IANA interface types into practical groups: Ethernet (physical Ethernet interfaces), Aggregation (LAG/port-channels, bond), Virtual (VLANs, loopbacks), or Other (all remaining types)
               - name: Admin Status
                 type: string
                 unit: ""
-                description: ""
+                description: Administrative state configured on the interface: up (enabled for use), down (administratively disabled), or testing (currently in test mode). Different from operational status.
               - name: Oper Status
                 type: string
                 unit: ""
-                description: ""
+                description: Current operational state of the interface: up (operational and passing traffic), down (not operational), testing (in test mode), unknown (status cannot be determined), dormant (waiting for external actions), notPresent (interface removed but configuration remains), or lowerLayerDown (interface down due to lower-layer issues)
               - name: Traffic In
                 type: float
                 unit: "Mbits"
-                description: ""
+                description: Inbound network traffic rate in megabits per second. High values indicate heavy inbound data flow that may require capacity planning.
               - name: Traffic Out
                 type: float
                 unit: "Mbits"
-                description: ""
+                description: Outbound network traffic rate in megabits per second. High values indicate heavy outbound data flow. Compare with Traffic In to identify asymmetric usage patterns.
               - name: Unicast In
                 type: float
                 unit: "Kpps"
                 visibility: hidden
-                description: ""
+                description: Rate of unicast packets (destined for a single recipient) received per second in thousands. Normal traffic pattern for point-to-point communications.
               - name: Unicast Out
                 type: float
                 unit: "Kpps"
                 visibility: hidden
-                description: ""
+                description: Rate of unicast packets (from a single sender) transmitted per second in thousands.
               - name: Broadcast In
                 type: float
                 unit: "Kpps"
                 visibility: hidden
-                description: ""
+                description: Rate of broadcast packets (sent to all nodes on network) received per second in thousands. High values may indicate network storms, ARP flooding, or misconfigured devices.
               - name: Broadcast Out
                 type: float
                 unit: "Kpps"
                 visibility: hidden
-                description: ""
+                description: Rate of broadcast packets transmitted per second in thousands. Consistently high broadcast rates can degrade network performance.
               - name: Packets In
                 type: float
                 unit: "Kpps"
-                description: ""
+                description: Total inbound packet rate (sum of unicast, broadcast, and multicast) per second in thousands. Useful for overall interface load assessment.
               - name: Packets Out
                 type: float
                 unit: "Kpps"
-                description: ""
+                description: Total outbound packet rate (sum of unicast, broadcast, and multicast) per second in thousands.
               - name: Errors In
                 type: float
                 unit: "packets/s"
                 visibility: hidden
-                description: ""
+                description: Rate of inbound packets with errors that prevented delivery. Non-zero values indicate physical layer issues (cable problems, signal integrity) or buffer overruns.
               - name: Errors Out
                 type: float
                 unit: "packets/s"
                 visibility: hidden
-                description: ""
+                description: Rate of outbound packets with transmission errors. Non-zero values may indicate interface hardware issues, cabling problems, or duplex mismatches.
               - name: Discards In
                 type: float
                 unit: "packets/s"
-                description: ""
+                description: Rate of inbound packets deliberately discarded by the device (often due to resource constraints, security policies, or unrecognized frames). Unlike errors, the interface may have been functioning correctly but chose to drop the packet.
               - name: Discards Out
                 type: float
                 unit: "packets/s"
-                description: ""
+                description: Rate of outbound packets deliberately discarded. Can indicate output queue overflows, ACL drops, or security policy rejections.
               - name: Multicast In
                 type: float
                 unit: "Kpps"
                 visibility: hidden
-                description: ""
+                description: Rate of multicast packets (destined for a group) received per second in thousands. Common in video streaming, multicast applications, and routing protocols.
               - name: Multicast Out
                 type: float
                 unit: "Kpps"
                 visibility: hidden
-                description: ""
+                description: Rate of multicast packets transmitted per second in thousands.
           performance: |
-            Uses cached data only and does not trigger additional SNMP requests. Large devices may return many rows.
+            Uses cached SNMP data only and does not trigger additional SNMP requests. Responses are instantaneous from memory cache.<br/>• Large devices (switches, routers with many interfaces) may return many rows, which may take longer to render<br/>• Default filter shows Ethernet interfaces only; use Type Group filter to reduce result set size<br/>• Data is updated only during regular SNMP polling cycles (controlled by update_every config option)
           security: |
-            Exposes interface names and counters only.
+            Exposes interface names, operational status, and traffic counters only. No sensitive data such as packet payloads, authentication credentials, or device configuration details are exposed.
           availability: |
-            Available after the collector has completed at least one data collection; returns 503 until cache is ready.
+            Available after collector has completed at least one data collection cycle.<br/>• Returns cached interface data instantly (no SNMP polling on function call)<br/>• Returns HTTP 503 if cache is not ready yet (wait for next SNMP collection cycle)<br/>• Interface metrics with nil values when Admin Status or Oper Status indicate interface is down
     metrics:
       folding:
         title: Metrics
