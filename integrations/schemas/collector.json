@@ -511,29 +511,29 @@
                                 "type": "string",
                                 "description": "Column type."
                               },
-                            "description": {
-                              "type": "string",
-                              "description": "Column description."
+                              "description": {
+                                "type": "string",
+                                "description": "Column description."
+                              },
+                              "unit": {
+                                "type": "string",
+                                "description": "Column unit, if applicable."
+                              },
+                              "visibility": {
+                                "type": "string",
+                                "description": "Whether the column is shown by default.",
+                                "enum": [
+                                  "hidden"
+                                ]
+                              }
                             },
-                            "unit": {
-                              "type": "string",
-                              "description": "Column unit, if applicable."
-                            },
-                            "visibility": {
-                              "type": "string",
-                              "description": "Whether the column is shown by default.",
-                              "enum": [
-                                "hidden"
-                              ]
-                            }
-                          },
-                          "required": [
-                            "name",
-                            "type",
-                            "unit"
-                          ]
+                            "required": [
+                              "name",
+                              "type",
+                              "unit"
+                            ]
+                          }
                         }
-                      }
                       },
                       "required": [
                         "description",
