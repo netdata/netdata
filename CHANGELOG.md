@@ -205,6 +205,19 @@
 - Prevent race condition during thread exit cleanup ([#21603](https://github.com/netdata/netdata/issues/21603))
 - Adjust Windows plugin ([#21597](https://github.com/netdata/netdata/issues/21597))
 - Chore(go.d/snmp): add ifTypeGroup mapping for interface type categorization ([#21605](https://github.com/netdata/netdata/issues/21605))
+- Regenerate integrations docs ([#21601](https://github.com/netdata/netdata/issues/21601))
+- (learn): Use new OneLineInstall component implementation ([#21606](https://github.com/netdata/netdata/issues/21606))
+- Feat(go.d/snmp): add interfaces function ([#21604](https://github.com/netdata/netdata/issues/21604))
+- Feat(go.d): add top-queries functions for 9 additional database collectors ([#21607](https://github.com/netdata/netdata/issues/21607))
+- Regenerate integrations docs ([#21611](https://github.com/netdata/netdata/issues/21611))
+- Fix logic for determining when to use $releasever_major. ([#21610](https://github.com/netdata/netdata/issues/21610))
+- Docs: clarify alert override ordering and add conceptual model ([#21613](https://github.com/netdata/netdata/issues/21613))
+- Improve statement preparation ([#21608](https://github.com/netdata/netdata/issues/21608))
+- Chore(docs): remove todo docs ([#21614](https://github.com/netdata/netdata/issues/21614))
+- Update kickstart.md ([#21600](https://github.com/netdata/netdata/issues/21600))
+- Chore(go.d): revise funcapi docs ([#21617](https://github.com/netdata/netdata/issues/21617))
+- Chore(go.d): set default update_every to 10 for all functions ([#21616](https://github.com/netdata/netdata/issues/21616))
+- Assortement of journal-viewer plugin fixes. ([#21612](https://github.com/netdata/netdata/issues/21612))
 
 ## [2.8.0] - 2025-11-19
 
