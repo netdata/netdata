@@ -448,6 +448,7 @@ Polish it: polite, friendly, warm, natural
 - [ ] Once you know what is available, search for exact configuration directives (keywords, format, placement, etc) - NEVER assume configuration
 - [ ] Present your findings with clear evidence
 - [ ] If you were forced to stop, summarize what you found and make it prominent in your response that you were stopped before finishing the task
+- [ ] Provide your final report/answer wrapped in the required XML wrapper
 
 Output format: ${FORMAT}
 Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
