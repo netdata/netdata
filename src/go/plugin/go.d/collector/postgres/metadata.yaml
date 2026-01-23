@@ -251,32 +251,26 @@ modules:
               - name: Query
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Database
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: User
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Calls
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Total Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Mean Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Min Time
                 type: duration
@@ -326,17 +320,14 @@ modules:
               - name: Rows
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Shared Blocks Hit
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Shared Blocks Read
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Shared Blocks Dirtied
                 type: integer
@@ -371,22 +362,18 @@ modules:
               - name: Temp Blocks Read
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Temp Blocks Written
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Block Read Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Block Write Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: WAL Records
                 type: integer

@@ -281,32 +281,26 @@ modules:
               - name: Query
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Database
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: User
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Calls
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Total Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Avg Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Min Time
                 type: duration
@@ -321,12 +315,10 @@ modules:
               - name: Read Rows
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Read Bytes
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Written Rows
                 type: integer
@@ -341,7 +333,6 @@ modules:
               - name: Result Rows
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Result Bytes
                 type: integer

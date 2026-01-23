@@ -523,7 +523,6 @@
                               "type": "string",
                               "description": "Whether the column is shown by default.",
                               "enum": [
-                                "shown",
                                 "hidden"
                               ]
                             }
@@ -531,8 +530,7 @@
                           "required": [
                             "name",
                             "type",
-                            "unit",
-                            "visibility"
+                            "unit"
                           ]
                         }
                       }

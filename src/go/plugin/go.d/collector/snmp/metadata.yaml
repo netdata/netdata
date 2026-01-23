@@ -516,37 +516,30 @@ modules:
               - name: Interface
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Type
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Type Group
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Admin Status
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Oper Status
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Traffic In
                 type: float
                 unit: "Mbits"
-                visibility: shown
                 description: ""
               - name: Traffic Out
                 type: float
                 unit: "Mbits"
-                visibility: shown
                 description: ""
               - name: Unicast In
                 type: float
@@ -571,12 +564,10 @@ modules:
               - name: Packets In
                 type: float
                 unit: "Kpps"
-                visibility: shown
                 description: ""
               - name: Packets Out
                 type: float
                 unit: "Kpps"
-                visibility: shown
                 description: ""
               - name: Errors In
                 type: float
@@ -591,12 +582,10 @@ modules:
               - name: Discards In
                 type: float
                 unit: "packets/s"
-                visibility: shown
                 description: ""
               - name: Discards Out
                 type: float
                 unit: "packets/s"
-                visibility: shown
                 description: ""
               - name: Multicast In
                 type: float

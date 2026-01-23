@@ -162,22 +162,18 @@ modules:
               - name: Query
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Duration
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Type
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: User
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Client Address
                 type: string

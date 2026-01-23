@@ -305,17 +305,14 @@ modules:
               - name: Node ID
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Node Name
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Action
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Type
                 type: string
@@ -325,17 +322,14 @@ modules:
               - name: Description
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Start Time
                 type: timestamp
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Running Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Cancellable
                 type: boolean

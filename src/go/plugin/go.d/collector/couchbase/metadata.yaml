@@ -220,27 +220,22 @@ modules:
               - name: Request Time
                 type: timestamp
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Statement
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Elapsed Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Service Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Result Count
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Result Size
                 type: integer
@@ -260,7 +255,6 @@ modules:
               - name: User
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Client Context ID
                 type: string

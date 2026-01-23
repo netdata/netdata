@@ -276,17 +276,14 @@ modules:
               - name: Query
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Database
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Application
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Statement Type
                 type: string
@@ -316,17 +313,14 @@ modules:
               - name: Executions
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Total Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Mean Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Run Time
                 type: duration
@@ -346,17 +340,14 @@ modules:
               - name: Rows Read
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Rows Written
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Rows Returned
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Bytes Read
                 type: integer
@@ -404,17 +395,14 @@ modules:
               - name: Query
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: User
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Application
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Client Address
                 type: string
@@ -434,7 +422,6 @@ modules:
               - name: Phase
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Distributed
                 type: string
@@ -449,7 +436,6 @@ modules:
               - name: Elapsed
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
           performance: |
             Executes SQL queries against system tables and may be expensive on busy clusters.

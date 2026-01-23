@@ -179,47 +179,38 @@ modules:
               - name: Query
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Schema
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Executions
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Total Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Avg Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: CPU Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Buffer Gets
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Disk Reads
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Rows Processed
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Parse Calls
                 type: integer
@@ -272,17 +263,14 @@ modules:
               - name: Session
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: User
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Status
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Type
                 type: string
@@ -297,12 +285,10 @@ modules:
               - name: Query
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Elapsed
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: SQL Exec Start
                 type: string

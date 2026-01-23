@@ -270,32 +270,26 @@ modules:
               - name: Query
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Database
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: User
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Calls
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Total Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Mean Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Min Time
                 type: duration
@@ -310,7 +304,6 @@ modules:
               - name: Rows
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Stddev Time
                 type: duration
@@ -353,22 +346,18 @@ modules:
               - name: Query
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Database
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: User
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: State
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Wait Event Type
                 type: string
@@ -398,7 +387,6 @@ modules:
               - name: Elapsed
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
           performance: |
             Executes SQL queries and may be expensive on busy clusters; use top_queries_limit and sql_timeout.

@@ -152,12 +152,10 @@ modules:
               - name: Query
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Schema
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: User
                 type: string
@@ -172,17 +170,14 @@ modules:
               - name: Calls
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Total Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Avg Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Min Time
                 type: duration
@@ -197,22 +192,18 @@ modules:
               - name: Rows Affected
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Rows Sent
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Errors
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Warnings
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: First Seen
                 type: string

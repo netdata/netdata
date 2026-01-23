@@ -189,57 +189,46 @@ modules:
               - name: Timestamp
                 type: timestamp
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Namespace
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Operation
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Query
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Execution Time
                 type: duration
                 unit: "seconds"
-                visibility: shown
                 description: ""
               - name: Docs Examined
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Keys Examined
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Docs Returned
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Plan Summary
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Client
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: User
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Docs Deleted
                 type: integer
@@ -269,7 +258,6 @@ modules:
               - name: App Name
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Cursor Exhausted
                 type: string

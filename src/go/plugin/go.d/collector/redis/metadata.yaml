@@ -213,22 +213,18 @@ modules:
               - name: Timestamp
                 type: timestamp
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Command
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Command Name
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Duration
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Client Address
                 type: string

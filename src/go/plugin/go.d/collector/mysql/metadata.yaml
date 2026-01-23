@@ -258,22 +258,18 @@ modules:
               - name: Query
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Schema
                 type: string
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Calls
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Total Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Min Time
                 type: duration
@@ -283,7 +279,6 @@ modules:
               - name: Avg Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Max Time
                 type: duration
@@ -293,47 +288,38 @@ modules:
               - name: Lock Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Errors
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Warnings
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Rows Affected
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Rows Sent
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Rows Examined
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Temp Disk Tables
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Temp Tables
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Full Joins
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Full Range Joins
                 type: integer
@@ -353,7 +339,6 @@ modules:
               - name: Select Scan
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Sort Merge Passes
                 type: integer
@@ -368,7 +353,6 @@ modules:
               - name: Sort Rows
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Sort Scan
                 type: integer
@@ -378,7 +362,6 @@ modules:
               - name: No Index Used
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: No Good Index Used
                 type: integer
@@ -398,12 +381,10 @@ modules:
               - name: P95 Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: P99 Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: P99.9 Time
                 type: duration
@@ -428,17 +409,14 @@ modules:
               - name: CPU Time
                 type: duration
                 unit: "milliseconds"
-                visibility: shown
                 description: ""
               - name: Max Controlled Memory
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
               - name: Max Total Memory
                 type: integer
                 unit: ""
-                visibility: shown
                 description: ""
           performance: |
             Requires performance_schema and can be expensive on busy servers.
