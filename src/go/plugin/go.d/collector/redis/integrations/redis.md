@@ -109,15 +109,21 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Top Queries
 
+Slow commands from Redis SLOWLOG. WARNING: Command arguments may contain unmasked literals (potential PII).
+
+Reads Redis SLOWLOG and returns the top entries sorted by the selected column.
+
+
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Redis:top-queries` |
-| Summary | Slow commands from Redis SLOWLOG. WARNING: Command arguments may contain unmasked literals (potential PII). |
-| Behavior | Reads Redis SLOWLOG and returns the top entries sorted by the selected column. |
 | Performance | Uses SLOWLOG GET and may return many entries; use top_queries_limit to control size. |
 | Security | Command arguments may contain unmasked literals (potential PII). |
-| Requirements | Requires access to the Redis SLOWLOG and a working connection. |
 | Availability | Available when the collector is initialized; returns 503 if the collector is still connecting. |
+
+#### Prerequisites
+
+No additional configuration is required.
 
 #### Parameters
 
@@ -129,15 +135,15 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 Slowlog entries with command timing and metadata.
 
-| Column | Type | Description |
-|:-------|:-----|:------------|
-| ID | integer |  |
-| Timestamp | timestamp |  |
-| Command | string |  |
-| Command Name | string |  |
-| Duration | duration |  |
-| Client Address | string |  |
-| Client Name | string |  |
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| ID | integer |  | hidden |  |
+| Timestamp | timestamp |  |  |  |
+| Command | string |  |  |  |
+| Command Name | string |  |  |  |
+| Duration | duration | milliseconds |  |  |
+| Client Address | string |  | hidden |  |
+| Client Name | string |  | hidden |  |
 
 
 

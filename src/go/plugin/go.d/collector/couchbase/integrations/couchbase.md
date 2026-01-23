@@ -82,15 +82,25 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Top Queries
 
+Top N1QL requests from system:completed_requests.
+
+Queries the system:completed_requests keyspace and returns the top entries sorted by the selected column.
+
+
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Couchbase:top-queries` |
-| Summary | Top N1QL requests from system:completed_requests. |
-| Behavior | Queries the system:completed_requests keyspace and returns the top entries sorted by the selected column. |
 | Performance | Runs N1QL queries against system keyspaces; use top_queries_limit to control response size. |
 | Security | Query text may include sensitive literals depending on workload. |
-| Requirements | Requires access to the system:completed_requests keyspace and N1QL service. |
 | Availability | Available when the collector can query system keyspaces; returns 503 until the collector is initialized. |
+
+#### Prerequisites
+
+##### Grant access to system:completed_requests
+
+Ensure the user can query system:completed_requests and the N1QL service is available.
+
+
 
 #### Parameters
 
@@ -102,19 +112,19 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 Completed N1QL request statistics.
 
-| Column | Type | Description |
-|:-------|:-----|:------------|
-| Request ID | string |  |
-| Request Time | timestamp |  |
-| Statement | string |  |
-| Elapsed Time | duration |  |
-| Service Time | duration |  |
-| Result Count | integer |  |
-| Result Size | integer |  |
-| Error Count | integer |  |
-| Warning Count | integer |  |
-| User | string |  |
-| Client Context ID | string |  |
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Request ID | string |  | hidden |  |
+| Request Time | timestamp |  |  |  |
+| Statement | string |  |  |  |
+| Elapsed Time | duration | milliseconds |  |  |
+| Service Time | duration | milliseconds |  |  |
+| Result Count | integer |  |  |  |
+| Result Size | integer |  | hidden |  |
+| Error Count | integer |  | hidden |  |
+| Warning Count | integer |  | hidden |  |
+| User | string |  |  |  |
+| Client Context ID | string |  | hidden |  |
 
 
 

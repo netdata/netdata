@@ -241,15 +241,25 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Top Queries
 
+Top SQL queries from Query Store.
+
+Queries Query Store runtime statistics and returns the top entries sorted by the selected column.
+
+
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Mssql:top-queries` |
-| Summary | Top SQL queries from Query Store. |
-| Behavior | Queries Query Store runtime statistics and returns the top entries sorted by the selected column. |
 | Performance | Uses Query Store and can be expensive on busy instances. |
 | Security | Query Store may contain unmasked literals (potential PII). |
-| Requirements | Requires Query Store enabled and query_store_function_enabled set to true. |
 | Availability | Available when Query Store is enabled and the collector is initialized; returns 403 if disabled in config. |
+
+#### Prerequisites
+
+##### Enable Query Store functions
+
+Enable Query Store and set query_store_function_enabled to true.
+
+
 
 #### Parameters
 
@@ -261,68 +271,68 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 Query Store statistics for top queries.
 
-| Column | Type | Description |
-|:-------|:-----|:------------|
-| Query Hash | string |  |
-| Query | string |  |
-| Database | string |  |
-| Calls | integer |  |
-| Total Time | duration |  |
-| Avg Time | duration |  |
-| Last Time | duration |  |
-| Min Time | duration |  |
-| Max Time | duration |  |
-| StdDev Time | duration |  |
-| Avg CPU | duration |  |
-| Last CPU | duration |  |
-| Min CPU | duration |  |
-| Max CPU | duration |  |
-| StdDev CPU | duration |  |
-| Avg Logical Reads | float |  |
-| Last Logical Reads | integer |  |
-| Min Logical Reads | integer |  |
-| Max Logical Reads | integer |  |
-| StdDev Logical Reads | float |  |
-| Avg Logical Writes | float |  |
-| Last Logical Writes | integer |  |
-| Min Logical Writes | integer |  |
-| Max Logical Writes | integer |  |
-| StdDev Logical Writes | float |  |
-| Avg Physical Reads | float |  |
-| Last Physical Reads | integer |  |
-| Min Physical Reads | integer |  |
-| Max Physical Reads | integer |  |
-| StdDev Physical Reads | float |  |
-| Avg CLR Time | duration |  |
-| Last CLR Time | duration |  |
-| Min CLR Time | duration |  |
-| Max CLR Time | duration |  |
-| StdDev CLR Time | duration |  |
-| Avg DOP | float |  |
-| Last DOP | integer |  |
-| Min DOP | integer |  |
-| Max DOP | integer |  |
-| StdDev DOP | float |  |
-| Avg Memory (8KB pages) | float |  |
-| Last Memory (8KB pages) | integer |  |
-| Min Memory (8KB pages) | integer |  |
-| Max Memory (8KB pages) | integer |  |
-| StdDev Memory | float |  |
-| Avg Rows | float |  |
-| Last Rows | integer |  |
-| Min Rows | integer |  |
-| Max Rows | integer |  |
-| StdDev Rows | float |  |
-| Avg Log Bytes | float |  |
-| Last Log Bytes | integer |  |
-| Min Log Bytes | integer |  |
-| Max Log Bytes | integer |  |
-| StdDev Log Bytes | float |  |
-| Avg TempDB (8KB pages) | float |  |
-| Last TempDB (8KB pages) | integer |  |
-| Min TempDB (8KB pages) | integer |  |
-| Max TempDB (8KB pages) | integer |  |
-| StdDev TempDB | float |  |
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Query Hash | string |  | hidden |  |
+| Query | string |  |  |  |
+| Database | string |  |  |  |
+| Calls | integer |  |  |  |
+| Total Time | duration | milliseconds |  |  |
+| Avg Time | duration | milliseconds |  |  |
+| Last Time | duration | milliseconds | hidden |  |
+| Min Time | duration | milliseconds | hidden |  |
+| Max Time | duration | milliseconds | hidden |  |
+| StdDev Time | duration | milliseconds | hidden |  |
+| Avg CPU | duration | milliseconds |  |  |
+| Last CPU | duration | milliseconds | hidden |  |
+| Min CPU | duration | milliseconds | hidden |  |
+| Max CPU | duration | milliseconds | hidden |  |
+| StdDev CPU | duration | milliseconds | hidden |  |
+| Avg Logical Reads | float |  |  |  |
+| Last Logical Reads | integer |  | hidden |  |
+| Min Logical Reads | integer |  | hidden |  |
+| Max Logical Reads | integer |  | hidden |  |
+| StdDev Logical Reads | float |  | hidden |  |
+| Avg Logical Writes | float |  |  |  |
+| Last Logical Writes | integer |  | hidden |  |
+| Min Logical Writes | integer |  | hidden |  |
+| Max Logical Writes | integer |  | hidden |  |
+| StdDev Logical Writes | float |  | hidden |  |
+| Avg Physical Reads | float |  |  |  |
+| Last Physical Reads | integer |  | hidden |  |
+| Min Physical Reads | integer |  | hidden |  |
+| Max Physical Reads | integer |  | hidden |  |
+| StdDev Physical Reads | float |  | hidden |  |
+| Avg CLR Time | duration | milliseconds | hidden |  |
+| Last CLR Time | duration | milliseconds | hidden |  |
+| Min CLR Time | duration | milliseconds | hidden |  |
+| Max CLR Time | duration | milliseconds | hidden |  |
+| StdDev CLR Time | duration | milliseconds | hidden |  |
+| Avg DOP | float |  |  |  |
+| Last DOP | integer |  | hidden |  |
+| Min DOP | integer |  | hidden |  |
+| Max DOP | integer |  | hidden |  |
+| StdDev DOP | float |  | hidden |  |
+| Avg Memory (8KB pages) | float |  |  |  |
+| Last Memory (8KB pages) | integer |  | hidden |  |
+| Min Memory (8KB pages) | integer |  | hidden |  |
+| Max Memory (8KB pages) | integer |  | hidden |  |
+| StdDev Memory | float |  | hidden |  |
+| Avg Rows | float |  |  |  |
+| Last Rows | integer |  | hidden |  |
+| Min Rows | integer |  | hidden |  |
+| Max Rows | integer |  | hidden |  |
+| StdDev Rows | float |  | hidden |  |
+| Avg Log Bytes | float |  |  |  |
+| Last Log Bytes | integer |  | hidden |  |
+| Min Log Bytes | integer |  | hidden |  |
+| Max Log Bytes | integer |  | hidden |  |
+| StdDev Log Bytes | float |  | hidden |  |
+| Avg TempDB (8KB pages) | float |  |  |  |
+| Last TempDB (8KB pages) | integer |  | hidden |  |
+| Min TempDB (8KB pages) | integer |  | hidden |  |
+| Max TempDB (8KB pages) | integer |  | hidden |  |
+| StdDev TempDB | float |  | hidden |  |
 
 
 
