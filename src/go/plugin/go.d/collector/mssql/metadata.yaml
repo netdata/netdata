@@ -256,7 +256,7 @@ modules:
                 type: string
                 unit: ""
                 visibility: hidden
-                description: Unique hash identifier (SHA1) for normalized query pattern. Queries with identical structure but different literal values share the same digest.
+                description: Unique hash identifier for the normalized query pattern. Queries with identical structure but different literal values share the same digest.
               - name: Query
                 type: string
                 unit: ""
