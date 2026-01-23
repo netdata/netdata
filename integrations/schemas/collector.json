@@ -511,17 +511,31 @@
                                 "type": "string",
                                 "description": "Column type."
                               },
-                              "description": {
-                                "type": "string",
-                                "description": "Column description."
-                              }
+                            "description": {
+                              "type": "string",
+                              "description": "Column description."
                             },
-                            "required": [
-                              "name",
-                              "type"
-                            ]
-                          }
+                            "unit": {
+                              "type": "string",
+                              "description": "Column unit, if applicable."
+                            },
+                            "visibility": {
+                              "type": "string",
+                              "description": "Whether the column is shown by default.",
+                              "enum": [
+                                "shown",
+                                "hidden"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "type",
+                            "unit",
+                            "visibility"
+                          ]
                         }
+                      }
                       },
                       "required": [
                         "description",
@@ -541,8 +555,34 @@
                       "description": "Security/PII considerations."
                     },
                     "requirements": {
-                      "type": "string",
-                      "description": "Prerequisites and required permissions."
+                      "type": "object",
+                      "description": "Prerequisites and required permissions.",
+                      "properties": {
+                        "list": {
+                          "type": "array",
+                          "description": "List of requirements.",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "title": {
+                                "type": "string",
+                                "description": "Short requirement title."
+                              },
+                              "description": {
+                                "type": "string",
+                                "description": "Requirement description."
+                              }
+                            },
+                            "required": [
+                              "title",
+                              "description"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "list"
+                      ]
                     },
                     "availability": {
                       "type": "string",

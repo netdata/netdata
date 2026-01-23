@@ -35,7 +35,7 @@ modules:
           description: |
             By default, it detects YugabyteDB instances running on localhost.
             On startup, it tries to collect metrics from:
-            
+
             - http://127.0.0.1:7000/prometheus-metrics (Master)
             - http://127.0.0.1:9000/prometheus-metrics (Tablet Server)
             - http://127.0.0.1:12000/prometheus-metrics (YCQL)
@@ -228,7 +228,7 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
@@ -261,36 +261,58 @@ modules:
             columns:
               - name: Query ID
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Query
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Database
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: User
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Calls
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Total Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Mean Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Min Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Max Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Rows
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Stddev Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
           behavior: |
             Reads pg_stat_statements and returns the top entries sorted by the selected column.
@@ -298,8 +320,11 @@ modules:
             Executes SQL queries and may be expensive on busy clusters; use top_queries_limit and sql_timeout.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements: |
-            Requires pg_stat_statements installed and a SQL DSN configured for YSQL.
+          requirements:
+            list:
+              - title: Requirement
+                description: |
+                  Requires pg_stat_statements installed and a SQL DSN configured for YSQL.
           availability: |
             Available when YSQL is accessible; returns errors if the SQL connection is unavailable.
         - id: running-queries
@@ -318,36 +343,58 @@ modules:
             columns:
               - name: PID
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Query
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Database
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: User
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: State
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Wait Event Type
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Wait Event
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Application
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Client Address
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Query Start
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Elapsed
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
           behavior: |
             Reads pg_stat_activity and returns running statements sorted by the selected column.
@@ -355,8 +402,11 @@ modules:
             Executes SQL queries and may be expensive on busy clusters; use top_queries_limit and sql_timeout.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements: |
-            Requires a SQL DSN configured for YSQL and access to pg_stat_activity.
+          requirements:
+            list:
+              - title: Requirement
+                description: |
+                  Requires a SQL DSN configured for YSQL and access to pg_stat_activity.
           availability: |
             Available when YSQL is accessible; returns errors if the SQL connection is unavailable.
     metrics:

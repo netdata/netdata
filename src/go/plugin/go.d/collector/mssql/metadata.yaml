@@ -246,183 +246,303 @@ modules:
             columns:
               - name: Query Hash
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Query
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Database
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Calls
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Total Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Avg Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Last Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Min Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Max Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: StdDev Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Avg CPU
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Last CPU
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Min CPU
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Max CPU
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: StdDev CPU
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Avg Logical Reads
                 type: float
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Last Logical Reads
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Min Logical Reads
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Max Logical Reads
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: StdDev Logical Reads
                 type: float
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Avg Logical Writes
                 type: float
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Last Logical Writes
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Min Logical Writes
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Max Logical Writes
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: StdDev Logical Writes
                 type: float
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Avg Physical Reads
                 type: float
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Last Physical Reads
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Min Physical Reads
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Max Physical Reads
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: StdDev Physical Reads
                 type: float
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Avg CLR Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Last CLR Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Min CLR Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Max CLR Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: StdDev CLR Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Avg DOP
                 type: float
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Last DOP
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Min DOP
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Max DOP
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: StdDev DOP
                 type: float
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Avg Memory (8KB pages)
                 type: float
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Last Memory (8KB pages)
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Min Memory (8KB pages)
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Max Memory (8KB pages)
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: StdDev Memory
                 type: float
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Avg Rows
                 type: float
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Last Rows
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Min Rows
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Max Rows
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: StdDev Rows
                 type: float
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Avg Log Bytes
                 type: float
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Last Log Bytes
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Min Log Bytes
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Max Log Bytes
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: StdDev Log Bytes
                 type: float
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Avg TempDB (8KB pages)
                 type: float
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Last TempDB (8KB pages)
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Min TempDB (8KB pages)
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Max TempDB (8KB pages)
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: StdDev TempDB
                 type: float
+                unit: ""
+                visibility: hidden
                 description: ""
           behavior: |
             Queries Query Store runtime statistics and returns the top entries sorted by the selected column.
@@ -430,8 +550,11 @@ modules:
             Uses Query Store and can be expensive on busy instances.
           security: |
             Query Store may contain unmasked literals (potential PII).
-          requirements: |
-            Requires Query Store enabled and query_store_function_enabled set to true.
+          requirements:
+            list:
+              - title: Requirement
+                description: |
+                  Requires Query Store enabled and query_store_function_enabled set to true.
           availability: |
             Available when Query Store is enabled and the collector is initialized; returns 403 if disabled in config.
     metrics:

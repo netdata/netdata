@@ -153,27 +153,43 @@ modules:
             columns:
               - name: Job ID
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Query
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Duration
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Type
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: User
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Client Address
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Client Port
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Servers
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
           behavior: |
             Queries rethinkdb.jobs and returns running queries sorted by the selected column.
@@ -181,8 +197,11 @@ modules:
             Uses system tables and may be expensive on busy clusters.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements: |
-            Requires admin access to rethinkdb.jobs and a working connection.
+          requirements:
+            list:
+              - title: Requirement
+                description: |
+                  Requires admin access to rethinkdb.jobs and a working connection.
           availability: |
             Available when the collector is initialized; returns 503 if the collector is still connecting.
     metrics:

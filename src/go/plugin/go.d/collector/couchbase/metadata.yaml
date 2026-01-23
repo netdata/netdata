@@ -178,7 +178,7 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
@@ -211,36 +211,58 @@ modules:
             columns:
               - name: Request ID
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Request Time
                 type: timestamp
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Statement
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Elapsed Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Service Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Result Count
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Result Size
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Error Count
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Warning Count
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: User
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Client Context ID
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
           behavior: |
             Queries the system:completed_requests keyspace and returns the top entries sorted by the selected column.
@@ -248,8 +270,11 @@ modules:
             Runs N1QL queries against system keyspaces; use top_queries_limit to control response size.
           security: |
             Query text may include sensitive literals depending on workload.
-          requirements: |
-            Requires access to the system:completed_requests keyspace and N1QL service.
+          requirements:
+            list:
+              - title: Requirement
+                description: |
+                  Requires access to the system:completed_requests keyspace and N1QL service.
           availability: |
             Available when the collector can query system keyspaces; returns 503 until the collector is initialized.
     metrics:

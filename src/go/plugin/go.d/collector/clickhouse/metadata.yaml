@@ -272,51 +272,83 @@ modules:
             columns:
               - name: Query ID
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Query
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Database
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: User
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Calls
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Total Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Avg Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Min Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Max Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Read Rows
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Read Bytes
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Written Rows
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Written Bytes
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Result Rows
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Result Bytes
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Max Memory
                 type: float
+                unit: ""
+                visibility: hidden
                 description: ""
           behavior: |
             Queries system.query_log, aggregates by query, and returns the top entries sorted by the selected column.
@@ -324,8 +356,11 @@ modules:
             Uses system.query_log and can be expensive on busy systems. Use limits to control response size.
           security: |
             Query text may include sensitive literals depending on server settings.
-          requirements: |
-            Requires access to system.query_log on the target ClickHouse instance.
+          requirements:
+            list:
+              - title: Requirement
+                description: |
+                  Requires access to system.query_log on the target ClickHouse instance.
           availability: |
             Available when the collector can query system tables; returns 503 if system.query_log is not available.
     metrics:

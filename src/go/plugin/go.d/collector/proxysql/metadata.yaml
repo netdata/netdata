@@ -98,7 +98,7 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Local and remote instances.
               config: |
                 jobs:
@@ -143,51 +143,83 @@ modules:
             columns:
               - name: Digest
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Query
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Schema
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: User
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Hostgroup
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Calls
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Total Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Avg Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Min Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Max Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Rows Affected
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Rows Sent
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Errors
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Warnings
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: First Seen
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Last Seen
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
           behavior: |
             Queries stats_mysql_query_digest and returns the top entries sorted by the selected column.
@@ -195,8 +227,11 @@ modules:
             Uses ProxySQL stats tables and can be expensive on busy systems.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements: |
-            Requires access to stats_mysql_query_digest in ProxySQL.
+          requirements:
+            list:
+              - title: Requirement
+                description: |
+                  Requires access to stats_mysql_query_digest in ProxySQL.
           availability: |
             Available when the collector can query ProxySQL stats; returns errors if the SQL connection is unavailable.
     metrics:

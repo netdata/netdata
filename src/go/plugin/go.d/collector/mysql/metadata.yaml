@@ -67,7 +67,7 @@ modules:
           - title: Create netdata user
             description: |
               A user account should have the following [permissions](https://dev.mysql.com/doc/refman/8.0/en/privileges-provided.html):
-              
+
               - [`USAGE`](https://dev.mysql.com/doc/refman/8.0/en/privileges-provided.html#priv_usage)
               - [`REPLICATION CLIENT`](https://dev.mysql.com/doc/refman/8.0/en/privileges-provided.html#priv_replication-client)
               - [`PROCESS`](https://dev.mysql.com/doc/refman/8.0/en/privileges-provided.html#priv_process)
@@ -76,21 +76,21 @@ modules:
 
               - **MySQL and MariaDB < 10.5.9**
 
-                  ```mysql
-                  CREATE USER 'netdata'@'localhost';
-                  GRANT USAGE, REPLICATION CLIENT, PROCESS ON *.* TO 'netdata'@'localhost';
-                  FLUSH PRIVILEGES;
-                  ```
+              ```mysql
+              CREATE USER 'netdata'@'localhost';
+              GRANT USAGE, REPLICATION CLIENT, PROCESS ON *.* TO 'netdata'@'localhost';
+              FLUSH PRIVILEGES;
+              ```
 
               - **MariaDB >= 10.5.9**
 
-                  For MariaDB 10.5.9 and later, use the `SLAVE MONITOR` privilege instead of `REPLICATION CLIENT`:
+              For MariaDB 10.5.9 and later, use the `SLAVE MONITOR` privilege instead of `REPLICATION CLIENT`:
 
-                  ```mysql
-                  CREATE USER 'netdata'@'localhost';
-                  GRANT USAGE, SLAVE MONITOR, PROCESS ON *.* TO 'netdata'@'localhost';
-                  FLUSH PRIVILEGES;
-                  ```
+              ```mysql
+              CREATE USER 'netdata'@'localhost';
+              GRANT USAGE, SLAVE MONITOR, PROCESS ON *.* TO 'netdata'@'localhost';
+              FLUSH PRIVILEGES;
+              ```
 
               The `netdata` user will have the ability to connect to the MySQL server on localhost without a password. 
               It will only be able to gather statistics without being able to alter or affect operations in any way.
@@ -168,7 +168,7 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Local and remote instances.
               config: |
                 jobs:
@@ -249,117 +249,193 @@ modules:
             columns:
               - name: Digest
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Query
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Schema
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Calls
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Total Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Min Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Avg Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Max Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Lock Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Errors
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Warnings
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Rows Affected
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Rows Sent
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Rows Examined
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Temp Disk Tables
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Temp Tables
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Full Joins
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Full Range Joins
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Select Range
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Select Range Check
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Select Scan
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Sort Merge Passes
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Sort Range
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Sort Rows
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Sort Scan
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: No Index Used
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: No Good Index Used
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: First Seen
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Last Seen
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: P95 Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: P99 Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: P99.9 Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: Sample Query
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Sample Seen
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Sample Time
                 type: duration
+                unit: "milliseconds"
+                visibility: hidden
                 description: ""
               - name: CPU Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Max Controlled Memory
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Max Total Memory
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
           behavior: |
             Reads performance_schema statement digest tables and returns the top entries sorted by the selected column.
@@ -367,8 +443,11 @@ modules:
             Requires performance_schema and can be expensive on busy servers.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements: |
-            Requires performance_schema enabled and access to events_statements_summary_by_digest.
+          requirements:
+            list:
+              - title: Requirement
+                description: |
+                  Requires performance_schema enabled and access to events_statements_summary_by_digest.
           availability: |
             Available when performance_schema tables are accessible and the collector is initialized.
     metrics:

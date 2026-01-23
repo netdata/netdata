@@ -170,45 +170,73 @@ modules:
             columns:
               - name: SQL ID
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Query
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Schema
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Executions
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Total Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Avg Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: CPU Time
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Buffer Gets
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Disk Reads
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Rows Processed
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Parse Calls
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Module
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Action
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Last Active
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
           behavior: |
             Queries V$SQLSTATS and returns the top entries sorted by the selected column.
@@ -216,8 +244,11 @@ modules:
             Queries system views and may be expensive on busy databases.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements: |
-            Requires access to V$SQLSTATS and a working SQL connection.
+          requirements:
+            list:
+              - title: Requirement
+                description: |
+                  Requires access to V$SQLSTATS and a working SQL connection.
           availability: |
             Available when the collector can query Oracle system views; returns errors if SQL is unavailable.
         - id: running-queries
@@ -236,39 +267,63 @@ modules:
             columns:
               - name: Session
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: User
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Status
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Type
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: SQL ID
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Query
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Elapsed
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: SQL Exec Start
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Module
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Action
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Program
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Machine
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
           behavior: |
             Queries V$SESSION and returns running statements sorted by the selected column.
@@ -276,8 +331,11 @@ modules:
             Queries system views and may be expensive on busy databases.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements: |
-            Requires access to V$SESSION and a working SQL connection.
+          requirements:
+            list:
+              - title: Requirement
+                description: |
+                  Requires access to V$SESSION and a working SQL connection.
           availability: |
             Available when the collector can query Oracle system views; returns errors if SQL is unavailable.
     metrics:

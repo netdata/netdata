@@ -49,27 +49,27 @@ modules:
           - title: Create a read-only user
             description: |
               Create a read-only user for Netdata in the admin database.
-              
+
               - Authenticate as the admin user:
-              
-                ```bash
-                use admin
-                db.auth("admin", "<MONGODB_ADMIN_PASSWORD>")
-                ```
-              
+
+              ```bash
+              use admin
+              db.auth("admin", "<MONGODB_ADMIN_PASSWORD>")
+              ```
+
               - Create a user:
-              
-                ```bash
-                db.createUser({
-                  "user":"netdata",
-                  "pwd": "<UNIQUE_PASSWORD>",
-                  "roles" : [
-                    {role: 'read', db: 'admin' },
-                    {role: 'clusterMonitor', db: 'admin'},
-                    {role: 'read', db: 'local' }
-                  ]
-                })
-                ```
+
+              ```bash
+              db.createUser({
+              "user":"netdata",
+              "pwd": "<UNIQUE_PASSWORD>",
+              "roles" : [
+              {role: 'read', db: 'admin' },
+              {role: 'clusterMonitor', db: 'admin'},
+              {role: 'read', db: 'local' }
+              ]
+              })
+              ```
       configuration:
         file:
           name: go.d/mongodb.conf
@@ -152,7 +152,7 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Local and remote instances.
               config: |
                 jobs:
@@ -185,87 +185,143 @@ modules:
             columns:
               - name: Timestamp
                 type: timestamp
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Namespace
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Operation
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Query
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Execution Time
                 type: duration
+                unit: "seconds"
+                visibility: shown
                 description: ""
               - name: Docs Examined
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Keys Examined
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Docs Returned
                 type: integer
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Plan Summary
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Client
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: User
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Docs Deleted
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Docs Inserted
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Docs Modified
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Response Length
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Num Yield
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: App Name
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Cursor Exhausted
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Has Sort Stage
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Uses Disk
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: From Multi Planner
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Replanned
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Query Hash
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Plan Cache Key
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Planning Time
                 type: duration
+                unit: "seconds"
+                visibility: hidden
                 description: ""
               - name: CPU Time
                 type: duration
+                unit: "seconds"
+                visibility: hidden
                 description: ""
               - name: Query Framework
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Query Shape Hash
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
           behavior: |
             Reads from system.profile and returns the top profiled queries sorted by the selected column.
@@ -273,8 +329,11 @@ modules:
             Requires profiling and reads from system.profile; may add load on busy systems.
           security: |
             Query text may contain unmasked literals (potential PII).
-          requirements: |
-            Requires MongoDB profiling enabled on target databases and top_queries_function_enabled set to true.
+          requirements:
+            list:
+              - title: Requirement
+                description: |
+                  Requires MongoDB profiling enabled on target databases and top_queries_function_enabled set to true.
           availability: |
             Available when profiling is enabled and the collector is initialized; returns 403 if disabled in config.
     metrics:
@@ -284,9 +343,9 @@ modules:
       availability: []
       description: |
         - WireTiger metrics are available only if [WiredTiger](https://docs.mongodb.com/v6.0/core/wiredtiger/) is used as the
-          storage engine.
+        storage engine.
         - Sharding metrics are available on shards only
-          for [mongos](https://www.mongodb.com/docs/manual/reference/program/mongos/).
+        for [mongos](https://www.mongodb.com/docs/manual/reference/program/mongos/).
       scopes:
         - name: global
           description: These metrics refer to the entire monitored application.

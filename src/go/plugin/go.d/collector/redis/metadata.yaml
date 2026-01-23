@@ -37,7 +37,7 @@ modules:
         auto_detection:
           description: |
             By default, it detects instances running on localhost by attempting to connect using known Redis TCP and UNIX sockets:
-            
+
             - 127.0.0.1:6379
             - /tmp/redis.sock
             - /var/run/redis/redis.sock
@@ -155,7 +155,7 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Local and remote instances.
               config: |
                 jobs:
@@ -204,24 +204,38 @@ modules:
             columns:
               - name: ID
                 type: integer
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Timestamp
                 type: timestamp
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Command
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Command Name
                 type: string
+                unit: ""
+                visibility: shown
                 description: ""
               - name: Duration
                 type: duration
+                unit: "milliseconds"
+                visibility: shown
                 description: ""
               - name: Client Address
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
               - name: Client Name
                 type: string
+                unit: ""
+                visibility: hidden
                 description: ""
           behavior: |
             Reads Redis SLOWLOG and returns the top entries sorted by the selected column.
@@ -229,8 +243,11 @@ modules:
             Uses SLOWLOG GET and may return many entries; use top_queries_limit to control size.
           security: |
             Command arguments may contain unmasked literals (potential PII).
-          requirements: |
-            Requires access to the Redis SLOWLOG and a working connection.
+          requirements:
+            list:
+              - title: Requirement
+                description: |
+                  Requires access to the Redis SLOWLOG and a working connection.
           availability: |
             Available when the collector is initialized; returns 503 if the collector is still connecting.
     metrics:
