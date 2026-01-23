@@ -474,9 +474,9 @@ modules:
                   TRUNCATE TABLE performance_schema.events_statements_summary_by_digest;
                   ```
 
-                  For MySQL versions before 8.0, ensure `performance-schema-instrument` includes statement instruments:
+                  For MySQL versions before 8.0, ensure `performance-schema-instrument` includes statement instruments. This mainly applies to MySQL 5.6 or specific locked-down configurations, as statement instruments are typically enabled by default in MySQL 5.7+:
                   ```ini
-                  performance-schema-instrument = 'statement/%=ON'
+                  performance-schema-instrument='statement/%=ON'
                   ```
               - title: Grant SELECT permission on Performance Schema tables
                 description: |
