@@ -113,8 +113,7 @@ const dumpScenarioResultIfNeeded = (scenarioId: string, result: AIAgentResult): 
 
 /**
  * Tests that MUST run sequentially (not in parallel) due to:
- * - captureSessionConfig: modifies sessionConfigObservers global array
- * - Tests that use other shared global state variables
+ * - Tests that use shared global state variables
  * - Tests that still patch LLMClient.prototype.executeTurn directly (pass-through pattern)
  *
  * Note: Tests using runWithExecuteTurnOverride now use DI (dependency injection via
@@ -123,6 +122,8 @@ const dumpScenarioResultIfNeeded = (scenarioId: string, result: AIAgentResult): 
  * Migrated to parallel:
  * - run-test-16, run-test-20, run-test-54 (use TestContext)
  * - All tests using runWithExecuteTurnOverride (use DI instead of prototype patching)
+ * - Queue tests (run-test-25, run-test-queue-cancel, run-test-queue-isolation) use isolated queue managers
+ * - reasoning-matrix-* tests use session.getSessionConfigSnapshot() instead of global observer
  */
 /* eslint-disable sonarjs/no-duplicate-string -- test IDs naturally share 'run-test-' prefix */
 const SEQUENTIAL_TEST_IDS = new Set([
@@ -190,8 +191,6 @@ const isSequentialTest = (test: HarnessTest): boolean => {
   if (test.sequential === true) return true;
   // Check against known sequential test IDs
   if (SEQUENTIAL_TEST_IDS.has(test.id)) return true;
-  // reasoning-matrix tests use captureSessionConfig
-  if (test.id.startsWith('reasoning-matrix-')) return true;
   return false;
 };
 const TOOL_OUTPUT_HANDLE_PREFIX = 'Tool output is too large (';
@@ -389,18 +388,10 @@ const defaultPersistenceCallbacks = (
 };
 
 const baseCreate = AIAgentSession.create.bind(AIAgentSession);
-const sessionConfigObservers: ((config: AIAgentSessionConfig) => void)[] = [];
 (AIAgentSession as unknown as { create: (sessionConfig: AIAgentSessionConfig) => AIAgentSession }).create = (sessionConfig: AIAgentSessionConfig) => {
   const originalCallbacks = sessionConfig.callbacks;
   const callbacks = defaultPersistenceCallbacks(sessionConfig.config, originalCallbacks);
   const patchedConfig = callbacks === originalCallbacks ? sessionConfig : { ...sessionConfig, callbacks };
-  sessionConfigObservers.forEach((observer) => {
-    try {
-      observer(patchedConfig);
-    } catch (error: unknown) {
-      warn(`session config observer failure: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  });
   return baseCreate(patchedConfig);
 };
 
@@ -982,30 +973,6 @@ function makeSuccessResult(content: string): AIAgentResult {
   };
 }
 
-function registerSessionConfigObserver(observer: (config: AIAgentSessionConfig) => void): () => void {
-  sessionConfigObservers.push(observer);
-  return () => {
-    const index = sessionConfigObservers.indexOf(observer);
-    if (index >= 0) {
-      sessionConfigObservers.splice(index, 1);
-    }
-  };
-}
-
-async function captureSessionConfig(runFactory: () => Promise<unknown>): Promise<AIAgentSessionConfig> {
-  let captured: AIAgentSessionConfig | undefined;
-  const unregister = registerSessionConfigObserver((config) => {
-    captured = { ...config };
-  });
-  try {
-    await runFactory();
-  } finally {
-    unregister();
-  }
-  invariant(captured !== undefined, 'Session configuration capture failed.');
-  return captured;
-}
-
 function logHasDetail(entry: LogEntry, key: string): boolean {
   const details = entry.details;
   return details !== undefined && Object.prototype.hasOwnProperty.call(details, key);
@@ -1127,9 +1094,7 @@ interface HarnessTest {
   timeoutMs?: number;
   /**
    * When true, this test MUST run sequentially (not in parallel with other tests).
-   * Set this flag for tests that:
-   * - Use captureSessionConfig/registerSessionConfigObserver (modifies global observers)
-   * - Use shared global state variables (not DI-based)
+   * Set this flag for tests that use shared global state variables (not DI-based).
    */
   sequential?: boolean;
   configure?: (
@@ -1298,10 +1263,9 @@ const buildReasoningMatrixScenarios = (): HarnessTest[] => {
               configLayers: layers,
               globalOverrides,
             });
-            const capturedConfig = await captureSessionConfig(async () => {
-              const session = await loaded.createSession(MINIMAL_SYSTEM_PROMPT, DEFAULT_PROMPT_SCENARIO, { outputFormat: 'markdown' });
-              void session;
-            });
+            // Use getSessionConfigSnapshot() instead of captureSessionConfig() for DI-compatible parallel execution
+            const session = await loaded.createSession(MINIMAL_SYSTEM_PROMPT, DEFAULT_PROMPT_SCENARIO, { outputFormat: 'markdown' });
+            const capturedConfig = session.getSessionConfigSnapshot();
             reasoningMatrixSummaries.set(scenarioId, {
               reasoning: capturedConfig.reasoning,
               reasoningValue: capturedConfig.reasoningValue,
