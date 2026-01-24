@@ -1092,9 +1092,13 @@ static ALWAYS_INLINE PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size
     // ------------------------------------------------------------------------
     // cleanup RRDSET / RRDDIM
 
-    if(likely(st->pluginsd.dims_with_slots)) {
-        for(size_t i = 0; i < st->pluginsd.size ;i++) {
-            RRDDIM *rd = st->pluginsd.prd_array[i].rd;
+    // Read prd_array pointer once to avoid race with cleanup
+    struct pluginsd_rrddim *prd_array = st->pluginsd.prd_array;
+    uint32_t prd_size = st->pluginsd.size;
+
+    if(likely(st->pluginsd.dims_with_slots && prd_array && prd_size)) {
+        for(size_t i = 0; i < prd_size ;i++) {
+            RRDDIM *rd = prd_array[i].rd;
 
             if(!rd)
                 continue;

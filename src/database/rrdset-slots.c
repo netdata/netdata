@@ -69,8 +69,12 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
 
     rrdset_pluginsd_receive_unslot(st);
 
-    rrd_slot_memory_removed(st->pluginsd.size * sizeof(struct pluginsd_rrddim));
-    freez(st->pluginsd.prd_array);
+    // Save old values for freeing after we NULL the pointers
+    struct pluginsd_rrddim *old_prd_array = st->pluginsd.prd_array;
+    size_t old_size = st->pluginsd.size;
+
+    // NULL the pointer and zero the size BEFORE freeing,
+    // so concurrent readers see NULL and return early
     st->pluginsd.prd_array = NULL;
     st->pluginsd.size = 0;
     st->pluginsd.pos = 0;
@@ -80,6 +84,10 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
     st->pluginsd.collector_tid = 0;
 
     spinlock_unlock(&st->pluginsd.spinlock);
+
+    // Free AFTER releasing lock and NULLing the pointer
+    rrd_slot_memory_removed(old_size * sizeof(struct pluginsd_rrddim));
+    freez(old_prd_array);
 }
 
 void rrdset_pluginsd_receive_slots_initialize(RRDSET *st) {
