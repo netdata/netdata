@@ -114,15 +114,15 @@ const dumpScenarioResultIfNeeded = (scenarioId: string, result: AIAgentResult): 
 /**
  * Tests that MUST run sequentially (not in parallel) due to:
  * - runWithPatchedExecuteTurn: patches LLMClient.prototype.executeTurn globally
- * - Shared state variables: runTest16Paths, runTest20Paths, runTest54State
  * - captureSessionConfig: modifies sessionConfigObservers global array
+ * - Tests that use other shared global state variables
+ *
+ * Note: run-test-16, run-test-20, run-test-54 have been migrated to use TestContext
+ * and no longer require sequential execution.
  */
 /* eslint-disable sonarjs/no-duplicate-string -- test IDs naturally share 'run-test-' prefix */
 const SEQUENTIAL_TEST_IDS = new Set([
-  // Tests using shared state variables
-  'run-test-16',
-  'run-test-20',
-  'run-test-54',
+  // Tests using shared state variables (event coverage globals)
   'run-test-handoff-event-chain',
   'run-test-router-handoff-event',
   'run-test-router-handoff-invalid-retry',
@@ -796,9 +796,8 @@ function makeTempDir(label: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}${label}-`));
 }
 
-let runTest16Paths: { sessionsDir: string; billingFile: string } | undefined;
-let runTest20Paths: { baseDir: string; blockerFile: string; billingFile: string } | undefined;
-let runTest54State: { received: JSONRPCMessage[]; serverPayloads: string[]; errors: string[] } | undefined;
+// Note: runTest16Paths, runTest20Paths, runTest54State globals have been removed.
+// These tests now use the TestContext object passed between configure/execute/expect.
 let coverageOpenrouterJson: {
   accept?: string;
   referer?: string;
@@ -1166,6 +1165,12 @@ function isLlmAccounting(entry: AccountingEntry): entry is AccountingEntry & { t
   return entry.type === 'llm';
 }
 
+/**
+ * Test context object passed between configure, execute, and expect phases.
+ * Each test gets its own context instance - no shared global state needed.
+ */
+type TestContext = Record<string, unknown>;
+
 interface HarnessTest {
   id: string;
   description?: string;
@@ -1174,21 +1179,22 @@ interface HarnessTest {
    * When true, this test MUST run sequentially (not in parallel with other tests).
    * Set this flag for tests that:
    * - Use runWithPatchedExecuteTurn (patches LLMClient.prototype.executeTurn globally)
-   * - Use shared state variables (runTest16Paths, runTest20Paths, runTest54State)
    * - Use captureSessionConfig/registerSessionConfigObserver (modifies global observers)
    */
   sequential?: boolean;
   configure?: (
     configuration: Configuration,
     sessionConfig: AIAgentSessionConfig,
-    defaults: NonNullable<Configuration['defaults']>
+    defaults: NonNullable<Configuration['defaults']>,
+    context: TestContext
   ) => void;
   execute?: (
     configuration: Configuration,
     sessionConfig: AIAgentSessionConfig,
-    defaults: NonNullable<Configuration['defaults']>
+    defaults: NonNullable<Configuration['defaults']>,
+    context: TestContext
   ) => Promise<AIAgentResult>;
-  expect: (result: AIAgentResult) => void;
+  expect: (result: AIAgentResult, context: TestContext) => void;
 }
 
 let overrideParentLoaded: LoadedAgent | undefined;
@@ -3029,17 +3035,19 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   },
   {
     id: 'run-test-16',
-    configure: (configuration) => {
+    configure: (configuration, _sessionConfig, _defaults, context) => {
       const baseDir = makeTempDir('persistence');
       const sessionsDir = path.join(baseDir, SESSIONS_SUBDIR);
       const billingFile = path.join(baseDir, BILLING_FILENAME);
       configuration.persistence = { sessionsDir, billingFile };
-      runTest16Paths = { sessionsDir, billingFile };
+      context.sessionsDir = sessionsDir;
+      context.billingFile = billingFile;
     },
-    expect: (result) => {
+    expect: (result, context) => {
       invariant(result.success, 'Scenario run-test-16 expected success.');
-      invariant(runTest16Paths !== undefined, 'Persistence paths should be initialized for run-test-16.');
-      const { sessionsDir, billingFile } = runTest16Paths;
+      const sessionsDir = context.sessionsDir as string;
+      const billingFile = context.billingFile as string;
+      invariant(sessionsDir !== undefined && billingFile !== undefined, 'Persistence paths should be initialized for run-test-16.');
       try {
         const sessionFiles = fs.existsSync(sessionsDir) ? fs.readdirSync(sessionsDir) : [];
         invariant(sessionFiles.length === 1 && sessionFiles[0].endsWith('.json.gz'), 'Session snapshot should be written for run-test-16.');
@@ -3047,7 +3055,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         invariant(fs.existsSync(billingFile) && fs.statSync(billingFile).size > 0, 'Billing ledger should be written for run-test-16.');
       } finally {
         fs.rmSync(path.dirname(sessionsDir), { recursive: true, force: true });
-        runTest16Paths = undefined;
       }
     },
   },
@@ -3110,24 +3117,26 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   },
   {
     id: 'run-test-20',
-    configure: (configuration) => {
+    configure: (configuration, _sessionConfig, _defaults, context) => {
       const baseDir = makeTempDir('persistence-error');
       const blockerFile = path.join(baseDir, 'sessions-blocker');
       fs.writeFileSync(blockerFile, 'block');
       const billingFile = path.join(blockerFile, BILLING_FILENAME);
       configuration.persistence = { sessionsDir: blockerFile, billingFile };
-      runTest20Paths = { baseDir, blockerFile, billingFile };
+      context.baseDir = baseDir;
+      context.billingFile = billingFile;
     },
-    expect: (result) => {
+    expect: (result, context) => {
+      const baseDir = context.baseDir as string | undefined;
+      const billingFile = context.billingFile as string | undefined;
       try {
         invariant(result.success, 'Scenario run-test-20 expected success.');
-        invariant(runTest20Paths !== undefined, 'Persistence paths should be initialized for run-test-20.');
-        const billingExists = fs.existsSync(runTest20Paths.billingFile);
+        invariant(baseDir !== undefined && billingFile !== undefined, 'Persistence paths should be initialized for run-test-20.');
+        const billingExists = fs.existsSync(billingFile);
         invariant(!billingExists, 'Billing ledger write should fail for run-test-20.');
       } finally {
-        if (runTest20Paths !== undefined) {
-          fs.rmSync(runTest20Paths.baseDir, { recursive: true, force: true });
-          runTest20Paths = undefined;
+        if (baseDir !== undefined) {
+          fs.rmSync(baseDir, { recursive: true, force: true });
         }
       }
     },
@@ -3907,8 +3916,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-54',
     description: 'WebSocket transport round-trip coverage.',
-    execute: async (_configuration, _sessionConfig, _defaults) => {
-      runTest54State = undefined;
+    execute: async (_configuration, _sessionConfig, _defaults, context) => {
       const server = new WebSocketServer({ port: 0 });
       const address = server.address();
       if (address === null || typeof address === 'string') {
@@ -3984,18 +3992,17 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           try { await transport.close(); } catch { /* ignore */ }
         }
         await new Promise<void>((resolve) => { server.close(() => { resolve(); }); });
-        runTest54State = {
-          received: [...received],
-          serverPayloads: [...serverPayloads],
-          errors: [...errors],
-        };
+        context.received = [...received];
+        context.serverPayloads = [...serverPayloads];
+        context.errors = [...errors];
       }
     },
-    expect: (result) => {
+    expect: (result, context) => {
       invariant(result.success, 'Scenario run-test-54 should succeed.');
-      invariant(runTest54State !== undefined, 'WebSocket state should be captured for run-test-54.');
-      const { received, serverPayloads, errors } = runTest54State;
-      runTest54State = undefined;
+      const received = context.received as JSONRPCMessage[] | undefined;
+      const serverPayloads = context.serverPayloads as string[] | undefined;
+      const errors = context.errors as string[] | undefined;
+      invariant(received !== undefined && serverPayloads !== undefined && errors !== undefined, 'WebSocket state should be captured for run-test-54.');
       invariant(errors.length === 0, 'No WebSocket errors expected for run-test-54.');
       const serverHello = received.find((message) => (message as { method?: unknown }).method === 'serverHello');
       const ackMessage = received.find((message) => (message as { method?: unknown }).method === 'ack');
@@ -5790,16 +5797,16 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             sessionConfig.tools = [restartServerName];
             sessionConfig.maxRetries = 1;
           },
-          expect: (innerResult) => { void innerResult; },
+          expect: (innerResult, _ctx) => { void innerResult; },
         };
 
-        const result = await runScenario(innerScenario);
+        const output = await runScenario(innerScenario);
         await failTask.catch(() => undefined);
         invariant(failFlagged, 'Failed to flag restart fixture for failure in run-test-72-shared-restart-error.');
         try {
           fs.rmSync(path.dirname(stateFile), { recursive: true, force: true });
         } catch { /* ignore cleanup errors */ }
-        return result;
+        return output.result;
       },
       expect: (result) => {
         invariant(result.success, 'Scenario run-test-72-shared-restart-error should still complete successfully.');
@@ -5843,15 +5850,15 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             sessionConfig.tools = [restartServerName];
             sessionConfig.maxRetries = 1;
           },
-          expect: (innerResult) => { void innerResult; },
+          expect: (innerResult, _ctx) => { void innerResult; },
         } satisfies HarnessTest;
-        const result = await runScenario(innerScenario);
+        const output = await runScenario(innerScenario);
         try {
           fs.rmSync(path.dirname(stateFile), { recursive: true, force: true });
         } catch { /* ignore cleanup errors */ }
-        return result;
+        return output.result;
       },
-      expect: (result) => {
+      expect: (result, _ctx) => {
         invariant(result.success, 'Scenario run-test-72-probe-success-no-restart should still complete successfully.');
         const expectedCommand = 'test__test';
         const toolEntry = result.accounting.filter(isToolAccounting).find((entry) => entry.command === expectedCommand);
@@ -10126,10 +10133,16 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   ...buildReasoningMatrixScenarios(),
 ];
 
-async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
+interface ScenarioRunOutput {
+  result: AIAgentResult;
+  context: TestContext;
+}
+
+async function runScenario(test: HarnessTest): Promise<ScenarioRunOutput> {
   const { id: prompt, configure, execute } = test;
   const effectiveTimeout = getEffectiveTimeoutMs(test);
   const abortController = new AbortController();
+  const context: TestContext = {};
 
   const baseConfiguration: Configuration = {
     providers: {
@@ -10171,7 +10184,7 @@ async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
     // transport fixed internally
   };
 
-  configure?.(configuration, baseSession, defaults);
+  configure?.(configuration, baseSession, defaults, context);
 
   queueManager.reset();
   queueManager.configureQueues(configuration.queues);
@@ -10201,7 +10214,7 @@ async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
 
   const runner = async (): Promise<AIAgentResult> => {
     if (typeof execute === 'function') {
-      return await execute(configuration, baseSession, defaults);
+      return await execute(configuration, baseSession, defaults, context);
     }
 
     let session;
@@ -10219,7 +10232,8 @@ async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
   };
 
   try {
-    return await runWithTimeout(runner(), effectiveTimeout, prompt, abortOnTimeout);
+    const result = await runWithTimeout(runner(), effectiveTimeout, prompt, abortOnTimeout);
+    return { result, context };
   } finally {
   }
 }
@@ -12873,9 +12887,10 @@ async function runSingleScenario(scenario: HarnessTest): Promise<TestRunResult> 
   const startMs = Date.now();
   let result: AIAgentResult | undefined;
   try {
-    result = await runScenario(scenario);
+    const output = await runScenario(scenario);
+    result = output.result;
     dumpScenarioResultIfNeeded(scenario.id, result);
-    scenario.expect(result);
+    scenario.expect(result, output.context);
     return { scenario, durationMs: Date.now() - startMs };
   } catch (error: unknown) {
     return { scenario, result, error: toError(error), durationMs: Date.now() - startMs };
@@ -12995,9 +13010,10 @@ export async function runPhaseOneSuite(options?: PhaseOneRunOptions): Promise<vo
     const startMs = Date.now();
     let result: AIAgentResult | undefined;
     try {
-      result = await runScenario(scenario);
+      const output = await runScenario(scenario);
+      result = output.result;
       dumpScenarioResultIfNeeded(scenario.id, result);
-      scenario.expect(result);
+      scenario.expect(result, output.context);
       const duration = formatDurationMs(startMs, Date.now());
 
       console.log(`${header} [PASS] ${duration}`);
@@ -13147,10 +13163,10 @@ function findScenarioById(id: string): HarnessTest {
 
 export async function runPhaseOneScenario(id: string): Promise<AIAgentResult> {
   const scenario = findScenarioById(id);
-  const result = await runScenario(scenario);
-  scenario.expect(result);
+  const output = await runScenario(scenario);
+  scenario.expect(output.result, output.context);
   await cleanupActiveHandles();
-  return result;
+  return output.result;
 }
 
 BASE_TEST_SCENARIOS.push({
