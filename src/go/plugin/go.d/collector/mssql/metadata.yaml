@@ -540,9 +540,9 @@ modules:
                 visibility: hidden
                 description: Standard deviation of tempdb space usage. High variability suggests inconsistent temporary object usage patterns, potentially varying by query complexity, parameter types, or different data access patterns affecting temporary object creation.
           performance: |
-            Executes dynamic SQL to aggregate Query Store data and can be resource-intensive on busy servers with many databases.<br/>• Execution time depends on Query Store workload and number of monitored databases<br/>• Default limit of 500 rows provides balance between completeness and performance<br/>• Columns are dynamically detected based on SQL Server version (some metrics only available in 2016+)
+            Executes dynamic SQL to aggregate Query Store data across all enabled databases:<br/>• Execution time depends on Query Store workload and number of monitored databases<br/>• Default limit of 500 rows balances completeness with performance
           security: |
-            Query text may contain unmasked literal values including potentially sensitive data.<br/>• Customer data (names, emails, phone numbers)<br/>• Business logic (proprietary algorithms, pricing)<br/>• Internal identifiers (application names, object IDs)<br/>• SQL statements that reveal table structures or relationships<br/>• Access should be restricted to authorized personnel only due to potential PII exposure
+            Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
               - title: Enable Query Store
@@ -580,7 +580,7 @@ modules:
 
                   :::
           availability: |
-            Available when:<br/>• Query Store is enabled on at least one user database<br/>• `query_store_function_enabled` is set to true in collector config<br/>• The collector has successfully connected to SQL Server<br/>• Returns HTTP 403 if function is disabled in configuration<br/>• Returns HTTP 500 if no databases have Query Store enabled<br/>• Returns HTTP 504 if the query times out
+            Available when:<br/>• The collector has successfully connected to SQL Server<br/>• Query Store is enabled on at least one user database<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
     metrics:
       folding:
         title: Metrics

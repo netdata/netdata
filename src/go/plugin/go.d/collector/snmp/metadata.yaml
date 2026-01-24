@@ -605,11 +605,11 @@ modules:
                 visibility: hidden
                 description: Rate of multicast packets transmitted per second in thousands.
           performance: |
-            Uses cached SNMP data only and does not trigger additional SNMP requests. Responses are instantaneous from memory cache.<br/>• Large devices (switches, routers with many interfaces) may return many rows, which may take longer to render<br/>• Default filter shows Ethernet interfaces only; use Type Group filter to reduce result set size<br/>• Data is updated only during regular SNMP polling cycles (controlled by update_every config option)
+            Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many interfaces may return many rows
           security: |
-            Exposes interface names, operational status, and traffic counters only. No sensitive data such as packet payloads, authentication credentials, or device configuration details are exposed.
+            Exposes interface names, operational status, and traffic counters only:<br/>• No packet payloads or authentication credentials are exposed<br/>• No device configuration details are exposed
           availability: |
-            Available when:<br/>• The collector has completed at least one data collection cycle<br/>• Interface data is cached from the last successful SNMP collection<br/>• Returns HTTP 503 if cache is not ready yet (wait for next SNMP collection cycle)<br/>• Returns HTTP 500 if no interface data is available
+            Available when:<br/>• The collector has completed at least one data collection cycle<br/>• Interface data is cached from the last successful SNMP collection<br/>• Returns HTTP 503 if cache is not ready yet
     metrics:
       folding:
         title: Metrics

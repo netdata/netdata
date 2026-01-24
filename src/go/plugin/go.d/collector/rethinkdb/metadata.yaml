@@ -159,7 +159,7 @@ modules:
               default: durationMs
               options: []
           returns:
-            description: Currently running queries from the rethinkdb.jobs system table. Each row represents a single active query with its execution context.
+            description: Currently running queries from the `rethinkdb.jobs` system table. Each row represents a single active query with its execution context.
             columns:
               - name: Job ID
                 type: string
@@ -203,7 +203,7 @@ modules:
             Query text may contain unmasked literal values including potentially sensitive data:<br/>• Document field values in filter conditions<br/>• User-provided data in insert/update operations<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
-              - title: Grant admin access to rethinkdb.jobs
+              - title: Grant admin access to `rethinkdb.jobs`
                 description: |
                   The user must have admin privileges to query the `rethinkdb.jobs` system table.
 
@@ -223,7 +223,7 @@ modules:
 
                   :::
           availability: |
-            Available when:<br/>• The collector has successfully connected to RethinkDB<br/>• The user has admin access to `rethinkdb.jobs` table<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the jobs query fails
+            Available when:<br/>• The collector has successfully connected to RethinkDB<br/>• The user has admin access to `rethinkdb.jobs` table<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
     metrics:
       folding:
         title: Metrics

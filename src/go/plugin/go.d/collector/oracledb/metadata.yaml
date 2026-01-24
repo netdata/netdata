@@ -165,6 +165,8 @@ modules:
             - Identify slow queries consuming the most total execution time
             - Find queries with high buffer gets or disk reads for I/O optimization
             - Analyze CPU-intensive queries for resource tuning
+
+            Query text is truncated at 4096 characters for display purposes.
           parameters:
             - id: __sort
               name: Filter By
@@ -238,9 +240,9 @@ modules:
                 visibility: hidden
                 description: "Timestamp when this SQL statement was last executed. Helps identify recently active vs historical queries."
           performance: |
-            Queries `V$SQLSTATS` which is a lightweight view optimized for statistics retrieval.<br/>• On busy databases with many SQL statements, the query may take longer<br/>• Default limit of 500 rows balances usefulness with performance<br/>• Filters to statements with at least one execution
+            Queries `V$SQLSTATS` which is a lightweight view optimized for statistics retrieval:<br/>• On busy databases with many SQL statements, the query may take longer<br/>• Default limit of 500 rows balances usefulness with performance
           security: |
-            Query text may contain unmasked literal values including potentially sensitive data.<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Table and column names revealing database schema<br/>• Access should be restricted to authorized personnel only
+            Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
               - title: Grant access to V$SQLSTATS
@@ -265,7 +267,7 @@ modules:
 
                   - `V$SQLSTATS` is available in Oracle 10g and later
                   - The view aggregates statistics across all child cursors for each SQL statement
-                  - Some columns like MODULE and ACTION require applications to set them via `DBMS_APPLICATION_INFO`
+                  - Some columns like `MODULE` and `ACTION` require applications to set them via `DBMS_APPLICATION_INFO`
 
                   :::
           availability: |
@@ -281,6 +283,8 @@ modules:
             - Identify long-running queries that may be blocking other sessions
             - Monitor active workload and session distribution
             - Debug stuck or slow queries in real-time
+
+            Query text is truncated at 4096 characters for display purposes.
           parameters:
             - id: __sort
               name: Filter By
@@ -348,9 +352,9 @@ modules:
                 visibility: hidden
                 description: "Client machine name or IP address. Useful for identifying query sources."
           performance: |
-            Queries `V$SESSION` joined with `V$SQL` for currently active sessions.<br/>• Lightweight operation as it only returns currently active user sessions<br/>• Default limit of 500 rows (rarely reached for running queries)<br/>• Filters to USER sessions with ACTIVE status and non-null SQL ID
+            Queries `V$SESSION` joined with `V$SQL` for currently active sessions:<br/>• Lightweight operation as it only returns currently active user sessions<br/>• Default limit of 500 rows (rarely reached for running queries)
           security: |
-            Query text may contain unmasked literal values including potentially sensitive data.<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and credentials in query parameters<br/>• Access should be restricted to authorized personnel only
+            Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and credentials in query parameters<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
               - title: Grant access to V$SESSION

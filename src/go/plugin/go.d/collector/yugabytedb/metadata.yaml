@@ -267,7 +267,7 @@ modules:
               default: totalTime
               options: []
           returns:
-            description: Aggregated query statistics from pg_stat_statements. Each row represents a unique query pattern with cumulative metrics across all executions.
+            description: Aggregated query statistics from `pg_stat_statements`. Each row represents a unique query pattern with cumulative metrics across all executions.
             columns:
               - name: Query ID
                 type: string
@@ -277,7 +277,7 @@ modules:
               - name: Query
                 type: string
                 unit: ""
-                description: The SQL statement text with literal values. Truncated to 4096 characters. May contain sensitive data from application queries.
+                description: The SQL statement text with literal values. Truncated to 4096 characters.
               - name: Database
                 type: string
                 unit: ""
@@ -347,7 +347,7 @@ modules:
 
                   :::
           availability: |
-            Available when:<br/>• The collector has successfully connected to YSQL<br/>• The `pg_stat_statements` extension is installed<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails
+            Available when:<br/>• The collector has successfully connected to YSQL<br/>• The `pg_stat_statements` extension is installed<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
         - id: running-queries
           name: Running Queries
           description: |
@@ -370,7 +370,7 @@ modules:
               default: elapsedMs
               options: []
           returns:
-            description: Currently running SQL statements from pg_stat_activity. Each row represents an active backend process with its current query and execution context.
+            description: Currently running SQL statements from `pg_stat_activity`. Each row represents an active backend process with its current query and execution context.
             columns:
               - name: PID
                 type: string
@@ -380,7 +380,7 @@ modules:
               - name: Query
                 type: string
                 unit: ""
-                description: The SQL statement currently being executed. Truncated to 4096 characters. May contain sensitive data.
+                description: The SQL statement currently being executed. Truncated to 4096 characters.
               - name: Database
                 type: string
                 unit: ""
@@ -444,7 +444,7 @@ modules:
 
                   :::
           availability: |
-            Available when:<br/>• The collector has successfully connected to YSQL<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails
+            Available when:<br/>• The collector has successfully connected to YSQL<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
     metrics:
       folding:
         title: Metrics

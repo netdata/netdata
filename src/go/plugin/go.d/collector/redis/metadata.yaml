@@ -248,7 +248,7 @@ modules:
           security: |
             Command arguments may contain unmasked literal values including potentially sensitive data:<br/>• Redis keys and values in command arguments<br/>• Application-specific identifiers or session tokens<br/>• Access should be restricted to authorized personnel only
           availability: |
-            Available when:<br/>• The collector has successfully connected to Redis<br/>• SLOWLOG is enabled (`slowlog-log-slower-than` > 0)<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the SLOWLOG GET command fails
+            Available when:<br/>• The collector has successfully connected to Redis<br/>• SLOWLOG is enabled (`slowlog-log-slower-than` > 0)<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the command fails<br/>• Returns HTTP 504 if the command times out
     metrics:
       folding:
         title: Metrics

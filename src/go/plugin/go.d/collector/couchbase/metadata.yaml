@@ -269,12 +269,12 @@ modules:
                 visibility: hidden
                 description: "Client-provided context identifier for request tracking and correlation."
           performance: |
-            Queries `system:completed_requests` via the N1QL query service.<br/>• The `completed_requests` keyspace has a configurable size limit (`completed-limit` setting)<br/>• Default limit of 500 rows balances usefulness with performance<br/>• Queries are sent to port 8093 (N1QL service) by default
+            Queries `system:completed_requests` via the N1QL query service:<br/>• The `completed_requests` keyspace has a configurable size limit (`completed-limit` setting)<br/>• Default limit of 500 rows balances usefulness with performance
           security: |
-            Query text may contain unmasked literal values including potentially sensitive data.<br/>• Personal information in WHERE clauses or INSERT values<br/>• Document keys or identifiers<br/>• Business data embedded in queries<br/>• Access should be restricted to authorized personnel only
+            Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data embedded in queries<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
-              - title: Grant access to system:completed_requests
+              - title: Grant access to `system:completed_requests`
                 description: |
                   The user must have appropriate privileges to query system keyspaces and the N1QL service must be available.
 
@@ -300,7 +300,7 @@ modules:
 
                      :::
           availability: |
-            Available when:<br/>• The collector has successfully connected to Couchbase<br/>• The N1QL (Query) service is running<br/>• The user has QUERY_SYSTEM_CATALOG privileges<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the N1QL query fails
+            Available when:<br/>• The collector has successfully connected to Couchbase<br/>• The N1QL (Query) service is running<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
     metrics:
       folding:
         title: Metrics

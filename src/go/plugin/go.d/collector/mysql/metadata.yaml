@@ -236,19 +236,16 @@ modules:
         - id: top-queries
           name: Top Queries
           description: |
-            Retrieves and aggregates SQL query performance metrics from MySQL Performance Schema statement digest tables.
+            Retrieves aggregated SQL query performance metrics from MySQL [performance_schema.events_statements_summary_by_digest](https://dev.mysql.com/doc/refman/8.4/en/performance-schema-statement-summary-tables.html) table.
 
-            This function queries the [performance_schema.events_statements_summary_by_digest](https://dev.mysql.com/doc/refman/8.4/en/performance-schema-statement-summary-tables.html) table, which contains aggregated
-            statistics for SQL statements grouped by their digest (normalized query pattern). The function dynamically detects
-            available columns based on your MySQL/MariaDB version and returns the top entries sorted by a user-selected metric.
+            This function queries the `events_statements_summary_by_digest` table which contains aggregated statistics for SQL statements grouped by their digest (normalized query pattern). The function dynamically detects available columns based on your MySQL/MariaDB version.
 
             Use cases:
             - Identify slow queries that consume the most execution time
             - Find frequently executed queries that may benefit from optimization
             - Detect queries with high lock time, errors, or table scans
 
-            The function automatically converts timer metrics from picoseconds (stored in Performance Schema) to milliseconds
-            for easier interpretation. Query text is truncated at 4096 characters for display purposes.
+            Query text is truncated at 4096 characters for display purposes.
           parameters:
             - id: __sort
               name: Filter By
@@ -429,9 +426,9 @@ modules:
                 unit: ""
                 description: "Maximum total memory used by this query pattern including both controlled and uncontrolled allocations. Available in MySQL 8.0.31+."
           performance: |
-            Minimal overhead when properly configured. On busy servers with high query throughput, digest table can contain many rows and queries may take longer.<br/>• Default limit of 500 rows balances usefulness with performance<br/>• Adjust `top_queries_limit` configuration option if needed<br/>• Performance Schema overhead typically 1-3% CPU for collecting statement statistics<br/>• Consider disabling statement instrumentation during peak load periods if performance impact is a concern
+            Queries the `events_statements_summary_by_digest` table:<br/>• On busy servers with high query throughput, the digest table can grow large<br/>• Default limit of 500 rows balances usefulness with performance
           security: |
-            Query text may contain unmasked literal values including potentially sensitive data.<br/>• Personal information (names, emails, phone numbers)<br/>• Authentication credentials (if improperly handled by application)<br/>• Proprietary business data<br/>• Session identifiers or tokens<br/>• Access should be restricted to authorized personnel only
+            Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
               - title: Enable performance_schema statement digest collection
@@ -504,7 +501,7 @@ modules:
                      SELECT COUNT(*) FROM performance_schema.events_statements_summary_by_digest;
                      ```
           availability: |
-            Available when:<br/>• Performance Schema is enabled and accessible<br/>• Statement digest collection is configured<br/>• The collector has completed its initial data collection<br/>• Columns are dynamically detected based on MySQL/MariaDB version<br/>• Some metrics (percentiles, sample queries, CPU time, memory) only available in MySQL 8.0+<br/>• Returns HTTP 503 if Performance Schema is not enabled<br/>• Returns HTTP 500 if digest table is not accessible or contains no available columns
+            Available when:<br/>• The collector has successfully connected to MySQL<br/>• Performance Schema is enabled with statement digest collection<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
     metrics:
       folding:
         title: Metrics

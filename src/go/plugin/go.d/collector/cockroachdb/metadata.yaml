@@ -26,7 +26,7 @@ modules:
         method_description: |
           It scrapes Prometheus metrics from the CockroachDB `/_status/vars` endpoint.
 
-          It also provides `top-queries` and `running-queries` functions using SQL statement statistics (`crdb_internal.cluster_statement_statistics`) and `SHOW CLUSTER STATEMENTS`.
+          It also provides `top-queries` and `running-queries` functions using SQL statement statistics (`crdb_internal.cluster_statement_statistics`) and `SHOW CLUSTER STATEMENTS` command.
       supported_platforms:
         include: []
         exclude: []
@@ -35,7 +35,7 @@ modules:
         description: |
           The `top-queries` and `running-queries` functions require:
 
-          - A SQL user with `VIEWACTIVITY` (or `VIEWACTIVITYREDACTED`) privileges.
+          - A SQL user with `VIEWACTIVITY` or `VIEWACTIVITYREDACTED` privileges.
           - Access to `crdb_internal.cluster_statement_statistics` (may require `SET allow_unsafe_internals = on` on newer versions).
       default_behavior:
         auto_detection:
@@ -367,16 +367,16 @@ modules:
                 visibility: hidden
                 description: "Maximum number of automatic retries observed for this query pattern. High values indicate transaction contention."
           performance: |
-            Queries crdb_internal.cluster_statement_statistics which aggregates data across the cluster.<br/>• On busy clusters with high query throughput, this query may take longer<br/>• Default limit of 500 rows balances usefulness with performance<br/>• Statistics are retained based on cluster settings (diagnostics.forced_stat_reset.interval, diagnostics.sampling.enabled)
+            Queries the `crdb_internal.cluster_statement_statistics` table which aggregates data across the cluster:<br/>• On busy clusters with high query throughput, this query may take longer<br/>• Default limit of 500 rows balances usefulness with performance
           security: |
-            Query text may contain unmasked literal values including potentially sensitive data.<br/>• Personal information (names, emails, identifiers)<br/>• Authentication tokens or session data<br/>• Business data in WHERE clauses or INSERT values<br/>• Use VIEWACTIVITYREDACTED privilege to mask sensitive literals<br/>• Access should be restricted to authorized personnel only
+            Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
-              - title: Grant VIEWACTIVITY access to cluster statement stats
+              - title: Grant `VIEWACTIVITY` access to cluster statement stats
                 description: |
                   The SQL user must have appropriate privileges to access statement statistics.
 
-                  1. Grant VIEWACTIVITY (shows full query text) or VIEWACTIVITYREDACTED (masks literals):
+                  1. Grant `VIEWACTIVITY` (shows full query text) or `VIEWACTIVITYREDACTED` (masks literals):
 
                      ```sql
                      GRANT SYSTEM VIEWACTIVITY TO netdata_user;
@@ -384,21 +384,21 @@ modules:
                      GRANT SYSTEM VIEWACTIVITYREDACTED TO netdata_user;
                      ```
 
-                  2. On newer CockroachDB versions, access to crdb_internal may require:
+                  2. On newer CockroachDB versions, access to `crdb_internal` may require:
 
                      ```sql
                      SET allow_unsafe_internals = on;
                      ```
 
-                     :::info
+                  :::info
 
-                     - The collector automatically attempts to set allow_unsafe_internals when connecting
-                     - VIEWACTIVITYREDACTED replaces literal values with underscores for privacy
-                     - Statement statistics are collected by default but can be disabled via cluster settings
+                  - The collector automatically attempts to set `allow_unsafe_internals` when connecting
+                  - `VIEWACTIVITYREDACTED` replaces literal values with underscores for privacy
+                  - Statement statistics are collected by default but can be disabled via cluster settings
 
-                     :::
+                  :::
           availability: |
-            Available when:<br/>• SQL DSN is configured in the collector<br/>• The SQL user has VIEWACTIVITY or VIEWACTIVITYREDACTED privileges<br/>• crdb_internal.cluster_statement_statistics is accessible<br/>• Returns HTTP 400 if DSN is not configured<br/>• Returns HTTP 503 if SQL connection fails<br/>• Returns HTTP 504 if query times out
+            Available when:<br/>• The collector has successfully connected to CockroachDB<br/>• The SQL user has `VIEWACTIVITY` or `VIEWACTIVITYREDACTED` privileges<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
         - id: running-queries
           name: Running Queries
           description: |
@@ -410,6 +410,8 @@ modules:
             - Identify long-running queries that may be blocking other operations
             - Monitor active workload distribution across the cluster
             - Debug stuck or slow queries in real-time
+
+            Query text is truncated at 4096 characters for display purposes.
           parameters:
             - id: __sort
               name: Filter By
@@ -472,16 +474,16 @@ modules:
                 unit: "milliseconds"
                 description: "Time elapsed since query started. High values indicate long-running queries that may need investigation."
           performance: |
-            Executes SHOW CLUSTER STATEMENTS which queries all nodes in the cluster.<br/>• Lightweight operation with minimal overhead<br/>• Returns only currently active queries, typically a small result set<br/>• Default limit of 500 rows (rarely reached for running queries)
+            Executes the `SHOW CLUSTER STATEMENTS` command which queries all nodes in the cluster:<br/>• Lightweight operation with minimal overhead<br/>• Returns only currently active queries, typically a small result set
           security: |
-            Query text may contain unmasked literal values including potentially sensitive data.<br/>• Personal information in WHERE clauses or VALUES<br/>• Session tokens or credentials<br/>• Use VIEWACTIVITYREDACTED privilege to mask sensitive literals<br/>• Access should be restricted to authorized personnel only
+            Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or VALUES<br/>• Session tokens or credentials<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
-              - title: Grant VIEWACTIVITY access to system tables
+              - title: Grant `VIEWACTIVITY` access to system tables
                 description: |
                   The SQL user must have appropriate privileges to view running statements.
 
-                  1. Grant VIEWACTIVITY (shows full query text) or VIEWACTIVITYREDACTED (masks literals):
+                  1. Grant `VIEWACTIVITY` (shows full query text) or `VIEWACTIVITYREDACTED` (masks literals):
 
                      ```sql
                      GRANT SYSTEM VIEWACTIVITY TO netdata_user;
@@ -491,13 +493,13 @@ modules:
 
                      :::info
 
-                     - SHOW CLUSTER STATEMENTS shows queries across all nodes, not just the connected node
-                     - VIEWACTIVITYREDACTED replaces literal values with underscores for privacy
+                     - `SHOW CLUSTER STATEMENTS` shows queries across all nodes, not just the connected node
+                     - `VIEWACTIVITYREDACTED` replaces literal values with underscores for privacy
                      - Queries shown are point-in-time snapshots and may complete between retrieval and display
 
                      :::
           availability: |
-            Available when:<br/>• SQL DSN is configured in the collector<br/>• The SQL user has VIEWACTIVITY or VIEWACTIVITYREDACTED privileges<br/>• Returns HTTP 400 if DSN is not configured<br/>• Returns HTTP 503 if SQL connection fails<br/>• Returns HTTP 504 if query times out
+            Available when:<br/>• The collector has successfully connected to CockroachDB<br/>• The SQL user has `VIEWACTIVITY` or `VIEWACTIVITYREDACTED` privileges<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
     metrics:
       folding:
         title: Metrics

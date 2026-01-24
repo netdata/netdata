@@ -237,6 +237,8 @@ modules:
             - Identify slow queries consuming the most total execution time
             - Find queries with high shared block reads for I/O optimization
             - Analyze temp block usage to detect queries needing memory tuning
+
+            Query text is truncated at 4096 characters for display purposes.
           parameters:
             - id: __sort
               name: Filter By
@@ -446,9 +448,9 @@ modules:
                 visibility: hidden
                 description: "Time spent writing temp blocks. Available in PostgreSQL 15+. Requires `track_io_timing`."
           performance: |
-            Queries `pg_stat_statements` which maintains statistics in shared memory.<br/>• On busy servers with many unique queries, the extension may consume significant memory<br/>• Default limit of 500 rows balances usefulness with performance<br/>• Columns are dynamically detected based on PostgreSQL version (13+ has planning stats, 15+ has JIT stats)
+            Queries `pg_stat_statements` which maintains statistics in shared memory:<br/>• On busy servers with many unique queries, the extension may consume significant memory<br/>• Default limit of 500 rows balances usefulness with performance
           security: |
-            Query text may contain unmasked literal values including potentially sensitive data.<br/>• Personal information in WHERE clauses or INSERT values<br/>• Credentials or tokens in query parameters<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only
+            Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
               - title: Enable pg_stat_statements

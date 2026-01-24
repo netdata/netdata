@@ -347,9 +347,9 @@ modules:
                 visibility: hidden
                 description: "Whether a cancellation request has been issued for this task."
           performance: |
-            Queries the `/_tasks` API filtered for search actions.<br/>• Lightweight operation with minimal cluster overhead<br/>• Returns only currently active search tasks, typically a small result set<br/>• Default limit of 500 rows (rarely reached for running tasks)
+            Queries the `/_tasks` API filtered for search actions:<br/>• Lightweight operation with minimal cluster overhead<br/>• Returns only currently active search tasks, typically a small result set
           security: |
-            Task descriptions may contain query details including potentially sensitive information.<br/>• Index names and search patterns<br/>• Query terms and filter values<br/>• Field names revealing data structure<br/>• Access should be restricted to authorized personnel only
+            Task descriptions may contain query details including potentially sensitive information:<br/>• Index names and search patterns<br/>• Query terms and filter values<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
               - title: Ensure access to Tasks API

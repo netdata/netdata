@@ -180,6 +180,8 @@ modules:
             - Identify slow queries that exceed the profiling threshold
             - Analyze query patterns by examining docs examined vs docs returned ratios
             - Detect collection scans (COLLSCAN) that may need index optimization
+
+            Query text is truncated at 4096 characters for display purposes.
           parameters:
             - id: __sort
               name: Filter By
@@ -320,9 +322,9 @@ modules:
                 visibility: hidden
                 description: "Hash representing the query shape for grouping similar queries. Available in MongoDB 8.0+."
           performance: |
-            Reads from `system.profile` collection across all user databases.<br/>• Profiling itself adds overhead to MongoDB operations (typically 1-5%)<br/>• The `system.profile` collection is a capped collection with configurable size<br/>• Default limit of 500 rows balances usefulness with performance
+            Reads from `system.profile` collection across all user databases:<br/>• Profiling itself adds overhead to MongoDB operations (typically 1-5%)<br/>• Default limit of 500 rows balances usefulness with performance
           security: |
-            Query text may contain unmasked literal values including potentially sensitive data.<br/>• Document field values in query filters<br/>• Personal information in inserted/updated documents<br/>• Authentication tokens or identifiers<br/>• Access should be restricted to authorized personnel only
+            Query text may contain unmasked literal values including potentially sensitive data:<br/>• Document field values in query filters<br/>• Personal information in inserted/updated documents<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
               - title: Enable MongoDB profiling
@@ -366,7 +368,7 @@ modules:
 
                   :::
           availability: |
-            Available when:<br/>• `top_queries_function_enabled` is set to true in collector config<br/>• Profiling is enabled on at least one user database<br/>• The collector has successfully connected to MongoDB<br/>• Returns HTTP 403 if function is disabled in config<br/>• Returns HTTP 503 if profiling is disabled on all databases<br/>• Returns HTTP 500 if database queries fail
+            Available when:<br/>• The collector has successfully connected to MongoDB<br/>• Profiling is enabled on at least one user database<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
     metrics:
       folding:
         title: Metrics
