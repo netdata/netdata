@@ -480,7 +480,7 @@ modules:
                   - `pg_stat_statements` requires a server restart to load the shared library
                   - Statistics can be reset with `SELECT pg_stat_statements_reset()`
                   - The `pg_stat_statements.max` parameter controls maximum tracked statements (default 5000)
-                  - Enable `track_io_timing` for block read/write timing metrics
+                  - Enable `track_io_timing` for block read/write timing metrics (may add slight overhead)
 
                   :::
           availability: |
