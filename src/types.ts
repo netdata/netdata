@@ -3,6 +3,7 @@ import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
 import type { PreloadedSubAgent } from './subagent-registry.js';
 import type { ToolOutputConfigInput } from './tool-output/types.js';
+import type { QueueManager } from './tools/queue-manager.js';
 import type { ReasoningOutput } from 'ai';
 // Core status interfaces for clear decision making
 export type TurnStatus =
@@ -799,6 +800,8 @@ export interface AIAgentSessionConfig {
   contextWindow?: number;
   // DI override for LLM turn execution (for testing - bypasses actual LLM calls)
   executeTurnOverride?: (request: TurnRequest) => Promise<TurnResult>;
+  // DI override for queue manager (for testing - enables parallel test execution)
+  queueManager?: QueueManager;
 }
 
 // Session result

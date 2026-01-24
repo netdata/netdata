@@ -755,6 +755,7 @@ export class AIAgentSession {
       toolTimeout: sessionConfig.toolTimeout,
       toolResponseMaxBytes: sessionConfig.toolResponseMaxBytes,
       traceTools: sessionConfig.traceMCP === true,
+      queueManager: sessionConfig.queueManager,
     },
     this.opTree,
     (tree: SessionNode) => { this.emitEvent({ type: 'op_tree', tree }); },

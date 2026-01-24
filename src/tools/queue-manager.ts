@@ -208,9 +208,48 @@ class QueueManagerImpl {
   }
 }
 
+// Interface definition for the queue manager (for DI)
+export interface QueueManager {
+  configureQueues: (map: Record<string, QueueConfig | undefined>) => void;
+  reset: () => void;
+  setListeners: (listeners: QueueListeners) => void;
+  acquire: (queue: string, ctx?: AcquireContext) => Promise<AcquireResult>;
+  release: (queue: string) => void;
+  getQueueStatus: (queue: string) => QueueStatus | undefined;
+}
+
+/**
+ * Factory function to create isolated queue manager instances.
+ * Used for testing to enable parallel test execution without shared state.
+ */
+export function createQueueManager(): QueueManager {
+  const instance = new QueueManagerImpl();
+  return {
+    configureQueues(map: Record<string, QueueConfig | undefined>): void {
+      instance.configure(map);
+    },
+    reset(): void {
+      instance.reset();
+    },
+    setListeners(listeners: QueueListeners): void {
+      instance.setListeners(listeners);
+    },
+    acquire(queue: string, ctx?: AcquireContext): Promise<AcquireResult> {
+      return instance.acquire(queue, ctx);
+    },
+    release(queue: string): void {
+      instance.release(queue);
+    },
+    getQueueStatus(queue: string): QueueStatus | undefined {
+      return instance.getStatus(queue);
+    },
+  };
+}
+
+// Default singleton instance for production use
 const manager = new QueueManagerImpl();
 
-export const queueManager = {
+export const queueManager: QueueManager = {
   configureQueues(map: Record<string, QueueConfig | undefined>): void {
     manager.configure(map);
   },

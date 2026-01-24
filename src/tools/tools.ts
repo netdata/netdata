@@ -15,10 +15,11 @@ import { computeTruncationPercent, truncateToBytesWithInfo } from '../truncation
 import { appendCallPathSegment, formatToolRequestCompact, normalizeCallPath, sanitizeToolName, warn } from '../utils.js';
 
 import { AgentProvider } from './agent-provider.js';
-import { queueManager, type AcquireResult, QueueAbortError } from './queue-manager.js';
+import { queueManager as defaultQueueManager, type AcquireResult, type QueueManager, QueueAbortError } from './queue-manager.js';
 import { ToolExecutionError, isToolExecutionError } from './tool-errors.js';
 
-queueManager.setListeners({
+// Set up telemetry listeners on the default singleton queue manager
+defaultQueueManager.setListeners({
   onDepthChange: (queue, info) => {
     recordQueueDepthMetrics({ queue, capacity: info.capacity, inUse: info.inUse, waiting: info.waiting });
   },
@@ -114,9 +115,11 @@ export class ToolsOrchestrator {
   private readonly cacheProvider?: () => ResponseCache | undefined;
   private readonly toolCacheResolver?: ToolCacheResolver;
   private readonly sessionInfo: { agentId?: string; agentPath?: string; callPath?: string; txnId?: string; headendId?: string; telemetryLabels?: Record<string, string>; agentHash?: string };
+  // Queue manager instance (injected for DI, or default singleton)
+  private readonly queueManager: QueueManager;
 
   constructor(
-    private readonly opts: { toolTimeout?: number; toolResponseMaxBytes?: number; traceTools?: boolean },
+    private readonly opts: { toolTimeout?: number; toolResponseMaxBytes?: number; traceTools?: boolean; queueManager?: QueueManager },
     private readonly opTree: SessionTreeBuilder,
     private readonly emitOpTree: (tree: SessionNode) => void,
     // Session-level logger (must never throw)
@@ -128,6 +131,8 @@ export class ToolsOrchestrator {
     private readonly toolOutputHandler?: ToolOutputHandler,
     cacheContext?: ToolCacheContext,
   ) {
+    // Use injected queue manager if provided, otherwise use default singleton
+    this.queueManager = opts.queueManager ?? defaultQueueManager;
     const normalizedCallPath = sessionInfo?.callPath !== undefined ? normalizeCallPath(sessionInfo.callPath) : undefined;
     const normalizedAgentPath = sessionInfo?.agentPath !== undefined ? normalizeCallPath(sessionInfo.agentPath) : undefined;
     const normalizedAgentId = sessionInfo?.agentId !== undefined ? normalizeCallPath(sessionInfo.agentId) : undefined;
@@ -301,7 +306,7 @@ export class ToolsOrchestrator {
       queueController = new AbortController();
       this.pendingQueueControllers.add(queueController);
       try {
-        queueResult = await queueManager.acquire(queueName, { signal: queueController.signal, agentId: this.sessionInfo.agentId, toolName: effective });
+        queueResult = await this.queueManager.acquire(queueName, { signal: queueController.signal, agentId: this.sessionInfo.agentId, toolName: effective });
         this.pendingQueueControllers.delete(queueController);
         queueController = undefined;
         acquiredQueue = true;
@@ -1352,7 +1357,7 @@ export class ToolsOrchestrator {
     };
     } finally {
       if (acquiredQueue && queueName !== undefined) {
-        queueManager.release(queueName);
+        this.queueManager.release(queueName);
       }
       if (queueController !== undefined) {
         this.pendingQueueControllers.delete(queueController);

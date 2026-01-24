@@ -40,7 +40,7 @@ import { ShutdownController } from '../../shutdown-controller.js';
 import { SubAgentRegistry } from '../../subagent-registry.js';
 import { estimateMessagesTokens, resolveTokenizer } from '../../tokenizer-registry.js';
 import { MCPProvider, forceRemoveSharedRegistryEntry, shutdownSharedRegistry } from '../../tools/mcp-provider.js';
-import { queueManager } from '../../tools/queue-manager.js';
+import { queueManager, createQueueManager } from '../../tools/queue-manager.js';
 import { truncateToBytes } from '../../truncation.js';
 import { clampToolName, sanitizeToolName, formatToolRequestCompact, formatAgentResultHumanReadable, setWarningSink, getWarningSink, warn } from '../../utils.js';
 import { createWebSocketTransport } from '../../websocket-transport.js';
@@ -132,10 +132,6 @@ const SEQUENTIAL_TEST_IDS = new Set([
   'run-test-router-handoff-invalid-retry',
   'run-test-advisor-event-meta',
   'run-test-subagent-event-meta',
-  // Tests that mutate global queue manager state
-  'run-test-25',
-  'run-test-queue-cancel',
-  'run-test-queue-isolation',
   // Coverage tests using global state variables
   'coverage-openrouter-json',
   'coverage-openrouter-sse',
@@ -3170,6 +3166,14 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     configure: (configuration) => {
       configuration.queues = { ...configuration.queues, default: { concurrent: 1 } };
     },
+    execute: async (configuration, sessionConfig) => {
+      // Create isolated queue manager for parallel test execution
+      const isolatedQueueManager = createQueueManager();
+      isolatedQueueManager.configureQueues(configuration.queues);
+      sessionConfig.queueManager = isolatedQueueManager;
+      const session = AIAgentSession.create(sessionConfig);
+      return await AIAgent.run(session);
+    },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-25 expected success.');
       const finalReport = result.finalReport!;
@@ -3224,7 +3228,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     configure: (configuration) => {
       configuration.queues = { ...configuration.queues, default: { concurrent: 1 } };
     },
-    execute: async (_configuration, sessionConfig) => {
+    execute: async (configuration, sessionConfig) => {
+      // Create isolated queue manager for parallel test execution
+      const isolatedQueueManager = createQueueManager();
+      isolatedQueueManager.configureQueues(configuration.queues);
+      sessionConfig.queueManager = isolatedQueueManager;
+
       const abort = new AbortController();
       sessionConfig.abortSignal = abort.signal;
       let abortTimer: NodeJS.Timeout | undefined;
@@ -3236,7 +3245,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         }, 0);
       };
       queuePoller = setInterval(() => {
-        const status = queueManager.getQueueStatus('default');
+        // Poll the isolated queue manager (same instance used by session)
+        const status = isolatedQueueManager.getQueueStatus('default');
         if (status?.waiting !== undefined && status.waiting > 0) {
           if (queuePoller !== undefined) {
             clearInterval(queuePoller);
@@ -3280,6 +3290,14 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         },
       } satisfies Record<string, MCPServerConfig>;
       sessionConfig.tools = ['slow', 'fast', 'batch'];
+    },
+    execute: async (configuration, sessionConfig) => {
+      // Create isolated queue manager for parallel test execution
+      const isolatedQueueManager = createQueueManager();
+      isolatedQueueManager.configureQueues(configuration.queues);
+      sessionConfig.queueManager = isolatedQueueManager;
+      const session = AIAgentSession.create(sessionConfig);
+      return await AIAgent.run(session);
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-queue-isolation expected success.');
