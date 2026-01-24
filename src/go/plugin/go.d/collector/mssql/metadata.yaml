@@ -233,14 +233,16 @@ modules:
         - id: top-queries
           name: Top Queries
           description: |
-            Provides comprehensive SQL query performance metrics from Microsoft SQL Server Query Store.
-            This function queries [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/query-store-oltp#overview) runtime statistics to retrieve aggregated runtime statistics for top-performing queries across all monitored databases. It presents results in a sortable, filterable table with extensive performance and resource utilization metrics.
+            Retrieves aggregated SQL query performance metrics from Microsoft SQL Server [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store) runtime statistics.
+
+            This function queries `sys.query_store_runtime_stats` and related views across all databases with Query Store enabled, aggregating execution statistics by query hash. It provides comprehensive timing, I/O, memory, and parallelism metrics.
+
             Use cases:
-            - Identify slow or resource-intensive queries consuming excessive CPU time or memory grants
-            - Analyze execution time patterns (min, max, standard deviation) for performance tuning
-            - Monitor Logical I/O and Physical I/O patterns to identify storage bottlenecks
-            - Investigate SQL Server memory pressure through tempdb and memory grant metrics
-            Data is sourced from Query Store runtime views, which aggregate query execution statistics. Query text is truncated at 4096 characters for display purposes. Columns are dynamically detected based on available Query Store views, with certain metrics only available in SQL Server 2016+.
+            - Identify slow or resource-intensive queries consuming excessive CPU time or memory
+            - Analyze I/O patterns (logical reads, physical reads, writes) to detect bottlenecks
+            - Monitor parallelism (DOP) and tempdb usage for capacity planning
+
+            Query text is truncated at 4096 characters for display purposes. Columns are dynamically detected based on SQL Server version (some metrics only available in 2016+/2017+).
           parameters:
             - id: __sort
               name: Filter By
@@ -541,30 +543,44 @@ modules:
             Executes dynamic SQL to aggregate Query Store data and can be resource-intensive on busy servers with many databases.<br/>• Execution time depends on Query Store workload and number of monitored databases<br/>• Default limit of 500 rows provides balance between completeness and performance<br/>• Columns are dynamically detected based on SQL Server version (some metrics only available in 2016+)
           security: |
             Query text may contain unmasked literal values including potentially sensitive data.<br/>• Customer data (names, emails, phone numbers)<br/>• Business logic (proprietary algorithms, pricing)<br/>• Internal identifiers (application names, object IDs)<br/>• SQL statements that reveal table structures or relationships<br/>• Access should be restricted to authorized personnel only due to potential PII exposure
-          availability: |
-            Available when Query Store is enabled and collector has completed at least one data collection cycle.<br/>• Columns are dynamically detected based on SQL Server version (2016+ metrics require newer versions)<br/>• Returns HTTP 403 if Query Store function is disabled in configuration<br/>• Returns HTTP 500 if no Query Store enabled databases found or available columns are missing
           prerequisites:
             list:
               - title: Enable Query Store
                 description: |
-                  Query Store must be enabled on each database you want to monitor for the collector to retrieve top queries performance data.
+                  Query Store must be enabled on each database you want to monitor.
 
                   1. Verify Query Store is enabled on your databases:
+
                      ```sql
-                     SELECT name, is_query_store_enabled
-                     FROM sys.databases;
+                     SELECT name, is_query_store_on
+                     FROM sys.databases
+                     WHERE name NOT IN ('master', 'tempdb', 'model', 'msdb');
                      ```
 
-                  2. Enable Query Store on databases where it is disabled (requires ALTER DATABASE permission):
+                  2. Enable Query Store on databases where it is disabled:
+
                      ```sql
                      ALTER DATABASE [YourDatabaseName] SET QUERY_STORE = ON;
                      ```
 
-                     ::: info
+                  3. Enable the function in Netdata collector config:
 
-                     Note: Enabling Query Store creates system objects and requires appropriate permissions. You may need to enable it on each database of interest individually.
+                     ```yaml
+                     jobs:
+                       - name: local
+                         dsn: "sqlserver://user:pass@localhost:1433"
+                         query_store_function_enabled: true
+                     ```
 
-                     :::
+                  :::info
+
+                  - Query Store is available in SQL Server 2016+ and Azure SQL Database
+                  - Requires ALTER DATABASE permission to enable Query Store
+                  - System databases (master, tempdb, model, msdb) are excluded from queries
+
+                  :::
+          availability: |
+            Available when:<br/>• Query Store is enabled on at least one user database<br/>• `query_store_function_enabled` is set to true in collector config<br/>• The collector has successfully connected to SQL Server<br/>• Returns HTTP 403 if function is disabled in configuration<br/>• Returns HTTP 500 if no databases have Query Store enabled<br/>• Returns HTTP 504 if the query times out
     metrics:
       folding:
         title: Metrics
