@@ -26,7 +26,7 @@ modules:
         method_description: |
           It scrapes Prometheus metrics from the CockroachDB `/_status/vars` endpoint.
 
-          It also provides `top-queries` and `running-queries` functions using SQL statement statistics (`crdb_internal.cluster_statement_statistics`) and `SHOW CLUSTER STATEMENTS` command.
+          It also provides `top-queries` and `running-queries` functions using SQL statement statistics (`crdb_internal.cluster_statement_statistics`) and the `SHOW CLUSTER STATEMENTS` command.
       supported_platforms:
         include: []
         exclude: []
