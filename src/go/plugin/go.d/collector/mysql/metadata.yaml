@@ -460,7 +460,7 @@ modules:
                      :::info
 
                      - Changes to `setup_consumers` take effect immediately without requiring a server restart.
-                     - MariaDB also supports `events_statements_summary_by_digest` table. The `setup_consumers.ENABLED` column is writable in MariaDB, or you can enable consumers at startup using `performance-schema-consumer-events_statements_summary_by_digest=ON` in your configuration file. Exact consumer names may vary by MariaDB version, so checking `setup_consumers` first as shown above is recommended.
+                     - MariaDB also supports the `events_statements_summary_by_digest` table. Exact consumer names may vary by MariaDB version, so checking `setup_consumers` first as shown above is recommended.
 
                      :::
 
