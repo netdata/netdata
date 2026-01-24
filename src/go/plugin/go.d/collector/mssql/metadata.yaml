@@ -398,7 +398,7 @@ modules:
               - name: Avg CLR Time
                 type: duration
                 unit: "milliseconds"
-                description: Average Common Language Runtime (CLR) time per execution. High values indicate managed code (stored procedures, functions, triggers) with heavy computations, garbage collection pressure, or inefficient memory allocations. Available in SQL Server 2016+.
+                description: Average CLR (Common Language Runtime) time per execution. High values indicate managed code (stored procedures, functions, triggers) with heavy computations, garbage collection pressure, or inefficient memory allocations. Available in SQL Server 2016+.
               - name: Last CLR Time
                 type: duration
                 unit: "milliseconds"
