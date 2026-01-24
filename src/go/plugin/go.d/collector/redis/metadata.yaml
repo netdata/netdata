@@ -191,19 +191,20 @@ modules:
         - id: top-queries
           name: Top Queries
           description: |
-            Provides performance analysis for slow commands logged in Redis [SLOWLOG](https://redis.io/docs/latest/commands/slowlog/).
-            This function queries the Redis [SLOWLOG](https://redis.io/docs/latest/commands/slowlog/) file to retrieve entries of commands that exceeded the configured execution time threshold. It presents results in a sortable, filterable table for identifying performance bottlenecks and inefficient command usage.
+            Retrieves slow command entries from Redis [SLOWLOG](https://redis.io/docs/latest/commands/slowlog/).
+
+            This function executes the `SLOWLOG GET` command to retrieve entries of commands that exceeded the configured execution time threshold (`slowlog-log-slower-than`). It provides command details, execution duration, and client information for each slow command.
+
             Use cases:
-            - Identify slow commands that may indicate optimization opportunities in application code or Redis usage patterns
-            - Analyze command execution frequency to detect performance hotspots and caching opportunities
-            - Investigate client address patterns to identify sources of slow commands or problematic clients
-            - Monitor slow command duration over time to detect performance degradation or improvements
-            - Track which commands are most frequently appearing in slow logs for resource planning
-            Note: Command arguments may contain unmasked literal values including potentially sensitive data. Exercise caution when reviewing or sharing slowlog contents.
+            - Identify slow commands that may need optimization
+            - Analyze command patterns to detect performance hotspots
+            - Investigate client sources of slow commands
+
+            Command text is truncated at 4096 characters for display purposes.
           parameters:
             - id: __sort
               name: Filter By
-              description: Select the primary sort column. The available options depend on your configuration and include metrics like execution duration, command type, and execution count. Default is Duration to focus on slowest commands.
+              description: Select the primary sort column. Options include duration, timestamp, ID, and command name. Defaults to duration to focus on slowest commands.
               type: select
               required: true
               default: duration
@@ -223,11 +224,11 @@ modules:
               - name: Command
                 type: string
                 unit: ""
-                description: The Redis command that was executed (e.g., SET, GET, HGETS, ZADD). Critical for identifying command type performance characteristics.
+                description: Full command text including all arguments. May contain sensitive data (keys, values) depending on application implementation. Truncated to 4096 characters.
               - name: Command Name
                 type: string
                 unit: ""
-                description: Full command text including all arguments passed to the command. May contain sensitive data (keys, values) depending on application implementation.
+                description: The Redis command name (e.g., SET, GET, HGETALL, ZADD). Useful for grouping and analyzing slow commands by type.
               - name: Duration
                 type: duration
                 unit: "milliseconds"
@@ -243,11 +244,11 @@ modules:
                 visibility: hidden
                 description: Client identifier or name reported by Redis. Useful for identifying specific applications or services generating slow commands.
           performance: |
-            Reads SLOWLOG file directly from disk; minimal overhead.<br/>• Returns limited entries based on top_queries_limit configuration<br/>• Large SLOWLOG files may take longer to read and process
+            Executes `SLOWLOG GET` command to retrieve entries from Redis memory:<br/>• Minimal overhead as SLOWLOG is stored in memory<br/>• Default limit of 500 entries balances completeness with performance<br/>• Large slowlogs with many entries may take slightly longer to transfer
           security: |
-            Command arguments may contain unmasked literal values including potentially sensitive data.<br/>• Redis keys, values, or cache keys in arguments<br/>• Application-specific identifiers or session tokens<br/>• Access should be restricted to authorized personnel only due to potential PII exposure
+            Command arguments may contain unmasked literal values including potentially sensitive data:<br/>• Redis keys and values in command arguments<br/>• Application-specific identifiers or session tokens<br/>• Access should be restricted to authorized personnel only
           availability: |
-            Available when SLOWLOG is enabled and collector has completed at least one data collection cycle.<br/>• Requires slowlog-log-slower-than configuration option to be set<br/>• Returns HTTP 503 if collector is still connecting to Redis<br/>• Returns HTTP 403 if top_queries_limit is set to 0
+            Available when:<br/>• The collector has successfully connected to Redis<br/>• SLOWLOG is enabled (`slowlog-log-slower-than` > 0)<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the SLOWLOG GET command fails
     metrics:
       folding:
         title: Metrics
