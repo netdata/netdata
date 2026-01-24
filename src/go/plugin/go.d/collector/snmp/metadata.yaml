@@ -557,7 +557,7 @@ modules:
                 type: float
                 unit: "Kpps"
                 visibility: hidden
-                description: Rate of unicast packets (from a single sender) transmitted per second in thousands.
+                description: Rate of unicast packets (addressed to a single destination) transmitted per second in thousands.
               - name: Broadcast In
                 type: float
                 unit: "Kpps"

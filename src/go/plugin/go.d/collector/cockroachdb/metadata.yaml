@@ -392,7 +392,7 @@ modules:
 
                   :::info
 
-                  - The collector automatically attempts to set `allow_unsafe_internals` when connecting
+                  - The collector automatically sets `allow_unsafe_internals = on` for the session when querying `crdb_internal` tables (required on newer versions)
                   - `VIEWACTIVITYREDACTED` replaces literal values with underscores for privacy
                   - Statement statistics are collected by default but can be disabled via cluster settings
 

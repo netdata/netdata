@@ -294,9 +294,9 @@ modules:
 
                      :::info
 
-                     - The `system:completed_requests` keyspace stores recently completed queries based on the `completed-limit` and `completed-threshold` settings
+                     - The `system:completed_requests` keyspace stores recently completed queries based on Couchbase server settings `completed-limit` and `completed-threshold`
                      - Only queries exceeding `completed-threshold` (default 1000ms) are logged to `completed_requests`
-                     - Adjust `completed-threshold` in Query Settings to capture faster queries if needed
+                     - Adjust `completed-threshold` in Couchbase Query Settings to capture faster queries if needed
 
                      :::
           availability: |
