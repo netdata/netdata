@@ -29,11 +29,10 @@ func init() {
 		Defaults: module.Defaults{
 			UpdateEvery: dbSamplingInterval,
 		},
-		Methods:      cockroachMethods,
-		MethodParams: cockroachMethodParams,
-		HandleMethod: cockroachHandleMethod,
-		Create:       func() module.Module { return New() },
-		Config:       func() any { return &Config{} },
+		Methods:       cockroachMethods,
+		MethodHandler: cockroachFunctionHandler,
+		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 

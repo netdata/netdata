@@ -163,6 +163,49 @@ func mysqlMethods() []module.MethodConfig {
 	}
 }
 
+// funcMysql implements funcapi.MethodHandler for MySQL.
+type funcMysql struct {
+	collector *Collector
+}
+
+// Compile-time interface check.
+var _ funcapi.MethodHandler = (*funcMysql)(nil)
+
+// MethodParams implements funcapi.MethodHandler.
+func (f *funcMysql) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if f.collector.db == nil {
+		return nil, fmt.Errorf("collector is still initializing")
+	}
+	switch method {
+	case "top-queries":
+		return f.collector.topQueriesParams(ctx)
+	default:
+		return nil, fmt.Errorf("unknown method: %s", method)
+	}
+}
+
+// Handle implements funcapi.MethodHandler.
+func (f *funcMysql) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if f.collector.db == nil {
+		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
+	}
+
+	switch method {
+	case "top-queries":
+		return f.collector.collectTopQueries(ctx, params.Column(paramSort))
+	default:
+		return funcapi.NotFoundResponse(method)
+	}
+}
+
+func mysqlFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
+	}
+	return &funcMysql{collector: c}
+}
+
 func buildMySQLSortOptions(cols []mysqlColumn) []funcapi.ParamOption {
 	var sortOptions []funcapi.ParamOption
 	sortDir := funcapi.FieldSortDescending
@@ -180,44 +223,6 @@ func buildMySQLSortOptions(cols []mysqlColumn) []funcapi.ParamOption {
 	return sortOptions
 }
 
-func mysqlMethodParams(ctx context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return nil, fmt.Errorf("invalid module type")
-	}
-	if collector.db == nil {
-		return nil, fmt.Errorf("collector is still initializing")
-	}
-	switch method {
-	case "top-queries":
-		return collector.topQueriesParams(ctx)
-	default:
-		return nil, fmt.Errorf("unknown method: %s", method)
-	}
-}
-
-// mysqlHandleMethod handles function requests for MySQL
-func mysqlHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return &module.FunctionResponse{Status: 500, Message: "internal error: invalid module type"}
-	}
-
-	// Check if collector is initialized (first collect() may not have run yet)
-	if collector.db == nil {
-		return &module.FunctionResponse{
-			Status:  503,
-			Message: "collector is still initializing, please retry in a few seconds",
-		}
-	}
-
-	switch method {
-	case "top-queries":
-		return collector.collectTopQueries(ctx, params.Column(paramSort))
-	default:
-		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
-	}
-}
 
 // detectMySQLStatementsColumns queries the database to discover available columns
 func (c *Collector) detectMySQLStatementsColumns(ctx context.Context) (map[string]bool, error) {

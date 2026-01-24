@@ -14,6 +14,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// mockMethodHandler implements funcapi.MethodHandler for testing.
+type mockMethodHandler struct {
+	job         *module.Job
+	paramsFunc  func(ctx context.Context, method string) ([]funcapi.ParamConfig, error)
+	handleFunc  func(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse
+}
+
+func (m *mockMethodHandler) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if m.paramsFunc != nil {
+		return m.paramsFunc(ctx, method)
+	}
+	return nil, nil
+}
+
+func (m *mockMethodHandler) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if m.handleFunc != nil {
+		return m.handleFunc(ctx, method, params)
+	}
+	return nil
+}
+
 func TestExtractParamValues(t *testing.T) {
 	tests := map[string]struct {
 		payload  map[string]any
@@ -180,32 +201,37 @@ func TestUnionMethodParams_JobOptionsOverrideStatic(t *testing.T) {
 		Methods: func() []module.MethodConfig {
 			return []module.MethodConfig{{ID: "top-queries", RequiredParams: baseParams}}
 		},
-		MethodParams: func(ctx context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
-			switch job.Name() {
-			case "job1":
-				return []funcapi.ParamConfig{{
-					ID:         "__sort",
-					Name:       "Filter By",
-					Selection:  funcapi.ParamSelect,
-					UniqueView: true,
-					Options: []funcapi.ParamOption{
-						{ID: "b", Name: "B", Sort: &sortDir},
-						{ID: "c", Name: "C", Sort: &sortDir},
-					},
-				}}, nil
-			case "job2":
-				return []funcapi.ParamConfig{{
-					ID:         "__sort",
-					Name:       "Filter By",
-					Selection:  funcapi.ParamSelect,
-					UniqueView: true,
-					Options: []funcapi.ParamOption{
-						{ID: "c", Name: "C", Sort: &sortDir},
-						{ID: "d", Name: "D", Sort: &sortDir},
-					},
-				}}, nil
-			default:
-				return nil, nil
+		MethodHandler: func(job *module.Job) funcapi.MethodHandler {
+			return &mockMethodHandler{
+				job: job,
+				paramsFunc: func(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+					switch job.Name() {
+					case "job1":
+						return []funcapi.ParamConfig{{
+							ID:         "__sort",
+							Name:       "Filter By",
+							Selection:  funcapi.ParamSelect,
+							UniqueView: true,
+							Options: []funcapi.ParamOption{
+								{ID: "b", Name: "B", Sort: &sortDir},
+								{ID: "c", Name: "C", Sort: &sortDir},
+							},
+						}}, nil
+					case "job2":
+						return []funcapi.ParamConfig{{
+							ID:         "__sort",
+							Name:       "Filter By",
+							Selection:  funcapi.ParamSelect,
+							UniqueView: true,
+							Options: []funcapi.ParamOption{
+								{ID: "c", Name: "C", Sort: &sortDir},
+								{ID: "d", Name: "D", Sort: &sortDir},
+							},
+						}}, nil
+					default:
+						return nil, nil
+					}
+				},
 			}
 		},
 	})
@@ -249,8 +275,13 @@ func TestUnionMethodParams_FallbackToStaticOnAllErrors(t *testing.T) {
 		Methods: func() []module.MethodConfig {
 			return []module.MethodConfig{{ID: "top-queries", RequiredParams: baseParams}}
 		},
-		MethodParams: func(ctx context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
-			return nil, errors.New("backend unavailable")
+		MethodHandler: func(job *module.Job) funcapi.MethodHandler {
+			return &mockMethodHandler{
+				job: job,
+				paramsFunc: func(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+					return nil, errors.New("backend unavailable")
+				},
+			}
 		},
 	})
 	r.addJob("postgres", "job1", newTestModuleFuncsJob("job1"))

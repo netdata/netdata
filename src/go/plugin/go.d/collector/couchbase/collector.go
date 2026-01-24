@@ -24,11 +24,10 @@ func init() {
 		Defaults: module.Defaults{
 			UpdateEvery: 5,
 		},
-		Create:       func() module.Module { return New() },
-		Config:       func() any { return &Config{} },
-		Methods:      couchbaseMethods,
-		MethodParams: couchbaseMethodParams,
-		HandleMethod: couchbaseHandleMethod,
+		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
+		Methods:       couchbaseMethods,
+		MethodHandler: couchbaseFunctionHandler,
 	})
 }
 

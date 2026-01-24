@@ -108,7 +108,16 @@ func elasticsearchMethods() []module.MethodConfig {
 	}
 }
 
-func elasticsearchMethodParams(_ context.Context, _ *module.Job, method string) ([]funcapi.ParamConfig, error) {
+// funcElasticsearch implements funcapi.MethodHandler for Elasticsearch.
+type funcElasticsearch struct {
+	collector *Collector
+}
+
+// Compile-time interface check.
+var _ funcapi.MethodHandler = (*funcElasticsearch)(nil)
+
+// MethodParams implements funcapi.MethodHandler.
+func (f *funcElasticsearch) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
 	switch method {
 	case "top-queries":
 		var sortOptions []funcapi.ParamOption
@@ -138,25 +147,26 @@ func elasticsearchMethodParams(_ context.Context, _ *module.Job, method string) 
 	}
 }
 
-func elasticsearchHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return &module.FunctionResponse{Status: 500, Message: "internal error: invalid module type"}
-	}
-
-	if collector.httpClient == nil {
-		return &module.FunctionResponse{
-			Status:  503,
-			Message: "collector is still initializing, please retry in a few seconds",
-		}
+// Handle implements funcapi.MethodHandler.
+func (f *funcElasticsearch) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if f.collector.httpClient == nil {
+		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 
 	switch method {
 	case "top-queries":
-		return collector.collectTopQueries(ctx, params.Column("__sort"))
+		return f.collector.collectTopQueries(ctx, params.Column("__sort"))
 	default:
-		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
+		return funcapi.NotFoundResponse(method)
 	}
+}
+
+func elasticsearchFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
+	}
+	return &funcElasticsearch{collector: c}
 }
 
 func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {

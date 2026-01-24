@@ -87,17 +87,21 @@ func yugabyteMethods() []module.MethodConfig {
 	}
 }
 
-func yugabyteMethodParams(ctx context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return nil, fmt.Errorf("invalid module type")
-	}
+// funcYugabyte implements funcapi.MethodHandler for YugabyteDB.
+type funcYugabyte struct {
+	collector *Collector
+}
 
+// Compile-time interface check.
+var _ funcapi.MethodHandler = (*funcYugabyte)(nil)
+
+// MethodParams implements funcapi.MethodHandler.
+func (f *funcYugabyte) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
 	switch method {
 	case "top-queries":
 		cols := ybTopColumns
-		if collector.db != nil {
-			if available, err := collector.availableTopColumns(ctx); err == nil {
+		if f.collector.db != nil {
+			if available, err := f.collector.availableTopColumns(ctx); err == nil {
 				cols = available
 			}
 		}
@@ -109,28 +113,32 @@ func yugabyteMethodParams(ctx context.Context, job *module.Job, method string) (
 	}
 }
 
-func yugabyteHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return &module.FunctionResponse{Status: 500, Message: "internal error: invalid module type"}
-	}
-
-	if err := collector.ensureSQL(ctx); err != nil {
+// Handle implements funcapi.MethodHandler.
+func (f *funcYugabyte) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if err := f.collector.ensureSQL(ctx); err != nil {
 		status := 503
 		if errors.Is(err, errYBSQLDSNNotSet) {
 			status = 400
 		}
-		return &module.FunctionResponse{Status: status, Message: err.Error()}
+		return funcapi.ErrorResponse(status, "%s", err.Error())
 	}
 
 	switch method {
 	case "top-queries":
-		return collector.collectTopQueries(ctx, params.Column("__sort"))
+		return f.collector.collectTopQueries(ctx, params.Column("__sort"))
 	case "running-queries":
-		return collector.collectRunningQueries(ctx, params.Column("__sort"))
+		return f.collector.collectRunningQueries(ctx, params.Column("__sort"))
 	default:
-		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
+		return funcapi.NotFoundResponse(method)
 	}
+}
+
+func yugabyteFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
+	}
+	return &funcYugabyte{collector: c}
 }
 
 func (c *Collector) ensureSQL(ctx context.Context) error {

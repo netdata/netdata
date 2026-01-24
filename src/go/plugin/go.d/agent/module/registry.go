@@ -3,7 +3,6 @@
 package module
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -34,7 +33,7 @@ type (
 
 type (
 	// Creator is a Job builder.
-	// Optional function fields (Methods/HandleMethod) enable the FunctionProvider pattern:
+	// Optional function fields (Methods/MethodHandler) enable the FunctionProvider pattern:
 	// modules that set these fields can expose data functions to the UI.
 	Creator struct {
 		Defaults
@@ -46,18 +45,12 @@ type (
 		// If Methods is non-nil, this module provides functions
 		Methods func() []MethodConfig
 
-		// Optional: MethodParams returns dynamic required params for a job+method.
-		// Use this to provide job-specific options (e.g., based on DB capabilities).
-		// When nil, MethodConfig.RequiredParams is used as-is.
-		MethodParams func(ctx context.Context, job *Job, method string) ([]funcapi.ParamConfig, error)
-
-		// HandleMethod handles a function request for a specific job
-		// ctx: context with timeout from function request
-		// job: the job instance to query
-		// method: the method name (e.g., "top-queries")
-		// params: resolved required params (includes __sort)
-		// Returns: FunctionResponse with data or error
-		HandleMethod func(ctx context.Context, job *Job, method string, params funcapi.ResolvedParams) *FunctionResponse
+		// Optional: MethodHandler returns a handler for method requests on a specific job.
+		// The handler implements funcapi.MethodHandler interface with:
+		// - MethodParams(ctx, method) for dynamic params
+		// - Handle(ctx, method, params) for request handling
+		// When nil, methods are disabled for this module.
+		MethodHandler func(job *Job) funcapi.MethodHandler
 	}
 	// Registry is a collection of Creators.
 	Registry map[string]Creator

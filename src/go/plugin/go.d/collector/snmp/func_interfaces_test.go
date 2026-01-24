@@ -620,7 +620,7 @@ func findColIdx(key string) int {
 
 func resolveIfaceParams(values map[string][]string) funcapi.ResolvedParams {
 	f := &funcInterfaces{}
-	params, err := f.MethodParams("interfaces")
+	params, err := f.MethodParams(context.Background(), "interfaces")
 	if err != nil {
 		return nil
 	}

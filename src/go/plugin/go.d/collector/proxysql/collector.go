@@ -25,8 +25,7 @@ func init() {
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         proxysqlMethods,
-		MethodParams:    proxysqlMethodParams,
-		HandleMethod:    proxysqlHandleMethod,
+		MethodHandler:   proxysqlFunctionHandler,
 	})
 }
 

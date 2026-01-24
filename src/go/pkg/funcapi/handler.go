@@ -7,8 +7,8 @@ import (
 	"fmt"
 )
 
-// FunctionHandler defines the interface for function implementations.
-// Each function (e.g., "top-queries", "interfaces") should have its own handler.
+// MethodHandler defines the interface for handling method requests.
+// Methods are defined in Creator.Methods(); this interface handles the requests.
 //
 // Example implementation:
 //
@@ -16,26 +16,20 @@ import (
 //	    db *sql.DB
 //	}
 //
-//	func (f *funcTopQueries) Methods() []MethodConfig {
-//	    return []MethodConfig{{ID: "top-queries", Name: "Top Queries", ...}}
-//	}
-//
-//	func (f *funcTopQueries) MethodParams(method string) ([]ParamConfig, error) {
-//	    return nil, nil // or return dynamic params
+//	func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]ParamConfig, error) {
+//	    return nil, nil // or return dynamic params from database
 //	}
 //
 //	func (f *funcTopQueries) Handle(ctx context.Context, method string, params ResolvedParams) *FunctionResponse {
 //	    // query database and build response
 //	}
-type FunctionHandler interface {
-	// Methods returns the method configurations this handler provides.
-	Methods() []MethodConfig
-
+type MethodHandler interface {
 	// MethodParams returns dynamic params for a method.
 	// Return nil to use static params from MethodConfig.RequiredParams.
-	MethodParams(method string) ([]ParamConfig, error)
+	// The context should be used for timeout/cancellation of database queries.
+	MethodParams(ctx context.Context, method string) ([]ParamConfig, error)
 
-	// Handle processes a function request and returns the response.
+	// Handle processes a method request and returns the response.
 	// The context should be used for timeout/cancellation of database queries.
 	Handle(ctx context.Context, method string, params ResolvedParams) *FunctionResponse
 }

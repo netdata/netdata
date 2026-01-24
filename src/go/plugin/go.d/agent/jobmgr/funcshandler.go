@@ -72,15 +72,22 @@ func (m *Manager) makeMethodFuncHandler(moduleName, methodID string) func(functi
 			return
 		}
 
-		// Get the creator for this module to call HandleMethod
+		// Get the creator for this module to call MethodHandler
 		creator, ok := m.moduleFuncs.getCreator(moduleName)
-		if !ok || creator.HandleMethod == nil {
-			m.respondError(fn, 500, "module '%s' does not implement HandleMethod", moduleName)
+		if !ok || creator.MethodHandler == nil {
+			m.respondError(fn, 500, "module '%s' does not implement MethodHandler", moduleName)
+			return
+		}
+
+		// Get the handler for this job
+		handler := creator.MethodHandler(job)
+		if handler == nil {
+			m.respondError(fn, 500, "module '%s' returned nil handler for job '%s'", moduleName, jobName)
 			return
 		}
 
 		// Resolve method-specific required params (job-aware)
-		methodParams, paramsFromJob, err := m.resolveMethodParamsForJob(ctx, moduleName, methodID, methodCfg, job, creator)
+		methodParams, paramsFromJob, err := m.resolveMethodParamsForJob(ctx, moduleName, methodID, methodCfg, job, handler)
 		if err != nil {
 			m.respondError(fn, 503, "job '%s' cannot provide parameters: %v", jobName, err)
 			return
@@ -102,7 +109,7 @@ func (m *Manager) makeMethodFuncHandler(moduleName, methodID string) func(functi
 		resolvedParams[paramJob] = resolvedJob
 
 		// Route to the module's handler - get DATA ONLY response
-		dataResp := creator.HandleMethod(ctx, job, methodID, resolvedParams)
+		dataResp := handler.Handle(ctx, methodID, resolvedParams)
 
 		// RACE CONDITION MITIGATION: Verify job was not replaced during handler execution
 		// If a config reload replaced this job while we were querying, the response
@@ -232,13 +239,10 @@ func (m *Manager) buildRequiredParams(moduleName string, methodParams []funcapi.
 	return required
 }
 
-func (m *Manager) resolveMethodParamsForJob(ctx context.Context, moduleName, methodID string, methodCfg *module.MethodConfig, job *module.Job, creator module.Creator) ([]funcapi.ParamConfig, bool, error) {
+func (m *Manager) resolveMethodParamsForJob(ctx context.Context, moduleName, methodID string, methodCfg *module.MethodConfig, job *module.Job, handler funcapi.MethodHandler) ([]funcapi.ParamConfig, bool, error) {
 	methodParams := methodCfg.RequiredParams
-	if creator.MethodParams == nil {
-		return methodParams, false, nil
-	}
 
-	jobParams, err := creator.MethodParams(ctx, job, methodID)
+	jobParams, err := handler.MethodParams(ctx, methodID)
 	if err != nil {
 		return nil, false, err
 	}
@@ -253,7 +257,7 @@ func (m *Manager) unionMethodParams(moduleName, methodID string, methodCfg *modu
 	baseParams := methodCfg.RequiredParams
 
 	creator, ok := m.moduleFuncs.getCreator(moduleName)
-	if !ok || creator.MethodParams == nil {
+	if !ok || creator.MethodHandler == nil {
 		return baseParams
 	}
 
@@ -271,7 +275,11 @@ func (m *Manager) unionMethodParams(moduleName, methodID string, methodCfg *modu
 		if !ok || job == nil {
 			continue
 		}
-		params, err := creator.MethodParams(ctx, job, methodID)
+		handler := creator.MethodHandler(job)
+		if handler == nil {
+			continue
+		}
+		params, err := handler.MethodParams(ctx, methodID)
 		if err != nil {
 			m.Debugf("method params unavailable for %s:%s job '%s': %v", moduleName, methodID, jobName, err)
 			continue

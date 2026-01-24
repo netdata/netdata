@@ -145,50 +145,52 @@ func mongoMethods() []module.MethodConfig {
 	}}
 }
 
-func mongoMethodParams(ctx context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return nil, fmt.Errorf("invalid module type")
-	}
-	if collector.conn == nil {
+// funcMongo implements funcapi.MethodHandler for MongoDB.
+type funcMongo struct {
+	collector *Collector
+}
+
+// Compile-time interface check.
+var _ funcapi.MethodHandler = (*funcMongo)(nil)
+
+// MethodParams implements funcapi.MethodHandler.
+func (f *funcMongo) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if f.collector.conn == nil {
 		return nil, fmt.Errorf("collector is still initializing")
 	}
 	switch method {
 	case "top-queries":
-		return collector.topQueriesParams(ctx)
+		return f.collector.topQueriesParams(ctx)
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
 }
 
-// mongoHandleMethod handles function requests for MongoDB
-func mongoHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return &module.FunctionResponse{Status: 500, Message: "internal error: invalid module type"}
-	}
-
+// Handle implements funcapi.MethodHandler.
+func (f *funcMongo) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	// Check if collector is initialized
-	if collector.conn == nil {
-		return &module.FunctionResponse{
-			Status:  503,
-			Message: "collector is still initializing, please retry in a few seconds",
-		}
+	if f.collector.conn == nil {
+		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 
 	switch method {
 	case "top-queries":
 		// Check if function is enabled
-		if !collector.Config.GetTopQueriesFunctionEnabled() {
-			return &module.FunctionResponse{
-				Status:  403,
-				Message: "Top Queries function has been disabled in configuration. Set 'top_queries_function_enabled: true' to enable.",
-			}
+		if !f.collector.Config.GetTopQueriesFunctionEnabled() {
+			return funcapi.ErrorResponse(403, "Top Queries function has been disabled in configuration. Set 'top_queries_function_enabled: true' to enable.")
 		}
-		return collector.collectTopQueries(ctx, params.Column(paramSort))
+		return f.collector.collectTopQueries(ctx, params.Column(paramSort))
 	default:
-		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
+		return funcapi.NotFoundResponse(method)
 	}
+}
+
+func mongoFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
+	}
+	return &funcMongo{collector: c}
 }
 
 // profileDocument represents a document from system.profile

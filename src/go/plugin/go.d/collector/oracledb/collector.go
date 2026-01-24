@@ -23,8 +23,7 @@ func init() {
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         oracleMethods,
-		MethodParams:    oracleMethodParams,
-		HandleMethod:    oracleHandleMethod,
+		MethodHandler:   oracleFunctionHandler,
 	})
 }
 

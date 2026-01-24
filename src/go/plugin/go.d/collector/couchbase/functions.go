@@ -120,7 +120,16 @@ func couchbaseMethods() []module.MethodConfig {
 	}
 }
 
-func couchbaseMethodParams(_ context.Context, _ *module.Job, method string) ([]funcapi.ParamConfig, error) {
+// funcCouchbase implements funcapi.MethodHandler for Couchbase.
+type funcCouchbase struct {
+	collector *Collector
+}
+
+// Compile-time interface check.
+var _ funcapi.MethodHandler = (*funcCouchbase)(nil)
+
+// MethodParams implements funcapi.MethodHandler.
+func (f *funcCouchbase) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
 	switch method {
 	case "top-queries":
 		var sortOptions []funcapi.ParamOption
@@ -150,25 +159,26 @@ func couchbaseMethodParams(_ context.Context, _ *module.Job, method string) ([]f
 	}
 }
 
-func couchbaseHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return &module.FunctionResponse{Status: 500, Message: "internal error: invalid module type"}
-	}
-
-	if collector.httpClient == nil {
-		return &module.FunctionResponse{
-			Status:  503,
-			Message: "collector is still initializing, please retry in a few seconds",
-		}
+// Handle implements funcapi.MethodHandler.
+func (f *funcCouchbase) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if f.collector.httpClient == nil {
+		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 
 	switch method {
 	case "top-queries":
-		return collector.collectTopQueries(ctx, params.Column("__sort"))
+		return f.collector.collectTopQueries(ctx, params.Column("__sort"))
 	default:
-		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
+		return funcapi.NotFoundResponse(method)
 	}
+}
+
+func couchbaseFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
+	}
+	return &funcCouchbase{collector: c}
 }
 
 func (c *Collector) queryServiceURL() (string, error) {

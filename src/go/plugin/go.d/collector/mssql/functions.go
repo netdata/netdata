@@ -188,43 +188,48 @@ func mssqlMethods() []module.MethodConfig {
 	}
 }
 
-func mssqlMethodParams(ctx context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return nil, fmt.Errorf("invalid module type")
-	}
-	if collector.db == nil {
+// funcMssql implements funcapi.MethodHandler for MSSQL.
+type funcMssql struct {
+	collector *Collector
+}
+
+// Compile-time interface check.
+var _ funcapi.MethodHandler = (*funcMssql)(nil)
+
+// MethodParams implements funcapi.MethodHandler.
+func (f *funcMssql) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if f.collector.db == nil {
 		return nil, fmt.Errorf("collector is still initializing")
 	}
 	switch method {
 	case "top-queries":
-		return collector.topQueriesParams(ctx)
+		return f.collector.topQueriesParams(ctx)
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
 }
 
-// mssqlHandleMethod handles function requests for MSSQL
-func mssqlHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return &module.FunctionResponse{Status: 500, Message: "internal error: invalid module type"}
-	}
-
+// Handle implements funcapi.MethodHandler.
+func (f *funcMssql) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	// Check if collector is initialized (first collect() may not have run yet)
-	if collector.db == nil {
-		return &module.FunctionResponse{
-			Status:  503,
-			Message: "collector is still initializing, please retry in a few seconds",
-		}
+	if f.collector.db == nil {
+		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 
 	switch method {
 	case "top-queries":
-		return collector.collectTopQueries(ctx, params.Column("__sort"))
+		return f.collector.collectTopQueries(ctx, params.Column("__sort"))
 	default:
-		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
+		return funcapi.NotFoundResponse(method)
 	}
+}
+
+func mssqlFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
+	}
+	return &funcMssql{collector: c}
 }
 
 // detectMSSQLQueryStoreColumns queries any database with Query Store enabled to discover available columns

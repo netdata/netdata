@@ -140,6 +140,49 @@ var pgLabelColumnIDs = map[string]bool{
 
 const pgPrimaryLabelID = "database"
 
+// funcPostgres implements funcapi.MethodHandler for PostgreSQL.
+type funcPostgres struct {
+	collector *Collector
+}
+
+// Compile-time interface check.
+var _ funcapi.MethodHandler = (*funcPostgres)(nil)
+
+// MethodParams implements funcapi.MethodHandler.
+func (f *funcPostgres) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if f.collector.db == nil {
+		return nil, fmt.Errorf("collector is still initializing")
+	}
+	switch method {
+	case "top-queries":
+		return f.collector.topQueriesParams(ctx)
+	default:
+		return nil, fmt.Errorf("unknown method: %s", method)
+	}
+}
+
+// Handle implements funcapi.MethodHandler.
+func (f *funcPostgres) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if f.collector.db == nil {
+		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
+	}
+	switch method {
+	case "top-queries":
+		return f.collector.collectTopQueries(ctx, params.Column(paramSort))
+	default:
+		return funcapi.NotFoundResponse(method)
+	}
+}
+
+// pgFunctionHandler creates and returns the MethodHandler for PostgreSQL.
+func pgFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
+	}
+	return &funcPostgres{collector: c}
+}
+
 // pgMethods returns the available function methods for PostgreSQL.
 // Sort options are built dynamically based on available columns.
 func pgMethods() []module.MethodConfig {
@@ -182,79 +225,28 @@ func buildPgSortOptions() []funcapi.ParamOption {
 	return opts
 }
 
-func pgMethodParams(ctx context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return nil, fmt.Errorf("invalid module type")
-	}
-	if collector.db == nil {
-		return nil, fmt.Errorf("collector is still initializing")
-	}
-	switch method {
-	case "top-queries":
-		return collector.topQueriesParams(ctx)
-	default:
-		return nil, fmt.Errorf("unknown method: %s", method)
-	}
-}
-
-// pgHandleMethod handles function requests for PostgreSQL
-func pgHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return &module.FunctionResponse{Status: 500, Message: "internal error: invalid module type"}
-	}
-
-	// Check if collector is initialized (first collect() may not have run yet)
-	if collector.db == nil {
-		return &module.FunctionResponse{
-			Status:  503,
-			Message: "collector is still initializing, please retry in a few seconds",
-		}
-	}
-
-	switch method {
-	case "top-queries":
-		return collector.collectTopQueries(ctx, params.Column(paramSort))
-	default:
-		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
-	}
-}
-
 // collectTopQueries queries pg_stat_statements for top queries.
-func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
+func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
 	// Check pg_stat_statements availability (lazy check)
 	available, err := c.checkPgStatStatements(ctx)
 	if err != nil {
-		return &module.FunctionResponse{
-			Status:  500,
-			Message: fmt.Sprintf("failed to check pg_stat_statements availability: %v", err),
-		}
+		return funcapi.InternalErrorResponse("failed to check pg_stat_statements availability: %v", err)
 	}
 	if !available {
-		return &module.FunctionResponse{
-			Status: 503,
-			Message: "pg_stat_statements extension is not installed in this database. " +
-				"Run 'CREATE EXTENSION pg_stat_statements;' in the database the collector connects to.",
-		}
+		return funcapi.UnavailableResponse("pg_stat_statements extension is not installed in this database. " +
+			"Run 'CREATE EXTENSION pg_stat_statements;' in the database the collector connects to.")
 	}
 
 	// Detect available columns (lazy detection, cached)
 	availableCols, err := c.detectPgStatStatementsColumns(ctx)
 	if err != nil {
-		return &module.FunctionResponse{
-			Status:  500,
-			Message: fmt.Sprintf("failed to detect available columns: %v", err),
-		}
+		return funcapi.InternalErrorResponse("failed to detect available columns: %v", err)
 	}
 
 	// Build list of columns to query based on what's available
 	queryCols := c.buildAvailableColumns(availableCols)
 	if len(queryCols) == 0 {
-		return &module.FunctionResponse{
-			Status:  500,
-			Message: "no queryable columns found in pg_stat_statements",
-		}
+		return funcapi.InternalErrorResponse("no queryable columns found in pg_stat_statements")
 	}
 
 	// Map and validate sort column
@@ -271,20 +263,20 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
+			return funcapi.ErrorResponse(504, "query timed out")
 		}
-		return &module.FunctionResponse{Status: 500, Message: fmt.Sprintf("query failed: %v", err)}
+		return funcapi.InternalErrorResponse("query failed: %v", err)
 	}
 	defer rows.Close()
 
 	// Process rows and build response
 	data, err := c.scanDynamicRows(rows, queryCols)
 	if err != nil {
-		return &module.FunctionResponse{Status: 500, Message: err.Error()}
+		return funcapi.InternalErrorResponse("%s", err)
 	}
 
 	if err := rows.Err(); err != nil {
-		return &module.FunctionResponse{Status: 500, Message: fmt.Sprintf("rows iteration error: %v", err)}
+		return funcapi.InternalErrorResponse("rows iteration error: %v", err)
 	}
 
 	// Build dynamic sort options from available columns (only those actually detected)
@@ -307,7 +299,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	annotatedCols := decoratePgColumns(queryCols)
 	cs := pgColumnSet(annotatedCols)
 
-	return &module.FunctionResponse{
+	return &funcapi.FunctionResponse{
 		Status:            200,
 		Help:              "Top SQL queries from pg_stat_statements",
 		Columns:           cs.BuildColumns(),

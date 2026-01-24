@@ -73,7 +73,16 @@ func redisMethods() []module.MethodConfig {
 	}
 }
 
-func redisMethodParams(_ context.Context, _ *module.Job, method string) ([]funcapi.ParamConfig, error) {
+// funcRedis implements funcapi.MethodHandler for Redis.
+type funcRedis struct {
+	collector *Collector
+}
+
+// Compile-time interface check.
+var _ funcapi.MethodHandler = (*funcRedis)(nil)
+
+// MethodParams implements funcapi.MethodHandler.
+func (f *funcRedis) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
 	switch method {
 	case "top-queries":
 		var sortOptions []funcapi.ParamOption
@@ -103,25 +112,26 @@ func redisMethodParams(_ context.Context, _ *module.Job, method string) ([]funca
 	}
 }
 
-func redisHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return &module.FunctionResponse{Status: 500, Message: "internal error: invalid module type"}
-	}
-
-	if collector.rdb == nil {
-		return &module.FunctionResponse{
-			Status:  503,
-			Message: "collector is still initializing, please retry in a few seconds",
-		}
+// Handle implements funcapi.MethodHandler.
+func (f *funcRedis) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if f.collector.rdb == nil {
+		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 
 	switch method {
 	case "top-queries":
-		return collector.collectTopQueries(ctx, params.Column("__sort"))
+		return f.collector.collectTopQueries(ctx, params.Column("__sort"))
 	default:
-		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
+		return funcapi.NotFoundResponse(method)
 	}
+}
+
+func redisFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
+	}
+	return &funcRedis{collector: c}
 }
 
 func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {

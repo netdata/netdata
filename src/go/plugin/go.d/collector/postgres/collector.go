@@ -28,8 +28,7 @@ func init() {
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         pgMethods,
-		MethodParams:    pgMethodParams,
-		HandleMethod:    pgHandleMethod,
+		MethodHandler:   pgFunctionHandler,
 	})
 }
 

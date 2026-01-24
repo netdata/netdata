@@ -71,7 +71,16 @@ func rethinkdbMethods() []module.MethodConfig {
 	}
 }
 
-func rethinkdbMethodParams(_ context.Context, _ *module.Job, method string) ([]funcapi.ParamConfig, error) {
+// funcRethinkdb implements funcapi.MethodHandler for RethinkDB.
+type funcRethinkdb struct {
+	collector *Collector
+}
+
+// Compile-time interface check.
+var _ funcapi.MethodHandler = (*funcRethinkdb)(nil)
+
+// MethodParams implements funcapi.MethodHandler.
+func (f *funcRethinkdb) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
 	switch method {
 	case "running-queries":
 		var sortOptions []funcapi.ParamOption
@@ -101,44 +110,48 @@ func rethinkdbMethodParams(_ context.Context, _ *module.Job, method string) ([]f
 	}
 }
 
-func rethinkdbHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return &module.FunctionResponse{Status: 500, Message: "internal error: invalid module type"}
-	}
-
-	if collector.rdb == nil {
-		conn, err := collector.newConn(collector.Config)
+// Handle implements funcapi.MethodHandler.
+func (f *funcRethinkdb) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if f.collector.rdb == nil {
+		conn, err := f.collector.newConn(f.collector.Config)
 		if err != nil {
-			return &module.FunctionResponse{Status: 503, Message: "collector is still initializing, please retry in a few seconds"}
+			return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 		}
-		collector.rdb = conn
+		f.collector.rdb = conn
 	}
 
 	switch method {
 	case "running-queries":
-		return collector.collectRunningQueries(ctx, params.Column("__sort"))
+		return f.collector.collectRunningQueries(ctx, params.Column("__sort"))
 	default:
-		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
+		return funcapi.NotFoundResponse(method)
 	}
 }
 
-func (c *Collector) collectRunningQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
+func rethinkdbFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
+	}
+	return &funcRethinkdb{collector: c}
+}
+
+func (c *Collector) collectRunningQueries(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
 	limit := c.TopQueriesLimit
 	if limit <= 0 {
 		limit = 500
 	}
 
 	if ctx.Err() == context.DeadlineExceeded {
-		return &module.FunctionResponse{Status: 504, Message: "query timed out"}
+		return &funcapi.FunctionResponse{Status: 504, Message: "query timed out"}
 	}
 
 	rows, err := c.rdb.jobs(ctx)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
+			return &funcapi.FunctionResponse{Status: 504, Message: "query timed out"}
 		}
-		return &module.FunctionResponse{Status: 500, Message: fmt.Sprintf("jobs query failed: %v", err)}
+		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("jobs query failed: %v", err)}
 	}
 
 	jobRows := make([]rethinkJobRow, 0, len(rows))
@@ -163,7 +176,7 @@ func (c *Collector) collectRunningQueries(ctx context.Context, sortColumn string
 	}
 
 	if len(jobRows) == 0 {
-		return &module.FunctionResponse{
+		return &funcapi.FunctionResponse{
 			Status:            200,
 			Message:           "No running queries found.",
 			Help:              "Currently running queries from rethinkdb.jobs",
@@ -215,7 +228,7 @@ func (c *Collector) collectRunningQueries(ctx context.Context, sortColumn string
 		data = append(data, out)
 	}
 
-	return &module.FunctionResponse{
+	return &funcapi.FunctionResponse{
 		Status:            200,
 		Help:              "Currently running queries from rethinkdb.jobs. WARNING: Query text may contain unmasked literals (potential PII).",
 		Columns:           cs.BuildColumns(),

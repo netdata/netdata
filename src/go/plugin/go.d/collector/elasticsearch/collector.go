@@ -25,11 +25,10 @@ func init() {
 		Defaults: module.Defaults{
 			UpdateEvery: 5,
 		},
-		Create:       func() module.Module { return New() },
-		Config:       func() any { return &Config{} },
-		Methods:      elasticsearchMethods,
-		MethodParams: elasticsearchMethodParams,
-		HandleMethod: elasticsearchHandleMethod,
+		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
+		Methods:       elasticsearchMethods,
+		MethodHandler: elasticsearchFunctionHandler,
 	})
 }
 

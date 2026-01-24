@@ -24,8 +24,7 @@ func init() {
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         mongoMethods,
-		MethodParams:    mongoMethodParams,
-		HandleMethod:    mongoHandleMethod,
+		MethodHandler: mongoFunctionHandler,
 	})
 }
 

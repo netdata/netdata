@@ -21,8 +21,7 @@ func init() {
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         rethinkdbMethods,
-		MethodParams:    rethinkdbMethodParams,
-		HandleMethod:    rethinkdbHandleMethod,
+		MethodHandler:   rethinkdbFunctionHandler,
 	})
 }
 

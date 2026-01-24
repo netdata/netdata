@@ -29,11 +29,10 @@ func init() {
 		Defaults: module.Defaults{
 			UpdateEvery: 10,
 		},
-		Create:       func() module.Module { return New() },
-		Config:       func() any { return &Config{} },
-		Methods:      snmpMethods,
-		MethodParams: snmpMethodParams,
-		HandleMethod: snmpHandleMethod,
+		Create:        func() module.Module { return New() },
+		Config:        func() any { return &Config{} },
+		Methods:       snmpMethods,
+		MethodHandler: snmpFunctionHandler,
 	})
 }
 

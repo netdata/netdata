@@ -82,42 +82,51 @@ func proxysqlMethods() []module.MethodConfig {
 	}
 }
 
-func proxysqlMethodParams(ctx context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return nil, fmt.Errorf("invalid module type")
-	}
-	if collector.db == nil {
-		if err := collector.openConnection(); err != nil {
+// funcProxysql implements funcapi.MethodHandler for ProxySQL top-queries.
+type funcProxysql struct {
+	collector *Collector
+}
+
+// Compile-time interface check.
+var _ funcapi.MethodHandler = (*funcProxysql)(nil)
+
+// MethodParams implements funcapi.MethodHandler.
+func (f *funcProxysql) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if f.collector.db == nil {
+		if err := f.collector.openConnection(); err != nil {
 			return nil, err
 		}
 	}
 	switch method {
 	case "top-queries":
-		return collector.topQueriesParams(ctx)
+		return f.collector.topQueriesParams(ctx)
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
 }
 
-func proxysqlHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return &module.FunctionResponse{Status: 500, Message: "internal error: invalid module type"}
-	}
-
-	if collector.db == nil {
-		if err := collector.openConnection(); err != nil {
-			return &module.FunctionResponse{Status: 503, Message: fmt.Sprintf("failed to open connection: %v", err)}
+// Handle implements funcapi.MethodHandler.
+func (f *funcProxysql) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if f.collector.db == nil {
+		if err := f.collector.openConnection(); err != nil {
+			return funcapi.UnavailableResponse(fmt.Sprintf("failed to open connection: %v", err))
 		}
 	}
 
 	switch method {
 	case "top-queries":
-		return collector.collectTopQueries(ctx, params.Column(paramSort))
+		return f.collector.collectTopQueries(ctx, params.Column(paramSort))
 	default:
-		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
+		return funcapi.NotFoundResponse(method)
 	}
+}
+
+func proxysqlFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
+	}
+	return &funcProxysql{collector: c}
 }
 
 func buildProxySQLSortOptions(cols []proxysqlColumn) []funcapi.ParamOption {

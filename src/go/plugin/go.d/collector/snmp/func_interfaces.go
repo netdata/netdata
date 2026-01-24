@@ -11,7 +11,7 @@ import (
 )
 
 // Compile-time interface check.
-var _ funcapi.FunctionHandler = (*funcInterfaces)(nil)
+var _ funcapi.MethodHandler = (*funcInterfaces)(nil)
 
 // funcInterfaces handles the "interfaces" function for SNMP devices.
 // It provides network interface traffic and status metrics from cached SNMP data.
@@ -29,43 +29,26 @@ const (
 	ifacesDefaultTypeGroup = "ethernet"
 )
 
-// Methods implements funcapi.FunctionHandler.
-func (f *funcInterfaces) Methods() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{
-		{
-			ID:          ifacesMethodID,
-			Name:        "Network Interfaces",
-			Help:        "Network interface traffic and status metrics",
-			UpdateEvery: 10,
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:        ifacesParamTypeGroup,
-				Name:      "Type Group",
-				Help:      "Filter by interface type group",
-				Selection: funcapi.ParamSelect,
-				Options: []funcapi.ParamOption{
-					{ID: "ethernet", Name: "Ethernet", Default: true},
-					{ID: "aggregation", Name: "Aggregation"},
-					{ID: "virtual", Name: "Virtual"},
-					{ID: "other", Name: "Other"},
-				},
-			}},
-		},
-	}
-}
-
-// MethodParams implements funcapi.FunctionHandler.
-func (f *funcInterfaces) MethodParams(method string) ([]funcapi.ParamConfig, error) {
+// MethodParams implements funcapi.MethodHandler.
+func (f *funcInterfaces) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
 	if method != ifacesMethodID {
 		return nil, nil
 	}
-	methods := f.Methods()
-	if len(methods) > 0 {
-		return methods[0].RequiredParams, nil
-	}
-	return nil, nil
+	return []funcapi.ParamConfig{{
+		ID:        ifacesParamTypeGroup,
+		Name:      "Type Group",
+		Help:      "Filter by interface type group",
+		Selection: funcapi.ParamSelect,
+		Options: []funcapi.ParamOption{
+			{ID: "ethernet", Name: "Ethernet", Default: true},
+			{ID: "aggregation", Name: "Aggregation"},
+			{ID: "virtual", Name: "Virtual"},
+			{ID: "other", Name: "Other"},
+		},
+	}}, nil
 }
 
-// Handle implements funcapi.FunctionHandler.
+// Handle implements funcapi.MethodHandler.
 func (f *funcInterfaces) Handle(_ context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	if method != ifacesMethodID {
 		return funcapi.NotFoundResponse(method)
@@ -306,23 +289,34 @@ func sumRates(vals ...*float64) *float64 {
 // Package-level registration functions that delegate to funcInterfaces.
 
 func snmpMethods() []module.MethodConfig {
-	return (&funcInterfaces{}).Methods()
+	return []module.MethodConfig{
+		{
+			ID:          ifacesMethodID,
+			Name:        "Network Interfaces",
+			Help:        "Network interface traffic and status metrics",
+			UpdateEvery: 10,
+			RequiredParams: []funcapi.ParamConfig{{
+				ID:        ifacesParamTypeGroup,
+				Name:      "Type Group",
+				Help:      "Filter by interface type group",
+				Selection: funcapi.ParamSelect,
+				Options: []funcapi.ParamOption{
+					{ID: "ethernet", Name: "Ethernet", Default: true},
+					{ID: "aggregation", Name: "Aggregation"},
+					{ID: "virtual", Name: "Virtual"},
+					{ID: "other", Name: "Other"},
+				},
+			}},
+		},
+	}
 }
 
-func snmpMethodParams(_ context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
+func snmpFunctionHandler(job *module.Job) funcapi.MethodHandler {
 	c, ok := job.Module().(*Collector)
 	if !ok {
-		return nil, nil
+		return nil
 	}
-	return c.funcIfaces.MethodParams(method)
-}
-
-func snmpHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return funcapi.InternalErrorResponse("invalid module type")
-	}
-	return c.funcIfaces.Handle(ctx, method, params)
+	return c.funcIfaces
 }
 
 // snmpColumn defines a column for SNMP interfaces function.

@@ -27,11 +27,10 @@ func init() {
 		Defaults: module.Defaults{
 			UpdateEvery: 5,
 		},
-		Methods:      yugabyteMethods,
-		MethodParams: yugabyteMethodParams,
-		HandleMethod: yugabyteHandleMethod,
-		Create:       func() module.Module { return New() },
-		Config:       func() any { return &Config{} },
+		Methods:       yugabyteMethods,
+		MethodHandler: yugabyteFunctionHandler,
+		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 

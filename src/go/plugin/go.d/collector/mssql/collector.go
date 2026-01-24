@@ -25,11 +25,10 @@ func init() {
 		Defaults: module.Defaults{
 			UpdateEvery: 10,
 		},
-		Create:       func() module.Module { return New() },
-		Config:       func() any { return &Config{} },
-		Methods:      mssqlMethods,
-		MethodParams: mssqlMethodParams,
-		HandleMethod: mssqlHandleMethod,
+		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
+		Methods:       mssqlMethods,
+		MethodHandler: mssqlFunctionHandler,
 	})
 }
 

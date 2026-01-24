@@ -94,16 +94,21 @@ func oracleMethods() []module.MethodConfig {
 	}
 }
 
-func oracleMethodParams(ctx context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return nil, fmt.Errorf("invalid module type")
-	}
+// funcOracle implements funcapi.MethodHandler for OracleDB.
+type funcOracle struct {
+	collector *Collector
+}
+
+// Compile-time interface check.
+var _ funcapi.MethodHandler = (*funcOracle)(nil)
+
+// MethodParams implements funcapi.MethodHandler.
+func (f *funcOracle) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
 	switch method {
 	case "top-queries":
 		cols := oracleTopColumns
-		if collector.db != nil {
-			cols = collector.oracleTopLayout(ctx).cols
+		if f.collector.db != nil {
+			cols = f.collector.oracleTopLayout(ctx).cols
 		}
 		return []funcapi.ParamConfig{buildOracleSortParam(cols)}, nil
 	case "running-queries":
@@ -113,26 +118,30 @@ func oracleMethodParams(ctx context.Context, job *module.Job, method string) ([]
 	}
 }
 
-func oracleHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return &module.FunctionResponse{Status: 500, Message: "internal error: invalid module type"}
-	}
-
-	if collector.db == nil {
-		if err := collector.openConnection(); err != nil {
-			return &module.FunctionResponse{Status: 503, Message: "collector is still initializing, please retry in a few seconds"}
+// Handle implements funcapi.MethodHandler.
+func (f *funcOracle) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if f.collector.db == nil {
+		if err := f.collector.openConnection(); err != nil {
+			return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 		}
 	}
 
 	switch method {
 	case "top-queries":
-		return collector.collectTopQueries(ctx, params.Column("__sort"))
+		return f.collector.collectTopQueries(ctx, params.Column("__sort"))
 	case "running-queries":
-		return collector.collectRunningQueries(ctx, params.Column("__sort"))
+		return f.collector.collectRunningQueries(ctx, params.Column("__sort"))
 	default:
-		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
+		return funcapi.NotFoundResponse(method)
 	}
+}
+
+func oracleFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
+	}
+	return &funcOracle{collector: c}
 }
 
 func buildOracleSortParam(cols []oracleColumn) funcapi.ParamConfig {

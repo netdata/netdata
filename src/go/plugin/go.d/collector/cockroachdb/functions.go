@@ -70,6 +70,46 @@ var crdbRunningColumns = []crdbColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "elapsedMs", Tooltip: "Elapsed", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, SelectExpr: "EXTRACT(EPOCH FROM (clock_timestamp() - s.start)) * 1000", IsSortOption: true, IsDefaultSort: true, SortLabel: "Running queries by Elapsed Time"},
 }
 
+// funcCockroach implements funcapi.MethodHandler for CockroachDB.
+type funcCockroach struct {
+	collector *Collector
+}
+
+// Compile-time interface check.
+var _ funcapi.MethodHandler = (*funcCockroach)(nil)
+
+// MethodParams implements funcapi.MethodHandler.
+func (f *funcCockroach) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
+	switch method {
+	case "top-queries":
+		return []funcapi.ParamConfig{buildCrdbSortParam(crdbTopColumns)}, nil
+	case "running-queries":
+		return []funcapi.ParamConfig{buildCrdbSortParam(crdbRunningColumns)}, nil
+	default:
+		return nil, fmt.Errorf("unknown method: %s", method)
+	}
+}
+
+// Handle implements funcapi.MethodHandler.
+func (f *funcCockroach) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if err := f.collector.ensureSQL(ctx); err != nil {
+		status := 503
+		if errors.Is(err, errSQLDSNNotSet) {
+			status = 400
+		}
+		return funcapi.ErrorResponse(status, "%s", err.Error())
+	}
+
+	switch method {
+	case "top-queries":
+		return f.collector.collectTopQueries(ctx, params.Column("__sort"))
+	case "running-queries":
+		return f.collector.collectRunningQueries(ctx, params.Column("__sort"))
+	default:
+		return funcapi.NotFoundResponse(method)
+	}
+}
+
 func cockroachMethods() []module.MethodConfig {
 	return []module.MethodConfig{
 		{
@@ -95,39 +135,12 @@ func cockroachMethods() []module.MethodConfig {
 	}
 }
 
-func cockroachMethodParams(_ context.Context, _ *module.Job, method string) ([]funcapi.ParamConfig, error) {
-	switch method {
-	case "top-queries":
-		return []funcapi.ParamConfig{buildCrdbSortParam(crdbTopColumns)}, nil
-	case "running-queries":
-		return []funcapi.ParamConfig{buildCrdbSortParam(crdbRunningColumns)}, nil
-	default:
-		return nil, fmt.Errorf("unknown method: %s", method)
-	}
-}
-
-func cockroachHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
-	collector, ok := job.Module().(*Collector)
+func cockroachFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
 	if !ok {
-		return &module.FunctionResponse{Status: 500, Message: "internal error: invalid module type"}
+		return nil
 	}
-
-	if err := collector.ensureSQL(ctx); err != nil {
-		status := 503
-		if errors.Is(err, errSQLDSNNotSet) {
-			status = 400
-		}
-		return &module.FunctionResponse{Status: status, Message: err.Error()}
-	}
-
-	switch method {
-	case "top-queries":
-		return collector.collectTopQueries(ctx, params.Column("__sort"))
-	case "running-queries":
-		return collector.collectRunningQueries(ctx, params.Column("__sort"))
-	default:
-		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
-	}
+	return &funcCockroach{collector: c}
 }
 
 func (c *Collector) ensureSQL(ctx context.Context) error {

@@ -20,7 +20,7 @@ func (m *mockHandler) Methods() []MethodConfig {
 	return m.methods
 }
 
-func (m *mockHandler) MethodParams(method string) ([]ParamConfig, error) {
+func (m *mockHandler) MethodParams(ctx context.Context, method string) ([]ParamConfig, error) {
 	return m.methodParams, nil
 }
 

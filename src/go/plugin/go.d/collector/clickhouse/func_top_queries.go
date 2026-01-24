@@ -15,13 +15,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
-const clickhouseMaxQueryTextLength = 4096
+const topQueriesMaxTextLength = 4096
 
-const paramSort = "__sort"
+const topQueriesParamSort = "__sort"
 
-// clickhouseColumn defines a column for ClickHouse top-queries function.
+// topQueriesColumn defines a column for ClickHouse top-queries function.
 // Embeds funcapi.ColumnMeta for UI display and adds collector-specific fields.
-type clickhouseColumn struct {
+type topQueriesColumn struct {
 	funcapi.ColumnMeta
 
 	// Data access
@@ -34,7 +34,7 @@ type clickhouseColumn struct {
 	IsDefaultSort bool   // Default sort option
 }
 
-var clickhouseAllColumns = []clickhouseColumn{
+var topQueriesColumns = []topQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "queryId", Tooltip: "Query ID", Type: funcapi.FieldTypeString, Visible: false, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, UniqueKey: true, Sortable: true}, DBColumn: "normalized_query_hash", SelectExpr: "toString(normalized_query_hash)"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sticky: true, FullWidth: true, Sortable: true}, DBColumn: "query", SelectExpr: "any(query)"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "database", Tooltip: "Database", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, GroupBy: &funcapi.GroupByOptions{IsDefault: true}, Sortable: true}, DBColumn: "current_database", SelectExpr: "any(current_database)"},
@@ -56,126 +56,85 @@ var clickhouseAllColumns = []clickhouseColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "memoryUsage", Tooltip: "Max Memory", Type: funcapi.FieldTypeFloat, Visible: false, Transform: funcapi.FieldTransformNumber, DecimalPoints: 0, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Memory", Title: "Memory"}, Sortable: true}, DBColumn: "memory_usage", SelectExpr: "max(memory_usage)"},
 }
 
-type clickhouseJSONResponse struct {
+type topQueriesJSONResponse struct {
 	Data []map[string]any `json:"data"`
 }
 
-// clickhouseColumnSet creates a ColumnSet for the given columns.
-func clickhouseColumnSet(cols []clickhouseColumn) funcapi.ColumnSet[clickhouseColumn] {
-	return funcapi.Columns(cols, func(c clickhouseColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+// funcTopQueries implements funcapi.MethodHandler for ClickHouse top-queries.
+// All function-related logic is encapsulated here, keeping Collector focused on metrics collection.
+type funcTopQueries struct {
+	collector *Collector
 }
 
-func clickhouseMethods() []module.MethodConfig {
-	sortOptions := buildClickHouseSortOptions(clickhouseAllColumns)
-	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Top SQL queries from ClickHouse system.query_log",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:         paramSort,
-				Name:       "Filter By",
-				Help:       "Select the primary sort column",
-				Selection:  funcapi.ParamSelect,
-				Options:    sortOptions,
-				UniqueView: true,
-			}},
-		},
-	}
+func newFuncTopQueries(c *Collector) *funcTopQueries {
+	return &funcTopQueries{collector: c}
 }
 
-func clickhouseMethodParams(ctx context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return nil, fmt.Errorf("invalid module type")
-	}
-	if collector.httpClient == nil {
+// Compile-time interface check.
+var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
+
+// MethodParams implements funcapi.MethodHandler.
+func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if f.collector.httpClient == nil {
 		return nil, fmt.Errorf("collector is still initializing")
 	}
 	switch method {
 	case "top-queries":
-		return collector.topQueriesParams(ctx)
+		return f.methodParams(ctx)
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
 }
 
-func clickhouseHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
-	collector, ok := job.Module().(*Collector)
-	if !ok {
-		return &module.FunctionResponse{Status: 500, Message: "internal error: invalid module type"}
+// Handle implements funcapi.MethodHandler.
+func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if f.collector.httpClient == nil {
+		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
-
-	if collector.httpClient == nil {
-		return &module.FunctionResponse{
-			Status:  503,
-			Message: "collector is still initializing, please retry in a few seconds",
-		}
-	}
-
 	switch method {
 	case "top-queries":
-		return collector.collectTopQueries(ctx, params.Column(paramSort))
+		return f.collectData(ctx, params.Column(topQueriesParamSort))
 	default:
-		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
+		return funcapi.NotFoundResponse(method)
 	}
 }
 
-func buildClickHouseSortOptions(cols []clickhouseColumn) []funcapi.ParamOption {
-	var sortOptions []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range cols {
-		if col.IsSortOption {
-			sortOptions = append(sortOptions, funcapi.ParamOption{
-				ID:      col.Name,
-				Column:  col.Name,
-				Name:    "Top queries by " + col.SortLabel,
-				Default: col.IsDefaultSort,
-				Sort:    &sortDir,
-			})
-		}
-	}
-	return sortOptions
-}
-
-func (c *Collector) topQueriesParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
-	available, err := c.detectQueryLogColumns(ctx)
+func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
+	available, err := f.detectQueryLogColumns(ctx)
 	if err != nil {
 		return nil, err
 	}
-	cols := c.buildAvailableClickHouseColumns(available)
+	cols := f.buildAvailableColumns(available)
 	if len(cols) == 0 {
 		return nil, fmt.Errorf("no columns available in system.query_log")
 	}
 	sortParam := funcapi.ParamConfig{
-		ID:         paramSort,
+		ID:         topQueriesParamSort,
 		Name:       "Filter By",
 		Help:       "Select the primary sort column",
 		Selection:  funcapi.ParamSelect,
-		Options:    buildClickHouseSortOptions(cols),
+		Options:    buildTopQueriesSortOptions(cols),
 		UniqueView: true,
 	}
 	return []funcapi.ParamConfig{sortParam}, nil
 }
 
-func (c *Collector) detectQueryLogColumns(ctx context.Context) (map[string]bool, error) {
+func (f *funcTopQueries) detectQueryLogColumns(ctx context.Context) (map[string]bool, error) {
 	query := `
 SELECT name
 FROM system.columns
 WHERE database = 'system' AND table = 'query_log'
 FORMAT JSON`
 
-	req, err := web.NewHTTPRequest(c.RequestConfig)
+	req, err := web.NewHTTPRequest(f.collector.RequestConfig)
 	if err != nil {
 		return nil, err
 	}
 	req = req.WithContext(ctx)
 	req.URL.RawQuery = makeURLQuery(query)
 
-	var resp clickhouseJSONResponse
-	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &resp); err != nil {
+	var resp topQueriesJSONResponse
+	if err := web.DoHTTP(f.collector.httpClient).RequestJSON(req, &resp); err != nil {
 		return nil, fmt.Errorf("failed to query system.columns: %w", err)
 	}
 
@@ -191,48 +150,21 @@ FORMAT JSON`
 	return cols, nil
 }
 
-func (c *Collector) buildAvailableClickHouseColumns(available map[string]bool) []clickhouseColumn {
-	var cols []clickhouseColumn
-	for _, col := range clickhouseAllColumns {
-		if col.DBColumn == "" || available[col.DBColumn] {
-			cols = append(cols, col)
-		}
-	}
-	return cols
-}
-
-func (c *Collector) mapAndValidateClickHouseSortColumn(input string, cs funcapi.ColumnSet[clickhouseColumn]) string {
-	if cs.ContainsColumn(input) {
-		return input
-	}
-	if cs.ContainsColumn("totalTime") {
-		return "totalTime"
-	}
-	if cs.ContainsColumn("calls") {
-		return "calls"
-	}
-	names := cs.Names()
-	if len(names) > 0 {
-		return names[0]
-	}
-	return ""
-}
-
-func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
-	availableCols, err := c.detectQueryLogColumns(ctx)
+func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
+	availableCols, err := f.detectQueryLogColumns(ctx)
 	if err != nil {
-		return &module.FunctionResponse{Status: 503, Message: fmt.Sprintf("system.query_log not available: %v", err)}
+		return funcapi.ErrorResponse(503, "system.query_log not available: %v", err)
 	}
 
-	cols := c.buildAvailableClickHouseColumns(availableCols)
+	cols := f.buildAvailableColumns(availableCols)
 	if len(cols) == 0 {
-		return &module.FunctionResponse{Status: 500, Message: "no columns available in system.query_log"}
+		return funcapi.ErrorResponse(500, "no columns available in system.query_log")
 	}
 
-	cs := clickhouseColumnSet(cols)
-	sortColumn = c.mapAndValidateClickHouseSortColumn(sortColumn, cs)
+	cs := f.columnSet(cols)
+	sortColumn = f.mapAndValidateSortColumn(sortColumn, cs)
 
-	limit := c.TopQueriesLimit
+	limit := f.collector.TopQueriesLimit
 	if limit <= 0 {
 		limit = 500
 	}
@@ -257,36 +189,36 @@ LIMIT %d
 FORMAT JSON
 `, strings.Join(selectParts, ", "), groupKey, sortColumn, limit)
 
-	req, err := web.NewHTTPRequest(c.RequestConfig)
+	req, err := web.NewHTTPRequest(f.collector.RequestConfig)
 	if err != nil {
-		return &module.FunctionResponse{Status: 500, Message: err.Error()}
+		return funcapi.ErrorResponse(500, "%v", err)
 	}
 	req = req.WithContext(ctx)
 	req.URL.RawQuery = makeURLQuery(query)
 
-	var resp clickhouseJSONResponse
-	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &resp); err != nil {
+	var resp topQueriesJSONResponse
+	if err := web.DoHTTP(f.collector.httpClient).RequestJSON(req, &resp); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
+			return funcapi.ErrorResponse(504, "query timed out")
 		}
-		return &module.FunctionResponse{Status: 500, Message: fmt.Sprintf("query failed: %v", err)}
+		return funcapi.ErrorResponse(500, "query failed: %v", err)
 	}
 
 	data := make([][]any, 0, len(resp.Data))
 	for _, rowMap := range resp.Data {
 		row := make([]any, len(cols))
 		for i, col := range cols {
-			row[i] = normalizeClickHouseValue(col, rowMap[col.Name])
+			row[i] = f.normalizeValue(col, rowMap[col.Name])
 		}
 		data = append(data, row)
 	}
 
 	sortParam := funcapi.ParamConfig{
-		ID:         paramSort,
+		ID:         topQueriesParamSort,
 		Name:       "Filter By",
 		Help:       "Select the primary sort column",
 		Selection:  funcapi.ParamSelect,
-		Options:    buildClickHouseSortOptions(cols),
+		Options:    buildTopQueriesSortOptions(cols),
 		UniqueView: true,
 	}
 
@@ -295,7 +227,7 @@ FORMAT JSON
 		defaultSort = "calls"
 	}
 
-	return &module.FunctionResponse{
+	return &funcapi.FunctionResponse{
 		Status:            200,
 		Help:              "Top SQL queries from ClickHouse system.query_log",
 		Columns:           cs.BuildColumns(),
@@ -308,7 +240,38 @@ FORMAT JSON
 	}
 }
 
-func normalizeClickHouseValue(col clickhouseColumn, v any) any {
+func (f *funcTopQueries) columnSet(cols []topQueriesColumn) funcapi.ColumnSet[topQueriesColumn] {
+	return funcapi.Columns(cols, func(c topQueriesColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+}
+
+func (f *funcTopQueries) buildAvailableColumns(available map[string]bool) []topQueriesColumn {
+	var cols []topQueriesColumn
+	for _, col := range topQueriesColumns {
+		if col.DBColumn == "" || available[col.DBColumn] {
+			cols = append(cols, col)
+		}
+	}
+	return cols
+}
+
+func (f *funcTopQueries) mapAndValidateSortColumn(input string, cs funcapi.ColumnSet[topQueriesColumn]) string {
+	if cs.ContainsColumn(input) {
+		return input
+	}
+	if cs.ContainsColumn("totalTime") {
+		return "totalTime"
+	}
+	if cs.ContainsColumn("calls") {
+		return "calls"
+	}
+	names := cs.Names()
+	if len(names) > 0 {
+		return names[0]
+	}
+	return ""
+}
+
+func (f *funcTopQueries) normalizeValue(col topQueriesColumn, v any) any {
 	switch col.Type {
 	case funcapi.FieldTypeInteger:
 		switch val := v.(type) {
@@ -341,7 +304,7 @@ func normalizeClickHouseValue(col clickhouseColumn, v any) any {
 	default:
 		if s, ok := v.(string); ok {
 			if col.Name == "query" {
-				return strmutil.TruncateText(s, clickhouseMaxQueryTextLength)
+				return strmutil.TruncateText(s, topQueriesMaxTextLength)
 			}
 			return s
 		}
@@ -349,8 +312,57 @@ func normalizeClickHouseValue(col clickhouseColumn, v any) any {
 			return ""
 		}
 		if col.Name == "query" {
-			return strmutil.TruncateText(fmt.Sprint(v), clickhouseMaxQueryTextLength)
+			return strmutil.TruncateText(fmt.Sprint(v), topQueriesMaxTextLength)
 		}
 		return fmt.Sprint(v)
 	}
+}
+
+// clickhouseMethods returns the method configurations for registration.
+func clickhouseMethods() []module.MethodConfig {
+	sortOptions := buildTopQueriesSortOptions(topQueriesColumns)
+	return []module.MethodConfig{
+		{
+			UpdateEvery:  10,
+			ID:           "top-queries",
+			Name:         "Top Queries",
+			Help:         "Top SQL queries from ClickHouse system.query_log",
+			RequireCloud: true,
+			RequiredParams: []funcapi.ParamConfig{{
+				ID:         topQueriesParamSort,
+				Name:       "Filter By",
+				Help:       "Select the primary sort column",
+				Selection:  funcapi.ParamSelect,
+				Options:    sortOptions,
+				UniqueView: true,
+			}},
+		},
+	}
+}
+
+// clickhouseFunctionHandler returns the MethodHandler for a ClickHouse job.
+func clickhouseFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
+	}
+	return c.funcTopQueries
+}
+
+// buildTopQueriesSortOptions builds sort options for method registration (before handler exists).
+func buildTopQueriesSortOptions(cols []topQueriesColumn) []funcapi.ParamOption {
+	var sortOptions []funcapi.ParamOption
+	sortDir := funcapi.FieldSortDescending
+	for _, col := range cols {
+		if col.IsSortOption {
+			sortOptions = append(sortOptions, funcapi.ParamOption{
+				ID:      col.Name,
+				Column:  col.Name,
+				Name:    "Top queries by " + col.SortLabel,
+				Default: col.IsDefaultSort,
+				Sort:    &sortDir,
+			})
+		}
+	}
+	return sortOptions
 }
