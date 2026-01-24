@@ -142,23 +142,12 @@ const SEQUENTIAL_TEST_IDS = new Set([
   'coverage-llm-payload',
   // Tests that still patch LLMClient.prototype.executeTurn directly (pass-through pattern)
   // These capture intermediate values or pass through to real providers
-  'run-test-60',
-  'run-test-61',
-  'run-test-69',
-  'run-test-84',
-  'run-test-85',
-  'run-test-87',
-  'run-test-88',
-  'run-test-90',
   'run-test-90-string',
   'run-test-90-adopt-text',
   'run-test-90-json-content',
   'run-test-90-no-retry',
   'run-test-90-rate-limit',
-  'run-test-101',
   'run-test-102',
-  'run-test-104',
-  'run-test-105',
   'run-test-106',
   'run-test-122',
   'run-test-123',
@@ -167,20 +156,14 @@ const SEQUENTIAL_TEST_IDS = new Set([
   'run-test-final-report-tool-message-fallback',
   'run-test-text-extraction-final-turn-accept',
   // Tests with queue/rate-limit/timing dependencies that fail in parallel
-  'context_guard__tool_drop_after_success',
-  'run-test-max-turn-limit',
   'run-test-63',
-  'run-test-91',
   'run-test-49',
-  'run-test-114',
   'run-test-44',
-  'reasoning-interleaved-sdk-payload',
-  'run-test-budget-truncation-preserves-output',
+  'run-test-tool-cache-hit',
   'run-test-size-cap-truncation',
   'run-test-size-cap-small-payload-passes',
   'run-test-size-cap-small-over-limit-fails',
-  'run-test-stream-dedupe-final-report',
-  'run-test-tool-cache-hit',
+  'run-test-budget-truncation-preserves-output',
   'run-test-72-probe-success-no-restart',
 ]);
 /* eslint-enable sonarjs/no-duplicate-string */
@@ -526,6 +509,57 @@ const runWithExecuteTurnOverride = async (
     invocation += 1;
     return handler({ request, invocation });
   };
+  const session = AIAgentSession.create(sessionConfig);
+  return AIAgent.run(session);
+};
+
+/**
+ * Handler type for pass-through capture.
+ * Return undefined to pass through to provider, or return a TurnResult to override.
+ */
+type PassThroughHandler = (ctx: {
+  request: TurnRequest;
+  invocation: number;
+  context: TestContext;
+  passThrough: () => Promise<TurnResult>;
+}) => Promise<TurnResult | undefined>;
+
+/**
+ * Run a session with pass-through capture using DI.
+ * This allows tests to intercept requests, capture data, and optionally pass through to the actual provider.
+ * The passThrough function creates a fresh LLMClient internally to call the real provider.
+ * This is safe for parallel execution since each test gets its own isolated state.
+ */
+const runWithPassThroughCapture = async (
+  sessionConfig: AIAgentSessionConfig,
+  handler: PassThroughHandler,
+  context: TestContext,
+): Promise<AIAgentResult> => {
+  let invocation = 0;
+
+  sessionConfig.executeTurnOverride = async (request: TurnRequest): Promise<TurnResult> => {
+    invocation += 1;
+
+    // Create a pass-through function that calls the actual provider
+    const passThrough = async (): Promise<TurnResult> => {
+      // Create a fresh LLMClient without override to call actual providers
+      const passThroughClient = new LLMClient(sessionConfig.config.providers, {
+        traceLLM: sessionConfig.traceLLM,
+        traceSDK: sessionConfig.traceSdk,
+        // No executeTurnOverride - calls actual providers
+      });
+      return passThroughClient.executeTurn(request);
+    };
+
+    // Let the handler decide whether to override or pass through
+    const result = await handler({ request, invocation, context, passThrough });
+    if (result !== undefined) {
+      return result;
+    }
+    // Handler returned undefined - pass through to actual provider
+    return passThrough();
+  };
+
   const session = AIAgentSession.create(sessionConfig);
   return AIAgent.run(session);
 };
@@ -4718,191 +4752,183 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
   },
 
-  (() => {
-    interface CapturedRequestSnapshot {
-      temperature?: number | null;
-      topP?: number | null;
-      maxOutputTokens?: number;
-      repeatPenalty?: number | null;
-      messages: { role: string; content: string }[];
-    };
-    const HISTORY_SYSTEM = 'Legacy advisory instructions.';
-    const HISTORY_ASSISTANT = 'Historical assistant answer.';
-    const TRACE_CONTEXT = { selfId: 'txn-session', originId: 'txn-origin', parentId: 'txn-parent', callPath: 'call/path' } as const;
-    let capturedRequests: CapturedRequestSnapshot[] = [];
-    return {
-      id: 'run-test-60',
-      configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
-        configuration.providers[PRIMARY_PROVIDER] = configuration.providers[PRIMARY_PROVIDER] ?? { type: 'test-llm' };
-        sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
-        sessionConfig.tools = ['test'];
-        sessionConfig.temperature = 0.21;
-        sessionConfig.topP = 0.77;
-        sessionConfig.maxOutputTokens = 123;
-        sessionConfig.repeatPenalty = 1.1;
-        sessionConfig.renderTarget = 'cli';
-        sessionConfig.initialTitle = 'Session Config Coverage';
-        sessionConfig.agentId = 'session-config-agent';
-        sessionConfig.trace = { ...TRACE_CONTEXT };
-        sessionConfig.traceLLM = true;
-        sessionConfig.conversationHistory = [
-          { role: 'system', content: HISTORY_SYSTEM },
-          { role: 'assistant', content: HISTORY_ASSISTANT },
-        ];
-      },
-      execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
-        capturedRequests = [];
-        // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original method for restoration after interception
-        const originalExecuteTurn = LLMClient.prototype.executeTurn;
-        LLMClient.prototype.executeTurn = async function(request: TurnRequest): Promise<TurnResult> {
-          const snapshot: CapturedRequestSnapshot = {
-            temperature: request.temperature,
-            topP: request.topP,
-            maxOutputTokens: request.maxOutputTokens,
-            repeatPenalty: request.repeatPenalty,
-            messages: request.messages.map((message) => ({
-              role: message.role,
-              content: typeof message.content === 'string' ? message.content : JSON.stringify(message.content),
-            })),
-          };
-          capturedRequests.push(snapshot);
-          return await originalExecuteTurn.call(this, request);
-        };
-        try {
-          const session = AIAgentSession.create(sessionConfig);
-          return await AIAgent.run(session);
-        } finally {
-          LLMClient.prototype.executeTurn = originalExecuteTurn;
-        }
-      },
-      expect: (result: AIAgentResult) => {
-        invariant(result.success, 'Scenario run-test-60 expected success.');
-        invariant(capturedRequests.length >= 1, 'Captured request snapshot missing for run-test-60.');
-        const first = capturedRequests[0];
-        const systemMessage = first.messages.find((message) => message.role === 'system');
-        invariant(systemMessage?.content.includes('TOOLS') === true, 'System message should be enhanced with tool instructions in run-test-60.');
-        invariant(first.messages.some((message) => message.role === 'assistant' && message.content.includes(HISTORY_ASSISTANT)), 'Conversation history assistant message missing in request for run-test-60.');
-        invariant(typeof first.temperature === 'number' && Math.abs(first.temperature - 0.21) < 1e-6, 'Temperature propagation failed for run-test-60.');
-        invariant(typeof first.topP === 'number' && Math.abs(first.topP - 0.77) < 1e-6, 'topP propagation failed for run-test-60.');
-        invariant(first.maxOutputTokens === 123, 'maxOutputTokens propagation failed for run-test-60.');
-        invariant(typeof first.repeatPenalty === 'number' && Math.abs(first.repeatPenalty - 1.1) < 1e-6, 'repeatPenalty propagation failed for run-test-60.');
-        const hasHistoryInResult = result.conversation.some((message) => message.role === 'assistant' && message.content.includes(HISTORY_ASSISTANT));
-        invariant(hasHistoryInResult, 'Historical assistant message should be present in result conversation for run-test-60.');
-        const llmEntry = result.accounting.find(isLlmAccounting);
-        invariant(llmEntry !== undefined, 'LLM accounting entry expected for run-test-60.');
-        invariant(typeof llmEntry.txnId === 'string' && llmEntry.txnId.length > 0, 'LLM accounting should include txnId for run-test-60.');
-        invariant(llmEntry.callPath === TRACE_CONTEXT.callPath, 'Trace context should set callPath on LLM accounting entry for run-test-60.');
-        invariant(llmEntry.originTxnId === TRACE_CONTEXT.originId, 'Trace context should preserve originTxnId on LLM accounting entry for run-test-60.');
-        invariant(llmEntry.parentTxnId === TRACE_CONTEXT.parentId, 'Trace context should preserve parentTxnId on LLM accounting entry for run-test-60.');
-        const finalReport = result.finalReport!;
-        invariant(result.success === true, 'Final report should indicate success for run-test-60.');
-      },
-    };
-  })(),
-  (() => {
-    let capturedLogs: LogEntry[] = [];
-    const TOOL_LIMIT_WARNING_MESSAGE = 'Tool calls per turn exceeded';
-    return {
-      id: 'run-test-61',
-      configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig, defaults) => {
-        defaults.maxToolCallsPerTurn = 1;
-        sessionConfig.maxToolCallsPerTurn = 1;
-        sessionConfig.tools = ['test'];
-      },
-      execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
-        capturedLogs = [];
-        const existingCallbacks = sessionConfig.callbacks ?? {};
-        sessionConfig.callbacks = {
-          ...existingCallbacks,
-          onEvent: (event, meta) => {
-            if (event.type === 'log') {
-              capturedLogs.push(event.entry);
-            }
-            existingCallbacks.onEvent?.(event, meta);
-          },
-        };
-        const session = AIAgentSession.create(sessionConfig);
-        return await AIAgent.run(session);
-      },
-      expect: (result: AIAgentResult) => {
-        invariant(!result.success, 'Scenario run-test-61 should produce a usable final report (presence-based contract).');
-        const limitLog = capturedLogs.find((entry) => entry.remoteIdentifier === 'agent:limits' && logHasEvent(entry, LOG_EVENTS.TOOL_LIMIT_EXCEEDED));
-        invariant(limitLog !== undefined, 'Limit enforcement log expected for run-test-61.');
-        invariant(limitLog.severity === 'WRN', 'Tool limit log should be severity WRN for run-test-61.');
-        invariant(!result.success, 'Final report should indicate failure for run-test-61.');
-      },
-    };
-  })(),
-  (() => {
-    const FINAL_TURN_INSTRUCTION = XML_NEXT_SLUGS.final_turn_max_turns.message;
-    let capturedRequests: TurnRequest[] = [];
-    let capturedLogs: LogEntry[] = [];
-    return {
-      id: RUN_TEST_MAX_TURN_LIMIT,
-      configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults) => {
-        configuration.providers = {
-          [PRIMARY_PROVIDER]: { type: 'test-llm' },
-        };
-        sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
-        sessionConfig.maxTurns = 2;
-        sessionConfig.userPrompt = RUN_TEST_MAX_TURN_LIMIT;
-        sessionConfig.tools = ['test'];
-        const existingCallbacks = sessionConfig.callbacks ?? {};
-        sessionConfig.callbacks = {
-          ...existingCallbacks,
-          onEvent: (event, meta) => {
-            if (event.type === 'log') {
-              capturedLogs.push(event.entry);
-            }
-            existingCallbacks.onEvent?.(event, meta);
-          },
-        };
-      },
-      execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
-        capturedRequests = [];
-        capturedLogs = [];
-        // eslint-disable-next-line @typescript-eslint/unbound-method -- capture method for restoration after interception
-        const originalExecute = LLMClient.prototype.executeTurn;
-        LLMClient.prototype.executeTurn = async function(request: TurnRequest): Promise<TurnResult> {
-          capturedRequests.push(request);
-          return await originalExecute.call(this, request);
-        };
-        try {
-          const session = AIAgentSession.create(sessionConfig);
-          return await AIAgent.run(session);
-        } finally {
-          LLMClient.prototype.executeTurn = originalExecute;
-        }
-      },
-      expect: (result: AIAgentResult) => {
-        // Model provided a final report, so status is success
-        invariant(result.success, `Scenario ${RUN_TEST_MAX_TURN_LIMIT} should have success=true when model provides final report.`);
-        const conversationHasXmlNext = result.conversation.some((message) => message.noticeType === 'xml-next');
-        if (conversationHasXmlNext && process.env.CONTEXT_DEBUG === 'true') {
-          console.log(`${RUN_TEST_MAX_TURN_LIMIT} conversation:`, JSON.stringify(result.conversation, null, 2));
-        }
-        invariant(!conversationHasXmlNext, `XML-NEXT should remain ephemeral and not persist in conversation for ${RUN_TEST_MAX_TURN_LIMIT}.`);
-        invariant(capturedRequests.length >= 2, `At least two LLM requests expected for ${RUN_TEST_MAX_TURN_LIMIT}.`);
-        const finalTurnRequest = capturedRequests.at(-1);
-        invariant(finalTurnRequest !== undefined, `Final turn request missing for ${RUN_TEST_MAX_TURN_LIMIT}.`);
-        const requestMessages = Array.isArray(finalTurnRequest.messages) ? finalTurnRequest.messages : [];
-        const xmlNextMessages = requestMessages.filter((message) => message.noticeType === 'xml-next');
-        if (xmlNextMessages.length !== 1 && process.env.CONTEXT_DEBUG === 'true') {
-          console.log(`${RUN_TEST_MAX_TURN_LIMIT} final request messages:`, JSON.stringify(requestMessages, null, 2));
-        }
-        invariant(xmlNextMessages.length === 1, `XML-NEXT should be present exactly once in the final LLM request for ${RUN_TEST_MAX_TURN_LIMIT}.`);
-        const xmlNextContent = typeof xmlNextMessages[0]?.content === 'string' ? xmlNextMessages[0].content : '';
-        invariant(xmlNextContent.includes(FINAL_TURN_INSTRUCTION), `XML-NEXT should include the final turn instruction for ${RUN_TEST_MAX_TURN_LIMIT}.`);
-        const toolNames = Array.isArray(finalTurnRequest.tools)
-          ? finalTurnRequest.tools.map((tool) => sanitizeToolName(tool.name))
-          : [];
-        invariant(toolNames.length === 1 && toolNames[0] === 'agent__final_report', `Final turn should restrict tools to agent__final_report for ${RUN_TEST_MAX_TURN_LIMIT}.`);
-        const finalTurnLog = capturedLogs.find((entry) => entry.remoteIdentifier === FINAL_TURN_REMOTE);
-        invariant(finalTurnLog !== undefined, `Final turn log expected for ${RUN_TEST_MAX_TURN_LIMIT}.`);
-        invariant(result.success === true, `Model-provided final report should indicate success for ${RUN_TEST_MAX_TURN_LIMIT}.`);
-      },
-    };
-  })(),
+  {
+    id: 'run-test-60',
+    description: 'Conversation history and sampling parameter propagation.',
+    configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults, context: TestContext) => {
+      // Store constants in context for expect phase
+      const HISTORY_SYSTEM = 'Legacy advisory instructions.';
+      const HISTORY_ASSISTANT = 'Historical assistant answer.';
+      const TRACE_CONTEXT = { selfId: 'txn-session', originId: 'txn-origin', parentId: 'txn-parent', callPath: 'call/path' } as const;
+      context.HISTORY_ASSISTANT = HISTORY_ASSISTANT;
+      context.TRACE_CONTEXT = TRACE_CONTEXT;
+      context.capturedRequests = [] as { temperature?: number | null; topP?: number | null; maxOutputTokens?: number; repeatPenalty?: number | null; messages: { role: string; content: string }[] }[];
+
+      configuration.providers[PRIMARY_PROVIDER] = configuration.providers[PRIMARY_PROVIDER] ?? { type: 'test-llm' };
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.tools = ['test'];
+      sessionConfig.temperature = 0.21;
+      sessionConfig.topP = 0.77;
+      sessionConfig.maxOutputTokens = 123;
+      sessionConfig.repeatPenalty = 1.1;
+      sessionConfig.renderTarget = 'cli';
+      sessionConfig.initialTitle = 'Session Config Coverage';
+      sessionConfig.agentId = 'session-config-agent';
+      sessionConfig.trace = { ...TRACE_CONTEXT };
+      sessionConfig.traceLLM = true;
+      sessionConfig.conversationHistory = [
+        { role: 'system', content: HISTORY_SYSTEM },
+        { role: 'assistant', content: HISTORY_ASSISTANT },
+      ];
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults, context: TestContext) => {
+      // Use pass-through capture to intercept requests and still call actual provider
+      return runWithPassThroughCapture(sessionConfig, async ({ request, passThrough }) => {
+        const capturedRequests = context.capturedRequests as { temperature?: number | null; topP?: number | null; maxOutputTokens?: number; repeatPenalty?: number | null; messages: { role: string; content: string }[] }[];
+        capturedRequests.push({
+          temperature: request.temperature,
+          topP: request.topP,
+          maxOutputTokens: request.maxOutputTokens,
+          repeatPenalty: request.repeatPenalty,
+          messages: request.messages.map((message) => ({
+            role: message.role,
+            content: typeof message.content === 'string' ? message.content : JSON.stringify(message.content),
+          })),
+        });
+        return passThrough();
+      }, context);
+    },
+    expect: (result: AIAgentResult, context: TestContext) => {
+      const HISTORY_ASSISTANT = context.HISTORY_ASSISTANT as string;
+      const TRACE_CONTEXT = context.TRACE_CONTEXT as { selfId: string; originId: string; parentId: string; callPath: string };
+      const capturedRequests = context.capturedRequests as { temperature?: number | null; topP?: number | null; maxOutputTokens?: number; repeatPenalty?: number | null; messages: { role: string; content: string }[] }[];
+
+      invariant(result.success, 'Scenario run-test-60 expected success.');
+      invariant(capturedRequests.length >= 1, 'Captured request snapshot missing for run-test-60.');
+      const first = capturedRequests[0];
+      const systemMessage = first.messages.find((message) => message.role === 'system');
+      invariant(systemMessage?.content.includes('TOOLS') === true, 'System message should be enhanced with tool instructions in run-test-60.');
+      invariant(first.messages.some((message) => message.role === 'assistant' && message.content.includes(HISTORY_ASSISTANT)), 'Conversation history assistant message missing in request for run-test-60.');
+      invariant(typeof first.temperature === 'number' && Math.abs(first.temperature - 0.21) < 1e-6, 'Temperature propagation failed for run-test-60.');
+      invariant(typeof first.topP === 'number' && Math.abs(first.topP - 0.77) < 1e-6, 'topP propagation failed for run-test-60.');
+      invariant(first.maxOutputTokens === 123, 'maxOutputTokens propagation failed for run-test-60.');
+      invariant(typeof first.repeatPenalty === 'number' && Math.abs(first.repeatPenalty - 1.1) < 1e-6, 'repeatPenalty propagation failed for run-test-60.');
+      const hasHistoryInResult = result.conversation.some((message) => message.role === 'assistant' && message.content.includes(HISTORY_ASSISTANT));
+      invariant(hasHistoryInResult, 'Historical assistant message should be present in result conversation for run-test-60.');
+      const llmEntry = result.accounting.find(isLlmAccounting);
+      invariant(llmEntry !== undefined, 'LLM accounting entry expected for run-test-60.');
+      invariant(typeof llmEntry.txnId === 'string' && llmEntry.txnId.length > 0, 'LLM accounting should include txnId for run-test-60.');
+      invariant(llmEntry.callPath === TRACE_CONTEXT.callPath, 'Trace context should set callPath on LLM accounting entry for run-test-60.');
+      invariant(llmEntry.originTxnId === TRACE_CONTEXT.originId, 'Trace context should preserve originTxnId on LLM accounting entry for run-test-60.');
+      invariant(llmEntry.parentTxnId === TRACE_CONTEXT.parentId, 'Trace context should preserve parentTxnId on LLM accounting entry for run-test-60.');
+      const finalReport = result.finalReport!;
+      invariant(result.success === true, 'Final report should indicate success for run-test-60.');
+    },
+  },
+  {
+    id: 'run-test-61',
+    description: 'Tool calls per turn limit enforcement.',
+    configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig, defaults, context: TestContext) => {
+      defaults.maxToolCallsPerTurn = 1;
+      sessionConfig.maxToolCallsPerTurn = 1;
+      sessionConfig.tools = ['test'];
+      context.capturedLogs = [] as LogEntry[];
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults, context: TestContext) => {
+      const capturedLogs = context.capturedLogs as LogEntry[];
+      const existingCallbacks = sessionConfig.callbacks ?? {};
+      sessionConfig.callbacks = {
+        ...existingCallbacks,
+        onEvent: (event, meta) => {
+          if (event.type === 'log') {
+            capturedLogs.push(event.entry);
+          }
+          existingCallbacks.onEvent?.(event, meta);
+        },
+      };
+      const session = AIAgentSession.create(sessionConfig);
+      return await AIAgent.run(session);
+    },
+    expect: (result: AIAgentResult, context: TestContext) => {
+      const capturedLogs = context.capturedLogs as LogEntry[];
+      invariant(!result.success, 'Scenario run-test-61 should produce a usable final report (presence-based contract).');
+      const limitLog = capturedLogs.find((entry) => entry.remoteIdentifier === 'agent:limits' && logHasEvent(entry, LOG_EVENTS.TOOL_LIMIT_EXCEEDED));
+      invariant(limitLog !== undefined, 'Limit enforcement log expected for run-test-61.');
+      invariant(limitLog.severity === 'WRN', 'Tool limit log should be severity WRN for run-test-61.');
+      invariant(!result.success, 'Final report should indicate failure for run-test-61.');
+    },
+  },
+  {
+    id: RUN_TEST_MAX_TURN_LIMIT,
+    description: 'Session max-turn enforcement when no final report is produced.',
+    configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults: NonNullable<Configuration['defaults']>, context: TestContext) => {
+      context.FINAL_TURN_INSTRUCTION = XML_NEXT_SLUGS.final_turn_max_turns.message;
+      context.capturedRequests = [] as TurnRequest[];
+      context.capturedLogs = [] as LogEntry[];
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: { type: 'test-llm' },
+      };
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.maxTurns = 2;
+      sessionConfig.userPrompt = RUN_TEST_MAX_TURN_LIMIT;
+      sessionConfig.tools = ['test'];
+      const existingCallbacks = sessionConfig.callbacks ?? {};
+      sessionConfig.callbacks = {
+        ...existingCallbacks,
+        onEvent: (event, meta) => {
+          if (event.type === 'log') {
+            (context.capturedLogs as LogEntry[]).push(event.entry);
+          }
+          existingCallbacks.onEvent?.(event, meta);
+        },
+      };
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults: NonNullable<Configuration['defaults']>, context: TestContext) => {
+      // Clear arrays (preserve reference for callback)
+      (context.capturedRequests as TurnRequest[]).length = 0;
+      (context.capturedLogs as LogEntry[]).length = 0;
+      sessionConfig.executeTurnOverride = async (request: TurnRequest): Promise<TurnResult> => {
+        (context.capturedRequests as TurnRequest[]).push(request);
+        const client = new LLMClient(sessionConfig.config.providers, {
+          traceLLM: sessionConfig.traceLLM,
+          traceSDK: sessionConfig.traceSdk,
+        });
+        return client.executeTurn(request);
+      };
+      const session = AIAgentSession.create(sessionConfig);
+      return await AIAgent.run(session);
+    },
+    expect: (result: AIAgentResult, context: TestContext) => {
+      const FINAL_TURN_INSTRUCTION = context.FINAL_TURN_INSTRUCTION as string;
+      const capturedRequests = context.capturedRequests as TurnRequest[];
+      const capturedLogs = context.capturedLogs as LogEntry[];
+      // Model provided a final report, so status is success
+      invariant(result.success, `Scenario ${RUN_TEST_MAX_TURN_LIMIT} should have success=true when model provides final report.`);
+      const conversationHasXmlNext = result.conversation.some((message) => message.noticeType === 'xml-next');
+      if (conversationHasXmlNext && process.env.CONTEXT_DEBUG === 'true') {
+        console.log(`${RUN_TEST_MAX_TURN_LIMIT} conversation:`, JSON.stringify(result.conversation, null, 2));
+      }
+      invariant(!conversationHasXmlNext, `XML-NEXT should remain ephemeral and not persist in conversation for ${RUN_TEST_MAX_TURN_LIMIT}.`);
+      invariant(capturedRequests.length >= 2, `At least two LLM requests expected for ${RUN_TEST_MAX_TURN_LIMIT}.`);
+      const finalTurnRequest = capturedRequests.at(-1);
+      invariant(finalTurnRequest !== undefined, `Final turn request missing for ${RUN_TEST_MAX_TURN_LIMIT}.`);
+      const requestMessages = Array.isArray(finalTurnRequest.messages) ? finalTurnRequest.messages : [];
+      const xmlNextMessages = requestMessages.filter((message) => message.noticeType === 'xml-next');
+      if (xmlNextMessages.length !== 1 && process.env.CONTEXT_DEBUG === 'true') {
+        console.log(`${RUN_TEST_MAX_TURN_LIMIT} final request messages:`, JSON.stringify(requestMessages, null, 2));
+      }
+      invariant(xmlNextMessages.length === 1, `XML-NEXT should be present exactly once in the final LLM request for ${RUN_TEST_MAX_TURN_LIMIT}.`);
+      const xmlNextContent = typeof xmlNextMessages[0]?.content === 'string' ? xmlNextMessages[0].content : '';
+      invariant(xmlNextContent.includes(FINAL_TURN_INSTRUCTION), `XML-NEXT should include the final turn instruction for ${RUN_TEST_MAX_TURN_LIMIT}.`);
+      const toolNames = Array.isArray(finalTurnRequest.tools)
+        ? finalTurnRequest.tools.map((tool) => sanitizeToolName(tool.name))
+        : [];
+      invariant(toolNames.length === 1 && toolNames[0] === 'agent__final_report', `Final turn should restrict tools to agent__final_report for ${RUN_TEST_MAX_TURN_LIMIT}.`);
+      const finalTurnLog = capturedLogs.find((entry) => entry.remoteIdentifier === FINAL_TURN_REMOTE);
+      invariant(finalTurnLog !== undefined, `Final turn log expected for ${RUN_TEST_MAX_TURN_LIMIT}.`);
+      invariant(result.success === true, `Model-provided final report should indicate success for ${RUN_TEST_MAX_TURN_LIMIT}.`);
+    },
+  },
   (() => {
     let abortController: AbortController | undefined;
     return {
@@ -5969,44 +5995,39 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       },
     };
   })(),
-  (() => {
-    let capturedTopP: number | null | undefined;
-    return {
-      id: 'run-test-69',
-      description: 'Model override snake-case top_p propagation.',
-      configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
-        configuration.providers[PRIMARY_PROVIDER] = {
-          type: 'test-llm',
-          models: {
-            [MODEL_NAME]: {
-              overrides: { top_p: 0.66 },
-            },
+  {
+    id: 'run-test-69',
+    description: 'Model override snake-case top_p propagation.',
+    configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults: NonNullable<Configuration['defaults']>, context: TestContext) => {
+      configuration.providers[PRIMARY_PROVIDER] = {
+        type: 'test-llm',
+        models: {
+          [MODEL_NAME]: {
+            overrides: { top_p: 0.66 },
           },
-        };
-        sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
-        sessionConfig.userPrompt = 'run-test-69';
-      },
-      execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
-        capturedTopP = undefined;
-        // eslint-disable-next-line @typescript-eslint/unbound-method -- capture method for restoration after interception
-        const originalExecute = LLMClient.prototype.executeTurn;
-        LLMClient.prototype.executeTurn = async function(request: TurnRequest): Promise<TurnResult> {
-          capturedTopP = request.topP;
-          return await originalExecute.call(this, request);
-        };
-        try {
-          const session = AIAgentSession.create(sessionConfig);
-          return await AIAgent.run(session);
-        } finally {
-          LLMClient.prototype.executeTurn = originalExecute;
-        }
-      },
-      expect: (result: AIAgentResult) => {
-        invariant(result.success, 'Scenario run-test-69 expected success.');
-        invariant(typeof capturedTopP === 'number' && Math.abs(capturedTopP - 0.66) < 1e-6, 'top_p override propagation failed for run-test-69.');
-      },
-    };
-  })(),
+        },
+      };
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.userPrompt = 'run-test-69';
+      sessionConfig.executeTurnOverride = async (request: TurnRequest): Promise<TurnResult> => {
+        context.capturedTopP = request.topP;
+        const client = new LLMClient(sessionConfig.config.providers, {
+          traceLLM: sessionConfig.traceLLM,
+          traceSDK: sessionConfig.traceSdk,
+        });
+        return client.executeTurn(request);
+      };
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      const session = AIAgentSession.create(sessionConfig);
+      return await AIAgent.run(session);
+    },
+    expect: (result: AIAgentResult, context: TestContext) => {
+      invariant(result.success, 'Scenario run-test-69 expected success.');
+      const capturedTopP = context.capturedTopP as number | undefined;
+      invariant(typeof capturedTopP === 'number' && Math.abs(capturedTopP - 0.66) < 1e-6, 'top_p override propagation failed for run-test-69.');
+    },
+  },
   (() => {
     let capturedEvents: AgentFinishedEvent[] = [];
     return {
@@ -7161,7 +7182,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-84',
     description: 'Final turn without final report retries next provider.',
-    configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults: NonNullable<Configuration['defaults']>, context: TestContext) => {
       configuration.providers = {
         ...configuration.providers,
         [SECONDARY_PROVIDER]: { type: 'test-llm' },
@@ -7171,15 +7192,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         { provider: SECONDARY_PROVIDER, model: `${MODEL_NAME}-secondary` },
       ];
       sessionConfig.maxTurns = 1;
-    },
-    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      const originalExecuteTurn = LLMClient.prototype.executeTurn;
-      let invocation = 0;
-      let activeSession: AIAgentSession | undefined;
-      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
-        invocation += 1;
-        if (invocation === 1) {
+      context.invocation = 0;
+      sessionConfig.executeTurnOverride = async (request: TurnRequest): Promise<TurnResult> => {
+        context.invocation = (context.invocation as number) + 1;
+        if (context.invocation === 1) {
           return {
             status: { type: 'success', hasToolCalls: false, finalAnswer: false },
             latencyMs: 5,
@@ -7189,13 +7205,14 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             tokens: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
           };
         }
-        if (invocation === 2) {
-            if (activeSession !== undefined) {
-              (activeSession as unknown as { finalReport?: { format: 'markdown'; content: string } }).finalReport = {
-                format: 'markdown',
-                content: FINAL_ANSWER_DELIVERED,
-              };
-            }
+        if (context.invocation === 2) {
+          const activeSession = context.activeSession as AIAgentSession | undefined;
+          if (activeSession !== undefined) {
+            (activeSession as unknown as { finalReport?: { format: 'markdown'; content: string } }).finalReport = {
+              format: 'markdown',
+              content: FINAL_ANSWER_DELIVERED,
+            };
+          }
           const assistantMessage = {
             role: 'assistant',
             content: '',
@@ -7222,31 +7239,33 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             tokens: { inputTokens: 12, outputTokens: 8, totalTokens: 20 },
           };
         }
-        return await originalExecuteTurn.call(this, request);
+        const client = new LLMClient(sessionConfig.config.providers, {
+          traceLLM: sessionConfig.traceLLM,
+          traceSDK: sessionConfig.traceSdk,
+        });
+        return client.executeTurn(request);
       };
-      try {
-          activeSession = AIAgentSession.create(sessionConfig);
-          return await activeSession.run();
-      } finally {
-        LLMClient.prototype.executeTurn = originalExecuteTurn;
-      }
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults: NonNullable<Configuration['defaults']>, context: TestContext) => {
+      const activeSession = AIAgentSession.create(sessionConfig);
+      context.activeSession = activeSession;
+      return await activeSession.run();
     },
     expect: (result: AIAgentResult) => {
       invariant(result.success, 'Scenario run-test-84 expected success.');
       const finalTurnLog = result.logs.find((entry) => entry.remoteIdentifier === FINAL_TURN_REMOTE);
       if (finalTurnLog === undefined) {
-         
+
         console.error('run-test-84 logs:', result.logs.map((entry) => ({ id: entry.remoteIdentifier, severity: entry.severity, message: entry.message })));
       }
       invariant(finalTurnLog !== undefined, 'Final-turn warning log expected for run-test-84.');
-      const finalReport = result.finalReport!;
       invariant(result.success === true, 'Final report should succeed for run-test-84.');
     },
   },
   {
     id: 'run-test-85',
     description: 'Final report JSON schema mismatch surfaces payload preview.',
-    configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults: NonNullable<Configuration['defaults']>, context: TestContext) => {
       sessionConfig.expectedOutput = {
         format: 'json',
         schema: {
@@ -7260,15 +7279,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       };
       sessionConfig.maxTurns = 1;
       sessionConfig.outputFormat = 'json';
-    },
-    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      const originalExecuteTurn = LLMClient.prototype.executeTurn;
-      let invocation = 0;
-      let activeSession: AIAgentSession | undefined;
-      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
-        invocation += 1;
-        if (invocation === 1) {
+      context.invocation = 0;
+      sessionConfig.executeTurnOverride = async (request: TurnRequest): Promise<TurnResult> => {
+        context.invocation = (context.invocation as number) + 1;
+        if (context.invocation === 1) {
           return {
             status: { type: 'success', hasToolCalls: false, finalAnswer: false },
             latencyMs: 5,
@@ -7278,7 +7292,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             tokens: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
           };
         }
-        if (invocation === 2) {
+        if (context.invocation === 2) {
+          const activeSession = context.activeSession as AIAgentSession | undefined;
           if (activeSession !== undefined) {
             (activeSession as unknown as { finalReport?: { format: 'json'; content_json: Record<string, unknown> } }).finalReport = {
               format: 'json',
@@ -7311,14 +7326,17 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             tokens: { inputTokens: 9, outputTokens: 6, totalTokens: 15 },
           };
         }
-        return await originalExecuteTurn.call(this, request);
+        const client = new LLMClient(sessionConfig.config.providers, {
+          traceLLM: sessionConfig.traceLLM,
+          traceSDK: sessionConfig.traceSdk,
+        });
+        return client.executeTurn(request);
       };
-      try {
-        activeSession = AIAgentSession.create(sessionConfig);
-        return await activeSession.run();
-      } finally {
-        LLMClient.prototype.executeTurn = originalExecuteTurn;
-      }
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults: NonNullable<Configuration['defaults']>, context: TestContext) => {
+      const activeSession = AIAgentSession.create(sessionConfig);
+      context.activeSession = activeSession;
+      return await activeSession.run();
     },
     expect: (result: AIAgentResult) => {
       // Pre-commit validation now rejects invalid payloads and triggers retries.
@@ -7378,17 +7396,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-87',
     description: 'Final report failure status is propagated.',
-    configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults: NonNullable<Configuration['defaults']>, context: TestContext) => {
       sessionConfig.maxTurns = 1;
-    },
-    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      const originalExecuteTurn = LLMClient.prototype.executeTurn;
-      let invocation = 0;
-      let activeSession: AIAgentSession | undefined;
-      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
-        invocation += 1;
-        if (invocation === 1) {
+      context.invocation = 0;
+      sessionConfig.executeTurnOverride = async (request: TurnRequest): Promise<TurnResult> => {
+        context.invocation = (context.invocation as number) + 1;
+        if (context.invocation === 1) {
           return {
             status: { type: 'success', hasToolCalls: false, finalAnswer: false },
             latencyMs: 5,
@@ -7398,7 +7411,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             tokens: { inputTokens: 7, outputTokens: 3, totalTokens: 10 },
           };
         }
-        if (invocation === 2) {
+        if (context.invocation === 2) {
+          const activeSession = context.activeSession as AIAgentSession | undefined;
           if (activeSession !== undefined) {
             (activeSession as unknown as { finalReport?: { format: 'markdown'; content: string } }).finalReport = {
               format: 'markdown',
@@ -7433,14 +7447,17 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             tokens: { inputTokens: 9, outputTokens: 6, totalTokens: 15 },
           };
         }
-        return await originalExecuteTurn.call(this, request);
+        const client = new LLMClient(sessionConfig.config.providers, {
+          traceLLM: sessionConfig.traceLLM,
+          traceSDK: sessionConfig.traceSdk,
+        });
+        return client.executeTurn(request);
       };
-      try {
-        activeSession = AIAgentSession.create(sessionConfig);
-        return await activeSession.run();
-      } finally {
-        LLMClient.prototype.executeTurn = originalExecuteTurn;
-      }
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults: NonNullable<Configuration['defaults']>, context: TestContext) => {
+      const activeSession = AIAgentSession.create(sessionConfig);
+      context.activeSession = activeSession;
+      return await activeSession.run();
     },
     expect: (result: AIAgentResult) => {
       // Transport-layer success: model produced a valid final report.
@@ -7458,17 +7475,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-88',
     description: 'Model-provided final report results in success status.',
-    configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults: NonNullable<Configuration['defaults']>, context: TestContext) => {
       sessionConfig.maxTurns = 1;
-    },
-    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      const originalExecuteTurn = LLMClient.prototype.executeTurn;
-      let invocation = 0;
-      let activeSession: AIAgentSession | undefined;
-      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
-        invocation += 1;
-        if (invocation === 1) {
+      context.invocation = 0;
+      sessionConfig.executeTurnOverride = async (request: TurnRequest): Promise<TurnResult> => {
+        context.invocation = (context.invocation as number) + 1;
+        if (context.invocation === 1) {
           return {
             status: { type: 'success', hasToolCalls: false, finalAnswer: false },
             latencyMs: 5,
@@ -7478,9 +7490,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             tokens: { inputTokens: 6, outputTokens: 3, totalTokens: 9 },
           };
         }
-        if (invocation === 2) {
+        if (context.invocation === 2) {
           // Model-provided final reports always result in status='success'
           const reportContent = 'Report content: gathered overview with available metrics.';
+          const activeSession = context.activeSession as AIAgentSession | undefined;
           if (activeSession !== undefined) {
             (activeSession as unknown as { finalReport?: { format: 'markdown'; content: string } }).finalReport = {
               format: 'markdown',
@@ -7514,14 +7527,17 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             tokens: { inputTokens: 8, outputTokens: 5, totalTokens: 13 },
           };
         }
-        return await originalExecuteTurn.call(this, request);
+        const client = new LLMClient(sessionConfig.config.providers, {
+          traceLLM: sessionConfig.traceLLM,
+          traceSDK: sessionConfig.traceSdk,
+        });
+        return client.executeTurn(request);
       };
-      try {
-        activeSession = AIAgentSession.create(sessionConfig);
-        return await activeSession.run();
-      } finally {
-        LLMClient.prototype.executeTurn = originalExecuteTurn;
-      }
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults: NonNullable<Configuration['defaults']>, context: TestContext) => {
+      const activeSession = AIAgentSession.create(sessionConfig);
+      context.activeSession = activeSession;
+      return await activeSession.run();
     },
     expect: (result: AIAgentResult) => {
       // Model-provided final reports always result in success=true, status='success'
@@ -7565,14 +7581,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   },
   {
     id: 'run-test-90',
-    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original method for restoration after interception
-      const originalExecuteTurn = LLMClient.prototype.executeTurn;
-      let invocation = 0;
-      let activeSession: AIAgentSession | undefined;
-      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
-        invocation += 1;
-        if (invocation === 1) {
+    configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults: NonNullable<Configuration['defaults']>, context: TestContext) => {
+      context.invocation = 0;
+      sessionConfig.executeTurnOverride = async (request: TurnRequest): Promise<TurnResult> => {
+        context.invocation = (context.invocation as number) + 1;
+        if (context.invocation === 1) {
           const assistantMessage: ConversationMessage = {
             role: 'assistant',
             content: '',
@@ -7596,7 +7609,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             tokens: { inputTokens: 10, outputTokens: 4, totalTokens: 14 },
           };
         }
-        if (invocation === 2) {
+        if (context.invocation === 2) {
           const assistantMessage: ConversationMessage = {
             role: 'assistant',
             content: '',
@@ -7615,7 +7628,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             tokens: { inputTokens: 12, outputTokens: 6, totalTokens: 18 },
           };
         }
-        if (invocation === 3) {
+        if (context.invocation === 3) {
           const finalContent = 'Final report produced after sanitizer retry.';
           const assistantMessage: ConversationMessage = {
             role: 'assistant',
@@ -7636,6 +7649,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             toolCallId: FINAL_REPORT_CALL_ID,
             content: finalContent,
           };
+          const activeSession = context.activeSession as AIAgentSession | undefined;
           if (activeSession !== undefined) {
             (activeSession as unknown as { finalReport?: { format: 'markdown'; content: string } }).finalReport = {
               format: 'markdown',
@@ -7649,14 +7663,17 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             tokens: { inputTokens: 14, outputTokens: 8, totalTokens: 22 },
           };
         }
-        return await originalExecuteTurn.call(this, request);
+        const client = new LLMClient(sessionConfig.config.providers, {
+          traceLLM: sessionConfig.traceLLM,
+          traceSDK: sessionConfig.traceSdk,
+        });
+        return client.executeTurn(request);
       };
-      try {
-        activeSession = AIAgentSession.create(sessionConfig);
-        return await activeSession.run();
-      } finally {
-        LLMClient.prototype.executeTurn = originalExecuteTurn;
-      }
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults: NonNullable<Configuration['defaults']>, context: TestContext) => {
+      const activeSession = AIAgentSession.create(sessionConfig);
+      context.activeSession = activeSession;
+      return await activeSession.run();
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-90 expected success.');
@@ -7687,7 +7704,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(retryLog !== undefined, 'Retry warning log missing for run-test-90.');
       const llmAttempts = result.accounting.filter(isLlmAccounting).length;
       invariant(llmAttempts === 3, 'Three LLM attempts expected for run-test-90.');
-      const finalReport = result.finalReport!;
       invariant(result.success === true, 'Final report should succeed after sanitizer retry (run-test-90).');
     },
   },
@@ -8420,17 +8436,16 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-104',
     description: 'Reasoning signatures survive turn replay before final report.',
-    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults: NonNullable<Configuration['defaults']>, context: TestContext) => {
+      context.signature = 'sig-preserve-123';
+      context.invocation = 0;
+      context.replayVerified = false;
       sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
       sessionConfig.reasoning = 'high';
-      const signature = 'sig-preserve-123';
-      let invocation = 0;
-      let replayVerified = false;
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      const originalExecuteTurn = LLMClient.prototype.executeTurn;
-      LLMClient.prototype.executeTurn = function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
-        invocation += 1;
-        const turnIndex = invocation;
+      sessionConfig.executeTurnOverride = async (request: TurnRequest): Promise<TurnResult> => {
+        context.invocation = (context.invocation as number) + 1;
+        const turnIndex = context.invocation as number;
+        const signature = context.signature as string;
         if (turnIndex === 1) {
           const assistantMessage: ConversationMessage = {
             role: 'assistant',
@@ -8443,7 +8458,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
               },
             ],
           };
-          return Promise.resolve({
+          return {
             status: { type: 'success', hasToolCalls: false, finalAnswer: false },
             latencyMs: 12,
             messages: [assistantMessage],
@@ -8451,7 +8466,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             response: '',
             hasReasoning: true,
             stopReason: 'other',
-          });
+          };
         }
         if (turnIndex === 2) {
           const assistantHistory = request.messages.filter((message) => message.role === 'assistant');
@@ -8465,9 +8480,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             return typeof anthropic?.signature === 'string' && anthropic.signature === signature;
           });
           if (!hasSignature) {
-            return Promise.reject(new Error('reasoning_signature_missing_on_replay'));
+            throw new Error('reasoning_signature_missing_on_replay');
           }
-          replayVerified = true;
+          context.replayVerified = true;
           const finalCallId = 'call-final-replay';
           const assistantMessage: ConversationMessage = {
             role: 'assistant',
@@ -8495,7 +8510,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             toolCallId: finalCallId,
             content: TOOL_OK_JSON,
           };
-          return Promise.resolve({
+          return {
             status: { type: 'success', hasToolCalls: true, finalAnswer: true },
             latencyMs: 18,
             messages: [assistantMessage, toolMessage],
@@ -8503,22 +8518,23 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             response: '',
             hasReasoning: true,
             stopReason: STOP_REASON_TOOL_CALLS,
-          });
+          };
         }
-        return originalExecuteTurn.call(this, request);
+        // Fallback: pass through to real provider
+        const client = new LLMClient(sessionConfig.config.providers, {
+          traceLLM: sessionConfig.traceLLM,
+          traceSDK: sessionConfig.traceSdk,
+        });
+        return client.executeTurn(request);
       };
-      try {
-        const session = AIAgentSession.create(sessionConfig);
-        const result = await AIAgent.run(session);
-        (result as { __reasoningReplayVerified?: boolean }).__reasoningReplayVerified = replayVerified;
-        return result;
-      } finally {
-        LLMClient.prototype.executeTurn = originalExecuteTurn;
-      }
     },
-    expect: (result: AIAgentResult & { __reasoningReplayVerified?: boolean }) => {
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      const session = AIAgentSession.create(sessionConfig);
+      return await AIAgent.run(session);
+    },
+    expect: (result: AIAgentResult, context: TestContext) => {
       invariant(result.success, 'Scenario run-test-104 expected success.');
-      invariant(result.__reasoningReplayVerified === true, 'Reasoning signatures were not verified during replay for run-test-104.');
+      invariant(context.replayVerified === true, 'Reasoning signatures were not verified during replay for run-test-104.');
       const finalReport = result.finalReport!;
       invariant(result.success === true, 'Final report missing for run-test-104.');
       invariant(finalReport.format === 'markdown', 'Final report format mismatch for run-test-104.');
@@ -8528,7 +8544,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-105',
     description: 'Reasoning signature survives fallback from primary to secondary provider.',
-    configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults: NonNullable<Configuration['defaults']>, context: TestContext) => {
+      context.signature = 'sig-fallback-123';
+      context.invocation = 0;
+      context.fallbackSignatureVerified = false;
       configuration.providers = {
         [PRIMARY_PROVIDER]: { type: 'test-llm' },
         [SECONDARY_PROVIDER]: { type: 'test-llm' },
@@ -8539,15 +8558,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       ];
       sessionConfig.reasoning = 'high';
       sessionConfig.maxRetries = 3;
-    },
-    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
-      const signature = 'sig-fallback-123';
-      let invocation = 0;
-      let fallbackSignatureVerified = false;
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      const originalExecuteTurn = LLMClient.prototype.executeTurn;
-      LLMClient.prototype.executeTurn = function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
-        invocation += 1;
+      sessionConfig.executeTurnOverride = async (request: TurnRequest): Promise<TurnResult> => {
+        context.invocation = (context.invocation as number) + 1;
+        const invocation = context.invocation as number;
+        const signature = context.signature as string;
         const provider = request.provider;
         if (invocation === 1) {
           invariant(provider === PRIMARY_PROVIDER, 'First invocation should target primary provider in run-test-105.');
@@ -8562,7 +8576,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
               },
             ],
           };
-          return Promise.resolve({
+          return {
             status: { type: 'success', hasToolCalls: false, finalAnswer: false },
             latencyMs: 12,
             messages: [assistantMessage],
@@ -8570,24 +8584,24 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             hasReasoning: true,
             response: '',
             stopReason: 'other',
-          });
+          };
         }
         if (invocation === 2) {
           invariant(provider === PRIMARY_PROVIDER, 'Second invocation should remain on primary provider in run-test-105.');
-          return Promise.resolve({
+          return {
             status: { type: 'model_error', message: 'primary failure', retryable: false },
             latencyMs: 8,
             messages: [],
             tokens: { inputTokens: 40, outputTokens: 10, totalTokens: 50 },
             response: '',
             stopReason: 'other',
-          });
+          };
         }
         if (invocation === 3) {
           invariant(provider === SECONDARY_PROVIDER, 'Fallback invocation should target secondary provider in run-test-105.');
           const assistantHistory = request.messages.filter((message) => message.role === 'assistant');
           const reasoningSegments = assistantHistory.flatMap((message) => (Array.isArray(message.reasoning) ? message.reasoning : []));
-          fallbackSignatureVerified = reasoningSegments.some((segment) => {
+          context.fallbackSignatureVerified = reasoningSegments.some((segment) => {
             const metadataUnknown = (segment as { providerMetadata?: unknown }).providerMetadata;
             if (metadataUnknown === undefined || metadataUnknown === null || typeof metadataUnknown !== 'object') {
               return false;
@@ -8622,7 +8636,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             toolCallId: finalCallId,
             content: TOOL_OK_JSON,
           };
-          return Promise.resolve({
+          return {
             status: { type: 'success', hasToolCalls: true, finalAnswer: true },
             latencyMs: 15,
             messages: [assistantMessage, toolMessage],
@@ -8630,22 +8644,23 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             hasReasoning: true,
             response: '',
             stopReason: STOP_REASON_TOOL_CALLS,
-          });
+          };
         }
-        return originalExecuteTurn.call(this, request);
+        // Fallback: pass through to real provider
+        const client = new LLMClient(sessionConfig.config.providers, {
+          traceLLM: sessionConfig.traceLLM,
+          traceSDK: sessionConfig.traceSdk,
+        });
+        return client.executeTurn(request);
       };
-      try {
-        const session = AIAgentSession.create(sessionConfig);
-        const result = await AIAgent.run(session);
-        (result as { __fallbackSignatureVerified?: boolean }).__fallbackSignatureVerified = fallbackSignatureVerified;
-        return result;
-      } finally {
-        LLMClient.prototype.executeTurn = originalExecuteTurn;
-      }
     },
-    expect: (result: AIAgentResult & { __fallbackSignatureVerified?: boolean }) => {
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      const session = AIAgentSession.create(sessionConfig);
+      return await AIAgent.run(session);
+    },
+    expect: (result: AIAgentResult, context: TestContext) => {
       invariant(result.success, 'Scenario run-test-105 expected success.');
-      invariant(result.__fallbackSignatureVerified === true, 'Fallback provider did not receive reasoning signature in run-test-105.');
+      invariant(context.fallbackSignatureVerified === true, 'Fallback provider did not receive reasoning signature in run-test-105.');
       const finalReport = result.finalReport!;
       invariant(result.success === true, 'Final report missing for run-test-105.');
       invariant(finalReport.format === 'markdown', 'Final report format mismatch for run-test-105.');
@@ -8942,16 +8957,14 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-101',
     description: 'Synthesizes a failure final report when tools keep failing on the final turn.',
-    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults: NonNullable<Configuration['defaults']>, context: TestContext) => {
+      context.invocation = 0;
       sessionConfig.maxTurns = 1;
       sessionConfig.maxRetries = 1;
       sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      const originalExecuteTurn = LLMClient.prototype.executeTurn;
-      let invocation = 0;
-      LLMClient.prototype.executeTurn = function(this: LLMClient, _request: TurnRequest): Promise<TurnResult> {
-        invocation += 1;
-        const failureCallId = `call-fail-${String(invocation)}`;
+      sessionConfig.executeTurnOverride = (_request: TurnRequest): Promise<TurnResult> => {
+        context.invocation = (context.invocation as number) + 1;
+        const failureCallId = `call-fail-${String(context.invocation)}`;
         const assistantMessage: ConversationMessage = {
           role: 'assistant',
           content: '',
@@ -8975,15 +8988,13 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           tokens: { inputTokens: 12, outputTokens: 0, cachedTokens: 0, totalTokens: 12 },
         });
       };
-      try {
-        const session = AIAgentSession.create(sessionConfig);
-        return await AIAgent.run(session);
-      } finally {
-        LLMClient.prototype.executeTurn = originalExecuteTurn;
-      }
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      const session = AIAgentSession.create(sessionConfig);
+      return await AIAgent.run(session);
     },
     expect: (result: AIAgentResult) => {
-           invariant(!result.success, 'Scenario run-test-101 should produce a usable final report (presence-based contract).');
+      invariant(!result.success, 'Scenario run-test-101 should produce a usable final report (presence-based contract).');
       const finalReport = result.finalReport!;
       invariant(finalReport !== undefined, 'Final report expected for run-test-101.');
       invariant(!result.success, 'Synthesized final report should carry failure status for run-test-101.');
@@ -12104,38 +12115,37 @@ BASE_TEST_SCENARIOS.push({
   },
 } satisfies HarnessTest);
 
-BASE_TEST_SCENARIOS.push((() => {
-  let streamedOutput = '';
-  const expected = 'Dedupe me.';
-  return {
-    id: 'run-test-stream-dedupe-final-report',
-    description: 'Streaming output should not be duplicated by final_report emission.',
-    configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig, defaults: NonNullable<Configuration['defaults']>) => {
-      streamedOutput = '';
-      defaults.stream = true;
-      configuration.defaults = defaults;
-      sessionConfig.stream = true;
-      const existingCallbacks = sessionConfig.callbacks ?? {};
-      sessionConfig.callbacks = {
-        ...existingCallbacks,
-        onEvent: (event, meta) => {
-          if (event.type === 'output') {
-            streamedOutput += event.text;
-          }
-          existingCallbacks.onEvent?.(event, meta);
-        },
-      };
-    },
-    expect: (result: AIAgentResult) => {
-      invariant(result.success, 'run-test-stream-dedupe-final-report expected success.');
-      const finalReport = result.finalReport;
-      invariant(finalReport !== undefined, 'Final report expected for run-test-stream-dedupe-final-report.');
-      invariant(typeof finalReport.content === 'string' && finalReport.content.trim() === expected, 'Final report content mismatch for run-test-stream-dedupe-final-report.');
-      const occurrences = streamedOutput.split(expected).length - 1;
-      invariant(occurrences === 1, `Expected streamed output to contain exactly 1 copy of final answer, got ${String(occurrences)}.`);
-    },
-  } satisfies HarnessTest;
-})());
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-stream-dedupe-final-report',
+  description: 'Streaming output should not be duplicated by final_report emission.',
+  configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig, defaults: NonNullable<Configuration['defaults']>, context: TestContext) => {
+    context.streamedOutput = '';
+    context.expected = 'Dedupe me.';
+    defaults.stream = true;
+    configuration.defaults = defaults;
+    sessionConfig.stream = true;
+    const existingCallbacks = sessionConfig.callbacks ?? {};
+    sessionConfig.callbacks = {
+      ...existingCallbacks,
+      onEvent: (event, meta) => {
+        if (event.type === 'output') {
+          context.streamedOutput = (context.streamedOutput as string) + event.text;
+        }
+        existingCallbacks.onEvent?.(event, meta);
+      },
+    };
+  },
+  expect: (result: AIAgentResult, context: TestContext) => {
+    const streamedOutput = context.streamedOutput as string;
+    const expected = context.expected as string;
+    invariant(result.success, 'run-test-stream-dedupe-final-report expected success.');
+    const finalReport = result.finalReport;
+    invariant(finalReport !== undefined, 'Final report expected for run-test-stream-dedupe-final-report.');
+    invariant(typeof finalReport.content === 'string' && finalReport.content.trim() === expected, 'Final report content mismatch for run-test-stream-dedupe-final-report.');
+    const occurrences = streamedOutput.split(expected).length - 1;
+    invariant(occurrences === 1, `Expected streamed output to contain exactly 1 copy of final answer, got ${String(occurrences)}.`);
+  },
+} satisfies HarnessTest);
 
 BASE_TEST_SCENARIOS.push({
   id: 'run-test-handoff-event-chain',
