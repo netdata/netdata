@@ -18,6 +18,7 @@ typedef struct ml_chart rrd_ml_chart_t;
 struct rrdhost;
 struct rrdcalc;
 struct pluginsd_rrddim;
+struct pluginsd_rrddim_array;  // Reference-counted array for pluginsd dimension caching
 struct rrdinstance_acquired;
 struct rrdcontext_acquired;
 struct storage_alignment;
@@ -215,8 +216,7 @@ struct rrdset {
         bool set;
         uint32_t pos;
         int32_t last_slot;
-        uint32_t size;
-        struct pluginsd_rrddim *prd_array;
+        struct pluginsd_rrddim_array *prd_array;  // Reference-counted array (use prd_array_* functions)
     } pluginsd;
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
