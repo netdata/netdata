@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdset-slots.h"
+#include "rrdset-pluginsd-array.h"
 
 void rrdset_stream_send_chart_slot_assign(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
@@ -41,12 +42,35 @@ void rrdset_stream_send_chart_slot_release(RRDSET *st) {
     spinlock_unlock(&host->stream.snd.pluginsd_chart_slots.available.spinlock);
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// Helper function to release RRDDIM_ACQUIRED references in array entries
+// This must be called before the final prd_array_release when cleaning up
+
+static void prd_array_release_entries(PRD_ARRAY *arr) {
+    if (!arr)
+        return;
+
+    for (size_t i = 0; i < arr->size; i++) {
+        rrddim_acquired_release(arr->entries[i].rda);  // safe with NULL
+        arr->entries[i].rda = NULL;
+        arr->entries[i].rd = NULL;
+        arr->entries[i].id = NULL;
+    }
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// Unslot a chart - releases dimension references but keeps the array for reuse
+// This is called when switching charts or marking them obsolete
+// Thread-safe: uses reference counting to protect array access
+
 void rrdset_pluginsd_receive_unslot(RRDSET *st) {
-    for(size_t i = 0; i < st->pluginsd.size ;i++) {
-        rrddim_acquired_release(st->pluginsd.prd_array[i].rda); // can be NULL
-        st->pluginsd.prd_array[i].rda = NULL;
-        st->pluginsd.prd_array[i].rd = NULL;
-        st->pluginsd.prd_array[i].id = NULL;
+    // Acquire a reference to safely access the array
+    PRD_ARRAY *arr = prd_array_acquire(&st->pluginsd.prd_array);
+    if (arr) {
+        // Release all dimension references
+        prd_array_release_entries(arr);
+        // Release our reference to the array
+        prd_array_release(arr);
     }
 
     RRDHOST *host = st->rrdhost;
@@ -61,28 +85,70 @@ void rrdset_pluginsd_receive_unslot(RRDSET *st) {
     st->pluginsd.dims_with_slots = false;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// Full cleanup - unslots and frees the array
+// This is called during chart finalization or host cleanup
+// Thread-safe: uses spinlock for cleanup coordination and reference counting for array lifetime
+
 void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
     if(!st)
         return;
 
     spinlock_lock(&st->pluginsd.spinlock);
 
-    rrdset_pluginsd_receive_unslot(st);
+    // Check if collector is still active - if so, we cannot safely cleanup
+    // The collector will clear collector_tid after it's done accessing the array
+    pid_t collector_tid = __atomic_load_n(&st->pluginsd.collector_tid, __ATOMIC_ACQUIRE);
+    if(collector_tid != 0) {
+        // Collector is still active, cannot cleanup now
+        // This shouldn't happen during normal operation - log a warning
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+                     "PLUGINSD: attempted cleanup while collector (tid %d) is still active on chart, skipping",
+                     collector_tid);
+        spinlock_unlock(&st->pluginsd.spinlock);
+        return;
+    }
 
-    rrd_slot_memory_removed(st->pluginsd.size * sizeof(struct pluginsd_rrddim));
-    freez(st->pluginsd.prd_array);
-    st->pluginsd.prd_array = NULL;
-    st->pluginsd.size = 0;
-    st->pluginsd.pos = 0;
+    // Replace the array with NULL - this prevents new references from being acquired
+    PRD_ARRAY *old_arr = prd_array_replace(&st->pluginsd.prd_array, NULL);
+
+    // Reset other state while holding the lock
+    __atomic_store_n(&st->pluginsd.pos, 0, __ATOMIC_RELAXED);
     st->pluginsd.set = false;
     st->pluginsd.last_slot = -1;
     st->pluginsd.dims_with_slots = false;
-    st->pluginsd.collector_tid = 0;
 
     spinlock_unlock(&st->pluginsd.spinlock);
+
+    // Now handle the old array outside the lock
+    if (old_arr) {
+        // Track memory being freed
+        rrd_slot_memory_removed(sizeof(PRD_ARRAY) + old_arr->size * sizeof(struct pluginsd_rrddim));
+
+        // Release all dimension references
+        prd_array_release_entries(old_arr);
+
+        // Clear the chart slot mapping
+        RRDHOST *host = st->rrdhost;
+        if(st->pluginsd.last_slot >= 0 &&
+            (uint32_t)st->pluginsd.last_slot < host->stream.rcv.pluginsd_chart_slots.size &&
+            host->stream.rcv.pluginsd_chart_slots.array[st->pluginsd.last_slot] == st) {
+            host->stream.rcv.pluginsd_chart_slots.array[st->pluginsd.last_slot] = NULL;
+        }
+
+        // Release our reference - array will be freed when refcount reaches 0
+        // If another thread still has a reference (unlikely but possible during races),
+        // the array will be freed when that thread releases its reference
+        prd_array_release(old_arr);
+    }
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// Initialize the pluginsd slots for a chart
 
 void rrdset_pluginsd_receive_slots_initialize(RRDSET *st) {
     spinlock_init(&st->pluginsd.spinlock);
     st->pluginsd.last_slot = -1;
+    st->pluginsd.prd_array = NULL;  // Explicitly initialize to NULL
 }
