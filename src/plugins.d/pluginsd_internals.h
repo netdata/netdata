@@ -7,6 +7,7 @@
 #include "pluginsd_functions.h"
 #include "pluginsd_dyncfg.h"
 #include "pluginsd_replication.h"
+#include "database/rrdset-pluginsd-array.h"
 
 #define SERVING_STREAMING(parser) ((parser)->repertoire == PARSER_INIT_STREAMING)
 #define SERVING_PLUGINSD(parser) ((parser)->repertoire == PARSER_INIT_PLUGINSD)
@@ -91,7 +92,7 @@ static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keywor
 
 static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const char *keyword) {
     RRDSET *old_st = parser->user.st;
-    pid_t old_collector_tid = (old_st) ? old_st->pluginsd.collector_tid : 0;
+    pid_t old_collector_tid = (old_st) ? __atomic_load_n(&old_st->pluginsd.collector_tid, __ATOMIC_ACQUIRE) : 0;
     pid_t my_collector_tid = gettid_cached();
 
     if(unlikely(old_collector_tid)) {
@@ -105,15 +106,20 @@ static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, c
 
             return false;
         }
-
-        old_st->pluginsd.collector_tid = 0;
+        // Don't clear collector_tid here - we still need to access old_st in pluginsd_clear_scope_chart
     }
 
-    st->pluginsd.collector_tid = my_collector_tid;
+    // Set new chart's collector_tid before any access
+    __atomic_store_n(&st->pluginsd.collector_tid, my_collector_tid, __ATOMIC_RELEASE);
 
+    // Access old_st's array in pluginsd_clear_scope_chart while old_st->collector_tid is still set
     pluginsd_clear_scope_chart(parser, keyword);
 
-    st->pluginsd.pos = 0;
+    // NOW clear old_st's collector_tid - after all accesses to old_st are complete
+    if(old_st)
+        __atomic_store_n(&old_st->pluginsd.collector_tid, 0, __ATOMIC_RELEASE);
+
+    __atomic_store_n(&st->pluginsd.pos, 0, __ATOMIC_RELAXED);
     parser->user.st = st;
     parser->user.cleanup_slots = false;
     parser->user.clabel_count = 0;
@@ -122,35 +128,67 @@ static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, c
 }
 
 static inline void pluginsd_rrddim_put_to_slot(PARSER *parser, RRDSET *st, RRDDIM *rd, ssize_t slot, bool obsolete)  {
-    size_t wanted_size = st->pluginsd.size;
+    // Determine the required array size
+    size_t wanted_size;
 
     if(slot >= 1) {
         st->pluginsd.dims_with_slots = true;
-        wanted_size = slot;
+        wanted_size = (size_t)slot;
     }
     else {
         st->pluginsd.dims_with_slots = false;
         wanted_size = dictionary_entries(st->rrddim_root_index);
     }
 
-    if(wanted_size > st->pluginsd.size) {
-        st->pluginsd.prd_array = reallocz(st->pluginsd.prd_array, wanted_size * sizeof(struct pluginsd_rrddim));
+    // Get current array (if any) to check size
+    // Note: We're the collector thread with collector_tid set, so the array won't be freed under us
+    PRD_ARRAY *current_arr = prd_array_get_unsafe(&st->pluginsd.prd_array);
+    size_t current_size = current_arr ? current_arr->size : 0;
 
-        // initialize the empty slots
-        for(ssize_t i = (ssize_t) wanted_size - 1; i >= (ssize_t) st->pluginsd.size; i--) {
-            st->pluginsd.prd_array[i].rda = NULL;
-            st->pluginsd.prd_array[i].rd = NULL;
-            st->pluginsd.prd_array[i].id = NULL;
+    // Check if we need to grow the array
+    if(wanted_size > current_size) {
+        // Create a new larger array
+        PRD_ARRAY *new_arr = prd_array_create(wanted_size);
+
+        // Copy existing entries from old array (if any)
+        if(current_arr) {
+            memcpy(new_arr->entries, current_arr->entries, current_size * sizeof(struct pluginsd_rrddim));
         }
 
-        rrd_slot_memory_added((wanted_size - st->pluginsd.size) * sizeof(struct pluginsd_rrddim));
-        st->pluginsd.size = wanted_size;
+        // Initialize the new slots (callocz already zeroed them, but be explicit)
+        for(size_t i = current_size; i < wanted_size; i++) {
+            new_arr->entries[i].rda = NULL;
+            new_arr->entries[i].rd = NULL;
+            new_arr->entries[i].id = NULL;
+        }
+
+        // Track memory added
+        rrd_slot_memory_added(sizeof(PRD_ARRAY) + wanted_size * sizeof(struct pluginsd_rrddim));
+
+        // Atomically replace the old array with the new one
+        PRD_ARRAY *old_arr = prd_array_replace(&st->pluginsd.prd_array, new_arr);
+
+        // Free the old array if there was one
+        if(old_arr) {
+            // Track memory removed (the old array)
+            rrd_slot_memory_removed(sizeof(PRD_ARRAY) + old_arr->size * sizeof(struct pluginsd_rrddim));
+            // Release the old array - it will be freed when refcount reaches 0
+            prd_array_release(old_arr);
+        }
+
+        // Update our local pointer to the new array
+        current_arr = new_arr;
     }
 
-    if(st->pluginsd.dims_with_slots) {
-        struct pluginsd_rrddim *prd = &st->pluginsd.prd_array[slot - 1];
+    // Now update the slot entry if we're using slots
+    if(st->pluginsd.dims_with_slots && current_arr && slot >= 1 && (size_t)slot <= current_arr->size) {
+        struct pluginsd_rrddim *prd = &current_arr->entries[slot - 1];
 
         if(prd->rd != rd) {
+            // Release old reference if any
+            if(prd->rda)
+                rrddim_acquired_release(prd->rda);
+
             prd->rda = rrddim_find_and_acquire(st, string2str(rd->id), true);
             prd->rd = rrddim_acquired_to_rrddim(prd->rda);
             prd->id = string2str(prd->rd->id);
@@ -168,36 +206,40 @@ static ALWAYS_INLINE RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *s
         return NULL;
     }
 
-    if (unlikely(!st->pluginsd.size)) {
+    // Get the array - we're protected by collector_tid being set, so it won't be freed
+    PRD_ARRAY *arr = prd_array_get_unsafe(&st->pluginsd.prd_array);
+
+    if (unlikely(!arr || !arr->size)) {
         netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s, but the chart has no dimensions.",
                           rrdhost_hostname(host), rrdset_id(st), cmd);
         return NULL;
     }
 
+    size_t prd_size = arr->size;
     struct pluginsd_rrddim *prd;
     RRDDIM *rd;
 
     if(likely(st->pluginsd.dims_with_slots)) {
         // caching with slots
 
-        if(unlikely(slot < 1 || slot > (ssize_t)st->pluginsd.size)) {
-            netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s with slot %zd, but slots in the range [1 - %u] are expected.",
-                              rrdhost_hostname(host), rrdset_id(st), cmd, slot, st->pluginsd.size);
+        if(unlikely(slot < 1 || slot > (ssize_t)prd_size)) {
+            netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s with slot %zd, but slots in the range [1 - %zu] are expected.",
+                              rrdhost_hostname(host), rrdset_id(st), cmd, slot, prd_size);
             return NULL;
         }
 
-        prd = &st->pluginsd.prd_array[slot - 1];
+        prd = &arr->entries[slot - 1];
 
         rd = prd->rd;
         if(likely(rd)) {
 #ifdef NETDATA_INTERNAL_CHECKS
             if(strcmp(prd->id, dimension) != 0) {
                 ssize_t t;
-                for(t = 0; t < st->pluginsd.size ;t++) {
-                    if (strcmp(st->pluginsd.prd_array[t].id, dimension) == 0)
+                for(t = 0; t < (ssize_t)prd_size ;t++) {
+                    if (strcmp(arr->entries[t].id, dimension) == 0)
                         break;
                 }
-                if(t >= st->pluginsd.size)
+                if(t >= (ssize_t)prd_size)
                     t = -1;
 
                 internal_fatal(true,
@@ -212,10 +254,12 @@ static ALWAYS_INLINE RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *s
     else {
         // caching without slots
 
-        if(unlikely(st->pluginsd.pos >= st->pluginsd.size))
-            st->pluginsd.pos = 0;
+        uint32_t pos = __atomic_load_n(&st->pluginsd.pos, __ATOMIC_RELAXED);
+        if(unlikely(pos >= prd_size))
+            pos = 0;
 
-        prd = &st->pluginsd.prd_array[st->pluginsd.pos++];
+        __atomic_store_n(&st->pluginsd.pos, pos + 1, __ATOMIC_RELAXED);
+        prd = &arr->entries[pos];
 
         rd = prd->rd;
         if(likely(rd)) {

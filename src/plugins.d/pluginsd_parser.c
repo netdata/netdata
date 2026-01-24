@@ -1092,9 +1092,12 @@ static ALWAYS_INLINE PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size
     // ------------------------------------------------------------------------
     // cleanup RRDSET / RRDDIM
 
-    if(likely(st->pluginsd.dims_with_slots)) {
-        for(size_t i = 0; i < st->pluginsd.size ;i++) {
-            RRDDIM *rd = st->pluginsd.prd_array[i].rd;
+    // Get the array - we're protected by collector_tid being set, so it won't be freed
+    PRD_ARRAY *prd_arr = prd_array_get_unsafe(&st->pluginsd.prd_array);
+
+    if(likely(st->pluginsd.dims_with_slots && prd_arr && prd_arr->size)) {
+        for(size_t i = 0; i < prd_arr->size ;i++) {
+            RRDDIM *rd = prd_arr->entries[i].rd;
 
             if(!rd)
                 continue;
