@@ -93,10 +93,11 @@ func proxysqlMethods() []module.MethodConfig {
 	sortOptions := buildProxySQLSortOptions(proxysqlAllColumns)
 	return []module.MethodConfig{
 		{
-			UpdateEvery: 10,
-			ID:          "top-queries",
-			Name:        "Top Queries",
-			Help:        "Top SQL queries from ProxySQL query digest stats",
+			UpdateEvery:  10,
+			ID:           "top-queries",
+			Name:         "Top Queries",
+			Help:         "Top SQL queries from ProxySQL query digest stats",
+			RequireCloud: true,
 			RequiredParams: []funcapi.ParamConfig{{
 				ID:         paramSort,
 				Name:       "Filter By",

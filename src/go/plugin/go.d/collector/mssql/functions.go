@@ -208,10 +208,11 @@ func mssqlMethods() []module.MethodConfig {
 
 	return []module.MethodConfig{
 		{
-			UpdateEvery: 10,
-			ID:          "top-queries",
-			Name:        "Top Queries",
-			Help:        "Top SQL queries from Query Store",
+			UpdateEvery:  10,
+			ID:           "top-queries",
+			Name:         "Top Queries",
+			Help:         "Top SQL queries from Query Store",
+			RequireCloud: true,
 			RequiredParams: []funcapi.ParamConfig{
 				{
 					ID:         paramSort,

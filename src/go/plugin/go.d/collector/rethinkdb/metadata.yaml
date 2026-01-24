@@ -224,6 +224,7 @@ modules:
                   :::
           availability: |
             Available when:<br/>• The collector has successfully connected to RethinkDB<br/>• The user has admin access to `rethinkdb.jobs` table<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+          require_cloud: true
     metrics:
       folding:
         title: Metrics

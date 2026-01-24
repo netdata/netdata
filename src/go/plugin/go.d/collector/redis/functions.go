@@ -84,10 +84,11 @@ func redisMethods() []module.MethodConfig {
 	sortOptions := buildRedisSortOptions(redisAllColumns)
 	return []module.MethodConfig{
 		{
-			UpdateEvery: 10,
-			ID:          "top-queries",
-			Name:        "Top Queries",
-			Help:        "Slow commands from Redis SLOWLOG. WARNING: Command arguments may contain unmasked literals (potential PII).",
+			UpdateEvery:  10,
+			ID:           "top-queries",
+			Name:         "Top Queries",
+			Help:         "Slow commands from Redis SLOWLOG. WARNING: Command arguments may contain unmasked literals (potential PII).",
+			RequireCloud: true,
 			RequiredParams: []funcapi.ParamConfig{{
 				ID:         paramSort,
 				Name:       "Filter By",

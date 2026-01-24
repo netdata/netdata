@@ -11,6 +11,7 @@
 | Aspect | Description |
 |:-------|:------------|
 | Name | `[[ strfy(entry.meta.module_name)|capitalize ]]:[[ strfy(func.id) ]]` |
+| Require Cloud | [[ 'yes' if func.require_cloud else 'no' ]] |
 | Performance | [[ strfy(func.performance) ]] |
 | Security | [[ strfy(func.security) ]] |
 | Availability | [[ strfy(func.availability) ]] |

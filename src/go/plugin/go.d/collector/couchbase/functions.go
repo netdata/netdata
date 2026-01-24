@@ -132,10 +132,11 @@ func couchbaseMethods() []module.MethodConfig {
 	sortOptions := buildCouchbaseSortOptions(couchbaseAllColumns)
 	return []module.MethodConfig{
 		{
-			UpdateEvery: 10,
-			ID:          "top-queries",
-			Name:        "Top Queries",
-			Help:        "Top N1QL requests from system:completed_requests",
+			UpdateEvery:  10,
+			ID:           "top-queries",
+			Name:         "Top Queries",
+			Help:         "Top N1QL requests from system:completed_requests",
+			RequireCloud: true,
 			RequiredParams: []funcapi.ParamConfig{{
 				ID:         paramSort,
 				Name:       "Filter By",

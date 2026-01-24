@@ -379,6 +379,7 @@ modules:
                   :::
           availability: |
             Available when:<br/>• The collector has successfully connected to Elasticsearch/OpenSearch<br/>• The user has `monitor` or `manage` cluster privileges<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the Tasks API query fails<br/>• Returns HTTP 504 if the query times out
+          require_cloud: true
     metrics:
       folding:
         title: Metrics

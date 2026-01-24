@@ -99,10 +99,11 @@ func clickhouseMethods() []module.MethodConfig {
 	sortOptions := buildClickHouseSortOptions(clickhouseAllColumns)
 	return []module.MethodConfig{
 		{
-			UpdateEvery: 10,
-			ID:          "top-queries",
-			Name:        "Top Queries",
-			Help:        "Top SQL queries from ClickHouse system.query_log",
+			UpdateEvery:  10,
+			ID:           "top-queries",
+			Name:         "Top Queries",
+			Help:         "Top SQL queries from ClickHouse system.query_log",
+			RequireCloud: true,
 			RequiredParams: []funcapi.ParamConfig{{
 				ID:         paramSort,
 				Name:       "Filter By",

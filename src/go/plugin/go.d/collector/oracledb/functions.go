@@ -115,19 +115,21 @@ var oracleRunningColumns = []oracleColumnMeta{
 func oracleMethods() []module.MethodConfig {
 	return []module.MethodConfig{
 		{
-			UpdateEvery: 10,
-			ID:          "top-queries",
-			Name:        "Top Queries",
-			Help:        "Top SQL statements from V$SQLSTATS. WARNING: Query text may contain unmasked literals (potential PII).",
+			UpdateEvery:  10,
+			ID:           "top-queries",
+			Name:         "Top Queries",
+			Help:         "Top SQL statements from V$SQLSTATS. WARNING: Query text may contain unmasked literals (potential PII).",
+			RequireCloud: true,
 			RequiredParams: []funcapi.ParamConfig{
 				buildOracleSortParam(oracleTopColumns),
 			},
 		},
 		{
-			UpdateEvery: 10,
-			ID:          "running-queries",
-			Name:        "Running Queries",
-			Help:        "Currently running SQL statements from V$SESSION. WARNING: Query text may contain unmasked literals (potential PII).",
+			UpdateEvery:  10,
+			ID:           "running-queries",
+			Name:         "Running Queries",
+			Help:         "Currently running SQL statements from V$SESSION. WARNING: Query text may contain unmasked literals (potential PII).",
+			RequireCloud: true,
 			RequiredParams: []funcapi.ParamConfig{
 				buildOracleSortParam(oracleRunningColumns),
 			},

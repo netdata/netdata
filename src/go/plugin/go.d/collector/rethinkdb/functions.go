@@ -77,10 +77,11 @@ func rethinkdbMethods() []module.MethodConfig {
 	sortOptions := buildRethinkSortOptions(rethinkRunningColumns)
 	return []module.MethodConfig{
 		{
-			UpdateEvery: 10,
-			ID:          "running-queries",
-			Name:        "Running Queries",
-			Help:        "Currently running queries from rethinkdb.jobs. WARNING: Query text may contain unmasked literals (potential PII).",
+			UpdateEvery:  10,
+			ID:           "running-queries",
+			Name:         "Running Queries",
+			Help:         "Currently running queries from rethinkdb.jobs. WARNING: Query text may contain unmasked literals (potential PII).",
+			RequireCloud: true,
 			RequiredParams: []funcapi.ParamConfig{
 				{
 					ID:         paramSort,

@@ -118,19 +118,21 @@ var crdbRunningColumns = []crdbColumnMeta{
 func cockroachMethods() []module.MethodConfig {
 	return []module.MethodConfig{
 		{
-			UpdateEvery: 10,
-			ID:          "top-queries",
-			Name:        "Top Queries",
-			Help:        "Top SQL statements from crdb_internal.cluster_statement_statistics. WARNING: Query text may contain unmasked literals (potential PII).",
+			UpdateEvery:  10,
+			ID:           "top-queries",
+			Name:         "Top Queries",
+			Help:         "Top SQL statements from crdb_internal.cluster_statement_statistics. WARNING: Query text may contain unmasked literals (potential PII).",
+			RequireCloud: true,
 			RequiredParams: []funcapi.ParamConfig{
 				buildCrdbSortParam(crdbTopColumns),
 			},
 		},
 		{
-			UpdateEvery: 10,
-			ID:          "running-queries",
-			Name:        "Running Queries",
-			Help:        "Currently running SQL statements from SHOW CLUSTER STATEMENTS. WARNING: Query text may contain unmasked literals (potential PII).",
+			UpdateEvery:  10,
+			ID:           "running-queries",
+			Name:         "Running Queries",
+			Help:         "Currently running SQL statements from SHOW CLUSTER STATEMENTS. WARNING: Query text may contain unmasked literals (potential PII).",
+			RequireCloud: true,
 			RequiredParams: []funcapi.ParamConfig{
 				buildCrdbSortParam(crdbRunningColumns),
 			},
