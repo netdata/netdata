@@ -37,7 +37,7 @@ The difference is **data availability**:
 | Scenario | State | Can Query Data? |
 |----------|-------|-----------------|
 | Child disconnected, Parent connected to Cloud | **Stale** | Yes, via Parent |
-| Standalone agent disconnected | **Offline** | No |
+| Standalone Agent disconnected | **Offline** | No |
 | Child disconnected, all Parents disconnected from Cloud | **Offline** | No |
 
 Stale nodes remain queryable because the Parent serves as a data cache. This is why you cannot delete Stale nodes from the UI—they still have accessible data.
@@ -107,7 +107,7 @@ These timings are hardcoded and not user-configurable.
 
 ### Standalone Agent Transitions
 
-A standalone agent connects directly to Cloud without a Parent.
+A standalone Agent connects directly to Cloud without a Parent.
 
 | Event | From | To | Timing |
 |-------|------|-----|--------|
@@ -231,10 +231,10 @@ journalctl -u netdata MESSAGE_ID=6e2e3839-0676-4896-8b64-6045dbf28d66
 
 ### Node shows Offline, expected Stale
 
-**Cause:** Either it's a standalone agent, or all its Parents are disconnected from Cloud.
+**Cause:** Either it's a standalone Agent, or all its Parents are disconnected from Cloud.
 
 **Check:**
-1. Is this a standalone agent or does it stream to a Parent?
+1. Is this a standalone Agent or does it stream to a Parent?
 2. If streaming: Is the Parent online and connected to Cloud?
 3. Check Parent's dashboard—does it show the child?
 
