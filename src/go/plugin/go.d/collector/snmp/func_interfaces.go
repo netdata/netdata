@@ -4,12 +4,14 @@ package snmp
 
 import (
 	"context"
-	"fmt"
 	"sort"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
+
+// Compile-time interface check.
+var _ funcapi.FunctionHandler = (*funcInterfaces)(nil)
 
 // funcInterfaces handles the "interfaces" function for SNMP devices.
 // It provides network interface traffic and status metrics from cached SNMP data.
@@ -21,16 +23,22 @@ func newFuncInterfaces(cache *ifaceCache) *funcInterfaces {
 	return &funcInterfaces{cache: cache}
 }
 
-// methods returns the method configurations for this function.
-func (f *funcInterfaces) methods() []module.MethodConfig {
-	return []module.MethodConfig{
+const (
+	ifacesMethodID         = "interfaces"
+	ifacesParamTypeGroup   = "if_type_group"
+	ifacesDefaultTypeGroup = "ethernet"
+)
+
+// Methods implements funcapi.FunctionHandler.
+func (f *funcInterfaces) Methods() []funcapi.MethodConfig {
+	return []funcapi.MethodConfig{
 		{
-			UpdateEvery: 10,
-			ID:          "interfaces",
+			ID:          ifacesMethodID,
 			Name:        "Network Interfaces",
 			Help:        "Network interface traffic and status metrics",
+			UpdateEvery: 10,
 			RequiredParams: []funcapi.ParamConfig{{
-				ID:        funcIfacesParamTypeGroup,
+				ID:        ifacesParamTypeGroup,
 				Name:      "Type Group",
 				Help:      "Filter by interface type group",
 				Selection: funcapi.ParamSelect,
@@ -45,38 +53,34 @@ func (f *funcInterfaces) methods() []module.MethodConfig {
 	}
 }
 
-// methodParams returns params for the given method.
-func (f *funcInterfaces) methodParams(method string) ([]funcapi.ParamConfig, error) {
-	if method != "interfaces" {
-		return nil, fmt.Errorf("unknown method: %s", method)
+// MethodParams implements funcapi.FunctionHandler.
+func (f *funcInterfaces) MethodParams(method string) ([]funcapi.ParamConfig, error) {
+	if method != ifacesMethodID {
+		return nil, nil
 	}
-
-	methods := f.methods()
+	methods := f.Methods()
 	if len(methods) > 0 {
 		return methods[0].RequiredParams, nil
 	}
 	return nil, nil
 }
 
-// handle processes a function request and returns the response.
-func (f *funcInterfaces) handle(method string, params funcapi.ResolvedParams) *module.FunctionResponse {
-	if method != "interfaces" {
-		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
+// Handle implements funcapi.FunctionHandler.
+func (f *funcInterfaces) Handle(_ context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if method != ifacesMethodID {
+		return funcapi.NotFoundResponse(method)
 	}
 
 	if f.cache == nil {
-		return &module.FunctionResponse{
-			Status:  503,
-			Message: "interface data not available yet, please retry after data collection",
-		}
+		return funcapi.UnavailableResponse("interface data not available yet, please retry after data collection")
 	}
 
 	f.cache.mu.RLock()
 	defer f.cache.mu.RUnlock()
 
-	typeGroupFilter := params.GetOne(funcIfacesParamTypeGroup)
+	typeGroupFilter := params.GetOne(ifacesParamTypeGroup)
 	if typeGroupFilter == "" {
-		typeGroupFilter = "ethernet"
+		typeGroupFilter = ifacesDefaultTypeGroup
 	}
 
 	// Build data rows from cache
@@ -85,24 +89,20 @@ func (f *funcInterfaces) handle(method string, params funcapi.ResolvedParams) *m
 		if !matchesTypeGroup(entry.ifTypeGroup, typeGroupFilter) {
 			continue
 		}
-		row := f.buildRow(entry)
-		data = append(data, row)
+		data = append(data, f.buildRow(entry))
 	}
 
-	// Sort data based on params
 	f.sortData(data, f.defaultSortColumn())
 
 	cs := snmpColumnSet(snmpAllColumns)
 
-	return &module.FunctionResponse{
+	return &funcapi.FunctionResponse{
 		Status:            200,
 		Help:              "Network interface traffic and status metrics",
 		Columns:           f.buildColumns(cs),
 		Data:              data,
 		DefaultSortColumn: f.defaultSortColumn(),
-
-		// Charts for aggregated visualization (hardcoded - SNMP uses custom chart groupings)
-		Charts: map[string]module.ChartConfig{
+		Charts: map[string]funcapi.ChartConfig{
 			"Traffic": {
 				Name:    "Traffic",
 				Type:    "stacked-bar",
@@ -133,7 +133,7 @@ func (f *funcInterfaces) handle(method string, params funcapi.ResolvedParams) *m
 			{Chart: "Traffic", GroupBy: "Type"},
 			{Chart: "OperationalStatus", GroupBy: "Oper Status"},
 		},
-		GroupBy: map[string]module.GroupByConfig{
+		GroupBy: map[string]funcapi.GroupByConfig{
 			"Type": {
 				Name:    "Group by Type",
 				Columns: []string{"Type"},
@@ -171,7 +171,6 @@ func (f *funcInterfaces) buildColumns(cs funcapi.ColumnSet[snmpColumn]) map[stri
 }
 
 // buildRow builds a data row from an interface entry.
-// Column order is determined by snmpAllColumns - each column's Value() extracts the data.
 func (f *funcInterfaces) buildRow(entry *ifaceEntry) []any {
 	row := make([]any, len(snmpAllColumns)+1)
 	for i, col := range snmpAllColumns {
@@ -194,7 +193,6 @@ func (f *funcInterfaces) sortData(data [][]any, sortColumn string) {
 		return
 	}
 
-	// Find column index and sort direction
 	colIdx := 0
 	sortDir := funcapi.FieldSortAscending
 
@@ -210,7 +208,6 @@ func (f *funcInterfaces) sortData(data [][]any, sortColumn string) {
 		vi := data[i][colIdx]
 		vj := data[j][colIdx]
 
-		// Handle nil values - put them at the end
 		if vi == nil && vj == nil {
 			return false
 		}
@@ -221,7 +218,6 @@ func (f *funcInterfaces) sortData(data [][]any, sortColumn string) {
 			return true
 		}
 
-		// Compare based on type
 		switch a := vi.(type) {
 		case string:
 			b := vj.(string)
@@ -277,7 +273,6 @@ func matchesTypeGroup(group, filter string) bool {
 	return group == filter
 }
 
-// ptrToAny converts a *float64 to any, returning nil if the pointer is nil.
 func ptrToAny(p *float64) any {
 	if p == nil {
 		return nil
@@ -311,47 +306,36 @@ func sumRates(vals ...*float64) *float64 {
 // Package-level registration functions that delegate to funcInterfaces.
 
 func snmpMethods() []module.MethodConfig {
-	return (&funcInterfaces{}).methods()
+	return (&funcInterfaces{}).Methods()
 }
 
 func snmpMethodParams(_ context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
 	c, ok := job.Module().(*Collector)
 	if !ok {
-		return nil, fmt.Errorf("invalid module type")
+		return nil, nil
 	}
-	return c.funcIfaces.methodParams(method)
+	return c.funcIfaces.MethodParams(method)
 }
 
-func snmpHandleMethod(_ context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
+func snmpHandleMethod(ctx context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
 	c, ok := job.Module().(*Collector)
 	if !ok {
-		return &module.FunctionResponse{Status: 500, Message: "internal error: invalid module type"}
+		return funcapi.InternalErrorResponse("invalid module type")
 	}
-	return c.funcIfaces.handle(method, params)
+	return c.funcIfaces.Handle(ctx, method, params)
 }
-
-// funcIfacesParamTypeGroup is the parameter ID for type group filtering.
-const funcIfacesParamTypeGroup = "if_type_group"
 
 // snmpColumn defines a column for SNMP interfaces function.
-// Embeds funcapi.ColumnMeta for UI display and adds collector-specific fields.
 type snmpColumn struct {
 	funcapi.ColumnMeta
-
-	// Data access
-	Value func(*ifaceEntry) any // Extracts value from entry
-
-	// Collector-specific
-	DefaultSort bool // Is default sort column
+	Value       func(*ifaceEntry) any // Extracts value from entry
+	DefaultSort bool                  // Is default sort column
 }
 
-// snmpColumnSet creates a ColumnSet for the given columns.
 func snmpColumnSet(cols []snmpColumn) funcapi.ColumnSet[snmpColumn] {
 	return funcapi.Columns(cols, func(c snmpColumn) funcapi.ColumnMeta { return c.ColumnMeta })
 }
 
-// snmpAllColumns defines all columns for the interfaces function.
-// Each column includes its value extractor - single source of truth.
 var snmpAllColumns = []snmpColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "Interface", Tooltip: "Interface", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sticky: true, Sortable: true}, Value: func(e *ifaceEntry) any { return e.name }, DefaultSort: true},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "Type", Tooltip: "IANA ifType (IF-MIB)", Type: funcapi.FieldTypeString, Visible: false, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, Value: func(e *ifaceEntry) any { return e.ifType }},

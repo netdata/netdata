@@ -3,6 +3,7 @@
 package snmp
 
 import (
+	"context"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -569,7 +570,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			f := tc.setup()
-			resp := f.handle(tc.method, tc.params)
+			resp := f.Handle(context.Background(), tc.method, tc.params)
 			tc.validate(t, resp)
 		})
 	}
@@ -619,7 +620,7 @@ func findColIdx(key string) int {
 
 func resolveIfaceParams(values map[string][]string) funcapi.ResolvedParams {
 	f := &funcInterfaces{}
-	params, err := f.methodParams("interfaces")
+	params, err := f.MethodParams("interfaces")
 	if err != nil {
 		return nil
 	}
