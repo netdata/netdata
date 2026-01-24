@@ -218,6 +218,14 @@
 - Chore(go.d): revise funcapi docs ([#21617](https://github.com/netdata/netdata/issues/21617))
 - Chore(go.d): set default update_every to 10 for all functions ([#21616](https://github.com/netdata/netdata/issues/21616))
 - Assortement of journal-viewer plugin fixes. ([#21612](https://github.com/netdata/netdata/issues/21612))
+- Docs: Add collector function docs metadata ([#21618](https://github.com/netdata/netdata/issues/21618))
+- Regenerate integrations docs ([#21620](https://github.com/netdata/netdata/issues/21620))
+- Fix(systemd-units.plugin): correct resp type on info ([#21621](https://github.com/netdata/netdata/issues/21621))
+- Add  check before releasing metric buffer ([#21615](https://github.com/netdata/netdata/issues/21615))
+- Docs: update collector function docs schema and templates ([#21622](https://github.com/netdata/netdata/issues/21622))
+- Regenerate integrations docs ([#21623](https://github.com/netdata/netdata/issues/21623))
+- Ci: update azure/trusted-signing-action after rebranding ([#21591](https://github.com/netdata/netdata/issues/21591))
+- Use debug level for logging of requests. ([#21625](https://github.com/netdata/netdata/issues/21625))
 
 ## [2.8.0] - 2025-11-19
 
