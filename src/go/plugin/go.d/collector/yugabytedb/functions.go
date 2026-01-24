@@ -109,19 +109,21 @@ var ybRunningColumns = []ybColumnMeta{
 func yugabyteMethods() []module.MethodConfig {
 	return []module.MethodConfig{
 		{
-			UpdateEvery: 10,
-			ID:          "top-queries",
-			Name:        "Top Queries",
-			Help:        "Top SQL queries from pg_stat_statements. WARNING: Query text may contain unmasked literals (potential PII).",
+			UpdateEvery:  10,
+			ID:           "top-queries",
+			Name:         "Top Queries",
+			Help:         "Top SQL queries from pg_stat_statements. WARNING: Query text may contain unmasked literals (potential PII).",
+			RequireCloud: true,
 			RequiredParams: []funcapi.ParamConfig{
 				buildYBSortParam(ybTopColumns),
 			},
 		},
 		{
-			UpdateEvery: 10,
-			ID:          "running-queries",
-			Name:        "Running Queries",
-			Help:        "Currently running SQL statements from pg_stat_activity. WARNING: Query text may contain unmasked literals (potential PII).",
+			UpdateEvery:  10,
+			ID:           "running-queries",
+			Name:         "Running Queries",
+			Help:         "Currently running SQL statements from pg_stat_activity. WARNING: Query text may contain unmasked literals (potential PII).",
+			RequireCloud: true,
 			RequiredParams: []funcapi.ParamConfig{
 				buildYBSortParam(ybRunningColumns),
 			},

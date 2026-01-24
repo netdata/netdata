@@ -139,12 +139,19 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 				if help == "" {
 					help = fmt.Sprintf("%s %s data function", name, method.ID)
 				}
+
+				// https://github.com/netdata/netdata/blob/1bc1775a17590b3c0fe3a4fe547dc6146d07be89/src/libnetdata/user-auth/http-access.h#L21
+				const cloudAccess = "0x0013" // SIGNED_ID | SAME_SPACE | SENSITIVE_DATA
+				access := "0x0000"
+				if method.RequireCloud {
+					access = cloudAccess
+				}
 				m.dyncfgApi.FunctionGlobal(netdataapi.FunctionGlobalOpts{
 					Name:     funcName,
 					Timeout:  60,
 					Help:     help,
 					Tags:     "top",
-					Access:   "0x0000",
+					Access:   access,
 					Priority: 100,
 					Version:  3,
 				})

@@ -369,6 +369,7 @@ modules:
                   :::
           availability: |
             Available when:<br/>• The collector has successfully connected to MongoDB<br/>• Profiling is enabled on at least one user database<br/>• Returns HTTP 503 if collector is still initializing or profiling is disabled on all databases<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+          require_cloud: true
     metrics:
       folding:
         title: Metrics

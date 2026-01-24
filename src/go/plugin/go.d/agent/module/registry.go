@@ -29,6 +29,7 @@ type MethodConfig struct {
 	Name           string                // Display name (e.g., "Top Queries")
 	UpdateEvery    int                   // Default UI refresh interval
 	Help           string                // Description for UI
+	RequireCloud   bool                  // Indicates whether the method requires cloud connection
 	RequiredParams []funcapi.ParamConfig // Required parameters for this method (including __sort if used)
 }
 

@@ -228,6 +228,7 @@ modules:
             Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data embedded in queries<br/>• Access should be restricted to authorized personnel only
           availability: |
             Available when:<br/>• The collector has successfully connected to ProxySQL admin interface<br/>• Returns HTTP 503 if the connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+          require_cloud: true
     metrics:
       folding:
         title: Metrics

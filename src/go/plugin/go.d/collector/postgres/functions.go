@@ -214,10 +214,11 @@ func pgMethods() []module.MethodConfig {
 
 	return []module.MethodConfig{
 		{
-			UpdateEvery: 10,
-			ID:          "top-queries",
-			Name:        "Top Queries",
-			Help:        "Top SQL queries from pg_stat_statements",
+			UpdateEvery:  10,
+			ID:           "top-queries",
+			Name:         "Top Queries",
+			Help:         "Top SQL queries from pg_stat_statements",
+			RequireCloud: true,
 			RequiredParams: []funcapi.ParamConfig{
 				{
 					ID:         paramSort,

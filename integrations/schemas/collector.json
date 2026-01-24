@@ -581,6 +581,10 @@
                     "availability": {
                       "type": "string",
                       "description": "Availability and enablement notes."
+                    },
+                    "require_cloud": {
+                      "type": "boolean",
+                      "description": "Whether the function requires cloud connection."
                     }
                   },
                   "required": [

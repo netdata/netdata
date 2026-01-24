@@ -119,10 +119,11 @@ func elasticsearchMethods() []module.MethodConfig {
 	sortOptions := buildElasticsearchSortOptions(esAllColumns)
 	return []module.MethodConfig{
 		{
-			UpdateEvery: 10,
-			ID:          "top-queries",
-			Name:        "Top Queries",
-			Help:        "Running queries from Elasticsearch Tasks API",
+			UpdateEvery:  10,
+			ID:           "top-queries",
+			Name:         "Top Queries",
+			Help:         "Running queries from Elasticsearch Tasks API",
+			RequireCloud: true,
 			RequiredParams: []funcapi.ParamConfig{
 				{
 					ID:         paramSort,

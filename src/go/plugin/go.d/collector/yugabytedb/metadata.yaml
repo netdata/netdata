@@ -348,6 +348,7 @@ modules:
                   :::
           availability: |
             Available when:<br/>• The collector has successfully connected to YSQL<br/>• The `pg_stat_statements` extension is installed<br/>• Returns HTTP 503 if the SQL connection cannot be established or extension is not installed<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+          require_cloud: true
         - id: running-queries
           name: Running Queries
           description: |
@@ -445,6 +446,7 @@ modules:
                   :::
           availability: |
             Available when:<br/>• The collector has successfully connected to YSQL<br/>• Returns HTTP 503 if the SQL connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+          require_cloud: true
     metrics:
       folding:
         title: Metrics

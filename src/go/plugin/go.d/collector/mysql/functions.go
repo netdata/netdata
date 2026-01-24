@@ -187,10 +187,11 @@ func mysqlMethods() []module.MethodConfig {
 
 	return []module.MethodConfig{
 		{
-			UpdateEvery: 10,
-			ID:          "top-queries",
-			Name:        "Top Queries",
-			Help:        "Top SQL queries from performance_schema",
+			UpdateEvery:  10,
+			ID:           "top-queries",
+			Name:         "Top Queries",
+			Help:         "Top SQL queries from performance_schema",
+			RequireCloud: true,
 			RequiredParams: []funcapi.ParamConfig{
 				{
 					ID:         paramSort,

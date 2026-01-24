@@ -274,6 +274,7 @@ modules:
                   :::
           availability: |
             Available when:<br/>• The collector has successfully connected to Oracle DB<br/>• The user has SELECT privilege on `V$SQLSTATS`<br/>• Returns HTTP 503 if the connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+          require_cloud: true
         - id: running-queries
           name: Running Queries
           description: |
@@ -389,6 +390,7 @@ modules:
                   :::
           availability: |
             Available when:<br/>• The collector has successfully connected to Oracle DB<br/>• The user has SELECT privilege on `V$SESSION` and `V$SQL`<br/>• Returns HTTP 503 if the connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+          require_cloud: true
     metrics:
       folding:
         title: Metrics

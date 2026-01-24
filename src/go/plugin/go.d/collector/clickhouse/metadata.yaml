@@ -382,6 +382,7 @@ modules:
                   :::
           availability: |
             Available when:<br/>• The collector has successfully connected to ClickHouse<br/>• `system.query_log` table is accessible<br/>• Returns HTTP 503 if `system.query_log` is not accessible<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+          require_cloud: true
     metrics:
       folding:
         title: Metrics
