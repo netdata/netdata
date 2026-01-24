@@ -233,317 +233,354 @@ modules:
         - id: top-queries
           name: Top Queries
           description: |
-            Top SQL queries from Query Store.
-            
-            Queries Query Store runtime statistics and returns the top entries sorted by the selected column.
+            Retrieves aggregated SQL query performance metrics from Microsoft SQL Server [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store) runtime statistics.
+
+            This function queries `sys.query_store_runtime_stats` and related views across all databases with Query Store enabled, aggregating execution statistics by query hash. It provides comprehensive timing, I/O, memory, and parallelism metrics.
+
+            Use cases:
+            - Identify slow or resource-intensive queries consuming excessive CPU time or memory
+            - Analyze I/O patterns (logical reads, physical reads, writes) to detect bottlenecks
+            - Monitor parallelism (DOP) and tempdb usage for capacity planning
+
+            Query text is truncated at 4096 characters for display purposes. Columns are dynamically detected based on SQL Server version (some metrics only available in 2016+/2017+).
           parameters:
             - id: __sort
               name: Filter By
-              description: Select the primary sort column (options are derived from sortable columns in the response).
+              description: Select the primary sort column. The available options depend on your SQL Server version and include metrics like total execution time, number of calls, CPU time, logical I/O, memory grants, and more. Default is Total Time to focus on most resource-intensive queries.
               type: select
               required: true
               default: totalTime
               options: []
           returns:
-            description: Query Store statistics for top queries.
+            description: Aggregated query execution statistics from Query Store runtime views, providing comprehensive performance analysis across all monitored databases. Each row represents a unique query pattern (normalized query hash) with cumulative metrics across all its executions.
             columns:
               - name: Query Hash
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Unique hash identifier for the normalized query pattern. Queries with identical structure but different literal values share the same digest.
               - name: Query
                 type: string
                 unit: ""
-                description: ""
+                description: The SQL query text with literal values truncated at 4096 characters. Use this to identify the actual SQL being executed and spot parameterized queries or injection risks.
               - name: Database
                 type: string
                 unit: ""
-                description: ""
+                description: Database name where the query was executed. Essential for multi-database analysis to identify which database is experiencing query load.
               - name: Calls
                 type: integer
                 unit: ""
-                description: ""
+                description: Total number of times this query pattern has been executed. High values indicate frequently run queries that may impact server performance significantly.
               - name: Total Time
                 type: duration
                 unit: "milliseconds"
-                description: ""
+                description: Cumulative execution time across all query executions. This is a key metric for identifying the most resource-intensive queries in terms of total server time consumption.
               - name: Avg Time
                 type: duration
                 unit: "milliseconds"
-                description: ""
+                description: Average execution time per query run, calculated as weighted average when execution count is greater than zero. Compare with Total Time to determine if individual executions or high frequency drives resource usage.
               - name: Last Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: Execution time of the most recent execution for this query pattern. Useful for identifying recent performance changes or individual outlier executions.
               - name: Min Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: Minimum execution time observed. Helps identify variability in query performance and spot potential optimization opportunities for outliers.
               - name: Max Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: Maximum execution time observed. Large gaps between Min Time and Max Time may indicate performance instability due to parameter sniffing, data skew, or lock contention.
               - name: StdDev Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: Standard deviation of execution time. High values indicate inconsistent query performance, making capacity planning difficult and suggesting need for query optimization or consistent indexing.
               - name: Avg CPU
                 type: duration
                 unit: "milliseconds"
-                description: ""
+                description: Average CPU time consumed per query execution. High values indicate CPU-intensive operations that may include complex calculations, string manipulations, or excessive function calls. Available in SQL Server 2016+.
               - name: Last CPU
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: CPU time of the most recent execution. Useful for identifying recent changes in query patterns and resource usage.
               - name: Min CPU
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: Minimum CPU time observed. Helps identify variability in CPU consumption and spot efficient vs. inefficient query executions.
               - name: Max CPU
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: Maximum CPU time observed. Spikes may indicate complex queries, large result sets, or parallelism issues.
               - name: StdDev CPU
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: Standard deviation of CPU time. High variability suggests inconsistent performance due to varying data volumes, plan cache hit rates, or changing execution contexts.
               - name: Avg Logical Reads
                 type: float
                 unit: ""
-                description: ""
+                description: Average number of logical read operations (8KB pages) per execution. High values indicate queries scanning large amounts of data through indexes or table scans. Monitor for I/O subsystem impact.
               - name: Last Logical Reads
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Logical reads from the most recent execution. Useful for identifying immediate query patterns and recent performance changes.
               - name: Min Logical Reads
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Minimum logical reads observed. Helps identify data access patterns and spot outliers.
               - name: Max Logical Reads
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Maximum logical reads observed. Very high values may indicate full table scans, missing indexes, or inefficient join operations requiring excessive data access.
               - name: StdDev Logical Reads
                 type: float
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Standard deviation of logical reads. High variability suggests inconsistent access patterns, potentially indicating performance issues with certain queries or data volumes.
               - name: Avg Logical Writes
                 type: float
                 unit: ""
-                description: ""
+                description: Average number of logical write operations per execution. High values indicate heavy write workloads that may benefit from batching or optimization.
               - name: Last Logical Writes
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Logical writes from the most recent execution. Helps track recent write activity and identify immediate performance impact.
               - name: Min Logical Writes
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Minimum logical writes observed. Helps identify read-heavy vs. write-heavy query patterns and data access characteristics.
               - name: Max Logical Writes
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Maximum logical writes observed. Spikes may indicate bulk insert/update operations, large transactions, or data migration activities.
               - name: StdDev Logical Writes
                 type: float
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Standard deviation of logical writes. High values indicate write performance variability, potentially suggesting inconsistent transaction sizes or periodic bulk operations.
               - name: Avg Physical Reads
                 type: float
                 unit: ""
-                description: ""
+                description: Average number of physical read operations from storage per execution. High values indicate queries requiring substantial disk I/O for data retrieval, potentially due to full table scans or missing covering indexes.
               - name: Last Physical Reads
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Physical reads from the most recent execution. Useful for identifying immediate I/O patterns and recent storage subsystem pressure.
               - name: Min Physical Reads
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Minimum physical reads observed. Helps baseline I/O patterns and identify read-intensive query scenarios.
               - name: Max Physical Reads
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Maximum physical reads observed. Extremely high values may indicate storage subsystem bottlenecks, full table scans without covering indexes, or queries processing very large data volumes.
               - name: StdDev Physical Reads
                 type: float
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Standard deviation of physical reads. High variability suggests inconsistent disk access patterns, potentially indicating intermittent I/O performance issues or storage contention.
               - name: Avg CLR Time
                 type: duration
                 unit: "milliseconds"
-                visibility: hidden
-                description: ""
+                description: Average CLR (Common Language Runtime) time per execution. High values indicate managed code (stored procedures, functions, triggers) with heavy computations, garbage collection pressure, or inefficient memory allocations. Available in SQL Server 2016+.
               - name: Last CLR Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: CLR time of the most recent execution. Useful for identifying recent managed code performance changes and detecting inefficient code deployments.
               - name: Min CLR Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: Minimum CLR time observed. Helps identify efficient managed code executions and spot expensive CLR operations.
               - name: Max CLR Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: Maximum CLR time observed. Spikes may indicate complex managed code operations, large object allocations, or expensive .NET framework method calls.
               - name: StdDev CLR Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: Standard deviation of CLR time. High variability suggests inconsistent managed code execution patterns, potentially varying by execution parameters, data volumes, or different code paths being taken.
               - name: Avg DOP
                 type: float
                 unit: ""
-                description: ""
+                description: Average Degree of Parallelism (DOP) per query. Higher values indicate queries utilizing more CPU cores through parallelism, potentially consuming significant server resources. Values above 1 indicate intra-query parallelism; values of 1 indicate serial execution.
               - name: Last DOP
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: DOP of the most recent execution. Helps track recent parallelism patterns and identify changes in query execution behavior.
               - name: Min DOP
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Minimum DOP observed. Values of 0 may indicate serial execution; values above 1 suggest parallel query execution within individual queries.
               - name: Max DOP
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Maximum DOP observed. Very high values (>4) may indicate aggressive parallelism consuming excessive resources and potentially affecting concurrent workloads. Available in SQL Server 2016+.
               - name: StdDev DOP
                 type: float
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Standard deviation of DOP. High variability suggests inconsistent parallelism patterns across executions, potentially indicating performance variability based on data characteristics or query complexity.
               - name: Avg Memory (8KB pages)
                 type: float
                 unit: ""
-                description: ""
+                description: Average memory grant (in 8KB pages) per execution. High values indicate memory-intensive queries that may benefit from index optimization, reduced result sets, or query tuning to reduce working memory usage.
               - name: Last Memory (8KB pages)
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Memory grant from the most recent execution. Useful for identifying recent memory pressure and tracking immediate impact of resource-intensive queries.
               - name: Min Memory (8KB pages)
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Minimum memory grant observed. Helps identify memory-efficient queries and baseline memory requirements for common operations.
               - name: Max Memory (8KB pages)
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Maximum memory grant observed. Spikes may indicate queries with large sort operations, hash joins, temporary table creation, or excessive parameter lengths consuming working memory.
               - name: StdDev Memory
                 type: float
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Standard deviation of memory grants. High variability suggests inconsistent memory usage patterns, potentially varying by execution parameters, result set sizes, or different code paths being executed.
               - name: Avg Rows
                 type: float
                 unit: ""
-                description: ""
+                description: Average number of rows processed per query execution. High values indicate queries returning large result sets that may consume significant network bandwidth, memory for result buffers, and client application resources.
               - name: Last Rows
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Row count from the most recent execution. Helps identify recent query patterns and track immediate data processing requirements.
               - name: Min Rows
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Minimum rows observed. Helps identify data access patterns and spot outliers in result set sizes.
               - name: Max Rows
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Maximum rows observed. Extremely high values may indicate full table scans without WHERE clauses, missing or inefficient filters, or data export operations.
               - name: StdDev Rows
                 type: float
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Standard deviation of rows processed. High variability suggests inconsistent result set sizes, potentially due to varying query filters, parameterized inputs, or different data distributions across executions.
               - name: Avg Log Bytes
                 type: float
                 unit: ""
-                description: ""
+                description: Average transaction log bytes written per query execution (SQL Server 2017+). High values indicate write-intensive operations (INSERT/UPDATE/DELETE), large transactions, or bulk modifications. This measures WAL activity, not diagnostic logging.
               - name: Last Log Bytes
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Transaction log bytes from the most recent execution. Useful for tracking recent write activity.
               - name: Min Log Bytes
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Minimum transaction log bytes observed. Helps identify write-efficient queries and baseline requirements.
               - name: Max Log Bytes
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Maximum transaction log bytes observed. Spikes may indicate bulk operations, large transactions, or queries affecting many rows.
               - name: StdDev Log Bytes
                 type: float
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Standard deviation of transaction log bytes. High variability suggests inconsistent write patterns, potentially varying by the number of rows affected or transaction sizes.
               - name: Avg TempDB (8KB pages)
                 type: float
                 unit: ""
-                description: ""
+                description: Average tempdb space usage (in 8KB pages) per execution. High values indicate queries that create or use large temporary objects, work tables, sort operations, or have heavy tempdb spillage from disk. High tempdb usage can lead to disk I/O contention and overall performance degradation.
               - name: Last TempDB (8KB pages)
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Tempdb space from the most recent execution. Useful for identifying recent tempdb pressure and tracking immediate disk I/O impact of resource-intensive queries.
               - name: Min TempDB (8KB pages)
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Minimum tempdb space observed. Helps identify tempdb-efficient queries and baseline temporary object requirements for common operations.
               - name: Max TempDB (8KB pages)
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Maximum tempdb space observed. Spikes may indicate queries with large sort operations, hash joins, index spool usage, or temporary table creation consuming substantial tempdb space. Can lead to tempdb autogrow and disk space issues.
               - name: StdDev TempDB
                 type: float
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: Standard deviation of tempdb space usage. High variability suggests inconsistent temporary object usage patterns, potentially varying by query complexity, parameter types, or different data access patterns affecting temporary object creation.
           performance: |
-            Uses Query Store and can be expensive on busy instances.
+            Executes dynamic SQL to aggregate Query Store data across all enabled databases:<br/>• Execution time depends on Query Store workload and number of monitored databases<br/>• Default limit of 500 rows balances completeness with performance
           security: |
-            Query Store may contain unmasked literals (potential PII).
+            Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
-              - title: Enable Query Store functions
+              - title: Enable Query Store
                 description: |
-                  Enable Query Store and set query_store_function_enabled to true.
+                  Query Store must be enabled on each database you want to monitor.
+
+                  1. Verify Query Store is enabled on your databases:
+
+                     ```sql
+                     SELECT name, is_query_store_on
+                     FROM sys.databases
+                     WHERE name NOT IN ('master', 'tempdb', 'model', 'msdb');
+                     ```
+
+                  2. Enable Query Store on databases where it is disabled:
+
+                     ```sql
+                     ALTER DATABASE [YourDatabaseName] SET QUERY_STORE = ON;
+                     ```
+
+                  3. Enable the function in Netdata collector config:
+
+                     ```yaml
+                     jobs:
+                       - name: local
+                         dsn: "sqlserver://user:pass@localhost:1433"
+                         query_store_function_enabled: true
+                     ```
+
+                  :::info
+
+                  - Query Store is available in SQL Server 2016+ and Azure SQL Database
+                  - Requires ALTER DATABASE permission to enable Query Store
+                  - System databases (master, tempdb, model, msdb) are excluded from queries
+
+                  :::
           availability: |
-            Available when Query Store is enabled and the collector is initialized; returns 403 if disabled in config.
+            Available when:<br/>• The collector has successfully connected to SQL Server<br/>• Query Store is enabled on at least one user database<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
     metrics:
       folding:
         title: Metrics
