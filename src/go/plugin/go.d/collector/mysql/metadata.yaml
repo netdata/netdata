@@ -474,10 +474,7 @@ modules:
                      TRUNCATE TABLE performance_schema.events_statements_summary_by_digest;
                      ```
 
-                     For MySQL versions before 8.0, ensure `performance-schema-instrument` includes statement instruments. This mainly applies to MySQL 5.6 or specific locked-down configurations, as statement instruments are typically enabled by default in MySQL 5.7+:
-                     ```ini
-                     performance-schema-instrument='statement/%=ON'
-                     ```
+                     Ensure that statement instruments are enabled in the Performance Schema so that statement digest statistics are collected. Refer to your MySQL or MariaDB version documentation for the appropriate configuration options.
               - title: Grant SELECT permission on Performance Schema tables
                 description: |
                   The netdata user must have SELECT permission on Performance Schema tables. The standard collector permissions
