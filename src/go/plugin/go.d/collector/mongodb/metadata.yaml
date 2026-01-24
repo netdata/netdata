@@ -172,159 +172,201 @@ modules:
         - id: top-queries
           name: Top Queries
           description: |
-            Top queries from MongoDB Profiler (system.profile). WARNING: Query text may contain unmasked literals (potential PII).
+            Retrieves profiled query statistics from MongoDB [system.profile](https://www.mongodb.com/docs/manual/reference/database-profiler/) collection.
 
-            Reads from system.profile and returns the top profiled queries sorted by the selected column.
+            This function queries the `system.profile` collection across all user databases (excluding admin, local, config) to retrieve slow or sampled queries captured by the MongoDB profiler. It provides detailed execution metrics including timing, document counts, and execution plan information.
+
+            Use cases:
+            - Identify slow queries that exceed the profiling threshold
+            - Analyze query patterns by examining docs examined vs docs returned ratios
+            - Detect collection scans (COLLSCAN) that may need index optimization
           parameters:
             - id: __sort
               name: Filter By
-              description: Select the primary sort column (options are derived from sortable columns in the response).
+              description: Select the primary sort column. Options include execution time, docs examined, keys examined, and more. Defaults to execution time to focus on slowest queries.
               type: select
               required: true
               default: execution_time
               options: []
           returns:
-            description: Profiled query statistics from system.profile.
+            description: Profiled query statistics from `system.profile`. Each row represents a single profiled operation with execution metrics and plan details.
             columns:
               - name: Timestamp
                 type: timestamp
                 unit: ""
-                description: ""
+                description: "When the operation was profiled. Useful for correlating slow queries with application events."
               - name: Namespace
                 type: string
                 unit: ""
-                description: ""
+                description: "Database and collection name in format `database.collection`. Identifies which collection the operation targeted."
               - name: Operation
                 type: string
                 unit: ""
-                description: ""
+                description: "Type of operation: query, insert, update, remove, command, getmore. Helps categorize workload patterns."
               - name: Query
                 type: string
                 unit: ""
-                description: ""
+                description: "The command document as JSON showing the query filter, projection, and options. Truncated to 4096 characters."
               - name: Execution Time
                 type: duration
                 unit: "seconds"
-                description: ""
+                description: "Total execution time of the operation. High values indicate slow queries that may need optimization."
               - name: Docs Examined
                 type: integer
                 unit: ""
-                description: ""
+                description: "Number of documents scanned during execution. A high ratio of docs examined to docs returned suggests missing or inefficient indexes."
               - name: Keys Examined
                 type: integer
                 unit: ""
-                description: ""
+                description: "Number of index keys scanned. Compare with docs examined to assess index efficiency."
               - name: Docs Returned
                 type: integer
                 unit: ""
-                description: ""
+                description: "Number of documents returned to the client. Compare with docs examined to identify inefficient queries."
               - name: Plan Summary
                 type: string
                 unit: ""
-                description: ""
+                description: "Execution plan summary (e.g., IXSCAN, COLLSCAN, SORT). COLLSCAN indicates a full collection scan that may need an index."
               - name: Client
                 type: string
                 unit: ""
-                description: ""
+                description: "Client IP address or hostname that executed the operation. Useful for identifying query sources."
               - name: User
                 type: string
                 unit: ""
-                description: ""
+                description: "Authenticated user who executed the operation. Empty for unauthenticated connections."
               - name: Docs Deleted
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Number of documents deleted by the operation. Relevant for remove operations."
               - name: Docs Inserted
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Number of documents inserted by the operation. Relevant for insert operations."
               - name: Docs Modified
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Number of documents modified by the operation. Relevant for update operations."
               - name: Response Length
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Size of the response in bytes. Large responses may indicate queries returning excessive data."
               - name: Num Yield
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Number of times the operation yielded to allow other operations to proceed. High yields may indicate lock contention."
               - name: App Name
                 type: string
                 unit: ""
-                description: ""
+                description: "Application name from the client connection string. Useful for identifying which application generated the query."
               - name: Cursor Exhausted
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Whether the cursor was fully exhausted (Yes/No)."
               - name: Has Sort Stage
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Whether the query required an in-memory sort stage (Yes/No). In-memory sorts are slower than index-based sorts."
               - name: Uses Disk
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Whether the operation used disk for sorting or aggregation (Yes/No). Indicates memory pressure."
               - name: From Multi Planner
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Whether multiple query plans were evaluated (Yes/No)."
               - name: Replanned
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Whether the query was replanned due to plan cache eviction (Yes/No)."
               - name: Query Hash
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Hash of the query shape for identifying similar queries. Available in MongoDB 4.2+."
               - name: Plan Cache Key
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Key used for plan cache lookup. Available in MongoDB 4.2+."
               - name: Planning Time
                 type: duration
                 unit: "seconds"
                 visibility: hidden
-                description: ""
+                description: "Time spent planning the query execution. Available in MongoDB 6.2+."
               - name: CPU Time
                 type: duration
                 unit: "seconds"
                 visibility: hidden
-                description: ""
+                description: "CPU time consumed by the operation. Available in MongoDB 6.3+ on Linux only."
               - name: Query Framework
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Query execution framework used (classic or SBE). Available in MongoDB 7.0+."
               - name: Query Shape Hash
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Hash representing the query shape for grouping similar queries. Available in MongoDB 8.0+."
           performance: |
-            Requires profiling and reads from system.profile; may add load on busy systems.
+            Reads from `system.profile` collection across all user databases.<br/>• Profiling itself adds overhead to MongoDB operations (typically 1-5%)<br/>• The `system.profile` collection is a capped collection with configurable size<br/>• Default limit of 500 rows balances usefulness with performance
           security: |
-            Query text may contain unmasked literals (potential PII).
+            Query text may contain unmasked literal values including potentially sensitive data.<br/>• Document field values in query filters<br/>• Personal information in inserted/updated documents<br/>• Authentication tokens or identifiers<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
               - title: Enable MongoDB profiling
                 description: |
-                  Enable profiling on the target databases and set top_queries_function_enabled to true.
+                  Database profiling must be enabled on each database you want to monitor, and the function must be enabled in the collector configuration.
+
+                  1. Enable profiling on a database (profile slow queries > 100ms):
+
+                     ```javascript
+                     use myDatabase
+                     db.setProfilingLevel(1, { slowms: 100 })
+                     ```
+
+                  2. Or profile all operations (level 2, use with caution):
+
+                     ```javascript
+                     db.setProfilingLevel(2)
+                     ```
+
+                  3. Verify profiling status:
+
+                     ```javascript
+                     db.getProfilingStatus()
+                     ```
+
+                  4. Enable the function in Netdata collector config:
+
+                     ```yaml
+                     jobs:
+                       - name: local
+                         uri: mongodb://localhost:27017
+                         top_queries_function_enabled: true
+                     ```
+
+                  :::info
+
+                  - Profiling level 0 = off, 1 = slow operations only, 2 = all operations
+                  - The `slowms` threshold determines which queries are captured at level 1
+                  - `system.profile` is a capped collection; old entries are automatically removed
+                  - System databases (admin, local, config) are excluded from profiling queries
+
+                  :::
           availability: |
-            Available when profiling is enabled and the collector is initialized; returns 403 if disabled in config.
+            Available when:<br/>• `top_queries_function_enabled` is set to true in collector config<br/>• Profiling is enabled on at least one user database<br/>• The collector has successfully connected to MongoDB<br/>• Returns HTTP 403 if function is disabled in config<br/>• Returns HTTP 503 if profiling is disabled on all databases<br/>• Returns HTTP 500 if database queries fail
     metrics:
       folding:
         title: Metrics
