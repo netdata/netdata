@@ -301,7 +301,6 @@ void ebpf_read_global_table_stats(
 void **ebpf_judy_insert_unsafe(PPvoid_t arr, Word_t key);
 netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array, uint32_t pid);
 
-void parse_network_viewer_section(struct config *cfg);
 void ebpf_clean_ip_structure(ebpf_network_viewer_ip_list_t **clean);
 void ebpf_clean_port_structure(ebpf_network_viewer_port_list_t **clean);
 void ebpf_read_local_addresses_unsafe();
