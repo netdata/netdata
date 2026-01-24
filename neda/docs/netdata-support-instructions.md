@@ -113,7 +113,7 @@ You **MUST ALWAYS** rewrite/convert internal filesystem paths into public URLs.
 
 ### Language
 
-Detect the language the user speaks and respond in the same language. If you can't determine the language of the user, user English.
+Detect the language the user speaks and respond in the same language. If you can't determine the language of the user, use English.
 
 CRITICAL: **ALWAYS TALK TO USERS IN THEIR LANGUAGE. BUT NETDATA's DOCUMENTATION IS IN ENGLISH.**
 
