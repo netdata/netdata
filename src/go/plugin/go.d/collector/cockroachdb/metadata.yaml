@@ -254,200 +254,250 @@ modules:
         - id: top-queries
           name: Top Queries
           description: |
-            Top SQL statements from crdb_internal.cluster_statement_statistics.
-            
-            Queries crdb_internal.cluster_statement_statistics and returns the top entries sorted by the selected column.
+            Retrieves and aggregates SQL statement performance metrics from CockroachDB [crdb_internal.cluster_statement_statistics](https://www.cockroachlabs.com/docs/stable/crdb-internal#cluster_statement_statistics) table.
+
+            This function queries cluster-wide statement statistics grouped by fingerprint (normalized query pattern). It provides aggregated metrics including execution counts, timing breakdowns, and row operation statistics.
+
+            Use cases:
+            - Identify slow queries consuming the most total execution time
+            - Find frequently executed queries that may benefit from optimization
+            - Analyze row read/write patterns to detect inefficient queries
+
+            Query text is truncated at 4096 characters for display purposes.
           parameters:
             - id: __sort
               name: Filter By
-              description: Select the primary sort column (options are derived from sortable columns in the response).
+              description: Select the primary sort column. Options include total time, executions, rows read, rows written, and more. Defaults to total time to focus on most resource-intensive queries.
               type: select
               required: true
               default: totalTime
               options: []
           returns:
-            description: Aggregated SQL statement statistics.
+            description: Aggregated SQL statement statistics grouped by fingerprint. Each row represents a unique query pattern with cumulative metrics across all executions.
             columns:
               - name: Fingerprint ID
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Unique hash identifier for the normalized query pattern. Queries with identical structure but different literal values share the same fingerprint."
               - name: Query
                 type: string
                 unit: ""
-                description: ""
+                description: "Normalized SQL statement text with literals replaced. Truncated to 4096 characters."
               - name: Database
                 type: string
                 unit: ""
-                description: ""
+                description: "Database name where the query was executed. Empty for queries without database context."
               - name: Application
                 type: string
                 unit: ""
-                description: ""
+                description: "Application name that executed the query. Useful for identifying query sources across services."
               - name: Statement Type
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Type of SQL statement (SELECT, INSERT, UPDATE, DELETE, etc.)."
               - name: Distributed
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Whether the query used DistSQL execution (true/false). Distributed queries span multiple nodes."
               - name: Full Scan
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Whether the query performed a full table scan (true/false). Full scans may indicate missing indexes."
               - name: Implicit Txn
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Whether the statement ran in an implicit transaction (true/false)."
               - name: Vectorized
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Whether the query used vectorized execution (true/false). Vectorized execution improves performance for analytical queries."
               - name: Executions
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total number of times this query pattern has been executed. High values indicate frequently run queries."
               - name: Total Time
                 type: duration
                 unit: "milliseconds"
-                description: ""
+                description: "Cumulative service latency across all executions (mean time × executions). High values indicate queries consuming significant cluster resources."
               - name: Mean Time
                 type: duration
                 unit: "milliseconds"
-                description: ""
+                description: "Average service latency per execution. Use this to compare typical performance across query patterns."
               - name: Run Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Average time spent executing the query after planning. Excludes parse and plan time."
               - name: Plan Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Average time spent generating the query execution plan. High values may indicate complex queries or stale statistics."
               - name: Parse Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Average time spent parsing the SQL statement."
               - name: Rows Read
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total rows read across all executions. High values relative to rows returned suggest missing indexes or inefficient scans."
               - name: Rows Written
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total rows written across all executions. Indicates write workload for INSERT, UPDATE, DELETE statements."
               - name: Rows Returned
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total rows returned to clients across all executions. Compare with rows read to assess query efficiency."
               - name: Bytes Read
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Total bytes read from storage across all executions. Indicates I/O load for the query pattern."
               - name: Max Retries
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Maximum number of automatic retries observed for this query pattern. High values indicate transaction contention."
           performance: |
-            Executes SQL queries against system tables and may be expensive on busy clusters.
+            Queries crdb_internal.cluster_statement_statistics which aggregates data across the cluster.<br/>• On busy clusters with high query throughput, this query may take longer<br/>• Default limit of 500 rows balances usefulness with performance<br/>• Statistics are retained based on cluster settings (diagnostics.forced_stat_reset.interval, diagnostics.sampling.enabled)
           security: |
-            Query text may contain unmasked literals (potential PII).
+            Query text may contain unmasked literal values including potentially sensitive data.<br/>• Personal information (names, emails, identifiers)<br/>• Authentication tokens or session data<br/>• Business data in WHERE clauses or INSERT values<br/>• Use VIEWACTIVITYREDACTED privilege to mask sensitive literals<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
               - title: Grant VIEWACTIVITY access to cluster statement stats
                 description: |
-                  Use a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to crdb_internal.cluster_statement_statistics.
+                  The SQL user must have appropriate privileges to access statement statistics.
+
+                  1. Grant VIEWACTIVITY (shows full query text) or VIEWACTIVITYREDACTED (masks literals):
+
+                     ```sql
+                     GRANT SYSTEM VIEWACTIVITY TO netdata_user;
+                     -- OR for privacy:
+                     GRANT SYSTEM VIEWACTIVITYREDACTED TO netdata_user;
+                     ```
+
+                  2. On newer CockroachDB versions, access to crdb_internal may require:
+
+                     ```sql
+                     SET allow_unsafe_internals = on;
+                     ```
+
+                     :::info
+
+                     - The collector automatically attempts to set allow_unsafe_internals when connecting
+                     - VIEWACTIVITYREDACTED replaces literal values with underscores for privacy
+                     - Statement statistics are collected by default but can be disabled via cluster settings
+
+                     :::
           availability: |
-            Requires SQL DSN configuration and access to system tables; returns errors if DSN is missing or SQL is unavailable.
+            Available when:<br/>• SQL DSN is configured in the collector<br/>• The SQL user has VIEWACTIVITY or VIEWACTIVITYREDACTED privileges<br/>• crdb_internal.cluster_statement_statistics is accessible<br/>• Returns HTTP 400 if DSN is not configured<br/>• Returns HTTP 503 if SQL connection fails<br/>• Returns HTTP 504 if query times out
         - id: running-queries
           name: Running Queries
           description: |
-            Currently running SQL statements from SHOW CLUSTER STATEMENTS.
-            
-            Queries SHOW CLUSTER STATEMENTS and returns running statements sorted by the selected column.
+            Retrieves currently executing SQL statements across the CockroachDB cluster using [SHOW CLUSTER STATEMENTS](https://www.cockroachlabs.com/docs/stable/show-statements).
+
+            This function provides a real-time snapshot of all active queries across all nodes in the cluster, including their execution phase, duration, and associated metadata.
+
+            Use cases:
+            - Identify long-running queries that may be blocking other operations
+            - Monitor active workload distribution across the cluster
+            - Debug stuck or slow queries in real-time
           parameters:
             - id: __sort
               name: Filter By
-              description: Select the primary sort column (options are derived from sortable columns in the response).
+              description: Select the primary sort column. Defaults to elapsed time to show longest-running queries first.
               type: select
               required: true
               default: elapsedMs
               options: []
           returns:
-            description: Snapshot of currently running SQL statements.
+            description: Real-time snapshot of currently executing SQL statements across all cluster nodes. Each row represents a single active query.
             columns:
               - name: Query ID
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Unique identifier for this specific query execution. Can be used with CANCEL QUERY if needed."
               - name: Query
                 type: string
                 unit: ""
-                description: ""
+                description: "The SQL statement currently being executed. Truncated to 4096 characters."
               - name: User
                 type: string
                 unit: ""
-                description: ""
+                description: "Database user executing the query. Useful for identifying workload by user."
               - name: Application
                 type: string
                 unit: ""
-                description: ""
+                description: "Application name from the client connection. Helps identify which service is running the query."
               - name: Client Address
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "IP address of the client connection. Useful for identifying query sources."
               - name: Node ID
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "CockroachDB node currently executing the query. Helps identify workload distribution."
               - name: Session ID
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Session identifier for the connection. Multiple queries may share a session."
               - name: Phase
                 type: string
                 unit: ""
-                description: ""
+                description: "Current execution phase (executing, preparing, etc.). Indicates query progress."
               - name: Distributed
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Whether the query is using distributed execution across multiple nodes."
               - name: Start Time
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Timestamp when the query started executing."
               - name: Elapsed
                 type: duration
                 unit: "milliseconds"
-                description: ""
+                description: "Time elapsed since query started. High values indicate long-running queries that may need investigation."
           performance: |
-            Executes SQL queries against system tables and may be expensive on busy clusters.
+            Executes SHOW CLUSTER STATEMENTS which queries all nodes in the cluster.<br/>• Lightweight operation with minimal overhead<br/>• Returns only currently active queries, typically a small result set<br/>• Default limit of 500 rows (rarely reached for running queries)
           security: |
-            Query text may contain unmasked literals (potential PII).
+            Query text may contain unmasked literal values including potentially sensitive data.<br/>• Personal information in WHERE clauses or VALUES<br/>• Session tokens or credentials<br/>• Use VIEWACTIVITYREDACTED privilege to mask sensitive literals<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
               - title: Grant VIEWACTIVITY access to system tables
                 description: |
-                  Use a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to system tables.
+                  The SQL user must have appropriate privileges to view running statements.
+
+                  1. Grant VIEWACTIVITY (shows full query text) or VIEWACTIVITYREDACTED (masks literals):
+
+                     ```sql
+                     GRANT SYSTEM VIEWACTIVITY TO netdata_user;
+                     -- OR for privacy:
+                     GRANT SYSTEM VIEWACTIVITYREDACTED TO netdata_user;
+                     ```
+
+                     :::info
+
+                     - SHOW CLUSTER STATEMENTS shows queries across all nodes, not just the connected node
+                     - VIEWACTIVITYREDACTED replaces literal values with underscores for privacy
+                     - Queries shown are point-in-time snapshots and may complete between retrieval and display
+
+                     :::
           availability: |
-            Requires SQL DSN configuration and access to system tables; returns errors if DSN is missing or SQL is unavailable.
+            Available when:<br/>• SQL DSN is configured in the collector<br/>• The SQL user has VIEWACTIVITY or VIEWACTIVITYREDACTED privileges<br/>• Returns HTTP 400 if DSN is not configured<br/>• Returns HTTP 503 if SQL connection fails<br/>• Returns HTTP 504 if query times out
     metrics:
       folding:
         title: Metrics
