@@ -277,7 +277,7 @@ modules:
               - name: Query
                 type: string
                 unit: ""
-                description: The SQL statement text with literal values. Truncated to 4096 characters.
+                description: Normalized SQL query text with literals replaced by parameter placeholders. Truncated to 4096 characters.
               - name: Database
                 type: string
                 unit: ""
@@ -347,7 +347,7 @@ modules:
 
                   :::
           availability: |
-            Available when:<br/>• The collector has successfully connected to YSQL<br/>• The `pg_stat_statements` extension is installed<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+            Available when:<br/>• The collector has successfully connected to YSQL<br/>• The `pg_stat_statements` extension is installed<br/>• Returns HTTP 503 if the SQL connection cannot be established or extension is not installed<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
         - id: running-queries
           name: Running Queries
           description: |
@@ -444,7 +444,7 @@ modules:
 
                   :::
           availability: |
-            Available when:<br/>• The collector has successfully connected to YSQL<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+            Available when:<br/>• The collector has successfully connected to YSQL<br/>• Returns HTTP 503 if the SQL connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
     metrics:
       folding:
         title: Metrics

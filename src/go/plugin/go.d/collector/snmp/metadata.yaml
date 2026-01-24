@@ -531,7 +531,7 @@ modules:
               - name: Type Group
                 type: string
                 unit: ""
-                description: "Custom categorization mapping IANA interface types into practical groups: Ethernet (physical Ethernet interfaces), Aggregation (LAG/port-channels, bond), Virtual (VLANs, loopbacks), or Other (all remaining types)"
+                description: "Custom categorization mapping IANA interface types into practical groups: Ethernet (physical Ethernet interfaces), Aggregation (LAG/port-channels, bonds), Virtual (VLANs, loopbacks), or Other (all remaining types)"
               - name: Admin Status
                 type: string
                 unit: ""

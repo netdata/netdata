@@ -398,7 +398,7 @@ modules:
 
                   :::
           availability: |
-            Available when:<br/>• The collector has successfully connected to CockroachDB<br/>• The SQL user has `VIEWACTIVITY` or `VIEWACTIVITYREDACTED` privileges<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+            Available when:<br/>• The collector has successfully connected to CockroachDB<br/>• The SQL user has `VIEWACTIVITY` or `VIEWACTIVITYREDACTED` privileges<br/>• Returns HTTP 503 if the SQL connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
         - id: running-queries
           name: Running Queries
           description: |
@@ -499,7 +499,7 @@ modules:
 
                      :::
           availability: |
-            Available when:<br/>• The collector has successfully connected to CockroachDB<br/>• The SQL user has `VIEWACTIVITY` or `VIEWACTIVITYREDACTED` privileges<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+            Available when:<br/>• The collector has successfully connected to CockroachDB<br/>• The SQL user has `VIEWACTIVITY` or `VIEWACTIVITYREDACTED` privileges<br/>• Returns HTTP 503 if the SQL connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
     metrics:
       folding:
         title: Metrics

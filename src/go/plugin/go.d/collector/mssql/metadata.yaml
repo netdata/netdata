@@ -494,27 +494,27 @@ modules:
               - name: Avg Log Bytes
                 type: float
                 unit: ""
-                description: Average SQL Server log bytes written per query execution (SQL Server 2017+). High values indicate logging-intensive operations such as verbose statement logging, extensive error handling, or large transaction rollbacks. Available in SQL Server 2017+.
+                description: Average transaction log bytes written per query execution (SQL Server 2017+). High values indicate write-intensive operations (INSERT/UPDATE/DELETE), large transactions, or bulk modifications. This measures WAL activity, not diagnostic logging.
               - name: Last Log Bytes
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: SQL Server log bytes from the most recent execution. Useful for tracking recent logging activity and identifying queries that generate excessive log output.
+                description: Transaction log bytes from the most recent execution. Useful for tracking recent write activity.
               - name: Min Log Bytes
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: Minimum log bytes observed. Helps identify log-efficient queries and baseline logging requirements for common operations.
+                description: Minimum transaction log bytes observed. Helps identify write-efficient queries and baseline requirements.
               - name: Max Log Bytes
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: Maximum log bytes observed. Spikes may indicate queries with heavy error logging, large amounts of printed statements, or logging sensitive data in error messages. Available in SQL Server 2017+.
+                description: Maximum transaction log bytes observed. Spikes may indicate bulk operations, large transactions, or queries affecting many rows.
               - name: StdDev Log Bytes
                 type: float
                 unit: ""
                 visibility: hidden
-                description: Standard deviation of log bytes written. High variability suggests inconsistent logging patterns across executions, potentially varying by error rates, query complexity, or different execution contexts.
+                description: Standard deviation of transaction log bytes. High variability suggests inconsistent write patterns, potentially varying by the number of rows affected or transaction sizes.
               - name: Avg TempDB (8KB pages)
                 type: float
                 unit: ""

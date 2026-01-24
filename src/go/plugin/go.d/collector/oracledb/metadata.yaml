@@ -252,6 +252,8 @@ modules:
                   1. Grant the required privileges:
 
                      ```sql
+                     -- Note: Use V_$ (with underscore) for GRANT - this is the base fixed view
+                     -- Queries use the V$ public synonym
                      GRANT SELECT ON V_$SQLSTATS TO netdata;
                      -- Or grant the broader role:
                      GRANT SELECT_CATALOG_ROLE TO netdata;
@@ -271,7 +273,7 @@ modules:
 
                   :::
           availability: |
-            Available when:<br/>• The collector has successfully connected to Oracle DB<br/>• The user has SELECT privilege on `V$SQLSTATS`<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+            Available when:<br/>• The collector has successfully connected to Oracle DB<br/>• The user has SELECT privilege on `V$SQLSTATS`<br/>• Returns HTTP 503 if the connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
         - id: running-queries
           name: Running Queries
           description: |
@@ -364,6 +366,8 @@ modules:
                   1. Grant the required privileges:
 
                      ```sql
+                     -- Note: Use V_$ (with underscore) for GRANT - this is the base fixed view
+                     -- Queries use the V$ public synonym
                      GRANT SELECT ON V_$SESSION TO netdata;
                      GRANT SELECT ON V_$SQL TO netdata;
                      -- Or grant the broader role:
@@ -384,7 +388,7 @@ modules:
 
                   :::
           availability: |
-            Available when:<br/>• The collector has successfully connected to Oracle DB<br/>• The user has SELECT privilege on `V$SESSION` and `V$SQL`<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+            Available when:<br/>• The collector has successfully connected to Oracle DB<br/>• The user has SELECT privilege on `V$SESSION` and `V$SQL`<br/>• Returns HTTP 503 if the connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
     metrics:
       folding:
         title: Metrics
