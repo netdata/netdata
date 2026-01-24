@@ -92,7 +92,7 @@ Children with retained data appear as **Stale** (or **Live** if actively streami
 
 | Event | Detection Time | Mechanism |
 |-------|----------------|-----------|
-| Agent or Parent loses Cloud connection | **~30 seconds** | MQTT Last-Will-Testament |
+| Agent or Parent loses Cloud connection | **~60 seconds** | MQTT keepalive (60s interval) |
 | UI reflects state change | **1-2 minutes** | Cloud processing + UI refresh |
 
 **Parent detects child disconnection:**
@@ -112,7 +112,7 @@ A standalone agent connects directly to Cloud without a Parent.
 | Event | From | To | Timing |
 |-------|------|-----|--------|
 | Agent starts, connects to Cloud | Unseen/Offline | **Live** | Immediate on connection |
-| Agent stops or loses network | Live | **Offline** | Immediate to ~30 seconds |
+| Agent stops or loses network | Live | **Offline** | Immediate to ~60 seconds |
 | Agent restarts | Offline | **Live** | Immediate on reconnection |
 
 **No Stale state**: Standalone agents go directly to Offline because there's no Parent holding their data.
@@ -126,7 +126,7 @@ A child streams metrics to a Parent, which connects to Cloud.
 | Child connects to Parent | Unseen/Offline | **Live** | Immediate |
 | Child stops streaming | Live | **Stale** | Immediate to ~60 seconds (see Detection Speed) |
 | Child restarts streaming | Stale | **Live** | Immediate |
-| All Parents go offline | Live/Stale | **Offline** | Immediate to ~30 seconds |
+| All Parents go offline | Live/Stale | **Offline** | Immediate to ~60 seconds |
 | Parent reconnects (child still down) | Offline | **Stale** | Immediate (if data retained) |
 
 ### First Connection
