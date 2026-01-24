@@ -244,11 +244,8 @@ modules:
 
             Use cases:
             - Identify slow queries that consume the most execution time
-            - Find frequently executed queries that may benefit from caching or optimization
-            - Detect queries with high lock time, errors, or warnings
-            - Analyze row operation patterns to optimize joins and indexes
-            - Monitor resource usage including temporary tables and disk I/O
-            - Track query performance over time with first/last seen timestamps
+            - Find frequently executed queries that may benefit from optimization
+            - Detect queries with high lock time, errors, or table scans
 
             The function automatically converts timer metrics from picoseconds (stored in Performance Schema) to milliseconds
             for easier interpretation. Query text is truncated at 4096 characters for display purposes.
@@ -434,7 +431,7 @@ modules:
           performance: |
             Minimal overhead when properly configured. On busy servers with high query throughput, digest table can contain many rows and queries may take longer.<br/>• Default limit of 500 rows balances usefulness with performance<br/>• Adjust `top_queries_limit` configuration option if needed<br/>• Performance Schema overhead typically 1-3% CPU for collecting statement statistics<br/>• Consider disabling statement instrumentation during peak load periods if performance impact is a concern
           security: |
-            Query text may contain unmasked literal values including potentially sensitive data. • Personal information (names, emails, phone numbers)<br/>• Authentication credentials (if improperly handled by application)<br/>• Proprietary business data<br/>• Session identifiers or tokens<br/>• Access should be restricted to authorized personnel only<br/>• Consider implementing data masking in applications to prevent sensitive literals from appearing in query text
+            Query text may contain unmasked literal values including potentially sensitive data.<br/>• Personal information (names, emails, phone numbers)<br/>• Authentication credentials (if improperly handled by application)<br/>• Proprietary business data<br/>• Session identifiers or tokens<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
               - title: Enable performance_schema statement digest collection
