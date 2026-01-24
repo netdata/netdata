@@ -15,82 +15,54 @@ import (
 
 const proxysqlMaxQueryTextLength = 4096
 
-const (
-	paramSort = "__sort"
+const paramSort = "__sort"
 
-	ftString   = funcapi.FieldTypeString
-	ftInteger  = funcapi.FieldTypeInteger
-	ftDuration = funcapi.FieldTypeDuration
+// proxysqlColumn defines metadata for a ProxySQL query digest column.
+// Embeds funcapi.ColumnMeta for UI rendering and adds ProxySQL-specific fields.
+type proxysqlColumn struct {
+	funcapi.ColumnMeta
 
-	trNone     = funcapi.FieldTransformNone
-	trNumber   = funcapi.FieldTransformNumber
-	trDuration = funcapi.FieldTransformDuration
-
-	sortAsc  = funcapi.FieldSortAscending
-	sortDesc = funcapi.FieldSortDescending
-
-	summaryCount = funcapi.FieldSummaryCount
-	summarySum   = funcapi.FieldSummarySum
-	summaryMin   = funcapi.FieldSummaryMin
-	summaryMax   = funcapi.FieldSummaryMax
-	summaryMean  = funcapi.FieldSummaryMean
-
-	filterMulti = funcapi.FieldFilterMultiselect
-	filterRange = funcapi.FieldFilterRange
-)
-
-type proxysqlColumnMeta struct {
-	dbColumn       string
-	uiKey          string
-	displayName    string
-	dataType       funcapi.FieldType
-	units          string
-	visible        bool
-	transform      funcapi.FieldTransform
-	decimalPoints  int
-	sortDir        funcapi.FieldSort
-	summary        funcapi.FieldSummary
-	filter         funcapi.FieldFilter
-	isMicroseconds bool
-	isSortOption   bool
-	sortLabel      string
-	isDefaultSort  bool
-	isUniqueKey    bool
-	isSticky       bool
-	fullWidth      bool
-	isLabel        bool
-	isPrimary      bool
-	isMetric       bool
-	chartGroup     string
-	chartTitle     string
-	isDefaultChart bool
+	// DBColumn is the database column name
+	DBColumn string
+	// IsMicroseconds indicates if the value is in microseconds (needs /1000 conversion)
+	IsMicroseconds bool
+	// IsSortOption indicates whether this column appears in the sort dropdown
+	IsSortOption bool
+	// SortLabel is the label shown in the sort dropdown
+	SortLabel string
+	// IsDefaultSort indicates whether this is the default sort column
+	IsDefaultSort bool
 }
 
-var proxysqlAllColumns = []proxysqlColumnMeta{
-	{dbColumn: "digest", uiKey: "digest", displayName: "Digest", dataType: ftString, visible: false, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti, isUniqueKey: true},
-	{dbColumn: "digest_text", uiKey: "query", displayName: "Query", dataType: ftString, visible: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti, isSticky: true, fullWidth: true},
-	{dbColumn: "schemaname", uiKey: "schema", displayName: "Schema", dataType: ftString, visible: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti, isLabel: true, isPrimary: true},
-	{dbColumn: "username", uiKey: "user", displayName: "User", dataType: ftString, visible: false, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti, isLabel: true},
-	{dbColumn: "hostgroup", uiKey: "hostgroup", displayName: "Hostgroup", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortAsc, summary: summaryCount, filter: filterRange, isLabel: true},
+// proxysqlColumnSet creates a ColumnSet from a slice of proxysqlColumn.
+func proxysqlColumnSet(cols []proxysqlColumn) funcapi.ColumnSet[proxysqlColumn] {
+	return funcapi.Columns(cols, func(c proxysqlColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+}
 
-	{dbColumn: "count_star", uiKey: "calls", displayName: "Calls", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Number of Calls", isMetric: true, chartGroup: "Calls", chartTitle: "Number of Calls", isDefaultChart: true},
+var proxysqlAllColumns = []proxysqlColumn{
+	{ColumnMeta: funcapi.ColumnMeta{Name: "digest", Tooltip: "Digest", Type: funcapi.FieldTypeString, Visible: false, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, UniqueKey: true, Sortable: true}, DBColumn: "digest"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sticky: true, FullWidth: true, Sortable: true}, DBColumn: "digest_text"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "schema", Tooltip: "Schema", Type: funcapi.FieldTypeString, Visible: true, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, GroupBy: &funcapi.GroupByOptions{IsDefault: true}, Sortable: true}, DBColumn: "schemaname"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "user", Tooltip: "User", Type: funcapi.FieldTypeString, Visible: false, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, GroupBy: &funcapi.GroupByOptions{}, Sortable: true}, DBColumn: "username"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "hostgroup", Tooltip: "Hostgroup", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterRange, GroupBy: &funcapi.GroupByOptions{}, Sortable: true}, DBColumn: "hostgroup"},
 
-	{dbColumn: "sum_time", uiKey: "totalTime", displayName: "Total Time", dataType: ftDuration, units: "milliseconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange, isMicroseconds: true, isSortOption: true, sortLabel: "Total Execution Time", isDefaultSort: true, isMetric: true, chartGroup: "Time", chartTitle: "Execution Time", isDefaultChart: true},
-	{dbColumn: "avg_time", uiKey: "avgTime", displayName: "Avg Time", dataType: ftDuration, units: "milliseconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMean, filter: filterRange, isMicroseconds: true, isSortOption: true, sortLabel: "Average Execution Time", isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
-	{dbColumn: "min_time", uiKey: "minTime", displayName: "Min Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMin, filter: filterRange, isMicroseconds: true, isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
-	{dbColumn: "max_time", uiKey: "maxTime", displayName: "Max Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange, isMicroseconds: true, isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "calls", Tooltip: "Calls", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Calls", Title: "Number of Calls", IsDefault: true}, Sortable: true}, DBColumn: "count_star", IsSortOption: true, SortLabel: "Number of Calls"},
 
-	{dbColumn: "sum_rows_affected", uiKey: "rowsAffected", displayName: "Rows Affected", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Rows Affected", isMetric: true, chartGroup: "Rows", chartTitle: "Rows"},
-	{dbColumn: "sum_rows_sent", uiKey: "rowsSent", displayName: "Rows Sent", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Rows Sent", isMetric: true, chartGroup: "Rows", chartTitle: "Rows"},
-	{dbColumn: "sum_errors", uiKey: "errors", displayName: "Errors", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Errors", isMetric: true, chartGroup: "Errors", chartTitle: "Errors & Warnings"},
-	{dbColumn: "sum_warnings", uiKey: "warnings", displayName: "Warnings", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Warnings", isMetric: true, chartGroup: "Errors", chartTitle: "Errors & Warnings"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time", IsDefault: true}, Sortable: true}, DBColumn: "sum_time", IsMicroseconds: true, IsSortOption: true, SortLabel: "Total Execution Time", IsDefaultSort: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "avgTime", Tooltip: "Avg Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}, Sortable: true}, DBColumn: "avg_time", IsMicroseconds: true, IsSortOption: true, SortLabel: "Average Execution Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "minTime", Tooltip: "Min Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMin, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}, Sortable: true}, DBColumn: "min_time", IsMicroseconds: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "maxTime", Tooltip: "Max Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}, Sortable: true}, DBColumn: "max_time", IsMicroseconds: true},
 
-	{dbColumn: "first_seen", uiKey: "firstSeen", displayName: "First Seen", dataType: ftString, visible: false, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti},
-	{dbColumn: "last_seen", uiKey: "lastSeen", displayName: "Last Seen", dataType: ftString, visible: false, transform: trNone, sortDir: sortDesc, summary: summaryCount, filter: filterMulti},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsAffected", Tooltip: "Rows Affected", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}, Sortable: true}, DBColumn: "sum_rows_affected", IsSortOption: true, SortLabel: "Rows Affected"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsSent", Tooltip: "Rows Sent", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}, Sortable: true}, DBColumn: "sum_rows_sent", IsSortOption: true, SortLabel: "Rows Sent"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "errors", Tooltip: "Errors", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Errors", Title: "Errors & Warnings"}, Sortable: true}, DBColumn: "sum_errors", IsSortOption: true, SortLabel: "Errors"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "warnings", Tooltip: "Warnings", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Errors", Title: "Errors & Warnings"}, Sortable: true}, DBColumn: "sum_warnings", IsSortOption: true, SortLabel: "Warnings"},
+
+	{ColumnMeta: funcapi.ColumnMeta{Name: "firstSeen", Tooltip: "First Seen", Type: funcapi.FieldTypeString, Visible: false, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, DBColumn: "first_seen"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "lastSeen", Tooltip: "Last Seen", Type: funcapi.FieldTypeString, Visible: false, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, DBColumn: "last_seen"},
 }
 
 func proxysqlMethods() []module.MethodConfig {
-	sortOptions := buildProxySQLSortOptions(proxysqlAllColumns)
 	return []module.MethodConfig{
 		{
 			UpdateEvery:  10,
@@ -103,7 +75,7 @@ func proxysqlMethods() []module.MethodConfig {
 				Name:       "Filter By",
 				Help:       "Select the primary sort column",
 				Selection:  funcapi.ParamSelect,
-				Options:    sortOptions,
+				Options:    buildProxySQLSortOptions(proxysqlAllColumns),
 				UniqueView: true,
 			}},
 		},
@@ -148,55 +120,21 @@ func proxysqlHandleMethod(ctx context.Context, job *module.Job, method string, p
 	}
 }
 
-func buildProxySQLSortOptions(cols []proxysqlColumnMeta) []funcapi.ParamOption {
+func buildProxySQLSortOptions(cols []proxysqlColumn) []funcapi.ParamOption {
 	var sortOptions []funcapi.ParamOption
 	sortDir := funcapi.FieldSortDescending
 	for _, col := range cols {
-		if col.isSortOption {
+		if col.IsSortOption {
 			sortOptions = append(sortOptions, funcapi.ParamOption{
-				ID:      col.uiKey,
-				Column:  col.uiKey,
-				Name:    "Top queries by " + col.sortLabel,
-				Default: col.isDefaultSort,
+				ID:      col.Name,
+				Column:  col.Name,
+				Name:    "Top queries by " + col.SortLabel,
+				Default: col.IsDefaultSort,
 				Sort:    &sortDir,
 			})
 		}
 	}
 	return sortOptions
-}
-
-func buildProxySQLColumns(cols []proxysqlColumnMeta) map[string]any {
-	columns := make(map[string]any, len(cols))
-	for i, col := range cols {
-		visual := funcapi.FieldVisualValue
-		if col.dataType == ftDuration {
-			visual = funcapi.FieldVisualBar
-		}
-		colDef := funcapi.Column{
-			Index:                 i,
-			Name:                  col.displayName,
-			Type:                  col.dataType,
-			Units:                 col.units,
-			Visualization:         visual,
-			Sort:                  col.sortDir,
-			Sortable:              true,
-			Sticky:                col.isSticky,
-			Summary:               col.summary,
-			Filter:                col.filter,
-			FullWidth:             col.fullWidth,
-			Wrap:                  false,
-			DefaultExpandedFilter: false,
-			UniqueKey:             col.isUniqueKey,
-			Visible:               col.visible,
-			ValueOptions: funcapi.ValueOptions{
-				Transform:     col.transform,
-				DecimalPoints: col.decimalPoints,
-				DefaultValue:  nil,
-			},
-		}
-		columns[col.uiKey] = colDef.BuildColumn()
-	}
-	return columns
 }
 
 func (c *Collector) detectProxySQLDigestColumns(ctx context.Context) (map[string]bool, error) {
@@ -233,10 +171,10 @@ func (c *Collector) detectProxySQLDigestColumns(ctx context.Context) (map[string
 	return cols, nil
 }
 
-func (c *Collector) buildAvailableProxySQLColumns(available map[string]bool) []proxysqlColumnMeta {
-	var cols []proxysqlColumnMeta
+func (c *Collector) buildAvailableProxySQLColumns(available map[string]bool) []proxysqlColumn {
+	var cols []proxysqlColumn
 	for _, col := range proxysqlAllColumns {
-		if col.dbColumn == "" || available[strings.ToLower(col.dbColumn)] {
+		if col.DBColumn == "" || available[strings.ToLower(col.DBColumn)] {
 			cols = append(cols, col)
 		}
 	}
@@ -263,31 +201,31 @@ func (c *Collector) topQueriesParams(ctx context.Context) ([]funcapi.ParamConfig
 	return []funcapi.ParamConfig{sortParam}, nil
 }
 
-func (c *Collector) mapAndValidateProxySQLSortColumn(input string, available []proxysqlColumnMeta) string {
-	availableKeys := make(map[string]bool, len(available))
-	for _, col := range available {
-		availableKeys[col.uiKey] = true
-	}
-	if availableKeys[input] {
+func (c *Collector) mapAndValidateProxySQLSortColumn(input string, cs funcapi.ColumnSet[proxysqlColumn]) string {
+	if cs.ContainsColumn(input) {
 		return input
 	}
-	if availableKeys["totalTime"] {
+	if cs.ContainsColumn("totalTime") {
 		return "totalTime"
 	}
-	if availableKeys["calls"] {
+	if cs.ContainsColumn("calls") {
 		return "calls"
 	}
-	return available[0].uiKey
+	names := cs.Names()
+	if len(names) > 0 {
+		return names[0]
+	}
+	return ""
 }
 
-func (c *Collector) buildProxySQLDynamicSQL(cols []proxysqlColumnMeta, sortColumn string, limit int) string {
+func (c *Collector) buildProxySQLDynamicSQL(cols []proxysqlColumn, sortColumn string, limit int) string {
 	selectParts := make([]string, 0, len(cols))
 	for _, col := range cols {
-		expr := col.dbColumn
-		if col.isMicroseconds {
-			expr = fmt.Sprintf("%s/1000", col.dbColumn)
+		expr := col.DBColumn
+		if col.IsMicroseconds {
+			expr = fmt.Sprintf("%s/1000", col.DBColumn)
 		}
-		selectParts = append(selectParts, fmt.Sprintf("%s AS `%s`", expr, col.uiKey))
+		selectParts = append(selectParts, fmt.Sprintf("%s AS `%s`", expr, col.Name))
 	}
 
 	return fmt.Sprintf(`
@@ -298,7 +236,7 @@ LIMIT %d
 `, strings.Join(selectParts, ", "), sortColumn, limit)
 }
 
-func (c *Collector) scanProxySQLDynamicRows(rows *sql.Rows, cols []proxysqlColumnMeta) ([][]any, error) {
+func (c *Collector) scanProxySQLDynamicRows(rows *sql.Rows, cols []proxysqlColumn) ([][]any, error) {
 	data := make([][]any, 0, 500)
 
 	valuePtrs := make([]any, len(cols))
@@ -306,14 +244,14 @@ func (c *Collector) scanProxySQLDynamicRows(rows *sql.Rows, cols []proxysqlColum
 
 	for rows.Next() {
 		for i, col := range cols {
-			switch col.dataType {
-			case ftString:
+			switch col.Type {
+			case funcapi.FieldTypeString:
 				var v sql.NullString
 				values[i] = &v
-			case ftInteger:
+			case funcapi.FieldTypeInteger:
 				var v sql.NullInt64
 				values[i] = &v
-			case ftDuration:
+			case funcapi.FieldTypeDuration:
 				var v sql.NullFloat64
 				values[i] = &v
 			default:
@@ -333,7 +271,7 @@ func (c *Collector) scanProxySQLDynamicRows(rows *sql.Rows, cols []proxysqlColum
 			case *sql.NullString:
 				if v.Valid {
 					s := v.String
-					if col.uiKey == "query" {
+					if col.Name == "query" {
 						s = strmutil.TruncateText(s, proxysqlMaxQueryTextLength)
 					}
 					row[i] = s
@@ -377,7 +315,8 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		return &module.FunctionResponse{Status: 500, Message: "no columns available in stats_mysql_query_digest"}
 	}
 
-	sortColumn = c.mapAndValidateProxySQLSortColumn(sortColumn, cols)
+	cs := proxysqlColumnSet(cols)
+	sortColumn = c.mapAndValidateProxySQLSortColumn(sortColumn, cs)
 
 	limit := c.TopQueriesLimit
 	if limit <= 0 {
@@ -409,119 +348,19 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	}
 
 	defaultSort := "totalTime"
-	if !containsProxySQLColumn(cols, defaultSort) {
+	if !cs.ContainsColumn(defaultSort) {
 		defaultSort = "calls"
 	}
 
 	return &module.FunctionResponse{
 		Status:            200,
 		Help:              "Top SQL queries from ProxySQL stats_mysql_query_digest",
-		Columns:           buildProxySQLColumns(cols),
+		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: defaultSort,
 		RequiredParams:    []funcapi.ParamConfig{sortParam},
-		Charts:            proxysqlTopQueriesCharts(cols),
-		DefaultCharts:     proxysqlTopQueriesDefaultCharts(cols),
-		GroupBy:           proxysqlTopQueriesGroupBy(cols),
+		Charts:            cs.BuildCharts(),
+		DefaultCharts:     cs.BuildDefaultCharts(),
+		GroupBy:           cs.BuildGroupBy(),
 	}
-}
-
-func containsProxySQLColumn(cols []proxysqlColumnMeta, key string) bool {
-	for _, col := range cols {
-		if col.uiKey == key {
-			return true
-		}
-	}
-	return false
-}
-
-func proxysqlTopQueriesCharts(cols []proxysqlColumnMeta) map[string]module.ChartConfig {
-	charts := make(map[string]module.ChartConfig)
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" {
-			continue
-		}
-		cfg, ok := charts[col.chartGroup]
-		if !ok {
-			title := col.chartTitle
-			if title == "" {
-				title = col.chartGroup
-			}
-			cfg = module.ChartConfig{
-				Name: title,
-				Type: "stacked-bar",
-			}
-		}
-		cfg.Columns = append(cfg.Columns, col.uiKey)
-		charts[col.chartGroup] = cfg
-	}
-	return charts
-}
-
-func proxysqlTopQueriesDefaultCharts(cols []proxysqlColumnMeta) [][]string {
-	label := primaryProxySQLLabel(cols)
-	if label == "" {
-		return nil
-	}
-	chartGroups := defaultProxySQLChartGroups(cols)
-	out := make([][]string, 0, len(chartGroups))
-	for _, group := range chartGroups {
-		out = append(out, []string{group, label})
-	}
-	return out
-}
-
-func proxysqlTopQueriesGroupBy(cols []proxysqlColumnMeta) map[string]module.GroupByConfig {
-	groupBy := make(map[string]module.GroupByConfig)
-	for _, col := range cols {
-		if !col.isLabel {
-			continue
-		}
-		groupBy[col.uiKey] = module.GroupByConfig{
-			Name:    "Group by " + col.displayName,
-			Columns: []string{col.uiKey},
-		}
-	}
-	return groupBy
-}
-
-func primaryProxySQLLabel(cols []proxysqlColumnMeta) string {
-	for _, col := range cols {
-		if col.isPrimary {
-			return col.uiKey
-		}
-	}
-	for _, col := range cols {
-		if col.isLabel {
-			return col.uiKey
-		}
-	}
-	return ""
-}
-
-func defaultProxySQLChartGroups(cols []proxysqlColumnMeta) []string {
-	groups := make([]string, 0)
-	seen := make(map[string]bool)
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" || !col.isDefaultChart {
-			continue
-		}
-		if !seen[col.chartGroup] {
-			seen[col.chartGroup] = true
-			groups = append(groups, col.chartGroup)
-		}
-	}
-	if len(groups) > 0 {
-		return groups
-	}
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" {
-			continue
-		}
-		if !seen[col.chartGroup] {
-			seen[col.chartGroup] = true
-			groups = append(groups, col.chartGroup)
-		}
-	}
-	return groups
 }

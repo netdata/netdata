@@ -36,25 +36,17 @@ func TestOracleMethods(t *testing.T) {
 func TestOracleTopColumns_HasRequiredColumns(t *testing.T) {
 	required := []string{"query", "executions", "totalTime"}
 
-	uiKeys := make(map[string]bool)
-	for _, col := range oracleTopColumns {
-		uiKeys[col.id] = true
-	}
-
-	for _, key := range required {
-		assert.True(t, uiKeys[key], "column %s should be defined", key)
+	cs := oracleColumnSet(oracleTopColumns)
+	for _, id := range required {
+		assert.True(t, cs.ContainsColumn(id), "column %s should be defined", id)
 	}
 }
 
 func TestOracleRunningColumns_HasRequiredColumns(t *testing.T) {
 	required := []string{"sessionId", "query", "lastCallMs"}
 
-	uiKeys := make(map[string]bool)
-	for _, col := range oracleRunningColumns {
-		uiKeys[col.id] = true
-	}
-
-	for _, key := range required {
-		assert.True(t, uiKeys[key], "column %s should be defined", key)
+	cs := oracleColumnSet(oracleRunningColumns)
+	for _, id := range required {
+		assert.True(t, cs.ContainsColumn(id), "column %s should be defined", id)
 	}
 }

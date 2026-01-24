@@ -23,46 +23,14 @@ type Defaults struct {
 	Disabled           bool
 }
 
-// MethodConfig describes a function method provided by a module.
-type MethodConfig struct {
-	ID             string                // Method ID (e.g., "top-queries")
-	Name           string                // Display name (e.g., "Top Queries")
-	UpdateEvery    int                   // Default UI refresh interval
-	Help           string                // Description for UI
-	RequireCloud   bool                  // Indicates whether the method requires cloud connection
-	RequiredParams []funcapi.ParamConfig // Required parameters for this method (including __sort if used)
-}
-
-// FunctionResponse is the response from a module's HandleMethod.
-type FunctionResponse struct {
-	Status            int            // HTTP-like status code (200, 400, 403, 500, 503)
-	Message           string         // Error message (if Status != 200)
-	Help              string         // Help text for this response
-	Columns           map[string]any // Column definitions for the table
-	Data              any            // Row data: [][]any (array of arrays, ordered by column index)
-	DefaultSortColumn string         // Default sort column ID
-
-	// Optional dynamic required params (override MethodConfig.RequiredParams)
-	RequiredParams []funcapi.ParamConfig
-
-	// Chart configuration for visualization
-	Charts        map[string]ChartConfig   // Chart definitions (chartID -> config)
-	DefaultCharts [][]string               // Default charts: [[chartID, groupByID], ...]
-	GroupBy       map[string]GroupByConfig // Group-by options (groupByID -> config)
-}
-
-// ChartConfig defines a chart for visualization.
-type ChartConfig struct {
-	Name    string   `json:"name"`
-	Type    string   `json:"type"`    // "stacked-bar", "line", etc.
-	Columns []string `json:"columns"` // Column IDs to include in chart
-}
-
-// GroupByConfig defines a grouping option for function responses.
-type GroupByConfig struct {
-	Name    string   `json:"name"`
-	Columns []string `json:"columns"` // Columns to group by
-}
+// Type aliases for backward compatibility during migration.
+// These types are now defined in funcapi package.
+type (
+	MethodConfig     = funcapi.MethodConfig
+	FunctionResponse = funcapi.FunctionResponse
+	ChartConfig      = funcapi.ChartConfig
+	GroupByConfig    = funcapi.GroupByConfig
+)
 
 type (
 	// Creator is a Job builder.

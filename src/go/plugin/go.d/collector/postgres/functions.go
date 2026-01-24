@@ -15,162 +15,107 @@ import (
 
 const maxQueryTextLength = 4096
 
-const (
-	paramSort = "__sort"
+const paramSort = "__sort"
 
-	ftString   = funcapi.FieldTypeString
-	ftInteger  = funcapi.FieldTypeInteger
-	ftFloat    = funcapi.FieldTypeFloat
-	ftDuration = funcapi.FieldTypeDuration
+// pgColumn defines metadata for a pg_stat_statements column.
+// Embeds funcapi.ColumnMeta for UI rendering and adds PG-specific fields.
+type pgColumn struct {
+	funcapi.ColumnMeta
 
-	trNone     = funcapi.FieldTransformNone
-	trNumber   = funcapi.FieldTransformNumber
-	trDuration = funcapi.FieldTransformDuration
-
-	sortAsc  = funcapi.FieldSortAscending
-	sortDesc = funcapi.FieldSortDescending
-
-	summaryCount  = funcapi.FieldSummaryCount
-	summarySum    = funcapi.FieldSummarySum
-	summaryMin    = funcapi.FieldSummaryMin
-	summaryMax    = funcapi.FieldSummaryMax
-	summaryMean   = funcapi.FieldSummaryMean
-	summaryMedian = funcapi.FieldSummaryMedian
-
-	filterMulti = funcapi.FieldFilterMultiselect
-	filterRange = funcapi.FieldFilterRange
-)
-
-// pgColumnMeta defines metadata for a pg_stat_statements column
-type pgColumnMeta struct {
-	// Database column name (may vary by version)
-	dbColumn string
-	// Canonical name used everywhere: SQL alias, UI key, sort key
-	uiKey string
-	// Display name in UI
-	displayName string
-	// Data type: "string", "integer", "float", "duration"
-	dataType funcapi.FieldType
-	// Unit for duration/numeric types
-	units string
-	// Whether visible by default
-	visible bool
-	// Transform for value_options
-	transform funcapi.FieldTransform
-	// Decimal points for display
-	decimalPoints int
-	// Sort direction preference
-	sortDir funcapi.FieldSort
-	// Summary function
-	summary funcapi.FieldSummary
-	// Filter type
-	filter funcapi.FieldFilter
-	// Whether this is a sortable option for the sort dropdown
-	isSortOption bool
-	// Sort option label (if isSortOption)
-	sortLabel string
-	// Whether this is the default sort
-	isDefaultSort bool
-	// Whether this is the unique key
-	isUniqueKey bool
-	// Whether this column is sticky (stays visible when scrolling)
-	isSticky bool
-	// Whether this column should take full width
-	fullWidth bool
-	// Whether this column is a label for grouping
-	isLabel bool
-	// Whether this label is the primary grouping
-	isPrimary bool
-	// Whether this column is a chartable metric
-	isMetric bool
-	// Chart group key
-	chartGroup string
-	// Chart title
-	chartTitle string
-	// Include this chart group in defaults
-	isDefaultChart bool
+	// DBColumn is the database column expression (e.g., "s.queryid::text", "d.datname")
+	DBColumn string
+	// IsSortOption indicates whether this column appears in the sort dropdown
+	IsSortOption bool
+	// SortLabel is the label shown in the sort dropdown (if IsSortOption)
+	SortLabel string
+	// IsDefaultSort indicates whether this is the default sort column
+	IsDefaultSort bool
 }
 
-// pgAllColumns defines ALL possible columns from pg_stat_statements
-// Order matters - this determines column index in the response
-var pgAllColumns = []pgColumnMeta{
+// pgColumnSet creates a ColumnSet from a slice of pgColumn.
+func pgColumnSet(cols []pgColumn) funcapi.ColumnSet[pgColumn] {
+	return funcapi.Columns(cols, func(c pgColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+}
+
+// pgAllColumns defines ALL possible columns from pg_stat_statements.
+// Order matters - this determines column index in the response.
+var pgAllColumns = []pgColumn{
 	// Core identification columns (always present)
-	{dbColumn: "s.queryid::text", uiKey: "queryid", displayName: "Query ID", dataType: ftString, visible: false, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti, isUniqueKey: true},
-	{dbColumn: "s.query", uiKey: "query", displayName: "Query", dataType: ftString, visible: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti, isSticky: true, fullWidth: true},
-	{dbColumn: "d.datname", uiKey: "database", displayName: "Database", dataType: ftString, visible: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti},
-	{dbColumn: "u.usename", uiKey: "user", displayName: "User", dataType: ftString, visible: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "queryid", Tooltip: "Query ID", Type: funcapi.FieldTypeString, Visible: false, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, UniqueKey: true, Sortable: true}, DBColumn: "s.queryid::text"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sticky: true, FullWidth: true, Sortable: true}, DBColumn: "s.query"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "database", Tooltip: "Database", Type: funcapi.FieldTypeString, Visible: true, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, DBColumn: "d.datname"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "user", Tooltip: "User", Type: funcapi.FieldTypeString, Visible: true, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, DBColumn: "u.usename"},
 
 	// Execution count (always present)
-	{dbColumn: "s.calls", uiKey: "calls", displayName: "Calls", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Number of Calls"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "calls", Tooltip: "Calls", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.calls", IsSortOption: true, SortLabel: "Number of Calls"},
 
 	// Execution time columns (names vary by version - detected dynamically)
 	// PG <13: total_time, mean_time, min_time, max_time, stddev_time
 	// PG 13+: total_exec_time, mean_exec_time, min_exec_time, max_exec_time, stddev_exec_time
-	{dbColumn: "total_time", uiKey: "totalTime", displayName: "Total Time", dataType: ftDuration, units: "milliseconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Total Execution Time", isDefaultSort: true},
-	{dbColumn: "mean_time", uiKey: "meanTime", displayName: "Mean Time", dataType: ftDuration, units: "milliseconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange, isSortOption: true, sortLabel: "Average Execution Time"},
-	{dbColumn: "min_time", uiKey: "minTime", displayName: "Min Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMin, filter: filterRange},
-	{dbColumn: "max_time", uiKey: "maxTime", displayName: "Max Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange},
-	{dbColumn: "stddev_time", uiKey: "stddevTime", displayName: "Stddev Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "total_time", IsSortOption: true, SortLabel: "Total Execution Time", IsDefaultSort: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "meanTime", Tooltip: "Mean Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "mean_time", IsSortOption: true, SortLabel: "Average Execution Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "minTime", Tooltip: "Min Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMin, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "min_time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "maxTime", Tooltip: "Max Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "max_time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "stddevTime", Tooltip: "Stddev Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "stddev_time"},
 
 	// Planning time columns (PG 13+ only)
-	{dbColumn: "s.plans", uiKey: "plans", displayName: "Plans", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
-	{dbColumn: "total_plan_time", uiKey: "totalPlanTime", displayName: "Total Plan Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
-	{dbColumn: "mean_plan_time", uiKey: "meanPlanTime", displayName: "Mean Plan Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange},
-	{dbColumn: "min_plan_time", uiKey: "minPlanTime", displayName: "Min Plan Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMin, filter: filterRange},
-	{dbColumn: "max_plan_time", uiKey: "maxPlanTime", displayName: "Max Plan Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange},
-	{dbColumn: "stddev_plan_time", uiKey: "stddevPlanTime", displayName: "Stddev Plan Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "plans", Tooltip: "Plans", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.plans"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "totalPlanTime", Tooltip: "Total Plan Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "total_plan_time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "meanPlanTime", Tooltip: "Mean Plan Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "mean_plan_time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "minPlanTime", Tooltip: "Min Plan Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMin, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "min_plan_time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "maxPlanTime", Tooltip: "Max Plan Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "max_plan_time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "stddevPlanTime", Tooltip: "Stddev Plan Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "stddev_plan_time"},
 
 	// Row count (always present)
-	{dbColumn: "s.rows", uiKey: "rows", displayName: "Rows", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Rows Returned"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "rows", Tooltip: "Rows", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.rows", IsSortOption: true, SortLabel: "Rows Returned"},
 
 	// Shared buffer statistics (always present)
-	{dbColumn: "s.shared_blks_hit", uiKey: "sharedBlksHit", displayName: "Shared Blocks Hit", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Shared Blocks Hit (Cache)"},
-	{dbColumn: "s.shared_blks_read", uiKey: "sharedBlksRead", displayName: "Shared Blocks Read", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Shared Blocks Read (Disk I/O)"},
-	{dbColumn: "s.shared_blks_dirtied", uiKey: "sharedBlksDirtied", displayName: "Shared Blocks Dirtied", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
-	{dbColumn: "s.shared_blks_written", uiKey: "sharedBlksWritten", displayName: "Shared Blocks Written", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "sharedBlksHit", Tooltip: "Shared Blocks Hit", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.shared_blks_hit", IsSortOption: true, SortLabel: "Shared Blocks Hit (Cache)"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "sharedBlksRead", Tooltip: "Shared Blocks Read", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.shared_blks_read", IsSortOption: true, SortLabel: "Shared Blocks Read (Disk I/O)"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "sharedBlksDirtied", Tooltip: "Shared Blocks Dirtied", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.shared_blks_dirtied"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "sharedBlksWritten", Tooltip: "Shared Blocks Written", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.shared_blks_written"},
 
 	// Local buffer statistics (always present)
-	{dbColumn: "s.local_blks_hit", uiKey: "localBlksHit", displayName: "Local Blocks Hit", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
-	{dbColumn: "s.local_blks_read", uiKey: "localBlksRead", displayName: "Local Blocks Read", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
-	{dbColumn: "s.local_blks_dirtied", uiKey: "localBlksDirtied", displayName: "Local Blocks Dirtied", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
-	{dbColumn: "s.local_blks_written", uiKey: "localBlksWritten", displayName: "Local Blocks Written", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "localBlksHit", Tooltip: "Local Blocks Hit", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.local_blks_hit"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "localBlksRead", Tooltip: "Local Blocks Read", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.local_blks_read"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "localBlksDirtied", Tooltip: "Local Blocks Dirtied", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.local_blks_dirtied"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "localBlksWritten", Tooltip: "Local Blocks Written", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.local_blks_written"},
 
 	// Temp buffer statistics (always present)
-	{dbColumn: "s.temp_blks_read", uiKey: "tempBlksRead", displayName: "Temp Blocks Read", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
-	{dbColumn: "s.temp_blks_written", uiKey: "tempBlksWritten", displayName: "Temp Blocks Written", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Temp Blocks Written"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "tempBlksRead", Tooltip: "Temp Blocks Read", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.temp_blks_read"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "tempBlksWritten", Tooltip: "Temp Blocks Written", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.temp_blks_written", IsSortOption: true, SortLabel: "Temp Blocks Written"},
 
 	// I/O timing (requires track_io_timing, always present but may be 0)
-	{dbColumn: "s.blk_read_time", uiKey: "blkReadTime", displayName: "Block Read Time", dataType: ftDuration, units: "milliseconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
-	{dbColumn: "s.blk_write_time", uiKey: "blkWriteTime", displayName: "Block Write Time", dataType: ftDuration, units: "milliseconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "blkReadTime", Tooltip: "Block Read Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.blk_read_time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "blkWriteTime", Tooltip: "Block Write Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.blk_write_time"},
 
 	// WAL statistics (PG 13+ only)
-	{dbColumn: "s.wal_records", uiKey: "walRecords", displayName: "WAL Records", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
-	{dbColumn: "s.wal_fpi", uiKey: "walFpi", displayName: "WAL Full Page Images", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
-	{dbColumn: "s.wal_bytes", uiKey: "walBytes", displayName: "WAL Bytes", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "walRecords", Tooltip: "WAL Records", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.wal_records"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "walFpi", Tooltip: "WAL Full Page Images", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.wal_fpi"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "walBytes", Tooltip: "WAL Bytes", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.wal_bytes"},
 
 	// JIT statistics (PG 15+ only)
-	{dbColumn: "s.jit_functions", uiKey: "jitFunctions", displayName: "JIT Functions", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
-	{dbColumn: "s.jit_generation_time", uiKey: "jitGenerationTime", displayName: "JIT Generation Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
-	{dbColumn: "s.jit_inlining_count", uiKey: "jitInliningCount", displayName: "JIT Inlining Count", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
-	{dbColumn: "s.jit_inlining_time", uiKey: "jitInliningTime", displayName: "JIT Inlining Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
-	{dbColumn: "s.jit_optimization_count", uiKey: "jitOptimizationCount", displayName: "JIT Optimization Count", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
-	{dbColumn: "s.jit_optimization_time", uiKey: "jitOptimizationTime", displayName: "JIT Optimization Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
-	{dbColumn: "s.jit_emission_count", uiKey: "jitEmissionCount", displayName: "JIT Emission Count", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange},
-	{dbColumn: "s.jit_emission_time", uiKey: "jitEmissionTime", displayName: "JIT Emission Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "jitFunctions", Tooltip: "JIT Functions", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.jit_functions"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "jitGenerationTime", Tooltip: "JIT Generation Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.jit_generation_time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "jitInliningCount", Tooltip: "JIT Inlining Count", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.jit_inlining_count"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "jitInliningTime", Tooltip: "JIT Inlining Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.jit_inlining_time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "jitOptimizationCount", Tooltip: "JIT Optimization Count", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.jit_optimization_count"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "jitOptimizationTime", Tooltip: "JIT Optimization Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.jit_optimization_time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "jitEmissionCount", Tooltip: "JIT Emission Count", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.jit_emission_count"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "jitEmissionTime", Tooltip: "JIT Emission Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.jit_emission_time"},
 
 	// Temp file statistics (PG 15+ only)
-	{dbColumn: "s.temp_blk_read_time", uiKey: "tempBlkReadTime", displayName: "Temp Block Read Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
-	{dbColumn: "s.temp_blk_write_time", uiKey: "tempBlkWriteTime", displayName: "Temp Block Write Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "tempBlkReadTime", Tooltip: "Temp Block Read Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.temp_blk_read_time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "tempBlkWriteTime", Tooltip: "Temp Block Write Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.temp_blk_write_time"},
 }
 
-type pgChartGroup struct {
+// pgChartGroupDefs defines chart groupings for columns. These are applied at runtime via decoratePgColumns.
+var pgChartGroupDefs = []struct {
 	key          string
 	title        string
 	columns      []string
 	defaultChart bool
-}
-
-var pgChartGroups = []pgChartGroup{
+}{
 	{key: "Calls", title: "Number of Calls", columns: []string{"calls"}, defaultChart: true},
 	{key: "Time", title: "Execution Time", columns: []string{"totalTime", "meanTime", "minTime", "maxTime", "stddevTime"}, defaultChart: true},
 	{key: "PlanTime", title: "Planning Time", columns: []string{"totalPlanTime", "meanPlanTime", "minPlanTime", "maxPlanTime", "stddevPlanTime"}},
@@ -187,31 +132,17 @@ var pgChartGroups = []pgChartGroup{
 	{key: "TempIOTime", title: "Temp Block I/O Time", columns: []string{"tempBlkReadTime", "tempBlkWriteTime"}},
 }
 
-var pgLabelColumns = map[string]bool{
+// pgLabelColumnIDs defines which columns are available for group-by.
+var pgLabelColumnIDs = map[string]bool{
 	"database": true,
 	"user":     true,
 }
 
-const pgPrimaryLabel = "database"
+const pgPrimaryLabelID = "database"
 
-// pgMethods returns the available function methods for PostgreSQL
-// Sort options are built dynamically based on available columns
+// pgMethods returns the available function methods for PostgreSQL.
+// Sort options are built dynamically based on available columns.
 func pgMethods() []module.MethodConfig {
-	// Build sort options from column metadata
-	var sortOptions []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range pgAllColumns {
-		if col.isSortOption {
-			sortOptions = append(sortOptions, funcapi.ParamOption{
-				ID:      col.uiKey,
-				Column:  col.uiKey,
-				Name:    "Top queries by " + col.sortLabel,
-				Default: col.isDefaultSort,
-				Sort:    &sortDir,
-			})
-		}
-	}
-
 	return []module.MethodConfig{
 		{
 			UpdateEvery:  10,
@@ -225,12 +156,30 @@ func pgMethods() []module.MethodConfig {
 					Name:       "Filter By",
 					Help:       "Select the primary sort column",
 					Selection:  funcapi.ParamSelect,
-					Options:    sortOptions,
+					Options:    buildPgSortOptions(),
 					UniqueView: true,
 				},
 			},
 		},
 	}
+}
+
+// buildPgSortOptions builds sort options from pgAllColumns.
+func buildPgSortOptions() []funcapi.ParamOption {
+	var opts []funcapi.ParamOption
+	sortDir := funcapi.FieldSortDescending
+	for _, col := range pgAllColumns {
+		if col.IsSortOption {
+			opts = append(opts, funcapi.ParamOption{
+				ID:      col.Name,
+				Column:  col.Name,
+				Name:    "Top queries by " + col.SortLabel,
+				Default: col.IsDefaultSort,
+				Sort:    &sortDir,
+			})
+		}
+	}
+	return opts
 }
 
 func pgMethodParams(ctx context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
@@ -272,7 +221,7 @@ func pgHandleMethod(ctx context.Context, job *module.Job, method string, params 
 	}
 }
 
-// collectTopQueries queries pg_stat_statements for top queries
+// collectTopQueries queries pg_stat_statements for top queries.
 func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
 	// Check pg_stat_statements availability (lazy check)
 	available, err := c.checkPgStatStatements(ctx)
@@ -341,11 +290,11 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	// Build dynamic sort options from available columns (only those actually detected)
 	sortParam, sortOptions := c.topQueriesSortParam(queryCols)
 
-	// Find default sort column UI key from metadata
+	// Find default sort column from metadata
 	defaultSort := ""
 	for _, col := range queryCols {
-		if col.isDefaultSort && col.isSortOption {
-			defaultSort = col.uiKey
+		if col.IsDefaultSort && col.IsSortOption {
+			defaultSort = col.Name
 			break
 		}
 	}
@@ -354,144 +303,59 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		defaultSort = sortOptions[0].ID
 	}
 
+	// Decorate columns with chart/label metadata and build using ColumnSet
 	annotatedCols := decoratePgColumns(queryCols)
+	cs := pgColumnSet(annotatedCols)
 
 	return &module.FunctionResponse{
 		Status:            200,
 		Help:              "Top SQL queries from pg_stat_statements",
-		Columns:           c.buildDynamicColumns(queryCols),
+		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: defaultSort,
 		RequiredParams:    []funcapi.ParamConfig{sortParam},
 
 		// Charts for aggregated visualization
-		Charts:        pgTopQueriesCharts(annotatedCols),
-		DefaultCharts: pgTopQueriesDefaultCharts(annotatedCols),
-		GroupBy:       pgTopQueriesGroupBy(annotatedCols),
+		Charts:        cs.BuildCharts(),
+		DefaultCharts: cs.BuildDefaultCharts(),
+		GroupBy:       cs.BuildGroupBy(),
 	}
 }
 
-func decoratePgColumns(cols []pgColumnMeta) []pgColumnMeta {
-	out := make([]pgColumnMeta, len(cols))
+// decoratePgColumns adds label and chart metadata to columns for ColumnSet builders.
+func decoratePgColumns(cols []pgColumn) []pgColumn {
+	out := make([]pgColumn, len(cols))
 	index := make(map[string]int, len(cols))
 	for i, col := range cols {
 		out[i] = col
-		index[col.uiKey] = i
+		index[col.Name] = i
 	}
 
+	// Mark groupby columns
 	for i := range out {
-		if pgLabelColumns[out[i].uiKey] {
-			out[i].isLabel = true
-			if out[i].uiKey == pgPrimaryLabel {
-				out[i].isPrimary = true
+		if pgLabelColumnIDs[out[i].Name] {
+			out[i].GroupBy = &funcapi.GroupByOptions{
+				IsDefault: out[i].Name == pgPrimaryLabelID,
 			}
 		}
 	}
 
-	for _, group := range pgChartGroups {
+	// Mark chart columns
+	for _, group := range pgChartGroupDefs {
 		for _, key := range group.columns {
 			idx, ok := index[key]
 			if !ok {
 				continue
 			}
-			out[idx].isMetric = true
-			out[idx].chartGroup = group.key
-			out[idx].chartTitle = group.title
-			if group.defaultChart {
-				out[idx].isDefaultChart = true
+			out[idx].Chart = &funcapi.ChartOptions{
+				Group:     group.key,
+				Title:     group.title,
+				IsDefault: group.defaultChart,
 			}
 		}
 	}
 
 	return out
-}
-
-func pgTopQueriesCharts(cols []pgColumnMeta) map[string]module.ChartConfig {
-	charts := make(map[string]module.ChartConfig)
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" {
-			continue
-		}
-		cfg, ok := charts[col.chartGroup]
-		if !ok {
-			title := col.chartTitle
-			if title == "" {
-				title = col.chartGroup
-			}
-			cfg = module.ChartConfig{Name: title, Type: "stacked-bar"}
-		}
-		cfg.Columns = append(cfg.Columns, col.uiKey)
-		charts[col.chartGroup] = cfg
-	}
-	return charts
-}
-
-func pgTopQueriesDefaultCharts(cols []pgColumnMeta) [][]string {
-	label := primaryPgLabel(cols)
-	if label == "" {
-		return nil
-	}
-	chartGroups := defaultPgChartGroups(cols)
-	out := make([][]string, 0, len(chartGroups))
-	for _, group := range chartGroups {
-		out = append(out, []string{group, label})
-	}
-	return out
-}
-
-func pgTopQueriesGroupBy(cols []pgColumnMeta) map[string]module.GroupByConfig {
-	groupBy := make(map[string]module.GroupByConfig)
-	for _, col := range cols {
-		if !col.isLabel {
-			continue
-		}
-		groupBy[col.uiKey] = module.GroupByConfig{
-			Name:    "Group by " + col.displayName,
-			Columns: []string{col.uiKey},
-		}
-	}
-	return groupBy
-}
-
-func primaryPgLabel(cols []pgColumnMeta) string {
-	for _, col := range cols {
-		if col.isPrimary {
-			return col.uiKey
-		}
-	}
-	for _, col := range cols {
-		if col.isLabel {
-			return col.uiKey
-		}
-	}
-	return ""
-}
-
-func defaultPgChartGroups(cols []pgColumnMeta) []string {
-	groups := make([]string, 0)
-	seen := make(map[string]bool)
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" || !col.isDefaultChart {
-			continue
-		}
-		if !seen[col.chartGroup] {
-			seen[col.chartGroup] = true
-			groups = append(groups, col.chartGroup)
-		}
-	}
-	if len(groups) > 0 {
-		return groups
-	}
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" {
-			continue
-		}
-		if !seen[col.chartGroup] {
-			seen[col.chartGroup] = true
-			groups = append(groups, col.chartGroup)
-		}
-	}
-	return groups
 }
 
 // detectPgStatStatementsColumns queries the database to find available columns
@@ -545,13 +409,13 @@ func (c *Collector) detectPgStatStatementsColumns(ctx context.Context) (map[stri
 	return cols, nil
 }
 
-// buildAvailableColumns returns column metadata for columns that exist in this PG version
-func (c *Collector) buildAvailableColumns(availableCols map[string]bool) []pgColumnMeta {
-	var result []pgColumnMeta
+// buildAvailableColumns returns column metadata for columns that exist in this PG version.
+func (c *Collector) buildAvailableColumns(availableCols map[string]bool) []pgColumn {
+	var result []pgColumn
 
 	for _, col := range pgAllColumns {
 		// Extract the actual column name (remove table prefix and type cast)
-		colName := col.dbColumn
+		colName := col.DBColumn
 		if idx := strings.LastIndex(colName, "."); idx != -1 {
 			colName = colName[idx+1:]
 		}
@@ -580,18 +444,15 @@ func (c *Collector) buildAvailableColumns(availableCols map[string]bool) []pgCol
 
 		// Check if column exists (either directly or via join)
 		// Join columns (database, user) come from other tables (d.datname, u.usename)
-		isJoinCol := col.uiKey == "database" || col.uiKey == "user"
+		isJoinCol := col.Name == "database" || col.Name == "user"
 		if isJoinCol || availableCols[actualColName] {
 			// Create a copy with the actual column name for this version
 			colCopy := col
 			if actualColName != colName {
-				// Update dbColumn to use the version-specific name with alias
-				prefix := "s."
-				if strings.HasPrefix(col.dbColumn, "s.") {
-					prefix = ""
-					colCopy.dbColumn = "s." + actualColName
+				// Update DBColumn to use the version-specific name with alias
+				if strings.HasPrefix(col.DBColumn, "s.") {
+					colCopy.DBColumn = "s." + actualColName
 				}
-				_ = prefix // suppress unused warning
 			}
 			result = append(result, colCopy)
 		}
@@ -600,13 +461,13 @@ func (c *Collector) buildAvailableColumns(availableCols map[string]bool) []pgCol
 	return result
 }
 
-// mapAndValidateSortColumn maps the semantic sort column to actual SQL column
+// mapAndValidateSortColumn maps the semantic sort column to actual SQL column.
 func (c *Collector) mapAndValidateSortColumn(sortColumn string, availableCols map[string]bool) string {
-	// Map UI key back to dbColumn
+	// Map column ID back to DBColumn
 	for _, col := range pgAllColumns {
-		if col.uiKey == sortColumn || col.dbColumn == sortColumn {
+		if col.Name == sortColumn || col.DBColumn == sortColumn {
 			// Get actual column name (strip table prefix and type cast)
-			colName := col.dbColumn
+			colName := col.DBColumn
 			if idx := strings.LastIndex(colName, "."); idx != -1 {
 				colName = colName[idx+1:]
 			}
@@ -644,12 +505,12 @@ func (c *Collector) mapAndValidateSortColumn(sortColumn string, availableCols ma
 	return "total_time"
 }
 
-// buildDynamicSQL builds the SQL query with only available columns
-func (c *Collector) buildDynamicSQL(cols []pgColumnMeta, sortColumn string, limit int) string {
+// buildDynamicSQL builds the SQL query with only available columns.
+func (c *Collector) buildDynamicSQL(cols []pgColumn, sortColumn string, limit int) string {
 	var selectCols []string
 
 	for _, col := range cols {
-		colExpr := col.dbColumn
+		colExpr := col.DBColumn
 
 		// Handle version-specific column names
 		if c.pgVersion >= pgVersion13 {
@@ -677,9 +538,9 @@ func (c *Collector) buildDynamicSQL(cols []pgColumnMeta, sortColumn string, limi
 			}
 		}
 
-		// Always use uiKey as the SQL alias for consistent naming
+		// Use column ID as the SQL alias for consistent naming
 		// Use double quotes to handle reserved keywords like "database", "user"
-		selectCols = append(selectCols, fmt.Sprintf("%s AS \"%s\"", colExpr, col.uiKey))
+		selectCols = append(selectCols, fmt.Sprintf("%s AS \"%s\"", colExpr, col.Name))
 	}
 
 	return fmt.Sprintf(`
@@ -692,9 +553,9 @@ LIMIT %d
 `, strings.Join(selectCols, ", "), sortColumn, limit)
 }
 
-// scanDynamicRows scans rows into the data array based on column types
-// Uses sql.Null* types to handle NULL values safely
-func (c *Collector) scanDynamicRows(rows dbRows, cols []pgColumnMeta) ([][]any, error) {
+// scanDynamicRows scans rows into the data array based on column types.
+// Uses sql.Null* types to handle NULL values safely.
+func (c *Collector) scanDynamicRows(rows dbRows, cols []pgColumn) ([][]any, error) {
 	data := make([][]any, 0, 500)
 
 	// Create value holders for scanning (reuse across rows for efficiency)
@@ -704,14 +565,14 @@ func (c *Collector) scanDynamicRows(rows dbRows, cols []pgColumnMeta) ([][]any, 
 	for rows.Next() {
 		// Reset value holders for each row
 		for i, col := range cols {
-			switch col.dataType {
-			case ftString:
+			switch col.Type {
+			case funcapi.FieldTypeString:
 				var v sql.NullString
 				values[i] = &v
-			case ftInteger:
+			case funcapi.FieldTypeInteger:
 				var v sql.NullInt64
 				values[i] = &v
-			case ftFloat, ftDuration:
+			case funcapi.FieldTypeFloat, funcapi.FieldTypeDuration:
 				var v sql.NullFloat64
 				values[i] = &v
 			default:
@@ -732,7 +593,7 @@ func (c *Collector) scanDynamicRows(rows dbRows, cols []pgColumnMeta) ([][]any, 
 			case *sql.NullString:
 				if v.Valid {
 					s := v.String
-					if col.uiKey == "query" {
+					if col.Name == "query" {
 						row[i] = strmutil.TruncateText(s, maxQueryTextLength)
 					} else {
 						row[i] = s
@@ -761,58 +622,21 @@ func (c *Collector) scanDynamicRows(rows dbRows, cols []pgColumnMeta) ([][]any, 
 	return data, nil
 }
 
-// buildDynamicColumns builds column definitions for the response
-func (c *Collector) buildDynamicColumns(cols []pgColumnMeta) map[string]any {
-	result := make(map[string]any)
-
-	for i, col := range cols {
-		visual := funcapi.FieldVisualValue
-		if col.dataType == ftDuration {
-			visual = funcapi.FieldVisualBar
-		}
-		colDef := funcapi.Column{
-			Index:                 i,
-			Name:                  col.displayName,
-			Type:                  col.dataType,
-			Units:                 col.units,
-			Visualization:         visual,
-			Sort:                  col.sortDir,
-			Sortable:              true,
-			Sticky:                col.isSticky,
-			Summary:               col.summary,
-			Filter:                col.filter,
-			FullWidth:             col.fullWidth,
-			Wrap:                  false,
-			DefaultExpandedFilter: false,
-			UniqueKey:             col.isUniqueKey,
-			Visible:               col.visible,
-			ValueOptions: funcapi.ValueOptions{
-				Transform:     col.transform,
-				DecimalPoints: col.decimalPoints,
-				DefaultValue:  nil,
-			},
-		}
-		result[col.uiKey] = colDef.BuildColumn()
-	}
-
-	return result
-}
-
-// buildDynamicSortOptions builds sort options from available columns
-// Returns only sort options for columns that actually exist in the database
-func (c *Collector) buildDynamicSortOptions(cols []pgColumnMeta) []funcapi.ParamOption {
+// buildDynamicSortOptions builds sort options from available columns.
+// Returns only sort options for columns that actually exist in the database.
+func (c *Collector) buildDynamicSortOptions(cols []pgColumn) []funcapi.ParamOption {
 	var sortOpts []funcapi.ParamOption
 	seen := make(map[string]bool)
 	sortDir := funcapi.FieldSortDescending
 
 	for _, col := range cols {
-		if col.isSortOption && !seen[col.uiKey] {
-			seen[col.uiKey] = true
+		if col.IsSortOption && !seen[col.Name] {
+			seen[col.Name] = true
 			sortOpts = append(sortOpts, funcapi.ParamOption{
-				ID:      col.uiKey,
-				Column:  col.uiKey,
-				Name:    col.sortLabel,
-				Default: col.isDefaultSort,
+				ID:      col.Name,
+				Column:  col.Name,
+				Name:    col.SortLabel,
+				Default: col.IsDefaultSort,
 				Sort:    &sortDir,
 			})
 		}
@@ -820,7 +644,7 @@ func (c *Collector) buildDynamicSortOptions(cols []pgColumnMeta) []funcapi.Param
 	return sortOpts
 }
 
-func (c *Collector) topQueriesSortParam(queryCols []pgColumnMeta) (funcapi.ParamConfig, []funcapi.ParamOption) {
+func (c *Collector) topQueriesSortParam(queryCols []pgColumn) (funcapi.ParamConfig, []funcapi.ParamOption) {
 	sortOptions := c.buildDynamicSortOptions(queryCols)
 	sortParam := funcapi.ParamConfig{
 		ID:         paramSort,

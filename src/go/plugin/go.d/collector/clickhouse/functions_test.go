@@ -32,43 +32,41 @@ func TestClickHouseMethods(t *testing.T) {
 func TestClickHouseAllColumns_HasRequiredColumns(t *testing.T) {
 	required := []string{"query", "calls", "totalTime"}
 
-	uiKeys := make(map[string]bool)
-	for _, col := range clickhouseAllColumns {
-		uiKeys[col.uiKey] = true
-	}
+	cs := clickhouseColumnSet(clickhouseAllColumns)
 
 	for _, key := range required {
-		assert.True(t, uiKeys[key], "column %s should be defined", key)
+		assert.True(t, cs.ContainsColumn(key), "column %s should be defined", key)
 	}
 }
 
 func TestCollector_mapAndValidateClickHouseSortColumn(t *testing.T) {
 	tests := map[string]struct {
-		available []clickhouseColumnMeta
-		input     string
-		expected  string
+		columns  []clickhouseColumn
+		input    string
+		expected string
 	}{
 		"valid totalTime": {
-			available: []clickhouseColumnMeta{{uiKey: "totalTime"}, {uiKey: "calls"}},
-			input:     "totalTime",
-			expected:  "totalTime",
+			columns:  []clickhouseColumn{{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime"}}, {ColumnMeta: funcapi.ColumnMeta{Name: "calls"}}},
+			input:    "totalTime",
+			expected: "totalTime",
 		},
 		"invalid falls back to totalTime": {
-			available: []clickhouseColumnMeta{{uiKey: "totalTime"}, {uiKey: "calls"}},
-			input:     "bad",
-			expected:  "totalTime",
+			columns:  []clickhouseColumn{{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime"}}, {ColumnMeta: funcapi.ColumnMeta{Name: "calls"}}},
+			input:    "bad",
+			expected: "totalTime",
 		},
 		"fallback to calls": {
-			available: []clickhouseColumnMeta{{uiKey: "calls"}},
-			input:     "bad",
-			expected:  "calls",
+			columns:  []clickhouseColumn{{ColumnMeta: funcapi.ColumnMeta{Name: "calls"}}},
+			input:    "bad",
+			expected: "calls",
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &Collector{}
-			assert.Equal(t, tc.expected, c.mapAndValidateClickHouseSortColumn(tc.input, tc.available))
+			cs := clickhouseColumnSet(tc.columns)
+			assert.Equal(t, tc.expected, c.mapAndValidateClickHouseSortColumn(tc.input, cs))
 		})
 	}
 }

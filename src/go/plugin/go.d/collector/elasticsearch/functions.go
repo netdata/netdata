@@ -19,69 +19,28 @@ import (
 
 const elasticMaxQueryTextLength = 4096
 
-const (
-	paramSort = "__sort"
-
-	ftString    = funcapi.FieldTypeString
-	ftDuration  = funcapi.FieldTypeDuration
-	ftTimestamp = funcapi.FieldTypeTimestamp
-	ftBoolean   = funcapi.FieldTypeBoolean
-
-	trNone     = funcapi.FieldTransformNone
-	trDuration = funcapi.FieldTransformDuration
-	trDatetime = funcapi.FieldTransformDatetime
-	trText     = funcapi.FieldTransformText
-
-	visValue = funcapi.FieldVisualValue
-	visBar   = funcapi.FieldVisualBar
-
-	sortAsc  = funcapi.FieldSortAscending
-	sortDesc = funcapi.FieldSortDescending
-
-	summaryCount = funcapi.FieldSummaryCount
-	summaryMax   = funcapi.FieldSummaryMax
-	summarySum   = funcapi.FieldSummarySum
-
-	filterMulti = funcapi.FieldFilterMultiselect
-	filterRange = funcapi.FieldFilterRange
-)
-
-type esColumnMeta struct {
-	id             string
-	name           string
-	colType        funcapi.FieldType
-	visible        bool
-	sortable       bool
-	fullWidth      bool
-	wrap           bool
-	sticky         bool
-	filter         funcapi.FieldFilter
-	visualization  funcapi.FieldVisual
-	transform      funcapi.FieldTransform
-	units          string
-	decimalPoints  int
-	uniqueKey      bool
-	sortDir        funcapi.FieldSort
-	summary        funcapi.FieldSummary
-	isLabel        bool
-	isPrimary      bool
-	isMetric       bool
-	chartGroup     string
-	chartTitle     string
-	isDefaultChart bool
+type esColumn struct {
+	funcapi.ColumnMeta
+	IsSortOption  bool   // whether this column appears as a sort option
+	SortLabel     string // label for sort option dropdown
+	IsDefaultSort bool   // default sort column
 }
 
-var esAllColumns = []esColumnMeta{
-	{id: "taskId", name: "Task ID", colType: ftString, visible: false, sortable: true, filter: filterMulti, visualization: visValue, transform: trText, uniqueKey: true, sortDir: sortDesc, summary: summaryCount},
-	{id: "node", name: "Node ID", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText, isLabel: true},
-	{id: "nodeName", name: "Node Name", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText, isLabel: true, isPrimary: true},
-	{id: "action", name: "Action", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText, isLabel: true},
-	{id: "type", name: "Type", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText, isLabel: true},
-	{id: "description", name: "Description", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText, sticky: true, fullWidth: true, wrap: true},
-	{id: "startTime", name: "Start Time", colType: ftTimestamp, visible: true, sortable: true, filter: filterRange, visualization: visValue, transform: trDatetime, sortDir: sortDesc, summary: summaryMax},
-	{id: "runningTime", name: "Running Time", colType: ftDuration, visible: true, sortable: true, filter: filterRange, visualization: visBar, transform: trDuration, units: "milliseconds", decimalPoints: 2, sortDir: sortDesc, summary: summarySum, isMetric: true, chartGroup: "RunningTime", chartTitle: "Running Time", isDefaultChart: true},
-	{id: "cancellable", name: "Cancellable", colType: ftBoolean, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trNone},
-	{id: "cancelled", name: "Cancelled", colType: ftBoolean, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trNone},
+func esColumnSet(cols []esColumn) funcapi.ColumnSet[esColumn] {
+	return funcapi.Columns(cols, func(c esColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+}
+
+var esAllColumns = []esColumn{
+	{ColumnMeta: funcapi.ColumnMeta{Name: "taskId", Tooltip: "Task ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryCount}, IsSortOption: true, SortLabel: "Top queries by Task ID"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "node", Tooltip: "Node ID", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "nodeName", Tooltip: "Node Name", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{IsDefault: true}}},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "action", Tooltip: "Action", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "type", Tooltip: "Type", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "description", Tooltip: "Description", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, Sticky: true, FullWidth: true, Wrap: true}},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "startTime", Tooltip: "Start Time", Type: funcapi.FieldTypeTimestamp, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformDatetime, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, IsSortOption: true, SortLabel: "Top queries by Start Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "runningTime", Tooltip: "Running Time", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "RunningTime", Title: "Running Time", IsDefault: true}}, IsSortOption: true, IsDefaultSort: true, SortLabel: "Top queries by Running Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "cancellable", Tooltip: "Cancellable", Type: funcapi.FieldTypeBoolean, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformNone}},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "cancelled", Tooltip: "Cancelled", Type: funcapi.FieldTypeBoolean, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformNone}},
 }
 
 type esTasksResponse struct {
@@ -116,7 +75,20 @@ type esTaskRow struct {
 }
 
 func elasticsearchMethods() []module.MethodConfig {
-	sortOptions := buildElasticsearchSortOptions(esAllColumns)
+	var sortOptions []funcapi.ParamOption
+	for _, col := range esAllColumns {
+		if !col.IsSortOption {
+			continue
+		}
+		sortDir := funcapi.FieldSortDescending
+		sortOptions = append(sortOptions, funcapi.ParamOption{
+			ID:      col.Name,
+			Column:  col.Name,
+			Name:    col.SortLabel,
+			Sort:    &sortDir,
+			Default: col.IsDefaultSort,
+		})
+	}
 	return []module.MethodConfig{
 		{
 			UpdateEvery:  10,
@@ -124,15 +96,14 @@ func elasticsearchMethods() []module.MethodConfig {
 			Name:         "Top Queries",
 			Help:         "Running queries from Elasticsearch Tasks API",
 			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{
-				{
-					ID:         paramSort,
-					Name:       "Filter By",
-					Help:       "Select the primary sort column",
-					Selection:  funcapi.ParamSelect,
-					Options:    sortOptions,
-					UniqueView: true,
-				}},
+			RequiredParams: []funcapi.ParamConfig{{
+				ID:         "__sort",
+				Name:       "Filter By",
+				Help:       "Select the primary sort column",
+				Selection:  funcapi.ParamSelect,
+				Options:    sortOptions,
+				UniqueView: true,
+			}},
 		},
 	}
 }
@@ -140,7 +111,28 @@ func elasticsearchMethods() []module.MethodConfig {
 func elasticsearchMethodParams(_ context.Context, _ *module.Job, method string) ([]funcapi.ParamConfig, error) {
 	switch method {
 	case "top-queries":
-		return []funcapi.ParamConfig{buildElasticsearchSortParam(esAllColumns)}, nil
+		var sortOptions []funcapi.ParamOption
+		for _, col := range esAllColumns {
+			if !col.IsSortOption {
+				continue
+			}
+			sortDir := funcapi.FieldSortDescending
+			sortOptions = append(sortOptions, funcapi.ParamOption{
+				ID:      col.Name,
+				Column:  col.Name,
+				Name:    col.SortLabel,
+				Sort:    &sortDir,
+				Default: col.IsDefaultSort,
+			})
+		}
+		return []funcapi.ParamConfig{{
+			ID:         "__sort",
+			Name:       "Filter By",
+			Help:       "Select the primary sort column",
+			Selection:  funcapi.ParamSelect,
+			Options:    sortOptions,
+			UniqueView: true,
+		}}, nil
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
@@ -161,72 +153,10 @@ func elasticsearchHandleMethod(ctx context.Context, job *module.Job, method stri
 
 	switch method {
 	case "top-queries":
-		return collector.collectTopQueries(ctx, params.Column(paramSort))
+		return collector.collectTopQueries(ctx, params.Column("__sort"))
 	default:
 		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
 	}
-}
-
-func buildElasticsearchSortOptions(cols []esColumnMeta) []funcapi.ParamOption {
-	var sortOptions []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range cols {
-		if !col.sortable {
-			continue
-		}
-		opt := funcapi.ParamOption{
-			ID:     col.id,
-			Column: col.id,
-			Name:   fmt.Sprintf("Top queries by %s", col.name),
-			Sort:   &sortDir,
-		}
-		if col.id == "runningTime" {
-			opt.Default = true
-		}
-		sortOptions = append(sortOptions, opt)
-	}
-	return sortOptions
-}
-
-func buildElasticsearchSortParam(cols []esColumnMeta) funcapi.ParamConfig {
-	return funcapi.ParamConfig{
-		ID:         paramSort,
-		Name:       "Filter By",
-		Help:       "Select the primary sort column",
-		Selection:  funcapi.ParamSelect,
-		Options:    buildElasticsearchSortOptions(cols),
-		UniqueView: true,
-	}
-}
-
-func buildElasticsearchColumns(cols []esColumnMeta) map[string]any {
-	result := make(map[string]any, len(cols))
-	for i, col := range cols {
-		colDef := funcapi.Column{
-			Index:                 i,
-			Name:                  col.name,
-			Type:                  col.colType,
-			Units:                 col.units,
-			Visualization:         col.visualization,
-			Sort:                  col.sortDir,
-			Sortable:              col.sortable,
-			Sticky:                col.sticky,
-			Summary:               col.summary,
-			Filter:                col.filter,
-			FullWidth:             col.fullWidth,
-			Wrap:                  col.wrap,
-			DefaultExpandedFilter: false,
-			UniqueKey:             col.uniqueKey,
-			Visible:               col.visible,
-			ValueOptions: funcapi.ValueOptions{
-				Transform:     col.transform,
-				DecimalPoints: col.decimalPoints,
-				DefaultValue:  nil,
-			},
-		}
-		result[col.id] = colDef.BuildColumn()
-	}
-	return result
 }
 
 func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
@@ -271,18 +201,41 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		}
 	}
 
+	cs := esColumnSet(esAllColumns)
+	var sortOptions []funcapi.ParamOption
+	for _, col := range esAllColumns {
+		if !col.IsSortOption {
+			continue
+		}
+		sortDir := funcapi.FieldSortDescending
+		sortOptions = append(sortOptions, funcapi.ParamOption{
+			ID:      col.Name,
+			Column:  col.Name,
+			Name:    col.SortLabel,
+			Sort:    &sortDir,
+			Default: col.IsDefaultSort,
+		})
+	}
+
 	if len(rows) == 0 {
 		return &module.FunctionResponse{
 			Status:            200,
 			Message:           "No running search tasks found.",
 			Help:              "Running queries from Elasticsearch Tasks API",
-			Columns:           buildElasticsearchColumns(esAllColumns),
+			Columns:           cs.BuildColumns(),
 			Data:              [][]any{},
 			DefaultSortColumn: "runningTime",
-			RequiredParams:    []funcapi.ParamConfig{buildElasticsearchSortParam(esAllColumns)},
-			Charts:            elasticsearchTopQueriesCharts(esAllColumns),
-			DefaultCharts:     elasticsearchTopQueriesDefaultCharts(esAllColumns),
-			GroupBy:           elasticsearchTopQueriesGroupBy(esAllColumns),
+			RequiredParams: []funcapi.ParamConfig{{
+				ID:         "__sort",
+				Name:       "Filter By",
+				Help:       "Select the primary sort column",
+				Selection:  funcapi.ParamSelect,
+				Options:    sortOptions,
+				UniqueView: true,
+			}},
+			Charts:        cs.BuildCharts(),
+			DefaultCharts: cs.BuildDefaultCharts(),
+			GroupBy:       cs.BuildGroupBy(),
 		}
 	}
 
@@ -297,7 +250,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	for _, row := range rows {
 		out := make([]any, len(esAllColumns))
 		for i, col := range esAllColumns {
-			switch col.id {
+			switch col.Name {
 			case "taskId":
 				out[i] = row.TaskID
 			case "node":
@@ -328,13 +281,20 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	return &module.FunctionResponse{
 		Status:            200,
 		Help:              "Running queries from Elasticsearch Tasks API",
-		Columns:           buildElasticsearchColumns(esAllColumns),
+		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: "runningTime",
-		RequiredParams:    []funcapi.ParamConfig{buildElasticsearchSortParam(esAllColumns)},
-		Charts:            elasticsearchTopQueriesCharts(esAllColumns),
-		DefaultCharts:     elasticsearchTopQueriesDefaultCharts(esAllColumns),
-		GroupBy:           elasticsearchTopQueriesGroupBy(esAllColumns),
+		RequiredParams: []funcapi.ParamConfig{{
+			ID:         "__sort",
+			Name:       "Filter By",
+			Help:       "Select the primary sort column",
+			Selection:  funcapi.ParamSelect,
+			Options:    sortOptions,
+			UniqueView: true,
+		}},
+		Charts:        cs.BuildCharts(),
+		DefaultCharts: cs.BuildDefaultCharts(),
+		GroupBy:       cs.BuildGroupBy(),
 	}
 }
 
@@ -379,92 +339,4 @@ func parseElasticsearchTaskID(taskID string) (int64, bool) {
 		return 0, false
 	}
 	return val, true
-}
-
-func elasticsearchTopQueriesCharts(cols []esColumnMeta) map[string]module.ChartConfig {
-	charts := make(map[string]module.ChartConfig)
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" {
-			continue
-		}
-		cfg, ok := charts[col.chartGroup]
-		if !ok {
-			title := col.chartTitle
-			if title == "" {
-				title = col.chartGroup
-			}
-			cfg = module.ChartConfig{Name: title, Type: "stacked-bar"}
-		}
-		cfg.Columns = append(cfg.Columns, col.id)
-		charts[col.chartGroup] = cfg
-	}
-	return charts
-}
-
-func elasticsearchTopQueriesDefaultCharts(cols []esColumnMeta) [][]string {
-	label := primaryElasticsearchLabel(cols)
-	if label == "" {
-		return nil
-	}
-	chartGroups := defaultElasticsearchChartGroups(cols)
-	out := make([][]string, 0, len(chartGroups))
-	for _, group := range chartGroups {
-		out = append(out, []string{group, label})
-	}
-	return out
-}
-
-func elasticsearchTopQueriesGroupBy(cols []esColumnMeta) map[string]module.GroupByConfig {
-	groupBy := make(map[string]module.GroupByConfig)
-	for _, col := range cols {
-		if !col.isLabel {
-			continue
-		}
-		groupBy[col.id] = module.GroupByConfig{
-			Name:    "Group by " + col.name,
-			Columns: []string{col.id},
-		}
-	}
-	return groupBy
-}
-
-func primaryElasticsearchLabel(cols []esColumnMeta) string {
-	for _, col := range cols {
-		if col.isPrimary {
-			return col.id
-		}
-	}
-	for _, col := range cols {
-		if col.isLabel {
-			return col.id
-		}
-	}
-	return ""
-}
-
-func defaultElasticsearchChartGroups(cols []esColumnMeta) []string {
-	groups := make([]string, 0)
-	seen := make(map[string]bool)
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" || !col.isDefaultChart {
-			continue
-		}
-		if !seen[col.chartGroup] {
-			seen[col.chartGroup] = true
-			groups = append(groups, col.chartGroup)
-		}
-	}
-	if len(groups) > 0 {
-		return groups
-	}
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" {
-			continue
-		}
-		if !seen[col.chartGroup] {
-			seen[col.chartGroup] = true
-			groups = append(groups, col.chartGroup)
-		}
-	}
-	return groups
 }

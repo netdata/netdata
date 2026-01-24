@@ -60,26 +60,18 @@ func TestFuncIfacesColumns(t *testing.T) {
 					"Multicast In", "Multicast Out",
 				}
 
-				keys := make(map[string]bool)
-				for _, col := range funcIfacesColumns {
-					keys[col.key] = true
-				}
-
+				cs := snmpColumnSet(snmpAllColumns)
 				for _, key := range requiredKeys {
-					assert.True(t, keys[key], "column %s should be defined", key)
+					assert.True(t, cs.ContainsColumn(key), "column %s should be defined", key)
 				}
 			},
 		},
 		"has valid metadata": {
 			validate: func(t *testing.T) {
-				for _, col := range funcIfacesColumns {
-					assert.NotEmpty(t, col.key, "column must have key")
-					assert.NotEqual(t, funcapi.FieldTypeNone, col.dataType, "column %s must have dataType", col.key)
-					assert.NotNil(t, col.value, "column %s must have value extractor", col.key)
-
-					if col.sortOption != "" {
-						assert.NotEmpty(t, col.sortOption, "sort option column %s must have sortOption label", col.key)
-					}
+				for _, col := range snmpAllColumns {
+					assert.NotEmpty(t, col.Name, "column must have ID")
+					assert.NotEqual(t, funcapi.FieldTypeNone, col.Type, "column %s must have Type", col.Name)
+					assert.NotNil(t, col.Value, "column %s must have Value extractor", col.Name)
 				}
 			},
 		},
@@ -101,30 +93,30 @@ func TestFuncIfacesColumns(t *testing.T) {
 				}
 
 				// Test each column's value extractor
-				for _, col := range funcIfacesColumns {
+				for _, col := range snmpAllColumns {
 					// Should not panic
-					_ = col.value(entry)
+					_ = col.Value(entry)
 				}
 
 				// Verify specific values
-				for _, col := range funcIfacesColumns {
-					switch col.key {
+				for _, col := range snmpAllColumns {
+					switch col.Name {
 					case "Interface":
-						assert.Equal(t, "eth0", col.value(entry))
+						assert.Equal(t, "eth0", col.Value(entry))
 					case "Type":
-						assert.Equal(t, "ethernetCsmacd", col.value(entry))
+						assert.Equal(t, "ethernetCsmacd", col.Value(entry))
 					case "Type Group":
-						assert.Equal(t, "ethernet", col.value(entry))
+						assert.Equal(t, "ethernet", col.Value(entry))
 					case "Traffic In":
-						assert.Equal(t, rate/1_000_000, col.value(entry))
+						assert.Equal(t, rate/1_000_000, col.Value(entry))
 					case "Packets In":
-						assert.Equal(t, rate/1_000, col.value(entry))
+						assert.Equal(t, rate/1_000, col.Value(entry))
 					case "Errors In":
-						assert.Equal(t, rate, col.value(entry))
+						assert.Equal(t, rate, col.Value(entry))
 					case "Discards In":
-						assert.Equal(t, rate, col.value(entry))
+						assert.Equal(t, rate, col.Value(entry))
 					case "Admin Status":
-						assert.Equal(t, "up", col.value(entry))
+						assert.Equal(t, "up", col.Value(entry))
 					}
 				}
 			},
@@ -140,7 +132,7 @@ func TestFuncIfacesColumns(t *testing.T) {
 				}
 				f := &funcInterfaces{}
 				row := f.buildRow(entry)
-				assert.Len(t, row, len(funcIfacesColumns)+1, "row length must match column count")
+				assert.Len(t, row, len(snmpAllColumns)+1, "row length must match column count")
 			},
 		},
 	}
@@ -154,21 +146,22 @@ func TestFuncIfacesColumns(t *testing.T) {
 
 func TestFuncInterfaces_buildColumns(t *testing.T) {
 	f := &funcInterfaces{}
-	columns := f.buildColumns()
+	cs := snmpColumnSet(snmpAllColumns)
+	columns := f.buildColumns(cs)
 
 	require.NotEmpty(t, columns)
-	assert.Len(t, columns, len(funcIfacesColumns)+1)
+	assert.Len(t, columns, len(snmpAllColumns)+1)
 
 	// Verify all columns are present
-	for _, col := range funcIfacesColumns {
-		colDef, ok := columns[col.key]
-		assert.True(t, ok, "column %s should be in result", col.key)
+	for _, col := range snmpAllColumns {
+		colDef, ok := columns[col.Name]
+		assert.True(t, ok, "column %s should be in result", col.Name)
 		assert.NotNil(t, colDef)
 
 		// Verify column is a map with expected fields
 		colMap, ok := colDef.(map[string]any)
-		require.True(t, ok, "column %s should be a map", col.key)
-		assert.Equal(t, col.name, colMap["name"])
+		require.True(t, ok, "column %s should be a map", col.Name)
+		assert.Equal(t, col.Tooltip, colMap["name"])
 	}
 
 	rowOptions, ok := columns["rowOptions"]
@@ -222,7 +215,7 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				packetsOutIdx := findColIdx("Packets Out")
 				adminIdx := findColIdx("Admin Status")
 				operIdx := findColIdx("Oper Status")
-				rowOptionsIdx := len(funcIfacesColumns)
+				rowOptionsIdx := len(snmpAllColumns)
 
 				assert.Equal(t, "eth0", row[nameIdx])
 				assert.Equal(t, "ethernetCsmacd", row[typeIdx])
@@ -252,7 +245,7 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				trafficOutIdx := findColIdx("Traffic Out")
 				adminIdx := findColIdx("Admin Status")
 				operIdx := findColIdx("Oper Status")
-				rowOptionsIdx := len(funcIfacesColumns)
+				rowOptionsIdx := len(snmpAllColumns)
 
 				assert.Equal(t, "eth1", row[nameIdx])
 				assert.Equal(t, "other", row[typeIdx])
@@ -280,7 +273,7 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				trafficInIdx := findColIdx("Traffic In")
 				trafficOutIdx := findColIdx("Traffic Out")
 				errorsInIdx := findColIdx("Errors In")
-				rowOptionsIdx := len(funcIfacesColumns)
+				rowOptionsIdx := len(snmpAllColumns)
 
 				assert.Nil(t, row[trafficInIdx])
 				assert.Nil(t, row[trafficOutIdx])
@@ -306,7 +299,7 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 				trafficInIdx := findColIdx("Traffic In")
 				trafficOutIdx := findColIdx("Traffic Out")
 				ucastInIdx := findColIdx("Unicast In")
-				rowOptionsIdx := len(funcIfacesColumns)
+				rowOptionsIdx := len(snmpAllColumns)
 
 				assert.Equal(t, "eth2", row[nameIdx])
 				assert.Nil(t, row[trafficInIdx])
@@ -321,7 +314,7 @@ func TestFuncInterfaces_buildRow(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			f := &funcInterfaces{}
 			row := f.buildRow(tc.entry)
-			require.Len(t, row, len(funcIfacesColumns)+1)
+			require.Len(t, row, len(snmpAllColumns)+1)
 			tc.validate(t, row)
 		})
 	}
@@ -334,9 +327,9 @@ func TestFuncInterfaces_sortData(t *testing.T) {
 
 	// Helper to build a test row with name and trafficIn
 	buildTestRow := func(name string, trafficIn *float64) []any {
-		row := make([]any, len(funcIfacesColumns)+1)
-		for i, col := range funcIfacesColumns {
-			switch col.key {
+		row := make([]any, len(snmpAllColumns)+1)
+		for i, col := range snmpAllColumns {
+			switch col.Name {
 			case "Interface":
 				row[i] = name
 			case "Traffic In":
@@ -344,14 +337,14 @@ func TestFuncInterfaces_sortData(t *testing.T) {
 			case "Traffic Out":
 				row[i] = ptrToAny(trafficIn) // reuse for simplicity
 			default:
-				if col.dataType == funcapi.FieldTypeString {
+				if col.Type == funcapi.FieldTypeString {
 					row[i] = "test"
 				} else {
 					row[i] = nil
 				}
 			}
 		}
-		row[len(funcIfacesColumns)] = nil
+		row[len(snmpAllColumns)] = nil
 		return row
 	}
 
@@ -459,7 +452,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 			validate: func(t *testing.T, resp *module.FunctionResponse) {
 				assert.Equal(t, 200, resp.Status)
 				assert.NotNil(t, resp.Columns)
-				assert.Len(t, resp.Columns, len(funcIfacesColumns)+1)
+				assert.Len(t, resp.Columns, len(snmpAllColumns)+1)
 
 				data, ok := resp.Data.([][]any)
 				require.True(t, ok)
@@ -507,7 +500,10 @@ func TestFuncInterfaces_handle(t *testing.T) {
 
 				// Verify DefaultCharts
 				require.NotEmpty(t, resp.DefaultCharts)
-				assert.Equal(t, [][]string{{"Traffic", "Type"}, {"OperationalStatus", "Oper Status"}}, resp.DefaultCharts)
+				assert.Equal(t, funcapi.DefaultCharts{
+					{Chart: "Traffic", GroupBy: "Type"},
+					{Chart: "OperationalStatus", GroupBy: "Oper Status"},
+				}, resp.DefaultCharts)
 
 				// Verify GroupBy
 				require.NotNil(t, resp.GroupBy)
@@ -613,8 +609,8 @@ func TestPtrToAny(t *testing.T) {
 
 // findColIdx finds the index of a column by key.
 func findColIdx(key string) int {
-	for i, col := range funcIfacesColumns {
-		if col.key == key {
+	for i, col := range snmpAllColumns {
+		if col.Name == key {
 			return i
 		}
 	}

@@ -32,43 +32,41 @@ func TestProxySQLMethods(t *testing.T) {
 func TestProxySQLAllColumns_HasRequiredColumns(t *testing.T) {
 	required := []string{"digest", "query", "calls", "totalTime"}
 
-	uiKeys := make(map[string]bool)
-	for _, col := range proxysqlAllColumns {
-		uiKeys[col.uiKey] = true
-	}
+	cs := proxysqlColumnSet(proxysqlAllColumns)
 
-	for _, key := range required {
-		assert.True(t, uiKeys[key], "column %s should be defined", key)
+	for _, id := range required {
+		assert.True(t, cs.ContainsColumn(id), "column %s should be defined", id)
 	}
 }
 
 func TestCollector_mapAndValidateProxySQLSortColumn(t *testing.T) {
 	tests := map[string]struct {
-		available []proxysqlColumnMeta
-		input     string
-		expected  string
+		columns  []proxysqlColumn
+		input    string
+		expected string
 	}{
 		"valid totalTime": {
-			available: []proxysqlColumnMeta{{uiKey: "totalTime"}, {uiKey: "calls"}},
-			input:     "totalTime",
-			expected:  "totalTime",
+			columns:  []proxysqlColumn{{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime"}}, {ColumnMeta: funcapi.ColumnMeta{Name: "calls"}}},
+			input:    "totalTime",
+			expected: "totalTime",
 		},
 		"invalid falls back to totalTime": {
-			available: []proxysqlColumnMeta{{uiKey: "totalTime"}, {uiKey: "calls"}},
-			input:     "bad",
-			expected:  "totalTime",
+			columns:  []proxysqlColumn{{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime"}}, {ColumnMeta: funcapi.ColumnMeta{Name: "calls"}}},
+			input:    "bad",
+			expected: "totalTime",
 		},
 		"fallback to calls": {
-			available: []proxysqlColumnMeta{{uiKey: "calls"}},
-			input:     "bad",
-			expected:  "calls",
+			columns:  []proxysqlColumn{{ColumnMeta: funcapi.ColumnMeta{Name: "calls"}}},
+			input:    "bad",
+			expected: "calls",
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &Collector{}
-			assert.Equal(t, tc.expected, c.mapAndValidateProxySQLSortColumn(tc.input, tc.available))
+			cs := proxysqlColumnSet(tc.columns)
+			assert.Equal(t, tc.expected, c.mapAndValidateProxySQLSortColumn(tc.input, cs))
 		})
 	}
 }
@@ -76,11 +74,11 @@ func TestCollector_mapAndValidateProxySQLSortColumn(t *testing.T) {
 func TestCollector_buildProxySQLDynamicSQL(t *testing.T) {
 	c := &Collector{}
 
-	cols := []proxysqlColumnMeta{
-		{dbColumn: "digest", uiKey: "digest", dataType: ftString},
-		{dbColumn: "digest_text", uiKey: "query", dataType: ftString},
-		{dbColumn: "count_star", uiKey: "calls", dataType: ftInteger},
-		{dbColumn: "sum_time", uiKey: "totalTime", dataType: ftDuration, isMicroseconds: true},
+	cols := []proxysqlColumn{
+		{ColumnMeta: funcapi.ColumnMeta{Name: "digest", Type: funcapi.FieldTypeString}, DBColumn: "digest"},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "query", Type: funcapi.FieldTypeString}, DBColumn: "digest_text"},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "calls", Type: funcapi.FieldTypeInteger}, DBColumn: "count_star"},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Type: funcapi.FieldTypeDuration}, DBColumn: "sum_time", IsMicroseconds: true},
 	}
 
 	sql := c.buildProxySQLDynamicSQL(cols, "totalTime", 500)

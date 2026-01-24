@@ -42,41 +42,37 @@ func TestMysqlMethods(t *testing.T) {
 
 func TestMysqlAllColumns_HasRequiredColumns(t *testing.T) {
 	// Verify all required base columns are defined
-	requiredUIKeys := []string{
+	requiredIDs := []string{
 		"digest", "query", "schema", "calls",
 		"totalTime", "avgTime", "minTime", "maxTime",
 		"rowsSent", "rowsExamined", "noIndexUsed",
 	}
 
-	uiKeys := make(map[string]bool)
-	for _, col := range mysqlAllColumns {
-		uiKeys[col.uiKey] = true
-	}
-
-	for _, key := range requiredUIKeys {
-		assert.True(t, uiKeys[key], "column %s should be defined in mysqlAllColumns", key)
+	cs := mysqlColumnSet(mysqlAllColumns)
+	for _, id := range requiredIDs {
+		assert.True(t, cs.ContainsColumn(id), "column %s should be defined in mysqlAllColumns", id)
 	}
 }
 
 func TestMysqlAllColumns_HasValidMetadata(t *testing.T) {
 	for _, col := range mysqlAllColumns {
-		// Every column must have a UI key
-		assert.NotEmpty(t, col.uiKey, "column %s must have uiKey", col.dbColumn)
+		// Every column must have an ID
+		assert.NotEmpty(t, col.Name, "column %s must have ID", col.DBColumn)
 
-		// Every column must have a display name
-		assert.NotEmpty(t, col.displayName, "column %s must have displayName", col.uiKey)
+		// Every column must have a name
+		assert.NotEmpty(t, col.Name, "column %s must have Name", col.Name)
 
-		// Every column must have a data type
-		assert.NotEqual(t, funcapi.FieldTypeNone, col.dataType, "column %s must have dataType", col.uiKey)
+		// Every column must have a type
+		assert.NotEqual(t, funcapi.FieldTypeNone, col.Type, "column %s must have Type", col.Name)
 
 		// Duration columns must have units
-		if col.dataType == ftDuration {
-			assert.NotEmpty(t, col.units, "duration column %s must have units", col.uiKey)
+		if col.Type == funcapi.FieldTypeDuration {
+			assert.NotEmpty(t, col.Units, "duration column %s must have Units", col.Name)
 		}
 
 		// Sort options must have labels
-		if col.isSortOption {
-			assert.NotEmpty(t, col.sortLabel, "sort option column %s must have sortLabel", col.uiKey)
+		if col.IsSortOption {
+			assert.NotEmpty(t, col.SortLabel, "sort option column %s must have SortLabel", col.Name)
 		}
 	}
 }
@@ -126,8 +122,8 @@ func TestCollector_mapAndValidateMySQLSortColumn(t *testing.T) {
 func TestCollector_buildAvailableMySQLColumns(t *testing.T) {
 	tests := map[string]struct {
 		availableCols map[string]bool
-		expectCols    []string // UI keys we expect to see
-		notExpectCols []string // UI keys we don't expect
+		expectCols    []string // IDs we expect to see
+		notExpectCols []string // IDs we don't expect
 	}{
 		"Basic MySQL 5.7 columns": {
 			availableCols: map[string]bool{
@@ -152,18 +148,13 @@ func TestCollector_buildAvailableMySQLColumns(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			c := &Collector{}
 			cols := c.buildAvailableMySQLColumns(tc.availableCols)
+			cs := mysqlColumnSet(cols)
 
-			// Build map of UI keys for easy lookup
-			uiKeys := make(map[string]bool)
-			for _, col := range cols {
-				uiKeys[col.uiKey] = true
+			for _, id := range tc.expectCols {
+				assert.True(t, cs.ContainsColumn(id), "expected column %s to be present", id)
 			}
-
-			for _, key := range tc.expectCols {
-				assert.True(t, uiKeys[key], "expected column %s to be present", key)
-			}
-			for _, key := range tc.notExpectCols {
-				assert.False(t, uiKeys[key], "did not expect column %s to be present", key)
+			for _, id := range tc.notExpectCols {
+				assert.False(t, cs.ContainsColumn(id), "did not expect column %s to be present", id)
 			}
 		})
 	}
@@ -172,11 +163,11 @@ func TestCollector_buildAvailableMySQLColumns(t *testing.T) {
 func TestCollector_buildMySQLDynamicSQL(t *testing.T) {
 	c := &Collector{}
 
-	cols := []mysqlColumnMeta{
-		{dbColumn: "DIGEST", uiKey: "digest", dataType: ftString},
-		{dbColumn: "DIGEST_TEXT", uiKey: "query", dataType: ftString},
-		{dbColumn: "COUNT_STAR", uiKey: "calls", dataType: ftInteger},
-		{dbColumn: "SUM_TIMER_WAIT", uiKey: "totalTime", dataType: ftDuration, isPicoseconds: true},
+	cols := []mysqlColumn{
+		{ColumnMeta: funcapi.ColumnMeta{Name: "digest", Type: funcapi.FieldTypeString}, DBColumn: "DIGEST"},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "query", Type: funcapi.FieldTypeString}, DBColumn: "DIGEST_TEXT"},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "calls", Type: funcapi.FieldTypeInteger}, DBColumn: "COUNT_STAR"},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Type: funcapi.FieldTypeDuration}, DBColumn: "SUM_TIMER_WAIT", IsPicoseconds: true},
 	}
 
 	sql := c.buildMySQLDynamicSQL(cols, "totalTime", 500)
@@ -191,16 +182,15 @@ func TestCollector_buildMySQLDynamicSQL(t *testing.T) {
 	assert.Contains(t, sql, "SUM_TIMER_WAIT/1000000000 AS `totalTime`")
 }
 
-func TestCollector_buildMySQLDynamicColumns(t *testing.T) {
-	c := &Collector{}
-
-	cols := []mysqlColumnMeta{
-		{uiKey: "digest", displayName: "Digest", dataType: ftString, visible: false, isUniqueKey: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti},
-		{uiKey: "query", displayName: "Query", dataType: ftString, visible: true, isSticky: true, fullWidth: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti},
-		{uiKey: "totalTime", displayName: "Total Time", dataType: ftDuration, units: "seconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+func TestMysqlColumnSet_BuildColumns(t *testing.T) {
+	cols := []mysqlColumn{
+		{ColumnMeta: funcapi.ColumnMeta{Name: "digest", Tooltip: "Digest", Type: funcapi.FieldTypeString, Visible: false, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, DBColumn: "DIGEST"},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sticky: true, FullWidth: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, DBColumn: "DIGEST_TEXT"},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_TIMER_WAIT"},
 	}
 
-	columns := c.buildMySQLDynamicColumns(cols)
+	cs := mysqlColumnSet(cols)
+	columns := cs.BuildColumns()
 
 	// Verify column count
 	assert.Len(t, columns, 3)

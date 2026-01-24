@@ -17,93 +17,49 @@ import (
 
 const ybMaxQueryTextLength = 4096
 
-const (
-	paramSort = "__sort"
-
-	ftString   = funcapi.FieldTypeString
-	ftInteger  = funcapi.FieldTypeInteger
-	ftFloat    = funcapi.FieldTypeFloat
-	ftDuration = funcapi.FieldTypeDuration
-
-	trNone     = funcapi.FieldTransformNone
-	trNumber   = funcapi.FieldTransformNumber
-	trDuration = funcapi.FieldTransformDuration
-	trText     = funcapi.FieldTransformText
-
-	visValue = funcapi.FieldVisualValue
-	visBar   = funcapi.FieldVisualBar
-
-	sortAsc  = funcapi.FieldSortAscending
-	sortDesc = funcapi.FieldSortDescending
-
-	summaryCount = funcapi.FieldSummaryCount
-	summarySum   = funcapi.FieldSummarySum
-	summaryMax   = funcapi.FieldSummaryMax
-	summaryMean  = funcapi.FieldSummaryMean
-
-	filterMulti = funcapi.FieldFilterMultiselect
-	filterRange = funcapi.FieldFilterRange
-)
-
 var errYBSQLDSNNotSet = errors.New("SQL DSN is not set")
 
-type ybColumnMeta struct {
-	id             string
-	name           string
-	selectExpr     string
-	dataType       funcapi.FieldType
-	visible        bool
-	sortable       bool
-	fullWidth      bool
-	wrap           bool
-	sticky         bool
-	filter         funcapi.FieldFilter
-	visualization  funcapi.FieldVisual
-	transform      funcapi.FieldTransform
-	units          string
-	decimalPoints  int
-	uniqueKey      bool
-	sortDir        funcapi.FieldSort
-	summary        funcapi.FieldSummary
-	sortLabel      string
-	isSortOption   bool
-	isDefaultSort  bool
-	isJoinColumn   bool
-	isLabel        bool
-	isPrimary      bool
-	isMetric       bool
-	chartGroup     string
-	chartTitle     string
-	isDefaultChart bool
+// ybColumn embeds funcapi.ColumnMeta and adds YugabyteDB-specific fields.
+type ybColumn struct {
+	funcapi.ColumnMeta
+	SelectExpr    string // SQL expression for SELECT clause
+	IsSortOption  bool   // whether this column appears as a sort option
+	SortLabel     string // label for sort option dropdown
+	IsDefaultSort bool   // default sort column
+	IsJoinColumn  bool   // column comes from a JOIN, not pg_stat_statements
 }
 
-var ybTopColumns = []ybColumnMeta{
-	{id: "queryId", name: "Query ID", selectExpr: "s.queryid::text", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, uniqueKey: true, sortDir: sortAsc, summary: summaryCount},
-	{id: "query", name: "Query", selectExpr: "s.query", dataType: ftString, visible: true, sortable: false, filter: filterMulti, transform: trText, sticky: true, fullWidth: true, wrap: true},
-	{id: "database", name: "Database", selectExpr: "d.datname", dataType: ftString, visible: true, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount, isJoinColumn: true, isLabel: true, isPrimary: true},
-	{id: "user", name: "User", selectExpr: "u.usename", dataType: ftString, visible: true, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount, isJoinColumn: true, isLabel: true},
-
-	{id: "calls", name: "Calls", selectExpr: "s.calls", dataType: ftInteger, visible: true, sortable: true, filter: filterRange, transform: trNumber, sortDir: sortDesc, summary: summarySum, isSortOption: true, sortLabel: "Top queries by Calls", isMetric: true, chartGroup: "Calls", chartTitle: "Number of Calls", isDefaultChart: true},
-	{id: "totalTime", name: "Total Time", selectExpr: "s.total_time", dataType: ftDuration, visible: true, sortable: true, filter: filterRange, transform: trDuration, units: "milliseconds", decimalPoints: 2, sortDir: sortDesc, summary: summarySum, isSortOption: true, isDefaultSort: true, sortLabel: "Top queries by Total Time", isMetric: true, chartGroup: "Time", chartTitle: "Execution Time", isDefaultChart: true},
-	{id: "meanTime", name: "Mean Time", selectExpr: "s.mean_time", dataType: ftDuration, visible: true, sortable: true, filter: filterRange, transform: trDuration, units: "milliseconds", decimalPoints: 2, sortDir: sortDesc, summary: summaryMean, isSortOption: true, sortLabel: "Top queries by Mean Time", isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
-	{id: "minTime", name: "Min Time", selectExpr: "s.min_time", dataType: ftDuration, visible: false, sortable: true, filter: filterRange, transform: trDuration, units: "milliseconds", decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
-	{id: "maxTime", name: "Max Time", selectExpr: "s.max_time", dataType: ftDuration, visible: false, sortable: true, filter: filterRange, transform: trDuration, units: "milliseconds", decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, isSortOption: true, sortLabel: "Top queries by Max Time", isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
-	{id: "rows", name: "Rows", selectExpr: "s.rows", dataType: ftInteger, visible: true, sortable: true, filter: filterRange, transform: trNumber, sortDir: sortDesc, summary: summarySum, isSortOption: true, sortLabel: "Top queries by Rows Returned", isMetric: true, chartGroup: "Rows", chartTitle: "Rows"},
-	{id: "stddevTime", name: "Stddev Time", selectExpr: "s.stddev_time", dataType: ftDuration, visible: false, sortable: true, filter: filterRange, transform: trDuration, units: "milliseconds", decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
+func ybColumnSet(cols []ybColumn) funcapi.ColumnSet[ybColumn] {
+	return funcapi.Columns(cols, func(c ybColumn) funcapi.ColumnMeta { return c.ColumnMeta })
 }
 
-var ybRunningColumns = []ybColumnMeta{
-	{id: "pid", name: "PID", selectExpr: "s.pid::text", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, uniqueKey: true, sortDir: sortAsc, summary: summaryCount},
-	{id: "query", name: "Query", selectExpr: "s.query", dataType: ftString, visible: true, sortable: false, filter: filterMulti, transform: trText, sticky: true, fullWidth: true, wrap: true},
-	{id: "database", name: "Database", selectExpr: "s.datname", dataType: ftString, visible: true, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "user", name: "User", selectExpr: "s.usename", dataType: ftString, visible: true, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "state", name: "State", selectExpr: "s.state", dataType: ftString, visible: true, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "waitEventType", name: "Wait Event Type", selectExpr: "s.wait_event_type", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "waitEvent", name: "Wait Event", selectExpr: "s.wait_event", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "application", name: "Application", selectExpr: "s.application_name", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "clientAddress", name: "Client Address", selectExpr: "s.client_addr::text", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "queryStart", name: "Query Start", selectExpr: "TO_CHAR(s.query_start, 'YYYY-MM-DD\"T\"HH24:MI:SS.FF3')", dataType: ftString, visible: false, sortable: true, filter: filterRange, transform: trText, sortDir: sortDesc, summary: summaryMax},
-	{id: "elapsedMs", name: "Elapsed", selectExpr: "CASE WHEN s.query_start IS NULL THEN 0 ELSE EXTRACT(EPOCH FROM (clock_timestamp() - s.query_start)) * 1000 END", dataType: ftDuration, visible: true, sortable: true, filter: filterRange, transform: trDuration, units: "milliseconds", decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, isSortOption: true, isDefaultSort: true, sortLabel: "Running queries by Elapsed Time"},
+var ybTopColumns = []ybColumn{
+	{ColumnMeta: funcapi.ColumnMeta{Name: "queryId", Tooltip: "Query ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.queryid::text"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sticky: true, FullWidth: true, Wrap: true}, SelectExpr: "s.query"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "database", Tooltip: "Database", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, GroupBy: &funcapi.GroupByOptions{IsDefault: true}}, SelectExpr: "d.datname", IsJoinColumn: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "user", Tooltip: "User", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, GroupBy: &funcapi.GroupByOptions{}}, SelectExpr: "u.usename", IsJoinColumn: true},
+
+	{ColumnMeta: funcapi.ColumnMeta{Name: "calls", Tooltip: "Calls", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Calls", Title: "Number of Calls", IsDefault: true}}, SelectExpr: "s.calls", IsSortOption: true, SortLabel: "Top queries by Calls"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time", IsDefault: true}}, SelectExpr: "s.total_time", IsSortOption: true, IsDefaultSort: true, SortLabel: "Top queries by Total Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "meanTime", Tooltip: "Mean Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, SelectExpr: "s.mean_time", IsSortOption: true, SortLabel: "Top queries by Mean Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "minTime", Tooltip: "Min Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, SelectExpr: "s.min_time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "maxTime", Tooltip: "Max Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, SelectExpr: "s.max_time", IsSortOption: true, SortLabel: "Top queries by Max Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "rows", Tooltip: "Rows", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}}, SelectExpr: "s.rows", IsSortOption: true, SortLabel: "Top queries by Rows Returned"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "stddevTime", Tooltip: "Stddev Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, SelectExpr: "s.stddev_time"},
+}
+
+var ybRunningColumns = []ybColumn{
+	{ColumnMeta: funcapi.ColumnMeta{Name: "pid", Tooltip: "PID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.pid::text"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sticky: true, FullWidth: true, Wrap: true}, SelectExpr: "s.query"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "database", Tooltip: "Database", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.datname"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "user", Tooltip: "User", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.usename"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "state", Tooltip: "State", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.state"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "waitEventType", Tooltip: "Wait Event Type", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.wait_event_type"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "waitEvent", Tooltip: "Wait Event", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.wait_event"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "application", Tooltip: "Application", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.application_name"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "clientAddress", Tooltip: "Client Address", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.client_addr::text"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "queryStart", Tooltip: "Query Start", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, SelectExpr: "TO_CHAR(s.query_start, 'YYYY-MM-DD\"T\"HH24:MI:SS.FF3')"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "elapsedMs", Tooltip: "Elapsed", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, SelectExpr: "CASE WHEN s.query_start IS NULL THEN 0 ELSE EXTRACT(EPOCH FROM (clock_timestamp() - s.query_start)) * 1000 END", IsSortOption: true, IsDefaultSort: true, SortLabel: "Running queries by Elapsed Time"},
 }
 
 func yugabyteMethods() []module.MethodConfig {
@@ -169,9 +125,9 @@ func yugabyteHandleMethod(ctx context.Context, job *module.Job, method string, p
 
 	switch method {
 	case "top-queries":
-		return collector.collectTopQueries(ctx, params.Column(paramSort))
+		return collector.collectTopQueries(ctx, params.Column("__sort"))
 	case "running-queries":
-		return collector.collectRunningQueries(ctx, params.Column(paramSort))
+		return collector.collectRunningQueries(ctx, params.Column("__sort"))
 	default:
 		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
 	}
@@ -212,7 +168,7 @@ func (c *Collector) sqlTimeout() time.Duration {
 	return time.Second
 }
 
-func (c *Collector) availableTopColumns(ctx context.Context) ([]ybColumnMeta, error) {
+func (c *Collector) availableTopColumns(ctx context.Context) ([]ybColumn, error) {
 	available, err := c.detectPgStatStatementsColumns(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect available columns: %v", err)
@@ -265,16 +221,17 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		return &module.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
+	cs := ybColumnSet(cols)
 	return &module.FunctionResponse{
 		Status:            200,
 		Help:              "Top SQL queries from pg_stat_statements. WARNING: Query text may contain unmasked literals (potential PII).",
-		Columns:           buildYBColumns(cols),
+		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: sortColumn,
 		RequiredParams:    []funcapi.ParamConfig{buildYBSortParam(cols)},
-		Charts:            ybTopQueriesCharts(cols),
-		DefaultCharts:     ybTopQueriesDefaultCharts(cols),
-		GroupBy:           ybTopQueriesGroupBy(cols),
+		Charts:            cs.BuildCharts(),
+		DefaultCharts:     cs.BuildDefaultCharts(),
+		GroupBy:           cs.BuildGroupBy(),
 	}
 }
 
@@ -302,110 +259,73 @@ func (c *Collector) collectRunningQueries(ctx context.Context, sortColumn string
 		return &module.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
+	cs := ybColumnSet(ybRunningColumns)
 	return &module.FunctionResponse{
 		Status:            200,
 		Help:              "Currently running SQL statements from pg_stat_activity. WARNING: Query text may contain unmasked literals (potential PII).",
-		Columns:           buildYBColumns(ybRunningColumns),
+		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: sortColumn,
 		RequiredParams:    []funcapi.ParamConfig{buildYBSortParam(ybRunningColumns)},
 	}
 }
 
-func buildYBSortParam(cols []ybColumnMeta) funcapi.ParamConfig {
+func buildYBSortParam(cols []ybColumn) funcapi.ParamConfig {
+	var options []funcapi.ParamOption
+	sortDir := funcapi.FieldSortDescending
+	for _, col := range cols {
+		if !col.IsSortOption {
+			continue
+		}
+		opt := funcapi.ParamOption{
+			ID:     col.Name,
+			Column: col.Name,
+			Name:   col.SortLabel,
+			Sort:   &sortDir,
+		}
+		if col.IsDefaultSort {
+			opt.Default = true
+		}
+		options = append(options, opt)
+	}
 	return funcapi.ParamConfig{
-		ID:         paramSort,
+		ID:         "__sort",
 		Name:       "Filter By",
 		Help:       "Select the primary sort column",
 		Selection:  funcapi.ParamSelect,
-		Options:    buildYBSortOptions(cols),
+		Options:    options,
 		UniqueView: true,
 	}
 }
 
-func buildYBSortOptions(cols []ybColumnMeta) []funcapi.ParamOption {
-	var sortOptions []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range cols {
-		if !col.isSortOption {
-			continue
-		}
-		opt := funcapi.ParamOption{
-			ID:     col.id,
-			Column: col.id,
-			Name:   col.sortLabel,
-			Sort:   &sortDir,
-		}
-		if col.isDefaultSort {
-			opt.Default = true
-		}
-		sortOptions = append(sortOptions, opt)
-	}
-	return sortOptions
-}
-
-func buildYBColumns(cols []ybColumnMeta) map[string]any {
-	result := make(map[string]any, len(cols))
-	for i, col := range cols {
-		visual := visValue
-		if col.dataType == ftDuration {
-			visual = visBar
-		}
-		colDef := funcapi.Column{
-			Index:                 i,
-			Name:                  col.name,
-			Type:                  col.dataType,
-			Units:                 col.units,
-			Visualization:         visual,
-			Sort:                  col.sortDir,
-			Sortable:              col.sortable,
-			Sticky:                col.sticky,
-			Summary:               col.summary,
-			Filter:                col.filter,
-			FullWidth:             col.fullWidth,
-			Wrap:                  col.wrap,
-			DefaultExpandedFilter: false,
-			UniqueKey:             col.uniqueKey,
-			Visible:               col.visible,
-			ValueOptions: funcapi.ValueOptions{
-				Transform:     col.transform,
-				DecimalPoints: col.decimalPoints,
-				DefaultValue:  nil,
-			},
-		}
-		result[col.id] = colDef.BuildColumn()
-	}
-	return result
-}
-
-func resolveYBSortColumn(cols []ybColumnMeta, requested string) string {
+func resolveYBSortColumn(cols []ybColumn, requested string) string {
 	if requested != "" {
 		for _, col := range cols {
-			if col.id == requested && col.isSortOption {
-				return col.id
+			if col.Name == requested && col.IsSortOption {
+				return col.Name
 			}
 		}
 	}
 	for _, col := range cols {
-		if col.isDefaultSort && col.isSortOption {
-			return col.id
+		if col.IsDefaultSort && col.IsSortOption {
+			return col.Name
 		}
 	}
 	for _, col := range cols {
-		if col.isSortOption {
-			return col.id
+		if col.IsSortOption {
+			return col.Name
 		}
 	}
 	if len(cols) > 0 {
-		return cols[0].id
+		return cols[0].Name
 	}
 	return ""
 }
 
-func buildYBTopQueriesSQL(cols []ybColumnMeta, sortColumn string) string {
+func buildYBTopQueriesSQL(cols []ybColumn, sortColumn string) string {
 	selectCols := make([]string, 0, len(cols))
 	for _, col := range cols {
-		selectCols = append(selectCols, fmt.Sprintf("%s AS %s", col.selectExpr, col.id))
+		selectCols = append(selectCols, fmt.Sprintf("%s AS %s", col.SelectExpr, col.Name))
 	}
 
 	return fmt.Sprintf(`
@@ -420,7 +340,7 @@ LIMIT $1`, strings.Join(selectCols, ", "), sortColumn)
 func buildYBRunningQueriesSQL(sortColumn string) string {
 	selectCols := make([]string, 0, len(ybRunningColumns))
 	for _, col := range ybRunningColumns {
-		selectCols = append(selectCols, fmt.Sprintf("%s AS %s", col.selectExpr, col.id))
+		selectCols = append(selectCols, fmt.Sprintf("%s AS %s", col.SelectExpr, col.Name))
 	}
 	return fmt.Sprintf(`
 SELECT %s
@@ -430,7 +350,7 @@ ORDER BY %s DESC NULLS LAST
 LIMIT $1`, strings.Join(selectCols, ", "), sortColumn)
 }
 
-func scanYBRows(rows *sql.Rows, cols []ybColumnMeta) ([][]any, error) {
+func scanYBRows(rows *sql.Rows, cols []ybColumn) ([][]any, error) {
 	data := make([][]any, 0, 500)
 
 	for rows.Next() {
@@ -438,14 +358,14 @@ func scanYBRows(rows *sql.Rows, cols []ybColumnMeta) ([][]any, error) {
 		valuePtrs := make([]any, len(cols))
 
 		for i, col := range cols {
-			switch col.dataType {
-			case ftString:
+			switch col.Type {
+			case funcapi.FieldTypeString:
 				var v sql.NullString
 				values[i] = &v
-			case ftInteger:
+			case funcapi.FieldTypeInteger:
 				var v sql.NullInt64
 				values[i] = &v
-			case ftFloat, ftDuration:
+			case funcapi.FieldTypeFloat, funcapi.FieldTypeDuration:
 				var v sql.NullFloat64
 				values[i] = &v
 			default:
@@ -465,7 +385,7 @@ func scanYBRows(rows *sql.Rows, cols []ybColumnMeta) ([][]any, error) {
 			case *sql.NullString:
 				if v.Valid {
 					s := v.String
-					if col.id == "query" {
+					if col.Name == "query" {
 						s = strmutil.TruncateText(s, ybMaxQueryTextLength)
 					}
 					row[i] = s
@@ -497,94 +417,6 @@ func scanYBRows(rows *sql.Rows, cols []ybColumnMeta) ([][]any, error) {
 	}
 
 	return data, nil
-}
-
-func ybTopQueriesCharts(cols []ybColumnMeta) map[string]module.ChartConfig {
-	charts := make(map[string]module.ChartConfig)
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" {
-			continue
-		}
-		cfg, ok := charts[col.chartGroup]
-		if !ok {
-			title := col.chartTitle
-			if title == "" {
-				title = col.chartGroup
-			}
-			cfg = module.ChartConfig{Name: title, Type: "stacked-bar"}
-		}
-		cfg.Columns = append(cfg.Columns, col.id)
-		charts[col.chartGroup] = cfg
-	}
-	return charts
-}
-
-func ybTopQueriesDefaultCharts(cols []ybColumnMeta) [][]string {
-	label := primaryYBLabel(cols)
-	if label == "" {
-		return nil
-	}
-	chartGroups := defaultYBChartGroups(cols)
-	out := make([][]string, 0, len(chartGroups))
-	for _, group := range chartGroups {
-		out = append(out, []string{group, label})
-	}
-	return out
-}
-
-func ybTopQueriesGroupBy(cols []ybColumnMeta) map[string]module.GroupByConfig {
-	groupBy := make(map[string]module.GroupByConfig)
-	for _, col := range cols {
-		if !col.isLabel {
-			continue
-		}
-		groupBy[col.id] = module.GroupByConfig{
-			Name:    "Group by " + col.name,
-			Columns: []string{col.id},
-		}
-	}
-	return groupBy
-}
-
-func primaryYBLabel(cols []ybColumnMeta) string {
-	for _, col := range cols {
-		if col.isPrimary {
-			return col.id
-		}
-	}
-	for _, col := range cols {
-		if col.isLabel {
-			return col.id
-		}
-	}
-	return ""
-}
-
-func defaultYBChartGroups(cols []ybColumnMeta) []string {
-	groups := make([]string, 0)
-	seen := make(map[string]bool)
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" || !col.isDefaultChart {
-			continue
-		}
-		if !seen[col.chartGroup] {
-			seen[col.chartGroup] = true
-			groups = append(groups, col.chartGroup)
-		}
-	}
-	if len(groups) > 0 {
-		return groups
-	}
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" {
-			continue
-		}
-		if !seen[col.chartGroup] {
-			seen[col.chartGroup] = true
-			groups = append(groups, col.chartGroup)
-		}
-	}
-	return groups
 }
 
 func (c *Collector) pgStatStatementsEnabled(ctx context.Context) (bool, error) {
@@ -652,19 +484,19 @@ func (c *Collector) detectPgStatStatementsColumns(ctx context.Context) (map[stri
 	return cols, nil
 }
 
-func (c *Collector) buildAvailableColumns(availableCols map[string]bool) []ybColumnMeta {
-	result := make([]ybColumnMeta, 0, len(ybTopColumns))
+func (c *Collector) buildAvailableColumns(availableCols map[string]bool) []ybColumn {
+	result := make([]ybColumn, 0, len(ybTopColumns))
 	for _, col := range ybTopColumns {
-		if col.isJoinColumn {
+		if col.IsJoinColumn {
 			result = append(result, col)
 			continue
 		}
-		actual, ok := resolveYBColumn(col.selectExpr, availableCols)
+		actual, ok := resolveYBColumn(col.SelectExpr, availableCols)
 		if !ok {
 			continue
 		}
 		colCopy := col
-		colCopy.selectExpr = actual
+		colCopy.SelectExpr = actual
 		result = append(result, colCopy)
 	}
 	return result

@@ -35,25 +35,17 @@ func TestYugabyteDBMethods(t *testing.T) {
 func TestYugabyteDBTopColumns_HasRequiredColumns(t *testing.T) {
 	required := []string{"queryId", "query", "calls", "totalTime"}
 
-	uiKeys := make(map[string]bool)
-	for _, col := range ybTopColumns {
-		uiKeys[col.id] = true
-	}
-
-	for _, key := range required {
-		assert.True(t, uiKeys[key], "column %s should be defined", key)
+	cs := ybColumnSet(ybTopColumns)
+	for _, id := range required {
+		assert.True(t, cs.ContainsColumn(id), "column %s should be defined", id)
 	}
 }
 
 func TestYugabyteDBRunningColumns_HasRequiredColumns(t *testing.T) {
 	required := []string{"pid", "query", "elapsedMs"}
 
-	uiKeys := make(map[string]bool)
-	for _, col := range ybRunningColumns {
-		uiKeys[col.id] = true
-	}
-
-	for _, key := range required {
-		assert.True(t, uiKeys[key], "column %s should be defined", key)
+	cs := ybColumnSet(ybRunningColumns)
+	for _, id := range required {
+		assert.True(t, cs.ContainsColumn(id), "column %s should be defined", id)
 	}
 }

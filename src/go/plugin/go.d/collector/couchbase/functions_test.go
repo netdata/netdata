@@ -32,13 +32,9 @@ func TestCouchbaseMethods(t *testing.T) {
 func TestCouchbaseAllColumns_HasRequiredColumns(t *testing.T) {
 	required := []string{"requestId", "statement", "elapsedTime"}
 
-	uiKeys := make(map[string]bool)
-	for _, col := range couchbaseAllColumns {
-		uiKeys[col.id] = true
-	}
-
-	for _, key := range required {
-		assert.True(t, uiKeys[key], "column %s should be defined", key)
+	cs := cbColumnSet(couchbaseAllColumns)
+	for _, id := range required {
+		assert.True(t, cs.ContainsColumn(id), "column %s should be defined", id)
 	}
 }
 

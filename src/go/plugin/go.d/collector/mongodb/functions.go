@@ -26,95 +26,63 @@ const (
 		"Requires profiling enabled on target databases (db.setProfilingLevel)."
 )
 
-const (
-	paramSort = "__sort"
+const paramSort = "__sort"
 
-	ftString    = funcapi.FieldTypeString
-	ftInteger   = funcapi.FieldTypeInteger
-	ftDuration  = funcapi.FieldTypeDuration
-	ftTimestamp = funcapi.FieldTypeTimestamp
+// mongoColumn defines metadata for a MongoDB profile column.
+// Embeds funcapi.ColumnMeta for UI rendering and adds MongoDB-specific fields.
+type mongoColumn struct {
+	funcapi.ColumnMeta
 
-	trNumber   = funcapi.FieldTransformNumber
-	trDuration = funcapi.FieldTransformDuration
-	trDatetime = funcapi.FieldTransformDatetime
-	trText     = funcapi.FieldTransformText
-
-	visValue = funcapi.FieldVisualValue
-	visBar   = funcapi.FieldVisualBar
-
-	summarySum = funcapi.FieldSummarySum
-	summaryMax = funcapi.FieldSummaryMax
-
-	filterRange = funcapi.FieldFilterRange
-	filterMulti = funcapi.FieldFilterMultiselect
-)
-
-// mongoColumnMeta defines metadata for a column in the response
-type mongoColumnMeta struct {
-	id             string                 // column ID in response (e.g., "execution_time")
-	dbField        string                 // MongoDB document field name (e.g., "millis")
-	name           string                 // display name (e.g., "Execution Time")
-	colType        funcapi.FieldType      // column type: integer, duration, timestamp, string, bool
-	visible        bool                   // default visibility
-	sortable       bool                   // can be used for sorting
-	fullWidth      bool                   // for query text columns
-	wrap           bool                   // wrap text
-	sticky         bool                   // sticky column
-	filter         funcapi.FieldFilter    // filter type: range, multiselect, text
-	visualization  funcapi.FieldVisual    // visualization type: value, bar
-	summary        funcapi.FieldSummary   // summary type: sum, max, or empty
-	transform      funcapi.FieldTransform // value transform: number, duration, datetime, text
-	units          string                 // display units (e.g., "seconds")
-	decimalPoints  int                    // decimal points for numeric display
-	uniqueKey      bool                   // unique key column
-	expandFilter   bool                   // default expanded filter
-	isLabel        bool                   // available for group-by
-	isPrimary      bool                   // primary label
-	isMetric       bool                   // chartable metric
-	chartGroup     string                 // chart group key
-	chartTitle     string                 // chart title
-	isDefaultChart bool                   // include in default charts
+	// DBField is the MongoDB document field name (e.g., "millis")
+	DBField string
+	// IsSortOption indicates whether this column can be used for sorting in params
+	IsSortOption bool
 }
 
-// mongoAllColumns defines all available columns from system.profile
-// Ordered by display priority (index)
-var mongoAllColumns = []mongoColumnMeta{
+// mongoColumnSet creates a ColumnSet from a slice of mongoColumn.
+func mongoColumnSet(cols []mongoColumn) funcapi.ColumnSet[mongoColumn] {
+	return funcapi.Columns(cols, func(c mongoColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+}
+
+// mongoAllColumns defines all available columns from system.profile.
+// Ordered by display priority (index).
+var mongoAllColumns = []mongoColumn{
 	// Core fields (visible by default)
-	{id: "timestamp", dbField: "ts", name: "Timestamp", colType: ftTimestamp, visible: true, sortable: true, filter: filterRange, visualization: visValue, summary: summaryMax, transform: trDatetime, uniqueKey: true},
-	{id: "namespace", dbField: "ns", name: "Namespace", colType: ftString, visible: true, sortable: false, sticky: true, filter: filterMulti, visualization: visValue, transform: trText, expandFilter: true, isLabel: true, isPrimary: true},
-	{id: "operation", dbField: "op", name: "Operation", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText, isLabel: true},
-	{id: "query", dbField: "command", name: "Query", colType: ftString, visible: true, sortable: false, fullWidth: true, wrap: true, filter: filterMulti, visualization: visValue, transform: trText},
-	{id: "execution_time", dbField: "millis", name: "Execution Time", colType: ftDuration, visible: true, sortable: true, filter: filterRange, visualization: visBar, summary: summarySum, transform: trDuration, units: "seconds", decimalPoints: 3, isMetric: true, chartGroup: "Time", chartTitle: "Execution Time", isDefaultChart: true},
-	{id: "docs_examined", dbField: "docsExamined", name: "Docs Examined", colType: ftInteger, visible: true, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber, isMetric: true, chartGroup: "Docs", chartTitle: "Documents"},
-	{id: "keys_examined", dbField: "keysExamined", name: "Keys Examined", colType: ftInteger, visible: true, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber, isMetric: true, chartGroup: "Docs", chartTitle: "Documents"},
-	{id: "docs_returned", dbField: "nreturned", name: "Docs Returned", colType: ftInteger, visible: true, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber, isMetric: true, chartGroup: "Docs", chartTitle: "Documents"},
-	{id: "plan_summary", dbField: "planSummary", name: "Plan Summary", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "timestamp", Tooltip: "Timestamp", Type: funcapi.FieldTypeTimestamp, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummaryMax, Transform: funcapi.FieldTransformDatetime, UniqueKey: true}, DBField: "ts", IsSortOption: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "namespace", Tooltip: "Namespace", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Sticky: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, ExpandFilter: true, GroupBy: &funcapi.GroupByOptions{IsDefault: true}}, DBField: "ns"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "operation", Tooltip: "Operation", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}, DBField: "op"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, FullWidth: true, Wrap: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "command"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "execution_time", Tooltip: "Execution Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformDuration, DecimalPoints: 3, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time", IsDefault: true}}, DBField: "millis", IsSortOption: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_examined", Tooltip: "Docs Examined", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "docsExamined", IsSortOption: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "keys_examined", Tooltip: "Keys Examined", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "keysExamined", IsSortOption: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_returned", Tooltip: "Docs Returned", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "nreturned", IsSortOption: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "plan_summary", Tooltip: "Plan Summary", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "planSummary"},
 
 	// Secondary fields
-	{id: "client", dbField: "client", name: "Client", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText, isLabel: true},
-	{id: "user", dbField: "user", name: "User", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText, isLabel: true},
-	{id: "docs_deleted", dbField: "ndeleted", name: "Docs Deleted", colType: ftInteger, visible: false, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber, isMetric: true, chartGroup: "Docs", chartTitle: "Documents"},
-	{id: "docs_inserted", dbField: "ninserted", name: "Docs Inserted", colType: ftInteger, visible: false, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber, isMetric: true, chartGroup: "Docs", chartTitle: "Documents"},
-	{id: "docs_modified", dbField: "nModified", name: "Docs Modified", colType: ftInteger, visible: false, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber, isMetric: true, chartGroup: "Docs", chartTitle: "Documents"},
-	{id: "response_length", dbField: "responseLength", name: "Response Length", colType: ftInteger, visible: false, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber, isMetric: true, chartGroup: "Response", chartTitle: "Response Size"},
-	{id: "num_yield", dbField: "numYield", name: "Num Yield", colType: ftInteger, visible: false, sortable: true, filter: filterRange, visualization: visValue, summary: summarySum, transform: trNumber, isMetric: true, chartGroup: "Yield", chartTitle: "Yield"},
-	{id: "app_name", dbField: "appName", name: "App Name", colType: ftString, visible: true, sortable: false, filter: filterMulti, visualization: visValue, transform: trText, isLabel: true},
-	{id: "cursor_exhausted", dbField: "cursorExhausted", name: "Cursor Exhausted", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},
-	{id: "has_sort_stage", dbField: "hasSortStage", name: "Has Sort Stage", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},
-	{id: "uses_disk", dbField: "usedDisk", name: "Uses Disk", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},
-	{id: "from_multi_planner", dbField: "fromMultiPlanner", name: "From Multi Planner", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},
-	{id: "replanned", dbField: "replanned", name: "Replanned", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "client", Tooltip: "Client", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}, DBField: "client"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "user", Tooltip: "User", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}, DBField: "user"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_deleted", Tooltip: "Docs Deleted", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "ndeleted", IsSortOption: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_inserted", Tooltip: "Docs Inserted", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "ninserted", IsSortOption: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_modified", Tooltip: "Docs Modified", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "nModified", IsSortOption: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "response_length", Tooltip: "Response Length", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Response", Title: "Response Size"}}, DBField: "responseLength", IsSortOption: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "num_yield", Tooltip: "Num Yield", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Yield", Title: "Yield"}}, DBField: "numYield", IsSortOption: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "app_name", Tooltip: "App Name", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}, DBField: "appName"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "cursor_exhausted", Tooltip: "Cursor Exhausted", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "cursorExhausted"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "has_sort_stage", Tooltip: "Has Sort Stage", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "hasSortStage"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "uses_disk", Tooltip: "Uses Disk", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "usedDisk"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "from_multi_planner", Tooltip: "From Multi Planner", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "fromMultiPlanner"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "replanned", Tooltip: "Replanned", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "replanned"},
 
 	// Version-specific fields (hidden by default)
-	{id: "query_hash", dbField: "queryHash", name: "Query Hash", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},            // 4.2+
-	{id: "plan_cache_key", dbField: "planCacheKey", name: "Plan Cache Key", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText}, // 4.2+
-	{id: "planning_time", dbField: "planningTimeMicros", name: "Planning Time", colType: ftDuration, visible: false, sortable: true, filter: filterRange, visualization: visBar, summary: summarySum, transform: trDuration, units: "seconds", decimalPoints: 3, isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
-	{id: "cpu_time", dbField: "cpuNanos", name: "CPU Time", colType: ftDuration, visible: false, sortable: true, filter: filterRange, visualization: visBar, summary: summarySum, transform: trDuration, units: "seconds", decimalPoints: 3, isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
-	{id: "query_framework", dbField: "queryFramework", name: "Query Framework", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText},   // 7.0+
-	{id: "query_shape_hash", dbField: "queryShapeHash", name: "Query Shape Hash", colType: ftString, visible: false, sortable: false, filter: filterMulti, visualization: visValue, transform: trText}, // 8.0+
+	{ColumnMeta: funcapi.ColumnMeta{Name: "query_hash", Tooltip: "Query Hash", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "queryHash"},            // 4.2+
+	{ColumnMeta: funcapi.ColumnMeta{Name: "plan_cache_key", Tooltip: "Plan Cache Key", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "planCacheKey"}, // 4.2+
+	{ColumnMeta: funcapi.ColumnMeta{Name: "planning_time", Tooltip: "Planning Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformDuration, DecimalPoints: 3, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, DBField: "planningTimeMicros", IsSortOption: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "cpu_time", Tooltip: "CPU Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformDuration, DecimalPoints: 3, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, DBField: "cpuNanos", IsSortOption: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "query_framework", Tooltip: "Query Framework", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "queryFramework"},   // 7.0+
+	{ColumnMeta: funcapi.ColumnMeta{Name: "query_shape_hash", Tooltip: "Query Shape Hash", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "queryShapeHash"}, // 8.0+
 }
 
-// optionalDuration converts an optional int64 pointer to float64 seconds, returning nil if nil
+// optionalDuration converts an optional int64 pointer to float64 seconds, returning nil if nil.
 func optionalDuration(v *int64, divisor float64) any {
 	if v == nil {
 		return nil
@@ -122,7 +90,7 @@ func optionalDuration(v *int64, divisor float64) any {
 	return float64(*v) / divisor
 }
 
-// optionalBool converts a bool pointer to a display value
+// optionalBool converts a bool pointer to a display value.
 func optionalBool(v *bool) any {
 	if v == nil {
 		return nil
@@ -133,111 +101,21 @@ func optionalBool(v *bool) any {
 	return "No"
 }
 
-// topQueriesCharts returns the chart configuration for top queries responses
-func topQueriesCharts(cols []mongoColumnMeta) map[string]module.ChartConfig {
-	charts := make(map[string]module.ChartConfig)
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" {
-			continue
-		}
-		cfg, ok := charts[col.chartGroup]
-		if !ok {
-			title := col.chartTitle
-			if title == "" {
-				title = col.chartGroup
-			}
-			cfg = module.ChartConfig{Name: title, Type: "stacked-bar"}
-		}
-		cfg.Columns = append(cfg.Columns, col.id)
-		charts[col.chartGroup] = cfg
-	}
-	return charts
-}
-
-// topQueriesDefaultCharts returns the default chart configuration
-func topQueriesDefaultCharts(cols []mongoColumnMeta) [][]string {
-	label := primaryMongoLabel(cols)
-	if label == "" {
-		return nil
-	}
-	chartGroups := defaultMongoChartGroups(cols)
-	out := make([][]string, 0, len(chartGroups))
-	for _, group := range chartGroups {
-		out = append(out, []string{group, label})
-	}
-	return out
-}
-
-// topQueriesGroupBy returns the group by configuration for top queries responses
-func topQueriesGroupBy(cols []mongoColumnMeta) map[string]module.GroupByConfig {
-	groupBy := make(map[string]module.GroupByConfig)
-	for _, col := range cols {
-		if !col.isLabel {
-			continue
-		}
-		groupBy[col.id] = module.GroupByConfig{
-			Name:    "Group by " + col.name,
-			Columns: []string{col.id},
-		}
-	}
-	return groupBy
-}
-
-func primaryMongoLabel(cols []mongoColumnMeta) string {
-	for _, col := range cols {
-		if col.isPrimary {
-			return col.id
-		}
-	}
-	for _, col := range cols {
-		if col.isLabel {
-			return col.id
-		}
-	}
-	return ""
-}
-
-func defaultMongoChartGroups(cols []mongoColumnMeta) []string {
-	groups := make([]string, 0)
-	seen := make(map[string]bool)
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" || !col.isDefaultChart {
-			continue
-		}
-		if !seen[col.chartGroup] {
-			seen[col.chartGroup] = true
-			groups = append(groups, col.chartGroup)
-		}
-	}
-	if len(groups) > 0 {
-		return groups
-	}
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" {
-			continue
-		}
-		if !seen[col.chartGroup] {
-			seen[col.chartGroup] = true
-			groups = append(groups, col.chartGroup)
-		}
-	}
-	return groups
-}
-
-func buildMongoSortParam(cols []mongoColumnMeta) funcapi.ParamConfig {
+// buildMongoSortParam builds sort parameter from available columns.
+func buildMongoSortParam(cols []mongoColumn) funcapi.ParamConfig {
 	var sortOptions []funcapi.ParamOption
 	sortDir := funcapi.FieldSortDescending
 	for _, col := range cols {
-		if !col.sortable {
+		if !col.IsSortOption {
 			continue
 		}
 		opt := funcapi.ParamOption{
-			ID:     col.id,
-			Column: col.dbField,
-			Name:   fmt.Sprintf("Top queries by %s", col.name),
+			ID:     col.Name,
+			Column: col.DBField,
+			Name:   fmt.Sprintf("Top queries by %s", col.Name),
 			Sort:   &sortDir,
 		}
-		if col.id == "execution_time" {
+		if col.Name == "execution_time" {
 			opt.Default = true
 		}
 		sortOptions = append(sortOptions, opt)
@@ -253,27 +131,8 @@ func buildMongoSortParam(cols []mongoColumnMeta) funcapi.ParamConfig {
 	}
 }
 
-// mongoMethods returns the available function methods for MongoDB
+// mongoMethods returns the available function methods for MongoDB.
 func mongoMethods() []module.MethodConfig {
-	// Build sort options from column metadata
-	var sortOptions []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range mongoAllColumns {
-		if !col.sortable {
-			continue
-		}
-		opt := funcapi.ParamOption{
-			ID:     col.id,
-			Column: col.dbField,
-			Name:   fmt.Sprintf("Top queries by %s", col.name),
-			Sort:   &sortDir,
-		}
-		if col.id == "execution_time" {
-			opt.Default = true
-		}
-		sortOptions = append(sortOptions, opt)
-	}
-
 	return []module.MethodConfig{{
 		UpdateEvery:  10,
 		ID:           "top-queries",
@@ -281,14 +140,7 @@ func mongoMethods() []module.MethodConfig {
 		Help:         topQueriesHelpText,
 		RequireCloud: true,
 		RequiredParams: []funcapi.ParamConfig{
-			{
-				ID:         paramSort,
-				Name:       "Filter By",
-				Help:       "Select the primary sort column",
-				Selection:  funcapi.ParamSelect,
-				Options:    sortOptions,
-				UniqueView: true,
-			},
+			buildMongoSortParam(mongoAllColumns),
 		},
 	}}
 }
@@ -436,55 +288,19 @@ func (c *Collector) detectMongoProfileFields(ctx context.Context, databases []st
 	return available, nil
 }
 
-// buildAvailableMongoColumns returns columns that are available based on detected fields
-func buildAvailableMongoColumns(available map[string]bool) []mongoColumnMeta {
-	var result []mongoColumnMeta
+// buildAvailableMongoColumns returns columns that are available based on detected fields.
+func buildAvailableMongoColumns(available map[string]bool) []mongoColumn {
+	var result []mongoColumn
 	for _, col := range mongoAllColumns {
 		// command field maps to query column, always include
-		if col.dbField == "command" || available[col.dbField] {
+		if col.DBField == "command" || available[col.DBField] {
 			result = append(result, col)
 		}
 	}
 	return result
 }
 
-// buildMongoColumnsFromMeta builds the Columns map for FunctionResponse
-func buildMongoColumnsFromMeta(cols []mongoColumnMeta) map[string]any {
-	result := make(map[string]any)
-	for i, col := range cols {
-		sortDir := funcapi.FieldSortDescending
-		if col.colType == ftString {
-			sortDir = funcapi.FieldSortAscending
-		}
-		colDef := funcapi.Column{
-			Index:                 i,
-			Name:                  col.name,
-			Type:                  col.colType,
-			Units:                 col.units,
-			Visualization:         col.visualization,
-			Sort:                  sortDir,
-			Sortable:              col.sortable,
-			Sticky:                col.sticky,
-			Summary:               col.summary,
-			Filter:                col.filter,
-			FullWidth:             col.fullWidth,
-			Wrap:                  col.wrap,
-			DefaultExpandedFilter: col.expandFilter,
-			UniqueKey:             col.uniqueKey,
-			Visible:               col.visible,
-			ValueOptions: funcapi.ValueOptions{
-				Transform:     col.transform,
-				DecimalPoints: col.decimalPoints,
-				DefaultValue:  nil,
-			},
-		}
-
-		result[col.id] = colDef.BuildColumn()
-	}
-	return result
-}
-
-// collectTopQueries queries system.profile for top queries across all databases
+// collectTopQueries queries system.profile for top queries across all databases.
 func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
 	// Get limit from config
 	limit := c.Config.TopQueriesLimit
@@ -495,8 +311,8 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	// Build valid sort columns map from metadata
 	validSortCols := make(map[string]bool)
 	for _, col := range mongoAllColumns {
-		if col.sortable {
-			validSortCols[col.dbField] = true
+		if col.IsSortOption {
+			validSortCols[col.DBField] = true
 		}
 	}
 	if !validSortCols[sortColumn] {
@@ -519,7 +335,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		c.Debugf("failed to detect profile fields: %v", err)
 	}
 	availableCols := buildAvailableMongoColumns(availableFields)
-	columns := buildMongoColumnsFromMeta(availableCols)
+	cs := mongoColumnSet(availableCols)
 	sortParam := buildMongoSortParam(availableCols)
 
 	// Query system.profile from each database
@@ -587,13 +403,13 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		Status:            200,
 		Message:           "No slow queries found. Profiling may be disabled or no queries exceeded the slowms threshold.",
 		Help:              topQueriesHelpText,
-		Columns:           columns,
+		Columns:           cs.BuildColumns(),
 		Data:              [][]any{},
 		DefaultSortColumn: "execution_time",
 		RequiredParams:    []funcapi.ParamConfig{sortParam},
-		Charts:            topQueriesCharts(availableCols),
-		DefaultCharts:     topQueriesDefaultCharts(availableCols),
-		GroupBy:           topQueriesGroupBy(availableCols),
+		Charts:            cs.BuildCharts(),
+		DefaultCharts:     cs.BuildDefaultCharts(),
+		GroupBy:           cs.BuildGroupBy(),
 	}
 
 	if len(allDocs) == 0 {
@@ -615,7 +431,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 
 		// Fill each column based on available columns
 		for i, col := range availableCols {
-			switch col.id {
+			switch col.Name {
 			case "timestamp":
 				row[i] = doc.Timestamp.Format(time.RFC3339Nano)
 			case "namespace":
@@ -687,13 +503,13 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	return &module.FunctionResponse{
 		Status:            200,
 		Help:              topQueriesHelpText,
-		Columns:           columns,
+		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: "execution_time",
 		RequiredParams:    []funcapi.ParamConfig{sortParam},
-		Charts:            topQueriesCharts(availableCols),
-		DefaultCharts:     topQueriesDefaultCharts(availableCols),
-		GroupBy:           topQueriesGroupBy(availableCols),
+		Charts:            cs.BuildCharts(),
+		DefaultCharts:     cs.BuildDefaultCharts(),
+		GroupBy:           cs.BuildGroupBy(),
 	}
 }
 

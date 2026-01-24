@@ -17,82 +17,52 @@ import (
 
 const clickhouseMaxQueryTextLength = 4096
 
-const (
-	paramSort = "__sort"
+const paramSort = "__sort"
 
-	ftString   = funcapi.FieldTypeString
-	ftInteger  = funcapi.FieldTypeInteger
-	ftFloat    = funcapi.FieldTypeFloat
-	ftDuration = funcapi.FieldTypeDuration
+// clickhouseColumn defines a column for ClickHouse top-queries function.
+// Embeds funcapi.ColumnMeta for UI display and adds collector-specific fields.
+type clickhouseColumn struct {
+	funcapi.ColumnMeta
 
-	trNone     = funcapi.FieldTransformNone
-	trNumber   = funcapi.FieldTransformNumber
-	trDuration = funcapi.FieldTransformDuration
+	// Data access
+	DBColumn   string // Column name in system.query_log (empty = computed)
+	SelectExpr string // SQL expression for SELECT
 
-	sortAsc  = funcapi.FieldSortAscending
-	sortDesc = funcapi.FieldSortDescending
-
-	summaryCount = funcapi.FieldSummaryCount
-	summarySum   = funcapi.FieldSummarySum
-	summaryMin   = funcapi.FieldSummaryMin
-	summaryMax   = funcapi.FieldSummaryMax
-	summaryMean  = funcapi.FieldSummaryMean
-
-	filterMulti = funcapi.FieldFilterMultiselect
-	filterRange = funcapi.FieldFilterRange
-)
-
-type clickhouseColumnMeta struct {
-	dbColumn       string
-	uiKey          string
-	displayName    string
-	dataType       funcapi.FieldType
-	units          string
-	visible        bool
-	transform      funcapi.FieldTransform
-	decimalPoints  int
-	sortDir        funcapi.FieldSort
-	summary        funcapi.FieldSummary
-	filter         funcapi.FieldFilter
-	isSortOption   bool
-	sortLabel      string
-	isDefaultSort  bool
-	isUniqueKey    bool
-	isSticky       bool
-	fullWidth      bool
-	selectExpr     string
-	isLabel        bool
-	isPrimary      bool
-	isMetric       bool
-	chartGroup     string
-	chartTitle     string
-	isDefaultChart bool
+	// Sort parameter metadata
+	IsSortOption  bool   // Include in __sort parameter options
+	SortLabel     string // Display label for sort option
+	IsDefaultSort bool   // Default sort option
 }
 
-var clickhouseAllColumns = []clickhouseColumnMeta{
-	{dbColumn: "normalized_query_hash", uiKey: "queryId", displayName: "Query ID", dataType: ftString, visible: false, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti, isUniqueKey: true, selectExpr: "toString(normalized_query_hash)"},
-	{dbColumn: "query", uiKey: "query", displayName: "Query", dataType: ftString, visible: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti, isSticky: true, fullWidth: true, selectExpr: "any(query)"},
-	{dbColumn: "current_database", uiKey: "database", displayName: "Database", dataType: ftString, visible: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti, selectExpr: "any(current_database)", isLabel: true, isPrimary: true},
-	{dbColumn: "user", uiKey: "user", displayName: "User", dataType: ftString, visible: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti, selectExpr: "any(user)", isLabel: true},
+var clickhouseAllColumns = []clickhouseColumn{
+	{ColumnMeta: funcapi.ColumnMeta{Name: "queryId", Tooltip: "Query ID", Type: funcapi.FieldTypeString, Visible: false, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, UniqueKey: true, Sortable: true}, DBColumn: "normalized_query_hash", SelectExpr: "toString(normalized_query_hash)"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sticky: true, FullWidth: true, Sortable: true}, DBColumn: "query", SelectExpr: "any(query)"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "database", Tooltip: "Database", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, GroupBy: &funcapi.GroupByOptions{IsDefault: true}, Sortable: true}, DBColumn: "current_database", SelectExpr: "any(current_database)"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "user", Tooltip: "User", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, GroupBy: &funcapi.GroupByOptions{}, Sortable: true}, DBColumn: "user", SelectExpr: "any(user)"},
 
-	{dbColumn: "", uiKey: "calls", displayName: "Calls", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Number of Calls", selectExpr: "count()", isMetric: true, chartGroup: "Calls", chartTitle: "Number of Calls", isDefaultChart: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "calls", Tooltip: "Calls", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Calls", Title: "Number of Calls", IsDefault: true}, Sortable: true}, SelectExpr: "count()", IsSortOption: true, SortLabel: "Number of Calls"},
 
-	{dbColumn: "query_duration_ms", uiKey: "totalTime", displayName: "Total Time", dataType: ftDuration, units: "milliseconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Total Execution Time", isDefaultSort: true, selectExpr: "sum(query_duration_ms)", isMetric: true, chartGroup: "Time", chartTitle: "Execution Time", isDefaultChart: true},
-	{dbColumn: "query_duration_ms", uiKey: "avgTime", displayName: "Avg Time", dataType: ftDuration, units: "milliseconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMean, filter: filterRange, isSortOption: true, sortLabel: "Average Execution Time", selectExpr: "avg(query_duration_ms)", isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
-	{dbColumn: "query_duration_ms", uiKey: "minTime", displayName: "Min Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMin, filter: filterRange, selectExpr: "min(query_duration_ms)", isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
-	{dbColumn: "query_duration_ms", uiKey: "maxTime", displayName: "Max Time", dataType: ftDuration, units: "milliseconds", visible: false, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, filter: filterRange, selectExpr: "max(query_duration_ms)", isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time", IsDefault: true}, Sortable: true}, DBColumn: "query_duration_ms", SelectExpr: "sum(query_duration_ms)", IsSortOption: true, SortLabel: "Total Execution Time", IsDefaultSort: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "avgTime", Tooltip: "Avg Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}, Sortable: true}, DBColumn: "query_duration_ms", SelectExpr: "avg(query_duration_ms)", IsSortOption: true, SortLabel: "Average Execution Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "minTime", Tooltip: "Min Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMin, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}, Sortable: true}, DBColumn: "query_duration_ms", SelectExpr: "min(query_duration_ms)"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "maxTime", Tooltip: "Max Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}, Sortable: true}, DBColumn: "query_duration_ms", SelectExpr: "max(query_duration_ms)"},
 
-	{dbColumn: "read_rows", uiKey: "readRows", displayName: "Read Rows", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, isSortOption: true, sortLabel: "Rows Read", selectExpr: "sum(read_rows)", isMetric: true, chartGroup: "Rows", chartTitle: "Rows"},
-	{dbColumn: "read_bytes", uiKey: "readBytes", displayName: "Read Bytes", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, selectExpr: "sum(read_bytes)", isMetric: true, chartGroup: "Bytes", chartTitle: "Bytes"},
-	{dbColumn: "written_rows", uiKey: "writtenRows", displayName: "Written Rows", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, selectExpr: "sum(written_rows)", isMetric: true, chartGroup: "Rows", chartTitle: "Rows"},
-	{dbColumn: "written_bytes", uiKey: "writtenBytes", displayName: "Written Bytes", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, selectExpr: "sum(written_bytes)", isMetric: true, chartGroup: "Bytes", chartTitle: "Bytes"},
-	{dbColumn: "result_rows", uiKey: "resultRows", displayName: "Result Rows", dataType: ftInteger, visible: true, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, selectExpr: "sum(result_rows)", isMetric: true, chartGroup: "Rows", chartTitle: "Rows"},
-	{dbColumn: "result_bytes", uiKey: "resultBytes", displayName: "Result Bytes", dataType: ftInteger, visible: false, transform: trNumber, sortDir: sortDesc, summary: summarySum, filter: filterRange, selectExpr: "sum(result_bytes)", isMetric: true, chartGroup: "Bytes", chartTitle: "Bytes"},
-	{dbColumn: "memory_usage", uiKey: "memoryUsage", displayName: "Max Memory", dataType: ftFloat, visible: false, transform: trNumber, decimalPoints: 0, sortDir: sortDesc, summary: summaryMax, filter: filterRange, selectExpr: "max(memory_usage)", isMetric: true, chartGroup: "Memory", chartTitle: "Memory"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "readRows", Tooltip: "Read Rows", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}, Sortable: true}, DBColumn: "read_rows", SelectExpr: "sum(read_rows)", IsSortOption: true, SortLabel: "Rows Read"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "readBytes", Tooltip: "Read Bytes", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Bytes", Title: "Bytes"}, Sortable: true}, DBColumn: "read_bytes", SelectExpr: "sum(read_bytes)"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "writtenRows", Tooltip: "Written Rows", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}, Sortable: true}, DBColumn: "written_rows", SelectExpr: "sum(written_rows)"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "writtenBytes", Tooltip: "Written Bytes", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Bytes", Title: "Bytes"}, Sortable: true}, DBColumn: "written_bytes", SelectExpr: "sum(written_bytes)"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "resultRows", Tooltip: "Result Rows", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}, Sortable: true}, DBColumn: "result_rows", SelectExpr: "sum(result_rows)"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "resultBytes", Tooltip: "Result Bytes", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Bytes", Title: "Bytes"}, Sortable: true}, DBColumn: "result_bytes", SelectExpr: "sum(result_bytes)"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "memoryUsage", Tooltip: "Max Memory", Type: funcapi.FieldTypeFloat, Visible: false, Transform: funcapi.FieldTransformNumber, DecimalPoints: 0, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Memory", Title: "Memory"}, Sortable: true}, DBColumn: "memory_usage", SelectExpr: "max(memory_usage)"},
 }
 
 type clickhouseJSONResponse struct {
 	Data []map[string]any `json:"data"`
+}
+
+// clickhouseColumnSet creates a ColumnSet for the given columns.
+func clickhouseColumnSet(cols []clickhouseColumn) funcapi.ColumnSet[clickhouseColumn] {
+	return funcapi.Columns(cols, func(c clickhouseColumn) funcapi.ColumnMeta { return c.ColumnMeta })
 }
 
 func clickhouseMethods() []module.MethodConfig {
@@ -153,16 +123,16 @@ func clickhouseHandleMethod(ctx context.Context, job *module.Job, method string,
 	}
 }
 
-func buildClickHouseSortOptions(cols []clickhouseColumnMeta) []funcapi.ParamOption {
+func buildClickHouseSortOptions(cols []clickhouseColumn) []funcapi.ParamOption {
 	var sortOptions []funcapi.ParamOption
 	sortDir := funcapi.FieldSortDescending
 	for _, col := range cols {
-		if col.isSortOption {
+		if col.IsSortOption {
 			sortOptions = append(sortOptions, funcapi.ParamOption{
-				ID:      col.uiKey,
-				Column:  col.uiKey,
-				Name:    "Top queries by " + col.sortLabel,
-				Default: col.isDefaultSort,
+				ID:      col.Name,
+				Column:  col.Name,
+				Name:    "Top queries by " + col.SortLabel,
+				Default: col.IsDefaultSort,
 				Sort:    &sortDir,
 			})
 		}
@@ -221,31 +191,31 @@ FORMAT JSON`
 	return cols, nil
 }
 
-func (c *Collector) buildAvailableClickHouseColumns(available map[string]bool) []clickhouseColumnMeta {
-	var cols []clickhouseColumnMeta
+func (c *Collector) buildAvailableClickHouseColumns(available map[string]bool) []clickhouseColumn {
+	var cols []clickhouseColumn
 	for _, col := range clickhouseAllColumns {
-		if col.dbColumn == "" || available[col.dbColumn] {
+		if col.DBColumn == "" || available[col.DBColumn] {
 			cols = append(cols, col)
 		}
 	}
 	return cols
 }
 
-func (c *Collector) mapAndValidateClickHouseSortColumn(input string, available []clickhouseColumnMeta) string {
-	availableKeys := make(map[string]bool, len(available))
-	for _, col := range available {
-		availableKeys[col.uiKey] = true
-	}
-	if availableKeys[input] {
+func (c *Collector) mapAndValidateClickHouseSortColumn(input string, cs funcapi.ColumnSet[clickhouseColumn]) string {
+	if cs.ContainsColumn(input) {
 		return input
 	}
-	if availableKeys["totalTime"] {
+	if cs.ContainsColumn("totalTime") {
 		return "totalTime"
 	}
-	if availableKeys["calls"] {
+	if cs.ContainsColumn("calls") {
 		return "calls"
 	}
-	return available[0].uiKey
+	names := cs.Names()
+	if len(names) > 0 {
+		return names[0]
+	}
+	return ""
 }
 
 func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
@@ -259,7 +229,8 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		return &module.FunctionResponse{Status: 500, Message: "no columns available in system.query_log"}
 	}
 
-	sortColumn = c.mapAndValidateClickHouseSortColumn(sortColumn, cols)
+	cs := clickhouseColumnSet(cols)
+	sortColumn = c.mapAndValidateClickHouseSortColumn(sortColumn, cs)
 
 	limit := c.TopQueriesLimit
 	if limit <= 0 {
@@ -273,7 +244,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 
 	selectParts := make([]string, 0, len(cols))
 	for _, col := range cols {
-		selectParts = append(selectParts, fmt.Sprintf("%s AS `%s`", col.selectExpr, col.uiKey))
+		selectParts = append(selectParts, fmt.Sprintf("%s AS `%s`", col.SelectExpr, col.Name))
 	}
 
 	query := fmt.Sprintf(`
@@ -305,7 +276,7 @@ FORMAT JSON
 	for _, rowMap := range resp.Data {
 		row := make([]any, len(cols))
 		for i, col := range cols {
-			row[i] = normalizeClickHouseValue(col, rowMap[col.uiKey])
+			row[i] = normalizeClickHouseValue(col, rowMap[col.Name])
 		}
 		data = append(data, row)
 	}
@@ -320,26 +291,26 @@ FORMAT JSON
 	}
 
 	defaultSort := "totalTime"
-	if !containsClickHouseColumn(cols, defaultSort) {
+	if !cs.ContainsColumn(defaultSort) {
 		defaultSort = "calls"
 	}
 
 	return &module.FunctionResponse{
 		Status:            200,
 		Help:              "Top SQL queries from ClickHouse system.query_log",
-		Columns:           buildClickHouseColumns(cols),
+		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: defaultSort,
 		RequiredParams:    []funcapi.ParamConfig{sortParam},
-		Charts:            clickhouseTopQueriesCharts(cols),
-		DefaultCharts:     clickhouseTopQueriesDefaultCharts(cols),
-		GroupBy:           clickhouseTopQueriesGroupBy(cols),
+		Charts:            cs.BuildCharts(),
+		DefaultCharts:     cs.BuildDefaultCharts(),
+		GroupBy:           cs.BuildGroupBy(),
 	}
 }
 
-func normalizeClickHouseValue(col clickhouseColumnMeta, v any) any {
-	switch col.dataType {
-	case ftInteger:
+func normalizeClickHouseValue(col clickhouseColumn, v any) any {
+	switch col.Type {
+	case funcapi.FieldTypeInteger:
 		switch val := v.(type) {
 		case float64:
 			return int64(val)
@@ -353,7 +324,7 @@ func normalizeClickHouseValue(col clickhouseColumnMeta, v any) any {
 			}
 		}
 		return int64(0)
-	case ftFloat, ftDuration:
+	case funcapi.FieldTypeFloat, funcapi.FieldTypeDuration:
 		switch val := v.(type) {
 		case float64:
 			return val
@@ -369,7 +340,7 @@ func normalizeClickHouseValue(col clickhouseColumnMeta, v any) any {
 		return float64(0)
 	default:
 		if s, ok := v.(string); ok {
-			if col.uiKey == "query" {
+			if col.Name == "query" {
 				return strmutil.TruncateText(s, clickhouseMaxQueryTextLength)
 			}
 			return s
@@ -377,143 +348,9 @@ func normalizeClickHouseValue(col clickhouseColumnMeta, v any) any {
 		if v == nil {
 			return ""
 		}
-		if col.uiKey == "query" {
+		if col.Name == "query" {
 			return strmutil.TruncateText(fmt.Sprint(v), clickhouseMaxQueryTextLength)
 		}
 		return fmt.Sprint(v)
 	}
-}
-
-func buildClickHouseColumns(cols []clickhouseColumnMeta) map[string]any {
-	columns := make(map[string]any, len(cols))
-	for i, col := range cols {
-		visual := funcapi.FieldVisualValue
-		if col.dataType == ftDuration {
-			visual = funcapi.FieldVisualBar
-		}
-		colDef := funcapi.Column{
-			Index:                 i,
-			Name:                  col.displayName,
-			Type:                  col.dataType,
-			Units:                 col.units,
-			Visualization:         visual,
-			Sort:                  col.sortDir,
-			Sortable:              true,
-			Sticky:                col.isSticky,
-			Summary:               col.summary,
-			Filter:                col.filter,
-			FullWidth:             col.fullWidth,
-			Wrap:                  false,
-			DefaultExpandedFilter: false,
-			UniqueKey:             col.isUniqueKey,
-			Visible:               col.visible,
-			ValueOptions: funcapi.ValueOptions{
-				Transform:     col.transform,
-				DecimalPoints: col.decimalPoints,
-				DefaultValue:  nil,
-			},
-		}
-		columns[col.uiKey] = colDef.BuildColumn()
-	}
-	return columns
-}
-
-func containsClickHouseColumn(cols []clickhouseColumnMeta, key string) bool {
-	for _, col := range cols {
-		if col.uiKey == key {
-			return true
-		}
-	}
-	return false
-}
-
-func clickhouseTopQueriesCharts(cols []clickhouseColumnMeta) map[string]module.ChartConfig {
-	charts := make(map[string]module.ChartConfig)
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" {
-			continue
-		}
-		cfg, ok := charts[col.chartGroup]
-		if !ok {
-			title := col.chartTitle
-			if title == "" {
-				title = col.chartGroup
-			}
-			cfg = module.ChartConfig{
-				Name: title,
-				Type: "stacked-bar",
-			}
-		}
-		cfg.Columns = append(cfg.Columns, col.uiKey)
-		charts[col.chartGroup] = cfg
-	}
-	return charts
-}
-
-func clickhouseTopQueriesDefaultCharts(cols []clickhouseColumnMeta) [][]string {
-	label := primaryClickhouseLabel(cols)
-	if label == "" {
-		return nil
-	}
-	chartGroups := defaultClickhouseChartGroups(cols)
-	out := make([][]string, 0, len(chartGroups))
-	for _, group := range chartGroups {
-		out = append(out, []string{group, label})
-	}
-	return out
-}
-
-func clickhouseTopQueriesGroupBy(cols []clickhouseColumnMeta) map[string]module.GroupByConfig {
-	groupBy := make(map[string]module.GroupByConfig)
-	for _, col := range cols {
-		if !col.isLabel {
-			continue
-		}
-		groupBy[col.uiKey] = module.GroupByConfig{
-			Name:    "Group by " + col.displayName,
-			Columns: []string{col.uiKey},
-		}
-	}
-	return groupBy
-}
-
-func primaryClickhouseLabel(cols []clickhouseColumnMeta) string {
-	for _, col := range cols {
-		if col.isPrimary {
-			return col.uiKey
-		}
-	}
-	for _, col := range cols {
-		if col.isLabel {
-			return col.uiKey
-		}
-	}
-	return ""
-}
-
-func defaultClickhouseChartGroups(cols []clickhouseColumnMeta) []string {
-	groups := make([]string, 0)
-	seen := make(map[string]bool)
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" || !col.isDefaultChart {
-			continue
-		}
-		if !seen[col.chartGroup] {
-			seen[col.chartGroup] = true
-			groups = append(groups, col.chartGroup)
-		}
-	}
-	if len(groups) > 0 {
-		return groups
-	}
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" {
-			continue
-		}
-		if !seen[col.chartGroup] {
-			seen[col.chartGroup] = true
-			groups = append(groups, col.chartGroup)
-		}
-	}
-	return groups
 }

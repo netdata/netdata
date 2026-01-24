@@ -32,13 +32,9 @@ func TestElasticsearchMethods(t *testing.T) {
 func TestElasticsearchAllColumns_HasRequiredColumns(t *testing.T) {
 	required := []string{"taskId", "description", "runningTime"}
 
-	uiKeys := make(map[string]bool)
-	for _, col := range esAllColumns {
-		uiKeys[col.id] = true
-	}
-
-	for _, key := range required {
-		assert.True(t, uiKeys[key], "column %s should be defined", key)
+	cs := esColumnSet(esAllColumns)
+	for _, id := range required {
+		assert.True(t, cs.ContainsColumn(id), "column %s should be defined", id)
 	}
 }
 

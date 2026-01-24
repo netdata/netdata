@@ -42,41 +42,37 @@ func TestMssqlMethods(t *testing.T) {
 
 func TestMssqlAllColumns_HasRequiredColumns(t *testing.T) {
 	// Verify all required base columns are defined
-	requiredUIKeys := []string{
+	requiredIDs := []string{
 		"queryHash", "query", "database", "calls",
 		"totalTime", "avgTime", "avgCpu",
 		"avgReads", "avgWrites",
 	}
 
-	uiKeys := make(map[string]bool)
-	for _, col := range mssqlAllColumns {
-		uiKeys[col.uiKey] = true
-	}
-
-	for _, key := range requiredUIKeys {
-		assert.True(t, uiKeys[key], "column %s should be defined in mssqlAllColumns", key)
+	cs := mssqlColumnSet(mssqlAllColumns)
+	for _, id := range requiredIDs {
+		assert.True(t, cs.ContainsColumn(id), "column %s should be defined in mssqlAllColumns", id)
 	}
 }
 
 func TestMssqlAllColumns_HasValidMetadata(t *testing.T) {
 	for _, col := range mssqlAllColumns {
-		// Every column must have a UI key
-		assert.NotEmpty(t, col.uiKey, "column %s must have uiKey", col.dbColumn)
+		// Every column must have an ID
+		assert.NotEmpty(t, col.Name, "column %s must have ID", col.DBColumn)
 
 		// Every column must have a display name
-		assert.NotEmpty(t, col.displayName, "column %s must have displayName", col.uiKey)
+		assert.NotEmpty(t, col.Name, "column %s must have Name", col.Name)
 
 		// Every column must have a data type
-		assert.NotEqual(t, funcapi.FieldTypeNone, col.dataType, "column %s must have dataType", col.uiKey)
+		assert.NotEqual(t, funcapi.FieldTypeNone, col.Type, "column %s must have Type", col.Name)
 
 		// Duration columns must have units
-		if col.dataType == ftDuration {
-			assert.NotEmpty(t, col.units, "duration column %s must have units", col.uiKey)
+		if col.Type == funcapi.FieldTypeDuration {
+			assert.NotEmpty(t, col.Units, "duration column %s must have Units", col.Name)
 		}
 
 		// Sort options must have labels
-		if col.isSortOption {
-			assert.NotEmpty(t, col.sortLabel, "sort option column %s must have sortLabel", col.uiKey)
+		if col.IsSortOption {
+			assert.NotEmpty(t, col.SortLabel, "sort option column %s must have SortLabel", col.Name)
 		}
 	}
 }
@@ -88,7 +84,7 @@ func TestCollector_mapAndValidateMSSQLSortColumn(t *testing.T) {
 	cols := c.buildAvailableMSSQLColumns(availableCols)
 
 	tests := map[string]struct {
-		cols     []mssqlColumnMeta
+		cols     []mssqlColumn
 		input    string
 		expected string
 	}{
@@ -125,8 +121,8 @@ func TestCollector_mapAndValidateMSSQLSortColumn(t *testing.T) {
 func TestCollector_buildAvailableMSSQLColumns(t *testing.T) {
 	tests := map[string]struct {
 		availableCols map[string]bool
-		expectCols    []string // UI keys we expect to see
-		notExpectCols []string // UI keys we don't expect
+		expectCols    []string // Column IDs we expect to see
+		notExpectCols []string // Column IDs we don't expect
 	}{
 		"SQL Server 2016 columns": {
 			availableCols: map[string]bool{
@@ -154,18 +150,13 @@ func TestCollector_buildAvailableMSSQLColumns(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			c := &Collector{}
 			cols := c.buildAvailableMSSQLColumns(tc.availableCols)
+			cs := mssqlColumnSet(cols)
 
-			// Build map of UI keys for easy lookup
-			uiKeys := make(map[string]bool)
-			for _, col := range cols {
-				uiKeys[col.uiKey] = true
+			for _, id := range tc.expectCols {
+				assert.True(t, cs.ContainsColumn(id), "expected column %s to be present", id)
 			}
-
-			for _, key := range tc.expectCols {
-				assert.True(t, uiKeys[key], "expected column %s to be present", key)
-			}
-			for _, key := range tc.notExpectCols {
-				assert.False(t, uiKeys[key], "did not expect column %s to be present", key)
+			for _, id := range tc.notExpectCols {
+				assert.False(t, cs.ContainsColumn(id), "did not expect column %s to be present", id)
 			}
 		})
 	}
@@ -174,15 +165,15 @@ func TestCollector_buildAvailableMSSQLColumns(t *testing.T) {
 func TestCollector_buildMSSQLDynamicSQL(t *testing.T) {
 	c := &Collector{}
 
-	cols := []mssqlColumnMeta{
-		{dbColumn: "query_hash", uiKey: "queryHash", dataType: ftString, isIdentity: true},
-		{dbColumn: "query_sql_text", uiKey: "query", dataType: ftString, isIdentity: true},
-		{dbColumn: "database_name", uiKey: "database", dataType: ftString, isIdentity: true},
-		{dbColumn: "count_executions", uiKey: "calls", dataType: ftInteger},
-		{dbColumn: "avg_duration", uiKey: "totalTime", dataType: ftDuration, isMicroseconds: true},
+	cols := []mssqlColumn{
+		{ColumnMeta: funcapi.ColumnMeta{Name: "queryHash", Type: funcapi.FieldTypeString}, DBColumn: "query_hash", IsIdentity: true},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "query", Type: funcapi.FieldTypeString}, DBColumn: "query_sql_text", IsIdentity: true},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "database", Type: funcapi.FieldTypeString}, DBColumn: "database_name", IsIdentity: true},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "calls", Type: funcapi.FieldTypeInteger}, DBColumn: "count_executions"},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Type: funcapi.FieldTypeDuration}, DBColumn: "avg_duration", IsMicroseconds: true},
 	}
 
-	// sortColumn is the uiKey which is also used as the SQL alias
+	// sortColumn is the ID which is also used as the SQL alias
 	sql := c.buildMSSQLDynamicSQL(cols, "totalTime", 7, 500)
 
 	// Basic query structure
@@ -205,9 +196,9 @@ func TestCollector_buildMSSQLDynamicSQL(t *testing.T) {
 func TestCollector_buildMSSQLDynamicSQL_NoTimeFilter(t *testing.T) {
 	c := &Collector{}
 
-	cols := []mssqlColumnMeta{
-		{dbColumn: "query_hash", uiKey: "queryHash", dataType: ftString, isIdentity: true},
-		{dbColumn: "count_executions", uiKey: "calls", dataType: ftInteger},
+	cols := []mssqlColumn{
+		{ColumnMeta: funcapi.ColumnMeta{Name: "queryHash", Type: funcapi.FieldTypeString}, DBColumn: "query_hash", IsIdentity: true},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "calls", Type: funcapi.FieldTypeInteger}, DBColumn: "count_executions"},
 	}
 
 	sql := c.buildMSSQLDynamicSQL(cols, "calls", 0, 500)
@@ -218,16 +209,15 @@ func TestCollector_buildMSSQLDynamicSQL_NoTimeFilter(t *testing.T) {
 	assert.NotContains(t, sql, "DATEADD")
 }
 
-func TestCollector_buildMSSQLDynamicColumns(t *testing.T) {
-	c := &Collector{}
-
-	cols := []mssqlColumnMeta{
-		{uiKey: "queryHash", displayName: "Query Hash", dataType: ftString, visible: false, isUniqueKey: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti},
-		{uiKey: "query", displayName: "Query", dataType: ftString, visible: true, isSticky: true, fullWidth: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti},
-		{uiKey: "totalTime", displayName: "Total Time", dataType: ftDuration, units: "seconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+func TestMssqlColumnSet_BuildColumns(t *testing.T) {
+	cols := []mssqlColumn{
+		{ColumnMeta: funcapi.ColumnMeta{Name: "queryHash", Tooltip: "Query Hash", Type: funcapi.FieldTypeString, Visible: false, UniqueKey: true, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect}},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sticky: true, FullWidth: true, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect}},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange}},
 	}
 
-	columns := c.buildMSSQLDynamicColumns(cols)
+	cs := mssqlColumnSet(cols)
+	columns := cs.BuildColumns()
 
 	// Verify column count
 	assert.Len(t, columns, 3)
@@ -282,10 +272,10 @@ func TestMapAndValidateMSSQLSortColumn_NoSortOptions(t *testing.T) {
 	c := &Collector{}
 
 	// Only identity columns available (no sort options)
-	identityOnlyCols := []mssqlColumnMeta{
-		{uiKey: "queryHash", isIdentity: true},
-		{uiKey: "query", isIdentity: true},
-		{uiKey: "database", isIdentity: true},
+	identityOnlyCols := []mssqlColumn{
+		{ColumnMeta: funcapi.ColumnMeta{Name: "queryHash"}, IsIdentity: true},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "query"}, IsIdentity: true},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "database"}, IsIdentity: true},
 	}
 
 	result := c.mapAndValidateMSSQLSortColumn("totalTime", identityOnlyCols)
@@ -293,7 +283,7 @@ func TestMapAndValidateMSSQLSortColumn_NoSortOptions(t *testing.T) {
 	assert.Equal(t, "queryHash", result, "should fall back to first column when no sort options")
 
 	// Empty columns list
-	result = c.mapAndValidateMSSQLSortColumn("totalTime", []mssqlColumnMeta{})
+	result = c.mapAndValidateMSSQLSortColumn("totalTime", []mssqlColumn{})
 	assert.Equal(t, "", result, "should return empty string when no columns available")
 }
 

@@ -15,101 +15,58 @@ import (
 
 const oracleMaxQueryTextLength = 4096
 
-const (
-	paramSort = "__sort"
+// oracleColumn embeds funcapi.ColumnMeta and adds Oracle-specific fields.
+type oracleColumn struct {
+	funcapi.ColumnMeta
+	SelectExpr     string // SQL expression for SELECT clause
+	IsSortOption   bool   // whether this column appears as a sort option
+	SortLabel      string // label for sort option dropdown
+	IsDefaultSort  bool   // default sort column
+	RequiresColumn string // only include if this column exists in the view
+}
 
-	ftString   = funcapi.FieldTypeString
-	ftInteger  = funcapi.FieldTypeInteger
-	ftDuration = funcapi.FieldTypeDuration
-
-	trNone     = funcapi.FieldTransformNone
-	trNumber   = funcapi.FieldTransformNumber
-	trDuration = funcapi.FieldTransformDuration
-	trText     = funcapi.FieldTransformText
-
-	visValue = funcapi.FieldVisualValue
-	visBar   = funcapi.FieldVisualBar
-
-	sortAsc  = funcapi.FieldSortAscending
-	sortDesc = funcapi.FieldSortDescending
-
-	summaryCount = funcapi.FieldSummaryCount
-	summarySum   = funcapi.FieldSummarySum
-	summaryMax   = funcapi.FieldSummaryMax
-	summaryMean  = funcapi.FieldSummaryMean
-
-	filterMulti = funcapi.FieldFilterMultiselect
-	filterRange = funcapi.FieldFilterRange
-)
-
-type oracleColumnMeta struct {
-	id             string
-	name           string
-	selectExpr     string
-	dataType       funcapi.FieldType
-	visible        bool
-	sortable       bool
-	fullWidth      bool
-	wrap           bool
-	sticky         bool
-	filter         funcapi.FieldFilter
-	visualization  funcapi.FieldVisual
-	transform      funcapi.FieldTransform
-	units          string
-	decimalPoints  int
-	uniqueKey      bool
-	sortDir        funcapi.FieldSort
-	summary        funcapi.FieldSummary
-	sortLabel      string
-	isSortOption   bool
-	isDefaultSort  bool
-	requiresColumn string
-	isLabel        bool
-	isPrimary      bool
-	isMetric       bool
-	chartGroup     string
-	chartTitle     string
-	isDefaultChart bool
+func oracleColumnSet(cols []oracleColumn) funcapi.ColumnSet[oracleColumn] {
+	return funcapi.Columns(cols, func(c oracleColumn) funcapi.ColumnMeta { return c.ColumnMeta })
 }
 
 type oracleTopLayout struct {
-	cols []oracleColumnMeta
+	cols []oracleColumn
 	join string
 }
 
-var oracleTopColumns = []oracleColumnMeta{
-	{id: "sqlId", name: "SQL ID", selectExpr: "s.sql_id", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, uniqueKey: true, sortDir: sortAsc, summary: summaryCount},
-	{id: "query", name: "Query", selectExpr: "s.sql_text", dataType: ftString, visible: true, sortable: false, filter: filterMulti, transform: trText, sticky: true, fullWidth: true, wrap: true},
-	{id: "schema", name: "Schema", selectExpr: "s.parsing_schema_name", dataType: ftString, visible: true, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount, isLabel: true, isPrimary: true},
+var oracleTopColumns = []oracleColumn{
+	{ColumnMeta: funcapi.ColumnMeta{Name: "sqlId", Tooltip: "SQL ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.sql_id"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sticky: true, FullWidth: true, Wrap: true}, SelectExpr: "s.sql_text"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "schema", Tooltip: "Schema", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, GroupBy: &funcapi.GroupByOptions{IsDefault: true}}, SelectExpr: "s.parsing_schema_name"},
 
-	{id: "executions", name: "Executions", selectExpr: "NVL(s.executions, 0)", dataType: ftInteger, visible: true, sortable: true, filter: filterRange, transform: trNumber, sortDir: sortDesc, summary: summarySum, isSortOption: true, sortLabel: "Top queries by Executions", isMetric: true, chartGroup: "Calls", chartTitle: "Executions", isDefaultChart: true},
-	{id: "totalTime", name: "Total Time", selectExpr: "NVL(s.elapsed_time, 0) / 1000", dataType: ftDuration, visible: true, sortable: true, filter: filterRange, transform: trDuration, units: "milliseconds", decimalPoints: 2, sortDir: sortDesc, summary: summarySum, isSortOption: true, isDefaultSort: true, sortLabel: "Top queries by Total Time", isMetric: true, chartGroup: "Time", chartTitle: "Execution Time", isDefaultChart: true},
-	{id: "avgTime", name: "Avg Time", selectExpr: "CASE WHEN NVL(s.executions,0) = 0 THEN 0 ELSE (s.elapsed_time / s.executions) / 1000 END", dataType: ftDuration, visible: true, sortable: true, filter: filterRange, transform: trDuration, units: "milliseconds", decimalPoints: 2, sortDir: sortDesc, summary: summaryMean, isSortOption: true, sortLabel: "Top queries by Avg Time", isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
-	{id: "cpuTime", name: "CPU Time", selectExpr: "NVL(s.cpu_time, 0) / 1000", dataType: ftDuration, visible: true, sortable: true, filter: filterRange, transform: trDuration, units: "milliseconds", decimalPoints: 2, sortDir: sortDesc, summary: summarySum, isSortOption: true, sortLabel: "Top queries by CPU Time", isMetric: true, chartGroup: "CPU", chartTitle: "CPU Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "executions", Tooltip: "Executions", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Calls", Title: "Executions", IsDefault: true}}, SelectExpr: "NVL(s.executions, 0)", IsSortOption: true, SortLabel: "Top queries by Executions"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time", IsDefault: true}}, SelectExpr: "NVL(s.elapsed_time, 0) / 1000", IsSortOption: true, IsDefaultSort: true, SortLabel: "Top queries by Total Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "avgTime", Tooltip: "Avg Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, SelectExpr: "CASE WHEN NVL(s.executions,0) = 0 THEN 0 ELSE (s.elapsed_time / s.executions) / 1000 END", IsSortOption: true, SortLabel: "Top queries by Avg Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "cpuTime", Tooltip: "CPU Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "CPU", Title: "CPU Time"}}, SelectExpr: "NVL(s.cpu_time, 0) / 1000", IsSortOption: true, SortLabel: "Top queries by CPU Time"},
 
-	{id: "bufferGets", name: "Buffer Gets", selectExpr: "NVL(s.buffer_gets, 0)", dataType: ftInteger, visible: true, sortable: true, filter: filterRange, transform: trNumber, sortDir: sortDesc, summary: summarySum, isSortOption: true, sortLabel: "Top queries by Buffer Gets", isMetric: true, chartGroup: "IO", chartTitle: "I/O"},
-	{id: "diskReads", name: "Disk Reads", selectExpr: "NVL(s.disk_reads, 0)", dataType: ftInteger, visible: true, sortable: true, filter: filterRange, transform: trNumber, sortDir: sortDesc, summary: summarySum, isSortOption: true, sortLabel: "Top queries by Disk Reads", isMetric: true, chartGroup: "IO", chartTitle: "I/O"},
-	{id: "rowsProcessed", name: "Rows Processed", selectExpr: "NVL(s.rows_processed, 0)", dataType: ftInteger, visible: true, sortable: true, filter: filterRange, transform: trNumber, sortDir: sortDesc, summary: summarySum, isSortOption: true, sortLabel: "Top queries by Rows Processed", isMetric: true, chartGroup: "Rows", chartTitle: "Rows"},
-	{id: "parseCalls", name: "Parse Calls", selectExpr: "NVL(s.parse_calls, 0)", dataType: ftInteger, visible: false, sortable: true, filter: filterRange, transform: trNumber, sortDir: sortDesc, summary: summarySum, isSortOption: true, sortLabel: "Top queries by Parse Calls", isMetric: true, chartGroup: "Parse", chartTitle: "Parse Calls"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "bufferGets", Tooltip: "Buffer Gets", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "IO", Title: "I/O"}}, SelectExpr: "NVL(s.buffer_gets, 0)", IsSortOption: true, SortLabel: "Top queries by Buffer Gets"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "diskReads", Tooltip: "Disk Reads", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "IO", Title: "I/O"}}, SelectExpr: "NVL(s.disk_reads, 0)", IsSortOption: true, SortLabel: "Top queries by Disk Reads"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsProcessed", Tooltip: "Rows Processed", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}}, SelectExpr: "NVL(s.rows_processed, 0)", IsSortOption: true, SortLabel: "Top queries by Rows Processed"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "parseCalls", Tooltip: "Parse Calls", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Parse", Title: "Parse Calls"}}, SelectExpr: "NVL(s.parse_calls, 0)", IsSortOption: true, SortLabel: "Top queries by Parse Calls"},
 
-	{id: "module", name: "Module", selectExpr: "s.module", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount, requiresColumn: "MODULE", isLabel: true},
-	{id: "action", name: "Action", selectExpr: "s.action", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount, requiresColumn: "ACTION", isLabel: true},
-	{id: "lastActiveTime", name: "Last Active", selectExpr: "TO_CHAR(CAST(s.last_active_time AS TIMESTAMP), 'YYYY-MM-DD\"T\"HH24:MI:SS.FF3')", dataType: ftString, visible: false, sortable: false, filter: filterRange, transform: trText, requiresColumn: "LAST_ACTIVE_TIME"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "module", Tooltip: "Module", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, GroupBy: &funcapi.GroupByOptions{}}, SelectExpr: "s.module", RequiresColumn: "MODULE"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "action", Tooltip: "Action", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, GroupBy: &funcapi.GroupByOptions{}}, SelectExpr: "s.action", RequiresColumn: "ACTION"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "lastActiveTime", Tooltip: "Last Active", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformText}, SelectExpr: "TO_CHAR(CAST(s.last_active_time AS TIMESTAMP), 'YYYY-MM-DD\"T\"HH24:MI:SS.FF3')", RequiresColumn: "LAST_ACTIVE_TIME"},
 }
 
-var oracleRunningColumns = []oracleColumnMeta{
-	{id: "sessionId", name: "Session", selectExpr: "s.sid || ',' || s.serial#", dataType: ftString, visible: true, sortable: false, filter: filterMulti, transform: trText, uniqueKey: true, sortDir: sortAsc, summary: summaryCount},
-	{id: "username", name: "User", selectExpr: "s.username", dataType: ftString, visible: true, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "status", name: "Status", selectExpr: "s.status", dataType: ftString, visible: true, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "type", name: "Type", selectExpr: "s.type", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "sqlId", name: "SQL ID", selectExpr: "s.sql_id", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "query", name: "Query", selectExpr: "q.sql_text", dataType: ftString, visible: true, sortable: false, filter: filterMulti, transform: trText, sticky: true, fullWidth: true, wrap: true},
-	{id: "lastCallMs", name: "Elapsed", selectExpr: "NVL(s.last_call_et, 0) * 1000", dataType: ftDuration, visible: true, sortable: true, filter: filterRange, transform: trDuration, units: "milliseconds", decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, isSortOption: true, isDefaultSort: true, sortLabel: "Running queries by Elapsed Time"},
-	{id: "sqlExecStart", name: "SQL Exec Start", selectExpr: "TO_CHAR(CAST(s.sql_exec_start AS TIMESTAMP), 'YYYY-MM-DD\"T\"HH24:MI:SS.FF3')", dataType: ftString, visible: false, sortable: true, filter: filterRange, transform: trText, sortDir: sortDesc, summary: summaryMax},
-	{id: "module", name: "Module", selectExpr: "s.module", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "action", name: "Action", selectExpr: "s.action", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "program", name: "Program", selectExpr: "s.program", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "machine", name: "Machine", selectExpr: "s.machine", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
+var oracleRunningColumns = []oracleColumn{
+	{ColumnMeta: funcapi.ColumnMeta{Name: "sessionId", Tooltip: "Session", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.sid || ',' || s.serial#"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "username", Tooltip: "User", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.username"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "status", Tooltip: "Status", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.status"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "type", Tooltip: "Type", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.type"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "sqlId", Tooltip: "SQL ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.sql_id"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sticky: true, FullWidth: true, Wrap: true}, SelectExpr: "q.sql_text"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "lastCallMs", Tooltip: "Elapsed", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, SelectExpr: "NVL(s.last_call_et, 0) * 1000", IsSortOption: true, IsDefaultSort: true, SortLabel: "Running queries by Elapsed Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "sqlExecStart", Tooltip: "SQL Exec Start", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, SelectExpr: "TO_CHAR(CAST(s.sql_exec_start AS TIMESTAMP), 'YYYY-MM-DD\"T\"HH24:MI:SS.FF3')"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "module", Tooltip: "Module", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.module"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "action", Tooltip: "Action", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.action"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "program", Tooltip: "Program", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.program"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "machine", Tooltip: "Machine", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.machine"},
 }
 
 func oracleMethods() []module.MethodConfig {
@@ -170,106 +127,68 @@ func oracleHandleMethod(ctx context.Context, job *module.Job, method string, par
 
 	switch method {
 	case "top-queries":
-		return collector.collectTopQueries(ctx, params.Column(paramSort))
+		return collector.collectTopQueries(ctx, params.Column("__sort"))
 	case "running-queries":
-		return collector.collectRunningQueries(ctx, params.Column(paramSort))
+		return collector.collectRunningQueries(ctx, params.Column("__sort"))
 	default:
 		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
 	}
 }
 
-func buildOracleSortParam(cols []oracleColumnMeta) funcapi.ParamConfig {
+func buildOracleSortParam(cols []oracleColumn) funcapi.ParamConfig {
+	var options []funcapi.ParamOption
+	sortDir := funcapi.FieldSortDescending
+	for _, col := range cols {
+		if !col.IsSortOption {
+			continue
+		}
+		opt := funcapi.ParamOption{
+			ID:     col.Name,
+			Column: col.Name,
+			Name:   col.SortLabel,
+			Sort:   &sortDir,
+		}
+		if col.IsDefaultSort {
+			opt.Default = true
+		}
+		options = append(options, opt)
+	}
 	return funcapi.ParamConfig{
-		ID:         paramSort,
+		ID:         "__sort",
 		Name:       "Filter By",
 		Help:       "Select the primary sort column",
 		Selection:  funcapi.ParamSelect,
-		Options:    buildOracleSortOptions(cols),
+		Options:    options,
 		UniqueView: true,
 	}
 }
 
-func buildOracleSortOptions(cols []oracleColumnMeta) []funcapi.ParamOption {
-	var sortOptions []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range cols {
-		if !col.isSortOption {
-			continue
-		}
-		opt := funcapi.ParamOption{
-			ID:     col.id,
-			Column: col.id,
-			Name:   col.sortLabel,
-			Sort:   &sortDir,
-		}
-		if col.isDefaultSort {
-			opt.Default = true
-		}
-		sortOptions = append(sortOptions, opt)
-	}
-	return sortOptions
-}
-
-func buildOracleColumns(cols []oracleColumnMeta) map[string]any {
-	result := make(map[string]any, len(cols))
-	for i, col := range cols {
-		visual := visValue
-		if col.dataType == ftDuration {
-			visual = visBar
-		}
-		colDef := funcapi.Column{
-			Index:                 i,
-			Name:                  col.name,
-			Type:                  col.dataType,
-			Units:                 col.units,
-			Visualization:         visual,
-			Sort:                  col.sortDir,
-			Sortable:              col.sortable,
-			Sticky:                col.sticky,
-			Summary:               col.summary,
-			Filter:                col.filter,
-			FullWidth:             col.fullWidth,
-			Wrap:                  col.wrap,
-			DefaultExpandedFilter: false,
-			UniqueKey:             col.uniqueKey,
-			Visible:               col.visible,
-			ValueOptions: funcapi.ValueOptions{
-				Transform:     col.transform,
-				DecimalPoints: col.decimalPoints,
-				DefaultValue:  nil,
-			},
-		}
-		result[col.id] = colDef.BuildColumn()
-	}
-	return result
-}
-
-func buildOracleSelect(cols []oracleColumnMeta) string {
+func buildOracleSelect(cols []oracleColumn) string {
 	parts := make([]string, 0, len(cols))
 	for _, col := range cols {
-		expr := col.selectExpr
+		expr := col.SelectExpr
 		if expr == "" {
-			expr = col.id
+			expr = col.Name
 		}
-		parts = append(parts, fmt.Sprintf("%s AS %s", expr, col.id))
+		parts = append(parts, fmt.Sprintf("%s AS %s", expr, col.Name))
 	}
 	return strings.Join(parts, ", ")
 }
 
-func mapOracleSortColumn(input string, cols []oracleColumnMeta) string {
+func mapOracleSortColumn(input string, cols []oracleColumn) string {
 	for _, col := range cols {
-		if col.isSortOption && col.id == input {
-			return col.id
+		if col.IsSortOption && col.Name == input {
+			return col.Name
 		}
 	}
 	for _, col := range cols {
-		if col.isDefaultSort {
-			return col.id
+		if col.IsDefaultSort {
+			return col.Name
 		}
 	}
 	for _, col := range cols {
-		if col.isSortOption {
-			return col.id
+		if col.IsSortOption {
+			return col.Name
 		}
 	}
 	return ""
@@ -283,14 +202,14 @@ func (c *Collector) oracleTopLayout(ctx context.Context) oracleTopLayout {
 	return buildOracleTopLayout(available)
 }
 
-func filterOracleColumns(cols []oracleColumnMeta, available map[string]bool) []oracleColumnMeta {
-	filtered := make([]oracleColumnMeta, 0, len(cols))
+func filterOracleColumns(cols []oracleColumn, available map[string]bool) []oracleColumn {
+	filtered := make([]oracleColumn, 0, len(cols))
 	for _, col := range cols {
-		if col.requiresColumn != "" {
+		if col.RequiresColumn != "" {
 			if available == nil {
 				continue
 			}
-			if !available[strings.ToUpper(col.requiresColumn)] {
+			if !available[strings.ToUpper(col.RequiresColumn)] {
 				continue
 			}
 		}
@@ -301,15 +220,15 @@ func filterOracleColumns(cols []oracleColumnMeta, available map[string]bool) []o
 
 func buildOracleTopLayout(available map[string]bool) oracleTopLayout {
 	schemaExpr, schemaJoin := resolveOracleSchemaExpr(available)
-	filtered := make([]oracleColumnMeta, 0, len(oracleTopColumns))
+	filtered := make([]oracleColumn, 0, len(oracleTopColumns))
 	for _, col := range oracleTopColumns {
-		if col.id == "schema" {
+		if col.Name == "schema" {
 			if schemaExpr == "" {
 				continue
 			}
-			col.selectExpr = schemaExpr
+			col.SelectExpr = schemaExpr
 		}
-		if col.requiresColumn != "" && !available[strings.ToUpper(col.requiresColumn)] {
+		if col.RequiresColumn != "" && !available[strings.ToUpper(col.RequiresColumn)] {
 			continue
 		}
 		filtered = append(filtered, col)
@@ -389,31 +308,33 @@ FETCH FIRST %d ROWS ONLY
 	if err != nil {
 		return &module.FunctionResponse{Status: 500, Message: err.Error()}
 	}
+
+	cs := oracleColumnSet(topCols)
 	if len(data) == 0 {
 		return &module.FunctionResponse{
 			Status:            200,
 			Message:           "No SQL statements found.",
 			Help:              "Top SQL statements from V$SQLSTATS",
-			Columns:           buildOracleColumns(topCols),
+			Columns:           cs.BuildColumns(),
 			Data:              [][]any{},
 			DefaultSortColumn: sortColumn,
 			RequiredParams:    []funcapi.ParamConfig{buildOracleSortParam(topCols)},
-			Charts:            oracleTopQueriesCharts(topCols),
-			DefaultCharts:     oracleTopQueriesDefaultCharts(topCols),
-			GroupBy:           oracleTopQueriesGroupBy(topCols),
+			Charts:            cs.BuildCharts(),
+			DefaultCharts:     cs.BuildDefaultCharts(),
+			GroupBy:           cs.BuildGroupBy(),
 		}
 	}
 
 	return &module.FunctionResponse{
 		Status:            200,
 		Help:              "Top SQL statements from V$SQLSTATS. WARNING: Query text may contain unmasked literals (potential PII).",
-		Columns:           buildOracleColumns(topCols),
+		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: sortColumn,
 		RequiredParams:    []funcapi.ParamConfig{buildOracleSortParam(topCols)},
-		Charts:            oracleTopQueriesCharts(topCols),
-		DefaultCharts:     oracleTopQueriesDefaultCharts(topCols),
-		GroupBy:           oracleTopQueriesGroupBy(topCols),
+		Charts:            cs.BuildCharts(),
+		DefaultCharts:     cs.BuildDefaultCharts(),
+		GroupBy:           cs.BuildGroupBy(),
 	}
 }
 
@@ -454,12 +375,13 @@ FETCH FIRST %d ROWS ONLY
 		return &module.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
+	cs := oracleColumnSet(oracleRunningColumns)
 	if len(data) == 0 {
 		return &module.FunctionResponse{
 			Status:            200,
 			Message:           "No running queries found.",
 			Help:              "Currently running SQL statements from V$SESSION",
-			Columns:           buildOracleColumns(oracleRunningColumns),
+			Columns:           cs.BuildColumns(),
 			Data:              [][]any{},
 			DefaultSortColumn: sortColumn,
 			RequiredParams:    []funcapi.ParamConfig{buildOracleSortParam(oracleRunningColumns)},
@@ -469,14 +391,14 @@ FETCH FIRST %d ROWS ONLY
 	return &module.FunctionResponse{
 		Status:            200,
 		Help:              "Currently running SQL statements from V$SESSION. WARNING: Query text may contain unmasked literals (potential PII).",
-		Columns:           buildOracleColumns(oracleRunningColumns),
+		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: sortColumn,
 		RequiredParams:    []funcapi.ParamConfig{buildOracleSortParam(oracleRunningColumns)},
 	}
 }
 
-func scanOracleRows(rows *sql.Rows, cols []oracleColumnMeta) ([][]any, error) {
+func scanOracleRows(rows *sql.Rows, cols []oracleColumn) ([][]any, error) {
 	data := make([][]any, 0, 500)
 
 	for rows.Next() {
@@ -484,14 +406,14 @@ func scanOracleRows(rows *sql.Rows, cols []oracleColumnMeta) ([][]any, error) {
 		valuePtrs := make([]any, len(cols))
 
 		for i, col := range cols {
-			switch col.dataType {
-			case ftString:
+			switch col.Type {
+			case funcapi.FieldTypeString:
 				var v sql.NullString
 				values[i] = &v
-			case ftInteger:
+			case funcapi.FieldTypeInteger:
 				var v sql.NullInt64
 				values[i] = &v
-			case ftDuration:
+			case funcapi.FieldTypeDuration:
 				var v sql.NullFloat64
 				values[i] = &v
 			default:
@@ -511,7 +433,7 @@ func scanOracleRows(rows *sql.Rows, cols []oracleColumnMeta) ([][]any, error) {
 			case *sql.NullString:
 				if v.Valid {
 					s := v.String
-					if col.id == "query" {
+					if col.Name == "query" {
 						s = strmutil.TruncateText(s, oracleMaxQueryTextLength)
 					}
 					row[i] = s
@@ -545,99 +467,3 @@ func scanOracleRows(rows *sql.Rows, cols []oracleColumnMeta) ([][]any, error) {
 	return data, nil
 }
 
-func oracleTopQueriesCharts(cols []oracleColumnMeta) map[string]module.ChartConfig {
-	charts := make(map[string]module.ChartConfig)
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" {
-			continue
-		}
-		cfg, ok := charts[col.chartGroup]
-		if !ok {
-			title := col.chartTitle
-			if title == "" {
-				title = col.chartGroup
-			}
-			cfg = module.ChartConfig{Name: title, Type: "stacked-bar"}
-		}
-		cfg.Columns = append(cfg.Columns, col.id)
-		charts[col.chartGroup] = cfg
-	}
-	return charts
-}
-
-func oracleTopQueriesDefaultCharts(cols []oracleColumnMeta) [][]string {
-	label := primaryOracleLabel(cols)
-	if label == "" {
-		return nil
-	}
-	chartGroups := defaultOracleChartGroups(cols)
-	out := make([][]string, 0, len(chartGroups))
-	for _, group := range chartGroups {
-		out = append(out, []string{group, label})
-	}
-	return out
-}
-
-func oracleTopQueriesGroupBy(cols []oracleColumnMeta) map[string]module.GroupByConfig {
-	groupBy := make(map[string]module.GroupByConfig)
-	for _, col := range cols {
-		if !col.isLabel {
-			continue
-		}
-		groupBy[col.id] = module.GroupByConfig{
-			Name:    "Group by " + col.name,
-			Columns: []string{col.id},
-		}
-	}
-	return groupBy
-}
-
-func hasOracleColumn(cols []oracleColumnMeta, id string) bool {
-	for _, col := range cols {
-		if col.id == id {
-			return true
-		}
-	}
-	return false
-}
-
-func primaryOracleLabel(cols []oracleColumnMeta) string {
-	for _, col := range cols {
-		if col.isPrimary {
-			return col.id
-		}
-	}
-	for _, col := range cols {
-		if col.isLabel {
-			return col.id
-		}
-	}
-	return ""
-}
-
-func defaultOracleChartGroups(cols []oracleColumnMeta) []string {
-	groups := make([]string, 0)
-	seen := make(map[string]bool)
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" || !col.isDefaultChart {
-			continue
-		}
-		if !seen[col.chartGroup] {
-			seen[col.chartGroup] = true
-			groups = append(groups, col.chartGroup)
-		}
-	}
-	if len(groups) > 0 {
-		return groups
-	}
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" {
-			continue
-		}
-		if !seen[col.chartGroup] {
-			seen[col.chartGroup] = true
-			groups = append(groups, col.chartGroup)
-		}
-	}
-	return groups
-}

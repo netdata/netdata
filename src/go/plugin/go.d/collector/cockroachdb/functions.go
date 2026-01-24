@@ -17,102 +17,57 @@ import (
 
 const crdbMaxQueryTextLength = 4096
 
-const (
-	paramSort = "__sort"
-
-	ftString   = funcapi.FieldTypeString
-	ftInteger  = funcapi.FieldTypeInteger
-	ftFloat    = funcapi.FieldTypeFloat
-	ftDuration = funcapi.FieldTypeDuration
-
-	trNone     = funcapi.FieldTransformNone
-	trNumber   = funcapi.FieldTransformNumber
-	trDuration = funcapi.FieldTransformDuration
-	trText     = funcapi.FieldTransformText
-
-	visValue = funcapi.FieldVisualValue
-	visBar   = funcapi.FieldVisualBar
-
-	sortAsc  = funcapi.FieldSortAscending
-	sortDesc = funcapi.FieldSortDescending
-
-	summaryCount = funcapi.FieldSummaryCount
-	summarySum   = funcapi.FieldSummarySum
-	summaryMax   = funcapi.FieldSummaryMax
-	summaryMean  = funcapi.FieldSummaryMean
-
-	filterMulti = funcapi.FieldFilterMultiselect
-	filterRange = funcapi.FieldFilterRange
-)
-
 var errSQLDSNNotSet = errors.New("SQL DSN is not set")
 
-type crdbColumnMeta struct {
-	id             string
-	name           string
-	selectExpr     string
-	dataType       funcapi.FieldType
-	visible        bool
-	sortable       bool
-	fullWidth      bool
-	wrap           bool
-	sticky         bool
-	filter         funcapi.FieldFilter
-	visualization  funcapi.FieldVisual
-	transform      funcapi.FieldTransform
-	units          string
-	decimalPoints  int
-	uniqueKey      bool
-	sortDir        funcapi.FieldSort
-	summary        funcapi.FieldSummary
-	sortLabel      string
-	isSortOption   bool
-	isDefaultSort  bool
-	isLabel        bool
-	isPrimary      bool
-	isMetric       bool
-	chartGroup     string
-	chartTitle     string
-	isDefaultChart bool
+type crdbColumn struct {
+	funcapi.ColumnMeta
+	SelectExpr    string // SQL expression for SELECT clause
+	IsSortOption  bool   // whether this column appears as a sort option
+	SortLabel     string // label for sort option dropdown
+	IsDefaultSort bool   // default sort column
 }
 
-var crdbTopColumns = []crdbColumnMeta{
-	{id: "fingerprintId", name: "Fingerprint ID", selectExpr: "s.fingerprint_id::STRING", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, uniqueKey: true, sortDir: sortAsc, summary: summaryCount},
-	{id: "query", name: "Query", selectExpr: "s.metadata->>'query'", dataType: ftString, visible: true, sortable: false, filter: filterMulti, transform: trText, sticky: true, fullWidth: true, wrap: true},
-	{id: "database", name: "Database", selectExpr: "s.metadata->>'db'", dataType: ftString, visible: true, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount, isLabel: true, isPrimary: true},
-	{id: "application", name: "Application", selectExpr: "s.app_name", dataType: ftString, visible: true, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount, isLabel: true},
-	{id: "statementType", name: "Statement Type", selectExpr: "s.metadata->>'stmtTyp'", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount, isLabel: true},
-	{id: "distributed", name: "Distributed", selectExpr: "s.metadata->>'distsql'", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "fullScan", name: "Full Scan", selectExpr: "s.metadata->>'fullScan'", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "implicitTxn", name: "Implicit Txn", selectExpr: "s.metadata->>'implicitTxn'", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "vectorized", name: "Vectorized", selectExpr: "s.metadata->>'vec'", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-
-	{id: "executions", name: "Executions", selectExpr: "COALESCE((s.statistics->'statistics'->>'cnt')::INT8, 0)", dataType: ftInteger, visible: true, sortable: true, filter: filterRange, transform: trNumber, sortDir: sortDesc, summary: summarySum, isSortOption: true, sortLabel: "Top queries by Executions", isMetric: true, chartGroup: "Calls", chartTitle: "Executions", isDefaultChart: true},
-	{id: "totalTime", name: "Total Time", selectExpr: "COALESCE((s.statistics->'statistics'->'svcLat'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0) * 1000", dataType: ftDuration, visible: true, sortable: true, filter: filterRange, transform: trDuration, units: "milliseconds", decimalPoints: 2, sortDir: sortDesc, summary: summarySum, isSortOption: true, isDefaultSort: true, sortLabel: "Top queries by Total Time", isMetric: true, chartGroup: "Time", chartTitle: "Execution Time", isDefaultChart: true},
-	{id: "meanTime", name: "Mean Time", selectExpr: "COALESCE((s.statistics->'statistics'->'svcLat'->>'mean')::FLOAT8, 0) * 1000", dataType: ftDuration, visible: true, sortable: true, filter: filterRange, transform: trDuration, units: "milliseconds", decimalPoints: 2, sortDir: sortDesc, summary: summaryMean, isSortOption: true, sortLabel: "Top queries by Mean Time", isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
-	{id: "runTime", name: "Run Time", selectExpr: "COALESCE((s.statistics->'statistics'->'runLat'->>'mean')::FLOAT8, 0) * 1000", dataType: ftDuration, visible: false, sortable: true, filter: filterRange, transform: trDuration, units: "milliseconds", decimalPoints: 2, sortDir: sortDesc, summary: summaryMean, isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
-	{id: "planTime", name: "Plan Time", selectExpr: "COALESCE((s.statistics->'statistics'->'planLat'->>'mean')::FLOAT8, 0) * 1000", dataType: ftDuration, visible: false, sortable: true, filter: filterRange, transform: trDuration, units: "milliseconds", decimalPoints: 2, sortDir: sortDesc, summary: summaryMean, isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
-	{id: "parseTime", name: "Parse Time", selectExpr: "COALESCE((s.statistics->'statistics'->'parseLat'->>'mean')::FLOAT8, 0) * 1000", dataType: ftDuration, visible: false, sortable: true, filter: filterRange, transform: trDuration, units: "milliseconds", decimalPoints: 2, sortDir: sortDesc, summary: summaryMean, isMetric: true, chartGroup: "Time", chartTitle: "Execution Time"},
-
-	{id: "rowsRead", name: "Rows Read", selectExpr: "CAST(ROUND(COALESCE((s.statistics->'statistics'->'rowsRead'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0)) AS INT8)", dataType: ftInteger, visible: true, sortable: true, filter: filterRange, transform: trNumber, sortDir: sortDesc, summary: summarySum, isSortOption: true, sortLabel: "Top queries by Rows Read", isMetric: true, chartGroup: "Rows", chartTitle: "Rows"},
-	{id: "rowsWritten", name: "Rows Written", selectExpr: "CAST(ROUND(COALESCE((s.statistics->'statistics'->'rowsWritten'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0)) AS INT8)", dataType: ftInteger, visible: true, sortable: true, filter: filterRange, transform: trNumber, sortDir: sortDesc, summary: summarySum, isSortOption: true, sortLabel: "Top queries by Rows Written", isMetric: true, chartGroup: "Rows", chartTitle: "Rows"},
-	{id: "rowsReturned", name: "Rows Returned", selectExpr: "CAST(ROUND(COALESCE((s.statistics->'statistics'->'numRows'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0)) AS INT8)", dataType: ftInteger, visible: true, sortable: true, filter: filterRange, transform: trNumber, sortDir: sortDesc, summary: summarySum, isSortOption: true, sortLabel: "Top queries by Rows Returned", isMetric: true, chartGroup: "Rows", chartTitle: "Rows"},
-	{id: "bytesRead", name: "Bytes Read", selectExpr: "CAST(ROUND(COALESCE((s.statistics->'statistics'->'bytesRead'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0)) AS INT8)", dataType: ftInteger, visible: false, sortable: true, filter: filterRange, transform: trNumber, sortDir: sortDesc, summary: summarySum, isSortOption: true, sortLabel: "Top queries by Bytes Read", isMetric: true, chartGroup: "Bytes", chartTitle: "Bytes"},
-	{id: "maxRetries", name: "Max Retries", selectExpr: "COALESCE((s.statistics->'statistics'->>'maxRetries')::INT8, 0)", dataType: ftInteger, visible: false, sortable: true, filter: filterRange, transform: trNumber, sortDir: sortDesc, summary: summaryMax, isMetric: true, chartGroup: "Retries", chartTitle: "Retries"},
+func crdbColumnSet(cols []crdbColumn) funcapi.ColumnSet[crdbColumn] {
+	return funcapi.Columns(cols, func(c crdbColumn) funcapi.ColumnMeta { return c.ColumnMeta })
 }
 
-var crdbRunningColumns = []crdbColumnMeta{
-	{id: "queryId", name: "Query ID", selectExpr: "s.query_id::STRING", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, uniqueKey: true, sortDir: sortAsc, summary: summaryCount},
-	{id: "query", name: "Query", selectExpr: "s.query", dataType: ftString, visible: true, sortable: false, filter: filterMulti, transform: trText, sticky: true, fullWidth: true, wrap: true},
-	{id: "user", name: "User", selectExpr: "s.user_name", dataType: ftString, visible: true, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "application", name: "Application", selectExpr: "s.application_name", dataType: ftString, visible: true, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "clientAddress", name: "Client Address", selectExpr: "s.client_address", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "nodeId", name: "Node ID", selectExpr: "s.node_id::STRING", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "sessionId", name: "Session ID", selectExpr: "s.session_id::STRING", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "phase", name: "Phase", selectExpr: "s.phase", dataType: ftString, visible: true, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "distributed", name: "Distributed", selectExpr: "s.distributed::STRING", dataType: ftString, visible: false, sortable: true, filter: filterMulti, transform: trText, sortDir: sortAsc, summary: summaryCount},
-	{id: "startTime", name: "Start Time", selectExpr: "TO_CHAR(s.start, 'YYYY-MM-DD\"T\"HH24:MI:SS.FF3')", dataType: ftString, visible: false, sortable: true, filter: filterRange, transform: trText, sortDir: sortDesc, summary: summaryMax},
-	{id: "elapsedMs", name: "Elapsed", selectExpr: "EXTRACT(EPOCH FROM (clock_timestamp() - s.start)) * 1000", dataType: ftDuration, visible: true, sortable: true, filter: filterRange, transform: trDuration, units: "milliseconds", decimalPoints: 2, sortDir: sortDesc, summary: summaryMax, isSortOption: true, isDefaultSort: true, sortLabel: "Running queries by Elapsed Time"},
+var crdbTopColumns = []crdbColumn{
+	{ColumnMeta: funcapi.ColumnMeta{Name: "fingerprintId", Tooltip: "Fingerprint ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.fingerprint_id::STRING"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sticky: true, FullWidth: true, Wrap: true}, SelectExpr: "s.metadata->>'query'"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "database", Tooltip: "Database", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, GroupBy: &funcapi.GroupByOptions{IsDefault: true}}, SelectExpr: "s.metadata->>'db'"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "application", Tooltip: "Application", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, GroupBy: &funcapi.GroupByOptions{}}, SelectExpr: "s.app_name"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "statementType", Tooltip: "Statement Type", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, GroupBy: &funcapi.GroupByOptions{}}, SelectExpr: "s.metadata->>'stmtTyp'"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "distributed", Tooltip: "Distributed", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.metadata->>'distsql'"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "fullScan", Tooltip: "Full Scan", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.metadata->>'fullScan'"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "implicitTxn", Tooltip: "Implicit Txn", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.metadata->>'implicitTxn'"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "vectorized", Tooltip: "Vectorized", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.metadata->>'vec'"},
+
+	{ColumnMeta: funcapi.ColumnMeta{Name: "executions", Tooltip: "Executions", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Calls", Title: "Executions", IsDefault: true}}, SelectExpr: "COALESCE((s.statistics->'statistics'->>'cnt')::INT8, 0)", IsSortOption: true, SortLabel: "Top queries by Executions"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time", IsDefault: true}}, SelectExpr: "COALESCE((s.statistics->'statistics'->'svcLat'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0) * 1000", IsSortOption: true, IsDefaultSort: true, SortLabel: "Top queries by Total Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "meanTime", Tooltip: "Mean Time", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, SelectExpr: "COALESCE((s.statistics->'statistics'->'svcLat'->>'mean')::FLOAT8, 0) * 1000", IsSortOption: true, SortLabel: "Top queries by Mean Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "runTime", Tooltip: "Run Time", Type: funcapi.FieldTypeDuration, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, SelectExpr: "COALESCE((s.statistics->'statistics'->'runLat'->>'mean')::FLOAT8, 0) * 1000"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "planTime", Tooltip: "Plan Time", Type: funcapi.FieldTypeDuration, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, SelectExpr: "COALESCE((s.statistics->'statistics'->'planLat'->>'mean')::FLOAT8, 0) * 1000"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "parseTime", Tooltip: "Parse Time", Type: funcapi.FieldTypeDuration, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, SelectExpr: "COALESCE((s.statistics->'statistics'->'parseLat'->>'mean')::FLOAT8, 0) * 1000"},
+
+	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsRead", Tooltip: "Rows Read", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}}, SelectExpr: "CAST(ROUND(COALESCE((s.statistics->'statistics'->'rowsRead'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0)) AS INT8)", IsSortOption: true, SortLabel: "Top queries by Rows Read"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsWritten", Tooltip: "Rows Written", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}}, SelectExpr: "CAST(ROUND(COALESCE((s.statistics->'statistics'->'rowsWritten'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0)) AS INT8)", IsSortOption: true, SortLabel: "Top queries by Rows Written"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsReturned", Tooltip: "Rows Returned", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}}, SelectExpr: "CAST(ROUND(COALESCE((s.statistics->'statistics'->'numRows'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0)) AS INT8)", IsSortOption: true, SortLabel: "Top queries by Rows Returned"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "bytesRead", Tooltip: "Bytes Read", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Bytes", Title: "Bytes"}}, SelectExpr: "CAST(ROUND(COALESCE((s.statistics->'statistics'->'bytesRead'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0)) AS INT8)", IsSortOption: true, SortLabel: "Top queries by Bytes Read"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "maxRetries", Tooltip: "Max Retries", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Chart: &funcapi.ChartOptions{Group: "Retries", Title: "Retries"}}, SelectExpr: "COALESCE((s.statistics->'statistics'->>'maxRetries')::INT8, 0)"},
+}
+
+var crdbRunningColumns = []crdbColumn{
+	{ColumnMeta: funcapi.ColumnMeta{Name: "queryId", Tooltip: "Query ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.query_id::STRING"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sticky: true, FullWidth: true, Wrap: true}, SelectExpr: "s.query"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "user", Tooltip: "User", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.user_name"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "application", Tooltip: "Application", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.application_name"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "clientAddress", Tooltip: "Client Address", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.client_address"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "nodeId", Tooltip: "Node ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.node_id::STRING"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "sessionId", Tooltip: "Session ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.session_id::STRING"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "phase", Tooltip: "Phase", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.phase"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "distributed", Tooltip: "Distributed", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.distributed::STRING"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "startTime", Tooltip: "Start Time", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, SelectExpr: "TO_CHAR(s.start, 'YYYY-MM-DD\"T\"HH24:MI:SS.FF3')"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "elapsedMs", Tooltip: "Elapsed", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, SelectExpr: "EXTRACT(EPOCH FROM (clock_timestamp() - s.start)) * 1000", IsSortOption: true, IsDefaultSort: true, SortLabel: "Running queries by Elapsed Time"},
 }
 
 func cockroachMethods() []module.MethodConfig {
@@ -167,9 +122,9 @@ func cockroachHandleMethod(ctx context.Context, job *module.Job, method string, 
 
 	switch method {
 	case "top-queries":
-		return collector.collectTopQueries(ctx, params.Column(paramSort))
+		return collector.collectTopQueries(ctx, params.Column("__sort"))
 	case "running-queries":
-		return collector.collectRunningQueries(ctx, params.Column(paramSort))
+		return collector.collectRunningQueries(ctx, params.Column("__sort"))
 	default:
 		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
 	}
@@ -240,16 +195,17 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		return &module.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
+	cs := crdbColumnSet(crdbTopColumns)
 	return &module.FunctionResponse{
 		Status:            200,
 		Help:              "Top SQL statements from crdb_internal.cluster_statement_statistics. WARNING: Query text may contain unmasked literals (potential PII).",
-		Columns:           buildCrdbColumns(crdbTopColumns),
+		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: sortColumn,
 		RequiredParams:    []funcapi.ParamConfig{buildCrdbSortParam(crdbTopColumns)},
-		Charts:            crdbTopQueriesCharts(crdbTopColumns),
-		DefaultCharts:     crdbTopQueriesDefaultCharts(crdbTopColumns),
-		GroupBy:           crdbTopQueriesGroupBy(crdbTopColumns),
+		Charts:            cs.BuildCharts(),
+		DefaultCharts:     cs.BuildDefaultCharts(),
+		GroupBy:           cs.BuildGroupBy(),
 	}
 }
 
@@ -277,98 +233,58 @@ func (c *Collector) collectRunningQueries(ctx context.Context, sortColumn string
 		return &module.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
+	cs := crdbColumnSet(crdbRunningColumns)
 	return &module.FunctionResponse{
 		Status:            200,
 		Help:              "Currently running SQL statements from SHOW CLUSTER STATEMENTS. WARNING: Query text may contain unmasked literals (potential PII).",
-		Columns:           buildCrdbColumns(crdbRunningColumns),
+		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: sortColumn,
 		RequiredParams:    []funcapi.ParamConfig{buildCrdbSortParam(crdbRunningColumns)},
 	}
 }
 
-func buildCrdbSortParam(cols []crdbColumnMeta) funcapi.ParamConfig {
+func buildCrdbSortParam(cols []crdbColumn) funcapi.ParamConfig {
+	var sortOptions []funcapi.ParamOption
+	sortDir := funcapi.FieldSortDescending
+	for _, col := range cols {
+		if !col.IsSortOption {
+			continue
+		}
+		sortOptions = append(sortOptions, funcapi.ParamOption{
+			ID:      col.Name,
+			Column:  col.Name,
+			Name:    col.SortLabel,
+			Sort:    &sortDir,
+			Default: col.IsDefaultSort,
+		})
+	}
 	return funcapi.ParamConfig{
-		ID:         paramSort,
+		ID:         "__sort",
 		Name:       "Filter By",
 		Help:       "Select the primary sort column",
 		Selection:  funcapi.ParamSelect,
-		Options:    buildCrdbSortOptions(cols),
+		Options:    sortOptions,
 		UniqueView: true,
 	}
 }
 
-func buildCrdbSortOptions(cols []crdbColumnMeta) []funcapi.ParamOption {
-	var sortOptions []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range cols {
-		if !col.isSortOption {
-			continue
-		}
-		opt := funcapi.ParamOption{
-			ID:     col.id,
-			Column: col.id,
-			Name:   col.sortLabel,
-			Sort:   &sortDir,
-		}
-		if col.isDefaultSort {
-			opt.Default = true
-		}
-		sortOptions = append(sortOptions, opt)
-	}
-	return sortOptions
-}
-
-func buildCrdbColumns(cols []crdbColumnMeta) map[string]any {
-	result := make(map[string]any, len(cols))
-	for i, col := range cols {
-		visual := visValue
-		if col.dataType == ftDuration {
-			visual = visBar
-		}
-		colDef := funcapi.Column{
-			Index:                 i,
-			Name:                  col.name,
-			Type:                  col.dataType,
-			Units:                 col.units,
-			Visualization:         visual,
-			Sort:                  col.sortDir,
-			Sortable:              col.sortable,
-			Sticky:                col.sticky,
-			Summary:               col.summary,
-			Filter:                col.filter,
-			FullWidth:             col.fullWidth,
-			Wrap:                  col.wrap,
-			DefaultExpandedFilter: false,
-			UniqueKey:             col.uniqueKey,
-			Visible:               col.visible,
-			ValueOptions: funcapi.ValueOptions{
-				Transform:     col.transform,
-				DecimalPoints: col.decimalPoints,
-				DefaultValue:  nil,
-			},
-		}
-		result[col.id] = colDef.BuildColumn()
-	}
-	return result
-}
-
-func resolveCrdbSortColumn(cols []crdbColumnMeta, requested string) string {
+func resolveCrdbSortColumn(cols []crdbColumn, requested string) string {
 	if requested != "" {
 		for _, col := range cols {
-			if col.id == requested && col.isSortOption {
-				return col.id
+			if col.Name == requested && col.IsSortOption {
+				return col.Name
 			}
 		}
 	}
 	for _, col := range cols {
-		if col.isDefaultSort && col.isSortOption {
-			return col.id
+		if col.IsDefaultSort && col.IsSortOption {
+			return col.Name
 		}
 	}
 	for _, col := range cols {
-		if col.isSortOption {
-			return col.id
+		if col.IsSortOption {
+			return col.Name
 		}
 	}
 	return ""
@@ -377,7 +293,7 @@ func resolveCrdbSortColumn(cols []crdbColumnMeta, requested string) string {
 func buildCrdbTopQueriesSQL(sortColumn string, limit int) string {
 	selectCols := make([]string, 0, len(crdbTopColumns))
 	for _, col := range crdbTopColumns {
-		selectCols = append(selectCols, fmt.Sprintf("%s AS %s", col.selectExpr, col.id))
+		selectCols = append(selectCols, fmt.Sprintf("%s AS %s", col.SelectExpr, col.Name))
 	}
 	return fmt.Sprintf(`
 SELECT %s
@@ -390,7 +306,7 @@ LIMIT $1`, strings.Join(selectCols, ", "), sortColumn)
 func buildCrdbRunningQueriesSQL(sortColumn string, limit int) string {
 	selectCols := make([]string, 0, len(crdbRunningColumns))
 	for _, col := range crdbRunningColumns {
-		selectCols = append(selectCols, fmt.Sprintf("%s AS %s", col.selectExpr, col.id))
+		selectCols = append(selectCols, fmt.Sprintf("%s AS %s", col.SelectExpr, col.Name))
 	}
 	return fmt.Sprintf(`
 SELECT %s
@@ -399,7 +315,7 @@ ORDER BY %s DESC NULLS LAST
 LIMIT $1`, strings.Join(selectCols, ", "), sortColumn)
 }
 
-func scanCrdbRows(rows *sql.Rows, cols []crdbColumnMeta) ([][]any, error) {
+func scanCrdbRows(rows *sql.Rows, cols []crdbColumn) ([][]any, error) {
 	data := make([][]any, 0, 500)
 
 	for rows.Next() {
@@ -407,14 +323,14 @@ func scanCrdbRows(rows *sql.Rows, cols []crdbColumnMeta) ([][]any, error) {
 		valuePtrs := make([]any, len(cols))
 
 		for i, col := range cols {
-			switch col.dataType {
-			case ftString:
+			switch col.Type {
+			case funcapi.FieldTypeString:
 				var v sql.NullString
 				values[i] = &v
-			case ftInteger:
+			case funcapi.FieldTypeInteger:
 				var v sql.NullInt64
 				values[i] = &v
-			case ftFloat, ftDuration:
+			case funcapi.FieldTypeFloat, funcapi.FieldTypeDuration:
 				var v sql.NullFloat64
 				values[i] = &v
 			default:
@@ -434,7 +350,7 @@ func scanCrdbRows(rows *sql.Rows, cols []crdbColumnMeta) ([][]any, error) {
 			case *sql.NullString:
 				if v.Valid {
 					s := v.String
-					if col.id == "query" {
+					if col.Name == "query" {
 						s = strmutil.TruncateText(s, crdbMaxQueryTextLength)
 					}
 					row[i] = s
@@ -466,92 +382,4 @@ func scanCrdbRows(rows *sql.Rows, cols []crdbColumnMeta) ([][]any, error) {
 	}
 
 	return data, nil
-}
-
-func crdbTopQueriesCharts(cols []crdbColumnMeta) map[string]module.ChartConfig {
-	charts := make(map[string]module.ChartConfig)
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" {
-			continue
-		}
-		cfg, ok := charts[col.chartGroup]
-		if !ok {
-			title := col.chartTitle
-			if title == "" {
-				title = col.chartGroup
-			}
-			cfg = module.ChartConfig{Name: title, Type: "stacked-bar"}
-		}
-		cfg.Columns = append(cfg.Columns, col.id)
-		charts[col.chartGroup] = cfg
-	}
-	return charts
-}
-
-func crdbTopQueriesDefaultCharts(cols []crdbColumnMeta) [][]string {
-	label := primaryCrdbLabel(cols)
-	if label == "" {
-		return nil
-	}
-	chartGroups := defaultCrdbChartGroups(cols)
-	out := make([][]string, 0, len(chartGroups))
-	for _, group := range chartGroups {
-		out = append(out, []string{group, label})
-	}
-	return out
-}
-
-func crdbTopQueriesGroupBy(cols []crdbColumnMeta) map[string]module.GroupByConfig {
-	groupBy := make(map[string]module.GroupByConfig)
-	for _, col := range cols {
-		if !col.isLabel {
-			continue
-		}
-		groupBy[col.id] = module.GroupByConfig{
-			Name:    "Group by " + col.name,
-			Columns: []string{col.id},
-		}
-	}
-	return groupBy
-}
-
-func primaryCrdbLabel(cols []crdbColumnMeta) string {
-	for _, col := range cols {
-		if col.isPrimary {
-			return col.id
-		}
-	}
-	for _, col := range cols {
-		if col.isLabel {
-			return col.id
-		}
-	}
-	return ""
-}
-
-func defaultCrdbChartGroups(cols []crdbColumnMeta) []string {
-	groups := make([]string, 0)
-	seen := make(map[string]bool)
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" || !col.isDefaultChart {
-			continue
-		}
-		if !seen[col.chartGroup] {
-			seen[col.chartGroup] = true
-			groups = append(groups, col.chartGroup)
-		}
-	}
-	if len(groups) > 0 {
-		return groups
-	}
-	for _, col := range cols {
-		if !col.isMetric || col.chartGroup == "" {
-			continue
-		}
-		if !seen[col.chartGroup] {
-			seen[col.chartGroup] = true
-			groups = append(groups, col.chartGroup)
-		}
-	}
-	return groups
 }

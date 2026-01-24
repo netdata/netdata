@@ -198,7 +198,7 @@ func (m *Manager) respondWithParams(fn functions.Function, moduleName string, da
 		resp["charts"] = dataResp.Charts
 	}
 	if len(dataResp.DefaultCharts) > 0 {
-		resp["default_charts"] = dataResp.DefaultCharts
+		resp["default_charts"] = dataResp.DefaultCharts.Build()
 	}
 	if len(dataResp.GroupBy) > 0 {
 		resp["group_by"] = dataResp.GroupBy

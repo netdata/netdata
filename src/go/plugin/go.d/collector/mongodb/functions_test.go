@@ -48,22 +48,16 @@ func TestMongoColumnMeta(t *testing.T) {
 
 	// Check required core columns exist
 	coreColumns := []string{"timestamp", "namespace", "operation", "query", "execution_time", "docs_examined", "keys_examined", "docs_returned", "plan_summary"}
+	cs := mongoColumnSet(mongoAllColumns)
 	for _, colID := range coreColumns {
-		found := false
-		for _, col := range mongoAllColumns {
-			if col.id == colID {
-				found = true
-				break
-			}
-		}
-		assert.True(t, found, "core column %s should exist", colID)
+		assert.True(t, cs.ContainsColumn(colID), "core column %s should exist", colID)
 	}
 
 	// Check that core columns are visible by default
 	for _, col := range mongoAllColumns {
-		switch col.id {
+		switch col.Name {
 		case "timestamp", "namespace", "operation", "query", "execution_time", "docs_examined", "keys_examined", "docs_returned", "plan_summary":
-			assert.True(t, col.visible, "column %s should be visible by default", col.id)
+			assert.True(t, col.Visible, "column %s should be visible by default", col.Name)
 		}
 	}
 }
@@ -94,7 +88,7 @@ func TestBuildAvailableMongoColumns(t *testing.T) {
 			available: func() map[string]bool {
 				m := make(map[string]bool)
 				for _, col := range mongoAllColumns {
-					m[col.dbField] = true
+					m[col.DBField] = true
 				}
 				return m
 			}(),
@@ -110,15 +104,16 @@ func TestBuildAvailableMongoColumns(t *testing.T) {
 	}
 }
 
-func TestBuildMongoColumnsFromMeta(t *testing.T) {
+func TestMongoColumnSet_BuildColumns(t *testing.T) {
 	// Use a subset of columns for testing
-	testCols := []mongoColumnMeta{
-		{id: "timestamp", dbField: "ts", name: "Timestamp", colType: ftTimestamp, visible: true, sortable: true, filter: filterRange, visualization: visValue, summary: summaryMax, transform: trDatetime, uniqueKey: true},
-		{id: "execution_time", dbField: "millis", name: "Execution Time", colType: ftDuration, visible: true, sortable: true, filter: filterRange, visualization: visBar, summary: summarySum, transform: trDuration, units: "seconds", decimalPoints: 3},
-		{id: "query", dbField: "command", name: "Query", colType: ftString, visible: true, sortable: false, fullWidth: true, wrap: true, filter: filterMulti, visualization: visValue, transform: trText},
+	testCols := []mongoColumn{
+		{ColumnMeta: funcapi.ColumnMeta{Name: "timestamp", Tooltip: "Timestamp", Type: funcapi.FieldTypeTimestamp, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummaryMax, Transform: funcapi.FieldTransformDatetime, UniqueKey: true}, DBField: "ts", IsSortOption: true},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "execution_time", Tooltip: "Execution Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformDuration, DecimalPoints: 3}, DBField: "millis", IsSortOption: true},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, FullWidth: true, Wrap: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "command"},
 	}
 
-	cols := buildMongoColumnsFromMeta(testCols)
+	cs := mongoColumnSet(testCols)
+	cols := cs.BuildColumns()
 
 	// Check required columns exist
 	assert.Contains(t, cols, "timestamp")
