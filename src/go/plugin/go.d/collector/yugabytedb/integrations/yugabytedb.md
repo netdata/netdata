@@ -340,23 +340,51 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Top Queries
 
-Top SQL queries from pg_stat_statements. WARNING: Query text may contain unmasked literals (potential PII).
+Retrieves aggregated query statistics from the PostgreSQL-compatible [pg_stat_statements](https://docs.yugabyte.com/preview/explore/query-1-performance/pg-stat-statements/) extension in YSQL.
 
-Reads pg_stat_statements and returns the top entries sorted by the selected column.
+This function queries the `pg_stat_statements` view which tracks execution statistics for all SQL statements executed on the YSQL layer. It provides timing metrics, execution counts, and row statistics for each unique query pattern.
+
+Use cases:
+- Identify slow queries consuming excessive total execution time
+- Find high-frequency queries that may benefit from optimization
+- Analyze query patterns by database and user
+
+Query text is truncated at 4096 characters for display purposes.
 
 
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Yugabytedb:top-queries` |
-| Performance | Executes SQL queries and may be expensive on busy clusters; use top_queries_limit and sql_timeout. |
-| Security | Query text may contain unmasked literals (potential PII). |
-| Availability | Available when YSQL is accessible; returns errors if the SQL connection is unavailable. |
+| Require Cloud | yes |
+| Performance | Queries the `pg_stat_statements` view via YSQL connection:<br/>• Default limit of 500 rows balances completeness with performance<br/>• Use `sql_timeout` to prevent long-running queries |
+| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data embedded in queries<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to YSQL<br/>• The `pg_stat_statements` extension is installed<br/>• Returns HTTP 503 if the SQL connection cannot be established or extension is not installed<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
 
 #### Prerequisites
 
-##### Enable pg_stat_statements for YSQL
+##### Enable pg_stat_statements extension
 
-Install and enable pg_stat_statements and configure a YSQL DSN.
+The `pg_stat_statements` extension must be installed in the target YSQL database.
+
+1. Install the extension:
+
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+   ```
+
+2. Verify access:
+
+   ```sql
+   SELECT * FROM pg_stat_statements LIMIT 1;
+   ```
+
+:::info
+
+- The extension tracks statistics for all SQL statements executed
+- Statistics can be reset with `SELECT pg_stat_statements_reset()`
+- YugabyteDB uses PostgreSQL-compatible extensions
+
+:::
 
 
 
@@ -364,45 +392,65 @@ Install and enable pg_stat_statements and configure a YSQL DSN.
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
-| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | totalTime |  |
+| Filter By | select | Select the primary sort column. Options include total time, mean time, max time, calls, and rows. Defaults to total time to focus on most resource-intensive queries. | yes | totalTime |  |
 
 #### Returns
 
-Aggregated query statistics from pg_stat_statements.
+Aggregated query statistics from `pg_stat_statements`. Each row represents a unique query pattern with cumulative metrics across all executions.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
-| Query ID | string |  | hidden |  |
-| Query | string |  |  |  |
-| Database | string |  |  |  |
-| User | string |  |  |  |
-| Calls | integer |  |  |  |
-| Total Time | duration | milliseconds |  |  |
-| Mean Time | duration | milliseconds |  |  |
-| Min Time | duration | milliseconds | hidden |  |
-| Max Time | duration | milliseconds | hidden |  |
-| Rows | integer |  |  |  |
-| Stddev Time | duration | milliseconds | hidden |  |
+| Query ID | string |  | hidden | Internal hash identifier for the normalized query pattern. |
+| Query | string |  |  | Normalized SQL query text with literals replaced by parameter placeholders. Truncated to 4096 characters. |
+| Database | string |  |  | Database name where the query was executed. Useful for multi-database workload analysis. |
+| User | string |  |  | YSQL user who executed the query. Useful for identifying workload by user or application. |
+| Calls | integer |  |  | Total number of times this query pattern has been executed. High values indicate frequently run queries. |
+| Total Time | duration | milliseconds |  | Cumulative execution time across all calls. Primary metric for identifying resource-intensive queries. |
+| Mean Time | duration | milliseconds |  | Average execution time per call. Compare with total time to distinguish slow queries from frequently called ones. |
+| Min Time | duration | milliseconds | hidden | Minimum execution time observed for this query pattern. |
+| Max Time | duration | milliseconds | hidden | Maximum execution time observed. Large gaps between min and max may indicate parameter sensitivity or lock contention. |
+| Rows | integer |  |  | Total number of rows retrieved or affected by the query across all executions. |
+| Stddev Time | duration | milliseconds | hidden | Standard deviation of execution times. High values indicate inconsistent query performance. |
 
 ### Running Queries
 
-Currently running SQL statements from pg_stat_activity. WARNING: Query text may contain unmasked literals (potential PII).
+Retrieves currently executing statements from the PostgreSQL-compatible [pg_stat_activity](https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW) view in YSQL.
 
-Reads pg_stat_activity and returns running statements sorted by the selected column.
+This function queries `pg_stat_activity` to show all non-idle backend processes with their current query, state, and timing information. It excludes idle connections to focus on active workload.
+
+Use cases:
+- Identify long-running queries that may need investigation
+- Monitor active connections and their current state
+- Investigate blocked or waiting queries
+
+Query text is truncated at 4096 characters for display purposes.
 
 
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Yugabytedb:running-queries` |
-| Performance | Executes SQL queries and may be expensive on busy clusters; use top_queries_limit and sql_timeout. |
-| Security | Query text may contain unmasked literals (potential PII). |
-| Availability | Available when YSQL is accessible; returns errors if the SQL connection is unavailable. |
+| Require Cloud | yes |
+| Performance | Queries the `pg_stat_activity` view via YSQL connection:<br/>• Returns only non-idle connections to reduce result size<br/>• Default limit of 500 rows balances completeness with performance<br/>• Use `sql_timeout` to prevent long-running queries |
+| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data embedded in queries<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to YSQL<br/>• Returns HTTP 503 if the SQL connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
 
 #### Prerequisites
 
-##### Grant access to pg_stat_activity
+##### Grant access to all queries (optional)
 
-Configure a YSQL DSN and grant access to pg_stat_activity.
+By default, users can only see their own queries in `pg_stat_activity`. To view all users' queries, grant the `pg_read_all_stats` role:
+
+```sql
+GRANT pg_read_all_stats TO your_user;
+```
+
+:::info
+
+- The `yugabyte` superuser can see all queries by default
+- Without elevated privileges, only the user's own queries are visible
+- Idle connections are filtered out from results
+
+:::
 
 
 
@@ -410,25 +458,25 @@ Configure a YSQL DSN and grant access to pg_stat_activity.
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
-| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | elapsedMs |  |
+| Filter By | select | Select the primary sort column. Defaults to elapsed time to focus on longest-running queries. | yes | elapsedMs |  |
 
 #### Returns
 
-Snapshot of currently running SQL statements.
+Currently running SQL statements from `pg_stat_activity`. Each row represents an active backend process with its current query and execution context.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
-| PID | string |  | hidden |  |
-| Query | string |  |  |  |
-| Database | string |  |  |  |
-| User | string |  |  |  |
-| State | string |  |  |  |
-| Wait Event Type | string |  | hidden |  |
-| Wait Event | string |  | hidden |  |
-| Application | string |  | hidden |  |
-| Client Address | string |  | hidden |  |
-| Query Start | string |  | hidden |  |
-| Elapsed | duration | milliseconds |  |  |
+| PID | string |  | hidden | Backend process ID. Can be used with pg_terminate_backend() to cancel a query. |
+| Query | string |  |  | The SQL statement currently being executed. Truncated to 4096 characters. |
+| Database | string |  |  | Database name the backend is connected to. |
+| User | string |  |  | YSQL user name of the backend process. |
+| State | string |  |  | Current state of the backend (active, idle in transaction, fastpath function call, etc.). |
+| Wait Event Type | string |  | hidden | Type of event the backend is waiting for (Lock, LWLock, IO, etc.). Null if not waiting. |
+| Wait Event | string |  | hidden | Specific wait event name. Useful for diagnosing lock contention or I/O bottlenecks. |
+| Application | string |  | hidden | Application name set by the client connection. Useful for identifying which application is running the query. |
+| Client Address | string |  | hidden | IP address of the client connection. |
+| Query Start | string |  | hidden | Timestamp when the current query began execution. |
+| Elapsed | duration | milliseconds |  | Time elapsed since the query started. High values indicate long-running queries that may need investigation. |
 
 
 

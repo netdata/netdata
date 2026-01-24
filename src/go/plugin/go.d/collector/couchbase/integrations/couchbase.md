@@ -82,23 +82,53 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Top Queries
 
-Top N1QL requests from system:completed_requests.
+Retrieves completed N1QL query statistics from Couchbase [system:completed_requests](https://docs.couchbase.com/server/current/manage/monitor/monitoring-n1ql-query.html#sys-completed-req) keyspace.
 
-Queries the system:completed_requests keyspace and returns the top entries sorted by the selected column.
+This function queries the `system:completed_requests` keyspace which stores information about recently completed N1QL requests. It provides timing metrics, result statistics, and error/warning counts for each completed query.
+
+Use cases:
+- Identify slow N1QL queries consuming the most elapsed time
+- Find queries with high error or warning counts
+- Analyze query patterns by user to understand workload distribution
+
+Statement text is truncated at 4096 characters for display purposes.
 
 
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Couchbase:top-queries` |
-| Performance | Runs N1QL queries against system keyspaces; use top_queries_limit to control response size. |
-| Security | Query text may include sensitive literals depending on workload. |
-| Availability | Available when the collector can query system keyspaces; returns 503 until the collector is initialized. |
+| Require Cloud | yes |
+| Performance | Queries `system:completed_requests` via the N1QL query service:<br/>• The `completed_requests` keyspace has a configurable size limit (`completed-limit` setting)<br/>• Default limit of 500 rows balances usefulness with performance |
+| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data embedded in queries<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to Couchbase<br/>• The N1QL (Query) service is running<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
 
 #### Prerequisites
 
-##### Grant access to system:completed_requests
+##### Grant access to `system:completed_requests`
 
-Ensure the user can query system:completed_requests and the N1QL service is available.
+The user must have appropriate privileges to query system keyspaces and the N1QL service must be available.
+
+1. Ensure the N1QL (Query) service is running on the cluster
+
+2. Grant query system catalog privileges to the monitoring user:
+
+   ```sql
+   GRANT QUERY_SYSTEM_CATALOG TO netdata_user;
+   ```
+
+3. Verify access to `completed_requests`:
+
+   ```sql
+   SELECT * FROM system:completed_requests LIMIT 1;
+   ```
+
+   :::info
+
+   - The `system:completed_requests` keyspace stores recently completed queries based on Couchbase server settings `completed-limit` and `completed-threshold`
+   - Only queries exceeding `completed-threshold` (default 1000ms) are logged to `completed_requests`
+   - Adjust `completed-threshold` in Couchbase Query Settings to capture faster queries if needed
+
+   :::
 
 
 
@@ -106,25 +136,25 @@ Ensure the user can query system:completed_requests and the N1QL service is avai
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
-| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | elapsedTime |  |
+| Filter By | select | Select the primary sort column. Options include elapsed time, service time, request time, and result count. Defaults to elapsed time to focus on slowest queries. | yes | elapsedTime |  |
 
 #### Returns
 
-Completed N1QL request statistics.
+Completed N1QL request statistics. Each row represents a single completed query with its timing and result metrics.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
-| Request ID | string |  | hidden |  |
-| Request Time | timestamp |  |  |  |
-| Statement | string |  |  |  |
-| Elapsed Time | duration | milliseconds |  |  |
-| Service Time | duration | milliseconds |  |  |
-| Result Count | integer |  |  |  |
-| Result Size | integer |  | hidden |  |
-| Error Count | integer |  | hidden |  |
-| Warning Count | integer |  | hidden |  |
-| User | string |  |  |  |
-| Client Context ID | string |  | hidden |  |
+| Request ID | string |  | hidden | Unique identifier for the N1QL request. Can be used for correlation with Couchbase logs. |
+| Request Time | timestamp |  |  | Timestamp when the request was received by the query service. |
+| Statement | string |  |  | The N1QL statement that was executed. Truncated to 4096 characters. |
+| Elapsed Time | duration | milliseconds |  | Total time from request receipt to response completion, including queue time, planning, execution, and result streaming. |
+| Service Time | duration | milliseconds |  | Time spent actively processing the request, excluding network latency and queue wait time. Compare with elapsed time to identify network or queueing delays. |
+| Result Count | integer |  |  | Number of documents/rows returned by the query. High values may indicate queries returning excessive data. |
+| Result Size | integer |  | hidden | Total size of the result set in bytes. Large result sizes may indicate inefficient queries or missing projections. |
+| Error Count | integer |  | hidden | Number of errors encountered during query execution. Non-zero values require investigation. |
+| Warning Count | integer |  | hidden | Number of warnings generated during query execution. Warnings may indicate suboptimal query patterns or index usage. |
+| User | string |  |  | Couchbase user who executed the query. Useful for identifying workload by user or application. |
+| Client Context ID | string |  | hidden | Client-provided context identifier for request tracking and correlation. |
 
 
 
