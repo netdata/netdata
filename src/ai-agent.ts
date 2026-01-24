@@ -1094,6 +1094,7 @@ export class AIAgentSession {
         try { externalEventRelay(enrichExternalEvent(event)); } catch (e) { warn(`external event relay failed: ${e instanceof Error ? e.message : String(e)}`); }
       },
       pricing: enrichedSessionConfig.config.pricing,
+      executeTurnOverride: enrichedSessionConfig.executeTurnOverride,
     });
 
     const sess = new AIAgentSession(

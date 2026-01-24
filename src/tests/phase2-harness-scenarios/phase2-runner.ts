@@ -113,12 +113,16 @@ const dumpScenarioResultIfNeeded = (scenarioId: string, result: AIAgentResult): 
 
 /**
  * Tests that MUST run sequentially (not in parallel) due to:
- * - runWithPatchedExecuteTurn: patches LLMClient.prototype.executeTurn globally
  * - captureSessionConfig: modifies sessionConfigObservers global array
  * - Tests that use other shared global state variables
+ * - Tests that still patch LLMClient.prototype.executeTurn directly (pass-through pattern)
  *
- * Note: run-test-16, run-test-20, run-test-54 have been migrated to use TestContext
- * and no longer require sequential execution.
+ * Note: Tests using runWithExecuteTurnOverride now use DI (dependency injection via
+ * sessionConfig.executeTurnOverride) instead of prototype patching, and can run in parallel.
+ *
+ * Migrated to parallel:
+ * - run-test-16, run-test-20, run-test-54 (use TestContext)
+ * - All tests using runWithExecuteTurnOverride (use DI instead of prototype patching)
  */
 /* eslint-disable sonarjs/no-duplicate-string -- test IDs naturally share 'run-test-' prefix */
 const SEQUENTIAL_TEST_IDS = new Set([
@@ -132,76 +136,6 @@ const SEQUENTIAL_TEST_IDS = new Set([
   'run-test-25',
   'run-test-queue-cancel',
   'run-test-queue-isolation',
-  // Tests using runWithPatchedExecuteTurn (patches LLMClient.prototype globally)
-  'run-test-60',
-  'run-test-69',
-  'run-test-107',
-  'run-test-empty-response',
-  'run-test-empty-response-final-turn',
-  'run-test-final-report-empty-parameters',
-  'run-test-final-report-literal-newlines',
-  'run-test-final-report-null-parameters',
-  'run-test-final-report-with-other-tools',
-  'run-test-final-report-wrong-types',
-  'run-test-invalid-no-text-fallback',
-  'run-test-llm-error-during-final-turn',
-  'run-test-llm-keeps-sending-invalid',
-  'run-test-llm-never-sends-final-report',
-  'run-test-multiple-tool-calls-all-invalid',
-  'run-test-reasoning-without-final-report',
-  'run-test-turn-collapse-incomplete-final-report',
-  'run-test-whitespace-only-response',
-  'run-test-final-report-parameters-string',
-  'run-test-final-report-retry-text',
-  'run-test-final-report-valid-tool-call',
-  'run-test-invalid-final-report-at-max-turns',
-  'run-test-invalid-final-report-before-max-turns',
-  'run-test-invalid-schema-tool-fails',
-  'run-test-max-provider-retries-exhausted',
-  'run-test-max-turn-exhaustion-fails',
-  'run-test-no-collapse-already-at-max',
-  'run-test-old-progress-report-rejected',
-  'run-test-progress-only-fails',
-  'run-test-pure-text-final-report',
-  'run-test-retry-exhaustion-during-final-turn',
-  'run-test-retry-exhaustion-forces-final',
-  'run-test-retry-exhaustion-no-tools',
-  'run-test-single-provider-final-turn-invalid-response',
-  'run-test-synthetic-failure-contract',
-  'run-test-task-status-completed',
-  'run-test-task-status-reset-on-real-tool',
-  'run-test-task-status-standalone-consecutive-final',
-  'run-test-task-status-standalone-first',
-  'run-test-task-status-standalone-second',
-  'run-test-task-status-thinking-stability',
-  'run-test-text-extraction-invalid-text',
-  'run-test-text-extraction-non-final-turn',
-  'run-test-tool-message-fallback-validation-fails',
-  'run-test-turn-collapse-both-flags',
-  'run-test-turn-collapse-final-report-attempted',
-  'run-test-unknown-tool-fails',
-  'run-test-xml-final-only',
-  'run-test-xml-happy',
-  'run-test-xml-invalid-tag',
-  'run-test-xml-wrapper-as-tool',
-  'run-test-max-context-bypass-retries',
-  'run-test-max-context-bypass-tools',
-  'run-test-remaining-turns-collapse',
-  'run-test-context-guard-compact-happy',
-  'run-test-context-guard-compact-large-drop',
-  'run-test-context-guard-compact-multi-drop',
-  'run-test-context-guard-compact-empty-second',
-  'run-test-context-guard-compact-all-drop',
-  'run-test-context-guard-no-compact-with-history',
-  'run-test-context-guard-compact-no-drop',
-  'run-test-conversation-message-type-inference',
-  'run-test-provider-fallback-during-retry',
-  'run-test-provider-fallback-after-failure',
-  'run-test-provider-fallback-success-after-retry',
-  'run-test-context-guard-force-final-turn',
-  'run-test-context-guard-preflight-final-turn',
-  'run-test-provider-error-increments-retry',
-  'run-test-remaining-turns-collapse-immediate',
   // Coverage tests using global state variables
   'coverage-openrouter-json',
   'coverage-openrouter-sse',
@@ -209,13 +143,36 @@ const SEQUENTIAL_TEST_IDS = new Set([
   'coverage-generic-json',
   'coverage-session-snapshot',
   'coverage-llm-payload',
-  // Tests with queue/rate-limit/timing dependencies that fail in parallel
-  'context_guard__tool_drop_after_success',
-  'run-test-queue-isolation',
-  'run-test-max-turn-limit',
-  'run-test-63',
+  // Tests that still patch LLMClient.prototype.executeTurn directly (pass-through pattern)
+  // These capture intermediate values or pass through to real providers
+  'run-test-60',
+  'run-test-61',
+  'run-test-69',
+  'run-test-84',
+  'run-test-85',
+  'run-test-87',
+  'run-test-88',
+  'run-test-90',
+  'run-test-90-string',
+  'run-test-90-adopt-text',
+  'run-test-90-json-content',
+  'run-test-90-no-retry',
+  'run-test-90-rate-limit',
+  'run-test-101',
+  'run-test-102',
+  'run-test-104',
+  'run-test-105',
+  'run-test-106',
   'run-test-122',
   'run-test-123',
+  'run-test-124',
+  'run-test-final-report-retry-text',
+  'run-test-final-report-tool-message-fallback',
+  'run-test-text-extraction-final-turn-accept',
+  // Tests with queue/rate-limit/timing dependencies that fail in parallel
+  'context_guard__tool_drop_after_success',
+  'run-test-max-turn-limit',
+  'run-test-63',
   'run-test-91',
   'run-test-49',
   'run-test-114',
@@ -225,12 +182,9 @@ const SEQUENTIAL_TEST_IDS = new Set([
   'run-test-size-cap-truncation',
   'run-test-size-cap-small-payload-passes',
   'run-test-size-cap-small-over-limit-fails',
-  'run-test-final-report-tool-message-fallback',
   'run-test-stream-dedupe-final-report',
   'run-test-tool-cache-hit',
-  'run-test-25',
   'run-test-72-probe-success-no-restart',
-  'run-test-90-rate-limit',
 ]);
 /* eslint-enable sonarjs/no-duplicate-string */
 
@@ -570,23 +524,23 @@ const safeJsonByteLengthLocal = (value: unknown): number => {
 
 type ExecuteTurnHandler = (ctx: { request: TurnRequest; invocation: number }) => Promise<TurnResult>;
 
-const runWithPatchedExecuteTurn = async (
+/**
+ * Run a session with a custom executeTurn handler using DI (dependency injection).
+ * This replaces the prototype-patching approach used in runWithExecuteTurnOverride.
+ * The override is injected via sessionConfig.executeTurnOverride, which flows to LLMClient.
+ * This is safe for parallel test execution since each session gets its own isolated override.
+ */
+const runWithExecuteTurnOverride = async (
   sessionConfig: AIAgentSessionConfig,
   handler: ExecuteTurnHandler,
 ): Promise<AIAgentResult> => {
-  // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original for restoration after interception
-  const originalExecuteTurn = LLMClient.prototype.executeTurn;
   let invocation = 0;
-  LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+  sessionConfig.executeTurnOverride = async (request: TurnRequest): Promise<TurnResult> => {
     invocation += 1;
     return handler({ request, invocation });
   };
-  try {
-    const session = AIAgentSession.create(sessionConfig);
-    return await AIAgent.run(session);
-  } finally {
-    LLMClient.prototype.executeTurn = originalExecuteTurn;
-  }
+  const session = AIAgentSession.create(sessionConfig);
+  return AIAgent.run(session);
 };
 
 const estimateMessagesBytesLocal = (messages: readonly ConversationMessage[]): number => {
@@ -1178,8 +1132,8 @@ interface HarnessTest {
   /**
    * When true, this test MUST run sequentially (not in parallel with other tests).
    * Set this flag for tests that:
-   * - Use runWithPatchedExecuteTurn (patches LLMClient.prototype.executeTurn globally)
    * - Use captureSessionConfig/registerSessionConfigObserver (modifies global observers)
+   * - Use shared global state variables (not DI-based)
    */
   sequential?: boolean;
   configure?: (
@@ -8859,8 +8813,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           originalCallbacks?.onEvent?.(event, meta);
         },
       };
-      // Use runWithPatchedExecuteTurn pattern for consistent behavior
-      const result = await runWithPatchedExecuteTurn(sessionConfig, ({ invocation }) => {
+      // Use DI-based executeTurn override for consistent behavior
+      const result = await runWithExecuteTurnOverride(sessionConfig, ({ invocation }) => {
         if (invocation === 1) {
           // Turn 1: progress-only (task_status) - now succeeds per design
           const progressCallId = 'call-turn-started-progress';
@@ -8954,7 +8908,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           originalCallbacks?.onEvent?.(event, meta);
         },
       };
-      const result = await runWithPatchedExecuteTurn(sessionConfig, ({ invocation }) => {
+      const result = await runWithExecuteTurnOverride(sessionConfig, ({ invocation }) => {
         if (invocation === 1) {
           return Promise.resolve({
             status: { type: 'invalid_response', message: 'invalid_response: missing report' },
@@ -10285,7 +10239,7 @@ const scenarioFilterIdsFromEnv = (() => {
     sessionConfig.maxRetries = 2;
     const finalContent = 'Valid tool call result.';
     const finalFormat = sessionConfig.outputFormat ?? 'markdown';
-    return await runWithPatchedExecuteTurn(sessionConfig, async ({ request }) => {
+    return await runWithExecuteTurnOverride(sessionConfig, async ({ request }) => {
       const assistantMessage: ConversationMessage = {
         role: 'assistant',
         content: '',
@@ -10341,7 +10295,7 @@ const scenarioFilterIdsFromEnv = (() => {
       sessionConfig.maxRetries = 2;
       const finalContent = 'Tool call succeeds after invalid parameters.';
       const finalFormat = sessionConfig.outputFormat ?? 'markdown';
-      return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
+      return await runWithExecuteTurnOverride(sessionConfig, async ({ request, invocation }) => {
         if (invocation === 1) {
           const assistantMessage: ConversationMessage = {
             role: 'assistant',
@@ -10418,7 +10372,7 @@ const scenarioFilterIdsFromEnv = (() => {
       sessionConfig.maxRetries = 2;
       const finalContent = 'Recovered after missing content.';
       const finalFormat = sessionConfig.outputFormat ?? 'markdown';
-      return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
+      return await runWithExecuteTurnOverride(sessionConfig, async ({ request, invocation }) => {
         if (invocation === 1) {
           const assistantMessage: ConversationMessage = {
             role: 'assistant',
@@ -10503,7 +10457,7 @@ const scenarioFilterIdsFromEnv = (() => {
       sessionConfig.maxRetries = 2;
       const finalContent = 'Recovered after wrong field types.';
       const finalFormat = sessionConfig.outputFormat ?? 'markdown';
-      return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
+      return await runWithExecuteTurnOverride(sessionConfig, async ({ request, invocation }) => {
         if (invocation === 1) {
           const assistantMessage: ConversationMessage = {
             role: 'assistant',
@@ -10587,7 +10541,7 @@ const scenarioFilterIdsFromEnv = (() => {
       sessionConfig.maxRetries = 2;
       const finalContent = 'Recovered after null parameters.';
       const finalFormat = sessionConfig.outputFormat ?? 'markdown';
-      return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
+      return await runWithExecuteTurnOverride(sessionConfig, async ({ request, invocation }) => {
         if (invocation === 1) {
           const assistantMessage: ConversationMessage = {
             role: 'assistant',
@@ -10660,7 +10614,7 @@ const scenarioFilterIdsFromEnv = (() => {
       sessionConfig.maxRetries = 2;
       const finalContent = 'Recovered after empty parameters.';
       const finalFormat = sessionConfig.outputFormat ?? 'markdown';
-      return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
+      return await runWithExecuteTurnOverride(sessionConfig, async ({ request, invocation }) => {
         if (invocation === 1) {
           const assistantMessage: ConversationMessage = {
             role: 'assistant',
@@ -10740,7 +10694,7 @@ const scenarioFilterIdsFromEnv = (() => {
       sessionConfig.maxRetries = 2;
       const finalContent = 'Recovered after newline payload.';
       const finalFormat = sessionConfig.outputFormat ?? 'markdown';
-      return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
+      return await runWithExecuteTurnOverride(sessionConfig, async ({ request, invocation }) => {
         if (invocation === 1) {
           const assistantMessage: ConversationMessage = {
             role: 'assistant',
@@ -10957,8 +10911,8 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.maxTurns = 2;
     sessionConfig.maxRetries = 3;
     const maxSyntheticResponses = sessionConfig.maxRetries * sessionConfig.maxTurns;
-    // Use runWithPatchedExecuteTurn for consistent behavior
-    return await runWithPatchedExecuteTurn(sessionConfig, ({ invocation }) => {
+    // Use runWithExecuteTurnOverride for consistent behavior
+    return await runWithExecuteTurnOverride(sessionConfig, ({ invocation }) => {
       if (invocation <= maxSyntheticResponses) {
         const assistantMessage: ConversationMessage = {
           role: 'assistant',
@@ -11004,8 +10958,8 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 2;
     sessionConfig.maxRetries = 2;
-    // Use runWithPatchedExecuteTurn for consistent behavior
-    return await runWithPatchedExecuteTurn(sessionConfig, ({ invocation }) => {
+    // Use runWithExecuteTurnOverride for consistent behavior
+    return await runWithExecuteTurnOverride(sessionConfig, ({ invocation }) => {
       const assistantMessage: ConversationMessage = {
         role: 'assistant',
         content: '',
@@ -11055,7 +11009,7 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.maxTurns = 5;
     sessionConfig.maxRetries = 2;
     const finalFormat = sessionConfig.outputFormat ?? 'markdown';
-    return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
+    return await runWithExecuteTurnOverride(sessionConfig, async ({ request, invocation }) => {
       if (invocation === 1) {
         const assistantMessage: ConversationMessage = {
           role: 'assistant',
@@ -11132,7 +11086,7 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.maxTurns = 4;
     sessionConfig.maxRetries = 2;
     const finalFormat = sessionConfig.outputFormat ?? 'markdown';
-    return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
+    return await runWithExecuteTurnOverride(sessionConfig, async ({ request, invocation }) => {
       if (invocation === 1) {
         const assistantMessage: ConversationMessage = {
           role: 'assistant',
@@ -11202,7 +11156,7 @@ BASE_TEST_SCENARIOS.push({
     execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
       sessionConfig.maxTurns = 5;
       sessionConfig.maxRetries = 2;
-      return await runWithPatchedExecuteTurn(sessionConfig, ({ request }) => {
+      return await runWithExecuteTurnOverride(sessionConfig, ({ request }) => {
         const turnIndex = request.turnMetadata?.turn ?? 1;
         const assistantMessage: ConversationMessage = {
           role: 'assistant',
@@ -11242,7 +11196,7 @@ BASE_TEST_SCENARIOS.push({
     execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
       sessionConfig.maxTurns = 5;
       sessionConfig.maxRetries = 2;
-      return await runWithPatchedExecuteTurn(sessionConfig, ({ request }) => {
+      return await runWithExecuteTurnOverride(sessionConfig, ({ request }) => {
         const attempt = request.turnMetadata?.attempt ?? 1;
         const assistantMessage: ConversationMessage = {
           role: 'assistant',
@@ -11291,7 +11245,7 @@ BASE_TEST_SCENARIOS.push({
     execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
       sessionConfig.maxTurns = 3;
       sessionConfig.maxRetries = 2;
-      return await runWithPatchedExecuteTurn(sessionConfig, ({ request }) => {
+      return await runWithExecuteTurnOverride(sessionConfig, ({ request }) => {
         const turnIndex = request.turnMetadata?.turn ?? 1;
         const assistantMessage: ConversationMessage = {
           role: 'assistant',
@@ -11331,7 +11285,7 @@ BASE_TEST_SCENARIOS.push({
     execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
       sessionConfig.maxTurns = 3;
       sessionConfig.maxRetries = 2;
-      return await runWithPatchedExecuteTurn(sessionConfig, ({ request }) => {
+      return await runWithExecuteTurnOverride(sessionConfig, ({ request }) => {
         const turnIndex = request.turnMetadata?.turn ?? 1;
         if (turnIndex === 3) {
           return Promise.resolve({
@@ -11378,7 +11332,7 @@ BASE_TEST_SCENARIOS.push({
     execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
       sessionConfig.maxTurns = 4;
       sessionConfig.maxRetries = 2;
-      return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
         status: { type: 'success', hasToolCalls: false, finalAnswer: false },
         latencyMs: 5,
         messages: [],
@@ -11401,7 +11355,7 @@ BASE_TEST_SCENARIOS.push({
     execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
       sessionConfig.maxTurns = 4;
       sessionConfig.maxRetries = 2;
-      return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
         status: { type: 'success', hasToolCalls: false, finalAnswer: false },
         latencyMs: 5,
         response: '   \n\t  ',
@@ -11430,7 +11384,7 @@ BASE_TEST_SCENARIOS.push({
       sessionConfig.maxTurns = 4;
       sessionConfig.maxRetries = 2;
       const finalFormat = sessionConfig.outputFormat ?? 'markdown';
-      return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
+      return await runWithExecuteTurnOverride(sessionConfig, async ({ request, invocation }) => {
         if (invocation === 1) {
           const assistantMessage: ConversationMessage = {
             role: 'assistant',
@@ -11497,7 +11451,7 @@ BASE_TEST_SCENARIOS.push({
     execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
       sessionConfig.maxTurns = 5;
       sessionConfig.maxRetries = 2;
-      return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
         status: { type: 'success', hasToolCalls: true, finalAnswer: true },
         latencyMs: 5,
         messages: [
@@ -11532,7 +11486,7 @@ BASE_TEST_SCENARIOS.push({
     execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
       sessionConfig.maxTurns = 4;
       sessionConfig.maxRetries = 2;
-      return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+      return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
         status: { type: 'success', hasToolCalls: false, finalAnswer: false },
         latencyMs: 5,
         response: 'Let me think about this.',
@@ -11560,7 +11514,7 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.maxTurns = 4;
     sessionConfig.maxRetries = 2;
     const finalFormat = sessionConfig.outputFormat ?? 'markdown';
-    return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
+    return await runWithExecuteTurnOverride(sessionConfig, async ({ request, invocation }) => {
       if (invocation === 1) {
         return {
           status: { type: 'success', hasToolCalls: false, finalAnswer: false },
@@ -11619,7 +11573,7 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 6;
     sessionConfig.maxRetries = 2;
-    return await runWithPatchedExecuteTurn(sessionConfig, ({ request }) => {
+    return await runWithExecuteTurnOverride(sessionConfig, ({ request }) => {
       const turnIndex = request.turnMetadata?.turn ?? 1;
       if (turnIndex < 3) {
         return Promise.resolve({
@@ -11668,7 +11622,7 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 6;
     sessionConfig.maxRetries = 2;
-    return await runWithPatchedExecuteTurn(sessionConfig, ({ request }) => {
+    return await runWithExecuteTurnOverride(sessionConfig, ({ request }) => {
       const turnIndex = request.turnMetadata?.turn ?? 1;
       if (turnIndex < 3) {
         return Promise.resolve({
@@ -11716,7 +11670,7 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.maxTurns = 5;
     sessionConfig.maxRetries = 2;
     const finalFormat = sessionConfig.outputFormat ?? 'markdown';
-    return await runWithPatchedExecuteTurn(sessionConfig, async ({ request }) => {
+    return await runWithExecuteTurnOverride(sessionConfig, async ({ request }) => {
       const turnIndex = request.turnMetadata?.turn ?? 1;
       if (turnIndex === 4) {
         const assistantMessage: ConversationMessage = {
@@ -11801,7 +11755,7 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.maxTurns = 10;
     sessionConfig.maxRetries = 2;
     const finalFormat = sessionConfig.outputFormat ?? 'markdown';
-    return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
+    return await runWithExecuteTurnOverride(sessionConfig, async ({ request, invocation }) => {
       if (invocation === 1) {
         const assistantMessage: ConversationMessage = {
           role: 'assistant',
@@ -11870,7 +11824,7 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.maxTurns = 10;
     sessionConfig.maxRetries = 2;
     const finalFormat = sessionConfig.outputFormat ?? 'markdown';
-    return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
+    return await runWithExecuteTurnOverride(sessionConfig, async ({ request, invocation }) => {
       if (invocation === 1) {
         const assistantMessage: ConversationMessage = {
           role: 'assistant',
@@ -11943,7 +11897,7 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.maxTurns = 10;
     sessionConfig.maxRetries = 3;
     const finalFormat = sessionConfig.outputFormat ?? 'markdown';
-    return await runWithPatchedExecuteTurn(sessionConfig, async ({ request }) => {
+    return await runWithExecuteTurnOverride(sessionConfig, async ({ request }) => {
       const turnIndex = request.turnMetadata?.turn ?? 1;
       const attempt = request.turnMetadata?.attempt ?? 1;
       if (turnIndex === 1) {
@@ -12059,7 +12013,7 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
     sessionConfig.maxRetries = 1;
     sessionConfig.maxTurns = 3;
-    return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
+    return await runWithExecuteTurnOverride(sessionConfig, async ({ request, invocation }) => {
       await Promise.resolve();
       const nonce = extractNonceFromMessages(request.messages, 'run-test-xml-happy');
       if (invocation > 1) throw new Error('Unexpected extra invocation');
@@ -12094,7 +12048,7 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
     sessionConfig.maxRetries = 1;
     sessionConfig.maxTurns = 2;
-    return await runWithPatchedExecuteTurn(sessionConfig, async ({ request }) => {
+    return await runWithExecuteTurnOverride(sessionConfig, async ({ request }) => {
       await Promise.resolve();
       // Progress follows tools transport (native), not final_report transport (XML)
       const nonce = extractNonceFromMessages(request.messages, 'run-test-xml-final-only');
@@ -12129,7 +12083,7 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
     sessionConfig.maxRetries = 1;
     sessionConfig.maxTurns = 3;
-    return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
+    return await runWithExecuteTurnOverride(sessionConfig, async ({ request, invocation }) => {
       await Promise.resolve();
       const nonce = extractNonceFromMessages(request.messages, 'run-test-xml-invalid-tag');
       if (invocation === 1) {
@@ -13174,7 +13128,7 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 1;
     sessionConfig.maxRetries = 1;
-    return await runWithPatchedExecuteTurn(sessionConfig, ({ request }) => {
+    return await runWithExecuteTurnOverride(sessionConfig, ({ request }) => {
       const assistantMessage: ConversationMessage = {
         role: 'assistant',
         content: 'progress only',
@@ -13201,7 +13155,7 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 1;
     sessionConfig.maxRetries = 1;
-    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+    return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
       status: { type: 'success', hasToolCalls: false, finalAnswer: false },
       latencyMs: 5,
       response: 'plain text without tools',
@@ -13226,7 +13180,7 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 2;
     sessionConfig.maxRetries = 1;
-    return await runWithPatchedExecuteTurn(sessionConfig, ({ invocation }) => {
+    return await runWithExecuteTurnOverride(sessionConfig, ({ invocation }) => {
       // Turn 1: Return task_status only (progress-only turn)
       // Turn 2: Return valid final_report to complete session
       if (invocation === 1) {
@@ -13269,7 +13223,7 @@ BASE_TEST_SCENARIOS.push({
   expect: (result: AIAgentResult) => {
     invariant(result.success, 'Session should succeed with task_status on Turn 1 and final_report on Turn 2');
     invariant(result.finalReport !== undefined, 'Final report should be provided');
-    // Note: Accounting entries aren't populated when using runWithPatchedExecuteTurn
+    // Note: Accounting entries aren't populated when using runWithExecuteTurnOverride
     // because tools aren't actually executed. The test verifies session-level behavior.
   },
 } satisfies HarnessTest);
@@ -13281,7 +13235,7 @@ BASE_TEST_SCENARIOS.push({
     // The session fails with retries_exhausted when maxTurns is reached without a final_report.
     sessionConfig.maxTurns = 2;
     sessionConfig.maxRetries = 1;
-    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+    return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
       status: { type: 'success', hasToolCalls: true, finalAnswer: false },
       latencyMs: 5,
       response: STATUS_UPDATE_RESPONSE,
@@ -13310,7 +13264,7 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 6;
     sessionConfig.maxRetries = 1;
-    return await runWithPatchedExecuteTurn(sessionConfig, ({ invocation }) => {
+    return await runWithExecuteTurnOverride(sessionConfig, ({ invocation }) => {
       if (invocation >= 1 && invocation <= 5) {
         return Promise.resolve({
           status: { type: 'success', hasToolCalls: true, finalAnswer: false },
@@ -13360,11 +13314,11 @@ BASE_TEST_SCENARIOS.push({
   id: 'run-test-task-status-completed',
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     // Test that task_status with completed status (without final_report) leads to session failure.
-    // Note: The task_status_completed slug requires actual tool execution (not patched executeTurn).
-    // With patched executeTurn, we verify the session fails without a final_report.
+    // Note: The task_status_completed slug requires actual tool execution (not executeTurn override).
+    // With executeTurn override, we verify the session fails without a final_report.
     sessionConfig.maxTurns = 2;
     sessionConfig.maxRetries = 1;
-    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+    return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
       status: { type: 'success', hasToolCalls: true, finalAnswer: false },
       latencyMs: 5,
       response: TASK_COMPLETED_RESPONSE,
@@ -13392,10 +13346,10 @@ BASE_TEST_SCENARIOS.push({
   id: 'run-test-task-status-reset-on-real-tool',
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     // Test that task_status with a real tool (non-progress) allows session to succeed.
-    // Note: Accounting entries aren't populated with patched executeTurn.
+    // Note: Accounting entries aren't populated with executeTurn override.
     sessionConfig.maxTurns = 2;
     sessionConfig.maxRetries = 1;
-    return await runWithPatchedExecuteTurn(sessionConfig, ({ invocation }) => {
+    return await runWithExecuteTurnOverride(sessionConfig, ({ invocation }) => {
       if (invocation === 1) {
         // Turn 1: task_status + real tool → session can continue
         return Promise.resolve({
@@ -13442,7 +13396,7 @@ BASE_TEST_SCENARIOS.push({
   expect: (result: AIAgentResult) => {
     invariant(result.success, 'Task status followed by real tool should succeed');
     invariant(result.finalReport !== undefined, 'Final report should be provided');
-    // Note: Accounting entries aren't populated when using runWithPatchedExecuteTurn
+    // Note: Accounting entries aren't populated when using runWithExecuteTurnOverride
     invariant(result.conversation.length > 0, 'Should have conversation after reset');
   },
 } satisfies HarnessTest);
@@ -13463,7 +13417,7 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 1;
     sessionConfig.maxRetries = 0; // No retries to force immediate exhaustion
-    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+    return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
       status: { type: 'auth_error', message: RETRY_EXHAUSTED_MESSAGE },
       latencyMs: 5,
       response: RETRY_EXHAUSTED_MESSAGE,
@@ -13488,7 +13442,7 @@ BASE_TEST_SCENARIOS.push({
     // Set up final turn with no retries to test edge case
     sessionConfig.maxTurns = 1;
     sessionConfig.maxRetries = 0; // No retries - immediate exhaustion on final turn
-    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+    return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
       status: { type: 'auth_error', message: RETRY_EXHAUSTED_MESSAGE },
       latencyMs: 5,
       response: RETRY_EXHAUSTED_MESSAGE,
@@ -13514,11 +13468,11 @@ BASE_TEST_SCENARIOS.push({
   id: 'run-test-old-progress-report-rejected',
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     // Test that session fails when encountering old progress_report tool (deprecated).
-    // Note: With patched executeTurn, tools aren't executed so detailed unknown_tool slug isn't generated.
+    // Note: With executeTurn override, tools aren't executed so detailed unknown_tool slug isn't generated.
     // We verify the session fails when no valid tools are executed and no final_report is provided.
     sessionConfig.maxTurns = 1;
     sessionConfig.maxRetries = 1;
-    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+    return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
       status: { type: 'success', hasToolCalls: true, finalAnswer: false },
       latencyMs: 5,
       response: 'trying old tool name',
@@ -13534,7 +13488,7 @@ BASE_TEST_SCENARIOS.push({
   },
   expect: (result: AIAgentResult) => {
     invariant(!result.success, 'Old progress_report tool should cause session failure');
-    // With patched executeTurn, verify session fails with retries_exhausted and no_tools
+    // With executeTurn override, verify session fails with retries_exhausted and no_tools
     expectTurnFailureContains(result.logs, 'run-test-old-progress-report-rejected', ['retries_exhausted', 'no_tools', 'final_report_missing']);
   },
 } satisfies HarnessTest);
@@ -13544,7 +13498,7 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 1;
     sessionConfig.maxRetries = 1;
-    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+    return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
       status: { type: 'success', hasToolCalls: true, finalAnswer: false },
       latencyMs: 5,
       messages: [
@@ -13577,7 +13531,7 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 3;
     sessionConfig.maxRetries = 1;
-    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+    return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
       status: { type: 'success', hasToolCalls: true, finalAnswer: false },
       latencyMs: 5,
       messages: [
@@ -13611,7 +13565,7 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 1;
     sessionConfig.maxRetries = 1;
-    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+    return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
       status: { type: 'success', hasToolCalls: true, finalAnswer: false },
       latencyMs: 5,
       messages: [
@@ -13640,7 +13594,7 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
     sessionConfig.maxTurns = 1;
     sessionConfig.maxRetries = 1;
-    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+    return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
       status: { type: 'success', hasToolCalls: false, finalAnswer: false },
       latencyMs: 5,
       response: 'no final report here',
@@ -13666,7 +13620,7 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
     sessionConfig.maxTurns = 1;
     sessionConfig.maxRetries = 1;
-    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+    return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
       status: { type: 'success', hasToolCalls: false, finalAnswer: false },
       latencyMs: 5,
       response: '',
@@ -13692,7 +13646,7 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.maxTurns = 1;
     sessionConfig.maxRetries = 1;
     sessionConfig.outputFormat = 'json';
-    return await runWithPatchedExecuteTurn(sessionConfig, ({ request }) => {
+    return await runWithExecuteTurnOverride(sessionConfig, ({ request }) => {
       const nonce = extractNonceFromMessages(request.messages, STOP_REASON_LENGTH_SCENARIO_ID);
       const xml = `<ai-agent-${nonce}-FINAL status=\"success\" format=\"json\">{\"ok\":true}`;
       return Promise.resolve({
@@ -13722,7 +13676,7 @@ BASE_TEST_SCENARIOS.push({
     sessionConfig.maxTurns = 1;
     sessionConfig.maxRetries = 1;
     sessionConfig.outputFormat = SLACK_OUTPUT_FORMAT;
-    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+    return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
       status: { type: 'success', hasToolCalls: true, finalAnswer: false },
       latencyMs: 5,
       messages: [
@@ -13758,7 +13712,7 @@ BASE_TEST_SCENARIOS.push({
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 2;
     sessionConfig.maxRetries = 1;
-    return await runWithPatchedExecuteTurn(sessionConfig, () => Promise.resolve({
+    return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
       status: { type: 'success', hasToolCalls: false, finalAnswer: false },
       latencyMs: 5,
       response: 'still no final report',

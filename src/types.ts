@@ -797,6 +797,8 @@ export interface AIAgentSessionConfig {
   ancestors?: string[];
   // Override context window for all targets (applies uniformly regardless of provider/model config)
   contextWindow?: number;
+  // DI override for LLM turn execution (for testing - bypasses actual LLM calls)
+  executeTurnOverride?: (request: TurnRequest) => Promise<TurnResult>;
 }
 
 // Session result

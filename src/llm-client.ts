@@ -52,6 +52,8 @@ export class LLMClient {
     requestPayload?: LogPayload;
     responsePayload?: LogPayload;
   };
+  // DI override for testing - bypasses actual LLM calls
+  private executeTurnOverride?: (request: TurnRequest) => Promise<TurnResult>;
 
   constructor(
     providerConfigs: Record<string, ProviderConfig>,
@@ -60,6 +62,7 @@ export class LLMClient {
       traceSDK?: boolean;
       emitEvent?: (event: AIAgentEvent) => void;
       pricing?: Partial<Record<string, Partial<Record<string, { unit?: 'per_1k'|'per_1m'; currency?: 'USD'; prompt?: number; completion?: number; cacheRead?: number; cacheWrite?: number }>>>>;
+      executeTurnOverride?: (request: TurnRequest) => Promise<TurnResult>;
     }
   ) {
     this.traceLLM = options?.traceLLM ?? false;
@@ -67,6 +70,7 @@ export class LLMClient {
     updateAiSdkWarningPreference(this.traceLLM);
     this.emitEvent = options?.emitEvent;
     this.pricing = options?.pricing;
+    this.executeTurnOverride = options?.executeTurnOverride;
 
     // Initialize providers - necessary for side effects
     // eslint-disable-next-line functional/no-loop-statements
@@ -97,6 +101,11 @@ export class LLMClient {
   }
 
   async executeTurn(request: TurnRequest): Promise<TurnResult> {
+    // DI override for testing - bypasses provider lookup and actual LLM calls
+    if (this.executeTurnOverride !== undefined) {
+      return this.executeTurnOverride(request);
+    }
+
     const provider = this.providers.get(request.provider);
     if (provider === undefined) {
       throw new Error(`Unknown provider: ${request.provider}`);
