@@ -229,228 +229,260 @@ modules:
         - id: top-queries
           name: Top Queries
           description: |
-            Top SQL queries from pg_stat_statements.
+            Retrieves aggregated SQL query performance metrics from PostgreSQL [pg_stat_statements](https://www.postgresql.org/docs/current/pgstatstatements.html) extension.
 
-            Reads pg_stat_statements and returns the top entries sorted by the selected column.
+            This function queries `pg_stat_statements` which tracks execution statistics for all SQL statements. Statistics include execution counts, timing metrics, I/O operations, and resource consumption. Columns are dynamically detected based on your PostgreSQL version.
+
+            Use cases:
+            - Identify slow queries consuming the most total execution time
+            - Find queries with high shared block reads for I/O optimization
+            - Analyze temp block usage to detect queries needing memory tuning
           parameters:
             - id: __sort
               name: Filter By
-              description: Select the primary sort column (options are derived from sortable columns in the response).
+              description: Select the primary sort column. Options include total time, mean time, calls, rows, shared blocks hit/read, and temp blocks written. Defaults to total time to focus on most resource-intensive queries.
               type: select
               required: true
               default: totalTime
               options: []
           returns:
-            description: Aggregated query statistics from pg_stat_statements.
+            description: Aggregated query statistics from `pg_stat_statements`. Each row represents a unique query pattern with cumulative metrics across all executions.
             columns:
               - name: Query ID
                 type: string
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Internal hash identifier for the normalized query. Can be used to track queries across statistics resets."
               - name: Query
                 type: string
                 unit: ""
-                description: ""
+                description: "Normalized SQL query text with literals replaced by parameter placeholders. Truncated to 4096 characters."
               - name: Database
                 type: string
                 unit: ""
-                description: ""
+                description: "Database name where the query was executed."
               - name: User
                 type: string
                 unit: ""
-                description: ""
+                description: "PostgreSQL user who executed the query."
               - name: Calls
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total number of times this query pattern has been executed. High values indicate frequently run queries."
               - name: Total Time
                 type: duration
                 unit: "milliseconds"
-                description: ""
+                description: "Cumulative execution time across all executions. High values indicate queries consuming significant database resources."
               - name: Mean Time
                 type: duration
                 unit: "milliseconds"
-                description: ""
+                description: "Average execution time per call. Use this to compare typical performance across different query patterns."
               - name: Min Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Minimum execution time observed for a single execution."
               - name: Max Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Maximum execution time observed for a single execution. Large gaps between min and max may indicate performance variability."
               - name: Stddev Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Standard deviation of execution time. High values indicate inconsistent query performance."
               - name: Plans
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Number of times the query was planned. Available in PostgreSQL 13+."
               - name: Total Plan Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Cumulative time spent planning the query. Available in PostgreSQL 13+."
               - name: Mean Plan Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Average time spent planning per execution. Available in PostgreSQL 13+."
               - name: Min Plan Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Minimum planning time observed. Available in PostgreSQL 13+."
               - name: Max Plan Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Maximum planning time observed. Available in PostgreSQL 13+."
               - name: Stddev Plan Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Standard deviation of planning time. Available in PostgreSQL 13+."
               - name: Rows
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total number of rows retrieved or affected across all executions."
               - name: Shared Blocks Hit
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total shared buffer cache hits. High values indicate good cache utilization."
               - name: Shared Blocks Read
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total shared blocks read from disk. High values indicate queries that bypass the cache and may benefit from more `shared_buffers`."
               - name: Shared Blocks Dirtied
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Total shared blocks dirtied by the query."
               - name: Shared Blocks Written
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Total shared blocks written by the query."
               - name: Local Blocks Hit
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Total local buffer cache hits (temporary tables)."
               - name: Local Blocks Read
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Total local blocks read from disk."
               - name: Local Blocks Dirtied
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Total local blocks dirtied."
               - name: Local Blocks Written
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Total local blocks written."
               - name: Temp Blocks Read
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total temp blocks read. Non-zero values indicate queries spilling to disk due to insufficient `work_mem`."
               - name: Temp Blocks Written
                 type: integer
                 unit: ""
-                description: ""
+                description: "Total temp blocks written. High values suggest increasing `work_mem` may improve performance."
               - name: Block Read Time
                 type: duration
                 unit: "milliseconds"
-                description: ""
+                description: "Time spent reading blocks from disk. Requires `track_io_timing` to be enabled."
               - name: Block Write Time
                 type: duration
                 unit: "milliseconds"
-                description: ""
+                description: "Time spent writing blocks to disk. Requires `track_io_timing` to be enabled."
               - name: WAL Records
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Total number of WAL records generated. Available in PostgreSQL 13+."
               - name: WAL Full Page Images
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Total number of WAL full page images generated. Available in PostgreSQL 13+."
               - name: WAL Bytes
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Total bytes of WAL generated. Available in PostgreSQL 13+."
               - name: JIT Functions
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Total number of functions JIT-compiled. Available in PostgreSQL 15+."
               - name: JIT Generation Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Time spent generating JIT code. Available in PostgreSQL 15+."
               - name: JIT Inlining Count
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Number of times JIT inlining was performed. Available in PostgreSQL 15+."
               - name: JIT Inlining Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Time spent on JIT inlining. Available in PostgreSQL 15+."
               - name: JIT Optimization Count
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Number of times JIT optimization was performed. Available in PostgreSQL 15+."
               - name: JIT Optimization Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Time spent on JIT optimization. Available in PostgreSQL 15+."
               - name: JIT Emission Count
                 type: integer
                 unit: ""
                 visibility: hidden
-                description: ""
+                description: "Number of times JIT code was emitted. Available in PostgreSQL 15+."
               - name: JIT Emission Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Time spent emitting JIT code. Available in PostgreSQL 15+."
               - name: Temp Block Read Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Time spent reading temp blocks. Available in PostgreSQL 15+. Requires `track_io_timing`."
               - name: Temp Block Write Time
                 type: duration
                 unit: "milliseconds"
                 visibility: hidden
-                description: ""
+                description: "Time spent writing temp blocks. Available in PostgreSQL 15+. Requires `track_io_timing`."
           performance: |
-            Requires pg_stat_statements and can be expensive on busy servers.
+            Queries `pg_stat_statements` which maintains statistics in shared memory.<br/>• On busy servers with many unique queries, the extension may consume significant memory<br/>• Default limit of 500 rows balances usefulness with performance<br/>• Columns are dynamically detected based on PostgreSQL version (13+ has planning stats, 15+ has JIT stats)
           security: |
-            Query text may contain unmasked literals (potential PII).
+            Query text may contain unmasked literal values including potentially sensitive data.<br/>• Personal information in WHERE clauses or INSERT values<br/>• Credentials or tokens in query parameters<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
               - title: Enable pg_stat_statements
                 description: |
-                  Install and enable the pg_stat_statements extension.
+                  The `pg_stat_statements` extension must be installed and configured.
+
+                  1. Add to `postgresql.conf`:
+
+                     ```ini
+                     shared_preload_libraries = 'pg_stat_statements'
+                     ```
+
+                  2. Restart PostgreSQL, then create the extension:
+
+                     ```sql
+                     CREATE EXTENSION pg_stat_statements;
+                     ```
+
+                  3. Verify the extension is working:
+
+                     ```sql
+                     SELECT COUNT(*) FROM pg_stat_statements;
+                     ```
+
+                  :::info
+
+                  - `pg_stat_statements` requires a server restart to load the shared library
+                  - Statistics can be reset with `SELECT pg_stat_statements_reset()`
+                  - The `pg_stat_statements.max` parameter controls maximum tracked statements (default 5000)
+                  - Enable `track_io_timing` for block read/write timing metrics
+
+                  :::
           availability: |
-            Available when pg_stat_statements is available and the collector is initialized.
+            Available when:<br/>• The `pg_stat_statements` extension is installed in the database<br/>• The collector has successfully connected to PostgreSQL<br/>• Returns HTTP 503 if extension is not installed (with instructions to install)<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
     metrics:
       folding:
         title: Metrics
