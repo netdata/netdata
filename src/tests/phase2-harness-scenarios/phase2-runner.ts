@@ -46,6 +46,8 @@ import { clampToolName, sanitizeToolName, formatToolRequestCompact, formatAgentR
 import { createWebSocketTransport } from '../../websocket-transport.js';
 import { getScenario } from '../fixtures/test-llm-scenarios.js';
 import { runJournaldSinkUnitTests } from '../unit/journald-sink.test.js';
+
+import { SUITE_TEST_SCENARIOS } from './suites/index.js';
 /* eslint-disable @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-unused-vars, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/no-unnecessary-boolean-literal-compare */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12776,23 +12778,29 @@ BASE_TEST_SCENARIOS.push({
   },
 } satisfies HarnessTest);
 
+/**
+ * Combined test scenarios from BASE_TEST_SCENARIOS and split suite files.
+ * Suite tests are defined in ./suites/ and imported via SUITE_TEST_SCENARIOS.
+ */
+const ALL_TEST_SCENARIOS: HarnessTest[] = [...BASE_TEST_SCENARIOS, ...SUITE_TEST_SCENARIOS];
+
 const filterScenarios = (ids: string[], logWarnings: boolean): HarnessTest[] => {
-  if (ids.length === 0) return BASE_TEST_SCENARIOS;
+  if (ids.length === 0) return ALL_TEST_SCENARIOS;
   const requestedIds = new Set(ids);
-  const filtered = BASE_TEST_SCENARIOS.filter((scenario) => requestedIds.has(scenario.id));
+  const filtered = ALL_TEST_SCENARIOS.filter((scenario) => requestedIds.has(scenario.id));
   if (logWarnings) {
-    const missing = ids.filter((id) => !BASE_TEST_SCENARIOS.some((scenario) => scenario.id === id));
+    const missing = ids.filter((id) => !ALL_TEST_SCENARIOS.some((scenario) => scenario.id === id));
     if (missing.length > 0) {
       console.warn(`[warn] PHASE1_ONLY_SCENARIO references unknown scenario(s): ${missing.join(', ')}.`);
     }
     if (filtered.length === 0) {
       console.warn('[warn] PHASE1_ONLY_SCENARIO matched no known scenarios; running the full suite instead.');
-      return BASE_TEST_SCENARIOS;
+      return ALL_TEST_SCENARIOS;
     }
     const label = filtered.map((scenario) => scenario.id).join(', ');
     console.log(`[info] Running filtered Phase 1 scenarios: ${label}`);
   }
-  return filtered.length > 0 ? filtered : BASE_TEST_SCENARIOS;
+  return filtered.length > 0 ? filtered : ALL_TEST_SCENARIOS;
 };
 
 const DEFAULT_TEST_SCENARIOS = filterScenarios(scenarioFilterIdsFromEnv, true);
@@ -12809,7 +12817,7 @@ const resolveScenarios = (options?: PhaseOneRunOptions): HarnessTest[] => {
 };
 
 export function listPhaseOneScenarioIds(): string[] {
-  return BASE_TEST_SCENARIOS.map((scenario) => scenario.id);
+  return ALL_TEST_SCENARIOS.map((scenario) => scenario.id);
 }
 
 /** Environment variable to force all-sequential mode (for debugging) */
@@ -13100,7 +13108,7 @@ async function cleanupActiveHandles(): Promise<void> {
 }
 
 function findScenarioById(id: string): HarnessTest {
-  const scenario = BASE_TEST_SCENARIOS.find((entry) => entry.id === id);
+  const scenario = ALL_TEST_SCENARIOS.find((entry) => entry.id === id);
   if (scenario === undefined) {
     throw new Error(`Unknown Phase 1 scenario id '${id}'.`);
   }
