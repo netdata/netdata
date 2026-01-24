@@ -497,10 +497,7 @@ modules:
             Use cases:
             - Identify top bandwidth-consuming interfaces on routers, switches, and access points
             - Monitor interface operational and administrative status for network health
-            - Analyze traffic patterns to detect usage spikes and plan capacity
-            - Investigate packet errors, discards, and unusual broadcast/multicast traffic
-            - Track unicast, broadcast, and multicast packet rates for traffic profiling
-            - Troubleshoot interface performance issues with detailed directional metrics
+            - Investigate packet errors, discards, and unusual traffic patterns
 
             Data is sourced from the IF-MIB (RFC 2863) interface counters and is cached from the last successful SNMP collection. No additional SNMP requests are triggered when calling this function.
           parameters:
@@ -612,7 +609,7 @@ modules:
           security: |
             Exposes interface names, operational status, and traffic counters only. No sensitive data such as packet payloads, authentication credentials, or device configuration details are exposed.
           availability: |
-            Available after collector has completed at least one data collection cycle.<br/>• Returns cached interface data instantly (no SNMP polling on function call)<br/>• Returns HTTP 503 if cache is not ready yet (wait for next SNMP collection cycle)<br/>• Interface metrics with nil values when Admin Status or Oper Status indicate interface is down
+            Available when:<br/>• The collector has completed at least one data collection cycle<br/>• Interface data is cached from the last successful SNMP collection<br/>• Returns HTTP 503 if cache is not ready yet (wait for next SNMP collection cycle)<br/>• Returns HTTP 500 if no interface data is available
     metrics:
       folding:
         title: Metrics

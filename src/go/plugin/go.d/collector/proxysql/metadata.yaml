@@ -130,17 +130,20 @@ modules:
         - id: top-queries
           name: Top Queries
           description: |
-            Provides comprehensive SQL query performance analysis from ProxySQL query digest tables.
-            This function queries ProxySQL's [stats_mysql_query_digest](https://proxysql.com/documentation/stats-statistics/#stats_mysql_query_digest) table to retrieve aggregated runtime statistics for top-performing queries across all monitored MySQL backends. It presents results in a sortable, filterable table with extensive performance metrics for connection pooling, query execution, and network throughput analysis.
+            Retrieves aggregated query statistics from ProxySQL's [stats_mysql_query_digest](https://proxysql.com/documentation/stats-statistics/#stats_mysql_query_digest) table.
+
+            This function queries the `stats_mysql_query_digest` table which stores runtime statistics for all queries proxied through ProxySQL, aggregated by query digest (normalized query pattern). It provides timing metrics, execution counts, and error statistics for each unique query pattern.
+
             Use cases:
-            - Identify slow or resource-intensive queries consuming excessive execution time
-            - Analyze query execution frequency to detect performance hotspots and caching opportunities
-            - Monitor connection pool efficiency and backend load distribution
-            Data is sourced from ProxySQL's internal query digest tracking, which aggregates SQL statement execution statistics across connections. Query text is truncated at 4096 characters for display purposes.
+            - Identify slow queries consuming excessive total execution time
+            - Find high-frequency queries that may benefit from caching
+            - Monitor query error rates across backends
+
+            Query text is truncated at 4096 characters for display purposes.
           parameters:
             - id: __sort
               name: Filter By
-              description: Selects primary sort column. The available options depend on your configuration and include metrics like total execution time, number of calls, rows affected, and errors. Default is Total Time to focus on most resource-intensive queries.
+              description: Select the primary sort column. Options include total execution time, number of calls, rows affected, rows sent, errors, and warnings. Defaults to total time to focus on most resource-intensive queries.
               type: select
               required: true
               default: totalTime
@@ -220,11 +223,11 @@ modules:
                 visibility: hidden
                 description: Timestamp when this query pattern was last executed. Can help identify stale queries that are no longer in use or to track recent query activity.
           performance: |
-            Queries ProxySQL stats tables and aggregates digest statistics across all backends.<br/>• Can be expensive on busy systems with many queries and backends<br/>• Default limit of 500 rows balances completeness with performance<br/>• Data is aggregated in-memory by ProxySQL from active connections
+            Queries ProxySQL admin interface for digest statistics:<br/>• Reads from in-memory `stats_mysql_query_digest` table<br/>• Default limit of 500 rows balances completeness with performance<br/>• Data is aggregated in-memory by ProxySQL from active connections
           security: |
-            Query text may contain unmasked literal values including potentially sensitive data.<br/>• Customer data (names, emails, phone numbers)<br/>• Business logic (proprietary algorithms, pricing)<br/>• Internal identifiers (application names, object IDs)<br/>• SQL statements that reveal table structures or relationships<br/>• Access should be restricted to authorized personnel only due to potential PII exposure
+            Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data embedded in queries<br/>• Internal identifiers and object IDs<br/>• Access should be restricted to authorized personnel only
           availability: |
-            Available when ProxySQL can query MySQL stats tables and collector has completed at least one data collection cycle.<br/>• Returns HTTP 403 if function is disabled in configuration<br/>• Returns HTTP 500 if ProxySQL cannot be queried or stats tables are empty
+            Available when:<br/>• The collector has successfully connected to ProxySQL admin interface<br/>• The user has access to query `stats_mysql_query_digest` table<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails or table is empty
     metrics:
       folding:
         title: Metrics
