@@ -176,54 +176,58 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Top Queries
 
-Top SQL queries from ProxySQL query digest stats.
+Retrieves aggregated query statistics from ProxySQL's [stats_mysql_query_digest](https://proxysql.com/documentation/stats-statistics/#stats_mysql_query_digest) table.
 
-Queries stats_mysql_query_digest and returns the top entries sorted by the selected column.
+This function queries the `stats_mysql_query_digest` table which stores runtime statistics for all queries proxied through ProxySQL, aggregated by query digest (normalized query pattern). It provides timing metrics, execution counts, and error statistics for each unique query pattern.
+
+Use cases:
+- Identify slow queries consuming excessive total execution time
+- Find high-frequency queries that may benefit from caching
+- Monitor query error rates across backends
+
+Query text is truncated at 4096 characters for display purposes.
 
 
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Proxysql:top-queries` |
-| Performance | Uses ProxySQL stats tables and can be expensive on busy systems. |
-| Security | Query text may contain unmasked literals (potential PII). |
-| Availability | Available when the collector can query ProxySQL stats; returns errors if the SQL connection is unavailable. |
+| Require Cloud | yes |
+| Performance | Queries ProxySQL admin interface for digest statistics:<br/>• Reads from in-memory `stats_mysql_query_digest` table<br/>• Default limit of 500 rows balances completeness with performance<br/>• Data is aggregated in-memory by ProxySQL from active connections |
+| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data embedded in queries<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to ProxySQL admin interface<br/>• Returns HTTP 503 if the connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
 
 #### Prerequisites
 
-##### Grant access to stats_mysql_query_digest
-
-Ensure the ProxySQL user can read stats_mysql_query_digest.
-
-
+No additional configuration is required.
 
 #### Parameters
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
-| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | totalTime |  |
+| Filter By | select | Select the primary sort column. Options include total execution time, number of calls, rows affected, rows sent, errors, and warnings. Defaults to total time to focus on most resource-intensive queries. | yes | totalTime |  |
 
 #### Returns
 
-Query digest statistics from ProxySQL.
+Aggregated query digest statistics from ProxySQL, providing comprehensive performance analysis across all monitored MySQL backends. Each row represents a unique query pattern (normalized digest) with cumulative metrics across all its executions.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
-| Digest | string |  | hidden |  |
-| Query | string |  |  |  |
-| Schema | string |  |  |  |
-| User | string |  | hidden |  |
-| Hostgroup | integer |  | hidden |  |
-| Calls | integer |  |  |  |
-| Total Time | duration | milliseconds |  |  |
-| Avg Time | duration | milliseconds |  |  |
-| Min Time | duration | milliseconds | hidden |  |
-| Max Time | duration | milliseconds | hidden |  |
-| Rows Affected | integer |  |  |  |
-| Rows Sent | integer |  |  |  |
-| Errors | integer |  |  |  |
-| Warnings | integer |  |  |  |
-| First Seen | string |  | hidden |  |
-| Last Seen | string |  | hidden |  |
+| Digest | string |  | hidden | Unique hash identifier for normalized query pattern. Queries with identical structure but different literal values share the same digest. |
+| Query | string |  |  | The SQL query text with literal values truncated at 4096 characters. Use this to identify the actual SQL being executed and spot parameterized queries or injection risks. |
+| Schema | string |  |  | Database name where the query was executed. Essential for multi-database analysis to identify which database or backend is experiencing query load. |
+| User | string |  | hidden | MySQL username used to execute the query. Useful for identifying application users or connection pool attribution. |
+| Hostgroup | integer |  | hidden | Backend hostgroup identifier from ProxySQL configuration. Allows grouping queries by backend server for multi-backend analysis. |
+| Calls | integer |  |  | Total number of times this query pattern has been executed. High values indicate frequently run queries that may impact server performance significantly. |
+| Total Time | duration | milliseconds |  | Cumulative execution time across all query executions. This is a key metric for identifying the most resource-intensive queries in terms of total server time consumption. |
+| Avg Time | duration | milliseconds |  | Average execution time per query run. Compare with Total Time to determine if individual executions or high frequency drives resource usage. |
+| Min Time | duration | milliseconds | hidden | Minimum execution time observed. Helps identify variability in query performance and spot potential optimization opportunities for outliers. |
+| Max Time | duration | milliseconds | hidden | Maximum execution time observed. Large gaps between Min Time and Max Time may indicate performance instability due to parameter sniffing, data skew, or lock contention. |
+| Rows Affected | integer |  |  | Total number of rows modified by INSERT, UPDATE, DELETE, or REPLACE statements. Useful for tracking write workloads and data modification patterns. |
+| Rows Sent | integer |  |  | Total number of rows returned to the client by SELECT statements. High values may indicate queries returning large result sets that consume significant network bandwidth and client resources. |
+| Errors | integer |  |  | Total number of times this query pattern resulted in an error. Non-zero values require investigation into the underlying SQL syntax, permission issues, or constraint violations. |
+| Warnings | integer |  |  | Total number of times this query pattern generated a warning. Warnings may indicate data type conversions, NULL handling issues, or other non-critical SQL problems that should be reviewed. |
+| First Seen | string |  | hidden | Timestamp when this query pattern was first observed. Helps identify new queries that may have been introduced by application changes or code deployments. |
+| Last Seen | string |  | hidden | Timestamp when this query pattern was last executed. Can help identify stale queries that are no longer in use or to track recent query activity. |
 
 
 

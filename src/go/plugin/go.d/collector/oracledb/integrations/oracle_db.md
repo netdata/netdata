@@ -143,23 +143,55 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Top Queries
 
-Top SQL statements from V$SQLSTATS. WARNING: Query text may contain unmasked literals (potential PII).
+Retrieves aggregated SQL statement performance metrics from Oracle [V$SQLSTATS](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/V-SQLSTATS.html) view.
 
-Queries V$SQLSTATS and returns the top entries sorted by the selected column.
+This function queries `V$SQLSTATS` which provides SQL execution statistics aggregated across all cursors for each SQL statement. Statistics include execution counts, timing metrics, I/O operations, and resource consumption.
+
+Use cases:
+- Identify slow queries consuming the most total execution time
+- Find queries with high buffer gets or disk reads for I/O optimization
+- Analyze CPU-intensive queries for resource tuning
+
+Query text is truncated at 4096 characters for display purposes.
 
 
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Oracledb:top-queries` |
-| Performance | Queries system views and may be expensive on busy databases. |
-| Security | Query text may contain unmasked literals (potential PII). |
-| Availability | Available when the collector can query Oracle system views; returns errors if SQL is unavailable. |
+| Require Cloud | yes |
+| Performance | Queries `V$SQLSTATS` which is a lightweight view optimized for statistics retrieval:<br/>• On busy databases with many SQL statements, the query may take longer<br/>• Default limit of 500 rows balances usefulness with performance |
+| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to Oracle DB<br/>• The user has SELECT privilege on `V$SQLSTATS`<br/>• Returns HTTP 503 if the connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
 
 #### Prerequisites
 
 ##### Grant access to V$SQLSTATS
 
-Use a SQL user with access to V$SQLSTATS and a working SQL connection.
+The monitoring user must have SELECT privilege on `V$SQLSTATS` and related views.
+
+1. Grant the required privileges:
+
+   ```sql
+   -- Note: Use V_$ (with underscore) for GRANT - this is the base fixed view
+   -- Queries use the V$ public synonym
+   GRANT SELECT ON V_$SQLSTATS TO netdata;
+   -- Or grant the broader role:
+   GRANT SELECT_CATALOG_ROLE TO netdata;
+   ```
+
+2. Verify access:
+
+   ```sql
+   SELECT COUNT(*) FROM V$SQLSTATS WHERE ROWNUM <= 1;
+   ```
+
+:::info
+
+- `V$SQLSTATS` is available in Oracle 10g and later
+- The view aggregates statistics across all child cursors for each SQL statement
+- Some columns like `MODULE` and `ACTION` require applications to set them via `DBMS_APPLICATION_INFO`
+
+:::
 
 
 
@@ -167,48 +199,81 @@ Use a SQL user with access to V$SQLSTATS and a working SQL connection.
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
-| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | totalTime |  |
+| Filter By | select | Select the primary sort column. Options include total time, CPU time, executions, buffer gets, disk reads, and more. Defaults to total time to focus on most resource-intensive queries. | yes | totalTime |  |
 
 #### Returns
 
-Aggregated SQL statistics from V$SQLSTATS.
+Aggregated SQL statistics from `V$SQLSTATS`. Each row represents a unique SQL statement with cumulative metrics across all executions.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
-| SQL ID | string |  | hidden |  |
-| Query | string |  |  |  |
-| Schema | string |  |  |  |
-| Executions | integer |  |  |  |
-| Total Time | duration | milliseconds |  |  |
-| Avg Time | duration | milliseconds |  |  |
-| CPU Time | duration | milliseconds |  |  |
-| Buffer Gets | integer |  |  |  |
-| Disk Reads | integer |  |  |  |
-| Rows Processed | integer |  |  |  |
-| Parse Calls | integer |  | hidden |  |
-| Module | string |  | hidden |  |
-| Action | string |  | hidden |  |
-| Last Active | string |  | hidden |  |
+| SQL ID | string |  | hidden | Unique identifier for the SQL statement in the shared pool. Can be used to find execution plans in `V$SQL_PLAN`. |
+| Query | string |  |  | SQL statement text. Truncated to 4096 characters for display purposes. |
+| Schema | string |  |  | Schema under which the SQL was parsed. Useful for identifying which application or user generated the query. |
+| Executions | integer |  |  | Total number of times this SQL statement has been executed. High values indicate frequently run queries. |
+| Total Time | duration | milliseconds |  | Cumulative elapsed time across all executions. High values indicate queries consuming significant database resources. |
+| Avg Time | duration | milliseconds |  | Average elapsed time per execution. Use this to compare typical performance across different SQL statements. |
+| CPU Time | duration | milliseconds |  | Cumulative CPU time consumed across all executions. Compare with total time to identify I/O-bound vs CPU-bound queries. |
+| Buffer Gets | integer |  |  | Total number of logical reads from the buffer cache. High values relative to rows processed may indicate inefficient queries. |
+| Disk Reads | integer |  |  | Total number of physical reads from disk. High values indicate queries that cannot be satisfied from the buffer cache. |
+| Rows Processed | integer |  |  | Total number of rows processed across all executions. Compare with buffer gets to assess query efficiency. |
+| Parse Calls | integer |  | hidden | Number of times the SQL was parsed (hard + soft parses). High values may indicate lack of bind variables. |
+| Module | string |  | hidden | Application module name set via `DBMS_APPLICATION_INFO`. Useful for identifying which application component generated the query. |
+| Action | string |  | hidden | Application action name set via `DBMS_APPLICATION_INFO`. Provides finer-grained identification within a module. |
+| Last Active | string |  | hidden | Timestamp when this SQL statement was last executed. Helps identify recently active vs historical queries. |
 
 ### Running Queries
 
-Currently running SQL statements from V$SESSION. WARNING: Query text may contain unmasked literals (potential PII).
+Retrieves currently executing SQL statements from Oracle [V$SESSION](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/V-SESSION.html) view.
 
-Queries V$SESSION and returns running statements sorted by the selected column.
+This function queries `V$SESSION` joined with `V$SQL` to provide a real-time snapshot of all active user sessions currently executing SQL statements. It shows session details, elapsed time, and the SQL being executed.
+
+Use cases:
+- Identify long-running queries that may be blocking other sessions
+- Monitor active workload and session distribution
+- Debug stuck or slow queries in real-time
+
+Query text is truncated at 4096 characters for display purposes.
 
 
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Oracledb:running-queries` |
-| Performance | Queries system views and may be expensive on busy databases. |
-| Security | Query text may contain unmasked literals (potential PII). |
-| Availability | Available when the collector can query Oracle system views; returns errors if SQL is unavailable. |
+| Require Cloud | yes |
+| Performance | Queries `V$SESSION` joined with `V$SQL` for currently active sessions:<br/>• Lightweight operation as it only returns currently active user sessions<br/>• Default limit of 500 rows (rarely reached for running queries) |
+| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and credentials in query parameters<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to Oracle DB<br/>• The user has SELECT privilege on `V$SESSION` and `V$SQL`<br/>• Returns HTTP 503 if the connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
 
 #### Prerequisites
 
 ##### Grant access to V$SESSION
 
-Use a SQL user with access to V$SESSION and a working SQL connection.
+The monitoring user must have SELECT privilege on `V$SESSION` and `V$SQL`.
+
+1. Grant the required privileges:
+
+   ```sql
+   -- Note: Use V_$ (with underscore) for GRANT - this is the base fixed view
+   -- Queries use the V$ public synonym
+   GRANT SELECT ON V_$SESSION TO netdata;
+   GRANT SELECT ON V_$SQL TO netdata;
+   -- Or grant the broader role:
+   GRANT SELECT_CATALOG_ROLE TO netdata;
+   ```
+
+2. Verify access:
+
+   ```sql
+   SELECT COUNT(*) FROM V$SESSION WHERE ROWNUM <= 1;
+   ```
+
+:::info
+
+- Only USER sessions with ACTIVE status and a current SQL ID are returned
+- The elapsed time is based on `LAST_CALL_ET` which resets when a new SQL starts
+- BACKGROUND sessions (Oracle internal processes) are filtered out
+
+:::
 
 
 
@@ -216,26 +281,26 @@ Use a SQL user with access to V$SESSION and a working SQL connection.
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
-| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | lastCallMs |  |
+| Filter By | select | Select the primary sort column. Defaults to elapsed time to show longest-running queries first. | yes | lastCallMs |  |
 
 #### Returns
 
-Snapshot of currently running SQL sessions.
+Real-time snapshot of currently executing SQL statements. Each row represents an active user session with its current SQL.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
-| Session | string |  |  |  |
-| User | string |  |  |  |
-| Status | string |  |  |  |
-| Type | string |  | hidden |  |
-| SQL ID | string |  | hidden |  |
-| Query | string |  |  |  |
-| Elapsed | duration | milliseconds |  |  |
-| SQL Exec Start | string |  | hidden |  |
-| Module | string |  | hidden |  |
-| Action | string |  | hidden |  |
-| Program | string |  | hidden |  |
-| Machine | string |  | hidden |  |
+| Session | string |  |  | Session identifier in format `SID,SERIAL#`. Can be used with `ALTER SYSTEM KILL SESSION` if needed. |
+| User | string |  |  | Oracle username of the session. Useful for identifying workload by user. |
+| Status | string |  |  | Session status (ACTIVE for currently executing). Only active sessions with SQL are shown. |
+| Type | string |  | hidden | Session type (USER or BACKGROUND). This function filters to USER sessions only. |
+| SQL ID | string |  | hidden | Identifier of the currently executing SQL. Can be used to find the statement in `V$SQL`. |
+| Query | string |  |  | SQL statement text currently being executed. Truncated to 4096 characters. |
+| Elapsed | duration | milliseconds |  | Time elapsed since the session's last call started. High values indicate long-running operations that may need investigation. |
+| SQL Exec Start | string |  | hidden | Timestamp when the current SQL execution started. |
+| Module | string |  | hidden | Application module name set via `DBMS_APPLICATION_INFO`. Identifies which application is running the query. |
+| Action | string |  | hidden | Application action name set via `DBMS_APPLICATION_INFO`. |
+| Program | string |  | hidden | Client program name that established the session (e.g., sqlplus, JDBC Thin Client). |
+| Machine | string |  | hidden | Client machine name or IP address. Useful for identifying query sources. |
 
 
 

@@ -27,7 +27,7 @@ This collector monitors CockroachDB servers.
 
 It scrapes Prometheus metrics from the CockroachDB `/_status/vars` endpoint.
 
-It also provides `top-queries` and `running-queries` functions using SQL statement statistics (`crdb_internal.cluster_statement_statistics`) and `SHOW CLUSTER STATEMENTS`.
+It also provides `top-queries` and `running-queries` functions using SQL statement statistics (`crdb_internal.cluster_statement_statistics`) and the `SHOW CLUSTER STATEMENTS` command.
 
 
 This collector is supported on all platforms.
@@ -36,7 +36,7 @@ This collector supports collecting metrics from multiple instances of this integ
 
 The `top-queries` and `running-queries` functions require:
 
-- A SQL user with `VIEWACTIVITY` (or `VIEWACTIVITYREDACTED`) privileges.
+- A SQL user with `VIEWACTIVITY` or `VIEWACTIVITYREDACTED` privileges.
 - Access to `crdb_internal.cluster_statement_statistics` (may require `SET allow_unsafe_internals = on` on newer versions).
 
 
@@ -142,23 +142,53 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Top Queries
 
-Top SQL statements from crdb_internal.cluster_statement_statistics.
+Retrieves and aggregates SQL statement performance metrics from CockroachDB [crdb_internal.cluster_statement_statistics](https://www.cockroachlabs.com/docs/stable/crdb-internal#cluster_statement_statistics) table.
 
-Queries crdb_internal.cluster_statement_statistics and returns the top entries sorted by the selected column.
+This function queries cluster-wide statement statistics grouped by fingerprint (normalized query pattern). It provides aggregated metrics including execution counts, timing breakdowns, and row operation statistics.
+
+Use cases:
+- Identify slow queries consuming the most total execution time
+- Find frequently executed queries that may benefit from optimization
+- Analyze row read/write patterns to detect inefficient queries
+
+Query text is truncated at 4096 characters for display purposes.
 
 
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Cockroachdb:top-queries` |
-| Performance | Executes SQL queries against system tables and may be expensive on busy clusters. |
-| Security | Query text may contain unmasked literals (potential PII). |
-| Availability | Requires SQL DSN configuration and access to system tables; returns errors if DSN is missing or SQL is unavailable. |
+| Require Cloud | yes |
+| Performance | Queries the `crdb_internal.cluster_statement_statistics` table which aggregates data across the cluster:<br/>• On busy clusters with high query throughput, this query may take longer<br/>• Default limit of 500 rows balances usefulness with performance |
+| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to CockroachDB<br/>• The SQL user has `VIEWACTIVITY` or `VIEWACTIVITYREDACTED` privileges<br/>• Returns HTTP 503 if the SQL connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
 
 #### Prerequisites
 
-##### Grant VIEWACTIVITY access to cluster statement stats
+##### Grant `VIEWACTIVITY` access to cluster statement stats
 
-Use a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to crdb_internal.cluster_statement_statistics.
+The SQL user must have appropriate privileges to access statement statistics.
+
+1. Grant `VIEWACTIVITY` (shows full query text) or `VIEWACTIVITYREDACTED` (masks literals):
+
+   ```sql
+   GRANT SYSTEM VIEWACTIVITY TO netdata_user;
+   -- OR for privacy:
+   GRANT SYSTEM VIEWACTIVITYREDACTED TO netdata_user;
+   ```
+
+2. On newer CockroachDB versions, access to `crdb_internal` may require:
+
+   ```sql
+   SET allow_unsafe_internals = on;
+   ```
+
+:::info
+
+- The collector automatically sets `allow_unsafe_internals = on` for the session when querying `crdb_internal` tables (required on newer versions)
+- `VIEWACTIVITYREDACTED` replaces literal values with underscores for privacy
+- Statement statistics are collected by default but can be disabled via cluster settings
+
+:::
 
 
 
@@ -166,54 +196,78 @@ Use a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to crdb_in
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
-| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | totalTime |  |
+| Filter By | select | Select the primary sort column. Options include total time, executions, rows read, rows written, and more. Defaults to total time to focus on most resource-intensive queries. | yes | totalTime |  |
 
 #### Returns
 
-Aggregated SQL statement statistics.
+Aggregated SQL statement statistics grouped by fingerprint. Each row represents a unique query pattern with cumulative metrics across all executions.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
-| Fingerprint ID | string |  | hidden |  |
-| Query | string |  |  |  |
-| Database | string |  |  |  |
-| Application | string |  |  |  |
-| Statement Type | string |  | hidden |  |
-| Distributed | string |  | hidden |  |
-| Full Scan | string |  | hidden |  |
-| Implicit Txn | string |  | hidden |  |
-| Vectorized | string |  | hidden |  |
-| Executions | integer |  |  |  |
-| Total Time | duration | milliseconds |  |  |
-| Mean Time | duration | milliseconds |  |  |
-| Run Time | duration | milliseconds | hidden |  |
-| Plan Time | duration | milliseconds | hidden |  |
-| Parse Time | duration | milliseconds | hidden |  |
-| Rows Read | integer |  |  |  |
-| Rows Written | integer |  |  |  |
-| Rows Returned | integer |  |  |  |
-| Bytes Read | integer |  | hidden |  |
-| Max Retries | integer |  | hidden |  |
+| Fingerprint ID | string |  | hidden | Unique hash identifier for the normalized query pattern. Queries with identical structure but different literal values share the same fingerprint. |
+| Query | string |  |  | Normalized SQL statement text with literals replaced. Truncated to 4096 characters. |
+| Database | string |  |  | Database name where the query was executed. Empty for queries without database context. |
+| Application | string |  |  | Application name that executed the query. Useful for identifying query sources across services. |
+| Statement Type | string |  | hidden | Type of SQL statement (SELECT, INSERT, UPDATE, DELETE, etc.). |
+| Distributed | string |  | hidden | Whether the query used DistSQL execution (true/false). Distributed queries span multiple nodes. |
+| Full Scan | string |  | hidden | Whether the query performed a full table scan (true/false). Full scans may indicate missing indexes. |
+| Implicit Txn | string |  | hidden | Whether the statement ran in an implicit transaction (true/false). |
+| Vectorized | string |  | hidden | Whether the query used vectorized execution (true/false). Vectorized execution improves performance for analytical queries. |
+| Executions | integer |  |  | Total number of times this query pattern has been executed. High values indicate frequently run queries. |
+| Total Time | duration | milliseconds |  | Cumulative service latency across all executions (mean time × executions). High values indicate queries consuming significant cluster resources. |
+| Mean Time | duration | milliseconds |  | Average service latency per execution. Use this to compare typical performance across query patterns. |
+| Run Time | duration | milliseconds | hidden | Average time spent executing the query after planning. Excludes parse and plan time. |
+| Plan Time | duration | milliseconds | hidden | Average time spent generating the query execution plan. High values may indicate complex queries or stale statistics. |
+| Parse Time | duration | milliseconds | hidden | Average time spent parsing the SQL statement. |
+| Rows Read | integer |  |  | Total rows read across all executions. High values relative to rows returned suggest missing indexes or inefficient scans. |
+| Rows Written | integer |  |  | Total rows written across all executions. Indicates write workload for INSERT, UPDATE, DELETE statements. |
+| Rows Returned | integer |  |  | Total rows returned to clients across all executions. Compare with rows read to assess query efficiency. |
+| Bytes Read | integer |  | hidden | Total bytes read from storage across all executions. Indicates I/O load for the query pattern. |
+| Max Retries | integer |  | hidden | Maximum number of automatic retries observed for this query pattern. High values indicate transaction contention. |
 
 ### Running Queries
 
-Currently running SQL statements from SHOW CLUSTER STATEMENTS.
+Retrieves currently executing SQL statements across the CockroachDB cluster using [SHOW CLUSTER STATEMENTS](https://www.cockroachlabs.com/docs/stable/show-statements).
 
-Queries SHOW CLUSTER STATEMENTS and returns running statements sorted by the selected column.
+This function provides a real-time snapshot of all active queries across all nodes in the cluster, including their execution phase, duration, and associated metadata.
+
+Use cases:
+- Identify long-running queries that may be blocking other operations
+- Monitor active workload distribution across the cluster
+- Debug stuck or slow queries in real-time
+
+Query text is truncated at 4096 characters for display purposes.
 
 
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Cockroachdb:running-queries` |
-| Performance | Executes SQL queries against system tables and may be expensive on busy clusters. |
-| Security | Query text may contain unmasked literals (potential PII). |
-| Availability | Requires SQL DSN configuration and access to system tables; returns errors if DSN is missing or SQL is unavailable. |
+| Require Cloud | yes |
+| Performance | Executes the `SHOW CLUSTER STATEMENTS` command which queries all nodes in the cluster:<br/>• Lightweight operation with minimal overhead<br/>• Returns only currently active queries, typically a small result set |
+| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or VALUES<br/>• Session tokens or credentials<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to CockroachDB<br/>• The SQL user has `VIEWACTIVITY` or `VIEWACTIVITYREDACTED` privileges<br/>• Returns HTTP 503 if the SQL connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
 
 #### Prerequisites
 
-##### Grant VIEWACTIVITY access to system tables
+##### Grant `VIEWACTIVITY` access to system tables
 
-Use a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to system tables.
+The SQL user must have appropriate privileges to view running statements.
+
+1. Grant `VIEWACTIVITY` (shows full query text) or `VIEWACTIVITYREDACTED` (masks literals):
+
+   ```sql
+   GRANT SYSTEM VIEWACTIVITY TO netdata_user;
+   -- OR for privacy:
+   GRANT SYSTEM VIEWACTIVITYREDACTED TO netdata_user;
+   ```
+
+   :::info
+
+   - `SHOW CLUSTER STATEMENTS` shows queries across all nodes, not just the connected node
+   - `VIEWACTIVITYREDACTED` replaces literal values with underscores for privacy
+   - Queries shown are point-in-time snapshots and may complete between retrieval and display
+
+   :::
 
 
 
@@ -221,25 +275,25 @@ Use a SQL user with VIEWACTIVITY (or VIEWACTIVITYREDACTED) and access to system 
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
-| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | elapsedMs |  |
+| Filter By | select | Select the primary sort column. Defaults to elapsed time to show longest-running queries first. | yes | elapsedMs |  |
 
 #### Returns
 
-Snapshot of currently running SQL statements.
+Real-time snapshot of currently executing SQL statements across all cluster nodes. Each row represents a single active query.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
-| Query ID | string |  | hidden |  |
-| Query | string |  |  |  |
-| User | string |  |  |  |
-| Application | string |  |  |  |
-| Client Address | string |  | hidden |  |
-| Node ID | string |  | hidden |  |
-| Session ID | string |  | hidden |  |
-| Phase | string |  |  |  |
-| Distributed | string |  | hidden |  |
-| Start Time | string |  | hidden |  |
-| Elapsed | duration | milliseconds |  |  |
+| Query ID | string |  | hidden | Unique identifier for this specific query execution. Can be used with CANCEL QUERY if needed. |
+| Query | string |  |  | The SQL statement currently being executed. Truncated to 4096 characters. |
+| User | string |  |  | Database user executing the query. Useful for identifying workload by user. |
+| Application | string |  |  | Application name from the client connection. Helps identify which service is running the query. |
+| Client Address | string |  | hidden | IP address of the client connection. Useful for identifying query sources. |
+| Node ID | string |  | hidden | CockroachDB node currently executing the query. Helps identify workload distribution. |
+| Session ID | string |  | hidden | Session identifier for the connection. Multiple queries may share a session. |
+| Phase | string |  |  | Current execution phase (executing, preparing, etc.). Indicates query progress. |
+| Distributed | string |  | hidden | Whether the query is using distributed execution across multiple nodes. |
+| Start Time | string |  | hidden | Timestamp when the query started executing. |
+| Elapsed | duration | milliseconds |  | Time elapsed since query started. High values indicate long-running queries that may need investigation. |
 
 
 

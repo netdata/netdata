@@ -173,44 +173,76 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Top Queries
 
-Running queries from the Elasticsearch Tasks API.
+Retrieves currently running search tasks from the Elasticsearch [Tasks API](https://www.elastic.co/guide/en/elasticsearch/reference/current/tasks.html).
 
-Calls the Tasks API and returns running task details sorted by the selected column.
+This function queries the `/_tasks` endpoint filtered for search actions (`*search`), providing a real-time snapshot of all active search operations across all nodes in the cluster.
+
+Use cases:
+- Identify long-running search queries that may be impacting cluster performance
+- Monitor active search workload distribution across cluster nodes
+- Debug slow or stuck search operations in real-time
 
 
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Elasticsearch:top-queries` |
-| Performance | Queries the Tasks API; on large clusters this may return many rows. |
-| Security | Task descriptions may include query details. |
-| Availability | Available when the collector can query the Tasks API; returns 503 until the collector is initialized. |
+| Require Cloud | yes |
+| Performance | Queries the `/_tasks` API filtered for search actions:<br/>• Lightweight operation with minimal cluster overhead<br/>• Returns only currently active search tasks, typically a small result set |
+| Security | Task descriptions may contain query details including potentially sensitive information:<br/>• Index names and search patterns<br/>• Query terms and filter values<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to Elasticsearch/OpenSearch<br/>• The user has `monitor` or `manage` cluster privileges<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the Tasks API query fails<br/>• Returns HTTP 504 if the query times out |
 
 #### Prerequisites
 
-No additional configuration is required.
+##### Ensure access to Tasks API
+
+The user must have appropriate privileges to access the Tasks API.
+
+1. For secured clusters, grant the `monitor` or `manage` cluster privilege:
+
+   ```json
+   {
+     "cluster": ["monitor"]
+   }
+   ```
+
+2. Verify access to the Tasks API:
+
+   ```bash
+   curl -u user:password "http://localhost:9200/_tasks?actions=*search"
+   ```
+
+:::info
+
+- The Tasks API returns only currently running tasks; completed tasks are not stored
+- Search tasks can be cancelled using `POST /_tasks/{task_id}/_cancel` if they are cancellable
+- Works with both Elasticsearch and OpenSearch clusters
+
+:::
+
+
 
 #### Parameters
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
-| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | runningTime |  |
+| Filter By | select | Select the primary sort column. Options include running time, start time, and task ID. Defaults to running time to show longest-running searches first. | yes | runningTime |  |
 
 #### Returns
 
-Snapshot of running tasks from the Tasks API.
+Real-time snapshot of currently executing search tasks across all cluster nodes. Each row represents a single active search operation.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
-| Task ID | string |  | hidden |  |
-| Node ID | string |  |  |  |
-| Node Name | string |  |  |  |
-| Action | string |  |  |  |
-| Type | string |  | hidden |  |
-| Description | string |  |  |  |
-| Start Time | timestamp |  |  |  |
-| Running Time | duration | milliseconds |  |  |
-| Cancellable | boolean |  | hidden |  |
-| Cancelled | boolean |  | hidden |  |
+| Task ID | string |  | hidden | Unique identifier for the task in format `nodeId:taskId`. Can be used with the Task Management API to cancel long-running tasks. |
+| Node ID | string |  |  | Internal identifier of the node executing this search task. |
+| Node Name | string |  |  | Human-readable name of the node executing the search. Useful for identifying workload distribution across the cluster. |
+| Action | string |  |  | The search action being performed (e.g., `indices:data/read/search`). Indicates the type of search operation. |
+| Type | string |  | hidden | Task type classification (typically `transport` for search tasks). |
+| Description | string |  |  | Detailed description of the search task including indices being searched and query details. Truncated to 4096 characters. |
+| Start Time | timestamp |  |  | Timestamp when the search task started executing. |
+| Running Time | duration | milliseconds |  | Time elapsed since the search started. High values indicate long-running searches that may need investigation or cancellation. |
+| Cancellable | boolean |  | hidden | Whether the task supports cancellation via the Task Management API. |
+| Cancelled | boolean |  | hidden | Whether a cancellation request has been issued for this task. |
 
 
 

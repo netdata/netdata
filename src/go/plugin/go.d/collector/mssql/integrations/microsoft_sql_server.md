@@ -241,23 +241,62 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Top Queries
 
-Top SQL queries from Query Store.
+Retrieves aggregated SQL query performance metrics from Microsoft SQL Server [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store) runtime statistics.
 
-Queries Query Store runtime statistics and returns the top entries sorted by the selected column.
+This function queries `sys.query_store_runtime_stats` and related views across all databases with Query Store enabled, aggregating execution statistics by query hash. It provides comprehensive timing, I/O, memory, and parallelism metrics.
+
+Use cases:
+- Identify slow or resource-intensive queries consuming excessive CPU time or memory
+- Analyze I/O patterns (logical reads, physical reads, writes) to detect bottlenecks
+- Monitor parallelism (DOP) and tempdb usage for capacity planning
+
+Query text is truncated at 4096 characters for display purposes. Columns are dynamically detected based on SQL Server version (some metrics only available in 2016+/2017+).
 
 
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Mssql:top-queries` |
-| Performance | Uses Query Store and can be expensive on busy instances. |
-| Security | Query Store may contain unmasked literals (potential PII). |
-| Availability | Available when Query Store is enabled and the collector is initialized; returns 403 if disabled in config. |
+| Require Cloud | yes |
+| Performance | Executes dynamic SQL to aggregate Query Store data across all enabled databases:<br/>• Execution time depends on Query Store workload and number of monitored databases<br/>• Default limit of 500 rows balances completeness with performance |
+| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to SQL Server<br/>• Query Store is enabled on at least one user database<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
 
 #### Prerequisites
 
-##### Enable Query Store functions
+##### Enable Query Store
 
-Enable Query Store and set query_store_function_enabled to true.
+Query Store must be enabled on each database you want to monitor.
+
+1. Verify Query Store is enabled on your databases:
+
+   ```sql
+   SELECT name, is_query_store_on
+   FROM sys.databases
+   WHERE name NOT IN ('master', 'tempdb', 'model', 'msdb');
+   ```
+
+2. Enable Query Store on databases where it is disabled:
+
+   ```sql
+   ALTER DATABASE [YourDatabaseName] SET QUERY_STORE = ON;
+   ```
+
+3. Enable the function in Netdata collector config:
+
+   ```yaml
+   jobs:
+     - name: local
+       dsn: "sqlserver://user:pass@localhost:1433"
+       query_store_function_enabled: true
+   ```
+
+:::info
+
+- Query Store is available in SQL Server 2016+ and Azure SQL Database
+- Requires ALTER DATABASE permission to enable Query Store
+- System databases (master, tempdb, model, msdb) are excluded from queries
+
+:::
 
 
 
@@ -265,74 +304,74 @@ Enable Query Store and set query_store_function_enabled to true.
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
-| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | totalTime |  |
+| Filter By | select | Select the primary sort column. The available options depend on your SQL Server version and include metrics like total execution time, number of calls, CPU time, logical I/O, memory grants, and more. Default is Total Time to focus on most resource-intensive queries. | yes | totalTime |  |
 
 #### Returns
 
-Query Store statistics for top queries.
+Aggregated query execution statistics from Query Store runtime views, providing comprehensive performance analysis across all monitored databases. Each row represents a unique query pattern (normalized query hash) with cumulative metrics across all its executions.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
-| Query Hash | string |  | hidden |  |
-| Query | string |  |  |  |
-| Database | string |  |  |  |
-| Calls | integer |  |  |  |
-| Total Time | duration | milliseconds |  |  |
-| Avg Time | duration | milliseconds |  |  |
-| Last Time | duration | milliseconds | hidden |  |
-| Min Time | duration | milliseconds | hidden |  |
-| Max Time | duration | milliseconds | hidden |  |
-| StdDev Time | duration | milliseconds | hidden |  |
-| Avg CPU | duration | milliseconds |  |  |
-| Last CPU | duration | milliseconds | hidden |  |
-| Min CPU | duration | milliseconds | hidden |  |
-| Max CPU | duration | milliseconds | hidden |  |
-| StdDev CPU | duration | milliseconds | hidden |  |
-| Avg Logical Reads | float |  |  |  |
-| Last Logical Reads | integer |  | hidden |  |
-| Min Logical Reads | integer |  | hidden |  |
-| Max Logical Reads | integer |  | hidden |  |
-| StdDev Logical Reads | float |  | hidden |  |
-| Avg Logical Writes | float |  |  |  |
-| Last Logical Writes | integer |  | hidden |  |
-| Min Logical Writes | integer |  | hidden |  |
-| Max Logical Writes | integer |  | hidden |  |
-| StdDev Logical Writes | float |  | hidden |  |
-| Avg Physical Reads | float |  |  |  |
-| Last Physical Reads | integer |  | hidden |  |
-| Min Physical Reads | integer |  | hidden |  |
-| Max Physical Reads | integer |  | hidden |  |
-| StdDev Physical Reads | float |  | hidden |  |
-| Avg CLR Time | duration | milliseconds | hidden |  |
-| Last CLR Time | duration | milliseconds | hidden |  |
-| Min CLR Time | duration | milliseconds | hidden |  |
-| Max CLR Time | duration | milliseconds | hidden |  |
-| StdDev CLR Time | duration | milliseconds | hidden |  |
-| Avg DOP | float |  |  |  |
-| Last DOP | integer |  | hidden |  |
-| Min DOP | integer |  | hidden |  |
-| Max DOP | integer |  | hidden |  |
-| StdDev DOP | float |  | hidden |  |
-| Avg Memory (8KB pages) | float |  |  |  |
-| Last Memory (8KB pages) | integer |  | hidden |  |
-| Min Memory (8KB pages) | integer |  | hidden |  |
-| Max Memory (8KB pages) | integer |  | hidden |  |
-| StdDev Memory | float |  | hidden |  |
-| Avg Rows | float |  |  |  |
-| Last Rows | integer |  | hidden |  |
-| Min Rows | integer |  | hidden |  |
-| Max Rows | integer |  | hidden |  |
-| StdDev Rows | float |  | hidden |  |
-| Avg Log Bytes | float |  |  |  |
-| Last Log Bytes | integer |  | hidden |  |
-| Min Log Bytes | integer |  | hidden |  |
-| Max Log Bytes | integer |  | hidden |  |
-| StdDev Log Bytes | float |  | hidden |  |
-| Avg TempDB (8KB pages) | float |  |  |  |
-| Last TempDB (8KB pages) | integer |  | hidden |  |
-| Min TempDB (8KB pages) | integer |  | hidden |  |
-| Max TempDB (8KB pages) | integer |  | hidden |  |
-| StdDev TempDB | float |  | hidden |  |
+| Query Hash | string |  | hidden | Unique hash identifier for the normalized query pattern. Queries with identical structure but different literal values share the same digest. |
+| Query | string |  |  | The SQL query text with literal values truncated at 4096 characters. Use this to identify the actual SQL being executed and spot parameterized queries or injection risks. |
+| Database | string |  |  | Database name where the query was executed. Essential for multi-database analysis to identify which database is experiencing query load. |
+| Calls | integer |  |  | Total number of times this query pattern has been executed. High values indicate frequently run queries that may impact server performance significantly. |
+| Total Time | duration | milliseconds |  | Cumulative execution time across all query executions. This is a key metric for identifying the most resource-intensive queries in terms of total server time consumption. |
+| Avg Time | duration | milliseconds |  | Average execution time per query run, calculated as weighted average when execution count is greater than zero. Compare with Total Time to determine if individual executions or high frequency drives resource usage. |
+| Last Time | duration | milliseconds | hidden | Execution time of the most recent execution for this query pattern. Useful for identifying recent performance changes or individual outlier executions. |
+| Min Time | duration | milliseconds | hidden | Minimum execution time observed. Helps identify variability in query performance and spot potential optimization opportunities for outliers. |
+| Max Time | duration | milliseconds | hidden | Maximum execution time observed. Large gaps between Min Time and Max Time may indicate performance instability due to parameter sniffing, data skew, or lock contention. |
+| StdDev Time | duration | milliseconds | hidden | Standard deviation of execution time. High values indicate inconsistent query performance, making capacity planning difficult and suggesting need for query optimization or consistent indexing. |
+| Avg CPU | duration | milliseconds |  | Average CPU time consumed per query execution. High values indicate CPU-intensive operations that may include complex calculations, string manipulations, or excessive function calls. Available in SQL Server 2016+. |
+| Last CPU | duration | milliseconds | hidden | CPU time of the most recent execution. Useful for identifying recent changes in query patterns and resource usage. |
+| Min CPU | duration | milliseconds | hidden | Minimum CPU time observed. Helps identify variability in CPU consumption and spot efficient vs. inefficient query executions. |
+| Max CPU | duration | milliseconds | hidden | Maximum CPU time observed. Spikes may indicate complex queries, large result sets, or parallelism issues. |
+| StdDev CPU | duration | milliseconds | hidden | Standard deviation of CPU time. High variability suggests inconsistent performance due to varying data volumes, plan cache hit rates, or changing execution contexts. |
+| Avg Logical Reads | float |  |  | Average number of logical read operations (8KB pages) per execution. High values indicate queries scanning large amounts of data through indexes or table scans. Monitor for I/O subsystem impact. |
+| Last Logical Reads | integer |  | hidden | Logical reads from the most recent execution. Useful for identifying immediate query patterns and recent performance changes. |
+| Min Logical Reads | integer |  | hidden | Minimum logical reads observed. Helps identify data access patterns and spot outliers. |
+| Max Logical Reads | integer |  | hidden | Maximum logical reads observed. Very high values may indicate full table scans, missing indexes, or inefficient join operations requiring excessive data access. |
+| StdDev Logical Reads | float |  | hidden | Standard deviation of logical reads. High variability suggests inconsistent access patterns, potentially indicating performance issues with certain queries or data volumes. |
+| Avg Logical Writes | float |  |  | Average number of logical write operations per execution. High values indicate heavy write workloads that may benefit from batching or optimization. |
+| Last Logical Writes | integer |  | hidden | Logical writes from the most recent execution. Helps track recent write activity and identify immediate performance impact. |
+| Min Logical Writes | integer |  | hidden | Minimum logical writes observed. Helps identify read-heavy vs. write-heavy query patterns and data access characteristics. |
+| Max Logical Writes | integer |  | hidden | Maximum logical writes observed. Spikes may indicate bulk insert/update operations, large transactions, or data migration activities. |
+| StdDev Logical Writes | float |  | hidden | Standard deviation of logical writes. High values indicate write performance variability, potentially suggesting inconsistent transaction sizes or periodic bulk operations. |
+| Avg Physical Reads | float |  |  | Average number of physical read operations from storage per execution. High values indicate queries requiring substantial disk I/O for data retrieval, potentially due to full table scans or missing covering indexes. |
+| Last Physical Reads | integer |  | hidden | Physical reads from the most recent execution. Useful for identifying immediate I/O patterns and recent storage subsystem pressure. |
+| Min Physical Reads | integer |  | hidden | Minimum physical reads observed. Helps baseline I/O patterns and identify read-intensive query scenarios. |
+| Max Physical Reads | integer |  | hidden | Maximum physical reads observed. Extremely high values may indicate storage subsystem bottlenecks, full table scans without covering indexes, or queries processing very large data volumes. |
+| StdDev Physical Reads | float |  | hidden | Standard deviation of physical reads. High variability suggests inconsistent disk access patterns, potentially indicating intermittent I/O performance issues or storage contention. |
+| Avg CLR Time | duration | milliseconds |  | Average CLR (Common Language Runtime) time per execution. High values indicate managed code (stored procedures, functions, triggers) with heavy computations, garbage collection pressure, or inefficient memory allocations. Available in SQL Server 2016+. |
+| Last CLR Time | duration | milliseconds | hidden | CLR time of the most recent execution. Useful for identifying recent managed code performance changes and detecting inefficient code deployments. |
+| Min CLR Time | duration | milliseconds | hidden | Minimum CLR time observed. Helps identify efficient managed code executions and spot expensive CLR operations. |
+| Max CLR Time | duration | milliseconds | hidden | Maximum CLR time observed. Spikes may indicate complex managed code operations, large object allocations, or expensive .NET framework method calls. |
+| StdDev CLR Time | duration | milliseconds | hidden | Standard deviation of CLR time. High variability suggests inconsistent managed code execution patterns, potentially varying by execution parameters, data volumes, or different code paths being taken. |
+| Avg DOP | float |  |  | Average Degree of Parallelism (DOP) per query. Higher values indicate queries utilizing more CPU cores through parallelism, potentially consuming significant server resources. Values above 1 indicate intra-query parallelism; values of 1 indicate serial execution. |
+| Last DOP | integer |  | hidden | DOP of the most recent execution. Helps track recent parallelism patterns and identify changes in query execution behavior. |
+| Min DOP | integer |  | hidden | Minimum DOP observed. Values of 0 may indicate serial execution; values above 1 suggest parallel query execution within individual queries. |
+| Max DOP | integer |  | hidden | Maximum DOP observed. Very high values (>4) may indicate aggressive parallelism consuming excessive resources and potentially affecting concurrent workloads. Available in SQL Server 2016+. |
+| StdDev DOP | float |  | hidden | Standard deviation of DOP. High variability suggests inconsistent parallelism patterns across executions, potentially indicating performance variability based on data characteristics or query complexity. |
+| Avg Memory (8KB pages) | float |  |  | Average memory grant (in 8KB pages) per execution. High values indicate memory-intensive queries that may benefit from index optimization, reduced result sets, or query tuning to reduce working memory usage. |
+| Last Memory (8KB pages) | integer |  | hidden | Memory grant from the most recent execution. Useful for identifying recent memory pressure and tracking immediate impact of resource-intensive queries. |
+| Min Memory (8KB pages) | integer |  | hidden | Minimum memory grant observed. Helps identify memory-efficient queries and baseline memory requirements for common operations. |
+| Max Memory (8KB pages) | integer |  | hidden | Maximum memory grant observed. Spikes may indicate queries with large sort operations, hash joins, temporary table creation, or excessive parameter lengths consuming working memory. |
+| StdDev Memory | float |  | hidden | Standard deviation of memory grants. High variability suggests inconsistent memory usage patterns, potentially varying by execution parameters, result set sizes, or different code paths being executed. |
+| Avg Rows | float |  |  | Average number of rows processed per query execution. High values indicate queries returning large result sets that may consume significant network bandwidth, memory for result buffers, and client application resources. |
+| Last Rows | integer |  | hidden | Row count from the most recent execution. Helps identify recent query patterns and track immediate data processing requirements. |
+| Min Rows | integer |  | hidden | Minimum rows observed. Helps identify data access patterns and spot outliers in result set sizes. |
+| Max Rows | integer |  | hidden | Maximum rows observed. Extremely high values may indicate full table scans without WHERE clauses, missing or inefficient filters, or data export operations. |
+| StdDev Rows | float |  | hidden | Standard deviation of rows processed. High variability suggests inconsistent result set sizes, potentially due to varying query filters, parameterized inputs, or different data distributions across executions. |
+| Avg Log Bytes | float |  |  | Average transaction log bytes written per query execution (SQL Server 2017+). High values indicate write-intensive operations (INSERT/UPDATE/DELETE), large transactions, or bulk modifications. This measures WAL activity, not diagnostic logging. |
+| Last Log Bytes | integer |  | hidden | Transaction log bytes from the most recent execution. Useful for tracking recent write activity. |
+| Min Log Bytes | integer |  | hidden | Minimum transaction log bytes observed. Helps identify write-efficient queries and baseline requirements. |
+| Max Log Bytes | integer |  | hidden | Maximum transaction log bytes observed. Spikes may indicate bulk operations, large transactions, or queries affecting many rows. |
+| StdDev Log Bytes | float |  | hidden | Standard deviation of transaction log bytes. High variability suggests inconsistent write patterns, potentially varying by the number of rows affected or transaction sizes. |
+| Avg TempDB (8KB pages) | float |  |  | Average tempdb space usage (in 8KB pages) per execution. High values indicate queries that create or use large temporary objects, work tables, sort operations, or have heavy tempdb spillage from disk. High tempdb usage can lead to disk I/O contention and overall performance degradation. |
+| Last TempDB (8KB pages) | integer |  | hidden | Tempdb space from the most recent execution. Useful for identifying recent tempdb pressure and tracking immediate disk I/O impact of resource-intensive queries. |
+| Min TempDB (8KB pages) | integer |  | hidden | Minimum tempdb space observed. Helps identify tempdb-efficient queries and baseline temporary object requirements for common operations. |
+| Max TempDB (8KB pages) | integer |  | hidden | Maximum tempdb space observed. Spikes may indicate queries with large sort operations, hash joins, index spool usage, or temporary table creation consuming substantial tempdb space. Can lead to tempdb autogrow and disk space issues. |
+| StdDev TempDB | float |  | hidden | Standard deviation of tempdb space usage. High variability suggests inconsistent temporary object usage patterns, potentially varying by query complexity, parameter types, or different data access patterns affecting temporary object creation. |
 
 
 

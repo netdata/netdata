@@ -212,23 +212,68 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Top Queries
 
-Top queries from MongoDB Profiler (system.profile). WARNING: Query text may contain unmasked literals (potential PII).
+Retrieves profiled query statistics from MongoDB [system.profile](https://www.mongodb.com/docs/manual/reference/database-profiler/) collection.
 
-Reads from system.profile and returns the top profiled queries sorted by the selected column.
+This function queries the `system.profile` collection across all user databases (excluding admin, local, config) to retrieve slow or sampled queries captured by the MongoDB profiler. It provides detailed execution metrics including timing, document counts, and execution plan information.
+
+Use cases:
+- Identify slow queries that exceed the profiling threshold
+- Analyze query patterns by examining docs examined vs docs returned ratios
+- Detect collection scans (COLLSCAN) that may need index optimization
+
+Query text is truncated at 4096 characters for display purposes.
 
 
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Mongodb:top-queries` |
-| Performance | Requires profiling and reads from system.profile; may add load on busy systems. |
-| Security | Query text may contain unmasked literals (potential PII). |
-| Availability | Available when profiling is enabled and the collector is initialized; returns 403 if disabled in config. |
+| Require Cloud | yes |
+| Performance | Reads from `system.profile` collection across all user databases:<br/>• Profiling itself adds overhead to MongoDB operations (typically 1-5%)<br/>• Default limit of 500 rows balances usefulness with performance |
+| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Document field values in query filters<br/>• Personal information in inserted/updated documents<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to MongoDB<br/>• Profiling is enabled on at least one user database<br/>• Returns HTTP 503 if collector is still initializing or profiling is disabled on all databases<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
 
 #### Prerequisites
 
 ##### Enable MongoDB profiling
 
-Enable profiling on the target databases and set top_queries_function_enabled to true.
+Database profiling must be enabled on each database you want to monitor, and the function must be enabled in the collector configuration.
+
+1. Enable profiling on a database (profile slow queries > 100ms):
+
+   ```javascript
+   use myDatabase
+   db.setProfilingLevel(1, { slowms: 100 })
+   ```
+
+2. Or profile all operations (level 2, use with caution):
+
+   ```javascript
+   db.setProfilingLevel(2)
+   ```
+
+3. Verify profiling status:
+
+   ```javascript
+   db.getProfilingStatus()
+   ```
+
+4. Enable the function in Netdata collector config:
+
+   ```yaml
+   jobs:
+     - name: local
+       uri: mongodb://localhost:27017
+       top_queries_function_enabled: true
+   ```
+
+:::info
+
+- Profiling level 0 = off, 1 = slow operations only, 2 = all operations
+- The `slowms` threshold determines which queries are captured at level 1
+- `system.profile` is a capped collection; old entries are automatically removed
+- System databases (admin, local, config) are excluded from profiling queries
+
+:::
 
 
 
@@ -236,42 +281,42 @@ Enable profiling on the target databases and set top_queries_function_enabled to
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
-| Filter By | select | Select the primary sort column (options are derived from sortable columns in the response). | yes | execution_time |  |
+| Filter By | select | Select the primary sort column. Options include execution time, docs examined, keys examined, and more. Defaults to execution time to focus on slowest queries. | yes | execution_time |  |
 
 #### Returns
 
-Profiled query statistics from system.profile.
+Profiled query statistics from `system.profile`. Each row represents a single profiled operation with execution metrics and plan details.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
-| Timestamp | timestamp |  |  |  |
-| Namespace | string |  |  |  |
-| Operation | string |  |  |  |
-| Query | string |  |  |  |
-| Execution Time | duration | seconds |  |  |
-| Docs Examined | integer |  |  |  |
-| Keys Examined | integer |  |  |  |
-| Docs Returned | integer |  |  |  |
-| Plan Summary | string |  |  |  |
-| Client | string |  |  |  |
-| User | string |  |  |  |
-| Docs Deleted | integer |  | hidden |  |
-| Docs Inserted | integer |  | hidden |  |
-| Docs Modified | integer |  | hidden |  |
-| Response Length | integer |  | hidden |  |
-| Num Yield | integer |  | hidden |  |
-| App Name | string |  |  |  |
-| Cursor Exhausted | string |  | hidden |  |
-| Has Sort Stage | string |  | hidden |  |
-| Uses Disk | string |  | hidden |  |
-| From Multi Planner | string |  | hidden |  |
-| Replanned | string |  | hidden |  |
-| Query Hash | string |  | hidden |  |
-| Plan Cache Key | string |  | hidden |  |
-| Planning Time | duration | seconds | hidden |  |
-| CPU Time | duration | seconds | hidden |  |
-| Query Framework | string |  | hidden |  |
-| Query Shape Hash | string |  | hidden |  |
+| Timestamp | timestamp |  |  | When the operation was profiled. Useful for correlating slow queries with application events. |
+| Namespace | string |  |  | Database and collection name in format `database.collection`. Identifies which collection the operation targeted. |
+| Operation | string |  |  | Type of operation: query, insert, update, remove, command, getmore. Helps categorize workload patterns. |
+| Query | string |  |  | The command document as JSON showing the query filter, projection, and options. Truncated to 4096 characters. |
+| Execution Time | duration | seconds |  | Total execution time of the operation. High values indicate slow queries that may need optimization. |
+| Docs Examined | integer |  |  | Number of documents scanned during execution. A high ratio of docs examined to docs returned suggests missing or inefficient indexes. |
+| Keys Examined | integer |  |  | Number of index keys scanned. Compare with docs examined to assess index efficiency. |
+| Docs Returned | integer |  |  | Number of documents returned to the client. Compare with docs examined to identify inefficient queries. |
+| Plan Summary | string |  |  | Execution plan summary (e.g., IXSCAN, COLLSCAN, SORT). COLLSCAN indicates a full collection scan that may need an index. |
+| Client | string |  |  | Client IP address or hostname that executed the operation. Useful for identifying query sources. |
+| User | string |  |  | Authenticated user who executed the operation. Empty for unauthenticated connections. |
+| Docs Deleted | integer |  | hidden | Number of documents deleted by the operation. Relevant for remove operations. |
+| Docs Inserted | integer |  | hidden | Number of documents inserted by the operation. Relevant for insert operations. |
+| Docs Modified | integer |  | hidden | Number of documents modified by the operation. Relevant for update operations. |
+| Response Length | integer |  | hidden | Size of the response in bytes. Large responses may indicate queries returning excessive data. |
+| Num Yield | integer |  | hidden | Number of times the operation yielded to allow other operations to proceed. High yields may indicate lock contention. |
+| App Name | string |  |  | Application name from the client connection string. Useful for identifying which application generated the query. |
+| Cursor Exhausted | string |  | hidden | Whether the cursor was fully exhausted (Yes/No). |
+| Has Sort Stage | string |  | hidden | Whether the query required an in-memory sort stage (Yes/No). In-memory sorts are slower than index-based sorts. |
+| Uses Disk | string |  | hidden | Whether the operation used disk for sorting or aggregation (Yes/No). Indicates memory pressure. |
+| From Multi Planner | string |  | hidden | Whether multiple query plans were evaluated (Yes/No). |
+| Replanned | string |  | hidden | Whether the query was replanned due to plan cache eviction (Yes/No). |
+| Query Hash | string |  | hidden | Hash of the query shape for identifying similar queries. Available in MongoDB 4.2+. |
+| Plan Cache Key | string |  | hidden | Key used for plan cache lookup. Available in MongoDB 4.2+. |
+| Planning Time | duration | seconds | hidden | Time spent planning the query execution. Available in MongoDB 6.2+. |
+| CPU Time | duration | seconds | hidden | CPU time consumed by the operation. Available in MongoDB 6.3+ on Linux only. |
+| Query Framework | string |  | hidden | Query execution framework used (classic or SBE). Available in MongoDB 7.0+. |
+| Query Shape Hash | string |  | hidden | Hash representing the query shape for grouping similar queries. Available in MongoDB 8.0+. |
 
 
 
