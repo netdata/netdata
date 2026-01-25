@@ -500,6 +500,78 @@ modules:
           availability: |
             Available when:<br/>• The collector has successfully connected to MySQL<br/>• Performance Schema is enabled with statement digest collection<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
           require_cloud: true
+        - id: deadlock-info
+          name: Deadlock Info
+          description: |
+            Retrieves the latest detected InnoDB deadlock from `SHOW ENGINE INNODB STATUS`.
+
+            The output is parsed to attribute the deadlock to the participating transactions and their query text, lock mode, lock status, and wait resource.
+
+            Use cases:
+            - Identify which query was chosen as the deadlock victim
+            - Inspect the waiting lock resource and lock mode
+            - Correlate deadlocks with application changes or deployment events
+
+            Query text is truncated at 4096 characters for display purposes.
+          returns:
+            description: Parsed deadlock participants from the latest detected deadlock. Each row represents one transaction involved in the deadlock.
+            columns:
+              - name: Row ID
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Unique row identifier composed of deadlock ID and process ID."
+              - name: Deadlock ID
+                type: string
+                unit: ""
+                description: "Identifier for the deadlock event, used to group participating transactions."
+              - name: Timestamp
+                type: timestamp
+                unit: ""
+                description: "Timestamp of the deadlock event. Parsed from the deadlock section when available; otherwise the function execution time."
+              - name: Process ID
+                type: string
+                unit: ""
+                description: "MySQL thread id of the transaction involved in the deadlock."
+              - name: Connection ID
+                type: integer
+                unit: ""
+                description: "Numeric connection identifier when the process id is numeric."
+              - name: ECID
+                type: integer
+                unit: ""
+                description: "Execution context id (engine-specific). This is typically null for MySQL and reserved for cross-engine consistency."
+              - name: Victim
+                type: string
+                unit: ""
+                description: "\"true\" when the transaction was chosen as the deadlock victim and rolled back; otherwise \"false\"."
+              - name: Query
+                type: string
+                unit: ""
+                description: "SQL query text for the transaction involved in the deadlock. Truncated to 4096 characters."
+              - name: Lock Mode
+                type: string
+                unit: ""
+                description: "Lock mode reported for the waiting lock (for example X or S)."
+              - name: Lock Status
+                type: string
+                unit: ""
+                description: "Lock status for the transaction. WAITING indicates the transaction was waiting on a lock."
+              - name: Wait Resource
+                type: string
+                unit: ""
+                description: "Lock resource line from InnoDB status showing what the transaction was waiting on."
+              - name: Database
+                type: string
+                unit: ""
+                description: "Database name when it can be inferred. This may be empty or null depending on the deadlock output."
+          performance: |
+            Executes `SHOW ENGINE INNODB STATUS` on demand:<br/>• Not part of regular collection<br/>• Query cost depends on server load and the size of the InnoDB status output
+          security: |
+            Query text and wait resource strings may include unmasked literal values including sensitive data (PII/secrets):<br/>• SQL literals such as emails, IDs, or tokens<br/>• Schema and table names that may be sensitive in some environments<br/>• Restrict dashboard access to authorized personnel only
+          availability: |
+            Available when:<br/>• The collector has successfully connected to MySQL<br/>• `deadlock_info_function_enabled` is true<br/>• The account can run `SHOW ENGINE INNODB STATUS` (PROCESS privilege)<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 200 with guidance when PROCESS privilege is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the collector is still initializing or the function is disabled
+          require_cloud: true
     metrics:
       folding:
         title: Metrics

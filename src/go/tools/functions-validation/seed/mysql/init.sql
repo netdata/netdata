@@ -4,6 +4,20 @@ CREATE TABLE IF NOT EXISTS sample (
   value INT NOT NULL
 );
 
+-- Tables for deadlock induction tests.
+CREATE TABLE IF NOT EXISTS deadlock_a (
+  id INT PRIMARY KEY,
+  value INT NOT NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS deadlock_b (
+  id INT PRIMARY KEY,
+  value INT NOT NULL
+) ENGINE=InnoDB;
+
+INSERT INTO deadlock_a (id, value) VALUES (1, 10);
+INSERT INTO deadlock_b (id, value) VALUES (1, 20);
+
 -- Ensure statement digest collection is enabled.
 UPDATE performance_schema.setup_consumers
   SET ENABLED = 'YES'

@@ -71,6 +71,14 @@ type Config struct {
 	// Default: true - MSSQL Query Store may contain unmasked PII in query text
 	QueryStoreFunctionEnabled *bool `yaml:"query_store_function_enabled,omitempty" json:"query_store_function_enabled"`
 
+	// DeadlockInfoFunctionEnabled controls whether the deadlock-info function is available
+	// Uses pointer to distinguish "unset" from explicit "false":
+	//   - nil (unset): Apply default of true (enabled)
+	//   - false: Explicitly disabled
+	//   - true: Explicitly enabled
+	// Default: true
+	DeadlockInfoFunctionEnabled *bool `yaml:"deadlock_info_function_enabled,omitempty" json:"deadlock_info_function_enabled"`
+
 	// TopQueriesLimit is the maximum number of queries to return
 	TopQueriesLimit int `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
 }
@@ -89,6 +97,14 @@ func (c *Config) GetQueryStoreFunctionEnabled() bool {
 		return true
 	}
 	return *c.QueryStoreFunctionEnabled
+}
+
+// GetDeadlockInfoFunctionEnabled returns whether the deadlock-info function is enabled (default: true)
+func (c *Config) GetDeadlockInfoFunctionEnabled() bool {
+	if c.DeadlockInfoFunctionEnabled == nil {
+		return true
+	}
+	return *c.DeadlockInfoFunctionEnabled
 }
 
 type Collector struct {

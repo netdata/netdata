@@ -13,15 +13,34 @@ func TestMSSQLMethods(t *testing.T) {
 	methods := mssqlMethods()
 
 	require := assert.New(t)
-	require.Len(methods, 1)
-	require.Equal("top-queries", methods[0].ID)
-	require.Equal("Top Queries", methods[0].Name)
-	require.NotEmpty(methods[0].RequiredParams)
+	require.Len(methods, 2)
+
+	topIdx := -1
+	deadlockIdx := -1
+	for i := range methods {
+		switch methods[i].ID {
+		case "top-queries":
+			topIdx = i
+		case "deadlock-info":
+			deadlockIdx = i
+		}
+	}
+
+	require.NotEqual(-1, topIdx, "expected top-queries method")
+	require.NotEqual(-1, deadlockIdx, "expected deadlock-info method")
+
+	topMethod := methods[topIdx]
+	require.Equal("Top Queries", topMethod.Name)
+	require.NotEmpty(topMethod.RequiredParams)
+
+	deadlockMethod := methods[deadlockIdx]
+	require.Equal("Deadlock Info", deadlockMethod.Name)
+	require.Empty(deadlockMethod.RequiredParams)
 
 	var sortParam *funcapi.ParamConfig
-	for i := range methods[0].RequiredParams {
-		if methods[0].RequiredParams[i].ID == "__sort" {
-			sortParam = &methods[0].RequiredParams[i]
+	for i := range topMethod.RequiredParams {
+		if topMethod.RequiredParams[i].ID == "__sort" {
+			sortParam = &topMethod.RequiredParams[i]
 			break
 		}
 	}

@@ -28,7 +28,7 @@ It collects metrics from:
 - Performance counters (buffer manager, memory manager, SQL statistics)
 - Dynamic management views (DMVs) for wait statistics, locks, and sessions
 - Per-database transaction and lock statistics
-- SQL Server Agent job status (if permissions allow)
+- SQL Server Agent job status
 
 
 It connects to the SQL Server instance via TCP using the go-mssqldb driver and executes queries against:
@@ -41,7 +41,7 @@ It connects to the SQL Server instance via TCP using the go-mssqldb driver and e
 - `sys.dm_os_process_memory` - SQL Server process memory
 - `sys.dm_os_sys_memory` - OS physical memory and page file
 - `sys.master_files` - Database file sizes
-- `msdb.dbo.sysjobs` - SQL Agent job status (optional)
+- `msdb.dbo.sysjobs` - SQL Agent job status
 
 
 This collector is supported on all platforms.
@@ -49,7 +49,8 @@ This collector is supported on all platforms.
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
 The monitoring user requires the VIEW SERVER STATE permission to access DMVs.
-For SQL Agent job monitoring, access to the msdb database is required.
+For SQL Agent job monitoring (queried during collector startup), access to
+`msdb.dbo.sysjobs` is required.
 
 
 ### Default Behavior
@@ -410,7 +411,7 @@ CREATE LOGIN netdata_user WITH PASSWORD = 'YourStrongPassword!';
 -- Grant VIEW SERVER STATE (required for DMVs)
 GRANT VIEW SERVER STATE TO netdata_user;
 
--- Optional: Grant access to msdb for SQL Agent job monitoring
+-- Grant access to msdb for SQL Agent job monitoring (required)
 USE msdb;
 CREATE USER netdata_user FOR LOGIN netdata_user;
 GRANT SELECT ON dbo.sysjobs TO netdata_user;
@@ -426,9 +427,9 @@ GRANT SELECT ON dbo.MSsubscriptions TO netdata_user;
 
 **Required permissions:**
 - `VIEW SERVER STATE` - Access to dynamic management views
+- `SELECT on msdb.dbo.sysjobs` - SQL Agent job status monitoring
 
 **Optional permissions:**
-- `SELECT on msdb.dbo.sysjobs` - SQL Agent job status monitoring
 - `SELECT on distribution.dbo.MSreplication_monitordata` - Replication monitoring
 - `SELECT on distribution.dbo.MSpublications` - Publication information
 - `SELECT on distribution.dbo.MSsubscriptions` - Subscription counts
@@ -678,6 +679,3 @@ Ensure SQL Server is configured for mixed mode authentication if using SQL login
 
 The monitoring user needs VIEW SERVER STATE permission.
 Grant it with: `GRANT VIEW SERVER STATE TO netdata_user;`
-
-
-
