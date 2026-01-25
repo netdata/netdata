@@ -34,7 +34,7 @@ func topQueriesMethodConfig() module.MethodConfig {
 		UpdateEvery:    10,
 		Help:           topQueriesHelpText,
 		RequireCloud:   true,
-		RequiredParams: []funcapi.ParamConfig{funcapi.BuildSortParam(topQueriesColumns)},
+		RequiredParams: []funcapi.ParamConfig{buildTopQueriesSortOptions(topQueriesColumns)},
 	}
 }
 
