@@ -23,6 +23,8 @@ export const FINAL_REPORT_TESTS: HarnessTest[] = [];
 // Shared constants
 const FINAL_REPORT_TOOL = 'agent__final_report';
 const VALID_REPORT_CONTENT = 'Valid final report content.';
+const FIRST_REPORT_CONTENT = 'First final report content.';
+const SECOND_REPORT_CONTENT = 'Second final report content.';
 const FINAL_REPORT_PRESENT_MSG = 'Final report should be present';
 
 // Test: Valid final report via tool call (suite version)
@@ -65,6 +67,64 @@ FINAL_REPORT_TESTS.push({
     invariant(result.success, 'Valid final report should succeed');
     invariant(result.finalReport !== undefined, FINAL_REPORT_PRESENT_MSG);
     invariant(result.finalReport.content === VALID_REPORT_CONTENT, 'Final report content should match');
+  },
+} satisfies HarnessTest);
+
+// Test: Multiple final_report tool calls in one turn (current behavior: first wins)
+FINAL_REPORT_TESTS.push({
+  id: 'suite-final-report-multiple-tool-calls-first-wins',
+  description: 'Suite: When multiple final_report tool calls appear, the first is adopted',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.maxTurns = 1;
+    sessionConfig.maxRetries = 1;
+    const finalFormat = sessionConfig.outputFormat;
+    const firstCallId = 'final-report-first';
+    const secondCallId = 'final-report-second';
+    return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
+      status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+      latencyMs: 5,
+      response: '',
+      messages: [
+        {
+          role: 'assistant',
+          content: '',
+          toolCalls: [
+            {
+              id: firstCallId,
+              name: FINAL_REPORT_TOOL,
+              parameters: {
+                report_format: finalFormat,
+                report_content: FIRST_REPORT_CONTENT,
+              },
+            },
+            {
+              id: secondCallId,
+              name: FINAL_REPORT_TOOL,
+              parameters: {
+                report_format: finalFormat,
+                report_content: SECOND_REPORT_CONTENT,
+              },
+            },
+          ],
+        } as ConversationMessage,
+        {
+          role: 'tool',
+          toolCallId: firstCallId,
+          content: FIRST_REPORT_CONTENT,
+        } as ConversationMessage,
+        {
+          role: 'tool',
+          toolCallId: secondCallId,
+          content: SECOND_REPORT_CONTENT,
+        } as ConversationMessage,
+      ],
+      tokens: { inputTokens: 5, outputTokens: 3, totalTokens: 8 },
+    }));
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(result.success, 'Multiple final_report calls should still succeed');
+    invariant(result.finalReport !== undefined, FINAL_REPORT_PRESENT_MSG);
+    invariant(result.finalReport.content === FIRST_REPORT_CONTENT, 'Current behavior should adopt the first final_report call');
   },
 } satisfies HarnessTest);
 

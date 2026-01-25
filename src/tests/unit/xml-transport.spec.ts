@@ -143,6 +143,80 @@ describe('XmlToolTransport', () => {
     expect(logWarning).not.toHaveBeenCalled();
   });
 
+  describe('xml mismatch failure paths', () => {
+    it('records xml_malformed_mismatch for a non-final slot with a closing tag', () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue(MOCK_UUID);
+      const transport = new XmlToolTransport();
+      transport.buildMessages({
+        turn: 1,
+        maxTurns: 2,
+        tools: baseTools,
+        maxToolCallsPerTurn: 1,
+        taskStatusToolEnabled: false,
+        finalReportToolName: 'agent__final_report',
+        resolvedFormat: 'markdown',
+        expectedJsonSchema: undefined,
+        attempt: 1,
+        maxRetries: 3,
+        contextPercentUsed: 8,
+      });
+
+      const nonFinalSlot = `${NONCE}-0001`;
+      const recordFailure = vi.fn();
+      const logWarning = vi.fn();
+
+      const parse = transport.parseAssistantMessage(
+        `<ai-agent-${nonFinalSlot} tool="agent__final_report">{"ok":true}</ai-agent-${nonFinalSlot}>`,
+        { turn: 1, resolvedFormat: 'markdown' },
+        { recordTurnFailure: recordFailure, logWarning }
+      );
+
+      expect(parse.toolCalls).toBeUndefined();
+      expect(parse.errors.length).toBeGreaterThan(0);
+      expect(parse.errors[0]?.slotId).toBe(nonFinalSlot);
+      expect(recordFailure).toHaveBeenCalled();
+      expect(recordFailure.mock.calls[0]?.[0]).toBe('xml_malformed_mismatch');
+      expect(recordFailure.mock.calls[0]?.[1]).toContain(nonFinalSlot);
+      expect(logWarning).toHaveBeenCalled();
+    });
+
+    it('records xml_missing_closing_tag for a non-final slot without a closing tag', () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue(MOCK_UUID);
+      const transport = new XmlToolTransport();
+      transport.buildMessages({
+        turn: 1,
+        maxTurns: 2,
+        tools: baseTools,
+        maxToolCallsPerTurn: 1,
+        taskStatusToolEnabled: false,
+        finalReportToolName: 'agent__final_report',
+        resolvedFormat: 'markdown',
+        expectedJsonSchema: undefined,
+        attempt: 1,
+        maxRetries: 3,
+        contextPercentUsed: 8,
+      });
+
+      const nonFinalSlot = `${NONCE}-0001`;
+      const recordFailure = vi.fn();
+      const logWarning = vi.fn();
+
+      const parse = transport.parseAssistantMessage(
+        `<ai-agent-${nonFinalSlot} tool="agent__final_report">{"ok":true}`,
+        { turn: 1, resolvedFormat: 'markdown', stopReason: 'tool-calls' },
+        { recordTurnFailure: recordFailure, logWarning }
+      );
+
+      expect(parse.toolCalls).toBeUndefined();
+      expect(parse.errors.length).toBeGreaterThan(0);
+      expect(parse.errors[0]?.slotId).toBe(nonFinalSlot);
+      expect(recordFailure).toHaveBeenCalled();
+      expect(recordFailure.mock.calls[0]?.[0]).toBe('xml_missing_closing_tag');
+      expect(recordFailure.mock.calls[0]?.[1]).toContain(nonFinalSlot);
+      expect(logWarning).toHaveBeenCalled();
+    });
+  });
+
   describe('truncation handling (stopReason=length)', () => {
     it('rejects truncated structured output (json) and calls recordTurnFailure', () => {
       vi.spyOn(crypto, 'randomUUID').mockReturnValue(MOCK_UUID);

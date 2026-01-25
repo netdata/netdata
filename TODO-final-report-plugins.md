@@ -139,6 +139,7 @@ Evidence: system prompt is enhanced with tool instructions (`src/ai-agent.ts:171
 | 17 | Final-report replacement policy | **5A: lock first final-report while META is missing** | Prevents double streaming and answer drift during META-only retries. |
 | 18 | Plugin session spawning (V1) | **4A: include `createSession` now** | Enables plugins to fan out and run follow-up sessions immediately. |
 | 19 | META wrapper contract | **6A: per-plugin META wrappers** | Enables targeted retries and isolated validation per plugin. |
+| 20 | XML-NEXT rendering strategy | **NONCE-only input; renderer builds FINAL + META guidance** | Keeps XML-NEXT short while guaranteeing META guidance is always paired with FINAL guidance. |
 
 ### Decisions (Costa)
 
@@ -156,10 +157,10 @@ Open decisions: 0.
 - META requirements MUST appear everywhere final report is mentioned.
 - Final report guidance must NEVER appear without META guidance.
 - Each plugin MUST provide:
-  1. `schema`
-  2. Full system prompt instructions
-  3. Snippet for XML-NEXT
-  4. Snippet to be inserted into examples in final-report instructions
+- `schema`
+- Full system prompt instructions
+- Snippet for XML-NEXT
+- Snippet to be inserted into examples in final-report instructions
 
 3c) Finalization semantics — DECIDED (Costa)
 - Task/model conclusion now means:
@@ -181,6 +182,12 @@ Clarification:
 Decision:
 - Update the contract to explicitly allow tool instructions in the system prompt for XML modes.
 - Rationale: XML-NEXT must remain short and per-turn; system prompt is the only viable place for full instructions today.
+
+3e) XML-NEXT rendering strategy — DECIDED
+Decision:
+- Pass only the NONCE and plugin requirement snippets to the XML-NEXT renderer.
+- The XML-NEXT renderer itself must render both FINAL and META guidance together.
+- Rationale: avoid large per-turn payloads while keeping the FINAL+META pairing unconditional.
 
 5) Final-report replacement policy when final-report exists but META is missing — DECIDED: 5A (lock first final-report)
 Context:
@@ -214,10 +221,12 @@ import type { AIAgentSessionConfig, ConversationMessage, FinalReportPayload } fr
 export interface FinalReportPluginRequirements {
   // JSON Schema for this plugin's metadata (validated independently)
   schema: Record<string, unknown>;
-  // Brief instruction injected in final-report examples section
-  shortInstruction: string;
-  // Detailed instruction injected in system prompt
-  longInstruction: string;
+  // Full instructions injected in the system prompt
+  systemPromptInstructions: string;
+  // Snippet injected into XML-NEXT for per-turn prominence
+  xmlNextSnippet: string;
+  // Snippet injected into final-report examples section
+  finalReportExampleSnippet: string;
 }
 
 export interface FinalReportPluginContext {
@@ -332,8 +341,9 @@ Key changes:
 
 **File:** `src/xml-tools.ts`
 
-- Parse META slots with plugin attribute
-- Infer tool as `agent__meta` for META slots
+- META is part of the final-report contract, not a tool.
+- Do not add an `agent__meta` tool.
+- Update XML slot recognition and parsing helpers only as needed to avoid unknown-tag failures and to pass META parsing to the transport layer.
 
 #### 3.2 Two-Phase Parsing
 
@@ -405,26 +415,14 @@ for (const plugin of plugins) {
 **File:** `src/tools/internal-provider.ts`
 
 Injection point at `getInstructions()` (line 212):
-- Inject `longInstruction` from each plugin into internal instructions
-- Inject `shortInstruction` into final-report examples section
+- Inject `systemPromptInstructions` from each plugin into internal instructions.
+- Inject `finalReportExampleSnippet` into the final-report examples section.
 
-**File:** `src/prompts/final-report.md`
+**File:** `src/llm-messages-xml-next.ts`
 
-Add META wrapper instructions when plugins active:
-```markdown
-## Metadata Requirements
-
-In addition to your final report, you MUST provide metadata for each plugin:
-
-{{#each plugins}}
-<ai-agent-{{{../nonce}}}-META plugin="{{{name}}}">
-{ ...{{{name}}} metadata JSON... }
-</ai-agent-{{{../nonce}}}-META>
-
-{{/each}}
-
-Each metadata block can appear before, after, or around your final report.
-```
+- Render FINAL and META requirements together inside XML-NEXT.
+- Use NONCE-only rendering inputs plus plugin-provided `xmlNextSnippet` values.
+- Do not depend on template loops/Handlebars; render via explicit string assembly aligned with current loader capabilities (`src/prompts/loader.ts:70`).
 
 #### 4.4 Turn Failure Slugs
 
@@ -545,9 +543,10 @@ export default function createSupportMetadataPlugin() {
           },
           required: ['user_language', 'categories'],
         },
-        shortInstruction: 'Include <ai-agent-NONCE-META plugin="support-metadata">...</ai-agent-NONCE-META>',
-        longInstruction: `
-Provide support request metadata with:
+        systemPromptInstructions: `
+Provide support request metadata using:
+<ai-agent-NONCE-META plugin="support-metadata"> ... </ai-agent-NONCE-META>
+Include fields:
 - user_language: The language the user is writing in
 - categories: Array of categories for this request
 - search_terms: Relevant search terms
@@ -555,6 +554,10 @@ Provide support request metadata with:
 - response_completeness: { score: "0-100%", limitations: [] }
 - user_frustration: { score: "0-100%" }
 `,
+        xmlNextSnippet:
+          'You MUST also emit <ai-agent-NONCE-META plugin="support-metadata">{...}</ai-agent-NONCE-META> with valid JSON.',
+        finalReportExampleSnippet:
+          'After the final report, include <ai-agent-NONCE-META plugin="support-metadata">{...}</ai-agent-NONCE-META>.',
       };
     },
 
@@ -670,17 +673,16 @@ Provide support request metadata with:
 
 ## Execution Contract (Costa)
 
-1. Before implementation, identify all touch points and ensure they are fully tested. Add missing tests first.
-2. Run `npm run test:phase1` and `npm run test:phase2` as many times as needed during the work.
+1. Before runtime implementation, identify all touch points and ensure they are fully tested. Add missing tests first.
+2. During the work, run `npm run lint`, `npm run build`, `npm run test:phase1`, and `npm run test:phase2` as many times as needed.
 3. Run `npm run test:phase3:tier1` only at the end of the implementation.
 4. Never run `npm run test:phase3:tier2`.
 5. Model-facing instructions, notices, and error messages must be coherent from the model’s point of view (no developer-only assumptions).
 6. After each major milestone and at the end, consult other agents for review.
-7. Final review protocol (required):
-8. Read `~/.AGENTS.md`.
-9. Run Claude, Codex, and GLM-4.7 in parallel for a full review using the TODO filename in the prompt.
-10. Instruction for all reviewers: "DO NOT MAKE CHANGES, DO NOT CREATE FILES, DO NOT ASK FOR PERMISSIONS. THIS IS A READ-ONLY REQUEST. PROVIDE YOUR REVIEW."
-11. Address findings until unanimous consensus, unless an agent repeatedly fails after a second attempt.
+7. Final review protocol: read `~/.AGENTS.md` after implementation is complete.
+8. Run Claude, Codex, and GLM-4.7 in parallel for a full review, including the TODO filename in the prompt.
+9. All reviewer prompts must include: "DO NOT MAKE CHANGES, DO NOT CREATE FILES, DO NOT ASK FOR PERMISSIONS. THIS IS A READ-ONLY REQUEST. PROVIDE YOUR REVIEW."
+10. Show the full prompts before execution and address findings until unanimous consensus, unless a reviewer fails twice.
 
 ## Baseline Test Status (2026-01-25)
 
@@ -691,7 +693,7 @@ Current baseline must be green before implementation begins.
 - `npm run test:phase1` — PASS
 - `npm run test:phase2` — PASS
 
-Concrete failing expectations (evidence):
+Previously failing expectations (resolved, kept as evidence):
 
 1. `context_guard__threshold_below_limit` expects no warnings:
    - `src/tests/phase2-harness-scenarios/phase2-runner.ts:2143`
@@ -742,6 +744,133 @@ Gating tasks status:
 - [DONE] Identify root cause of the Phase2 baseline failures.
 - [DONE] Restore a fully green baseline (Phase1 + Phase2) before feature implementation.
 - [DONE] Recalibrate context-window test constants to current prompt size so the baseline is meaningful again.
+
+## Touchpoints & Coverage (Pre-Implementation)
+
+Finalization and XML transport touchpoints that will be affected by the new contract (final-report + META):
+
+1. **Early finalization on final-report only**
+   - Evidence: `src/session-turn-runner.ts:1666`
+   - Risk: would finalize before required META exists
+2. **Final-report overwrites are allowed**
+   - Evidence: `src/session-turn-runner.ts:2511`
+   - Risk: answer drift + double streaming while META is missing
+3. **Final-report event emission is unconditional after report acceptance**
+   - Evidence: `src/session-turn-runner.ts:2741`
+   - Risk: would emit `final_report` before META requirements are satisfied
+4. **Final-turn tool filtering enforces final-report-only**
+   - Evidence: `src/session-turn-runner.ts:2179`
+   - Risk: META requirements must be treated as part of finalization, not as extra tools
+5. **XML transport defines only FINAL slot and allows only final-report tool**
+   - Evidence: `src/xml-transport.ts:171`
+   - Evidence: `src/xml-transport.ts:203`
+   - Risk: META tags will be rejected or ignored
+6. **XML tool inference treats only `-FINAL` as `agent__final_report`**
+   - Evidence: `src/xml-tools.ts:104`
+   - Risk: META wrappers need explicit handling
+7. **Malformed or unknown XML tags currently trigger turn failure**
+   - Evidence: `src/xml-transport.ts:451`
+   - Risk: META tags must be recognized to avoid retries
+8. **Streaming filter keeps only FINAL wrapper content**
+   - Evidence: `src/tests/unit/xml-final-report-strict-filter.spec.ts:10`
+   - Risk: META must never stream to headends
+9. **Tool instructions are injected into the system prompt**
+   - Evidence: `src/ai-agent.ts:1715`
+   - Risk: contract docs must be updated to match runtime behavior
+10. **Agent cache finalizes immediately with cached final-report**
+    - Evidence: `src/ai-agent.ts:1481`
+    - Risk: META requirements must gate cache hits
+11. **Agent hash does not include plugin content**
+    - Evidence: `src/agent-loader.ts:753`
+    - Risk: schema changes would not invalidate cache
+12. **Frontmatter strict validation and manual parsing**
+    - Evidence: `src/frontmatter.ts:113`
+    - Evidence: `src/frontmatter.ts:175`
+    - Risk: `plugins:` will be rejected even if registry allows it
+13. **XML-NEXT rendering is centralized in the turn runner**
+    - Evidence: `src/session-turn-runner.ts:601`
+    - Evidence: `src/xml-tools.ts:145`
+    - Risk: META guidance must be injected via `buildXmlNextNotice`, not slot templates
+14. **Streaming filter is applied in the turn runner and only strips FINAL**
+    - Evidence: `src/session-turn-runner.ts:3739`
+    - Evidence: `src/xml-transport.ts:635`
+    - Risk: META tags would leak to headends unless the filter is extended
+15. **Max-turn synthetic final reports finalize immediately**
+    - Evidence: `src/session-turn-runner.ts:1976`
+    - Evidence: `src/session-turn-runner.ts:2029`
+    - Risk: META requirements need explicit handling at exhaustion points
+16. **FinalReportManager commit overwrites prior reports**
+    - Evidence: `src/final-report-manager.ts:127`
+    - Risk: conflicts with the lock-first final-report policy while waiting for META
+17. **XML wrapper-as-tool detection is FINAL-only**
+    - Evidence: `src/session-turn-runner.ts:854`
+    - Evidence: `src/llm-providers/base.ts:2193`
+    - Evidence: `src/llm-messages.ts:77`
+    - Risk: META wrappers called as tools would not receive targeted guidance
+18. **Tool-output extractor only understands the FINAL wrapper**
+    - Evidence: `src/tool-output/extractor.ts:222`
+    - Evidence: `src/tool-output/extractor.ts:447`
+    - Risk: META could be lost in tool-output map/reduce flows
+19. **Deterministic nonce extraction relies on the FINAL wrapper pattern**
+    - Evidence: `src/llm-providers/test-llm.ts:64`
+    - Evidence: `src/tests/phase2-harness-scenarios/infrastructure/harness-helpers.ts:297`
+    - Risk: XML-NEXT must continue to include the FINAL wrapper example
+20. **Cache payload guard has no META awareness**
+    - Evidence: `src/ai-agent.ts:94`
+    - Risk: plugin requirements need explicit cache gating beyond the existing guard
+21. **Headends rely on `final_report` events from finalize**
+    - Evidence: `src/headends/embed-headend.ts:619`
+    - Evidence: `src/session-turn-runner.ts:2741`
+    - Risk: the new gating must preserve a single, authoritative final report emission
+22. **Contract docs contradict runtime system-prompt behavior today**
+    - Evidence: `docs/specs/CONTRACT.md:509`
+    - Evidence: `src/ai-agent.ts:1715`
+    - Evidence: `src/tools/internal-provider.ts:229`
+    - Risk: documentation must be updated in the same commit as runtime changes
+
+Coverage status (today) — existing coverage:
+
+1. XML-final transport and parser have unit coverage, but only for FINAL slot:
+   - `src/tests/unit/xml-transport.spec.ts:30`
+   - `src/tests/unit/xml-tools.spec.ts:68`
+2. Final-report streaming filter has unit coverage, but only for FINAL tag:
+   - `src/tests/xml-final-report-filter.spec.ts:5`
+   - `src/tests/unit/xml-final-report-strict-filter.spec.ts:5`
+3. Deterministic harness has extensive final-report and retry coverage, but no META contract coverage yet:
+   - `src/tests/phase2-harness-scenarios/phase2-runner.ts:13045`
+4. System prompt enhancement with tool instructions is already covered:
+   - `src/tests/phase2-harness-scenarios/phase2-runner.ts:4821`
+5. XML wrapper called as a tool is already covered:
+   - `src/tests/phase2-harness-scenarios/phase2-runner.ts:14594`
+6. Synthetic final-report paths are covered in the harness:
+   - `src/tests/phase2-harness-scenarios/phase2-runner.ts:9013`
+   - `src/tests/phase2-harness-scenarios/phase2-runner.ts:11971`
+7. Tool-output extraction of FINAL wrappers has unit coverage:
+   - `src/tests/unit/tool-output.spec.ts:184`
+
+Coverage gaps to close before runtime changes:
+
+1. FinalReportManager has no direct unit coverage:
+   - Evidence: no matches for `FinalReportManager` under `src/tests/unit`
+2. Prompt loader / final-report instruction rendering has no direct unit coverage:
+   - Evidence: no matches for `loadFinalReportInstructions` under `src/tests`
+3. Multiple final-report emissions and overwrite behavior are not explicitly covered:
+   - Evidence: no overwrite/multiple-final scenarios in `src/tests/phase2-harness-scenarios/phase2-runner.ts`
+4. XML mismatch failure paths are only partially covered:
+   - Evidence: no direct assertions for `xml_slot_mismatch` / unknown slot leftovers in `src/tests/unit/xml-transport.spec.ts`
+
+Pre-implementation test actions:
+
+1. Keep Phase1 and Phase2 fully green after recalibration (DONE).
+2. [DONE] Add unit tests for FinalReportManager BEFORE refactoring it.
+   Evidence: `src/tests/unit/final-report-manager.spec.ts:14`
+3. [DONE] Add unit tests for prompt loading / final-report instruction rendering BEFORE injection changes.
+   Evidence: `src/tests/unit/prompts-loader.spec.ts:11`
+4. [DONE] Add unit tests for XML mismatch failure paths (unknown slot leftovers) BEFORE transport changes.
+   Evidence: `src/tests/unit/xml-transport.spec.ts:146`
+5. [DONE] Add a deterministic harness scenario that covers multiple final-report emissions BEFORE we change the replacement policy.
+   Evidence: `src/tests/phase2-harness-scenarios/suites/final-report.test.ts:73`
+6. [DONE] Run `npm run lint`, `npm run build`, `npm run test:phase1`, and `npm run test:phase2` after the pre-implementation test additions (verified on 2026-01-25).
 
 ## Documentation Updates
 
