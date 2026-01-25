@@ -38,11 +38,7 @@ func (r *funcRouter) MethodParams(ctx context.Context, method string) ([]funcapi
 
 func (r *funcRouter) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	if r.collector.rdb == nil {
-		conn, err := r.collector.newConn(r.collector.Config)
-		if err != nil {
-			return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
-		}
-		r.collector.rdb = conn
+		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 
 	if h, ok := r.handlers[method]; ok {
