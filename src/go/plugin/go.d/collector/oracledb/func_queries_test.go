@@ -37,7 +37,7 @@ func TestQueriesTopColumns_HasRequiredColumns(t *testing.T) {
 
 	for _, id := range required {
 		found := false
-		for _, col := range queriesTopColumns {
+		for _, col := range topQueriesColumns {
 			if col.Name == id {
 				found = true
 				break
@@ -52,7 +52,7 @@ func TestQueriesRunningColumns_HasRequiredColumns(t *testing.T) {
 
 	for _, id := range required {
 		found := false
-		for _, col := range queriesRunningColumns {
+		for _, col := range runningQueriesColumns {
 			if col.Name == id {
 				found = true
 				break

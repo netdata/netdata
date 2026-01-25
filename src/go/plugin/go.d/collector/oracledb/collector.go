@@ -60,7 +60,7 @@ type Collector struct {
 
 	db *sql.DB
 
-	funcQueries *funcQueries
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -75,7 +75,7 @@ func (c *Collector) Init(context.Context) error {
 
 	c.publicDSN = dsn
 
-	c.funcQueries = newFuncQueries(c)
+	c.funcRouter = newFuncRouter(c)
 
 	return nil
 }
