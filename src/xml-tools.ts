@@ -1,4 +1,5 @@
 import type { OutputFormatId } from './formats.js';
+import type { ResolvedFinalReportPluginRequirement } from './plugins/types.js';
 import type { ToolCall } from './types.js';
 
 import { buildXmlNextNotice } from './llm-messages-xml-next.js';
@@ -20,6 +21,9 @@ export interface XmlNextPayload {
   taskStatusToolEnabled: boolean;
   expectedFinalFormat: OutputFormatId | 'text';
   finalSchema?: Record<string, unknown>;
+  finalReportPluginRequirements: ResolvedFinalReportPluginRequirement[];
+  finalReportLocked: boolean;
+  missingMetaPluginNames: string[];
   // Retry info
   attempt: number;
   maxRetries: number;
@@ -153,6 +157,9 @@ export function renderXmlNext(payload: XmlNextPayload): string {
     expectedFinalFormat: payload.expectedFinalFormat,
     hasExternalTools: payload.hasExternalTools,
     taskStatusToolEnabled: payload.taskStatusToolEnabled,
+    finalReportPluginRequirements: payload.finalReportPluginRequirements,
+    finalReportLocked: payload.finalReportLocked,
+    missingMetaPluginNames: payload.missingMetaPluginNames,
     forcedFinalTurnReason: payload.forcedFinalTurnReason,
     finalTurnTools: payload.finalTurnTools,
     consecutiveProgressOnlyTurns: payload.consecutiveProgressOnlyTurns,

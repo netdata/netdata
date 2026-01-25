@@ -436,10 +436,10 @@ const SESSIONS_SUBDIR = 'sessions';
 const BILLING_FILENAME = 'billing.jsonl';
 const THRESHOLD_BUFFER_TOKENS = 8;
 const THRESHOLD_MAX_OUTPUT_TOKENS = 32;
-// Prompt + instructions currently estimate to ~1832 tokens (ctx + new, schema excluded from projection).
-const THRESHOLD_CONTEXT_WINDOW_BELOW = 1892; // limit = 1892 - 8 - 32 = 1852 (> projected ~1832)
-const THRESHOLD_CONTEXT_WINDOW_EQUAL = 1872; // limit = 1872 - 8 - 32 = 1832 (matches projected)
-const THRESHOLD_CONTEXT_WINDOW_ABOVE = 1852; // limit = 1852 - 8 - 32 = 1812 (< projected ~1832)
+// Prompt + instructions currently estimate to ~2198 tokens (ctx + new, schema excluded from projection).
+const THRESHOLD_CONTEXT_WINDOW_BELOW = 2258; // limit = 2258 - 8 - 32 = 2218 (> projected ~2198)
+const THRESHOLD_CONTEXT_WINDOW_EQUAL = 2238; // limit = 2238 - 8 - 32 = 2198 (matches projected)
+const THRESHOLD_CONTEXT_WINDOW_ABOVE = 2218; // limit = 2218 - 8 - 32 = 2178 (< projected ~2198)
 const PREFLIGHT_CONTEXT_WINDOW = 80;
 const PREFLIGHT_BUFFER_TOKENS = 8;
 const PREFLIGHT_MAX_OUTPUT_TOKENS = 16;

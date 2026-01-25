@@ -6,6 +6,9 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import type { ResolvedFinalReportPluginRequirement } from '../plugins/types.js';
+
+import { buildMetaPromptGuidance } from '../plugins/meta-guidance.js';
 import { SLACK_BLOCK_KIT_MRKDWN_RULES } from '../slack-block-kit.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -40,20 +43,23 @@ const BATCH_WITHOUT_PROGRESS_TEMPLATE = loadPromptSync('batch-without-progress.m
 // Exported functions - return pre-loaded templates (no file I/O at runtime)
 // -----------------------------------------------------------------------------
 
-export function loadTaskStatusInstructions(): string {
-  return TASK_STATUS_TEMPLATE;
+export function loadTaskStatusInstructions(metaReminderShort: string): string {
+  return TASK_STATUS_TEMPLATE.replace(/\{\{\{metaReminderShort\}\}\}/g, metaReminderShort);
 }
 
 export function loadFinalReportInstructions(
   formatId: string,
   formatDescription: string,
   schemaBlock: string,
-  sessionNonce: string | undefined
+  sessionNonce: string | undefined,
+  pluginRequirements: ResolvedFinalReportPluginRequirement[],
 ): string {
   // Caller MUST provide a nonce - without it, LLM will output literal 'NONCE-FINAL'
   if (sessionNonce === undefined) {
     throw new Error('sessionNonce is required for XML final report instructions');
   }
+
+  const metaGuidance = buildMetaPromptGuidance(pluginRequirements, sessionNonce);
 
   const slotId = `${sessionNonce}-FINAL`;
   const exampleContent = formatId === 'slack-block-kit'
@@ -73,13 +79,18 @@ export function loadFinalReportInstructions(
     .replace(/\{\{\{exampleContent\}\}\}/g, exampleContent)
     .replace(/\{\{\{formatDescription\}\}\}/g, formatDescription)
     .replace(/\{\{\{schemaBlock\}\}\}/g, schemaBlock)
-    .replace(/\{\{\{slackMrkdwnGuidance\}\}\}/g, slackMrkdwnGuidance);
+    .replace(/\{\{\{slackMrkdwnGuidance\}\}\}/g, slackMrkdwnGuidance)
+    .replace(/\{\{\{metaReminderShort\}\}\}/g, metaGuidance.reminderShort)
+    .replace(/\{\{\{metaReminderFull\}\}\}/g, metaGuidance.reminderFull)
+    .replace(/\{\{\{metaDetailedBlock\}\}\}/g, metaGuidance.detailedBlock)
+    .replace(/\{\{\{metaExampleSnippets\}\}\}/g, metaGuidance.exampleSnippets);
 }
 
-export function loadMandatoryRules(): string {
-  return MANDATORY_RULES_TEMPLATE;
+export function loadMandatoryRules(metaReminderShort: string): string {
+  return MANDATORY_RULES_TEMPLATE.replace(/\{\{\{metaReminderShort\}\}\}/g, metaReminderShort);
 }
 
-export function loadBatchInstructions(hasProgressTool: boolean): string {
-  return hasProgressTool ? BATCH_WITH_PROGRESS_TEMPLATE : BATCH_WITHOUT_PROGRESS_TEMPLATE;
+export function loadBatchInstructions(hasProgressTool: boolean, metaReminderShort: string): string {
+  const template = hasProgressTool ? BATCH_WITH_PROGRESS_TEMPLATE : BATCH_WITHOUT_PROGRESS_TEMPLATE;
+  return template.replace(/\{\{\{metaReminderShort\}\}\}/g, metaReminderShort);
 }

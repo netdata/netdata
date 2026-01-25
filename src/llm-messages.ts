@@ -119,7 +119,8 @@ export const isUnknownToolFailureMessage = (content: string): boolean =>
 // Used by: internal-provider.ts (system prompt, tool schema), xml-tools.ts (XML-NEXT)
 // =============================================================================
 
-export const TASK_STATUS_TOOL_INSTRUCTIONS = loadTaskStatusInstructions();
+export const renderTaskStatusToolInstructions = (metaReminderShort: string): string =>
+  loadTaskStatusInstructions(metaReminderShort);
 
 export const TASK_STATUS_TOOL_BATCH_RULES = `- Include at most one task_status per batch
 - task_status updates the user; to perform actions, use other tools in the same batch
@@ -178,4 +179,5 @@ export const FINAL_REPORT_FIELDS_SLACK =
 export const finalReportFieldsText = (formatId: string): string =>
   `  - \`report_format\`: "${formatId}".\n  - \`report_content\`: the content of your final report, in the requested format.`;
 
-export const MANDATORY_XML_FINAL_RULES = loadMandatoryRules();
+export const renderMandatoryXmlFinalRules = (metaReminderShort: string): string =>
+  loadMandatoryRules(metaReminderShort);

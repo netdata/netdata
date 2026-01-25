@@ -13,6 +13,7 @@ import crypto from 'node:crypto';
 
 import type { OutputFormatId } from './formats.js';
 import type { LLMClient } from './llm-client.js';
+import type { FinalReportPluginRuntimeManager } from './plugins/runtime.js';
 import type { SessionProgressReporter } from './session-progress-reporter.js';
 import type { SessionTreeBuilder } from './session-tree.js';
 import type { SubAgentRegistry } from './subagent-registry.js';
@@ -50,7 +51,7 @@ import { ThinkTagStreamFilter } from './think-tag-filter.js';
 import { processLeakedToolCalls, type LeakedToolFallbackResult } from './tool-call-fallback.js';
 import { TRUNCATE_PREVIEW_BYTES, truncateToBytes } from './truncation.js';
 import { estimateMessagesBytes, formatToolRequestCompact, isPlainObject, parseJsonValueDetailed, sanitizeToolName, warn } from './utils.js';
-import { XmlFinalReportFilter, type XmlToolTransport } from './xml-transport.js';
+import { XmlFinalReportFilter, type XmlMetaBlock, type XmlMetaIssue, type XmlToolTransport } from './xml-transport.js';
 
 const TOOL_FAILED_PREFIX = '(tool failed:';
 const TEXT_EXTRACTION_REMOTE_ID = 'agent:text-extraction';
@@ -78,6 +79,7 @@ export interface TurnRunnerContext {
   readonly progressReporter: SessionProgressReporter;
   readonly sessionExecutor: SessionToolExecutor;
   readonly xmlTransport: XmlToolTransport;
+  readonly pluginRuntime: FinalReportPluginRuntimeManager;
   readonly subAgents?: SubAgentRegistry;
   readonly resolvedFormat?: OutputFormatId;
   readonly resolvedFormatPromptValue?: string;
@@ -598,6 +600,8 @@ export class TurnRunner {
                         ? (this.forcedFinalTurnReason ?? 'max_turns')
                         : undefined;
                     // Build XML-NEXT notice using 3-part structure directly
+                    const finalReportLocked = this.ctx.finalReportManager.isFinalReportLocked();
+                    const missingMetaPluginNames = finalReportLocked ? this.ctx.pluginRuntime.getMissingRequiredPluginNames() : [];
                     const xmlNextContent = buildXmlNextNotice({
                         nonce: this.ctx.xmlTransport.getSessionNonce(),
                         turn: currentTurn,
@@ -606,6 +610,7 @@ export class TurnRunner {
                         maxRetries,
                         contextPercentUsed,
                         expectedFinalFormat: this.ctx.resolvedFormat ?? 'markdown',
+                        finalReportPluginRequirements: this.ctx.pluginRuntime.getResolvedRequirements(),
                         hasExternalTools: allTools.some((tool) => tool.name !== FINAL_REPORT_TOOL),
                         taskStatusToolEnabled: this.ctx.taskStatusToolEnabled,
                         forcedFinalTurnReason: xmlNextForcedReason,
@@ -613,6 +618,8 @@ export class TurnRunner {
                             ? Array.from(this.ctx.finalTurnAllowedTools.values())
                             : undefined,
                         consecutiveProgressOnlyTurns: this.state.consecutiveProgressOnlyTurns ?? 0,
+                        finalReportLocked,
+                        missingMetaPluginNames,
                     });
                     const xmlResult = this.ctx.xmlTransport.buildMessages({
                         turn: currentTurn,
@@ -631,6 +638,8 @@ export class TurnRunner {
                             ? Array.from(this.ctx.finalTurnAllowedTools.values())
                             : undefined,
                         noticeContent: xmlNextContent,
+                        finalReportLocked,
+                        missingMetaPluginNames,
                     });
                     if (xmlResult.pastMessage !== undefined)
                         attemptConversation.push(xmlResult.pastMessage);
@@ -735,7 +744,9 @@ export class TurnRunner {
                 }
                     const turnResult = await this.executeSingleTurn(attemptConversation, provider, model, isFinalTurn, currentTurn, logs, accounting, lastShownThinkingHeaderTurn, attempts, maxRetries, sessionReasoningLevel, sessionReasoningValue ?? undefined);
                     lastTurnResult = turnResult;
-                    const { messages: sanitizedMessages, dropped: droppedInvalidToolCalls, finalReportAttempted, syntheticToolMessages } = this.sanitizeTurnMessages(turnResult.messages, { turn: currentTurn, provider, model, stopReason: turnResult.stopReason, maxOutputTokens: this.ctx.sessionConfig.maxOutputTokens });
+                    const { messages: sanitizedMessages, dropped: droppedInvalidToolCalls, finalReportAttempted, syntheticToolMessages, metaBlocks, metaIssues } = this.sanitizeTurnMessages(turnResult.messages, { turn: currentTurn, provider, model, stopReason: turnResult.stopReason, maxOutputTokens: this.ctx.sessionConfig.maxOutputTokens });
+                    const metaBlocksThisAttempt = metaBlocks;
+                    const metaIssuesFromTransport = metaIssues;
                     this.state.droppedInvalidToolCalls = droppedInvalidToolCalls;
                     // Mark turnResult with finalReportAttempted flag but defer collapseRemainingTurns
                     // until we know if the final report was actually accepted (done later in the flow)
@@ -1610,7 +1621,32 @@ export class TurnRunner {
                                 }
                             }
                         }
-                        const finalReportReady = this.finalReport !== undefined;
+                        const metaEvaluation = this.evaluateMetaState(metaBlocksThisAttempt, metaIssuesFromTransport, currentTurn);
+                        const finalReportExists = metaEvaluation.finalReportExists;
+                        const finalizationReady = metaEvaluation.finalizationReady;
+                        if (finalReportExists && !finalizationReady) {
+                            metaEvaluation.metaIssuesToApply.forEach((issue) => {
+                                this.addTurnFailure(issue.slug, issue.reason);
+                            });
+                            if (metaEvaluation.missingMetaReason !== undefined) {
+                                this.addTurnFailure('final_meta_missing', metaEvaluation.missingMetaReason);
+                            }
+                            const invalidMetaReason = metaEvaluation.metaIssuesToApply
+                                .map((issue) => issue.reason.trim())
+                                .filter((reason) => reason.length > 0)
+                                .join(' | ');
+                            const metaFailureSummaryParts = [
+                                metaEvaluation.missingMetaReason,
+                                invalidMetaReason.length > 0 ? `meta_invalid=${invalidMetaReason}` : undefined,
+                            ].filter((part): part is string => typeof part === 'string' && part.length > 0);
+                            const metaFailureSummary = metaFailureSummaryParts.join(' | ');
+                            const metaFailureReason = metaFailureSummary.length > 0 ? metaFailureSummary : 'required META blocks are missing';
+                            lastError = `invalid_response: final_meta_requirements: ${metaFailureReason}`;
+                            lastErrorType = 'invalid_response';
+                            if (currentTurn < maxTurns) {
+                                collapseRemainingTurns('incomplete_final_report');
+                            }
+                        }
         const executionStats = turnResult.executionStats ?? { executedTools: 0, executedNonProgressBatchTools: 0, executedProgressBatchTools: 0, unknownToolEncountered: false };
         const hasNonProgressTools = executionStats.executedNonProgressBatchTools > 0;
         const hasProgressOnly = executionStats.executedProgressBatchTools > 0 && executionStats.executedNonProgressBatchTools === 0;
@@ -1649,7 +1685,7 @@ export class TurnRunner {
                         conversation.push(...sanitizedMessages);
                         // If we encountered an invalid response and still have retries in this turn, retry
                         // Skip retry if progress tools succeeded (standalone task_status consumes the turn per TODO design)
-                        if (!finalReportReady && !hasNonProgressTools && !hasProgressOnly && lastErrorType === 'invalid_response' && attempts < maxRetries) {
+                        if (!finalizationReady && !hasNonProgressTools && !hasProgressOnly && lastErrorType === 'invalid_response' && attempts < maxRetries) {
                             // Collapse turns on retry if a final report was attempted but rejected
                             if (turnHadFinalReportAttempt && currentTurn < maxTurns) {
                                 collapseRemainingTurns('final_report_attempt');
@@ -1663,7 +1699,7 @@ export class TurnRunner {
                         const incompleteFinalReportDetected = retryFlags.incompleteFinalReportDetected === true;
                         const finalReportAttemptFlag = turnHadFinalReportAttempt || retryFlags.finalReportAttempted === true;
                         // If final report is already accepted, skip collapse and finalize immediately
-                        if (finalReportReady) {
+                        if (finalizationReady) {
                             return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn);
                         }
                         // Only collapse remaining turns if final report is NOT ready
@@ -1677,7 +1713,7 @@ export class TurnRunner {
                         // Progress-only (standalone task_status) also succeeds - turn is consumed per TODO design
                         // BUT: if final report validation failed, do NOT mark successful - retry instead
                         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-                        if ((finalReportReady || hasNonProgressTools || hasProgressOnly) && lastErrorType !== 'invalid_response') {
+                        if ((finalizationReady || hasNonProgressTools || hasProgressOnly) && lastErrorType !== 'invalid_response') {
                             turnSuccessful = true;
                             break;
                         }
@@ -1972,6 +2008,9 @@ export class TurnRunner {
             // Preserve lastError for post-loop access
             this.state.lastTurnError = typeof lastError === 'string' ? lastError : undefined;
             this.state.lastTurnErrorType = typeof lastErrorType === 'string' ? lastErrorType : undefined;
+        }
+        if (this.ctx.finalReportManager.hasReport() && !this.ctx.finalReportManager.isFinalizationReady()) {
+            return this.finalizeMissingMetaFailure(conversation, logs, accounting, maxTurns);
         }
         // Max turns exceeded - synthesize final report if missing (unless final_report tool itself failed)
         if (this.finalReport === undefined && !this.state.finalReportToolFailedEver) {
@@ -2271,11 +2310,24 @@ export class TurnRunner {
         }
         addSpanEvent('context.guard', attributes);
     }
+    private evaluateMetaState(metaBlocks: XmlMetaBlock[], transportMetaIssues: XmlMetaIssue[], turn: number): { finalReportExists: boolean; finalizationReady: boolean; metaIssuesToApply: XmlMetaIssue[]; missingMetaReason?: string } {
+        const runtimeResult = this.ctx.pluginRuntime.processMetaBlocks(metaBlocks, turn);
+        const finalReportExists = this.ctx.finalReportManager.hasReport();
+        const finalizationReady = this.ctx.finalReportManager.isFinalizationReady();
+        const missingMetaNames = this.ctx.finalReportManager.getMissingRequiredPluginMetas();
+        const shouldEnforceMeta = finalReportExists && !finalizationReady;
+        const metaIssuesToApply = shouldEnforceMeta ? [...transportMetaIssues, ...runtimeResult.issues] : [];
+        const missingMetaReason = shouldEnforceMeta && missingMetaNames.length > 0
+            ? this.ctx.pluginRuntime.buildMissingMetaReason(missingMetaNames)
+            : undefined;
+        return { finalReportExists, finalizationReady, metaIssuesToApply, missingMetaReason };
+    }
     private addTurnFailure(slug: TurnFailedSlug, reason?: string): void {
         const normalizedReason = typeof reason === 'string' ? reason.trim() : undefined;
         const existing = this.state.turnFailedEvents.find((entry) => entry.slug === slug);
         if (existing !== undefined) {
-            if ((existing.reason === undefined || existing.reason.trim().length === 0) && normalizedReason !== undefined && normalizedReason.length > 0) {
+            const replaceReason = slug === 'final_meta_missing' || slug === 'final_meta_invalid';
+            if (normalizedReason !== undefined && normalizedReason.length > 0 && (replaceReason || existing.reason === undefined || existing.reason.trim().length === 0)) {
                 existing.reason = normalizedReason;
             }
             return;
@@ -2397,17 +2449,23 @@ export class TurnRunner {
     const stats = lastTurnResult?.executionStats ?? { executedTools: 0, executedNonProgressBatchTools: 0, executedProgressBatchTools: 0, unknownToolEncountered: false };
     const hasNonProgressTools = stats.executedNonProgressBatchTools > 0;
     const hasProgressOnly = stats.executedProgressBatchTools > 0 && stats.executedNonProgressBatchTools === 0;
+    const finalReportExists = this.ctx.finalReportManager.hasReport();
+    const finalizationReady = this.ctx.finalReportManager.isFinalizationReady();
+    const missingMetaNames = this.ctx.finalReportManager.getMissingRequiredPluginMetas();
+    const metaInvalidEvent = this.state.turnFailedEvents.some((entry) => entry.slug === 'final_meta_invalid');
     const hadToolCalls = (lastTurnResult?.messages ?? []).some((m) => {
         const toolCalls = (m as { toolCalls?: unknown }).toolCalls;
         return Array.isArray(toolCalls) && toolCalls.length > 0;
     });
     if (hasProgressOnly) slugs.add('task_status_only');
     else if (!hasNonProgressTools) slugs.add('no_tools');
-    if (this.finalReport === undefined) slugs.add('final_report_missing');
+    if (!finalReportExists) slugs.add('final_report_missing');
+    else if (!finalizationReady && missingMetaNames.length > 0) slugs.add('final_meta_missing');
+    if (!finalizationReady && metaInvalidEvent) slugs.add('final_meta_invalid');
     const responseText = typeof lastTurnResult?.response === 'string' ? lastTurnResult.response.trim() : '';
     if (responseText.length === 0) slugs.add('empty_response');
     if (lastTurnResult?.hasReasoning === true && (responseText.length === 0)) slugs.add('reasoning_only');
-    if (responseText.length > 0 && !hasNonProgressTools && this.finalReport === undefined) slugs.add('text_only');
+    if (responseText.length > 0 && !hasNonProgressTools && !finalReportExists) slugs.add('text_only');
     const stopReason = lastTurnResult?.stopReason;
     if (stopReason === 'length' || stopReason === 'max_tokens') slugs.add('stop_reason_length');
     if (lastErrorType === 'invalid_response') slugs.add('invalid_response');
@@ -2475,6 +2533,57 @@ export class TurnRunner {
       },
     };
     this.log(entry);
+  }
+
+  private finalizeMissingMetaFailure(
+    conversation: ConversationMessage[],
+    logs: LogEntry[],
+    accounting: AccountingEntry[],
+    maxTurns: number,
+  ): AIAgentResult {
+    const currentTurn = this.state.currentTurn;
+    const missingMetaNames = this.ctx.finalReportManager.getMissingRequiredPluginMetas();
+    const missingMetaReason = missingMetaNames.length > 0
+      ? this.ctx.pluginRuntime.buildMissingMetaReason(missingMetaNames)
+      : 'required META blocks are missing';
+    const turnLabel = `${String(maxTurns)} turn${maxTurns === 1 ? '' : 's'}`;
+    const baseSummary = `Session completed without required META after ${turnLabel}.`;
+    const savedError = this.state.lastTurnError;
+    const causeLine = typeof savedError === 'string' && savedError.length > 0 ? `Cause: ${savedError}` : undefined;
+    const detailedSummaryParts = [
+      baseSummary,
+      `Missing META: ${missingMetaReason}`,
+      causeLine,
+    ].filter((part): part is string => typeof part === 'string' && part.length > 0);
+    const detailedSummary = detailedSummaryParts.join(' ');
+    const fallbackFormatCandidate = this.ctx.resolvedFormat ?? 'text';
+    const fallbackFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === fallbackFormatCandidate) ?? 'text';
+    const finalReportAttempts = this.ctx.finalReportManager.finalReportAttempts;
+    const failureDetails: Record<string, LogDetailValue> = {
+      reason: 'final_meta_missing',
+      turns_completed: maxTurns,
+      final_report_attempts: finalReportAttempts,
+      missing_meta_plugins: missingMetaNames.join(','),
+      missing_meta_reason: missingMetaReason,
+      ...(typeof savedError === 'string' && savedError.length > 0 ? { last_error: savedError } : {}),
+    };
+    this.logFailureReport(detailedSummary, currentTurn, failureDetails);
+    this.ctx.finalReportManager.clear();
+    this.finalReportStreamed = false;
+    this.resetStreamedOutputTail();
+    this.commitFinalReport({
+      format: fallbackFormat,
+      content: detailedSummary,
+      metadata: {
+        reason: 'final_meta_missing',
+        turns_completed: maxTurns,
+        final_report_attempts: finalReportAttempts,
+        missing_meta_plugins: missingMetaNames,
+        missing_meta_reason: missingMetaReason,
+        last_stop_reason: savedError ?? 'final_meta_missing',
+      },
+    }, 'synthetic');
+    return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn);
   }
 
   private finalizeSessionFailure(
@@ -3152,10 +3261,12 @@ export class TurnRunner {
         this.state.toolNameCorrections.clear();
     }
 
-    private sanitizeTurnMessages(messages: ConversationMessage[], context: { turn: number; provider: string; model: string; stopReason?: string; maxOutputTokens?: number }): { messages: ConversationMessage[]; dropped: number; finalReportAttempted: boolean; syntheticToolMessages: ConversationMessage[] } {
+    private sanitizeTurnMessages(messages: ConversationMessage[], context: { turn: number; provider: string; model: string; stopReason?: string; maxOutputTokens?: number }): { messages: ConversationMessage[]; dropped: number; finalReportAttempted: boolean; syntheticToolMessages: ConversationMessage[]; metaBlocks: XmlMetaBlock[]; metaIssues: XmlMetaIssue[] } {
         let dropped = 0;
         let finalReportAttempted = false;
         const syntheticToolMessages: ConversationMessage[] = [];
+        const metaBlocks: XmlMetaBlock[] = [];
+        const metaIssues: XmlMetaIssue[] = [];
         const formatPayload = (value: unknown): string => {
             if (typeof value === 'string') {
                 return value;
@@ -3233,6 +3344,12 @@ export class TurnRunner {
                         });
                     },
                 });
+                if (parseResult.metaBlocks.length > 0) {
+                    metaBlocks.push(...parseResult.metaBlocks);
+                }
+                if (parseResult.metaIssues.length > 0) {
+                    metaIssues.push(...parseResult.metaIssues);
+                }
                 if (parseResult.toolCalls !== undefined && parseResult.toolCalls.length > 0) {
                     // Merge XML-parsed tool calls with native tool calls (xml-final mode)
                     // Native tool calls execute first, then XML-parsed calls (final report)
@@ -3343,7 +3460,7 @@ export class TurnRunner {
             }
             return result;
         });
-        return { messages: sanitized, dropped, finalReportAttempted, syntheticToolMessages };
+        return { messages: sanitized, dropped, finalReportAttempted, syntheticToolMessages, metaBlocks, metaIssues };
     }
     private emitReasoningChunks(chunks: string[]): void {
         chunks.forEach((chunk: string) => {

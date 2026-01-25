@@ -1,6 +1,7 @@
 import Ajv from 'ajv';
 
 import type { OutputFormatId } from '../formats.js';
+import type { ResolvedFinalReportPluginRequirement } from '../plugins/types.js';
 import type { LogDetailValue, MCPTool, TaskStatusData } from '../types.js';
 import type { ToolsOrchestrator } from './tools.js';
 import type { ToolExecuteOptions, ToolExecuteResult, ToolExecutionContext } from './types.js';
@@ -17,10 +18,11 @@ import {
   FINAL_REPORT_FIELDS_JSON,
   FINAL_REPORT_FIELDS_SLACK,
   finalReportFieldsText,
-  MANDATORY_XML_FINAL_RULES,
-  TASK_STATUS_TOOL_INSTRUCTIONS,
+  renderMandatoryXmlFinalRules,
+  renderTaskStatusToolInstructions,
 } from '../llm-messages.js';
 import { LOG_EVENTS } from '../logging/log-events.js';
+import { buildMetaPromptGuidance } from '../plugins/meta-guidance.js';
 import { loadBatchInstructions, loadFinalReportInstructions } from '../prompts/loader.js';
 import { normalizeSlackMessages, SLACK_BLOCK_KIT_SCHEMA } from '../slack-block-kit.js';
 import { truncateToBytes } from '../truncation.js';
@@ -86,6 +88,7 @@ export class InternalToolProvider extends ToolProvider {
   private readonly disableProgressTool: boolean;
   private readonly hasRouterHandoff: boolean;
   private readonly xmlSessionNonce: string;
+  private finalReportPluginRequirements: ResolvedFinalReportPluginRequirement[] = [];
 
   constructor(
     public readonly namespace: string,
@@ -213,6 +216,11 @@ export class InternalToolProvider extends ToolProvider {
     return this.instructions;
   }
 
+  setFinalReportPluginRequirements(requirements: ResolvedFinalReportPluginRequirement[]): void {
+    this.finalReportPluginRequirements = requirements;
+    this.instructions = this.buildInstructions();
+  }
+
   getFormatInfo(): { formatId: OutputFormatId; promptValue: string; parameterDescription: string } {
     return {
       formatId: this.formatId,
@@ -223,14 +231,21 @@ export class InternalToolProvider extends ToolProvider {
 
   private buildInstructions(): string {
     const lines: string[] = [];
+    const metaGuidance = buildMetaPromptGuidance(this.finalReportPluginRequirements, this.xmlSessionNonce);
 
     // SECTION 1: Final report instructions FIRST (most critical for first-try success)
     const schemaBlock = this.buildFinalReportSchemaBlock();
-    lines.push(loadFinalReportInstructions(this.formatId, this.formatDescription, schemaBlock, this.xmlSessionNonce));
+    lines.push(loadFinalReportInstructions(
+      this.formatId,
+      this.formatDescription,
+      schemaBlock,
+      this.xmlSessionNonce,
+      this.finalReportPluginRequirements,
+    ));
 
     // SECTION 2: Mandatory rules (reinforces critical format requirements)
     lines.push('');
-    lines.push(MANDATORY_XML_FINAL_RULES);
+    lines.push(renderMandatoryXmlFinalRules(metaGuidance.reminderShort));
 
     // SECTION 3: Internal tools (only if any are available)
     const hasProgressTool = !this.disableProgressTool;
@@ -256,12 +271,12 @@ export class InternalToolProvider extends ToolProvider {
 
       if (hasProgressTool) {
         lines.push('');
-        lines.push(TASK_STATUS_TOOL_INSTRUCTIONS);
+        lines.push(renderTaskStatusToolInstructions(metaGuidance.reminderShort));
       }
 
       if (hasBatchTool) {
         lines.push('');
-        lines.push(loadBatchInstructions(hasProgressTool));
+        lines.push(loadBatchInstructions(hasProgressTool, metaGuidance.reminderShort));
       }
 
       if (this.hasRouterHandoff) {

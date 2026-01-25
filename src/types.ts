@@ -1,5 +1,6 @@
 import type { CacheConfig } from './cache/types.js';
 import type { OutputFormatId } from './formats.js';
+import type { PreparedFinalReportPluginDescriptor } from './plugins/types.js';
 import type { SessionNode } from './session-tree.js';
 import type { PreloadedSubAgent } from './subagent-registry.js';
 import type { ToolOutputConfigInput } from './tool-output/types.js';
@@ -738,6 +739,7 @@ export interface AIAgentSessionConfig {
   config: Configuration;
   targets: { provider: string; model: string }[];
   tools: string[];
+  finalReportPluginDescriptors?: PreparedFinalReportPluginDescriptor[];
   // Optional preloaded sub-agent definitions (fully resolved at bootstrap)
   subAgents?: PreloadedSubAgent[];
   orchestration?: OrchestrationConfig;

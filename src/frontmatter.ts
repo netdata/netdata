@@ -16,6 +16,7 @@ export interface FrontmatterOptions {
   models?: string | string[];
   tools?: string | string[];
   agents?: string | string[];
+  plugins?: string | string[];
   router?: { destinations?: string | string[] };
   advisors?: string | string[];
   handoff?: string;
@@ -179,6 +180,8 @@ export function parseFrontmatter(
       options.tools = raw.tools as string | string[];
     if (typeof raw.agents === "string" || Array.isArray(raw.agents))
       options.agents = raw.agents as string | string[];
+    if (typeof raw.plugins === "string" || Array.isArray(raw.plugins))
+      options.plugins = raw.plugins as string | string[];
     if (raw.router !== undefined) {
       const routerRaw = raw.router;
       if (
@@ -456,6 +459,7 @@ export function buildFrontmatterTemplate(args: {
   const llmsVal: string[] = fm !== undefined ? toArray(fm.models) : [];
   const toolsVal: string[] = fm !== undefined ? toArray(fm.tools) : [];
   const agentsVal: string[] = fm !== undefined ? toArray(fm.agents) : [];
+  const pluginsVal: string[] = fm !== undefined ? toArray(fm.plugins) : [];
 
   const tpl: Record<string, unknown> = {};
   tpl.description = args.description;
@@ -464,13 +468,14 @@ export function buildFrontmatterTemplate(args: {
   tpl.models = llmsVal;
   tpl.tools = toolsVal;
   tpl.agents = agentsVal.length > 0 ? agentsVal : [];
+  tpl.plugins = pluginsVal.length > 0 ? pluginsVal : [];
 
   // Dynamically include ALL fm-allowed options from the OPTIONS_REGISTRY
   const fmAllowed = OPTIONS_REGISTRY.filter((o) => o.fm?.allowed === true);
   fmAllowed.forEach((opt) => {
     const key = opt.fm?.key ?? opt.key;
     // Avoid re-setting models/tools/agents already handled above
-    if (key === "models" || key === "tools" || key === "agents") return;
+    if (key === "models" || key === "tools" || key === "agents" || key === "plugins") return;
     const fmVal = (fm as Record<string, unknown> | undefined)?.[key];
     let val: unknown = undefined;
     switch (opt.type) {

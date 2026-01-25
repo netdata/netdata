@@ -20,6 +20,7 @@ import { isReservedAgentName } from './internal-tools.js';
 import { validateOrchestrationGraph } from './orchestration/cycle-detection.js';
 import { resolveEffectiveOptions } from './options-resolver.js';
 import { buildEffectiveOptionsSchema } from './options-schema.js';
+import { prepareFinalReportPluginDescriptors } from './plugins/loader.js';
 import { openApiToRestTools, parseOpenAPISpec } from './tools/openapi-importer.js';
 import { queueManager } from './tools/queue-manager.js';
 import { clampToolName, sanitizeToolName } from './utils.js';
@@ -183,6 +184,7 @@ export interface LoadAgentOptions {
   targets?: { provider: string; model: string }[];
   tools?: string[];
   agents?: string[];
+  plugins?: string[];
   // Overrides applied to every agent/sub-agent. Override values take precedence over CLI/frontmatter/defaults.
   globalOverrides?: GlobalOverrides;
   // Optional overrides (CLI precedence) for runtime knobs
@@ -371,6 +373,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
   const fmModels = parsePairs(fm?.options?.models);
   const fmTools = parseList(fm?.options?.tools);
   const fmAgents = parseList(fm?.options?.agents);
+  const fmPlugins = parseList(fm?.options?.plugins);
   const globalContextWindow = options?.globalOverrides?.contextWindow;
   if (globalContextWindow !== undefined) {
     if (!Number.isInteger(globalContextWindow) || globalContextWindow <= 0) {
@@ -389,6 +392,8 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
     selectedTools = selectedTools.filter((t) => t !== 'batch');
   }
   const effAgents = Array.isArray(options?.agents) && options.agents.length > 0 ? options.agents : fmAgents;
+  const selectedPlugins = Array.isArray(options?.plugins) && options.plugins.length > 0 ? [...options.plugins] : [...fmPlugins];
+  const { descriptors: preparedPlugins, pluginHash } = prepareFinalReportPluginDescriptors(baseDir, selectedPlugins);
   const selectedAgents = effAgents.map((rel) => path.resolve(baseDir, rel));
   const subAgentInfos: PreloadedSubAgent[] = [];
   const seenToolNames = new Set<string>();
@@ -756,6 +761,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
     targets: selectedTargets,
     tools: selectedTools,
     agents: effAgents,
+    plugins: pluginHash,
     expectedOutput: resolvedExpectedOutput,
     input: resolvedInput,
     outputSchema: resolvedOutputSchema,
@@ -852,6 +858,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       reasoning: eff.reasoning,
       reasoningValue: eff.reasoningValue,
       caching: eff.caching,
+      finalReportPluginDescriptors: preparedPlugins.length > 0 ? preparedPlugins : undefined,
       headendId: o.headendId ?? o.renderTarget ?? 'cli',
       headendWantsProgressUpdates: options?.globalOverrides?.noProgress === true ? false : (o.wantsProgressUpdates !== undefined ? o.wantsProgressUpdates : true),
       // Preserve the original reference (no clone) so recursion guards see identical identity.

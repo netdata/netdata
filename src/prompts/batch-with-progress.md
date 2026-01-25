@@ -11,7 +11,7 @@
       (Tool names must match exactly, and every required parameter must be present.)
     ]
   }
-- Do not combine `agent__task_status` with your final report; send the final report on its own.
+- Do not combine `agent__task_status` with your final report; send the final report on its own. ({{{metaReminderShort}}})
 
 ### MANDATORY RULE FOR PARALLEL TOOL CALLS
 When gathering information from multiple independent sources, use the agent__batch tool to execute tools in parallel.

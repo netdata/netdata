@@ -100,6 +100,16 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
     groups: [G_MASTER_OVERRIDES],
   }),
   strArrDef({
+    key: "plugins",
+    default: [],
+    description:
+      "Final report plugin .js files for metadata extensions (relative to the agent .ai file)",
+    cli: { names: ["--plugins"], showInHelp: true },
+    fm: { allowed: true, key: "plugins" },
+    scope: "masterOnly",
+    groups: [G_MASTER_OVERRIDES],
+  }),
+  strArrDef({
     key: "advisors",
     default: [],
     description:

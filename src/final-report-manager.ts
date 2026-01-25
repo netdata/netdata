@@ -12,6 +12,7 @@
 import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
+import type { FinalReportPluginMetaRecord } from './plugins/types.js';
 import type { FinalReportPayload } from './types.js';
 import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
 
@@ -54,6 +55,8 @@ export class FinalReportManager {
   // Committed final report
   private finalReport?: FinalReportPayload;
   private finalReportSource?: FinalReportSource;
+  private requiredPluginNames: string[] = [];
+  private readonly pluginMetas = new Map<string, Record<string, unknown>>();
 
   // Attempt tracking
   private _finalReportAttempts = 0;
@@ -114,6 +117,48 @@ export class FinalReportManager {
     return this.finalReportSource;
   }
 
+  setRequiredPlugins(pluginNames: string[]): void {
+    const normalized = pluginNames
+      .map((name) => name.trim())
+      .filter((name) => name.length > 0);
+    this.requiredPluginNames = Array.from(new Set(normalized));
+  }
+
+  getRequiredPlugins(): string[] {
+    return [...this.requiredPluginNames];
+  }
+
+  commitPluginMeta(pluginName: string, meta: Record<string, unknown>): void {
+    this.pluginMetas.set(pluginName, meta);
+  }
+
+  getPluginMeta(pluginName: string): Record<string, unknown> | undefined {
+    return this.pluginMetas.get(pluginName);
+  }
+
+  getPluginMetasRecord(): FinalReportPluginMetaRecord {
+    return Array.from(this.pluginMetas.entries()).reduce<FinalReportPluginMetaRecord>((acc, [name, meta]) => {
+      acc[name] = meta;
+      return acc;
+    }, {});
+  }
+
+  getMissingRequiredPluginMetas(): string[] {
+    return this.requiredPluginNames.filter((name) => !this.pluginMetas.has(name));
+  }
+
+  hasAllRequiredPluginMetas(): boolean {
+    return this.getMissingRequiredPluginMetas().length === 0;
+  }
+
+  isFinalReportLocked(): boolean {
+    return this.finalReport !== undefined && this.getMissingRequiredPluginMetas().length > 0;
+  }
+
+  isFinalizationReady(): boolean {
+    return this.finalReport !== undefined && this.hasAllRequiredPluginMetas();
+  }
+
   /**
    * Get the resolved format for this session
    */
@@ -125,6 +170,9 @@ export class FinalReportManager {
    * Commit a final report to the manager
    */
   commit(payload: PendingFinalReportPayload, source: FinalReportSource): void {
+    if (this.finalReport !== undefined && this.isFinalReportLocked()) {
+      return;
+    }
     this.finalReport = {
       format: payload.format,
       content: payload.content,

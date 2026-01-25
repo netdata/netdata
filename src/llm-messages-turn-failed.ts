@@ -27,6 +27,14 @@ export const TURN_FAILED_SLUGS: Record<string, TurnFailedSlugConfig> = {
     message: 'Final report failed schema validation. Fix the payload to match the final-report/answer schema and resend your final report/answer.',
     priority: 'high',
   },
+  final_meta_missing: {
+    message: 'Final report is incomplete: required META blocks are missing. Provide every required `<ai-agent-NONCE-META plugin="name">...</ai-agent-NONCE-META>` block with valid JSON alongside your final report.',
+    priority: 'critical',
+  },
+  final_meta_invalid: {
+    message: 'Final report META failed validation. Fix the META JSON for the specified plugin(s) and resend the required `<ai-agent-NONCE-META plugin="name">...</ai-agent-NONCE-META>` blocks.',
+    priority: 'critical',
+  },
   tool_message_fallback_schema_failed: {
     message: 'Fallback final report from tool output failed schema validation. Provide your valid final report/answer in the required format.',
     priority: 'critical',

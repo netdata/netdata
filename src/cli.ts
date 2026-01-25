@@ -1312,6 +1312,17 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
     }
   }
 
+  let parsedPlugins: LoadAgentOptions['plugins'];
+  const cliPlugins = normalizeListOption(config.options.plugins);
+  if (cliPlugins !== undefined) {
+    try {
+      parsedPlugins = parseList(cliPlugins);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      exitWith(4, `invalid plugins specification: ${message}`, 'EXIT-HEADEND-BAD-PLUGINS');
+    }
+  }
+
   const loadOptions: LoadAgentOptions = {
     configPath: configPathValue,
     verbose,
@@ -1401,6 +1412,9 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   }
   if (parsedTools !== undefined) {
     loadOptions.tools = parsedTools;
+  }
+  if (parsedPlugins !== undefined) {
+    loadOptions.plugins = parsedPlugins;
   }
 
   const registry = new AgentRegistry(uniqueAgents, loadOptions);
@@ -1725,16 +1739,19 @@ program
       }
 
       const cliAgentsRaw: string | undefined = normalizeListOption(optsRecord.agents);
+      const cliPluginsRaw: string | undefined = normalizeListOption(optsRecord.plugins);
 
       // fmOptions already computed above
       const fmTargetsRaw = normalizeListOption(fmOptions?.models);
 
       const fmToolsRaw = normalizeListOption(fmOptions?.tools);
       const fmAgentsRaw = normalizeListOption(fmOptions?.agents);
+      const fmPluginsRaw = normalizeListOption(fmOptions?.plugins);
 
       const targets = parsePairs(cliTargetsRaw ?? fmTargetsRaw);
       const toolList = parseList(cliToolsRaw ?? fmToolsRaw);
       const agentsList = parseList(cliAgentsRaw ?? fmAgentsRaw);
+      const pluginsList = parseList(cliPluginsRaw ?? fmPluginsRaw);
 
       if (targets.length === 0 && !(Array.isArray(globalOverrides?.models) && globalOverrides.models.length > 0)) {
         console.error('Error: No provider/model targets specified. Use --models or frontmatter models.');
@@ -1859,6 +1876,7 @@ program
         targets,
         tools: toolList,
         agents: agentsList,
+        plugins: pluginsList,
         baseDir: fmBaseDir,
         // Keep overrides pointer intact for downstream recursion checks.
         globalOverrides,

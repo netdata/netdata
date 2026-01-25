@@ -9,6 +9,7 @@ import type { ResponseCache } from './cache/response-cache.js';
 import type { ToolCacheResolver } from './cache/tool-cache-resolver.js';
 import type { OutputFormatId } from './formats.js';
 import type { AdvisorExecutionResult } from './orchestration/advisors.js';
+import type { FinalReportPluginMetaRecord } from './plugins/types.js';
 import type { SessionNode, StepKind } from './session-tree.js';
 import type { AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, AIAgentSessionConfig, AIAgentResult, AccountingEntry, AccountingFlushPayload, Configuration, ConversationMessage, LogDetailValue, LogEntry, LLMAccountingEntry, MCPTool, OrchestrationConfig, OrchestrationRuntimeAgent, OrchestrationRuntimeConfig, ProgressMetrics, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, RestToolConfig, SessionSnapshotPayload, TaskStatusData, ToolAccountingEntry, ToolChoiceMode, TurnRequestContextMetrics, LogPayload } from './types.js';
 
@@ -26,6 +27,7 @@ import { executeHandoff } from './orchestration/handoff.js';
 import { buildAdvisoryBlock, buildOriginalUserRequestBlock, joinTaggedBlocks } from './orchestration/prompt-tags.js';
 import { RouterToolProvider } from './orchestration/router.js';
 import { spawnOrchestrationChild } from './orchestration/spawn-child.js';
+import { FinalReportPluginRuntimeManager } from './plugins/runtime.js';
 import { applyFormat, buildPromptVars, expandVars } from './prompt-builder.js';
 import { SessionProgressReporter } from './session-progress-reporter.js';
 import { SessionToolExecutor, type SessionContext } from './session-tool-executor.js';
@@ -86,9 +88,10 @@ interface ToolSelection {
 }
 
 interface AgentCachePayload {
-  finalReport?: AIAgentResult['finalReport'];
+  finalReport: NonNullable<AIAgentResult['finalReport']>;
   conversation: ConversationMessage[];
   childConversations?: AIAgentResult['childConversations'];
+  pluginMetas?: FinalReportPluginMetaRecord;
 }
 
 const isAgentCachePayload = (value: unknown): value is AgentCachePayload => {
@@ -96,6 +99,13 @@ const isAgentCachePayload = (value: unknown): value is AgentCachePayload => {
   const record = value;
   if (!Array.isArray(record.conversation)) return false;
   if (record.childConversations !== undefined && !Array.isArray(record.childConversations)) return false;
+  const pluginMetas = record.pluginMetas;
+  if (pluginMetas !== undefined) {
+    if (!isPlainObject(pluginMetas)) return false;
+    const metaValues = Object.values(pluginMetas);
+    const allPlainObjects = metaValues.every((meta) => isPlainObject(meta));
+    if (!allPlainObjects) return false;
+  }
   const finalReport = record.finalReport;
   if (!isPlainObject(finalReport)) return false;
   const report = finalReport;
@@ -162,6 +172,8 @@ export class AIAgentSession {
   private readonly routerToolName?: string;
   private readonly expectedJsonSchema?: Record<string, unknown>;
   private readonly xmlTransport: XmlToolTransport;
+  private internalProvider?: InternalToolProvider;
+  private readonly pluginRuntime: FinalReportPluginRuntimeManager;
   private turnFailureReasons: string[] = [];
   // Per-turn planned subturns (tool call count) discovered when LLM yields toolCalls
   private plannedSubturns: Map<number, number> = new Map<number, number>();
@@ -813,8 +825,8 @@ export class AIAgentSession {
       const routerDestinations = this.sessionConfig.orchestration?.router?.destinations ?? [];
       const hasRouterHandoff = routerDestinations.some((dest) => typeof dest.toolName === 'string' && dest.toolName.length > 0);
       const wantsProgressUpdates = this.sessionConfig.headendWantsProgressUpdates !== false;
-    const enableProgressTool = wantsProgressUpdates && (hasNonInternalDeclaredTools || hasSubAgentsConfigured);
-    this.taskStatusToolEnabled = enableProgressTool;
+      const enableProgressTool = wantsProgressUpdates && (hasNonInternalDeclaredTools || hasSubAgentsConfigured);
+      this.taskStatusToolEnabled = enableProgressTool;
       const enableBatch = declaredTools.includes('batch');
       const eo = this.sessionConfig.expectedOutput;
       const expectedJsonSchema = (eo?.format === 'json') ? eo.schema : undefined;
@@ -907,6 +919,7 @@ export class AIAgentSession {
         getCurrentTurn: () => this.currentTurn,
         toolTimeoutMs: sessionConfig.toolTimeout
       });
+      this.internalProvider = internalProvider;
       const formatInfo = internalProvider.getFormatInfo();
       this.resolvedFormat = formatInfo.formatId;
       this.resolvedFormatPromptValue = formatInfo.promptValue;
@@ -1015,6 +1028,26 @@ export class AIAgentSession {
         hasTool: (name) => this.subAgents?.hasTool(name) ?? false,
         addInvoked: (name) => this.invokedSubAgents.add(name)
       } : undefined
+    );
+
+    const pluginDescriptors = sessionConfig.finalReportPluginDescriptors ?? [];
+    const createSession = (config: AIAgentSessionConfig) => {
+      const session = AIAgentSession.create(config);
+      return { run: () => session.run() };
+    };
+    this.pluginRuntime = new FinalReportPluginRuntimeManager(
+      pluginDescriptors,
+      this.xmlTransport.getSessionNonce(),
+      this.finalReportManager,
+      (entry) => { this.log(entry); },
+      () => this.currentTurn,
+      {
+        sessionId: this.txnId,
+        originId: this.originTxnId ?? this.txnId,
+        agentId: this.getAgentIdLabel(),
+        agentPath: this.getAgentPathLabel(),
+      },
+      createSession,
     );
 
     // Apply an initial session title without consuming a tool turn (side-channel)
@@ -1478,63 +1511,80 @@ export class AIAgentSession {
       });
 
       try {
-      if (cache !== undefined && cacheKeyPayload !== undefined && typeof cacheTtlMs === 'number' && cacheTtlMs > 0) {
-        const hit = await cache.get(cacheKeyPayload, cacheTtlMs, Date.now());
-        if (hit !== undefined && isAgentCachePayload(hit.value)) {
-          const cacheDetails: Record<string, LogDetailValue> = {
-            cache_kind: 'agent',
-            cache_key: hit.entry.keyHash,
-            cache_age_ms: hit.entry.ageMs,
-            cache_current_agent: this.getAgentIdLabel(),
-            cache_stored_agent: hit.entry.metadata.agentName ?? '',
-            cache_current_format: this.sessionConfig.outputFormat,
-            cache_stored_format: hit.entry.metadata.format ?? '',
-          };
-          if (this.sessionConfig.agentHash !== undefined) {
-            cacheDetails.cache_current_agent_hash = this.sessionConfig.agentHash;
+        await this.pluginRuntime.initialize();
+        const pluginRequirements = this.pluginRuntime.getResolvedRequirements();
+        this.internalProvider?.setFinalReportPluginRequirements(pluginRequirements);
+        this.xmlTransport.setFinalReportPluginRequirements(pluginRequirements);
+
+        if (cache !== undefined && cacheKeyPayload !== undefined && typeof cacheTtlMs === 'number' && cacheTtlMs > 0) {
+          const hit = await cache.get(cacheKeyPayload, cacheTtlMs, Date.now());
+          if (hit !== undefined && isAgentCachePayload(hit.value)) {
+            const cachedPayload = hit.value;
+            const cacheUsable = this.pluginRuntime.validateCachePayload(
+              { finalReport: cachedPayload.finalReport, pluginMetas: cachedPayload.pluginMetas },
+              currentTurn,
+            );
+            if (cacheUsable) {
+              const cacheDetails: Record<string, LogDetailValue> = {
+                cache_kind: 'agent',
+                cache_key: hit.entry.keyHash,
+                cache_age_ms: hit.entry.ageMs,
+                cache_current_agent: this.getAgentIdLabel(),
+                cache_stored_agent: hit.entry.metadata.agentName ?? '',
+                cache_current_format: this.sessionConfig.outputFormat,
+                cache_stored_format: hit.entry.metadata.format ?? '',
+              };
+              if (this.sessionConfig.agentHash !== undefined) {
+                cacheDetails.cache_current_agent_hash = this.sessionConfig.agentHash;
+              }
+              if (hit.entry.metadata.agentHash !== undefined) {
+                cacheDetails.cache_stored_agent_hash = hit.entry.metadata.agentHash;
+              }
+              const cacheLog: LogEntry = {
+                timestamp: Date.now(),
+                severity: 'VRB',
+                turn: currentTurn,
+                subturn: 0,
+                direction: 'response',
+                type: 'llm',
+                remoteIdentifier: 'agent:cache',
+                fatal: false,
+                message: `cache hit: ${this.getAgentDisplayName()}`,
+                details: cacheDetails,
+              };
+              this.log(cacheLog);
+              this.pluginRuntime.runOnComplete({
+                finalReport: cachedPayload.finalReport,
+                messages: cachedPayload.conversation,
+                userRequest: this.sessionConfig.userPrompt,
+                fromCache: true,
+              });
+              finalizeOpTree({ message: AIAgentSession.SESSION_FINALIZED_MESSAGE, success: true });
+              const flat = safeFlatten();
+              const mergedLogs = mergeLogEntries(flat.logs, this.logs);
+              const mergedAccounting = mergeAccountingSnapshot(flat.accounting);
+              const resultShape: AIAgentResult = {
+                success: true,
+                error: undefined,
+                conversation: cachedPayload.conversation,
+                logs: mergedLogs,
+                accounting: mergedAccounting,
+                finalReport: cachedPayload.finalReport,
+                childConversations: cachedPayload.childConversations,
+                treeAscii: undefined,
+                opTreeAscii: (() => { try { return this.opTree.renderAscii(); } catch { return undefined; } })(),
+                opTree: (() => { try { return this.opTree.getSession(); } catch { return undefined; } })(),
+              };
+              this.emitAgentCompletion(true, undefined);
+              persistFinalArtifacts(resultShape.accounting);
+              span.setAttributes({
+                'ai.agent.success': resultShape.success,
+                'ai.agent.turn_count': currentTurn,
+              });
+              return resultShape;
+            }
           }
-          if (hit.entry.metadata.agentHash !== undefined) {
-            cacheDetails.cache_stored_agent_hash = hit.entry.metadata.agentHash;
-          }
-          const cacheLog: LogEntry = {
-            timestamp: Date.now(),
-            severity: 'VRB',
-            turn: currentTurn,
-            subturn: 0,
-            direction: 'response',
-            type: 'llm',
-            remoteIdentifier: 'agent:cache',
-            fatal: false,
-            message: `cache hit: ${this.getAgentDisplayName()}`,
-            details: cacheDetails,
-          };
-          this.log(cacheLog);
-          const cachedPayload = hit.value;
-          finalizeOpTree({ message: AIAgentSession.SESSION_FINALIZED_MESSAGE, success: true });
-          const flat = safeFlatten();
-          const mergedLogs = mergeLogEntries(flat.logs, this.logs);
-          const mergedAccounting = mergeAccountingSnapshot(flat.accounting);
-          const resultShape: AIAgentResult = {
-            success: true,
-            error: undefined,
-            conversation: cachedPayload.conversation,
-            logs: mergedLogs,
-            accounting: mergedAccounting,
-            finalReport: cachedPayload.finalReport,
-            childConversations: cachedPayload.childConversations,
-            treeAscii: undefined,
-            opTreeAscii: (() => { try { return this.opTree.renderAscii(); } catch { return undefined; } })(),
-            opTree: (() => { try { return this.opTree.getSession(); } catch { return undefined; } })(),
-          };
-          this.emitAgentCompletion(true, undefined);
-          persistFinalArtifacts(resultShape.accounting);
-          span.setAttributes({
-            'ai.agent.success': resultShape.success,
-            'ai.agent.turn_count': currentTurn,
-          });
-          return resultShape;
         }
-      }
       // Start execution session in the tree
       // opTree is canonical; no separate session
       // Warmup providers (ensures MCP tools/instructions are available) and refresh mapping
@@ -1751,6 +1801,7 @@ export class AIAgentSession {
         progressReporter: this.progressReporter,
         sessionExecutor: this.sessionExecutor,
         xmlTransport: this.xmlTransport,
+        pluginRuntime: this.pluginRuntime,
         subAgents: this.subAgents,
         resolvedFormat: this.resolvedFormat,
         resolvedFormatPromptValue: this.resolvedFormatPromptValue,
@@ -1809,6 +1860,15 @@ export class AIAgentSession {
         opTreeAscii: (() => { try { return this.opTree.renderAscii(); } catch { return undefined; } })(),
         opTree: (() => { try { return this.opTree.getSession(); } catch { return undefined; } })(),
       } as AIAgentResult;
+      const finalReport = resultShape.finalReport;
+      if (resultShape.success && finalReport !== undefined && this.finalReportManager.isFinalizationReady()) {
+        this.pluginRuntime.runOnComplete({
+          finalReport,
+          messages: resultShape.conversation,
+          userRequest: this.resolvedUserPrompt ?? this.sessionConfig.userPrompt,
+          fromCache: false,
+        });
+      }
       if (cache !== undefined && cacheKeyPayload !== undefined && typeof cacheTtlMs === 'number' && cacheTtlMs > 0 && resultShape.success && resultShape.finalReport !== undefined) {
         const metadata = {
           kind: 'agent' as const,
@@ -1820,6 +1880,7 @@ export class AIAgentSession {
           finalReport: resultShape.finalReport,
           conversation: resultShape.conversation,
           childConversations: resultShape.childConversations,
+          pluginMetas: this.finalReportManager.getPluginMetasRecord(),
         };
         try {
           await cache.set(cacheKeyPayload, cacheTtlMs, payload, metadata, Date.now());

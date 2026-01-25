@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import type { ResolvedFinalReportPluginRequirement } from '../../plugins/types.js';
+
 import { createXmlParser, renderXmlNext } from '../../xml-tools.js';
 
 const NONCE = 'abcd1234';
@@ -8,6 +10,21 @@ const SLOT_TWO = `${NONCE}-0002`;
 const ALLOWED_SLOTS = new Set([SLOT_ONE]);
 const ALLOWED_TOOLS = new Set(['echo']);
 const ROUTER_HANDOFF_TOOL = 'router__handoff-to';
+const META_REQUIRED_PHRASE = 'META REQUIRED WITH FINAL.';
+const META_NONE_PHRASE = 'META: none required for this session.';
+const EMPTY_PLUGIN_REQUIREMENTS: ResolvedFinalReportPluginRequirement[] = [];
+const SAMPLE_PLUGIN_NAME = 'support-metadata';
+const SAMPLE_XML_NEXT_SNIPPET = 'Support META must include ticketId.';
+const SAMPLE_META_WRAPPER = `<ai-agent-${NONCE}-META plugin="${SAMPLE_PLUGIN_NAME}">{...}</ai-agent-${NONCE}-META>`;
+const SAMPLE_REQUIREMENTS: ResolvedFinalReportPluginRequirement[] = [
+  {
+    name: SAMPLE_PLUGIN_NAME,
+    schema: { type: 'object', additionalProperties: false },
+    systemPromptInstructions: 'Provide support metadata JSON.',
+    xmlNextSnippet: SAMPLE_XML_NEXT_SNIPPET,
+    finalReportExampleSnippet: `<ai-agent-${NONCE}-META plugin="${SAMPLE_PLUGIN_NAME}">{"ticketId":"123"}</ai-agent-${NONCE}-META>`,
+  },
+];
 
 describe('XML streaming parser', () => {
   it('parses a single complete tag', () => {
@@ -75,6 +92,7 @@ describe('XML streaming parser', () => {
       taskStatusToolEnabled: false,
       expectedFinalFormat: 'markdown',
       finalSchema: undefined,
+      finalReportPluginRequirements: EMPTY_PLUGIN_REQUIREMENTS,
       attempt: 1,
       maxRetries: 3,
       contextPercentUsed: 12,
@@ -83,7 +101,31 @@ describe('XML streaming parser', () => {
     // xml-final: XML-NEXT describes the XML wrapper with nonce-FINAL
     expect(xml).toContain(`${NONCE}-FINAL`);
     expect(xml).toContain('markdown');
+    expect(xml).toContain(META_NONE_PHRASE);
     expect(xml).not.toContain('mock_tool');
+  });
+
+  it('renders META requirements section when plugins are configured', () => {
+    const xml = renderXmlNext({
+      nonce: NONCE,
+      turn: 1,
+      maxTurns: 3,
+      tools: [{ name: 'final_xml_only' }],
+      slotTemplates: [{ slotId: `${NONCE}-FINAL`, tools: ['final_xml_only'] }],
+      taskStatusToolEnabled: false,
+      expectedFinalFormat: 'markdown',
+      finalSchema: undefined,
+      finalReportPluginRequirements: SAMPLE_REQUIREMENTS,
+      attempt: 1,
+      maxRetries: 3,
+      contextPercentUsed: 12,
+      hasExternalTools: true,
+    });
+
+    expect(xml).toContain('## META Requirements');
+    expect(xml).toContain(META_REQUIRED_PHRASE);
+    expect(xml).toContain(SAMPLE_META_WRAPPER);
+    expect(xml).toContain(SAMPLE_XML_NEXT_SNIPPET);
   });
 
   it('mentions router handoff option on final turn when allowed', () => {
@@ -96,6 +138,7 @@ describe('XML streaming parser', () => {
       taskStatusToolEnabled: false,
       expectedFinalFormat: 'markdown',
       finalSchema: undefined,
+      finalReportPluginRequirements: EMPTY_PLUGIN_REQUIREMENTS,
       attempt: 1,
       maxRetries: 3,
       contextPercentUsed: 90,

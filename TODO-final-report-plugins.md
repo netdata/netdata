@@ -140,6 +140,10 @@ Evidence: system prompt is enhanced with tool instructions (`src/ai-agent.ts:171
 | 18 | Plugin session spawning (V1) | **4A: include `createSession` now** | Enables plugins to fan out and run follow-up sessions immediately. |
 | 19 | META wrapper contract | **6A: per-plugin META wrappers** | Enables targeted retries and isolated validation per plugin. |
 | 20 | XML-NEXT rendering strategy | **NONCE-only input; renderer builds FINAL + META guidance** | Keeps XML-NEXT short while guaranteeing META guidance is always paired with FINAL guidance. |
+| 21 | Execution autonomy contract | **Proceed autonomously; ask Costa only for design conflicts** | Required by Costa for this task; all other uncertainty must be resolved via code review and/or second opinions. |
+| 22 | Test execution policy | **Phase1 + Phase2 during work; Phase3:tier1 only at end; never Phase3:tier2** | Explicit instruction for this task. |
+| 23 | Mandatory review gates | **Run Claude + Codex + GLM-4.7 after major milestones and at the end** | Required unanimous consensus unless an agent fails twice. |
+| 24 | Model-facing messaging quality bar | **All model-visible instructions/errors must be coherent from the model’s point of view** | Explicit risk called out by Costa; treat as a hard requirement. |
 
 ### Decisions (Costa)
 
@@ -637,14 +641,114 @@ Include fields:
 7. **Plugin errors don't fail session** - logged but session continues
 8. **No symlink protection** - invalid files rejected by import anyway
 9. **No createSession limits** - trust plugin author
+10. **Plugin requirement fields must be non-empty** - empty schema/instruction/snippet is a configuration error
+11. **Unknown META plugins are ignored (with logs)** - do not fail turns for extra META blocks
+12. **Invalid META does not override existing valid META** - log and keep the last valid META
+13. **Invalid META does not fail the turn if valid META exists by end-of-turn** - prefer the last valid META per plugin
+14. **META validation failures are aggregated per turn** - one invalid-META failure reason summarizing all invalid plugins
+15. **Cache META is revalidated** - missing/invalid META in cache causes a cache miss (with logs)
+16. **Final-report META instructions are rendered per session** - mandatory rules and final-report prompts will be rendered with session nonce + plugin META guidance (no static constant)
+17. **Plugin runtime initializes before cache checks** - cache acceptance is gated by META validation and required plugin schemas
+18. **Shared META guidance builder** - a single helper (`buildMetaPromptGuidance`) renders reminders and META blocks consistently across prompts
+19. **LLM message constants replaced with per-session renderers** - task-status and mandatory rules now accept META reminders instead of using static strings
+20. **Phase2 context-guard thresholds must be recalibrated after META prompt expansion** - the threshold constants were tuned for ~1832 tokens but the current prompt projection is ~2198 tokens, causing the below/equal threshold scenarios to fail
+    - Evidence: `src/tests/phase2-harness-scenarios/phase2-runner.ts:439`
+    - Evidence: `src/tests/phase2-harness-scenarios/phase2-runner.ts:2119`
+    - Evidence: `src/tests/phase2-harness-scenarios/phase2-runner.ts:2160`
+21. **META blocks will be extracted and removed before the XML tool parser runs** - this prevents valid META tags from being treated as unknown/malformed XML tool calls, because the parser only accepts allowed slots + tools today
+    - Evidence: `src/xml-tools.ts:115`
+    - Evidence: `src/xml-tools.ts:116`
+22. **Streaming must strip all META content and suppress FINAL streaming during META-only retries** - without this, headends will receive duplicate FINAL tokens after the final report is locked but META is still missing
+    - Evidence: `src/session-turn-runner.ts:3746`
+23. **TURN-FAILED notices must replace NONCE with the session nonce and include META reminders when plugins are required** - otherwise the model sees literal `NONCE` and ambiguous META guidance
+    - Evidence: `src/llm-messages-turn-failed.ts:31`
+    - Evidence: `src/llm-messages-turn-failed.ts:35`
+24. **XML-NEXT must explicitly switch to META-only mode when the final report is locked** - once FINAL exists but META is missing, the model should be told that FINAL is already accepted and only the missing META blocks should be sent
+    - Evidence: `src/final-report-manager.ts:154`
+    - Evidence: `src/session-turn-runner.ts:1616`
+    - Evidence: `src/session-turn-runner.ts:1669`
+25. **Remaining turns will collapse to `currentTurn + 1` when FINAL exists but META is missing** - this mirrors existing final-report collapse behavior by allowing exactly one additional final turn for META correction
+    - Evidence: `src/final-report-manager.ts:154`
+    - Evidence: `src/session-turn-runner.ts:1669`
+26. **Router handoff options will be suppressed during META-only mode** - once the final report is locked, advertising a handoff tool is misleading and can break completion semantics
+    - Evidence: `src/llm-messages-xml-next.ts:170`
+    - Evidence: `src/final-report-manager.ts:154`
+27. **XML-NEXT warnings will switch to a META-only directive when FINAL is locked** - final-turn warnings currently demand a new final report/answer, which would conflict with the locked-final contract
+    - Evidence: `src/llm-messages-xml-next.ts:31`
+    - Evidence: `src/final-report-manager.ts:154`
+28. **Malformed META wrappers will be treated as `invalid_response` with `final_meta_invalid` feedback** - this aligns META failures with the existing retry mechanism that is triggered by `lastErrorType = 'invalid_response'`
+    - Evidence: `src/session-turn-runner.ts:1496`
+    - Evidence: `src/session-turn-runner.ts:1698`
+29. **If the session ends with FINAL present but required META missing, we will synthesize a failure final report and clear the locked FINAL** - max-turn synthesis currently triggers only when no final report exists, and the lock prevents replacement otherwise
+    - Evidence: `src/session-turn-runner.ts:1986`
+    - Evidence: `src/final-report-manager.ts:154`
+    - Evidence: `src/final-report-manager.ts:173`
+30. **Missing or invalid META will force `lastErrorType = 'invalid_response'` even if other tools succeeded** - turn success is explicitly gated on `lastErrorType !== 'invalid_response'`, so META enforcement must drive that flag
+    - Evidence: `src/session-turn-runner.ts:1496`
+    - Evidence: `src/session-turn-runner.ts:1689`
+31. **META failures will be enforced only after a final report is committed/accepted (`hasReport()` is true)** - META slugs are critical and the turn-failed notice is limited to two reasons, so enforcing META before a valid final report can hide the real final-report error
+    - Evidence: `src/final-report-manager.ts:102`
+    - Evidence: `src/llm-messages-turn-failed.ts:34`
+    - Evidence: `src/llm-messages-turn-failed.ts:110`
+32. **META blocks will be collected during sanitization but validated after tool execution/final-report commit** - this ensures META enforcement runs with the most up-to-date final-report state
+    - Evidence: `src/session-turn-runner.ts:747`
+    - Evidence: `src/session-turn-runner.ts:1501`
+33. **Turn-failed reasons for META slugs will be replaced with the latest reason across retries** - the missing META list can change after each attempt, and the current de-duplication logic preserves stale reasons
+    - Evidence: `src/session-turn-runner.ts:2286`
+    - Evidence: `src/final-report-manager.ts:146`
+34. **Retry slugs will use finalization readiness (FINAL+META) instead of only FINAL presence** - `buildTurnFailureInfo(...)` currently reports `final_report_missing` whenever the final report is present but META is missing, which is now incorrect under the new contract
+    - Evidence: `src/session-turn-runner.ts:2415`
+    - Evidence: `src/final-report-manager.ts:158`
+35. **`final_meta_missing` feedback will be emitted only after a committed final report exists** - META is part of the final-report contract, so missing-META feedback without a final report would be confusing to the model
+    - Evidence: `src/final-report-manager.ts:102`
+    - Evidence: `src/llm-messages-turn-failed.ts:30`
+36. **META issues will block completion only when finalization is not ready** - malformed/extra META tags should be logged, but they should not prevent completion when FINAL + required META are already valid
+    - Evidence: `src/xml-transport.ts:420`
+    - Evidence: `src/final-report-manager.ts:158`
+37. **When META enforcement fails, `lastError` will be set to the META failure summary** - `lastError` is persisted into `state.lastTurnError` and later surfaced in synthetic failure reports, so it must reflect missing/invalid META when that is the blocking condition
+    - Evidence: `src/session-turn-runner.ts:1984`
+    - Evidence: `src/session-turn-runner.ts:2015`
+38. **`buildTurnFailureInfo(...)` will derive `final_meta_missing` from finalization readiness and `final_meta_invalid` from the current attempt’s turn-failed events** - turn-failed events are flushed at the start of each attempt, so the remaining events reflect only the latest attempt
+    - Evidence: `src/session-turn-runner.ts:588`
+    - Evidence: `src/session-turn-runner.ts:2415`
+    - Evidence: `src/final-report-manager.ts:158`
+39. **On exhaustion with FINAL present but META missing, we will finalize with a synthetic failure report even though finalization readiness is false** - normal finalization now requires `finalizationReady`, so the exhaustion path must bypass the gate to avoid returning without a report
+    - Evidence: `src/session-turn-runner.ts:1702`
+    - Evidence: `src/final-report-manager.ts:154`
+40. **Synthetic failure reports due to missing META will set `metadata.reason = "final_meta_missing"` and include explicit META diagnostics fields** - consumers need structured fields to detect missing META and to understand which plugins were missing
+    - Evidence: `src/session-turn-runner.ts:2055`
+    - Evidence: `src/final-report-manager.ts:146`
+41. **When the final report is locked, streaming output will be fully suppressed (not only FINAL content), and META blocks will always be stripped from streaming** - the current filter streams all content outside the FINAL wrapper, which would leak META payloads and duplicate outputs during META-only retries
+    - Evidence: `src/xml-transport.ts:776`
+    - Evidence: `src/final-report-manager.ts:154`
+42. **When the final report is locked, we will not reset `finalReportStreamed` or the streamed-output tail between attempts** - otherwise the finalize step can re-emit the previously streamed final report after META-only retries
+    - Evidence: `src/session-turn-runner.ts:3861`
+    - Evidence: `src/final-report-manager.ts:154`
+43. **When a synthetic failure report replaces a locked final report, the streaming dedupe state must be reset** - otherwise `finalReportStreamed === true` will suppress the synthetic failure output during finalize
+    - Evidence: `src/session-turn-runner.ts:2838`
+    - Evidence: `src/final-report-manager.ts:189`
+44. **Streaming filters will support an explicit suppression mode and always strip META wrappers** - the filter currently has no way to block streaming during META-only retries, and it leaks META content because it streams everything outside the FINAL wrapper
+    - Evidence: `src/xml-transport.ts:776`
+    - Evidence: `src/session-turn-runner.ts:3746`
+45. **Cache writes will be gated on finalization readiness (FINAL + required META)** - writing cache entries when META is missing would store unusable results that can never be served under the new contract
+    - Evidence: `src/ai-agent.ts:1481`
+    - Evidence: `src/final-report-manager.ts:158`
+46. **TURN-FAILED notices will be rendered per session with nonce replacement and optional META reminders** - static TURN-FAILED text currently includes the literal `NONCE` placeholder and cannot reflect per-session plugin requirements
+    - Evidence: `src/llm-messages-turn-failed.ts:31`
+    - Evidence: `src/session-turn-runner.ts:585`
+47. **Partial META buffers will be dropped on stream flush** - streaming can end mid-wrapper; dropping partial META prefixes avoids leaking internal META tags to headends
+    - Evidence: `src/xml-transport.ts:836`
+    - Evidence: `src/xml-transport.ts:903`
 
 ## Security Considerations
 
 1. **Arbitrary code execution**: Plugins are `.js` files loaded via dynamic import. If agent files are user-controlled, this is RCE. Mitigations:
    - Document that `.ai` files must be trusted
-   - Path restrictions prevent escaping agent directory
+   - Infrastructure assumption: agent/plugin files are admin-controlled and trusted
 
-2. **Path traversal**: Reject any path containing `..` or starting with `/`
+2. **Path traversal**: Paths are required to be relative (`/abs/path.js` rejected), but `..` segments are allowed by design.
+   - Implication: plugins can resolve outside the agent directory.
+   - Rationale: explicitly accepted risk in admin-controlled environments (Decision #6).
 
 3. **Fail fast**: All plugin loading errors are fatal configuration errors
 
@@ -652,7 +756,7 @@ Include fields:
 
 1. Plugin factory pattern works
 2. Plugin loading from relative paths
-3. Path traversal rejection (paths with `..`)
+3. Relative path with `..` resolves and loads when the target file exists
 4. Absolute path rejection
 5. Missing plugin file → startup error
 6. Invalid plugin export (not function) → startup error
@@ -827,6 +931,18 @@ Finalization and XML transport touchpoints that will be affected by the new cont
     - Evidence: `src/ai-agent.ts:1715`
     - Evidence: `src/tools/internal-provider.ts:229`
     - Risk: documentation must be updated in the same commit as runtime changes
+23. **Streaming currently replays FINAL content on every retry**
+    - Evidence: `src/xml-transport.ts:694`
+    - Evidence: `src/session-turn-runner.ts:3739`
+    - Risk: once FINAL is locked but META is missing, headends will receive duplicate FINAL tokens unless we suppress FINAL streaming during META-only retries
+24. **Limit exhaustion does not account for required META**
+    - Evidence: `src/session-turn-runner.ts:1976`
+    - Evidence: `src/session-turn-runner.ts:2768`
+    - Risk: forced finalization paths can report success even when required META is missing, unless we mark the result as incomplete and log the missing META explicitly
+25. **Agent loading is synchronous and widely used in synchronous call sites**
+    - Evidence: `src/agent-loader.ts:967`
+    - Evidence: `src/tests/phase2-harness-scenarios/phase2-runner.ts:521`
+    - Risk: plugin module imports must occur during session initialization in `run()` (before the first LLM turn), while agent-loader still performs synchronous path validation and plugin hashing
 
 Coverage status (today) — existing coverage:
 
@@ -882,7 +998,7 @@ Pre-implementation test actions:
 11. [TODO] META gating scenarios (final-report present but required META missing) will require new Phase 2 coverage during implementation, because current semantics finalize immediately on the first valid final report.
    Evidence: early finalize occurs at `src/session-turn-runner.ts:1666` and the `final_report` event is emitted during finalize at `src/session-turn-runner.ts:2741`.
 
-## Documentation Updates
+## Documentation updates required
 
 1. **docs/specs/DESIGN.md**: Add plugin system section
 2. **docs/specs/IMPLEMENTATION.md**: Plugin interface, factory pattern, loading, lifecycle

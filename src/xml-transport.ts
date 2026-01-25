@@ -12,9 +12,11 @@
 import crypto from 'node:crypto';
 
 import type { OutputFormatId } from './formats.js';
+import type { ResolvedFinalReportPluginRequirement } from './plugins/types.js';
 import type { ConversationMessage, LogDetailValue, MCPTool, ToolCall } from './types.js';
 
 import { renderTurnFailedSlug, type TurnFailedSlug } from './llm-messages-turn-failed.js';
+import { buildMetaWrapper } from './plugins/meta-guidance.js';
 import { stripLeadingThinkBlock, ThinkTagStreamFilter } from './think-tag-filter.js';
 import { TRUNCATE_PREVIEW_BYTES, truncateToBytes, truncateToChars } from './truncation.js';
 import { sanitizeToolName } from './utils.js';
@@ -68,6 +70,8 @@ export interface XmlBuildMessagesConfig {
   noticeContent?: string;
   // Wasted turn tracking - consecutive task_status-only turns
   consecutiveProgressOnlyTurns?: number;
+  finalReportLocked: boolean;
+  missingMetaPluginNames: string[];
 }
 
 // Result from building messages
@@ -93,10 +97,22 @@ export interface XmlParseCallbacks {
   logWarning: (entry: { severity: 'WRN'; message: string; details?: Record<string, LogDetailValue> }) => void;
 }
 
+export interface XmlMetaBlock {
+  plugin?: string;
+  content: string;
+}
+
+export interface XmlMetaIssue {
+  slug: TurnFailedSlug;
+  reason: string;
+}
+
 // Result from parsing a single message
 export interface XmlParseMessageResult {
   toolCalls: ToolCall[] | undefined;
   errors: XmlPastEntry[];
+  metaBlocks: XmlMetaBlock[];
+  metaIssues: XmlMetaIssue[];
 }
 
 // Result from recording a tool execution
@@ -119,6 +135,7 @@ export class XmlToolTransport {
 
   // Session-level state: fixed nonce and incrementing slot counter
   private readonly sessionNonce: string;
+  private finalReportPluginRequirements: ResolvedFinalReportPluginRequirement[] = [];
   private nextSlotNumber = 1;
 
   // Current turn state
@@ -140,6 +157,10 @@ export class XmlToolTransport {
    */
   getSessionNonce(): string {
     return this.sessionNonce;
+  }
+
+  setFinalReportPluginRequirements(requirements: ResolvedFinalReportPluginRequirement[]): void {
+    this.finalReportPluginRequirements = [...requirements];
   }
 
   /**
@@ -184,6 +205,9 @@ export class XmlToolTransport {
       taskStatusToolEnabled: config.taskStatusToolEnabled,
       expectedFinalFormat: (config.resolvedFormat ?? 'markdown') as XmlNextPayload['expectedFinalFormat'],
       finalSchema: config.resolvedFormat === 'json' ? config.expectedJsonSchema : undefined,
+      finalReportPluginRequirements: [...this.finalReportPluginRequirements],
+      finalReportLocked: config.finalReportLocked,
+      missingMetaPluginNames: [...config.missingMetaPluginNames],
       attempt: config.attempt,
       maxRetries: config.maxRetries,
       contextPercentUsed: config.contextPercentUsed,
@@ -317,6 +341,89 @@ export class XmlToolTransport {
     return { slotId: finalSlotId, content: extractedContent };
   }
 
+  private buildRequiredMetaWrapperSummary(): string {
+    if (this.finalReportPluginRequirements.length === 0) {
+      return 'required META wrappers are missing';
+    }
+    return this.finalReportPluginRequirements
+      .map((requirement) => `plugin="${requirement.name}" wrapper=${buildMetaWrapper(this.sessionNonce, requirement.name)}`)
+      .join(' | ');
+  }
+
+  private extractMetaBlocks(
+    content: string,
+    turn: number,
+    callbacks: XmlParseCallbacks,
+  ): { contentWithoutMeta: string; metaBlocks: XmlMetaBlock[]; metaIssues: XmlMetaIssue[] } {
+    const stripped = stripLeadingThinkBlock(content).stripped;
+    const metaSlotId = `${this.sessionNonce}-META`;
+    const openTagPrefix = `<ai-agent-${metaSlotId}`;
+    if (!stripped.includes(openTagPrefix)) {
+      return { contentWithoutMeta: stripped, metaBlocks: [], metaIssues: [] };
+    }
+
+    const completeMetaRegex = new RegExp(
+      `<ai-agent-${metaSlotId}\\b([^>]*)>([\\s\\S]*?)</ai-agent-${metaSlotId}>`,
+      'g',
+    );
+    const pluginAttrRegex = /plugin=["']([^"']+)["']/;
+    const completeMatches = Array.from(stripped.matchAll(completeMetaRegex));
+    const metaBlocks = completeMatches.map((match) => {
+      const attrs = match[1] ?? '';
+      const pluginMatch = pluginAttrRegex.exec(attrs);
+      const plugin = pluginMatch?.[1]?.trim();
+      return {
+        plugin: plugin !== undefined && plugin.length > 0 ? plugin : undefined,
+        content: match[2] ?? '',
+      } satisfies XmlMetaBlock;
+    });
+
+    let contentWithoutMeta = stripped.replace(completeMetaRegex, '');
+
+    const malformedOpenRegex = new RegExp(`<ai-agent-${metaSlotId}\\b[^>]*>`, 'g');
+    const malformedCloseRegex = new RegExp(`</ai-agent-${metaSlotId}>`, 'g');
+    const malformedOpenMatches = Array.from(contentWithoutMeta.matchAll(malformedOpenRegex));
+    const malformedCloseMatches = Array.from(contentWithoutMeta.matchAll(malformedCloseRegex));
+    const malformedCount = malformedOpenMatches.length + malformedCloseMatches.length;
+
+    if (malformedCount === 0) {
+      return { contentWithoutMeta, metaBlocks, metaIssues: [] };
+    }
+
+    contentWithoutMeta = contentWithoutMeta
+      .replace(malformedOpenRegex, '')
+      .replace(malformedCloseRegex, '');
+
+    const hasPlugins = this.finalReportPluginRequirements.length > 0;
+    callbacks.logWarning({
+      severity: 'WRN',
+      message: hasPlugins
+        ? 'Malformed META wrapper detected; META requirements will be retried.'
+        : 'Malformed META wrapper detected but no final report plugins are configured; META will be ignored.',
+      details: {
+        warning: 'meta_malformed',
+        action: 'strip',
+        meta_slot: metaSlotId,
+        malformed_count: malformedCount,
+        has_plugins: hasPlugins,
+        turn,
+      },
+    });
+
+    if (!hasPlugins) {
+      return { contentWithoutMeta, metaBlocks, metaIssues: [] };
+    }
+
+    return {
+      contentWithoutMeta,
+      metaBlocks,
+      metaIssues: [{
+        slug: 'final_meta_invalid',
+        reason: `malformed_meta_wrapper required_wrappers=${this.buildRequiredMetaWrapperSummary()}`,
+      }],
+    };
+  }
+
   /**
    * Parse XML tool calls from an assistant message.
    * Returns parsed tool calls and any errors to record.
@@ -327,12 +434,17 @@ export class XmlToolTransport {
     callbacks: XmlParseCallbacks
   ): XmlParseMessageResult {
     if (this.nonce === undefined || this.slots === undefined || this.allowedTools === undefined) {
-      return { toolCalls: undefined, errors: [] };
+      return { toolCalls: undefined, errors: [], metaBlocks: [], metaIssues: [] };
     }
+
+    const metaExtraction = this.extractMetaBlocks(content, context.turn, callbacks);
+    const sanitizedContent = metaExtraction.contentWithoutMeta;
+    const metaBlocks = metaExtraction.metaBlocks;
+    const metaIssues = metaExtraction.metaIssues;
 
     // First, try to extract unclosed final report if stop reason indicates normal completion
     const unclosedFinal = this.tryExtractUnclosedFinalReport(
-      content,
+      sanitizedContent,
       context.stopReason,
       context.resolvedFormat,
       context.maxOutputTokens,
@@ -343,7 +455,7 @@ export class XmlToolTransport {
       // Check if this was a structured format truncation that was rejected
       if ('truncatedRejected' in unclosedFinal) {
         // Structured format truncation - already reported error via recordTurnFailure, don't add more errors
-        return { toolCalls: undefined, errors: [] };
+        return { toolCalls: undefined, errors: [], metaBlocks, metaIssues };
       }
 
       const expectedFormat = context.resolvedFormat ?? 'text';
@@ -383,7 +495,9 @@ export class XmlToolTransport {
               status: 'failed',
               request: truncateToBytes(unclosedFinal.content, TRUNCATE_PREVIEW_BYTES) ?? unclosedFinal.content,
               response: failureMessage,
-            }]
+            }],
+            metaBlocks,
+            metaIssues,
           };
         }
         parameters = {
@@ -403,11 +517,11 @@ export class XmlToolTransport {
         parameters,
       };
 
-      return { toolCalls: [toolCall], errors: [] };
+      return { toolCalls: [toolCall], errors: [], metaBlocks, metaIssues };
     }
 
     const allowedSlots = new Set(this.slots.map((slot) => slot.slotId));
-    const parsed = this.parser.parseChunk(content, this.nonce, allowedSlots, this.allowedTools);
+    const parsed = this.parser.parseChunk(sanitizedContent, this.nonce, allowedSlots, this.allowedTools);
     const flushResult = this.parser.flush();
     const parsedSlots = [...parsed, ...flushResult.slots];
     const errors: XmlPastEntry[] = [];
@@ -450,7 +564,6 @@ export class XmlToolTransport {
 
     if (parsedSlots.length === 0) {
       // Check if there was an attempt at XML that failed
-      const sanitizedContent = stripLeadingThinkBlock(content).stripped;
       if (sanitizedContent.includes(XML_TAG_PREFIX)) {
         const slotMatch = /<ai-agent-([A-Za-z0-9\-]+)/.exec(sanitizedContent);
         const missingClosing = !sanitizedContent.includes('</ai-agent-');
@@ -485,7 +598,7 @@ export class XmlToolTransport {
         errors.push(errorEntry);
         this.thisTurnEntries.push(errorEntry);
       }
-      return { toolCalls: undefined, errors };
+      return { toolCalls: undefined, errors, metaBlocks, metaIssues };
     }
 
     // Process valid slots into tool calls
@@ -546,7 +659,9 @@ export class XmlToolTransport {
 
     return {
       toolCalls: validCalls.length > 0 ? validCalls : undefined,
-      errors
+      errors,
+      metaBlocks,
+      metaIssues,
     };
   }
 
@@ -623,6 +738,95 @@ export class XmlToolTransport {
  * Leading whitespace is tolerated; the <think> block is excluded before
  * processing XML tags so examples inside thinking are never parsed.
  */
+interface XmlFinalReportFilterOptions {
+  suppressStreaming?: boolean;
+}
+
+class XmlMetaStreamFilter {
+  private readonly openTagPrefix: string;
+  private readonly closeTag: string;
+  private buffer = '';
+  private state: 'search_open' | 'buffering_open' | 'inside' | 'buffering_close' = 'search_open';
+
+  constructor(nonce: string) {
+    this.openTagPrefix = `<ai-agent-${nonce}-META`;
+    this.closeTag = `</ai-agent-${nonce}-META>`;
+  }
+
+  process(chunk: string): string {
+    let output = '';
+    // eslint-disable-next-line functional/no-loop-statements -- streaming parser must be stateful across characters
+    for (const char of chunk) {
+      output += this.processChar(char);
+    }
+    return output;
+  }
+
+  private processChar(char: string): string {
+    if (this.state === 'search_open') {
+      if (char === '<') {
+        this.state = 'buffering_open';
+        this.buffer = char;
+        return '';
+      }
+      return char;
+    }
+
+    if (this.state === 'buffering_open') {
+      this.buffer += char;
+      if (this.buffer.length <= this.openTagPrefix.length) {
+        if (!this.openTagPrefix.startsWith(this.buffer)) {
+          const out = this.buffer;
+          this.buffer = '';
+          this.state = 'search_open';
+          return out;
+        }
+      } else if (this.buffer.startsWith(this.openTagPrefix)) {
+        if (char === '>') {
+          this.buffer = '';
+          this.state = 'inside';
+        }
+      } else {
+        const out = this.buffer;
+        this.buffer = '';
+        this.state = 'search_open';
+        return out;
+      }
+      return '';
+    }
+
+    if (this.state === 'inside') {
+      if (char === '<') {
+        this.state = 'buffering_close';
+        this.buffer = char;
+      }
+      return '';
+    }
+
+    // state === 'buffering_close'
+    this.buffer += char;
+    if (!this.closeTag.startsWith(this.buffer)) {
+      // Not a closing tag; remain inside META and keep buffering.
+      // Cap the buffer to avoid unbounded growth on malformed output.
+      if (this.buffer.length > this.closeTag.length) {
+        this.buffer = this.buffer.slice(-this.closeTag.length);
+      }
+      return '';
+    }
+    if (this.buffer === this.closeTag) {
+      this.buffer = '';
+      this.state = 'search_open';
+    }
+    return '';
+  }
+
+  flush(): string {
+    // Drop partial META buffers to avoid leaking internal wrappers.
+    this.buffer = '';
+    return '';
+  }
+}
+
 export class XmlFinalReportFilter {
   private readonly openTagPrefix: string;
   private readonly closeTag: string;
@@ -630,10 +834,14 @@ export class XmlFinalReportFilter {
   private state: 'search_open' | 'buffering_open' | 'inside' | 'buffering_close' | 'done' = 'search_open';
   private _hasStreamedContent = false;
   private readonly thinkFilter = new ThinkTagStreamFilter();
+  private readonly metaFilter: XmlMetaStreamFilter;
+  private readonly suppressStreaming: boolean;
 
-  constructor(nonce: string) {
+  constructor(nonce: string, options?: XmlFinalReportFilterOptions) {
     this.openTagPrefix = `<ai-agent-${nonce}-FINAL`;
     this.closeTag = `</ai-agent-${nonce}-FINAL>`;
+    this.metaFilter = new XmlMetaStreamFilter(nonce);
+    this.suppressStreaming = options?.suppressStreaming === true;
   }
 
   get hasStreamedContent(): boolean {
@@ -641,11 +849,16 @@ export class XmlFinalReportFilter {
   }
 
   process(chunk: string): string {
+    if (this.suppressStreaming) {
+      return '';
+    }
     let output = '';
     const split = this.thinkFilter.process(chunk);
     if (split.content.length === 0) return '';
+    const withoutMeta = this.metaFilter.process(split.content);
+    if (withoutMeta.length === 0) return '';
     // eslint-disable-next-line functional/no-loop-statements
-    for (const char of split.content) {
+    for (const char of withoutMeta) {
       output += this.processNormalChar(char);
     }
     return output;
@@ -720,7 +933,12 @@ export class XmlFinalReportFilter {
   }
 
   flush(): string {
-    const ret = this.buffer;
+    if (this.suppressStreaming) {
+      this.buffer = '';
+      return '';
+    }
+    const metaFlush = this.metaFilter.flush();
+    const ret = metaFlush + this.buffer;
     this.buffer = '';
     return ret;
   }
@@ -737,10 +955,14 @@ export class XmlFinalReportStrictFilter {
   private state: 'search_open' | 'buffering_open' | 'inside' | 'buffering_close' | 'done' = 'search_open';
   private _hasStreamedContent = false;
   private readonly thinkFilter = new ThinkTagStreamFilter();
+  private readonly metaFilter: XmlMetaStreamFilter;
+  private readonly suppressStreaming: boolean;
 
-  constructor(nonce: string) {
+  constructor(nonce: string, options?: XmlFinalReportFilterOptions) {
     this.openTagPrefix = `<ai-agent-${nonce}-FINAL`;
     this.closeTag = `</ai-agent-${nonce}-FINAL>`;
+    this.metaFilter = new XmlMetaStreamFilter(nonce);
+    this.suppressStreaming = options?.suppressStreaming === true;
   }
 
   get hasStreamedContent(): boolean {
@@ -748,11 +970,16 @@ export class XmlFinalReportStrictFilter {
   }
 
   process(chunk: string): string {
+    if (this.suppressStreaming) {
+      return '';
+    }
     let output = '';
     const split = this.thinkFilter.process(chunk);
     if (split.content.length === 0) return '';
+    const withoutMeta = this.metaFilter.process(split.content);
+    if (withoutMeta.length === 0) return '';
     // eslint-disable-next-line functional/no-loop-statements
-    for (const char of split.content) {
+    for (const char of withoutMeta) {
       output += this.processNormalChar(char);
     }
     return output;
@@ -817,11 +1044,16 @@ export class XmlFinalReportStrictFilter {
   }
 
   flush(): string {
+    if (this.suppressStreaming) {
+      this.buffer = '';
+      return '';
+    }
+    const metaFlush = this.metaFilter.flush();
     if (this.state !== 'inside') {
       this.buffer = '';
       return '';
     }
-    const ret = this.buffer;
+    const ret = metaFlush + this.buffer;
     this.buffer = '';
     return ret;
   }
