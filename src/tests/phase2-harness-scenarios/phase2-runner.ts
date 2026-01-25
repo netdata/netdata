@@ -436,10 +436,10 @@ const SESSIONS_SUBDIR = 'sessions';
 const BILLING_FILENAME = 'billing.jsonl';
 const THRESHOLD_BUFFER_TOKENS = 8;
 const THRESHOLD_MAX_OUTPUT_TOKENS = 32;
-// Prompt + instructions currently estimate to ~1009 tokens (ctx + new, schema excluded from projection).
-const THRESHOLD_CONTEXT_WINDOW_BELOW = 1069; // limit = 1069 - 8 - 32 = 1029 (> projected ~1009)
-const THRESHOLD_CONTEXT_WINDOW_EQUAL = 1049; // limit = 1049 - 8 - 32 = 1009 (matches projected)
-const THRESHOLD_CONTEXT_WINDOW_ABOVE = 1029; // limit = 1029 - 8 - 32 = 989 (< projected ~1011)
+// Prompt + instructions currently estimate to ~1832 tokens (ctx + new, schema excluded from projection).
+const THRESHOLD_CONTEXT_WINDOW_BELOW = 1892; // limit = 1892 - 8 - 32 = 1852 (> projected ~1832)
+const THRESHOLD_CONTEXT_WINDOW_EQUAL = 1872; // limit = 1872 - 8 - 32 = 1832 (matches projected)
+const THRESHOLD_CONTEXT_WINDOW_ABOVE = 1852; // limit = 1852 - 8 - 32 = 1812 (< projected ~1832)
 const PREFLIGHT_CONTEXT_WINDOW = 80;
 const PREFLIGHT_BUFFER_TOKENS = 8;
 const PREFLIGHT_MAX_OUTPUT_TOKENS = 16;
@@ -2292,7 +2292,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
 	          type: 'test-llm',
 	          models: {
 	            [MODEL_NAME]: {
-	              contextWindow: 2300,
+	              contextWindow: 4096,
 	              contextWindowBufferTokens: 0,
 	              tokenizer: TOKENIZER_GPT4O,
 	            },
@@ -2351,17 +2351,19 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'context_guard__progress_passthrough',
     configure: (configuration, sessionConfig, defaults) => {
-      configuration.providers = {
-        [PRIMARY_PROVIDER]: {
-          type: 'test-llm',
-          models: {
-            [MODEL_NAME]: {
-              contextWindow: 2300,
-              contextWindowBufferTokens: 0,
-              tokenizer: TOKENIZER_GPT4O,
-            },
-          },
-        },
+	      configuration.providers = {
+	        [PRIMARY_PROVIDER]: {
+	          type: 'test-llm',
+	          models: {
+	            [MODEL_NAME]: {
+	              // Keep the window above the prompt (~2896 tokens) but below prompt+overflow tool (~3203)
+	              // so the guard activates after the heavy tool while still allowing the turn to start.
+	              contextWindow: 3220,
+	              contextWindowBufferTokens: 0,
+	              tokenizer: TOKENIZER_GPT4O,
+	            },
+	          },
+	        },
       };
       defaults.contextWindowBufferTokens = 0;
       configuration.defaults = defaults;
@@ -2493,17 +2495,17 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'context_guard__llm_metrics_logging',
     configure: (configuration, sessionConfig, defaults) => {
-      configuration.providers = {
-        [PRIMARY_PROVIDER]: {
-          type: 'test-llm',
-          models: {
-            [MODEL_NAME]: {
-              contextWindow: 2048,
-              contextWindowBufferTokens: 32,
-              tokenizer: TOKENIZER_GPT4O,
-            },
-          },
-        },
+	      configuration.providers = {
+	        [PRIMARY_PROVIDER]: {
+	          type: 'test-llm',
+	          models: {
+	            [MODEL_NAME]: {
+	              contextWindow: 4096,
+	              contextWindowBufferTokens: 32,
+	              tokenizer: TOKENIZER_GPT4O,
+	            },
+	          },
+	        },
       };
       defaults.contextWindowBufferTokens = 32;
       configuration.defaults = defaults;
@@ -2542,7 +2544,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const expectedTokens = expectLogDetailNumber(metricsLog, 'expected_tokens', 'expected_tokens detail missing for context_guard__llm_metrics_logging.');
       invariant(expectedTokens === ctxTokens + newTokens, 'expected_tokens should equal ctx + new for context_guard__llm_metrics_logging.');
       const contextWindow = expectLogDetailNumber(metricsLog, 'context_window', 'context_window detail missing for context_guard__llm_metrics_logging.');
-      invariant(contextWindow === 2048, 'context_window detail should match configured window for context_guard__llm_metrics_logging.');
+      invariant(contextWindow === 4096, 'context_window detail should match configured window for context_guard__llm_metrics_logging.');
       const contextPct = expectLogDetailNumber(metricsLog, 'context_pct', 'context_pct detail missing for context_guard__llm_metrics_logging.');
       invariant(contextPct >= 0, 'context_pct should be non-negative for context_guard__llm_metrics_logging.');
     },
@@ -2684,17 +2686,17 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'context_guard__init_counters_from_history',
     configure: (configuration, sessionConfig, defaults) => {
-      configuration.providers = {
-        [PRIMARY_PROVIDER]: {
-          type: 'test-llm',
-          models: {
-            [MODEL_NAME]: {
-              contextWindow: 2048,
-              contextWindowBufferTokens: 32,
-              tokenizer: TOKENIZER_GPT4O,
-            },
-          },
-        },
+	      configuration.providers = {
+	        [PRIMARY_PROVIDER]: {
+	          type: 'test-llm',
+	          models: {
+	            [MODEL_NAME]: {
+	              contextWindow: 4096,
+	              contextWindowBufferTokens: 32,
+	              tokenizer: TOKENIZER_GPT4O,
+	            },
+	          },
+	        },
       };
       defaults.contextWindowBufferTokens = 32;
       configuration.defaults = defaults;
@@ -2759,7 +2761,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           type: 'test-llm',
           models: {
             [MODEL_NAME]: {
-              contextWindow: 2048,
+              contextWindow: 4096,
               contextWindowBufferTokens: 32,
               tokenizer: TOKENIZER_GPT4O,
             },
@@ -10677,13 +10679,14 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-budget-truncation-preserves-output',
     configure: (configuration, sessionConfig, defaults) => {
-      // Set up a small context window that will trigger budget truncation
+      // Keep the window above the prompt (~2900 tokens) but below prompt+budget payload (~3407)
+      // so budget truncation triggers after the tool call instead of at preflight.
       configuration.providers = {
         [PRIMARY_PROVIDER]: {
           type: 'test-llm',
           models: {
             [MODEL_NAME]: {
-              contextWindow: 2500,
+              contextWindow: 3600,
               tokenizer: 'approximate',
             },
           },
