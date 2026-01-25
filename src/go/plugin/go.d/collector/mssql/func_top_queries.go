@@ -137,6 +137,7 @@ func (c topQueriesColumn) IsSortOption() bool  { return c.sortOpt }
 func (c topQueriesColumn) SortLabel() string   { return c.sortLbl }
 func (c topQueriesColumn) IsDefaultSort() bool { return c.defaultSort }
 func (c topQueriesColumn) ColumnName() string  { return c.Name }
+func (c topQueriesColumn) SortColumn() string  { return "" }
 
 type topQueriesChartGroupDef struct {
 	key          string

@@ -155,6 +155,7 @@ func (c rethinkColumn) IsSortOption() bool  { return c.sortOpt }
 func (c rethinkColumn) SortLabel() string   { return c.sortLbl }
 func (c rethinkColumn) IsDefaultSort() bool { return c.defaultSort }
 func (c rethinkColumn) ColumnName() string  { return c.Name }
+func (c rethinkColumn) SortColumn() string  { return "" }
 
 func rethinkColumnSet(cols []rethinkColumn) funcapi.ColumnSet[rethinkColumn] {
 	return funcapi.Columns(cols, func(c rethinkColumn) funcapi.ColumnMeta { return c.ColumnMeta })

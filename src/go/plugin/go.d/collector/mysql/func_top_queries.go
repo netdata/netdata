@@ -50,6 +50,7 @@ func (c topQueriesColumn) IsSortOption() bool  { return c.sortOpt }
 func (c topQueriesColumn) SortLabel() string   { return c.sortLbl }
 func (c topQueriesColumn) IsDefaultSort() bool { return c.defaultSort }
 func (c topQueriesColumn) ColumnName() string  { return c.Name }
+func (c topQueriesColumn) SortColumn() string  { return "" }
 
 // topQueriesColumns defines ALL possible columns from events_statements_summary_by_digest
 // Columns that don't exist in certain MySQL/MariaDB versions will be filtered at runtime

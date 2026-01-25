@@ -29,26 +29,33 @@ func topQueriesMethodConfig() module.MethodConfig {
 		UpdateEvery:    10,
 		Help:           "Running queries from Elasticsearch Tasks API",
 		RequireCloud:   true,
-		RequiredParams: []funcapi.ParamConfig{buildTopQueriesSortOptions(topQueriesColumns)},
+		RequiredParams: []funcapi.ParamConfig{funcapi.BuildSortParam(topQueriesColumns)},
 	}
 }
 
 type topQueriesColumn struct {
 	funcapi.ColumnMeta
-	IsSortOption  bool   // whether this column appears as a sort option
-	SortLabel     string // label for sort option dropdown
-	IsDefaultSort bool   // default sort column
+	sortOpt     bool   // whether this column appears as a sort option
+	sortLbl     string // label for sort option dropdown
+	defaultSort bool   // default sort column
 }
 
+// funcapi.SortableColumn interface implementation for topQueriesColumn.
+func (c topQueriesColumn) IsSortOption() bool  { return c.sortOpt }
+func (c topQueriesColumn) SortLabel() string   { return c.sortLbl }
+func (c topQueriesColumn) IsDefaultSort() bool { return c.defaultSort }
+func (c topQueriesColumn) ColumnName() string  { return c.Name }
+func (c topQueriesColumn) SortColumn() string  { return "" }
+
 var topQueriesColumns = []topQueriesColumn{
-	{ColumnMeta: funcapi.ColumnMeta{Name: "taskId", Tooltip: "Task ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryCount}, IsSortOption: true, SortLabel: "Top queries by Task ID"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "taskId", Tooltip: "Task ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryCount}, sortOpt: true, sortLbl: "Top queries by Task ID"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "node", Tooltip: "Node ID", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "nodeName", Tooltip: "Node Name", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{IsDefault: true}}},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "action", Tooltip: "Action", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "type", Tooltip: "Type", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "description", Tooltip: "Description", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, Sticky: true, FullWidth: true, Wrap: true}},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "startTime", Tooltip: "Start Time", Type: funcapi.FieldTypeTimestamp, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformDatetime, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, IsSortOption: true, SortLabel: "Top queries by Start Time"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "runningTime", Tooltip: "Running Time", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "RunningTime", Title: "Running Time", IsDefault: true}}, IsSortOption: true, IsDefaultSort: true, SortLabel: "Top queries by Running Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "startTime", Tooltip: "Start Time", Type: funcapi.FieldTypeTimestamp, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformDatetime, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, sortOpt: true, sortLbl: "Top queries by Start Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "runningTime", Tooltip: "Running Time", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "RunningTime", Title: "Running Time", IsDefault: true}}, sortOpt: true, defaultSort: true, sortLbl: "Top queries by Running Time"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "cancellable", Tooltip: "Cancellable", Type: funcapi.FieldTypeBoolean, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformNone}},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "cancelled", Tooltip: "Cancelled", Type: funcapi.FieldTypeBoolean, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformNone}},
 }
@@ -102,7 +109,7 @@ func (f *funcTopQueries) Cleanup(ctx context.Context) {}
 func (f *funcTopQueries) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
 	switch method {
 	case topQueriesMethodID:
-		return []funcapi.ParamConfig{buildTopQueriesSortOptions(topQueriesColumns)}, nil
+		return []funcapi.ParamConfig{funcapi.BuildSortParam(topQueriesColumns)}, nil
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
@@ -165,7 +172,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 	}
 
 	cs := f.columnSet(topQueriesColumns)
-	sortParam := buildTopQueriesSortOptions(topQueriesColumns)
+	sortParam := funcapi.BuildSortParam(topQueriesColumns)
 
 	if len(rows) == 0 {
 		return &module.FunctionResponse{
@@ -277,27 +284,3 @@ func (f *funcTopQueries) parseTaskID(taskID string) (int64, bool) {
 	return val, true
 }
 
-func buildTopQueriesSortOptions(cols []topQueriesColumn) funcapi.ParamConfig {
-	var sortOptions []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range cols {
-		if !col.IsSortOption {
-			continue
-		}
-		sortOptions = append(sortOptions, funcapi.ParamOption{
-			ID:      col.Name,
-			Column:  col.Name,
-			Name:    col.SortLabel,
-			Sort:    &sortDir,
-			Default: col.IsDefaultSort,
-		})
-	}
-	return funcapi.ParamConfig{
-		ID:         "__sort",
-		Name:       "Filter By",
-		Help:       "Select the primary sort column",
-		Selection:  funcapi.ParamSelect,
-		Options:    sortOptions,
-		UniqueView: true,
-	}
-}

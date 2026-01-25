@@ -34,7 +34,7 @@ func topQueriesMethodConfig() module.MethodConfig {
 		UpdateEvery:    10,
 		Help:           topQueriesHelpText,
 		RequireCloud:   true,
-		RequiredParams: []funcapi.ParamConfig{buildTopQueriesSortOptions(topQueriesColumns)},
+		RequiredParams: []funcapi.ParamConfig{funcapi.BuildSortParam(topQueriesColumns)},
 	}
 }
 
@@ -57,9 +57,10 @@ type topQueriesColumn struct {
 
 // funcapi.SortableColumn interface implementation for topQueriesColumn.
 func (c topQueriesColumn) IsSortOption() bool  { return c.sortOpt }
-func (c topQueriesColumn) SortLabel() string   { return c.sortLbl }
+func (c topQueriesColumn) SortLabel() string   { return fmt.Sprintf("Top queries by %s", c.sortLbl) }
 func (c topQueriesColumn) IsDefaultSort() bool { return c.defaultSort }
 func (c topQueriesColumn) ColumnName() string  { return c.Name }
+func (c topQueriesColumn) SortColumn() string  { return c.DBField }
 
 // topQueriesColumns defines all available columns from system.profile.
 // Ordered by display priority (index).
@@ -199,7 +200,7 @@ func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfi
 	}
 
 	availableCols := f.buildAvailableColumns(availableFields)
-	sortParam := buildTopQueriesSortOptions(availableCols)
+	sortParam := funcapi.BuildSortParam(availableCols)
 	return []funcapi.ParamConfig{sortParam}, nil
 }
 
@@ -235,7 +236,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 	}
 	availableCols := f.buildAvailableColumns(availableFields)
 	cs := f.columnSet(availableCols)
-	sortParam := buildTopQueriesSortOptions(availableCols)
+	sortParam := funcapi.BuildSortParam(availableCols)
 
 	// Query system.profile from each database
 	var allDocs []topQueriesProfileDocument
@@ -620,31 +621,3 @@ func optionalBool(v *bool) any {
 	return "No"
 }
 
-// buildTopQueriesSortOptions builds sort parameter from available columns.
-// Unlike funcapi.BuildSortParam, this uses DBField for the Column value
-// because MongoDB queries use the raw BSON field names.
-func buildTopQueriesSortOptions(cols []topQueriesColumn) funcapi.ParamConfig {
-	var sortOptions []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range cols {
-		if !col.IsSortOption() {
-			continue
-		}
-		sortOptions = append(sortOptions, funcapi.ParamOption{
-			ID:      col.ColumnName(),
-			Column:  col.DBField,
-			Name:    fmt.Sprintf("Top queries by %s", col.SortLabel()),
-			Default: col.IsDefaultSort(),
-			Sort:    &sortDir,
-		})
-	}
-
-	return funcapi.ParamConfig{
-		ID:         topQueriesParamSort,
-		Name:       "Filter By",
-		Help:       "Select the primary sort column",
-		Selection:  funcapi.ParamSelect,
-		Options:    sortOptions,
-		UniqueView: true,
-	}
-}

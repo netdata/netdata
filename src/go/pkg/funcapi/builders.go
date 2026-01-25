@@ -217,10 +217,12 @@ type SortableColumn interface {
 	SortLabel() string
 	IsDefaultSort() bool
 	ColumnName() string
+	SortColumn() string // Returns the column value for sorting; empty string uses ColumnName()
 }
 
 // BuildSortParam builds a sort parameter configuration from sortable columns.
 // Only columns where IsSortOption() returns true are included as options.
+// Uses SortColumn() for the Column value if non-empty, otherwise ColumnName().
 func BuildSortParam[T SortableColumn](cols []T) ParamConfig {
 	var options []ParamOption
 	sortDir := FieldSortDescending
@@ -228,9 +230,13 @@ func BuildSortParam[T SortableColumn](cols []T) ParamConfig {
 		if !col.IsSortOption() {
 			continue
 		}
+		column := col.SortColumn()
+		if column == "" {
+			column = col.ColumnName()
+		}
 		opt := ParamOption{
 			ID:     col.ColumnName(),
-			Column: col.ColumnName(),
+			Column: column,
 			Name:   col.SortLabel(),
 			Sort:   &sortDir,
 		}

@@ -43,6 +43,7 @@ func (c runningQueriesColumn) IsSortOption() bool  { return c.sortOpt }
 func (c runningQueriesColumn) SortLabel() string   { return c.sortLbl }
 func (c runningQueriesColumn) IsDefaultSort() bool { return c.defaultSort }
 func (c runningQueriesColumn) ColumnName() string  { return c.Name }
+func (c runningQueriesColumn) SortColumn() string  { return "" }
 
 var runningQueriesColumns = []runningQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "sessionId", Tooltip: "Session", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.sid || ',' || s.serial#"},

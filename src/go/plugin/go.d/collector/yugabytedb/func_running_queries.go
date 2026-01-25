@@ -58,6 +58,7 @@ func (c runningQueriesColumn) IsSortOption() bool  { return c.sortOpt }
 func (c runningQueriesColumn) SortLabel() string   { return c.sortLbl }
 func (c runningQueriesColumn) IsDefaultSort() bool { return c.defaultSort }
 func (c runningQueriesColumn) ColumnName() string  { return c.Name }
+func (c runningQueriesColumn) SortColumn() string  { return "" }
 
 // funcRunningQueries handles the running-queries function.
 type funcRunningQueries struct {

@@ -51,6 +51,7 @@ func (c topQueriesColumn) IsSortOption() bool  { return c.sortOpt }
 func (c topQueriesColumn) SortLabel() string   { return c.sortLbl }
 func (c topQueriesColumn) IsDefaultSort() bool { return c.defaultSort }
 func (c topQueriesColumn) ColumnName() string  { return c.Name }
+func (c topQueriesColumn) SortColumn() string  { return "" }
 
 var topQueriesColumns = []topQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "queryId", Tooltip: "Query ID", Type: funcapi.FieldTypeString, Visible: false, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, UniqueKey: true, Sortable: true}, DBColumn: "normalized_query_hash", SelectExpr: "toString(normalized_query_hash)"},

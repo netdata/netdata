@@ -53,6 +53,7 @@ func (c proxysqlColumn) IsSortOption() bool  { return c.sortOpt }
 func (c proxysqlColumn) SortLabel() string   { return c.sortLbl }
 func (c proxysqlColumn) IsDefaultSort() bool { return c.defaultSort }
 func (c proxysqlColumn) ColumnName() string  { return c.Name }
+func (c proxysqlColumn) SortColumn() string  { return "" }
 
 // proxysqlColumnSet creates a ColumnSet from a slice of proxysqlColumn.
 func proxysqlColumnSet(cols []proxysqlColumn) funcapi.ColumnSet[proxysqlColumn] {

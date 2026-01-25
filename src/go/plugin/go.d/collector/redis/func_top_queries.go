@@ -44,6 +44,7 @@ func (c redisColumn) IsSortOption() bool  { return c.sortOpt }
 func (c redisColumn) SortLabel() string   { return c.sortLbl }
 func (c redisColumn) IsDefaultSort() bool { return c.defaultSort }
 func (c redisColumn) ColumnName() string  { return c.Name }
+func (c redisColumn) SortColumn() string  { return "" }
 
 func redisColumnSet(cols []redisColumn) funcapi.ColumnSet[redisColumn] {
 	return funcapi.Columns(cols, func(c redisColumn) funcapi.ColumnMeta { return c.ColumnMeta })
