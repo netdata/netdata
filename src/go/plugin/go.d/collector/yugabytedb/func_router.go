@@ -117,8 +117,8 @@ func (r *funcRouter) topQueriesLimit() int {
 	return 500
 }
 
-func yugabyteMethods() []module.MethodConfig {
-	return []module.MethodConfig{
+func yugabyteMethods() []funcapi.MethodConfig {
+	return []funcapi.MethodConfig{
 		topQueriesMethodConfig(),
 		runningQueriesMethodConfig(),
 	}

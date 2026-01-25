@@ -16,7 +16,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
@@ -25,8 +24,8 @@ const (
 	topQueriesMaxTextLength = 4096
 )
 
-func topQueriesMethodConfig() module.MethodConfig {
-	return module.MethodConfig{
+func topQueriesMethodConfig() funcapi.MethodConfig {
+	return funcapi.MethodConfig{
 		ID:             topQueriesMethodID,
 		Name:           "Top Queries",
 		UpdateEvery:    10,
@@ -142,7 +141,7 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 // Cleanup implements funcapi.MethodHandler.
 func (f *funcTopQueries) Cleanup(ctx context.Context) {}
 
-func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *module.FunctionResponse {
+func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
 	limit := f.router.collector.TopQueriesLimit
 	if limit <= 0 {
 		limit = 500
@@ -154,15 +153,15 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 
 	req, err := f.buildQueryRequest(ctx, statement)
 	if err != nil {
-		return &module.FunctionResponse{Status: 500, Message: err.Error()}
+		return &funcapi.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
 	var resp topQueriesResponse
 	if err := web.DoHTTP(f.router.collector.httpClient).RequestJSON(req, &resp); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
+			return &funcapi.FunctionResponse{Status: 504, Message: "query timed out"}
 		}
-		return &module.FunctionResponse{Status: 500, Message: fmt.Sprintf("query failed: %v", err)}
+		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("query failed: %v", err)}
 	}
 
 	if strings.ToLower(resp.Status) != "success" {
@@ -170,7 +169,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 		if len(resp.Errors) > 0 && resp.Errors[0].Message != "" {
 			msg = resp.Errors[0].Message
 		}
-		return &module.FunctionResponse{Status: 500, Message: msg}
+		return &funcapi.FunctionResponse{Status: 500, Message: msg}
 	}
 
 	rows := make([]topQueriesRow, 0, len(resp.Results))
@@ -182,7 +181,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 	sortParam := funcapi.BuildSortParam(topQueriesColumns)
 
 	if len(rows) == 0 {
-		return &module.FunctionResponse{
+		return &funcapi.FunctionResponse{
 			Status:            200,
 			Message:           "No completed requests found.",
 			Help:              "Top N1QL requests from system:completed_requests",
@@ -239,7 +238,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 		data = append(data, out)
 	}
 
-	return &module.FunctionResponse{
+	return &funcapi.FunctionResponse{
 		Status:            200,
 		Help:              "Top N1QL requests from system:completed_requests",
 		Columns:           cs.BuildColumns(),

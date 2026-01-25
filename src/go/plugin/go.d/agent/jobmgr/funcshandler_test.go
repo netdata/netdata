@@ -123,8 +123,8 @@ func TestBuildRequiredParams_TypeSelect(t *testing.T) {
 	// Setup a minimal manager with test data
 	r := newModuleFuncRegistry()
 	r.registerModule("postgres", module.Creator{
-		Methods: func() []module.MethodConfig {
-			return []module.MethodConfig{{
+		Methods: func() []funcapi.MethodConfig {
+			return []funcapi.MethodConfig{{
 				ID:   "top-queries",
 				Name: "Top Queries",
 			}}
@@ -173,4 +173,3 @@ func TestBuildRequiredParams_TypeSelect(t *testing.T) {
 	assert.Equal(t, "__job", params[0]["id"])
 	assert.Equal(t, "__sort", params[1]["id"])
 }
-

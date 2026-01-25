@@ -49,8 +49,8 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 	}
 }
 
-func mysqlMethods() []module.MethodConfig {
-	return []module.MethodConfig{
+func mysqlMethods() []funcapi.MethodConfig {
+	return []funcapi.MethodConfig{
 		topQueriesMethodConfig(),
 	}
 }

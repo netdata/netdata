@@ -49,8 +49,8 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 	}
 }
 
-func redisMethods() []module.MethodConfig {
-	return []module.MethodConfig{
+func redisMethods() []funcapi.MethodConfig {
+	return []funcapi.MethodConfig{
 		topQueriesMethodConfig(),
 	}
 }

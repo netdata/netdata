@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -426,7 +425,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 		setup    func() *funcInterfaces
 		method   string
 		params   funcapi.ResolvedParams
-		validate func(t *testing.T, resp *module.FunctionResponse)
+		validate func(t *testing.T, resp *funcapi.FunctionResponse)
 	}{
 		"unknown method returns 404": {
 			setup: func() *funcInterfaces {
@@ -434,7 +433,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 			},
 			method: "unknown",
 			params: funcapi.ResolvedParams{},
-			validate: func(t *testing.T, resp *module.FunctionResponse) {
+			validate: func(t *testing.T, resp *funcapi.FunctionResponse) {
 				assert.Equal(t, 404, resp.Status)
 				assert.Contains(t, resp.Message, "unknown method")
 			},
@@ -445,7 +444,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 			},
 			method: "interfaces",
 			params: funcapi.ResolvedParams{},
-			validate: func(t *testing.T, resp *module.FunctionResponse) {
+			validate: func(t *testing.T, resp *funcapi.FunctionResponse) {
 				assert.Equal(t, 503, resp.Status)
 				assert.Contains(t, resp.Message, "not available")
 			},
@@ -456,7 +455,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 			},
 			method: "interfaces",
 			params: resolveIfaceParams(nil),
-			validate: func(t *testing.T, resp *module.FunctionResponse) {
+			validate: func(t *testing.T, resp *funcapi.FunctionResponse) {
 				assert.Equal(t, 200, resp.Status)
 				assert.NotNil(t, resp.Columns)
 				assert.Len(t, resp.Columns, len(snmpAllColumns)+1)
@@ -491,7 +490,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 			},
 			method: "interfaces",
 			params: resolveIfaceParams(nil),
-			validate: func(t *testing.T, resp *module.FunctionResponse) {
+			validate: func(t *testing.T, resp *funcapi.FunctionResponse) {
 				assert.Equal(t, 200, resp.Status)
 				assert.Equal(t, "Interface", resp.DefaultSortColumn)
 
@@ -559,7 +558,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 			},
 			method: "interfaces",
 			params: resolveIfaceParams(map[string][]string{"if_type_group": {"other"}}),
-			validate: func(t *testing.T, resp *module.FunctionResponse) {
+			validate: func(t *testing.T, resp *funcapi.FunctionResponse) {
 				assert.Equal(t, 200, resp.Status)
 
 				data, ok := resp.Data.([][]any)

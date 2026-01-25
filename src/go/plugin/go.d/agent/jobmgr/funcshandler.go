@@ -161,7 +161,7 @@ func (m *Manager) handleMethodFuncInfo(moduleName, methodID string, fn functions
 }
 
 // respondWithParams wraps the module's data response with current required_params
-func (m *Manager) respondWithParams(fn functions.Function, moduleName string, dataResp *module.FunctionResponse, methodParams []funcapi.ParamConfig) {
+func (m *Manager) respondWithParams(fn functions.Function, moduleName string, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig) {
 	// Nil guard: if module returns nil, treat as internal error
 	if dataResp == nil {
 		m.respondError(fn, 500, "internal error: module returned nil response")
@@ -240,7 +240,7 @@ func (m *Manager) buildRequiredParams(moduleName string, methodParams []funcapi.
 	return required
 }
 
-func (m *Manager) resolveMethodParamsForJob(ctx context.Context, moduleName, methodID string, methodCfg *module.MethodConfig, job *module.Job, handler funcapi.MethodHandler) ([]funcapi.ParamConfig, bool, error) {
+func (m *Manager) resolveMethodParamsForJob(ctx context.Context, moduleName, methodID string, methodCfg *funcapi.MethodConfig, job *module.Job, handler funcapi.MethodHandler) ([]funcapi.ParamConfig, bool, error) {
 	methodParams := methodCfg.RequiredParams
 
 	jobParams, err := handler.MethodParams(ctx, methodID)

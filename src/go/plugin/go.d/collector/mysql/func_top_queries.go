@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
@@ -19,8 +18,8 @@ const (
 	topQueriesParamSort     = "__sort"
 )
 
-func topQueriesMethodConfig() module.MethodConfig {
-	return module.MethodConfig{
+func topQueriesMethodConfig() funcapi.MethodConfig {
+	return funcapi.MethodConfig{
 		ID:             topQueriesMethodID,
 		Name:           "Top Queries",
 		UpdateEvery:    10,
@@ -226,17 +225,17 @@ func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfi
 }
 
 // collectData queries performance_schema for top queries using dynamic columns
-func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *module.FunctionResponse {
+func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
 	// Check if performance_schema is enabled
 	available, err := f.checkPerformanceSchema(ctx)
 	if err != nil {
-		return &module.FunctionResponse{
+		return &funcapi.FunctionResponse{
 			Status:  500,
 			Message: fmt.Sprintf("failed to check performance_schema availability: %v", err),
 		}
 	}
 	if !available {
-		return &module.FunctionResponse{
+		return &funcapi.FunctionResponse{
 			Status:  503,
 			Message: "performance_schema is not enabled",
 		}
@@ -245,7 +244,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 	// Detect available columns
 	availableCols, err := f.detectStatementsColumns(ctx)
 	if err != nil {
-		return &module.FunctionResponse{
+		return &funcapi.FunctionResponse{
 			Status:  500,
 			Message: fmt.Sprintf("failed to detect available columns: %v", err),
 		}
@@ -254,7 +253,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 	// Build list of available columns
 	cols := f.buildAvailableColumns(availableCols)
 	if len(cols) == 0 {
-		return &module.FunctionResponse{
+		return &funcapi.FunctionResponse{
 			Status:  500,
 			Message: "no columns available in events_statements_summary_by_digest",
 		}
@@ -275,16 +274,16 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 	rows, err := f.router.collector.db.QueryContext(ctx, query)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
+			return &funcapi.FunctionResponse{Status: 504, Message: "query timed out"}
 		}
-		return &module.FunctionResponse{Status: 500, Message: fmt.Sprintf("query failed: %v", err)}
+		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("query failed: %v", err)}
 	}
 	defer rows.Close()
 
 	// Scan rows dynamically
 	data, err := f.scanDynamicRows(rows, cols)
 	if err != nil {
-		return &module.FunctionResponse{Status: 500, Message: err.Error()}
+		return &funcapi.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
 	// Build dynamic sort options from available columns (only those actually detected)
@@ -308,7 +307,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 	annotatedCols := f.decorateColumns(cols)
 	cs := f.columnSet(annotatedCols)
 
-	return &module.FunctionResponse{
+	return &funcapi.FunctionResponse{
 		Status:            200,
 		Help:              "Top SQL queries from performance_schema.events_statements_summary_by_digest",
 		Columns:           cs.BuildColumns(),

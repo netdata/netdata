@@ -22,15 +22,6 @@ type Defaults struct {
 	Disabled           bool
 }
 
-// Type aliases for backward compatibility during migration.
-// These types are now defined in funcapi package.
-type (
-	MethodConfig     = funcapi.MethodConfig
-	FunctionResponse = funcapi.FunctionResponse
-	ChartConfig      = funcapi.ChartConfig
-	GroupByConfig    = funcapi.GroupByConfig
-)
-
 type (
 	// Creator is a Job builder.
 	// Optional function fields (Methods/MethodHandler) enable the FunctionProvider pattern:
@@ -43,7 +34,7 @@ type (
 
 		// Optional: FunctionProvider fields for exposing data functions
 		// If Methods is non-nil, this module provides functions
-		Methods func() []MethodConfig
+		Methods func() []funcapi.MethodConfig
 
 		// Optional: MethodHandler returns a handler for method requests on a specific job.
 		// The handler implements funcapi.MethodHandler interface with:

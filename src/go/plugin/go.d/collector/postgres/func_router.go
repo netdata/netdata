@@ -49,8 +49,8 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 	}
 }
 
-func pgMethods() []module.MethodConfig {
-	return []module.MethodConfig{
+func pgMethods() []funcapi.MethodConfig {
+	return []funcapi.MethodConfig{
 		topQueriesMethodConfig(),
 	}
 }

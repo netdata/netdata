@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -27,8 +26,8 @@ const (
 		"Requires profiling enabled on target databases (db.setProfilingLevel)."
 )
 
-func topQueriesMethodConfig() module.MethodConfig {
-	return module.MethodConfig{
+func topQueriesMethodConfig() funcapi.MethodConfig {
+	return funcapi.MethodConfig{
 		ID:             topQueriesMethodID,
 		Name:           "Top Queries",
 		UpdateEvery:    10,
@@ -204,7 +203,7 @@ func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfi
 	return []funcapi.ParamConfig{sortParam}, nil
 }
 
-func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *module.FunctionResponse {
+func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
 	limit := f.router.collector.Config.TopQueriesLimit
 	if limit <= 0 {
 		limit = topQueriesDefaultLimit
@@ -223,7 +222,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 
 	databases, err := f.getDatabases()
 	if err != nil {
-		return &module.FunctionResponse{
+		return &funcapi.FunctionResponse{
 			Status:  500,
 			Message: fmt.Sprintf("failed to list databases: %v", err),
 		}
@@ -249,7 +248,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 		if err != nil {
 			// Check for timeout (parent or child context)
 			if ctx.Err() == context.DeadlineExceeded || errors.Is(err, context.DeadlineExceeded) {
-				return &module.FunctionResponse{Status: 504, Message: "query timed out"}
+				return &funcapi.FunctionResponse{Status: 504, Message: "query timed out"}
 			}
 			f.router.collector.Debugf("failed to query system.profile in %s: %v", dbName, err)
 			failedDBs = append(failedDBs, dbName)
@@ -267,7 +266,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 
 	// Check if all databases failed with errors (not just profiling disabled)
 	if successfulDBs == 0 && len(failedDBs) > 0 && len(profilingDisabledDBs) == 0 {
-		return &module.FunctionResponse{
+		return &funcapi.FunctionResponse{
 			Status:  500,
 			Message: fmt.Sprintf("failed to query all databases: %v", failedDBs),
 		}
@@ -275,7 +274,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 
 	// Check if profiling is disabled everywhere (no successful queries, no errors, only disabled)
 	if len(allDocs) == 0 && len(profilingDisabledDBs) > 0 && len(failedDBs) == 0 {
-		return &module.FunctionResponse{
+		return &funcapi.FunctionResponse{
 			Status: 503,
 			Message: fmt.Sprintf(
 				"Database profiling is disabled. Enable it with: db.setProfilingLevel(1, {slowms: 100}). "+
@@ -292,14 +291,14 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 		if len(profilingDisabledDBs) > 0 {
 			msg += fmt.Sprintf(" Profiling disabled: %v.", profilingDisabledDBs)
 		}
-		return &module.FunctionResponse{
+		return &funcapi.FunctionResponse{
 			Status:  503,
 			Message: msg,
 		}
 	}
 
 	// Build empty response structure
-	emptyResponse := &module.FunctionResponse{
+	emptyResponse := &funcapi.FunctionResponse{
 		Status:            200,
 		Message:           "No slow queries found. Profiling may be disabled or no queries exceeded the slowms threshold.",
 		Help:              topQueriesHelpText,
@@ -398,7 +397,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 		data = append(data, row)
 	}
 
-	return &module.FunctionResponse{
+	return &funcapi.FunctionResponse{
 		Status:            200,
 		Help:              topQueriesHelpText,
 		Columns:           cs.BuildColumns(),

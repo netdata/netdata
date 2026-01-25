@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
@@ -19,8 +18,8 @@ const (
 	topQueriesMaxTextLength = 4096
 )
 
-func topQueriesMethodConfig() module.MethodConfig {
-	return module.MethodConfig{
+func topQueriesMethodConfig() funcapi.MethodConfig {
+	return funcapi.MethodConfig{
 		ID:             topQueriesMethodID,
 		Name:           "Top Queries",
 		UpdateEvery:    10,

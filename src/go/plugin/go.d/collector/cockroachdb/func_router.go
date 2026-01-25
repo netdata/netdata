@@ -119,8 +119,8 @@ func (r *funcRouter) topQueriesLimit() int {
 	return 500
 }
 
-func cockroachMethods() []module.MethodConfig {
-	return []module.MethodConfig{
+func cockroachMethods() []funcapi.MethodConfig {
+	return []funcapi.MethodConfig{
 		topQueriesMethodConfig(),
 		runningQueriesMethodConfig(),
 	}

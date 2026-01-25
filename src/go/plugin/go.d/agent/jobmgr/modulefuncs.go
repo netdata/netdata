@@ -6,6 +6,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
@@ -19,9 +20,9 @@ type moduleFuncRegistry struct {
 }
 
 type moduleFunc struct {
-	creator        module.Creator        // The module creator (has Methods())
-	methods        []module.MethodConfig // Static methods from creator (ordered)
-	methodsByID    map[string]module.MethodConfig
+	creator        module.Creator         // The module creator (has Methods())
+	methods        []funcapi.MethodConfig // Static methods from creator (ordered)
+	methodsByID    map[string]funcapi.MethodConfig
 	jobs           map[string]*jobEntry // jobName → job entry with generation
 	lastGeneration map[string]uint64    // jobName → last known generation (persists across removals)
 }
@@ -43,7 +44,7 @@ func (r *moduleFuncRegistry) registerModule(name string, creator module.Creator)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	var methods []module.MethodConfig
+	var methods []funcapi.MethodConfig
 	if creator.Methods != nil {
 		methods = creator.Methods()
 	}
@@ -57,11 +58,11 @@ func (r *moduleFuncRegistry) registerModule(name string, creator module.Creator)
 	}
 }
 
-func indexMethods(methods []module.MethodConfig) map[string]module.MethodConfig {
+func indexMethods(methods []funcapi.MethodConfig) map[string]funcapi.MethodConfig {
 	if len(methods) == 0 {
 		return nil
 	}
-	idx := make(map[string]module.MethodConfig, len(methods))
+	idx := make(map[string]funcapi.MethodConfig, len(methods))
 	for _, m := range methods {
 		if m.ID == "" {
 			continue
@@ -147,7 +148,7 @@ func (r *moduleFuncRegistry) verifyJobGeneration(moduleName, jobName string, exp
 }
 
 // getMethods returns the method configurations for a module
-func (r *moduleFuncRegistry) getMethods(moduleName string) []module.MethodConfig {
+func (r *moduleFuncRegistry) getMethods(moduleName string) []funcapi.MethodConfig {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -159,7 +160,7 @@ func (r *moduleFuncRegistry) getMethods(moduleName string) []module.MethodConfig
 }
 
 // getMethod returns a method config by ID for a module.
-func (r *moduleFuncRegistry) getMethod(moduleName, methodID string) (*module.MethodConfig, bool) {
+func (r *moduleFuncRegistry) getMethod(moduleName, methodID string) (*funcapi.MethodConfig, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

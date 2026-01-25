@@ -57,8 +57,8 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 	}
 }
 
-func rethinkdbMethods() []module.MethodConfig {
-	return []module.MethodConfig{
+func rethinkdbMethods() []funcapi.MethodConfig {
+	return []funcapi.MethodConfig{
 		runningQueriesMethodConfig(),
 	}
 }

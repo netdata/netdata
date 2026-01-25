@@ -12,7 +12,6 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
@@ -21,8 +20,8 @@ const (
 	redisMaxQueryTextLength = 4096
 )
 
-func topQueriesMethodConfig() module.MethodConfig {
-	return module.MethodConfig{
+func topQueriesMethodConfig() funcapi.MethodConfig {
+	return funcapi.MethodConfig{
 		ID:             topQueriesMethodID,
 		Name:           "Top Queries",
 		UpdateEvery:    10,
@@ -96,7 +95,7 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 // Cleanup implements funcapi.MethodHandler.
 func (f *funcTopQueries) Cleanup(ctx context.Context) {}
 
-func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
+func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
 	c := f.router.collector
 
 	limit := c.TopQueriesLimit
@@ -107,16 +106,16 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 	entries, err := c.rdb.SlowLogGet(ctx, -1).Result()
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
+			return &funcapi.FunctionResponse{Status: 504, Message: "query timed out"}
 		}
-		return &module.FunctionResponse{Status: 500, Message: fmt.Sprintf("slowlog query failed: %v", err)}
+		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("slowlog query failed: %v", err)}
 	}
 
 	cs := redisColumnSet(redisAllColumns)
 	sortParam := funcapi.BuildSortParam(redisAllColumns)
 
 	if len(entries) == 0 {
-		return &module.FunctionResponse{
+		return &funcapi.FunctionResponse{
 			Status:            200,
 			Message:           "No slow commands found. SLOWLOG may be empty or disabled.",
 			Help:              "Slow commands from Redis SLOWLOG. WARNING: Command arguments may contain unmasked literals (potential PII).",
@@ -167,7 +166,7 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 		data = append(data, row)
 	}
 
-	return &module.FunctionResponse{
+	return &funcapi.FunctionResponse{
 		Status:            200,
 		Help:              "Slow commands from Redis SLOWLOG. WARNING: Command arguments may contain unmasked literals (potential PII).",
 		Columns:           cs.BuildColumns(),

@@ -48,8 +48,8 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 	}
 }
 
-func elasticsearchMethods() []module.MethodConfig {
-	return []module.MethodConfig{
+func elasticsearchMethods() []funcapi.MethodConfig {
+	return []funcapi.MethodConfig{
 		topQueriesMethodConfig(),
 	}
 }

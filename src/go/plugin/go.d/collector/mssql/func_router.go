@@ -49,8 +49,8 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 	}
 }
 
-func mssqlMethods() []module.MethodConfig {
-	return []module.MethodConfig{
+func mssqlMethods() []funcapi.MethodConfig {
+	return []funcapi.MethodConfig{
 		topQueriesMethodConfig(),
 	}
 }

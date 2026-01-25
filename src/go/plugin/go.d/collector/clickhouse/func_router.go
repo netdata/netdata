@@ -10,8 +10,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
-func clickhouseMethods() []module.MethodConfig {
-	return []module.MethodConfig{
+func clickhouseMethods() []funcapi.MethodConfig {
+	return []funcapi.MethodConfig{
 		topQueriesMethodConfig(),
 	}
 }

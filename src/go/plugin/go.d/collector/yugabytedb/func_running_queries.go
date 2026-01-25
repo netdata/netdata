@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
@@ -19,8 +18,8 @@ const (
 	runningQueriesMaxTextLength = 4096
 )
 
-func runningQueriesMethodConfig() module.MethodConfig {
-	return module.MethodConfig{
+func runningQueriesMethodConfig() funcapi.MethodConfig {
+	return funcapi.MethodConfig{
 		ID:             runningQueriesMethodID,
 		Name:           "Running Queries",
 		UpdateEvery:    10,

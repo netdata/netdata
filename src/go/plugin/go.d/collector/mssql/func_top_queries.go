@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
@@ -19,8 +18,8 @@ const (
 	topQueriesParamSort     = "__sort"
 )
 
-func topQueriesMethodConfig() module.MethodConfig {
-	return module.MethodConfig{
+func topQueriesMethodConfig() funcapi.MethodConfig {
+	return funcapi.MethodConfig{
 		ID:             topQueriesMethodID,
 		Name:           "Top Queries",
 		UpdateEvery:    10,
@@ -234,9 +233,9 @@ func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfi
 	return []funcapi.ParamConfig{sortParam}, nil
 }
 
-func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *module.FunctionResponse {
+func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
 	if !f.router.collector.Config.GetQueryStoreFunctionEnabled() {
-		return &module.FunctionResponse{
+		return &funcapi.FunctionResponse{
 			Status: 403,
 			Message: "Query Store function has been disabled in configuration. " +
 				"To enable, set query_store_function_enabled: true in the MSSQL collector config.",
@@ -245,7 +244,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 
 	availableCols, err := f.detectQueryStoreColumns(ctx)
 	if err != nil {
-		return &module.FunctionResponse{
+		return &funcapi.FunctionResponse{
 			Status:  500,
 			Message: fmt.Sprintf("failed to detect available columns: %v", err),
 		}
@@ -253,7 +252,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 
 	cols := f.buildAvailableColumns(availableCols)
 	if len(cols) == 0 {
-		return &module.FunctionResponse{
+		return &funcapi.FunctionResponse{
 			Status:  500,
 			Message: "no columns available in Query Store",
 		}
@@ -271,13 +270,13 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 	rows, err := f.router.collector.db.QueryContext(ctx, query)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
+			return &funcapi.FunctionResponse{Status: 504, Message: "query timed out"}
 		}
 		colIDs := make([]string, len(cols))
 		for i, col := range cols {
 			colIDs[i] = col.Name
 		}
-		return &module.FunctionResponse{
+		return &funcapi.FunctionResponse{
 			Status:  500,
 			Message: fmt.Sprintf("query failed: %v (sort: %s, detected cols: %v)", err, validatedSortColumn, colIDs),
 		}
@@ -286,7 +285,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 
 	data, err := f.scanDynamicRows(rows, cols)
 	if err != nil {
-		return &module.FunctionResponse{Status: 500, Message: err.Error()}
+		return &funcapi.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
 	sortParam, sortOptions := f.buildSortParam(cols)
@@ -305,7 +304,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 	annotatedCols := f.decorateColumns(cols)
 	cs := f.columnSet(annotatedCols)
 
-	return &module.FunctionResponse{
+	return &funcapi.FunctionResponse{
 		Status:            200,
 		Help:              "Top SQL queries from Query Store. WARNING: Query text may contain unmasked literals (potential PII).",
 		Columns:           cs.BuildColumns(),

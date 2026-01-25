@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
@@ -20,8 +19,8 @@ const (
 	paramSort          = "__sort"
 )
 
-func topQueriesMethodConfig() module.MethodConfig {
-	return module.MethodConfig{
+func topQueriesMethodConfig() funcapi.MethodConfig {
+	return funcapi.MethodConfig{
 		ID:             topQueriesMethodID,
 		Name:           "Top Queries",
 		UpdateEvery:    10,
@@ -292,15 +291,15 @@ func (c *Collector) scanProxySQLDynamicRows(rows *sql.Rows, cols []proxysqlColum
 	return data, nil
 }
 
-func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
+func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
 	availableCols, err := c.detectProxySQLDigestColumns(ctx)
 	if err != nil {
-		return &module.FunctionResponse{Status: 500, Message: fmt.Sprintf("failed to detect available columns: %v", err)}
+		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("failed to detect available columns: %v", err)}
 	}
 
 	cols := c.buildAvailableProxySQLColumns(availableCols)
 	if len(cols) == 0 {
-		return &module.FunctionResponse{Status: 500, Message: "no columns available in stats_mysql_query_digest"}
+		return &funcapi.FunctionResponse{Status: 500, Message: "no columns available in stats_mysql_query_digest"}
 	}
 
 	cs := proxysqlColumnSet(cols)
@@ -315,15 +314,15 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
+			return &funcapi.FunctionResponse{Status: 504, Message: "query timed out"}
 		}
-		return &module.FunctionResponse{Status: 500, Message: fmt.Sprintf("query failed: %v", err)}
+		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("query failed: %v", err)}
 	}
 	defer rows.Close()
 
 	data, err := c.scanProxySQLDynamicRows(rows, cols)
 	if err != nil {
-		return &module.FunctionResponse{Status: 500, Message: err.Error()}
+		return &funcapi.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
 	defaultSort := "totalTime"
@@ -331,7 +330,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		defaultSort = "calls"
 	}
 
-	return &module.FunctionResponse{
+	return &funcapi.FunctionResponse{
 		Status:            200,
 		Help:              "Top SQL queries from ProxySQL stats_mysql_query_digest",
 		Columns:           cs.BuildColumns(),

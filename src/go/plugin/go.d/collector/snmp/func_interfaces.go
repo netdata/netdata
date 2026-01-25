@@ -7,7 +7,6 @@ import (
 	"sort"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 // Compile-time interface check.
@@ -29,8 +28,8 @@ const (
 	ifacesDefaultTypeGroup = "ethernet"
 )
 
-func ifacesMethodConfig() module.MethodConfig {
-	return module.MethodConfig{
+func ifacesMethodConfig() funcapi.MethodConfig {
+	return funcapi.MethodConfig{
 		ID:          ifacesMethodID,
 		Name:        "Network Interfaces",
 		UpdateEvery: 10,

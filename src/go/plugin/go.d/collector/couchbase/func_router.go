@@ -48,8 +48,8 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 	}
 }
 
-func couchbaseMethods() []module.MethodConfig {
-	return []module.MethodConfig{
+func couchbaseMethods() []funcapi.MethodConfig {
+	return []funcapi.MethodConfig{
 		topQueriesMethodConfig(),
 	}
 }

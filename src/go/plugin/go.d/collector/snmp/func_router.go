@@ -49,8 +49,8 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 	}
 }
 
-func snmpMethods() []module.MethodConfig {
-	return []module.MethodConfig{
+func snmpMethods() []funcapi.MethodConfig {
+	return []funcapi.MethodConfig{
 		ifacesMethodConfig(),
 	}
 }
