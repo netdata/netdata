@@ -15,7 +15,10 @@ import (
 
 const proxysqlMaxQueryTextLength = 4096
 
-const paramSort = "__sort"
+const (
+	topQueriesMethodID = "top-queries"
+	paramSort          = "__sort"
+)
 
 // proxysqlColumn defines metadata for a ProxySQL query digest column.
 // Embeds funcapi.ColumnMeta for UI rendering and adds ProxySQL-specific fields.
@@ -62,71 +65,48 @@ var proxysqlAllColumns = []proxysqlColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "lastSeen", Tooltip: "Last Seen", Type: funcapi.FieldTypeString, Visible: false, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, DBColumn: "last_seen"},
 }
 
-func proxysqlMethods() []module.MethodConfig {
-	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Top SQL queries from ProxySQL query digest stats",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:         paramSort,
-				Name:       "Filter By",
-				Help:       "Select the primary sort column",
-				Selection:  funcapi.ParamSelect,
-				Options:    buildProxySQLSortOptions(proxysqlAllColumns),
-				UniqueView: true,
-			}},
-		},
-	}
-}
-
-// funcProxysql implements funcapi.MethodHandler for ProxySQL top-queries.
-type funcProxysql struct {
-	collector *Collector
-}
-
 // Compile-time interface check.
-var _ funcapi.MethodHandler = (*funcProxysql)(nil)
+var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
+
+// funcTopQueries handles the "top-queries" function for ProxySQL.
+type funcTopQueries struct {
+	router *funcRouter
+}
+
+func newFuncTopQueries(r *funcRouter) *funcTopQueries {
+	return &funcTopQueries{router: r}
+}
 
 // MethodParams implements funcapi.MethodHandler.
-func (f *funcProxysql) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if f.collector.db == nil {
-		if err := f.collector.openConnection(); err != nil {
+func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if method != topQueriesMethodID {
+		return nil, nil
+	}
+
+	c := f.router.collector
+	if c.db == nil {
+		if err := c.openConnection(); err != nil {
 			return nil, err
 		}
 	}
-	switch method {
-	case "top-queries":
-		return f.collector.topQueriesParams(ctx)
-	default:
-		return nil, fmt.Errorf("unknown method: %s", method)
-	}
+
+	return c.topQueriesParams(ctx)
 }
 
 // Handle implements funcapi.MethodHandler.
-func (f *funcProxysql) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if f.collector.db == nil {
-		if err := f.collector.openConnection(); err != nil {
+func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if method != topQueriesMethodID {
+		return funcapi.NotFoundResponse(method)
+	}
+
+	c := f.router.collector
+	if c.db == nil {
+		if err := c.openConnection(); err != nil {
 			return funcapi.UnavailableResponse(fmt.Sprintf("failed to open connection: %v", err))
 		}
 	}
 
-	switch method {
-	case "top-queries":
-		return f.collector.collectTopQueries(ctx, params.Column(paramSort))
-	default:
-		return funcapi.NotFoundResponse(method)
-	}
-}
-
-func proxysqlFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return nil
-	}
-	return &funcProxysql{collector: c}
+	return c.collectTopQueries(ctx, params.Column(paramSort))
 }
 
 func buildProxySQLSortOptions(cols []proxysqlColumn) []funcapi.ParamOption {

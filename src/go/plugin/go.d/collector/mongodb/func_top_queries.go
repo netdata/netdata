@@ -123,11 +123,11 @@ type topQueriesProfileDocument struct {
 // funcTopQueries implements funcapi.MethodHandler for MongoDB top-queries.
 // All function-related logic is encapsulated here, keeping Collector focused on metrics collection.
 type funcTopQueries struct {
-	collector *Collector
+	router *funcRouter
 }
 
-func newFuncTopQueries(c *Collector) *funcTopQueries {
-	return &funcTopQueries{collector: c}
+func newFuncTopQueries(r *funcRouter) *funcTopQueries {
+	return &funcTopQueries{router: r}
 }
 
 // Compile-time interface check.
@@ -135,7 +135,7 @@ var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
 
 // MethodParams implements funcapi.MethodHandler.
 func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if f.collector.conn == nil {
+	if f.router.collector.conn == nil {
 		return nil, fmt.Errorf("collector is still initializing")
 	}
 	switch method {
@@ -148,13 +148,13 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 
 // Handle implements funcapi.MethodHandler.
 func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if f.collector.conn == nil {
+	if f.router.collector.conn == nil {
 		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 
 	switch method {
 	case "top-queries":
-		if !f.collector.Config.GetTopQueriesFunctionEnabled() {
+		if !f.router.collector.Config.GetTopQueriesFunctionEnabled() {
 			return funcapi.ErrorResponse(403, "Top Queries function has been disabled in configuration. Set 'top_queries_function_enabled: true' to enable.")
 		}
 		return f.collectData(ctx, params.Column(topQueriesParamSort))
@@ -164,7 +164,7 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 }
 
 func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
-	if !f.collector.Config.GetTopQueriesFunctionEnabled() {
+	if !f.router.collector.Config.GetTopQueriesFunctionEnabled() {
 		return nil, fmt.Errorf("top queries function disabled")
 	}
 
@@ -184,7 +184,7 @@ func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfi
 }
 
 func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *module.FunctionResponse {
-	limit := f.collector.Config.TopQueriesLimit
+	limit := f.router.collector.Config.TopQueriesLimit
 	if limit <= 0 {
 		limit = topQueriesDefaultLimit
 	}
@@ -211,7 +211,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 	// Detect available fields (with caching)
 	availableFields, err := f.detectProfileFields(ctx, databases)
 	if err != nil {
-		f.collector.Debugf("failed to detect profile fields: %v", err)
+		f.router.collector.Debugf("failed to detect profile fields: %v", err)
 	}
 	availableCols := f.buildAvailableColumns(availableFields)
 	cs := f.columnSet(availableCols)
@@ -230,7 +230,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 			if ctx.Err() == context.DeadlineExceeded || errors.Is(err, context.DeadlineExceeded) {
 				return &module.FunctionResponse{Status: 504, Message: "query timed out"}
 			}
-			f.collector.Debugf("failed to query system.profile in %s: %v", dbName, err)
+			f.router.collector.Debugf("failed to query system.profile in %s: %v", dbName, err)
 			failedDBs = append(failedDBs, dbName)
 			continue
 		}
@@ -397,7 +397,7 @@ func (f *funcTopQueries) columnSet(cols []topQueriesColumn) funcapi.ColumnSet[to
 }
 
 func (f *funcTopQueries) getDatabases() ([]string, error) {
-	databases, err := f.collector.conn.listDatabaseNames()
+	databases, err := f.router.collector.conn.listDatabaseNames()
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +407,7 @@ func (f *funcTopQueries) getDatabases() ([]string, error) {
 		if dbName == "admin" || dbName == "local" || dbName == "config" {
 			continue
 		}
-		if f.collector.dbSelector != nil && !f.collector.dbSelector.MatchString(dbName) {
+		if f.router.collector.dbSelector != nil && !f.router.collector.dbSelector.MatchString(dbName) {
 			continue
 		}
 		filteredDBs = append(filteredDBs, dbName)
@@ -419,24 +419,24 @@ func (f *funcTopQueries) getDatabases() ([]string, error) {
 // detectProfileFields detects available fields in system.profile using double-checked locking
 func (f *funcTopQueries) detectProfileFields(ctx context.Context, databases []string) (map[string]bool, error) {
 	// Fast path: return cached
-	f.collector.topQueriesColsMu.RLock()
-	if f.collector.topQueriesCols != nil {
-		cols := f.collector.topQueriesCols
-		f.collector.topQueriesColsMu.RUnlock()
+	f.router.collector.topQueriesColsMu.RLock()
+	if f.router.collector.topQueriesCols != nil {
+		cols := f.router.collector.topQueriesCols
+		f.router.collector.topQueriesColsMu.RUnlock()
 		return cols, nil
 	}
-	f.collector.topQueriesColsMu.RUnlock()
+	f.router.collector.topQueriesColsMu.RUnlock()
 
 	// Slow path: detect and cache
-	f.collector.topQueriesColsMu.Lock()
-	defer f.collector.topQueriesColsMu.Unlock()
+	f.router.collector.topQueriesColsMu.Lock()
+	defer f.router.collector.topQueriesColsMu.Unlock()
 
 	// Double-check after acquiring write lock
-	if f.collector.topQueriesCols != nil {
-		return f.collector.topQueriesCols, nil
+	if f.router.collector.topQueriesCols != nil {
+		return f.router.collector.topQueriesCols, nil
 	}
 
-	client, ok := f.collector.conn.(*mongoClient)
+	client, ok := f.router.collector.conn.(*mongoClient)
 	if !ok || client == nil || client.client == nil {
 		return nil, fmt.Errorf("client not initialized")
 	}
@@ -470,7 +470,7 @@ func (f *funcTopQueries) detectProfileFields(ctx context.Context, databases []st
 		}
 	}
 
-	f.collector.topQueriesCols = available
+	f.router.collector.topQueriesCols = available
 	return available, nil
 }
 
@@ -488,7 +488,7 @@ func (f *funcTopQueries) buildAvailableColumns(available map[string]bool) []topQ
 
 // querySystemProfile queries the system.profile collection for a specific database
 func (f *funcTopQueries) querySystemProfile(ctx context.Context, dbName, sortColumn string, limit int) ([]topQueriesProfileDocument, bool, error) {
-	client, ok := f.collector.conn.(*mongoClient)
+	client, ok := f.router.collector.conn.(*mongoClient)
 	if !ok || client == nil || client.client == nil {
 		return nil, false, fmt.Errorf("client not initialized")
 	}
@@ -602,29 +602,6 @@ func optionalBool(v *bool) any {
 		return "Yes"
 	}
 	return "No"
-}
-
-// mongoMethods returns the method configurations for registration.
-func mongoMethods() []module.MethodConfig {
-	return []module.MethodConfig{{
-		UpdateEvery:  10,
-		ID:           "top-queries",
-		Name:         "Top Queries",
-		Help:         topQueriesHelpText,
-		RequireCloud: true,
-		RequiredParams: []funcapi.ParamConfig{
-			buildTopQueriesSortOptions(topQueriesColumns),
-		},
-	}}
-}
-
-// mongoFunctionHandler returns the MethodHandler for a MongoDB job.
-func mongoFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return nil
-	}
-	return c.funcTopQueries
 }
 
 // buildTopQueriesSortOptions builds sort parameter from available columns.

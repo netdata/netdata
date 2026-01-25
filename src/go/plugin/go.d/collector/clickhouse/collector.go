@@ -67,7 +67,7 @@ type (
 		seenDbTables map[string]*seenTable
 
 		// Function handler (singleton, initialized in Init)
-		funcTopQueries *funcTopQueries
+		funcRouter *funcRouter
 	}
 	seenDisk  struct{ disk string }
 	seenTable struct{ db, table string }
@@ -88,7 +88,7 @@ func (c *Collector) Init(context.Context) error {
 	}
 	c.httpClient = httpClient
 
-	c.funcTopQueries = newFuncTopQueries(c)
+	c.funcRouter = newFuncRouter(c)
 
 	c.Debugf("using URL %s", c.URL)
 	c.Debugf("using timeout: %s", c.Timeout)

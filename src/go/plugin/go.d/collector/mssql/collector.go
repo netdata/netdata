@@ -112,7 +112,7 @@ type Collector struct {
 	queryStoreColsMu sync.RWMutex // protects queryStoreCols for concurrent access
 	queryStoreCols   map[string]bool
 
-	funcTopQueries *funcTopQueries
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -125,7 +125,7 @@ func (c *Collector) Init(context.Context) error {
 	}
 	c.Debugf("using DSN [%s]", c.DSN)
 
-	c.funcTopQueries = newFuncTopQueries(c)
+	c.funcRouter = newFuncRouter(c)
 
 	return nil
 }

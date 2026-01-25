@@ -39,7 +39,7 @@ func init() {
 }
 
 func New() *Collector {
-	return &Collector{
+	c := &Collector{
 		Config: Config{
 			Address:     "redis://@localhost:6379",
 			Timeout:     confopt.Duration(time.Second),
@@ -52,6 +52,8 @@ func New() *Collector {
 		collectedCommands:      make(map[string]bool),
 		collectedDbs:           make(map[string]bool),
 	}
+	c.funcRouter = newFuncRouter(c)
+	return c
 }
 
 type Config struct {
@@ -77,6 +79,8 @@ type (
 		addReplSlaveChartsOnce *sync.Once
 
 		rdb redisClient
+
+		funcRouter *funcRouter
 
 		server            string
 		version           *semver.Version

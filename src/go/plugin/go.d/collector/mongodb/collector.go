@@ -90,7 +90,7 @@ type Collector struct {
 	topQueriesColsMu sync.RWMutex
 	topQueriesCols   map[string]bool
 
-	funcTopQueries *funcTopQueries
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -106,7 +106,7 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("init database selector: %v", err)
 	}
 
-	c.funcTopQueries = newFuncTopQueries(c)
+	c.funcRouter = newFuncRouter(c)
 
 	return nil
 }

@@ -16,7 +16,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
-const redisMaxQueryTextLength = 4096
+const (
+	topQueriesMethodID     = "top-queries"
+	redisMaxQueryTextLength = 4096
+)
 
 type redisColumn struct {
 	funcapi.ColumnMeta
@@ -39,7 +42,24 @@ var redisAllColumns = []redisColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "client_name", Tooltip: "Client Name", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}},
 }
 
-func redisMethods() []module.MethodConfig {
+// Compile-time interface check.
+var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
+
+// funcTopQueries handles the "top-queries" function for Redis.
+type funcTopQueries struct {
+	router *funcRouter
+}
+
+func newFuncTopQueries(r *funcRouter) *funcTopQueries {
+	return &funcTopQueries{router: r}
+}
+
+// MethodParams implements funcapi.MethodHandler.
+func (f *funcTopQueries) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if method != topQueriesMethodID {
+		return nil, fmt.Errorf("unknown method: %s", method)
+	}
+
 	var sortOptions []funcapi.ParamOption
 	for _, col := range redisAllColumns {
 		if !col.IsSortOption {
@@ -54,87 +74,32 @@ func redisMethods() []module.MethodConfig {
 			Default: col.IsDefaultSort,
 		})
 	}
-	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Slow commands from Redis SLOWLOG. WARNING: Command arguments may contain unmasked literals (potential PII).",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:         "__sort",
-				Name:       "Filter By",
-				Help:       "Select the primary sort column",
-				Selection:  funcapi.ParamSelect,
-				Options:    sortOptions,
-				UniqueView: true,
-			}},
-		},
-	}
-}
-
-// funcRedis implements funcapi.MethodHandler for Redis.
-type funcRedis struct {
-	collector *Collector
-}
-
-// Compile-time interface check.
-var _ funcapi.MethodHandler = (*funcRedis)(nil)
-
-// MethodParams implements funcapi.MethodHandler.
-func (f *funcRedis) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
-	switch method {
-	case "top-queries":
-		var sortOptions []funcapi.ParamOption
-		for _, col := range redisAllColumns {
-			if !col.IsSortOption {
-				continue
-			}
-			sortDir := funcapi.FieldSortDescending
-			sortOptions = append(sortOptions, funcapi.ParamOption{
-				ID:      col.Name,
-				Column:  col.Name,
-				Name:    col.SortLabel,
-				Sort:    &sortDir,
-				Default: col.IsDefaultSort,
-			})
-		}
-		return []funcapi.ParamConfig{{
-			ID:         "__sort",
-			Name:       "Filter By",
-			Help:       "Select the primary sort column",
-			Selection:  funcapi.ParamSelect,
-			Options:    sortOptions,
-			UniqueView: true,
-		}}, nil
-	default:
-		return nil, fmt.Errorf("unknown method: %s", method)
-	}
+	return []funcapi.ParamConfig{{
+		ID:         "__sort",
+		Name:       "Filter By",
+		Help:       "Select the primary sort column",
+		Selection:  funcapi.ParamSelect,
+		Options:    sortOptions,
+		UniqueView: true,
+	}}, nil
 }
 
 // Handle implements funcapi.MethodHandler.
-func (f *funcRedis) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if f.collector.rdb == nil {
+func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if method != topQueriesMethodID {
+		return funcapi.NotFoundResponse(method)
+	}
+
+	if f.router.collector.rdb == nil {
 		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 
-	switch method {
-	case "top-queries":
-		return f.collector.collectTopQueries(ctx, params.Column("__sort"))
-	default:
-		return funcapi.NotFoundResponse(method)
-	}
+	return f.collectTopQueries(ctx, params.Column("__sort"))
 }
 
-func redisFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return nil
-	}
-	return &funcRedis{collector: c}
-}
+func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
+	c := f.router.collector
 
-func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
 	limit := c.TopQueriesLimit
 	if limit <= 0 {
 		limit = 500

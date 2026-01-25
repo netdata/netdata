@@ -86,7 +86,7 @@ type Collector struct {
 	nodes       map[string]bool
 	indices     map[string]bool
 
-	funcTopQueries *funcTopQueries
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -105,7 +105,7 @@ func (c *Collector) Init(context.Context) error {
 	}
 	c.httpClient = httpClient
 
-	c.funcTopQueries = newFuncTopQueries(c)
+	c.funcRouter = newFuncRouter(c)
 
 	return nil
 }

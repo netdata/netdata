@@ -65,7 +65,7 @@ type Collector struct {
 
 	collectedBuckets map[string]bool
 
-	funcTopQueries *funcTopQueries
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -90,7 +90,7 @@ func (c *Collector) Init(context.Context) error {
 	}
 	c.charts = charts
 
-	c.funcTopQueries = newFuncTopQueries(c)
+	c.funcRouter = newFuncRouter(c)
 
 	return nil
 }

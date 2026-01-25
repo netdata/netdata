@@ -84,11 +84,11 @@ type topQueriesRow struct {
 
 // funcTopQueries implements funcapi.MethodHandler for Couchbase top-queries.
 type funcTopQueries struct {
-	collector *Collector
+	router *funcRouter
 }
 
-func newFuncTopQueries(c *Collector) *funcTopQueries {
-	return &funcTopQueries{collector: c}
+func newFuncTopQueries(r *funcRouter) *funcTopQueries {
+	return &funcTopQueries{router: r}
 }
 
 // Compile-time interface check.
@@ -106,7 +106,7 @@ func (f *funcTopQueries) MethodParams(_ context.Context, method string) ([]funca
 
 // Handle implements funcapi.MethodHandler.
 func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if f.collector.httpClient == nil {
+	if f.router.collector.httpClient == nil {
 		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 
@@ -119,7 +119,7 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 }
 
 func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *module.FunctionResponse {
-	limit := f.collector.TopQueriesLimit
+	limit := f.router.collector.TopQueriesLimit
 	if limit <= 0 {
 		limit = 500
 	}
@@ -134,7 +134,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 	}
 
 	var resp topQueriesResponse
-	if err := web.DoHTTP(f.collector.httpClient).RequestJSON(req, &resp); err != nil {
+	if err := web.DoHTTP(f.router.collector.httpClient).RequestJSON(req, &resp); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
 		}
@@ -235,10 +235,10 @@ func (f *funcTopQueries) columnSet(cols []topQueriesColumn) funcapi.ColumnSet[to
 }
 
 func (f *funcTopQueries) queryServiceURL() (string, error) {
-	if f.collector.QueryURL != "" {
-		return f.collector.QueryURL, nil
+	if f.router.collector.QueryURL != "" {
+		return f.router.collector.QueryURL, nil
 	}
-	parsed, err := url.Parse(f.collector.URL)
+	parsed, err := url.Parse(f.router.collector.URL)
 	if err != nil {
 		return "", err
 	}
@@ -268,7 +268,7 @@ func (f *funcTopQueries) buildQueryRequest(ctx context.Context, statement string
 	}
 	u.Path = path.Join(u.Path, "/query/service")
 
-	reqCfg := f.collector.RequestConfig
+	reqCfg := f.router.collector.RequestConfig
 	reqCfg.URL = u.String()
 	reqCfg.Method = http.MethodPost
 	reqCfg.Body = url.Values{"statement": {statement}}.Encode()
@@ -360,29 +360,6 @@ func (f *funcTopQueries) sortRows(rows []topQueriesRow, sortColumn string) {
 			return rows[i].ElapsedMs > rows[j].ElapsedMs
 		})
 	}
-}
-
-func couchbaseMethods() []module.MethodConfig {
-	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Top N1QL requests from system:completed_requests",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{
-				buildTopQueriesSortOptions(topQueriesColumns),
-			},
-		},
-	}
-}
-
-func couchbaseFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return nil
-	}
-	return c.funcTopQueries
 }
 
 func buildTopQueriesSortOptions(cols []topQueriesColumn) funcapi.ParamConfig {

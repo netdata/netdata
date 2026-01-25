@@ -156,11 +156,11 @@ type topQueriesRowScanner interface {
 // funcTopQueries implements funcapi.MethodHandler for MSSQL top-queries.
 // All function-related logic is encapsulated here, keeping Collector focused on metrics collection.
 type funcTopQueries struct {
-	collector *Collector
+	router *funcRouter
 }
 
-func newFuncTopQueries(c *Collector) *funcTopQueries {
-	return &funcTopQueries{collector: c}
+func newFuncTopQueries(r *funcRouter) *funcTopQueries {
+	return &funcTopQueries{router: r}
 }
 
 // Compile-time interface check.
@@ -168,7 +168,7 @@ var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
 
 // MethodParams implements funcapi.MethodHandler.
 func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if f.collector.db == nil {
+	if f.router.collector.db == nil {
 		return nil, fmt.Errorf("collector is still initializing")
 	}
 	switch method {
@@ -181,7 +181,7 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 
 // Handle implements funcapi.MethodHandler.
 func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if f.collector.db == nil {
+	if f.router.collector.db == nil {
 		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 	switch method {
@@ -193,7 +193,7 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 }
 
 func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
-	if !f.collector.Config.GetQueryStoreFunctionEnabled() {
+	if !f.router.collector.Config.GetQueryStoreFunctionEnabled() {
 		return nil, fmt.Errorf("query store function disabled")
 	}
 
@@ -212,7 +212,7 @@ func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfi
 }
 
 func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *module.FunctionResponse {
-	if !f.collector.Config.GetQueryStoreFunctionEnabled() {
+	if !f.router.collector.Config.GetQueryStoreFunctionEnabled() {
 		return &module.FunctionResponse{
 			Status: 403,
 			Message: "Query Store function has been disabled in configuration. " +
@@ -238,14 +238,14 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 
 	validatedSortColumn := f.mapAndValidateSortColumn(sortColumn, cols)
 
-	timeWindowDays := f.collector.Config.GetQueryStoreTimeWindowDays()
-	limit := f.collector.TopQueriesLimit
+	timeWindowDays := f.router.collector.Config.GetQueryStoreTimeWindowDays()
+	limit := f.router.collector.TopQueriesLimit
 	if limit <= 0 {
 		limit = 500
 	}
 	query := f.buildDynamicSQL(cols, validatedSortColumn, timeWindowDays, limit)
 
-	rows, err := f.collector.db.QueryContext(ctx, query)
+	rows, err := f.router.collector.db.QueryContext(ctx, query)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
@@ -301,26 +301,26 @@ func (f *funcTopQueries) columnSet(cols []topQueriesColumn) funcapi.ColumnSet[to
 
 func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[string]bool, error) {
 	// Fast path: return cached result
-	f.collector.queryStoreColsMu.RLock()
-	if f.collector.queryStoreCols != nil {
-		cols := f.collector.queryStoreCols
-		f.collector.queryStoreColsMu.RUnlock()
+	f.router.collector.queryStoreColsMu.RLock()
+	if f.router.collector.queryStoreCols != nil {
+		cols := f.router.collector.queryStoreCols
+		f.router.collector.queryStoreColsMu.RUnlock()
 		return cols, nil
 	}
-	f.collector.queryStoreColsMu.RUnlock()
+	f.router.collector.queryStoreColsMu.RUnlock()
 
 	// Slow path: query and cache
-	f.collector.queryStoreColsMu.Lock()
-	defer f.collector.queryStoreColsMu.Unlock()
+	f.router.collector.queryStoreColsMu.Lock()
+	defer f.router.collector.queryStoreColsMu.Unlock()
 
 	// Double-check after acquiring write lock
-	if f.collector.queryStoreCols != nil {
-		return f.collector.queryStoreCols, nil
+	if f.router.collector.queryStoreCols != nil {
+		return f.router.collector.queryStoreCols, nil
 	}
 
 	// Find any database with Query Store enabled (excluding system databases)
 	var sampleDB string
-	err := f.collector.db.QueryRowContext(ctx, `
+	err := f.router.collector.db.QueryRowContext(ctx, `
 		SELECT TOP 1 name
 		FROM sys.databases
 		WHERE is_query_store_on = 1
@@ -335,7 +335,7 @@ func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[strin
 
 	// Use dynamic SQL to get column metadata from that database's Query Store view
 	query := fmt.Sprintf(`SELECT TOP 0 * FROM [%s].sys.query_store_runtime_stats`, sampleDB)
-	rows, err := f.collector.db.QueryContext(ctx, query)
+	rows, err := f.router.collector.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query Query Store columns from %s: %w", sampleDB, err)
 	}
@@ -360,7 +360,7 @@ func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[strin
 	cols["query_sql_text"] = true
 	cols["database_name"] = true
 
-	f.collector.queryStoreCols = cols
+	f.router.collector.queryStoreCols = cols
 
 	return cols, nil
 }
@@ -621,39 +621,6 @@ func (f *funcTopQueries) decorateColumns(cols []topQueriesColumn) []topQueriesCo
 	}
 
 	return out
-}
-
-// mssqlMethods returns the method configurations for registration.
-func mssqlMethods() []module.MethodConfig {
-	sortOptions := buildTopQueriesSortOptions(topQueriesColumns)
-	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Top SQL queries from Query Store",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{
-				{
-					ID:         topQueriesParamSort,
-					Name:       "Filter By",
-					Help:       "Select the primary sort column",
-					Selection:  funcapi.ParamSelect,
-					Options:    sortOptions,
-					UniqueView: true,
-				},
-			},
-		},
-	}
-}
-
-// mssqlFunctionHandler returns the MethodHandler for a MSSQL job.
-func mssqlFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return nil
-	}
-	return c.funcTopQueries
 }
 
 // buildTopQueriesSortOptions builds sort options for method registration (before handler exists).

@@ -143,11 +143,11 @@ type topQueriesRowScanner interface {
 // funcTopQueries implements funcapi.MethodHandler for MySQL top-queries.
 // All function-related logic is encapsulated here, keeping Collector focused on metrics collection.
 type funcTopQueries struct {
-	collector *Collector
+	router *funcRouter
 }
 
-func newFuncTopQueries(c *Collector) *funcTopQueries {
-	return &funcTopQueries{collector: c}
+func newFuncTopQueries(r *funcRouter) *funcTopQueries {
+	return &funcTopQueries{router: r}
 }
 
 // Compile-time interface check.
@@ -155,7 +155,7 @@ var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
 
 // MethodParams implements funcapi.MethodHandler.
 func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if f.collector.db == nil {
+	if f.router.collector.db == nil {
 		return nil, fmt.Errorf("collector is still initializing")
 	}
 	switch method {
@@ -168,7 +168,7 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 
 // Handle implements funcapi.MethodHandler.
 func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if f.collector.db == nil {
+	if f.router.collector.db == nil {
 		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 
@@ -241,7 +241,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 	dbSortColumn := f.mapAndValidateSortColumn(sortColumn, availableCols)
 
 	// Get query limit (default 500)
-	limit := f.collector.TopQueriesLimit
+	limit := f.router.collector.TopQueriesLimit
 	if limit <= 0 {
 		limit = 500
 	}
@@ -249,7 +249,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 	// Build and execute query
 	query := f.buildDynamicSQL(cols, dbSortColumn, limit)
 
-	rows, err := f.collector.db.QueryContext(ctx, query)
+	rows, err := f.router.collector.db.QueryContext(ctx, query)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
@@ -307,53 +307,53 @@ func (f *funcTopQueries) columnSet(cols []topQueriesColumn) funcapi.ColumnSet[to
 // checkPerformanceSchema checks if performance_schema is enabled (cached)
 func (f *funcTopQueries) checkPerformanceSchema(ctx context.Context) (bool, error) {
 	// Fast path: return cached result if already checked
-	f.collector.varPerfSchemaMu.RLock()
-	cached := f.collector.varPerformanceSchema
-	f.collector.varPerfSchemaMu.RUnlock()
+	f.router.collector.varPerfSchemaMu.RLock()
+	cached := f.router.collector.varPerformanceSchema
+	f.router.collector.varPerfSchemaMu.RUnlock()
 	if cached != "" {
 		return cached == "ON" || cached == "1", nil
 	}
 
 	// Slow path: query and cache the result
 	// Use write lock for the entire operation to prevent duplicate queries
-	f.collector.varPerfSchemaMu.Lock()
-	defer f.collector.varPerfSchemaMu.Unlock()
+	f.router.collector.varPerfSchemaMu.Lock()
+	defer f.router.collector.varPerfSchemaMu.Unlock()
 
 	// Double-check after acquiring write lock (another goroutine may have set it)
-	if f.collector.varPerformanceSchema != "" {
-		return f.collector.varPerformanceSchema == "ON" || f.collector.varPerformanceSchema == "1", nil
+	if f.router.collector.varPerformanceSchema != "" {
+		return f.router.collector.varPerformanceSchema == "ON" || f.router.collector.varPerformanceSchema == "1", nil
 	}
 
 	var value string
 	query := "SELECT @@performance_schema"
-	err := f.collector.db.QueryRowContext(ctx, query).Scan(&value)
+	err := f.router.collector.db.QueryRowContext(ctx, query).Scan(&value)
 	if err != nil {
 		return false, err
 	}
 
 	// Cache the result
-	f.collector.varPerformanceSchema = value
+	f.router.collector.varPerformanceSchema = value
 	return value == "ON" || value == "1", nil
 }
 
 // detectStatementsColumns queries the database to discover available columns
 func (f *funcTopQueries) detectStatementsColumns(ctx context.Context) (map[string]bool, error) {
 	// Fast path: return cached result
-	f.collector.stmtSummaryColsMu.RLock()
-	if f.collector.stmtSummaryCols != nil {
-		cols := f.collector.stmtSummaryCols
-		f.collector.stmtSummaryColsMu.RUnlock()
+	f.router.collector.stmtSummaryColsMu.RLock()
+	if f.router.collector.stmtSummaryCols != nil {
+		cols := f.router.collector.stmtSummaryCols
+		f.router.collector.stmtSummaryColsMu.RUnlock()
 		return cols, nil
 	}
-	f.collector.stmtSummaryColsMu.RUnlock()
+	f.router.collector.stmtSummaryColsMu.RUnlock()
 
 	// Slow path: query and cache
-	f.collector.stmtSummaryColsMu.Lock()
-	defer f.collector.stmtSummaryColsMu.Unlock()
+	f.router.collector.stmtSummaryColsMu.Lock()
+	defer f.router.collector.stmtSummaryColsMu.Unlock()
 
 	// Double-check after acquiring write lock
-	if f.collector.stmtSummaryCols != nil {
-		return f.collector.stmtSummaryCols, nil
+	if f.router.collector.stmtSummaryCols != nil {
+		return f.router.collector.stmtSummaryCols, nil
 	}
 
 	// Query information_schema to get available columns
@@ -363,7 +363,7 @@ func (f *funcTopQueries) detectStatementsColumns(ctx context.Context) (map[strin
 		WHERE TABLE_SCHEMA = 'performance_schema'
 		AND TABLE_NAME = 'events_statements_summary_by_digest'
 	`
-	rows, err := f.collector.db.QueryContext(ctx, query)
+	rows, err := f.router.collector.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query column information: %w", err)
 	}
@@ -383,7 +383,7 @@ func (f *funcTopQueries) detectStatementsColumns(ctx context.Context) (map[strin
 	}
 
 	// Cache the result
-	f.collector.stmtSummaryCols = cols
+	f.router.collector.stmtSummaryCols = cols
 
 	return cols, nil
 }
@@ -554,40 +554,6 @@ func (f *funcTopQueries) decorateColumns(cols []topQueriesColumn) []topQueriesCo
 	}
 
 	return out
-}
-
-// mysqlMethods returns the available function methods for MySQL
-func mysqlMethods() []module.MethodConfig {
-	sortOptions := buildTopQueriesSortOptions(topQueriesColumns)
-
-	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Top SQL queries from performance_schema",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{
-				{
-					ID:         topQueriesParamSort,
-					Name:       "Filter By",
-					Help:       "Select the primary sort column",
-					Selection:  funcapi.ParamSelect,
-					Options:    sortOptions,
-					UniqueView: true,
-				},
-			},
-		},
-	}
-}
-
-// mysqlFunctionHandler returns the MethodHandler for a MySQL job.
-func mysqlFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return nil
-	}
-	return c.funcTopQueries
 }
 
 // buildTopQueriesSortOptions builds sort options for method registration (before handler exists).

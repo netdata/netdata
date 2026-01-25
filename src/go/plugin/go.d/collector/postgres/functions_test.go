@@ -81,7 +81,7 @@ func TestPgAllColumns_HasValidMetadata(t *testing.T) {
 	}
 }
 
-func TestCollector_mapAndValidateSortColumn(t *testing.T) {
+func TestFuncTopQueries_mapAndValidateSortColumn(t *testing.T) {
 	tests := map[string]struct {
 		pgVersion     int
 		availableCols map[string]bool
@@ -129,13 +129,15 @@ func TestCollector_mapAndValidateSortColumn(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &Collector{pgVersion: tc.pgVersion}
-			result := c.mapAndValidateSortColumn(tc.input, tc.availableCols)
+			r := &funcRouter{collector: c}
+			f := &funcTopQueries{router: r}
+			result := f.mapAndValidateSortColumn(tc.input, tc.availableCols)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
 }
 
-func TestCollector_buildAvailableColumns(t *testing.T) {
+func TestFuncTopQueries_buildAvailableColumns(t *testing.T) {
 	tests := map[string]struct {
 		pgVersion     int
 		availableCols map[string]bool
@@ -167,7 +169,9 @@ func TestCollector_buildAvailableColumns(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &Collector{pgVersion: tc.pgVersion}
-			cols := c.buildAvailableColumns(tc.availableCols)
+			r := &funcRouter{collector: c}
+			f := &funcTopQueries{router: r}
+			cols := f.buildAvailableColumns(tc.availableCols)
 			cs := pgColumnSet(cols)
 
 			for _, id := range tc.expectCols {
@@ -180,7 +184,7 @@ func TestCollector_buildAvailableColumns(t *testing.T) {
 	}
 }
 
-func TestCollector_buildDynamicSQL(t *testing.T) {
+func TestFuncTopQueries_buildDynamicSQL(t *testing.T) {
 	tests := map[string]struct {
 		pgVersion  int
 		sortColumn string
@@ -201,6 +205,8 @@ func TestCollector_buildDynamicSQL(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &Collector{pgVersion: tc.pgVersion}
+			r := &funcRouter{collector: c}
+			f := &funcTopQueries{router: r}
 
 			// Build minimal column set for test
 			cols := []pgColumn{
@@ -210,7 +216,7 @@ func TestCollector_buildDynamicSQL(t *testing.T) {
 				{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Type: funcapi.FieldTypeDuration}, DBColumn: "total_time"},
 			}
 
-			sql := c.buildDynamicSQL(cols, tc.sortColumn, 500)
+			sql := f.buildDynamicSQL(cols, tc.sortColumn, 500)
 
 			assert.Contains(t, sql, "pg_stat_statements")
 			assert.Contains(t, sql, tc.sortColumn)

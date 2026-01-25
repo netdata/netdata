@@ -11,7 +11,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
@@ -63,11 +62,11 @@ type topQueriesJSONResponse struct {
 // funcTopQueries implements funcapi.MethodHandler for ClickHouse top-queries.
 // All function-related logic is encapsulated here, keeping Collector focused on metrics collection.
 type funcTopQueries struct {
-	collector *Collector
+	router *funcRouter
 }
 
-func newFuncTopQueries(c *Collector) *funcTopQueries {
-	return &funcTopQueries{collector: c}
+func newFuncTopQueries(r *funcRouter) *funcTopQueries {
+	return &funcTopQueries{router: r}
 }
 
 // Compile-time interface check.
@@ -75,7 +74,7 @@ var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
 
 // MethodParams implements funcapi.MethodHandler.
 func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if f.collector.httpClient == nil {
+	if f.router.collector.httpClient == nil {
 		return nil, fmt.Errorf("collector is still initializing")
 	}
 	switch method {
@@ -88,7 +87,7 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 
 // Handle implements funcapi.MethodHandler.
 func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if f.collector.httpClient == nil {
+	if f.router.collector.httpClient == nil {
 		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 	switch method {
@@ -113,7 +112,7 @@ func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfi
 		Name:       "Filter By",
 		Help:       "Select the primary sort column",
 		Selection:  funcapi.ParamSelect,
-		Options:    buildTopQueriesSortOptions(cols),
+		Options:    buildSortOptions(cols),
 		UniqueView: true,
 	}
 	return []funcapi.ParamConfig{sortParam}, nil
@@ -126,7 +125,7 @@ FROM system.columns
 WHERE database = 'system' AND table = 'query_log'
 FORMAT JSON`
 
-	req, err := web.NewHTTPRequest(f.collector.RequestConfig)
+	req, err := web.NewHTTPRequest(f.router.collector.RequestConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +133,7 @@ FORMAT JSON`
 	req.URL.RawQuery = makeURLQuery(query)
 
 	var resp topQueriesJSONResponse
-	if err := web.DoHTTP(f.collector.httpClient).RequestJSON(req, &resp); err != nil {
+	if err := web.DoHTTP(f.router.collector.httpClient).RequestJSON(req, &resp); err != nil {
 		return nil, fmt.Errorf("failed to query system.columns: %w", err)
 	}
 
@@ -164,7 +163,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 	cs := f.columnSet(cols)
 	sortColumn = f.mapAndValidateSortColumn(sortColumn, cs)
 
-	limit := f.collector.TopQueriesLimit
+	limit := f.router.collector.TopQueriesLimit
 	if limit <= 0 {
 		limit = 500
 	}
@@ -189,7 +188,7 @@ LIMIT %d
 FORMAT JSON
 `, strings.Join(selectParts, ", "), groupKey, sortColumn, limit)
 
-	req, err := web.NewHTTPRequest(f.collector.RequestConfig)
+	req, err := web.NewHTTPRequest(f.router.collector.RequestConfig)
 	if err != nil {
 		return funcapi.ErrorResponse(500, "%v", err)
 	}
@@ -197,7 +196,7 @@ FORMAT JSON
 	req.URL.RawQuery = makeURLQuery(query)
 
 	var resp topQueriesJSONResponse
-	if err := web.DoHTTP(f.collector.httpClient).RequestJSON(req, &resp); err != nil {
+	if err := web.DoHTTP(f.router.collector.httpClient).RequestJSON(req, &resp); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return funcapi.ErrorResponse(504, "query timed out")
 		}
@@ -218,7 +217,7 @@ FORMAT JSON
 		Name:       "Filter By",
 		Help:       "Select the primary sort column",
 		Selection:  funcapi.ParamSelect,
-		Options:    buildTopQueriesSortOptions(cols),
+		Options:    buildSortOptions(cols),
 		UniqueView: true,
 	}
 
@@ -316,53 +315,4 @@ func (f *funcTopQueries) normalizeValue(col topQueriesColumn, v any) any {
 		}
 		return fmt.Sprint(v)
 	}
-}
-
-// clickhouseMethods returns the method configurations for registration.
-func clickhouseMethods() []module.MethodConfig {
-	sortOptions := buildTopQueriesSortOptions(topQueriesColumns)
-	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Top SQL queries from ClickHouse system.query_log",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:         topQueriesParamSort,
-				Name:       "Filter By",
-				Help:       "Select the primary sort column",
-				Selection:  funcapi.ParamSelect,
-				Options:    sortOptions,
-				UniqueView: true,
-			}},
-		},
-	}
-}
-
-// clickhouseFunctionHandler returns the MethodHandler for a ClickHouse job.
-func clickhouseFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return nil
-	}
-	return c.funcTopQueries
-}
-
-// buildTopQueriesSortOptions builds sort options for method registration (before handler exists).
-func buildTopQueriesSortOptions(cols []topQueriesColumn) []funcapi.ParamOption {
-	var sortOptions []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range cols {
-		if col.IsSortOption {
-			sortOptions = append(sortOptions, funcapi.ParamOption{
-				ID:      col.Name,
-				Column:  col.Name,
-				Name:    "Top queries by " + col.SortLabel,
-				Default: col.IsDefaultSort,
-				Sort:    &sortDir,
-			})
-		}
-	}
-	return sortOptions
 }

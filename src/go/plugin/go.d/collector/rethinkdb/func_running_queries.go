@@ -9,35 +9,32 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
-const rethinkMaxQueryTextLength = 4096
+const (
+	runningQueriesMethodID   = "running-queries"
+	rethinkMaxQueryTextLength = 4096
+)
 
-type rethinkColumn struct {
-	funcapi.ColumnMeta
-	IsSortOption  bool   // whether this column appears as a sort option
-	SortLabel     string // label for sort option dropdown
-	IsDefaultSort bool   // default sort column
+// Compile-time interface check.
+var _ funcapi.MethodHandler = (*funcRunningQueries)(nil)
+
+// funcRunningQueries handles the "running-queries" function for RethinkDB.
+type funcRunningQueries struct {
+	router *funcRouter
 }
 
-func rethinkColumnSet(cols []rethinkColumn) funcapi.ColumnSet[rethinkColumn] {
-	return funcapi.Columns(cols, func(c rethinkColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+func newFuncRunningQueries(r *funcRouter) *funcRunningQueries {
+	return &funcRunningQueries{router: r}
 }
 
-var rethinkRunningColumns = []rethinkColumn{
-	{ColumnMeta: funcapi.ColumnMeta{Name: "jobId", Tooltip: "Job ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, Sticky: true, FullWidth: true, Wrap: true}},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "durationMs", Tooltip: "Duration", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, IsSortOption: true, IsDefaultSort: true, SortLabel: "Running queries by Duration"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "type", Tooltip: "Type", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "user", Tooltip: "User", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "clientAddress", Tooltip: "Client Address", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "clientPort", Tooltip: "Client Port", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "servers", Tooltip: "Servers", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}},
-}
+// MethodParams implements funcapi.MethodHandler.
+func (f *funcRunningQueries) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if method != runningQueriesMethodID {
+		return nil, fmt.Errorf("unknown method: %s", method)
+	}
 
-func rethinkdbMethods() []module.MethodConfig {
 	var sortOptions []funcapi.ParamOption
 	for _, col := range rethinkRunningColumns {
 		if !col.IsSortOption {
@@ -52,91 +49,28 @@ func rethinkdbMethods() []module.MethodConfig {
 			Default: col.IsDefaultSort,
 		})
 	}
-	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "running-queries",
-			Name:         "Running Queries",
-			Help:         "Currently running queries from rethinkdb.jobs. WARNING: Query text may contain unmasked literals (potential PII).",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:         "__sort",
-				Name:       "Filter By",
-				Help:       "Select the primary sort column",
-				Selection:  funcapi.ParamSelect,
-				Options:    sortOptions,
-				UniqueView: true,
-			}},
-		},
-	}
-}
-
-// funcRethinkdb implements funcapi.MethodHandler for RethinkDB.
-type funcRethinkdb struct {
-	collector *Collector
-}
-
-// Compile-time interface check.
-var _ funcapi.MethodHandler = (*funcRethinkdb)(nil)
-
-// MethodParams implements funcapi.MethodHandler.
-func (f *funcRethinkdb) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
-	switch method {
-	case "running-queries":
-		var sortOptions []funcapi.ParamOption
-		for _, col := range rethinkRunningColumns {
-			if !col.IsSortOption {
-				continue
-			}
-			sortDir := funcapi.FieldSortDescending
-			sortOptions = append(sortOptions, funcapi.ParamOption{
-				ID:      col.Name,
-				Column:  col.Name,
-				Name:    col.SortLabel,
-				Sort:    &sortDir,
-				Default: col.IsDefaultSort,
-			})
-		}
-		return []funcapi.ParamConfig{{
-			ID:         "__sort",
-			Name:       "Filter By",
-			Help:       "Select the primary sort column",
-			Selection:  funcapi.ParamSelect,
-			Options:    sortOptions,
-			UniqueView: true,
-		}}, nil
-	default:
-		return nil, fmt.Errorf("unknown method: %s", method)
-	}
+	return []funcapi.ParamConfig{{
+		ID:         "__sort",
+		Name:       "Filter By",
+		Help:       "Select the primary sort column",
+		Selection:  funcapi.ParamSelect,
+		Options:    sortOptions,
+		UniqueView: true,
+	}}, nil
 }
 
 // Handle implements funcapi.MethodHandler.
-func (f *funcRethinkdb) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if f.collector.rdb == nil {
-		conn, err := f.collector.newConn(f.collector.Config)
-		if err != nil {
-			return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
-		}
-		f.collector.rdb = conn
-	}
-
-	switch method {
-	case "running-queries":
-		return f.collector.collectRunningQueries(ctx, params.Column("__sort"))
-	default:
+func (f *funcRunningQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if method != runningQueriesMethodID {
 		return funcapi.NotFoundResponse(method)
 	}
+
+	return f.collectRunningQueries(ctx, params.Column("__sort"))
 }
 
-func rethinkdbFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return nil
-	}
-	return &funcRethinkdb{collector: c}
-}
+func (f *funcRunningQueries) collectRunningQueries(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
+	c := f.router.collector
 
-func (c *Collector) collectRunningQueries(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
 	limit := c.TopQueriesLimit
 	if limit <= 0 {
 		limit = 500
@@ -243,6 +177,28 @@ func (c *Collector) collectRunningQueries(ctx context.Context, sortColumn string
 			UniqueView: true,
 		}},
 	}
+}
+
+type rethinkColumn struct {
+	funcapi.ColumnMeta
+	IsSortOption  bool   // whether this column appears as a sort option
+	SortLabel     string // label for sort option dropdown
+	IsDefaultSort bool   // default sort column
+}
+
+func rethinkColumnSet(cols []rethinkColumn) funcapi.ColumnSet[rethinkColumn] {
+	return funcapi.Columns(cols, func(c rethinkColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+}
+
+var rethinkRunningColumns = []rethinkColumn{
+	{ColumnMeta: funcapi.ColumnMeta{Name: "jobId", Tooltip: "Job ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, Sticky: true, FullWidth: true, Wrap: true}},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "durationMs", Tooltip: "Duration", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, IsSortOption: true, IsDefaultSort: true, SortLabel: "Running queries by Duration"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "type", Tooltip: "Type", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "user", Tooltip: "User", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "clientAddress", Tooltip: "Client Address", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "clientPort", Tooltip: "Client Port", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "servers", Tooltip: "Servers", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}},
 }
 
 type rethinkJobRow struct {

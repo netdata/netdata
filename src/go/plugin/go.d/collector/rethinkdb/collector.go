@@ -26,7 +26,7 @@ func init() {
 }
 
 func New() *Collector {
-	return &Collector{
+	c := &Collector{
 		Config: Config{
 			Address: "127.0.0.1:28015",
 			Timeout: confopt.Duration(time.Second * 1),
@@ -36,6 +36,10 @@ func New() *Collector {
 		newConn:     newRethinkdbConn,
 		seenServers: make(map[string]bool),
 	}
+
+	c.funcRouter = newFuncRouter(c)
+
+	return c
 }
 
 type Config struct {
@@ -57,6 +61,8 @@ type Collector struct {
 
 	newConn func(cfg Config) (rdbConn, error)
 	rdb     rdbConn
+
+	funcRouter *funcRouter // function router for method handlers
 
 	seenServers map[string]bool
 }

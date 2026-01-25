@@ -113,7 +113,7 @@ type Collector struct {
 	stmtSummaryCols   map[string]bool // cached column names from events_statements_summary_by_digest
 	stmtSummaryColsMu sync.RWMutex    // protects stmtSummaryCols for concurrent access
 
-	funcTopQueries *funcTopQueries
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -143,7 +143,7 @@ func (c *Collector) Init(context.Context) error {
 
 	c.Debugf("using DSN [%s]", c.DSN)
 
-	c.funcTopQueries = newFuncTopQueries(c)
+	c.funcRouter = newFuncRouter(c)
 
 	return nil
 }

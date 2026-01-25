@@ -72,11 +72,11 @@ type topQueriesRow struct {
 
 // funcTopQueries implements funcapi.MethodHandler for Elasticsearch top-queries.
 type funcTopQueries struct {
-	collector *Collector
+	router *funcRouter
 }
 
-func newFuncTopQueries(c *Collector) *funcTopQueries {
-	return &funcTopQueries{collector: c}
+func newFuncTopQueries(r *funcRouter) *funcTopQueries {
+	return &funcTopQueries{router: r}
 }
 
 // Compile-time interface check.
@@ -94,7 +94,7 @@ func (f *funcTopQueries) MethodParams(_ context.Context, method string) ([]funca
 
 // Handle implements funcapi.MethodHandler.
 func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if f.collector.httpClient == nil {
+	if f.router.collector.httpClient == nil {
 		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 
@@ -107,12 +107,12 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 }
 
 func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *module.FunctionResponse {
-	limit := f.collector.TopQueriesLimit
+	limit := f.router.collector.TopQueriesLimit
 	if limit <= 0 {
 		limit = 500
 	}
 
-	req, err := web.NewHTTPRequestWithPath(f.collector.RequestConfig, "/_tasks")
+	req, err := web.NewHTTPRequestWithPath(f.router.collector.RequestConfig, "/_tasks")
 	if err != nil {
 		return &module.FunctionResponse{Status: 500, Message: err.Error()}
 	}
@@ -123,7 +123,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 	req.URL.RawQuery = q.Encode()
 
 	var resp topQueriesResponse
-	if err := web.DoHTTP(f.collector.httpClient).RequestJSON(req, &resp); err != nil {
+	if err := web.DoHTTP(f.router.collector.httpClient).RequestJSON(req, &resp); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
 		}
@@ -263,29 +263,6 @@ func (f *funcTopQueries) parseTaskID(taskID string) (int64, bool) {
 		return 0, false
 	}
 	return val, true
-}
-
-func elasticsearchMethods() []module.MethodConfig {
-	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Running queries from Elasticsearch Tasks API",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{
-				buildTopQueriesSortOptions(topQueriesColumns),
-			},
-		},
-	}
-}
-
-func elasticsearchFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return nil
-	}
-	return c.funcTopQueries
 }
 
 func buildTopQueriesSortOptions(cols []topQueriesColumn) funcapi.ParamConfig {
