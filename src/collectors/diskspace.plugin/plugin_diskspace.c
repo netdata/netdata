@@ -183,7 +183,6 @@ static void calculate_values_and_show_charts(
 {
     const char *family = mi->mount_point;
     const char *disk = mi->persistent_id;
-    static bool is_inside_lxc = false;
 
     // logic found at get_fs_usage() in coreutils
     unsigned long bsize = (buff_statvfs->f_frsize) ? buff_statvfs->f_frsize : buff_statvfs->f_bsize;
@@ -320,6 +319,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     static SIMPLE_PATTERN *excluded_filesystems = NULL;
     static SIMPLE_PATTERN *excluded_filesystems_inodes = NULL;
     static SIMPLE_PATTERN *excluded_zfs_datasets = NULL;
+    static bool is_inside_lxc = false;
 
     usec_t slow_timeout = MAX_STAT_USEC * update_every;
 
