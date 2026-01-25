@@ -11,12 +11,12 @@ Docs previously lived under nested `/Alerts & Notifications/The Book/` path whic
 
 ---
 
-## Structure Overview
+## Structure Overview (12 Chapters Total)
 
 ```
 docs/alerts/
 ├── understanding-alerts/           # Chapter 1 - Fundamentals
-│   ├── README.md                  # Landing page (uses README.md not index.md!)
+│   ├── README.md                  # Landing page
 │   ├── 1-what-is-a-netdata-alert.md
 │   ├── 2-alert-types-alarm-vs-template.md
 │   └── 3-where-alerts-live.md
@@ -63,17 +63,14 @@ docs/alerts/
 ├── cloud-alert-features/         # Chapter 10
 │   ├── README.md
 │   └── *.md files
-├── stock-alerts/                # Chapter 11
-│   ├── README.md
-│   └── *.md files
-├── best-practices/              # Chapter 12
+├── best-practices/              # Chapter 11
 │   ├── README.md
 │   ├── 1-designing-useful-alerts.md
 │   ├── 2-notification-strategy.md
 │   ├── 3-maintaining-configurations.md
 │   ├── 4-scaling-large-environments.md
 │   └── 5-sli-slo-alerts.md
-└── architecture/                # Chapter 13
+└── architecture/                # Chapter 12 (FINAL CHAPTER)
     ├── README.md
     ├── 1-evaluation-architecture.md
     ├── 2-alert-lifecycle.md
@@ -81,6 +78,8 @@ docs/alerts/
     ├── 4-configuration-layers.md
     └── 5-scaling-topologies.md
 ```
+
+**REMOVED:** stock-alerts directory (no longer exists)
 
 ---
 
@@ -91,8 +90,6 @@ docs/alerts/
 | Landing page | `README.md` | `understanding-alerts/README.md` |
 | Topic | `N-topic-name.md` | `1-what-is-a-netdata-alert.md` |
 | Numbering | Sequential starting at 1 | 1, 2, 3, 4, 5... |
-
-**IMPORTANT:** This branch uses `README.md` for landing pages, NOT `index.md`.
 
 ---
 
@@ -106,7 +103,7 @@ https://github.com/netdata/netdata/edit/master/docs/alerts/{folder}/{filename}.m
 
 Example:
 ```
-https://github.com/netdata/netdata/edit/master/docs/alerts/understanding-alerts/1-what-is-a-netdata-alert.md,What is a Netdata Alert,Published,Alerts & Notifications/Understanding Alerts,
+https://github.com/netdata/netdata/edit/master/docs/alerts/architecture/1-evaluation-architecture.md,Alert Evaluation Architecture,Published,Alerts & Notifications/Alerts and Notifications Architecture,
 ```
 
 ---
@@ -141,26 +138,17 @@ Link to other chapters like this:
 
 ---
 
-## Key Differences From Previous Structure
-
-| Old Pattern | New Pattern |
-|-------------|-------------|
-| `/The Book/Chapter/` | `/Chapter/` (flattened) |
-| `index.md` landing | `README.md` landing |
-| Descriptive names | Numerical prefix `N-` |
-| Mixed ordering | Strict sequential numbering |
-
----
-
 ## Chapters With Sub-sections Numbered
 
 | Chapter | Subsection Numbers |
 |---------|-------------------|
+| 1. Understanding Alerts | 1-3 |
+| 2. Creating and Managing Alerts | 1-5 |
 | 3. Alert Configuration Syntax | 1-6 |
 | 4. Controlling Alerts and Noise | 1-4 |
 | 5. Receiving Notifications | 1-5 |
-| 12. Best Practices | 1-5 |
-| 13. Architecture | 1-5 |
+| 11. Best Practices | 1-5 |
+| 12. Architecture | 1-5 |
 
 ---
 
