@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// mockHandler implements FunctionHandler for testing.
+// mockHandler implements MethodHandler for testing.
 type mockHandler struct {
 	methods      []MethodConfig
 	methodParams []ParamConfig
@@ -28,9 +28,9 @@ func (m *mockHandler) Handle(ctx context.Context, method string, params Resolved
 	return m.response
 }
 
-func TestFunctionHandler_Interface(t *testing.T) {
-	// Verify mockHandler implements FunctionHandler
-	var _ FunctionHandler = &mockHandler{}
+func TestMethodHandler_Interface(t *testing.T) {
+	// Verify mockHandler implements MethodHandler
+	var _ MethodHandler = &mockHandler{}
 
 	h := &mockHandler{
 		methods:  []MethodConfig{{ID: "test", Name: "Test"}},
@@ -40,7 +40,7 @@ func TestFunctionHandler_Interface(t *testing.T) {
 	assert.Len(t, h.Methods(), 1)
 	assert.Equal(t, "test", h.Methods()[0].ID)
 
-	params, err := h.MethodParams("test")
+	params, err := h.MethodParams(context.Background(), "test")
 	assert.NoError(t, err)
 	assert.Nil(t, params)
 
