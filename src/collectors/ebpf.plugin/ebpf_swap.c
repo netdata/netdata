@@ -454,9 +454,9 @@ static void ebpf_swap_exit(void *ptr)
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
 
 #ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj) {
-        swap_bpf__destroy(bpf_obj);
-        bpf_obj = NULL;
+    if (swap_bpf_obj) {
+        swap_bpf__destroy(swap_bpf_obj);
+        swap_bpf_obj = NULL;
     }
 #endif
     if (em->objects) {
@@ -1160,11 +1160,11 @@ static int ebpf_swap_load_bpf(ebpf_module_t *em)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = swap_bpf__open();
-        if (!bpf_obj)
+        swap_bpf_obj = swap_bpf__open();
+        if (!swap_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_swap_load_and_attach(bpf_obj, em);
+            ret = ebpf_swap_load_and_attach(swap_bpf_obj, em);
     }
 #endif
 

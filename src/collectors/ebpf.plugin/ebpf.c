@@ -833,7 +833,7 @@ struct mdflush_bpf *mdflush_bpf_obj = NULL;
 struct mount_bpf *mount_bpf_obj = NULL;
 struct shm_bpf *shm_bpf_obj = NULL;
 struct socket_bpf *socket_bpf_obj = NULL;
-struct swap_bpf *bpf_obj = NULL;
+struct swap_bpf *swap_bpf_obj = NULL;
 struct vfs_bpf *vfs_bpf_obj = NULL;
 struct process_bpf *process_bpf_obj = NULL;
 #else
