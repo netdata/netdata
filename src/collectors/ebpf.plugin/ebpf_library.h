@@ -7,7 +7,10 @@
 #include "ebpf_socket_ipc.h"
 
 typedef struct netdata_publish_syscall netdata_publish_syscall_t;
+typedef struct netdata_syscall_stat netdata_syscall_stat_t;
 typedef struct ebpf_module ebpf_module_t;
+typedef struct ebpf_target ebpf_target_t;
+typedef struct ebpf_tracepoint ebpf_tracepoint_t;
 typedef struct aral ARAL;
 typedef struct config config;
 
@@ -116,5 +119,65 @@ void ebpf_parse_ips_unsafe(const char *ptr);
 void ebpf_read_local_addresses_unsafe();
 int ebpf_load_collector_config(char *path, int *disable_cgroups, int update_every);
 void ebpf_load_thread_config();
+
+/*****************************************************************
+ *
+ *  FUNCTIONS TO CREATE CHARTS
+ *
+ *****************************************************************/
+
+void ebpf_create_apps_for_module(ebpf_module_t *em, ebpf_target_t *root);
+void ebpf_create_apps_charts(ebpf_target_t *root);
+
+/*****************************************************************
+ *
+ *  FUNCTIONS TO READ GLOBAL HASH TABLES
+ *
+ *****************************************************************/
+
+void ebpf_read_global_table_stats(
+    netdata_idx_t *stats,
+    netdata_idx_t *values,
+    int map_fd,
+    int maps_per_core,
+    uint32_t begin,
+    uint32_t end);
+
+/*****************************************************************
+ *
+ *  FUNCTIONS TO DEFINE OPTIONS
+ *
+ *****************************************************************/
+
+void ebpf_global_labels(
+    netdata_syscall_stat_t *is,
+    netdata_publish_syscall_t *pio,
+    char **dim,
+    char **name,
+    int *algorithm,
+    int end);
+
+void disable_all_global_charts();
+void ebpf_disable_cgroups();
+void ebpf_update_disabled_plugin_stats(ebpf_module_t *em);
+void ebpf_print_help();
+
+/*****************************************************************
+ *
+ *  TRACEPOINT MANAGEMENT FUNCTIONS
+ *
+ *****************************************************************/
+
+int ebpf_enable_tracepoint(ebpf_tracepoint_t *tp);
+int ebpf_disable_tracepoint(ebpf_tracepoint_t *tp);
+uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps);
+
+/*****************************************************************
+ *
+ *  AUXILIARY FUNCTIONS USED DURING INITIALIZATION
+ *
+ *****************************************************************/
+
+void read_local_ports(char *filename, uint8_t proto);
 
 #endif /* NETDATA_COLLECTOR_EBPF_LIBRARY_H */
