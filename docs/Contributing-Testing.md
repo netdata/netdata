@@ -120,6 +120,34 @@ node dist/tests/phase2-runner.js
 | `src/tests/phase2-runner.ts`                          | Live provider test runner (real LLMs)                                                      |
 | `src/tests/phase2-models.ts`                          | Model configurations for live provider tests                                               |
 | `src/tests/phase2-harness-scenarios/phase2-runner.ts` | Phase 2 deterministic test harness implementation                                          |
+| `src/tests/phase2-harness-scenarios/infrastructure/`  | Shared test infrastructure (types, helpers, mocks, runner)                                 |
+| `src/tests/phase2-harness-scenarios/suites/`          | Category-based test suites (see below)                                                     |
+| `src/tests/phase2-harness-scenarios/COVERAGE-MATRIX.md` | Branch coverage documentation                                                            |
+
+### Test Suite Structure
+
+The deterministic harness tests are organized into category-based suites:
+
+| Suite File                    | Tests | Coverage Area                        |
+| ----------------------------- | ----- | ------------------------------------ |
+| `core-orchestration.test.ts`  | 3     | Turn loop basics, session lifecycle  |
+| `final-report.test.ts`        | 3     | Report validation, format handling   |
+| `tool-execution.test.ts`      | 3     | MCP tools, unknown tools, batching   |
+| `context-guard.test.ts`       | 3     | Context limits, token tracking       |
+| `task-status.test.ts`         | 4     | Progress reporting, task completion  |
+| `router-handoff.test.ts`      | 3     | Agent delegation, routing            |
+| `error-handling.test.ts`      | 3     | Retry recovery, error behavior       |
+| `reasoning.test.ts`           | 4     | Content handling, retry without tools|
+| `format-specific.test.ts`     | 4     | Slack, JSON, pipe, markdown formats  |
+| `coverage.test.ts`            | 4     | Edge cases, boundary conditions      |
+
+**Infrastructure modules** (`infrastructure/`):
+- `harness-types.ts` - Type definitions (TestContext, HarnessTest, etc.)
+- `harness-helpers.ts` - Utility functions (invariant, log helpers)
+- `harness-mocks.ts` - Mock providers, registries
+- `harness-runner.ts` - Test runner logic (runWithExecuteTurnOverride)
+- `harness-constants.ts` - Shared constants
+- `index.ts` - Re-exports for convenient imports
 
 ### Deterministic Harness Controls
 
