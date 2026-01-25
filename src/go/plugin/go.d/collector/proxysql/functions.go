@@ -350,8 +350,6 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		Data:              data,
 		DefaultSortColumn: defaultSort,
 		RequiredParams:    []funcapi.ParamConfig{sortParam},
-		Charts:            cs.BuildCharts(),
-		DefaultCharts:     cs.BuildDefaultCharts(),
-		GroupBy:           cs.BuildGroupBy(),
+		ChartingConfig:    cs.BuildCharting(),
 	}
 }

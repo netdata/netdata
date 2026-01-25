@@ -236,9 +236,7 @@ FORMAT JSON
 		Data:              data,
 		DefaultSortColumn: defaultSort,
 		RequiredParams:    []funcapi.ParamConfig{sortParam},
-		Charts:            cs.BuildCharts(),
-		DefaultCharts:     cs.BuildDefaultCharts(),
-		GroupBy:           cs.BuildGroupBy(),
+		ChartingConfig:    cs.BuildCharting(),
 	}
 }
 

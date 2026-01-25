@@ -507,7 +507,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 
 				// Verify DefaultCharts
 				require.NotEmpty(t, resp.DefaultCharts)
-				assert.Equal(t, funcapi.DefaultCharts{
+				assert.ElementsMatch(t, funcapi.DefaultCharts{
 					{Chart: "Traffic", GroupBy: "Type"},
 					{Chart: "OperationalStatus", GroupBy: "Oper Status"},
 				}, resp.DefaultCharts)

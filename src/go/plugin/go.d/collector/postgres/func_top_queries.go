@@ -268,11 +268,7 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 		Data:              data,
 		DefaultSortColumn: defaultSort,
 		RequiredParams:    []funcapi.ParamConfig{sortParam},
-
-		// Charts for aggregated visualization
-		Charts:        cs.BuildCharts(),
-		DefaultCharts: cs.BuildDefaultCharts(),
-		GroupBy:       cs.BuildGroupBy(),
+		ChartingConfig:    cs.BuildCharting(),
 	}
 }
 

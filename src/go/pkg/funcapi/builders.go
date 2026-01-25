@@ -107,17 +107,42 @@ func (cs ColumnSet[T]) BuildGroupBy() map[string]GroupByConfig {
 }
 
 // BuildDefaultCharts builds default chart configurations.
+// Each chart uses its own DefaultGroupBy if set, otherwise falls back to global default.
 func (cs ColumnSet[T]) BuildDefaultCharts() DefaultCharts {
-	groupBy := cs.FindDefaultGroupBy()
-	if groupBy == "" {
-		return nil
-	}
+	globalGroupBy := cs.FindDefaultGroupBy()
 	groups := cs.FindDefaultChartGroups()
-	result := make(DefaultCharts, 0, len(groups))
+	var result DefaultCharts
 	for _, g := range groups {
+		groupBy := cs.findChartGroupBy(g)
+		if groupBy == "" {
+			groupBy = globalGroupBy
+		}
+		if groupBy == "" {
+			continue
+		}
 		result = append(result, DefaultChart{Chart: g, GroupBy: groupBy})
 	}
 	return result
+}
+
+// findChartGroupBy returns the DefaultGroupBy for a specific chart group.
+func (cs ColumnSet[T]) findChartGroupBy(chartGroup string) string {
+	for _, col := range cs.cols {
+		meta := cs.getMeta(col)
+		if meta.Chart != nil && meta.Chart.Group == chartGroup && meta.Chart.DefaultGroupBy != "" {
+			return meta.Chart.DefaultGroupBy
+		}
+	}
+	return ""
+}
+
+// BuildCharting builds the complete charting configuration.
+func (cs ColumnSet[T]) BuildCharting() ChartingConfig {
+	return ChartingConfig{
+		Charts:        cs.BuildCharts(),
+		DefaultCharts: cs.BuildDefaultCharts(),
+		GroupBy:       cs.BuildGroupBy(),
+	}
 }
 
 // FindDefaultGroupBy finds the default grouping column name.

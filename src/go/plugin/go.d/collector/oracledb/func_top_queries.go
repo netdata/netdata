@@ -124,9 +124,7 @@ FETCH FIRST %d ROWS ONLY
 			Data:              [][]any{},
 			DefaultSortColumn: sortColumn,
 			RequiredParams:    []funcapi.ParamConfig{buildSortParam(cols)},
-			Charts:            cs.BuildCharts(),
-			DefaultCharts:     cs.BuildDefaultCharts(),
-			GroupBy:           cs.BuildGroupBy(),
+			ChartingConfig:    cs.BuildCharting(),
 		}
 	}
 
@@ -137,9 +135,7 @@ FETCH FIRST %d ROWS ONLY
 		Data:              data,
 		DefaultSortColumn: sortColumn,
 		RequiredParams:    []funcapi.ParamConfig{buildSortParam(cols)},
-		Charts:            cs.BuildCharts(),
-		DefaultCharts:     cs.BuildDefaultCharts(),
-		GroupBy:           cs.BuildGroupBy(),
+		ChartingConfig:    cs.BuildCharting(),
 	}
 }
 

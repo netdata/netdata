@@ -162,9 +162,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 			Data:              [][]any{},
 			DefaultSortColumn: "runningTime",
 			RequiredParams:    []funcapi.ParamConfig{sortParam},
-			Charts:            cs.BuildCharts(),
-			DefaultCharts:     cs.BuildDefaultCharts(),
-			GroupBy:           cs.BuildGroupBy(),
+			ChartingConfig:    cs.BuildCharting(),
 		}
 	}
 
@@ -214,9 +212,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 		Data:              data,
 		DefaultSortColumn: "runningTime",
 		RequiredParams:    []funcapi.ParamConfig{sortParam},
-		Charts:            cs.BuildCharts(),
-		DefaultCharts:     cs.BuildDefaultCharts(),
-		GroupBy:           cs.BuildGroupBy(),
+		ChartingConfig:    cs.BuildCharting(),
 	}
 }
 

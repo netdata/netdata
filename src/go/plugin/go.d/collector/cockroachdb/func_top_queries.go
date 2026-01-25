@@ -105,9 +105,7 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 		Data:              data,
 		DefaultSortColumn: sortColumn,
 		RequiredParams:    []funcapi.ParamConfig{buildSortParam(topQueriesColumns)},
-		Charts:            cs.BuildCharts(),
-		DefaultCharts:     cs.BuildDefaultCharts(),
-		GroupBy:           cs.BuildGroupBy(),
+		ChartingConfig:    cs.BuildCharting(),
 	}
 }
 

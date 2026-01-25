@@ -148,9 +148,7 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 				Options:    sortOptions,
 				UniqueView: true,
 			}},
-			Charts:        cs.BuildCharts(),
-			DefaultCharts: cs.BuildDefaultCharts(),
-			GroupBy:       cs.BuildGroupBy(),
+			ChartingConfig: cs.BuildCharting(),
 		}
 	}
 
@@ -207,9 +205,7 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 			Options:    sortOptions,
 			UniqueView: true,
 		}},
-		Charts:        cs.BuildCharts(),
-		DefaultCharts: cs.BuildDefaultCharts(),
-		GroupBy:       cs.BuildGroupBy(),
+		ChartingConfig: cs.BuildCharting(),
 	}
 }
 

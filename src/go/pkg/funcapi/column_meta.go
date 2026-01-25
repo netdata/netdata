@@ -48,9 +48,10 @@ type ColumnMeta struct {
 
 // ChartOptions defines how a column participates in charts.
 type ChartOptions struct {
-	Group     string // Which chart this column belongs to (required)
-	Title     string // Chart display title (defaults to Group if empty)
-	IsDefault bool   // Include this chart in the default charts view
+	Group          string // Which chart this column belongs to (required)
+	Title          string // Chart display title (defaults to Group if empty)
+	IsDefault      bool   // Include this chart in the default charts view
+	DefaultGroupBy string // GroupBy column name for this chart's default (optional, falls back to global)
 }
 
 // GroupByOptions defines how a column participates in data grouping.

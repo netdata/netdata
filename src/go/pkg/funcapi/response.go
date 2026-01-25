@@ -24,7 +24,13 @@ type FunctionResponse struct {
 	// Optional dynamic required params (override MethodConfig.RequiredParams)
 	RequiredParams []ParamConfig
 
-	// Chart configuration for visualization
+	// Chart configuration for visualization (embedded for JSON compatibility)
+	ChartingConfig
+}
+
+// ChartingConfig groups chart visualization settings.
+// Embedded in FunctionResponse - JSON fields are promoted to top level.
+type ChartingConfig struct {
 	Charts        map[string]ChartConfig   // Chart definitions (chartID -> config)
 	DefaultCharts DefaultCharts            // Default charts to display
 	GroupBy       map[string]GroupByConfig // Group-by options (groupByID -> config)
