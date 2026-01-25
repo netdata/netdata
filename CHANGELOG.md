@@ -226,6 +226,11 @@
 - Regenerate integrations docs ([#21623](https://github.com/netdata/netdata/issues/21623))
 - Ci: update azure/trusted-signing-action after rebranding ([#21591](https://github.com/netdata/netdata/issues/21591))
 - Use debug level for logging of requests. ([#21625](https://github.com/netdata/netdata/issues/21625))
+- Docs(go.d): improve functions metadata ([#21626](https://github.com/netdata/netdata/issues/21626))
+- Feat(go.d.plugin): add RequireCloud for database functions ([#21629](https://github.com/netdata/netdata/issues/21629))
+- Regenerate integrations docs ([#21627](https://github.com/netdata/netdata/issues/21627))
+- Docs: add comprehensive node states and transitions documentation ([#21630](https://github.com/netdata/netdata/issues/21630))
+- Docs: add node-states-and-transitions to learn map ([#21631](https://github.com/netdata/netdata/issues/21631))
 
 ## [2.8.0] - 2025-11-19
 
