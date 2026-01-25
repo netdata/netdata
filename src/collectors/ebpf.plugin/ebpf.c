@@ -3,6 +3,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <ifaddrs.h>
+#include <errno.h>
 
 #include "ebpf.h"
 #include "ebpf_socket.h"
@@ -702,7 +703,7 @@ ebpf_filesystem_partitions_t localfs[] = {
           "nfs_file_write",
           "nfs_open",
           "nfs_getattr",
-          NULL}}, // // "nfs4_file_open" - not present on all kernels
+          NULL}}, // "nfs4_file_open" - not present on all kernels
     {.filesystem = "zfs",
      .optional_filesystem = NULL,
      .family = "zfs",
@@ -970,8 +971,8 @@ static void ebpf_exit()
 
     char filename[FILENAME_MAX + 1];
     ebpf_pid_file(filename, FILENAME_MAX);
-    if (unlink(filename))
-        netdata_log_error("Cannot remove PID file %s", filename);
+    if (unlink(filename) == -1 && errno != ENOENT)
+        netdata_log_error("Cannot remove PID file %s: %s", filename, strerror(errno));
 
 #ifdef NETDATA_INTERNAL_CHECKS
     netdata_log_error("Good bye world! I was PID %d", main_thread_id);
@@ -992,7 +993,7 @@ static void ebpf_exit()
 }
 
 /**
- * Unload loegacy code
+ * Unload legacy code
  *
  * @param objects       objects loaded from eBPF programs
  * @param probe_links   links from loader
@@ -1022,16 +1023,11 @@ void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe
 static void ebpf_unload_unique_maps()
 {
     int i;
-    for (i = 0; ebpf_modules[i].info.thread_name; i++) {
-        // These threads are cleaned with other functions
+    for (i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
         if (i != EBPF_MODULE_SOCKET_IDX)
             continue;
 
         if (ebpf_modules[i].enabled != NETDATA_THREAD_EBPF_STOPPED) {
-            if (ebpf_modules[i].enabled != NETDATA_THREAD_EBPF_NOT_RUNNING)
-                netdata_log_error(
-                    "Cannot unload maps for thread %s, because it is not stopped.", ebpf_modules[i].info.thread_name);
-
             continue;
         }
 
@@ -1116,7 +1112,8 @@ void ebpf_stop_threads(int sig)
     only_one = 1;
     int i;
     for (i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
-        if (ebpf_modules[i].enabled < NETDATA_THREAD_EBPF_STOPPING) {
+        if (ebpf_modules[i].enabled < NETDATA_THREAD_EBPF_STOPPING && ebpf_modules[i].thread &&
+            ebpf_modules[i].thread->thread) {
             nd_thread_signal_cancel(ebpf_modules[i].thread->thread);
 #ifdef NETDATA_DEV_MODE
             netdata_log_info("Sending cancel for thread %s", ebpf_modules[i].info.thread_name);
@@ -1149,7 +1146,6 @@ void ebpf_stop_threads(int sig)
 
     ebpf_exit();
 }
-
 
 /**
  * Start Pthread Variable
@@ -1524,8 +1520,8 @@ static void ebpf_parse_args(int argc, char **argv)
  *****************************************************************/
 
 static char *load_event_stat[NETDATA_EBPF_LOAD_STAT_END] = {"legacy", "co-re"};
-static char *memlock_stat = {"memory_locked"};
-static char *hash_table_stat = {"hash_table"};
+static char *memlock_stat = "memory_locked";
+static char *hash_table_stat = "hash_table";
 static char *hash_table_core[NETDATA_EBPF_LOAD_STAT_END] = {"per_core", "unique"};
 
 /**
@@ -1643,24 +1639,6 @@ void ebpf_send_statistic_data()
         NETDATA_EBPF_HASH_TABLES_INSERT_PID_ELEMENTS, NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_ADD);
     ebpf_send_hash_table_pid_data(
         NETDATA_EBPF_HASH_TABLES_REMOVE_PID_ELEMENTS, NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_DEL);
-
-    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
-        ebpf_module_t *wem = &ebpf_modules[i];
-        if (!wem->functions.fnct_routine)
-            continue;
-
-        ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, (char *)wem->functions.fcnt_thread_chart_name, "");
-        write_chart_dimension((char *)wem->info.thread_name, (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ? 1 : 0);
-        ebpf_write_end_chart();
-
-        ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, (char *)wem->functions.fcnt_thread_lifetime_name, "");
-        write_chart_dimension(
-            (char *)wem->info.thread_name,
-            (wem->lifetime && wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ?
-                (long long)(wem->lifetime - wem->running_time) :
-                0);
-        ebpf_write_end_chart();
-    }
 }
 
 /**
@@ -2003,12 +1981,10 @@ static void ebpf_create_statistic_charts(int update_every)
 
         em->functions.order_thread_chart = j;
         snprintfz(name, sizeof(name) - 1, "%s_%s", NETDATA_EBPF_THREADS, em->info.thread_name);
-        em->functions.fcnt_thread_chart_name = strdupz(name);
         ebpf_create_thread_chart(name, "Threads running.", "boolean", j++, update_every, em);
 
         em->functions.order_thread_lifetime = j;
         snprintfz(name, sizeof(name) - 1, "%s_%s", NETDATA_EBPF_LIFE_TIME, em->info.thread_name);
-        em->functions.fcnt_thread_lifetime_name = strdupz(name);
         ebpf_create_thread_chart(name, "Time remaining for thread.", "seconds", j++, update_every, em);
     }
 
@@ -2074,7 +2050,7 @@ static char *ebpf_get_process_name(pid_t pid)
 {
     char *name = NULL;
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "/proc/%d/status", pid);
+    snprintfz(filename, sizeof(filename) - 1, "/proc/%d/status", pid);
 
     procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
     if (unlikely(!ff)) {
@@ -2192,14 +2168,12 @@ static void ebpf_kill_previous_process(char *filename, pid_t pid)
     if (!old_pid)
         return;
 
-    // Process is not running
     char *prev_name = ebpf_get_process_name(old_pid);
     if (!prev_name)
         return;
 
     char *current_name = ebpf_get_process_name(pid);
-
-    if (!strcmp(prev_name, current_name))
+    if (current_name && !strcmp(prev_name, current_name))
         kill(old_pid, SIGKILL);
 
     freez(prev_name);
@@ -2219,7 +2193,7 @@ static void ebpf_kill_previous_process(char *filename, pid_t pid)
  */
 void ebpf_pid_file(char *filename, size_t length)
 {
-    snprintfz(filename, length, "%s/var/run/ebpf.pid", netdata_configured_host_prefix);
+    snprintfz(filename, length - 1, "%s/var/run/ebpf.pid", netdata_configured_host_prefix);
 }
 
 /**
@@ -2246,7 +2220,7 @@ static void ebpf_manage_pid(pid_t pid)
 static void ebpf_set_static_routine()
 {
     int i;
-    for (i = 0; ebpf_modules[i].info.thread_name; i++) {
+    for (i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
         ebpf_threads[i].start_routine = ebpf_modules[i].functions.start_routine;
     }
 }
