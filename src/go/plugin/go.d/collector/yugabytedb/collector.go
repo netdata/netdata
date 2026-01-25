@@ -27,8 +27,8 @@ func init() {
 		},
 		Methods:       yugabyteMethods,
 		MethodHandler: yugabyteFunctionHandler,
-		Create:          func() module.Module { return New() },
-		Config:          func() any { return &Config{} },
+		Create:        func() module.Module { return New() },
+		Config:        func() any { return &Config{} },
 	})
 }
 

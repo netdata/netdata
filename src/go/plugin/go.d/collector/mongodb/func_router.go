@@ -22,7 +22,7 @@ func newFuncRouter(c *Collector) *funcRouter {
 		collector: c,
 		handlers:  make(map[string]funcapi.MethodHandler),
 	}
-	r.handlers["top-queries"] = newFuncTopQueries(r)
+	r.handlers[topQueriesMethodID] = newFuncTopQueries(r)
 	return r
 }
 
@@ -50,16 +50,9 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 }
 
 func mongoMethods() []module.MethodConfig {
-	return []module.MethodConfig{{
-		UpdateEvery:  10,
-		ID:           "top-queries",
-		Name:         "Top Queries",
-		Help:         topQueriesHelpText,
-		RequireCloud: true,
-		RequiredParams: []funcapi.ParamConfig{
-			buildTopQueriesSortOptions(topQueriesColumns),
-		},
-	}}
+	return []module.MethodConfig{
+		topQueriesMethodConfig(),
+	}
 }
 
 func mongoFunctionHandler(job *module.Job) funcapi.MethodHandler {

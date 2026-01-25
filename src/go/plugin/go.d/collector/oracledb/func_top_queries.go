@@ -9,10 +9,25 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
-const topQueriesMaxTextLength = 4096
+const (
+	topQueriesMethodID      = "top-queries"
+	topQueriesMaxTextLength = 4096
+)
+
+func topQueriesMethodConfig() module.MethodConfig {
+	return module.MethodConfig{
+		ID:             topQueriesMethodID,
+		Name:           "Top Queries",
+		UpdateEvery:    10,
+		Help:           "Top SQL statements from V$SQLSTATS. WARNING: Query text may contain unmasked literals (potential PII).",
+		RequireCloud:   true,
+		RequiredParams: []funcapi.ParamConfig{funcapi.BuildSortParam(topQueriesColumns)},
+	}
+}
 
 // topQueriesColumn embeds funcapi.ColumnMeta and adds OracleDB-specific fields.
 type topQueriesColumn struct {

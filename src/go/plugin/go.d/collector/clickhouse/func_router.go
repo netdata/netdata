@@ -11,23 +11,8 @@ import (
 )
 
 func clickhouseMethods() []module.MethodConfig {
-	sortOptions := buildSortOptions(topQueriesColumns)
 	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Top SQL queries from ClickHouse system.query_log",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:         topQueriesParamSort,
-				Name:       "Filter By",
-				Help:       "Select the primary sort column",
-				Selection:  funcapi.ParamSelect,
-				Options:    sortOptions,
-				UniqueView: true,
-			}},
-		},
+		topQueriesMethodConfig(),
 	}
 }
 
@@ -50,7 +35,7 @@ func newFuncRouter(c *Collector) *funcRouter {
 		collector: c,
 		handlers:  make(map[string]funcapi.MethodHandler),
 	}
-	r.handlers["top-queries"] = newFuncTopQueries(r)
+	r.handlers[topQueriesMethodID] = newFuncTopQueries(r)
 	return r
 }
 
@@ -72,22 +57,4 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 	for _, h := range r.handlers {
 		h.Cleanup(ctx)
 	}
-}
-
-// buildSortOptions builds sort options for method registration (before handler exists).
-func buildSortOptions(cols []topQueriesColumn) []funcapi.ParamOption {
-	var sortOptions []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range cols {
-		if col.IsSortOption {
-			sortOptions = append(sortOptions, funcapi.ParamOption{
-				ID:      col.Name,
-				Column:  col.Name,
-				Name:    "Top queries by " + col.SortLabel,
-				Default: col.IsDefaultSort,
-				Sort:    &sortDir,
-			})
-		}
-	}
-	return sortOptions
 }

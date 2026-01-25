@@ -17,27 +17,44 @@ import (
 )
 
 const (
-	topQueriesMethodID     = "top-queries"
+	topQueriesMethodID      = "top-queries"
 	redisMaxQueryTextLength = 4096
 )
 
+func topQueriesMethodConfig() module.MethodConfig {
+	return module.MethodConfig{
+		ID:             topQueriesMethodID,
+		Name:           "Top Queries",
+		UpdateEvery:    10,
+		Help:           "Slow commands from Redis SLOWLOG. WARNING: Command arguments may contain unmasked literals (potential PII).",
+		RequireCloud:   true,
+		RequiredParams: []funcapi.ParamConfig{funcapi.BuildSortParam(redisAllColumns)},
+	}
+}
+
 type redisColumn struct {
 	funcapi.ColumnMeta
-	IsSortOption  bool   // whether this column appears as a sort option
-	SortLabel     string // label for sort option dropdown
-	IsDefaultSort bool   // default sort column
+	sortOpt     bool   // whether this column appears as a sort option
+	sortLbl     string // label for sort option dropdown
+	defaultSort bool   // default sort column
 }
+
+// funcapi.SortableColumn interface implementation for redisColumn.
+func (c redisColumn) IsSortOption() bool  { return c.sortOpt }
+func (c redisColumn) SortLabel() string   { return c.sortLbl }
+func (c redisColumn) IsDefaultSort() bool { return c.defaultSort }
+func (c redisColumn) ColumnName() string  { return c.Name }
 
 func redisColumnSet(cols []redisColumn) funcapi.ColumnSet[redisColumn] {
 	return funcapi.Columns(cols, func(c redisColumn) funcapi.ColumnMeta { return c.ColumnMeta })
 }
 
 var redisAllColumns = []redisColumn{
-	{ColumnMeta: funcapi.ColumnMeta{Name: "id", Tooltip: "ID", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformNumber, UniqueKey: true, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryCount}, IsSortOption: true, SortLabel: "Top queries by ID"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "timestamp", Tooltip: "Timestamp", Type: funcapi.FieldTypeTimestamp, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformDatetime, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, IsSortOption: true, SortLabel: "Top queries by Timestamp"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "id", Tooltip: "ID", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformNumber, UniqueKey: true, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryCount}, sortOpt: true, sortLbl: "Top queries by ID"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "timestamp", Tooltip: "Timestamp", Type: funcapi.FieldTypeTimestamp, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformDatetime, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, sortOpt: true, sortLbl: "Top queries by Timestamp"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "command", Tooltip: "Command", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, Sticky: true, FullWidth: true, Wrap: true}},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "command_name", Tooltip: "Command Name", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, GroupBy: &funcapi.GroupByOptions{IsDefault: true}}, IsSortOption: true, SortLabel: "Top queries by Command Name"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "duration", Tooltip: "Duration", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Duration", Title: "Execution Time", IsDefault: true}}, IsSortOption: true, SortLabel: "Top queries by Duration", IsDefaultSort: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "command_name", Tooltip: "Command Name", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, GroupBy: &funcapi.GroupByOptions{IsDefault: true}}, sortOpt: true, sortLbl: "Top queries by Command Name"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "duration", Tooltip: "Duration", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Duration", Title: "Execution Time", IsDefault: true}}, sortOpt: true, sortLbl: "Top queries by Duration", defaultSort: true},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "client_addr", Tooltip: "Client Address", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "client_name", Tooltip: "Client Name", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}},
 }
@@ -59,29 +76,7 @@ func (f *funcTopQueries) MethodParams(_ context.Context, method string) ([]funca
 	if method != topQueriesMethodID {
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
-
-	var sortOptions []funcapi.ParamOption
-	for _, col := range redisAllColumns {
-		if !col.IsSortOption {
-			continue
-		}
-		sortDir := funcapi.FieldSortDescending
-		sortOptions = append(sortOptions, funcapi.ParamOption{
-			ID:      col.Name,
-			Column:  col.Name,
-			Name:    col.SortLabel,
-			Sort:    &sortDir,
-			Default: col.IsDefaultSort,
-		})
-	}
-	return []funcapi.ParamConfig{{
-		ID:         "__sort",
-		Name:       "Filter By",
-		Help:       "Select the primary sort column",
-		Selection:  funcapi.ParamSelect,
-		Options:    sortOptions,
-		UniqueView: true,
-	}}, nil
+	return []funcapi.ParamConfig{funcapi.BuildSortParam(redisAllColumns)}, nil
 }
 
 // Handle implements funcapi.MethodHandler.
@@ -117,20 +112,7 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 	}
 
 	cs := redisColumnSet(redisAllColumns)
-	var sortOptions []funcapi.ParamOption
-	for _, col := range redisAllColumns {
-		if !col.IsSortOption {
-			continue
-		}
-		sortDir := funcapi.FieldSortDescending
-		sortOptions = append(sortOptions, funcapi.ParamOption{
-			ID:      col.Name,
-			Column:  col.Name,
-			Name:    col.SortLabel,
-			Sort:    &sortDir,
-			Default: col.IsDefaultSort,
-		})
-	}
+	sortParam := funcapi.BuildSortParam(redisAllColumns)
 
 	if len(entries) == 0 {
 		return &module.FunctionResponse{
@@ -140,15 +122,8 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 			Columns:           cs.BuildColumns(),
 			Data:              [][]any{},
 			DefaultSortColumn: "duration",
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:         "__sort",
-				Name:       "Filter By",
-				Help:       "Select the primary sort column",
-				Selection:  funcapi.ParamSelect,
-				Options:    sortOptions,
-				UniqueView: true,
-			}},
-			ChartingConfig: cs.BuildCharting(),
+			RequiredParams:    []funcapi.ParamConfig{sortParam},
+			ChartingConfig:    cs.BuildCharting(),
 		}
 	}
 
@@ -197,15 +172,8 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: "duration",
-		RequiredParams: []funcapi.ParamConfig{{
-			ID:         "__sort",
-			Name:       "Filter By",
-			Help:       "Select the primary sort column",
-			Selection:  funcapi.ParamSelect,
-			Options:    sortOptions,
-			UniqueView: true,
-		}},
-		ChartingConfig: cs.BuildCharting(),
+		RequiredParams:    []funcapi.ParamConfig{sortParam},
+		ChartingConfig:    cs.BuildCharting(),
 	}
 }
 

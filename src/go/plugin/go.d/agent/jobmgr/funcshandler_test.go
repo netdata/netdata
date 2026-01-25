@@ -16,9 +16,9 @@ import (
 
 // mockMethodHandler implements funcapi.MethodHandler for testing.
 type mockMethodHandler struct {
-	job         *module.Job
-	paramsFunc  func(ctx context.Context, method string) ([]funcapi.ParamConfig, error)
-	handleFunc  func(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse
+	job        *module.Job
+	paramsFunc func(ctx context.Context, method string) ([]funcapi.ParamConfig, error)
+	handleFunc func(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse
 }
 
 func (m *mockMethodHandler) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {

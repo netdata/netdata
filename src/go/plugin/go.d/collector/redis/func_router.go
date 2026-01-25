@@ -50,36 +50,8 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 }
 
 func redisMethods() []module.MethodConfig {
-	var sortOptions []funcapi.ParamOption
-	for _, col := range redisAllColumns {
-		if !col.IsSortOption {
-			continue
-		}
-		sortDir := funcapi.FieldSortDescending
-		sortOptions = append(sortOptions, funcapi.ParamOption{
-			ID:      col.Name,
-			Column:  col.Name,
-			Name:    col.SortLabel,
-			Sort:    &sortDir,
-			Default: col.IsDefaultSort,
-		})
-	}
 	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           topQueriesMethodID,
-			Name:         "Top Queries",
-			Help:         "Slow commands from Redis SLOWLOG. WARNING: Command arguments may contain unmasked literals (potential PII).",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:         "__sort",
-				Name:       "Filter By",
-				Help:       "Select the primary sort column",
-				Selection:  funcapi.ParamSelect,
-				Options:    sortOptions,
-				UniqueView: true,
-			}},
-		},
+		topQueriesMethodConfig(),
 	}
 }
 

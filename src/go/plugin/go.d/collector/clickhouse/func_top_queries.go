@@ -11,12 +11,25 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
-const topQueriesMaxTextLength = 4096
+const (
+	topQueriesMethodID      = "top-queries"
+	topQueriesMaxTextLength = 4096
+)
 
-const topQueriesParamSort = "__sort"
+func topQueriesMethodConfig() module.MethodConfig {
+	return module.MethodConfig{
+		ID:             topQueriesMethodID,
+		Name:           "Top Queries",
+		UpdateEvery:    10,
+		Help:           "Top SQL queries from ClickHouse system.query_log",
+		RequireCloud:   true,
+		RequiredParams: []funcapi.ParamConfig{funcapi.BuildSortParam(topQueriesColumns)},
+	}
+}
 
 // topQueriesColumn defines a column for ClickHouse top-queries function.
 // Embeds funcapi.ColumnMeta for UI display and adds collector-specific fields.
@@ -28,10 +41,16 @@ type topQueriesColumn struct {
 	SelectExpr string // SQL expression for SELECT
 
 	// Sort parameter metadata
-	IsSortOption  bool   // Include in __sort parameter options
-	SortLabel     string // Display label for sort option
-	IsDefaultSort bool   // Default sort option
+	sortOpt     bool   // Include in __sort parameter options
+	sortLbl     string // Display label for sort option
+	defaultSort bool   // Default sort option
 }
+
+// funcapi.SortableColumn interface implementation for topQueriesColumn.
+func (c topQueriesColumn) IsSortOption() bool  { return c.sortOpt }
+func (c topQueriesColumn) SortLabel() string   { return c.sortLbl }
+func (c topQueriesColumn) IsDefaultSort() bool { return c.defaultSort }
+func (c topQueriesColumn) ColumnName() string  { return c.Name }
 
 var topQueriesColumns = []topQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "queryId", Tooltip: "Query ID", Type: funcapi.FieldTypeString, Visible: false, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, UniqueKey: true, Sortable: true}, DBColumn: "normalized_query_hash", SelectExpr: "toString(normalized_query_hash)"},
@@ -39,14 +58,14 @@ var topQueriesColumns = []topQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "database", Tooltip: "Database", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, GroupBy: &funcapi.GroupByOptions{IsDefault: true}, Sortable: true}, DBColumn: "current_database", SelectExpr: "any(current_database)"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "user", Tooltip: "User", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, GroupBy: &funcapi.GroupByOptions{}, Sortable: true}, DBColumn: "user", SelectExpr: "any(user)"},
 
-	{ColumnMeta: funcapi.ColumnMeta{Name: "calls", Tooltip: "Calls", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Calls", Title: "Number of Calls", IsDefault: true}, Sortable: true}, SelectExpr: "count()", IsSortOption: true, SortLabel: "Number of Calls"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "calls", Tooltip: "Calls", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Calls", Title: "Number of Calls", IsDefault: true}, Sortable: true}, SelectExpr: "count()", sortOpt: true, sortLbl: "Top queries by Number of Calls"},
 
-	{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time", IsDefault: true}, Sortable: true}, DBColumn: "query_duration_ms", SelectExpr: "sum(query_duration_ms)", IsSortOption: true, SortLabel: "Total Execution Time", IsDefaultSort: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "avgTime", Tooltip: "Avg Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}, Sortable: true}, DBColumn: "query_duration_ms", SelectExpr: "avg(query_duration_ms)", IsSortOption: true, SortLabel: "Average Execution Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time", IsDefault: true}, Sortable: true}, DBColumn: "query_duration_ms", SelectExpr: "sum(query_duration_ms)", sortOpt: true, defaultSort: true, sortLbl: "Top queries by Total Execution Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "avgTime", Tooltip: "Avg Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}, Sortable: true}, DBColumn: "query_duration_ms", SelectExpr: "avg(query_duration_ms)", sortOpt: true, sortLbl: "Top queries by Average Execution Time"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "minTime", Tooltip: "Min Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMin, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}, Sortable: true}, DBColumn: "query_duration_ms", SelectExpr: "min(query_duration_ms)"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "maxTime", Tooltip: "Max Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}, Sortable: true}, DBColumn: "query_duration_ms", SelectExpr: "max(query_duration_ms)"},
 
-	{ColumnMeta: funcapi.ColumnMeta{Name: "readRows", Tooltip: "Read Rows", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}, Sortable: true}, DBColumn: "read_rows", SelectExpr: "sum(read_rows)", IsSortOption: true, SortLabel: "Rows Read"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "readRows", Tooltip: "Read Rows", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}, Sortable: true}, DBColumn: "read_rows", SelectExpr: "sum(read_rows)", sortOpt: true, sortLbl: "Top queries by Rows Read"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "readBytes", Tooltip: "Read Bytes", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Bytes", Title: "Bytes"}, Sortable: true}, DBColumn: "read_bytes", SelectExpr: "sum(read_bytes)"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "writtenRows", Tooltip: "Written Rows", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}, Sortable: true}, DBColumn: "written_rows", SelectExpr: "sum(written_rows)"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "writtenBytes", Tooltip: "Written Bytes", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Bytes", Title: "Bytes"}, Sortable: true}, DBColumn: "written_bytes", SelectExpr: "sum(written_bytes)"},
@@ -78,7 +97,7 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 		return nil, fmt.Errorf("collector is still initializing")
 	}
 	switch method {
-	case "top-queries":
+	case topQueriesMethodID:
 		return f.methodParams(ctx)
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
@@ -91,8 +110,8 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 	switch method {
-	case "top-queries":
-		return f.collectData(ctx, params.Column(topQueriesParamSort))
+	case topQueriesMethodID:
+		return f.collectData(ctx, params.Column("__sort"))
 	default:
 		return funcapi.NotFoundResponse(method)
 	}
@@ -110,15 +129,7 @@ func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfi
 	if len(cols) == 0 {
 		return nil, fmt.Errorf("no columns available in system.query_log")
 	}
-	sortParam := funcapi.ParamConfig{
-		ID:         topQueriesParamSort,
-		Name:       "Filter By",
-		Help:       "Select the primary sort column",
-		Selection:  funcapi.ParamSelect,
-		Options:    buildSortOptions(cols),
-		UniqueView: true,
-	}
-	return []funcapi.ParamConfig{sortParam}, nil
+	return []funcapi.ParamConfig{funcapi.BuildSortParam(cols)}, nil
 }
 
 func (f *funcTopQueries) detectQueryLogColumns(ctx context.Context) (map[string]bool, error) {
@@ -215,27 +226,13 @@ FORMAT JSON
 		data = append(data, row)
 	}
 
-	sortParam := funcapi.ParamConfig{
-		ID:         topQueriesParamSort,
-		Name:       "Filter By",
-		Help:       "Select the primary sort column",
-		Selection:  funcapi.ParamSelect,
-		Options:    buildSortOptions(cols),
-		UniqueView: true,
-	}
-
-	defaultSort := "totalTime"
-	if !cs.ContainsColumn(defaultSort) {
-		defaultSort = "calls"
-	}
-
 	return &funcapi.FunctionResponse{
 		Status:            200,
 		Help:              "Top SQL queries from ClickHouse system.query_log",
 		Columns:           cs.BuildColumns(),
 		Data:              data,
-		DefaultSortColumn: defaultSort,
-		RequiredParams:    []funcapi.ParamConfig{sortParam},
+		DefaultSortColumn: sortColumn,
+		RequiredParams:    []funcapi.ParamConfig{funcapi.BuildSortParam(cols)},
 		ChartingConfig:    cs.BuildCharting(),
 	}
 }

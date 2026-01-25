@@ -9,13 +9,25 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
 const (
-	runningQueriesMethodID   = "running-queries"
+	runningQueriesMethodID    = "running-queries"
 	rethinkMaxQueryTextLength = 4096
 )
+
+func runningQueriesMethodConfig() module.MethodConfig {
+	return module.MethodConfig{
+		ID:             runningQueriesMethodID,
+		Name:           "Running Queries",
+		UpdateEvery:    10,
+		Help:           "Currently running queries from rethinkdb.jobs. WARNING: Query text may contain unmasked literals (potential PII).",
+		RequireCloud:   true,
+		RequiredParams: []funcapi.ParamConfig{funcapi.BuildSortParam(rethinkRunningColumns)},
+	}
+}
 
 // Compile-time interface check.
 var _ funcapi.MethodHandler = (*funcRunningQueries)(nil)
@@ -36,29 +48,7 @@ func (f *funcRunningQueries) MethodParams(_ context.Context, method string) ([]f
 	if method != runningQueriesMethodID {
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
-
-	var sortOptions []funcapi.ParamOption
-	for _, col := range rethinkRunningColumns {
-		if !col.IsSortOption {
-			continue
-		}
-		sortDir := funcapi.FieldSortDescending
-		sortOptions = append(sortOptions, funcapi.ParamOption{
-			ID:      col.Name,
-			Column:  col.Name,
-			Name:    col.SortLabel,
-			Sort:    &sortDir,
-			Default: col.IsDefaultSort,
-		})
-	}
-	return []funcapi.ParamConfig{{
-		ID:         "__sort",
-		Name:       "Filter By",
-		Help:       "Select the primary sort column",
-		Selection:  funcapi.ParamSelect,
-		Options:    sortOptions,
-		UniqueView: true,
-	}}, nil
+	return []funcapi.ParamConfig{funcapi.BuildSortParam(rethinkRunningColumns)}, nil
 }
 
 // Handle implements funcapi.MethodHandler.
@@ -96,20 +86,6 @@ func (f *funcRunningQueries) collectRunningQueries(ctx context.Context, sortColu
 	}
 
 	cs := rethinkColumnSet(rethinkRunningColumns)
-	var sortOptions []funcapi.ParamOption
-	for _, col := range rethinkRunningColumns {
-		if !col.IsSortOption {
-			continue
-		}
-		sortDir := funcapi.FieldSortDescending
-		sortOptions = append(sortOptions, funcapi.ParamOption{
-			ID:      col.Name,
-			Column:  col.Name,
-			Name:    col.SortLabel,
-			Sort:    &sortDir,
-			Default: col.IsDefaultSort,
-		})
-	}
 
 	if len(jobRows) == 0 {
 		return &funcapi.FunctionResponse{
@@ -119,14 +95,7 @@ func (f *funcRunningQueries) collectRunningQueries(ctx context.Context, sortColu
 			Columns:           cs.BuildColumns(),
 			Data:              [][]any{},
 			DefaultSortColumn: mapRethinkSortColumn(sortColumn),
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:         "__sort",
-				Name:       "Filter By",
-				Help:       "Select the primary sort column",
-				Selection:  funcapi.ParamSelect,
-				Options:    sortOptions,
-				UniqueView: true,
-			}},
+			RequiredParams:    []funcapi.ParamConfig{funcapi.BuildSortParam(rethinkRunningColumns)},
 		}
 	}
 
@@ -170,23 +139,22 @@ func (f *funcRunningQueries) collectRunningQueries(ctx context.Context, sortColu
 		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: sortColumn,
-		RequiredParams: []funcapi.ParamConfig{{
-			ID:         "__sort",
-			Name:       "Filter By",
-			Help:       "Select the primary sort column",
-			Selection:  funcapi.ParamSelect,
-			Options:    sortOptions,
-			UniqueView: true,
-		}},
+		RequiredParams:    []funcapi.ParamConfig{funcapi.BuildSortParam(rethinkRunningColumns)},
 	}
 }
 
 type rethinkColumn struct {
 	funcapi.ColumnMeta
-	IsSortOption  bool   // whether this column appears as a sort option
-	SortLabel     string // label for sort option dropdown
-	IsDefaultSort bool   // default sort column
+	sortOpt     bool   // whether this column appears as a sort option
+	sortLbl     string // label for sort option dropdown
+	defaultSort bool   // default sort column
 }
+
+// funcapi.SortableColumn interface implementation for rethinkColumn.
+func (c rethinkColumn) IsSortOption() bool  { return c.sortOpt }
+func (c rethinkColumn) SortLabel() string   { return c.sortLbl }
+func (c rethinkColumn) IsDefaultSort() bool { return c.defaultSort }
+func (c rethinkColumn) ColumnName() string  { return c.Name }
 
 func rethinkColumnSet(cols []rethinkColumn) funcapi.ColumnSet[rethinkColumn] {
 	return funcapi.Columns(cols, func(c rethinkColumn) funcapi.ColumnMeta { return c.ColumnMeta })
@@ -195,7 +163,7 @@ func rethinkColumnSet(cols []rethinkColumn) funcapi.ColumnSet[rethinkColumn] {
 var rethinkRunningColumns = []rethinkColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "jobId", Tooltip: "Job ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, Sticky: true, FullWidth: true, Wrap: true}},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "durationMs", Tooltip: "Duration", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, IsSortOption: true, IsDefaultSort: true, SortLabel: "Running queries by Duration"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "durationMs", Tooltip: "Duration", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, sortOpt: true, defaultSort: true, sortLbl: "Running queries by Duration"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "type", Tooltip: "Type", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "user", Tooltip: "User", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "clientAddress", Tooltip: "Client Address", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}},
@@ -283,17 +251,17 @@ func toInt64(v any) int64 {
 
 func mapRethinkSortColumn(input string) string {
 	for _, col := range rethinkRunningColumns {
-		if col.IsSortOption && col.Name == input {
+		if col.IsSortOption() && col.Name == input {
 			return col.Name
 		}
 	}
 	for _, col := range rethinkRunningColumns {
-		if col.IsDefaultSort {
+		if col.IsDefaultSort() {
 			return col.Name
 		}
 	}
 	for _, col := range rethinkRunningColumns {
-		if col.IsSortOption {
+		if col.IsSortOption() {
 			return col.Name
 		}
 	}

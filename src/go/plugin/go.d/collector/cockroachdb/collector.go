@@ -30,8 +30,8 @@ func init() {
 		},
 		Methods:       cockroachMethods,
 		MethodHandler: cockroachFunctionHandler,
-		Create:          func() module.Module { return New() },
-		Config:          func() any { return &Config{} },
+		Create:        func() module.Module { return New() },
+		Config:        func() any { return &Config{} },
 	})
 }
 

@@ -131,4 +131,3 @@ func yugabyteFunctionHandler(job *module.Job) funcapi.MethodHandler {
 	}
 	return c.funcRouter
 }
-

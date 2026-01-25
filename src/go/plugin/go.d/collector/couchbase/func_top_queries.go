@@ -20,7 +20,21 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
-const topQueriesMaxTextLength = 4096
+const (
+	topQueriesMethodID      = "top-queries"
+	topQueriesMaxTextLength = 4096
+)
+
+func topQueriesMethodConfig() module.MethodConfig {
+	return module.MethodConfig{
+		ID:             topQueriesMethodID,
+		Name:           "Top Queries",
+		UpdateEvery:    10,
+		Help:           "Top N1QL requests from system:completed_requests",
+		RequireCloud:   true,
+		RequiredParams: []funcapi.ParamConfig{buildTopQueriesSortOptions(topQueriesColumns)},
+	}
+}
 
 type topQueriesColumn struct {
 	funcapi.ColumnMeta
@@ -97,7 +111,7 @@ var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
 // MethodParams implements funcapi.MethodHandler.
 func (f *funcTopQueries) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
 	switch method {
-	case "top-queries":
+	case topQueriesMethodID:
 		return []funcapi.ParamConfig{buildTopQueriesSortOptions(topQueriesColumns)}, nil
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
@@ -111,7 +125,7 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 	}
 
 	switch method {
-	case "top-queries":
+	case topQueriesMethodID:
 		return f.collectData(ctx, params.Column("__sort"))
 	default:
 		return funcapi.NotFoundResponse(method)

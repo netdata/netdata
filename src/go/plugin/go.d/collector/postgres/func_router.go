@@ -22,7 +22,7 @@ func newFuncRouter(c *Collector) *funcRouter {
 		collector: c,
 		handlers:  make(map[string]funcapi.MethodHandler),
 	}
-	r.handlers["top-queries"] = newFuncTopQueries(r)
+	r.handlers[topQueriesMethodID] = newFuncTopQueries(r)
 	return r
 }
 
@@ -51,23 +51,7 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 
 func pgMethods() []module.MethodConfig {
 	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Top SQL queries from pg_stat_statements",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{
-				{
-					ID:         paramSort,
-					Name:       "Filter By",
-					Help:       "Select the primary sort column",
-					Selection:  funcapi.ParamSelect,
-					Options:    buildPgSortOptions(),
-					UniqueView: true,
-				},
-			},
-		},
+		topQueriesMethodConfig(),
 	}
 }
 

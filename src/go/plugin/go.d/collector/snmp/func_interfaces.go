@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 // Compile-time interface check.
@@ -27,6 +28,27 @@ const (
 	ifacesParamTypeGroup   = "if_type_group"
 	ifacesDefaultTypeGroup = "ethernet"
 )
+
+func ifacesMethodConfig() module.MethodConfig {
+	return module.MethodConfig{
+		ID:          ifacesMethodID,
+		Name:        "Network Interfaces",
+		UpdateEvery: 10,
+		Help:        "Network interface traffic and status metrics",
+		RequiredParams: []funcapi.ParamConfig{{
+			ID:        ifacesParamTypeGroup,
+			Name:      "Type Group",
+			Help:      "Filter by interface type group",
+			Selection: funcapi.ParamSelect,
+			Options: []funcapi.ParamOption{
+				{ID: "ethernet", Name: "Ethernet", Default: true},
+				{ID: "aggregation", Name: "Aggregation"},
+				{ID: "virtual", Name: "Virtual"},
+				{ID: "other", Name: "Other"},
+			},
+		}},
+	}
+}
 
 // MethodParams implements funcapi.MethodHandler.
 func (f *funcInterfaces) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {

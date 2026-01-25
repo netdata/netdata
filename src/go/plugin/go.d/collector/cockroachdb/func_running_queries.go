@@ -10,10 +10,25 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
-const runningQueriesMaxTextLength = 4096
+const (
+	runningQueriesMethodID      = "running-queries"
+	runningQueriesMaxTextLength = 4096
+)
+
+func runningQueriesMethodConfig() module.MethodConfig {
+	return module.MethodConfig{
+		ID:             runningQueriesMethodID,
+		Name:           "Running Queries",
+		UpdateEvery:    10,
+		Help:           "Currently running SQL statements from SHOW CLUSTER STATEMENTS. WARNING: Query text may contain unmasked literals (potential PII).",
+		RequireCloud:   true,
+		RequiredParams: []funcapi.ParamConfig{funcapi.BuildSortParam(runningQueriesColumns)},
+	}
+}
 
 // runningQueriesColumn embeds funcapi.ColumnMeta and adds CockroachDB-specific fields.
 type runningQueriesColumn struct {

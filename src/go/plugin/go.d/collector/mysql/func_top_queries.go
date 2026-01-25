@@ -13,9 +13,22 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
-const topQueriesMaxTextLength = 4096
+const (
+	topQueriesMethodID      = "top-queries"
+	topQueriesMaxTextLength = 4096
+	topQueriesParamSort     = "__sort"
+)
 
-const topQueriesParamSort = "__sort"
+func topQueriesMethodConfig() module.MethodConfig {
+	return module.MethodConfig{
+		ID:             topQueriesMethodID,
+		Name:           "Top Queries",
+		UpdateEvery:    10,
+		Help:           "Top SQL queries from performance_schema",
+		RequireCloud:   true,
+		RequiredParams: []funcapi.ParamConfig{funcapi.BuildSortParam(topQueriesColumns)},
+	}
+}
 
 // topQueriesColumn defines a column for MySQL top-queries function.
 // Embeds funcapi.ColumnMeta for UI display and adds collector-specific fields.
@@ -27,10 +40,16 @@ type topQueriesColumn struct {
 	IsPicoseconds bool   // Needs picoseconds to milliseconds conversion
 
 	// Sort parameter metadata
-	IsSortOption  bool   // Show in sort dropdown
-	SortLabel     string // Label for sort option
-	IsDefaultSort bool   // Is this the default sort option
+	sortOpt     bool   // Show in sort dropdown
+	sortLbl     string // Label for sort option
+	defaultSort bool   // Is this the default sort option
 }
+
+// funcapi.SortableColumn interface implementation for topQueriesColumn.
+func (c topQueriesColumn) IsSortOption() bool  { return c.sortOpt }
+func (c topQueriesColumn) SortLabel() string   { return c.sortLbl }
+func (c topQueriesColumn) IsDefaultSort() bool { return c.defaultSort }
+func (c topQueriesColumn) ColumnName() string  { return c.Name }
 
 // topQueriesColumns defines ALL possible columns from events_statements_summary_by_digest
 // Columns that don't exist in certain MySQL/MariaDB versions will be filtered at runtime
@@ -41,45 +60,45 @@ var topQueriesColumns = []topQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "schema", Tooltip: "Schema", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, DBColumn: "SCHEMA_NAME"},
 
 	// Execution counts
-	{ColumnMeta: funcapi.ColumnMeta{Name: "calls", Tooltip: "Calls", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "COUNT_STAR", IsSortOption: true, SortLabel: "Top queries by Number of Calls"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "calls", Tooltip: "Calls", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "COUNT_STAR", sortOpt: true, sortLbl: "Top queries by Number of Calls"},
 
 	// Timer metrics (picoseconds -> milliseconds)
-	{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_TIMER_WAIT", IsPicoseconds: true, IsSortOption: true, SortLabel: "Top queries by Total Execution Time", IsDefaultSort: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_TIMER_WAIT", IsPicoseconds: true, sortOpt: true, sortLbl: "Top queries by Total Execution Time", defaultSort: true},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "minTime", Tooltip: "Min Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMin, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "MIN_TIMER_WAIT", IsPicoseconds: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "avgTime", Tooltip: "Avg Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "AVG_TIMER_WAIT", IsPicoseconds: true, IsSortOption: true, SortLabel: "Top queries by Average Execution Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "avgTime", Tooltip: "Avg Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "AVG_TIMER_WAIT", IsPicoseconds: true, sortOpt: true, sortLbl: "Top queries by Average Execution Time"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "maxTime", Tooltip: "Max Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "MAX_TIMER_WAIT", IsPicoseconds: true},
 
 	// Lock time (picoseconds -> milliseconds)
-	{ColumnMeta: funcapi.ColumnMeta{Name: "lockTime", Tooltip: "Lock Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_LOCK_TIME", IsPicoseconds: true, IsSortOption: true, SortLabel: "Top queries by Lock Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "lockTime", Tooltip: "Lock Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_LOCK_TIME", IsPicoseconds: true, sortOpt: true, sortLbl: "Top queries by Lock Time"},
 
 	// Error and warning counts
-	{ColumnMeta: funcapi.ColumnMeta{Name: "errors", Tooltip: "Errors", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_ERRORS", IsSortOption: true, SortLabel: "Top queries by Errors"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "warnings", Tooltip: "Warnings", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_WARNINGS", IsSortOption: true, SortLabel: "Top queries by Warnings"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "errors", Tooltip: "Errors", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_ERRORS", sortOpt: true, sortLbl: "Top queries by Errors"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "warnings", Tooltip: "Warnings", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_WARNINGS", sortOpt: true, sortLbl: "Top queries by Warnings"},
 
 	// Row operations
-	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsAffected", Tooltip: "Rows Affected", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_ROWS_AFFECTED", IsSortOption: true, SortLabel: "Top queries by Rows Affected"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsSent", Tooltip: "Rows Sent", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_ROWS_SENT", IsSortOption: true, SortLabel: "Top queries by Rows Sent"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsExamined", Tooltip: "Rows Examined", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_ROWS_EXAMINED", IsSortOption: true, SortLabel: "Top queries by Rows Examined"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsAffected", Tooltip: "Rows Affected", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_ROWS_AFFECTED", sortOpt: true, sortLbl: "Top queries by Rows Affected"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsSent", Tooltip: "Rows Sent", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_ROWS_SENT", sortOpt: true, sortLbl: "Top queries by Rows Sent"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsExamined", Tooltip: "Rows Examined", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_ROWS_EXAMINED", sortOpt: true, sortLbl: "Top queries by Rows Examined"},
 
 	// Temp table usage
-	{ColumnMeta: funcapi.ColumnMeta{Name: "tmpDiskTables", Tooltip: "Temp Disk Tables", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_CREATED_TMP_DISK_TABLES", IsSortOption: true, SortLabel: "Top queries by Temp Disk Tables"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "tmpTables", Tooltip: "Temp Tables", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_CREATED_TMP_TABLES", IsSortOption: true, SortLabel: "Top queries by Temp Tables"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "tmpDiskTables", Tooltip: "Temp Disk Tables", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_CREATED_TMP_DISK_TABLES", sortOpt: true, sortLbl: "Top queries by Temp Disk Tables"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "tmpTables", Tooltip: "Temp Tables", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_CREATED_TMP_TABLES", sortOpt: true, sortLbl: "Top queries by Temp Tables"},
 
 	// Join operations
-	{ColumnMeta: funcapi.ColumnMeta{Name: "fullJoin", Tooltip: "Full Joins", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_SELECT_FULL_JOIN", IsSortOption: true, SortLabel: "Top queries by Full Joins"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "fullJoin", Tooltip: "Full Joins", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_SELECT_FULL_JOIN", sortOpt: true, sortLbl: "Top queries by Full Joins"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "fullRangeJoin", Tooltip: "Full Range Joins", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_SELECT_FULL_RANGE_JOIN"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "selectRange", Tooltip: "Select Range", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_SELECT_RANGE"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "selectRangeCheck", Tooltip: "Select Range Check", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_SELECT_RANGE_CHECK"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "selectScan", Tooltip: "Select Scan", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_SELECT_SCAN", IsSortOption: true, SortLabel: "Top queries by Table Scans"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "selectScan", Tooltip: "Select Scan", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_SELECT_SCAN", sortOpt: true, sortLbl: "Top queries by Table Scans"},
 
 	// Sort operations
 	{ColumnMeta: funcapi.ColumnMeta{Name: "sortMergePasses", Tooltip: "Sort Merge Passes", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_SORT_MERGE_PASSES"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "sortRange", Tooltip: "Sort Range", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_SORT_RANGE"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "sortRows", Tooltip: "Sort Rows", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_SORT_ROWS", IsSortOption: true, SortLabel: "Top queries by Rows Sorted"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "sortRows", Tooltip: "Sort Rows", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_SORT_ROWS", sortOpt: true, sortLbl: "Top queries by Rows Sorted"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "sortScan", Tooltip: "Sort Scan", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_SORT_SCAN"},
 
 	// Index usage
-	{ColumnMeta: funcapi.ColumnMeta{Name: "noIndexUsed", Tooltip: "No Index Used", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_NO_INDEX_USED", IsSortOption: true, SortLabel: "Top queries by No Index Used"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "noIndexUsed", Tooltip: "No Index Used", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_NO_INDEX_USED", sortOpt: true, sortLbl: "Top queries by No Index Used"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "noGoodIndexUsed", Tooltip: "No Good Index Used", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_NO_GOOD_INDEX_USED"},
 
 	// Timestamp columns
@@ -87,8 +106,8 @@ var topQueriesColumns = []topQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "lastSeen", Tooltip: "Last Seen", Type: funcapi.FieldTypeString, Visible: false, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, DBColumn: "LAST_SEEN"},
 
 	// MySQL 8.0+ quantile columns
-	{ColumnMeta: funcapi.ColumnMeta{Name: "p95Time", Tooltip: "P95 Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "QUANTILE_95", IsPicoseconds: true, IsSortOption: true, SortLabel: "Top queries by 95th Percentile Time"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "p99Time", Tooltip: "P99 Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "QUANTILE_99", IsPicoseconds: true, IsSortOption: true, SortLabel: "Top queries by 99th Percentile Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "p95Time", Tooltip: "P95 Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "QUANTILE_95", IsPicoseconds: true, sortOpt: true, sortLbl: "Top queries by 95th Percentile Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "p99Time", Tooltip: "P99 Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "QUANTILE_99", IsPicoseconds: true, sortOpt: true, sortLbl: "Top queries by 99th Percentile Time"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "p999Time", Tooltip: "P99.9 Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "QUANTILE_999", IsPicoseconds: true},
 
 	// MySQL 8.0+ sample query
@@ -97,11 +116,11 @@ var topQueriesColumns = []topQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "sampleTime", Tooltip: "Sample Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "QUERY_SAMPLE_TIMER_WAIT", IsPicoseconds: true},
 
 	// MySQL 8.0.28+ CPU time
-	{ColumnMeta: funcapi.ColumnMeta{Name: "cpuTime", Tooltip: "CPU Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_CPU_TIME", IsPicoseconds: true, IsSortOption: true, SortLabel: "Top queries by CPU Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "cpuTime", Tooltip: "CPU Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "SUM_CPU_TIME", IsPicoseconds: true, sortOpt: true, sortLbl: "Top queries by CPU Time"},
 
 	// MySQL 8.0.31+ memory columns
-	{ColumnMeta: funcapi.ColumnMeta{Name: "maxControlledMemory", Tooltip: "Max Controlled Memory", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "MAX_CONTROLLED_MEMORY", IsSortOption: true, SortLabel: "Top queries by Max Controlled Memory"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "maxTotalMemory", Tooltip: "Max Total Memory", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "MAX_TOTAL_MEMORY", IsSortOption: true, SortLabel: "Top queries by Max Total Memory"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "maxControlledMemory", Tooltip: "Max Controlled Memory", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "MAX_CONTROLLED_MEMORY", sortOpt: true, sortLbl: "Top queries by Max Controlled Memory"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "maxTotalMemory", Tooltip: "Max Total Memory", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "MAX_TOTAL_MEMORY", sortOpt: true, sortLbl: "Top queries by Max Total Memory"},
 }
 
 type topQueriesChartGroup struct {
@@ -159,7 +178,7 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 		return nil, fmt.Errorf("collector is still initializing")
 	}
 	switch method {
-	case "top-queries":
+	case topQueriesMethodID:
 		return f.methodParams(ctx)
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
@@ -173,7 +192,7 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 	}
 
 	switch method {
-	case "top-queries":
+	case topQueriesMethodID:
 		return f.collectData(ctx, params.Column(topQueriesParamSort))
 	default:
 		return funcapi.NotFoundResponse(method)
@@ -274,7 +293,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 	// Find default sort column ID
 	defaultSort := ""
 	for _, col := range cols {
-		if col.IsDefaultSort && col.IsSortOption {
+		if col.IsDefaultSort() && col.IsSortOption() {
 			defaultSort = col.Name
 			break
 		}
@@ -511,15 +530,7 @@ func (f *funcTopQueries) scanDynamicRows(rows topQueriesRowScanner, cols []topQu
 }
 
 func (f *funcTopQueries) buildSortParam(cols []topQueriesColumn) funcapi.ParamConfig {
-	sortOptions := buildTopQueriesSortOptions(cols)
-	return funcapi.ParamConfig{
-		ID:         topQueriesParamSort,
-		Name:       "Filter By",
-		Help:       "Select the primary sort column",
-		Selection:  funcapi.ParamSelect,
-		Options:    sortOptions,
-		UniqueView: true,
-	}
+	return funcapi.BuildSortParam(cols)
 }
 
 func (f *funcTopQueries) decorateColumns(cols []topQueriesColumn) []topQueriesColumn {
@@ -553,22 +564,4 @@ func (f *funcTopQueries) decorateColumns(cols []topQueriesColumn) []topQueriesCo
 	}
 
 	return out
-}
-
-// buildTopQueriesSortOptions builds sort options for method registration (before handler exists).
-func buildTopQueriesSortOptions(cols []topQueriesColumn) []funcapi.ParamOption {
-	var sortOptions []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range cols {
-		if col.IsSortOption {
-			sortOptions = append(sortOptions, funcapi.ParamOption{
-				ID:      col.Name,
-				Column:  col.DBColumn,
-				Name:    col.SortLabel,
-				Default: col.IsDefaultSort,
-				Sort:    &sortDir,
-			})
-		}
-	}
-	return sortOptions
 }

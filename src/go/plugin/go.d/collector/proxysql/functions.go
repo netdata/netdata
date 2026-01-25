@@ -20,6 +20,17 @@ const (
 	paramSort          = "__sort"
 )
 
+func topQueriesMethodConfig() module.MethodConfig {
+	return module.MethodConfig{
+		ID:             topQueriesMethodID,
+		Name:           "Top Queries",
+		UpdateEvery:    10,
+		Help:           "Top SQL queries from ProxySQL query digest stats",
+		RequireCloud:   true,
+		RequiredParams: []funcapi.ParamConfig{funcapi.BuildSortParam(proxysqlAllColumns)},
+	}
+}
+
 // proxysqlColumn defines metadata for a ProxySQL query digest column.
 // Embeds funcapi.ColumnMeta for UI rendering and adds ProxySQL-specific fields.
 type proxysqlColumn struct {
@@ -29,13 +40,19 @@ type proxysqlColumn struct {
 	DBColumn string
 	// IsMicroseconds indicates if the value is in microseconds (needs /1000 conversion)
 	IsMicroseconds bool
-	// IsSortOption indicates whether this column appears in the sort dropdown
-	IsSortOption bool
-	// SortLabel is the label shown in the sort dropdown
-	SortLabel string
-	// IsDefaultSort indicates whether this is the default sort column
-	IsDefaultSort bool
+	// sortOpt indicates whether this column appears in the sort dropdown
+	sortOpt bool
+	// sortLbl is the label shown in the sort dropdown
+	sortLbl string
+	// defaultSort indicates whether this is the default sort column
+	defaultSort bool
 }
+
+// funcapi.SortableColumn interface implementation for proxysqlColumn.
+func (c proxysqlColumn) IsSortOption() bool  { return c.sortOpt }
+func (c proxysqlColumn) SortLabel() string   { return c.sortLbl }
+func (c proxysqlColumn) IsDefaultSort() bool { return c.defaultSort }
+func (c proxysqlColumn) ColumnName() string  { return c.Name }
 
 // proxysqlColumnSet creates a ColumnSet from a slice of proxysqlColumn.
 func proxysqlColumnSet(cols []proxysqlColumn) funcapi.ColumnSet[proxysqlColumn] {
@@ -49,17 +66,17 @@ var proxysqlAllColumns = []proxysqlColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "user", Tooltip: "User", Type: funcapi.FieldTypeString, Visible: false, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, GroupBy: &funcapi.GroupByOptions{}, Sortable: true}, DBColumn: "username"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "hostgroup", Tooltip: "Hostgroup", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterRange, GroupBy: &funcapi.GroupByOptions{}, Sortable: true}, DBColumn: "hostgroup"},
 
-	{ColumnMeta: funcapi.ColumnMeta{Name: "calls", Tooltip: "Calls", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Calls", Title: "Number of Calls", IsDefault: true}, Sortable: true}, DBColumn: "count_star", IsSortOption: true, SortLabel: "Number of Calls"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "calls", Tooltip: "Calls", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Calls", Title: "Number of Calls", IsDefault: true}, Sortable: true}, DBColumn: "count_star", sortOpt: true, sortLbl: "Top queries by Number of Calls"},
 
-	{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time", IsDefault: true}, Sortable: true}, DBColumn: "sum_time", IsMicroseconds: true, IsSortOption: true, SortLabel: "Total Execution Time", IsDefaultSort: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "avgTime", Tooltip: "Avg Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}, Sortable: true}, DBColumn: "avg_time", IsMicroseconds: true, IsSortOption: true, SortLabel: "Average Execution Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time", IsDefault: true}, Sortable: true}, DBColumn: "sum_time", IsMicroseconds: true, sortOpt: true, sortLbl: "Top queries by Total Execution Time", defaultSort: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "avgTime", Tooltip: "Avg Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}, Sortable: true}, DBColumn: "avg_time", IsMicroseconds: true, sortOpt: true, sortLbl: "Top queries by Average Execution Time"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "minTime", Tooltip: "Min Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMin, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}, Sortable: true}, DBColumn: "min_time", IsMicroseconds: true},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "maxTime", Tooltip: "Max Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}, Sortable: true}, DBColumn: "max_time", IsMicroseconds: true},
 
-	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsAffected", Tooltip: "Rows Affected", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}, Sortable: true}, DBColumn: "sum_rows_affected", IsSortOption: true, SortLabel: "Rows Affected"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsSent", Tooltip: "Rows Sent", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}, Sortable: true}, DBColumn: "sum_rows_sent", IsSortOption: true, SortLabel: "Rows Sent"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "errors", Tooltip: "Errors", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Errors", Title: "Errors & Warnings"}, Sortable: true}, DBColumn: "sum_errors", IsSortOption: true, SortLabel: "Errors"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "warnings", Tooltip: "Warnings", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Errors", Title: "Errors & Warnings"}, Sortable: true}, DBColumn: "sum_warnings", IsSortOption: true, SortLabel: "Warnings"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsAffected", Tooltip: "Rows Affected", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}, Sortable: true}, DBColumn: "sum_rows_affected", sortOpt: true, sortLbl: "Top queries by Rows Affected"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsSent", Tooltip: "Rows Sent", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}, Sortable: true}, DBColumn: "sum_rows_sent", sortOpt: true, sortLbl: "Top queries by Rows Sent"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "errors", Tooltip: "Errors", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Errors", Title: "Errors & Warnings"}, Sortable: true}, DBColumn: "sum_errors", sortOpt: true, sortLbl: "Top queries by Errors"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "warnings", Tooltip: "Warnings", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Chart: &funcapi.ChartOptions{Group: "Errors", Title: "Errors & Warnings"}, Sortable: true}, DBColumn: "sum_warnings", sortOpt: true, sortLbl: "Top queries by Warnings"},
 
 	{ColumnMeta: funcapi.ColumnMeta{Name: "firstSeen", Tooltip: "First Seen", Type: funcapi.FieldTypeString, Visible: false, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, DBColumn: "first_seen"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "lastSeen", Tooltip: "Last Seen", Type: funcapi.FieldTypeString, Visible: false, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, DBColumn: "last_seen"},
@@ -111,21 +128,8 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 
 func (f *funcTopQueries) Cleanup(ctx context.Context) {}
 
-func buildProxySQLSortOptions(cols []proxysqlColumn) []funcapi.ParamOption {
-	var sortOptions []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range cols {
-		if col.IsSortOption {
-			sortOptions = append(sortOptions, funcapi.ParamOption{
-				ID:      col.Name,
-				Column:  col.Name,
-				Name:    "Top queries by " + col.SortLabel,
-				Default: col.IsDefaultSort,
-				Sort:    &sortDir,
-			})
-		}
-	}
-	return sortOptions
+func buildProxySQLSortParam(cols []proxysqlColumn) funcapi.ParamConfig {
+	return funcapi.BuildSortParam(cols)
 }
 
 func (c *Collector) detectProxySQLDigestColumns(ctx context.Context) (map[string]bool, error) {
@@ -181,15 +185,7 @@ func (c *Collector) topQueriesParams(ctx context.Context) ([]funcapi.ParamConfig
 	if len(cols) == 0 {
 		return nil, fmt.Errorf("no columns available in stats_mysql_query_digest")
 	}
-	sortParam := funcapi.ParamConfig{
-		ID:         paramSort,
-		Name:       "Filter By",
-		Help:       "Select the primary sort column",
-		Selection:  funcapi.ParamSelect,
-		Options:    buildProxySQLSortOptions(cols),
-		UniqueView: true,
-	}
-	return []funcapi.ParamConfig{sortParam}, nil
+	return []funcapi.ParamConfig{buildProxySQLSortParam(cols)}, nil
 }
 
 func (c *Collector) mapAndValidateProxySQLSortColumn(input string, cs funcapi.ColumnSet[proxysqlColumn]) string {
@@ -329,15 +325,6 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		return &module.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
-	sortParam := funcapi.ParamConfig{
-		ID:         paramSort,
-		Name:       "Filter By",
-		Help:       "Select the primary sort column",
-		Selection:  funcapi.ParamSelect,
-		Options:    buildProxySQLSortOptions(cols),
-		UniqueView: true,
-	}
-
 	defaultSort := "totalTime"
 	if !cs.ContainsColumn(defaultSort) {
 		defaultSort = "calls"
@@ -349,7 +336,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: defaultSort,
-		RequiredParams:    []funcapi.ParamConfig{sortParam},
+		RequiredParams:    []funcapi.ParamConfig{buildProxySQLSortParam(cols)},
 		ChartingConfig:    cs.BuildCharting(),
 	}
 }

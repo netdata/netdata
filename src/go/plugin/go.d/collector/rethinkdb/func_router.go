@@ -58,36 +58,8 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 }
 
 func rethinkdbMethods() []module.MethodConfig {
-	var sortOptions []funcapi.ParamOption
-	for _, col := range rethinkRunningColumns {
-		if !col.IsSortOption {
-			continue
-		}
-		sortDir := funcapi.FieldSortDescending
-		sortOptions = append(sortOptions, funcapi.ParamOption{
-			ID:      col.Name,
-			Column:  col.Name,
-			Name:    col.SortLabel,
-			Sort:    &sortDir,
-			Default: col.IsDefaultSort,
-		})
-	}
 	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           runningQueriesMethodID,
-			Name:         "Running Queries",
-			Help:         "Currently running queries from rethinkdb.jobs. WARNING: Query text may contain unmasked literals (potential PII).",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:         "__sort",
-				Name:       "Filter By",
-				Help:       "Select the primary sort column",
-				Selection:  funcapi.ParamSelect,
-				Options:    sortOptions,
-				UniqueView: true,
-			}},
-		},
+		runningQueriesMethodConfig(),
 	}
 }
 

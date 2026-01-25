@@ -19,12 +19,24 @@ import (
 )
 
 const (
-	topQueriesMaxTextLength    = 4096
-	topQueriesDefaultLimit     = 500
-	topQueriesHelpText         = "Top queries from MongoDB Profiler (system.profile). " +
+	topQueriesMethodID      = "top-queries"
+	topQueriesMaxTextLength = 4096
+	topQueriesDefaultLimit  = 500
+	topQueriesHelpText      = "Top queries from MongoDB Profiler (system.profile). " +
 		"WARNING: Query text may contain unmasked literals (potential PII). " +
 		"Requires profiling enabled on target databases (db.setProfilingLevel)."
 )
+
+func topQueriesMethodConfig() module.MethodConfig {
+	return module.MethodConfig{
+		ID:             topQueriesMethodID,
+		Name:           "Top Queries",
+		UpdateEvery:    10,
+		Help:           topQueriesHelpText,
+		RequireCloud:   true,
+		RequiredParams: []funcapi.ParamConfig{funcapi.BuildSortParam(topQueriesColumns)},
+	}
+}
 
 const topQueriesParamSort = "__sort"
 
@@ -35,36 +47,42 @@ type topQueriesColumn struct {
 
 	// DBField is the MongoDB document field name (e.g., "millis")
 	DBField string
-	// IsSortOption indicates whether this column can be used for sorting in params
-	IsSortOption bool
-	// SortLabel is the label for the sort option dropdown
-	SortLabel string
-	// IsDefaultSort indicates whether this is the default sort column
-	IsDefaultSort bool
+	// sortOpt indicates whether this column can be used for sorting in params
+	sortOpt bool
+	// sortLbl is the label for the sort option dropdown
+	sortLbl string
+	// defaultSort indicates whether this is the default sort column
+	defaultSort bool
 }
+
+// funcapi.SortableColumn interface implementation for topQueriesColumn.
+func (c topQueriesColumn) IsSortOption() bool  { return c.sortOpt }
+func (c topQueriesColumn) SortLabel() string   { return c.sortLbl }
+func (c topQueriesColumn) IsDefaultSort() bool { return c.defaultSort }
+func (c topQueriesColumn) ColumnName() string  { return c.Name }
 
 // topQueriesColumns defines all available columns from system.profile.
 // Ordered by display priority (index).
 var topQueriesColumns = []topQueriesColumn{
 	// Core fields (visible by default)
-	{ColumnMeta: funcapi.ColumnMeta{Name: "timestamp", Tooltip: "Timestamp", Type: funcapi.FieldTypeTimestamp, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummaryMax, Transform: funcapi.FieldTransformDatetime, UniqueKey: true}, DBField: "ts", IsSortOption: true, SortLabel: "Timestamp"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "timestamp", Tooltip: "Timestamp", Type: funcapi.FieldTypeTimestamp, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummaryMax, Transform: funcapi.FieldTransformDatetime, UniqueKey: true}, DBField: "ts", sortOpt: true, sortLbl: "Timestamp"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "namespace", Tooltip: "Namespace", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Sticky: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, ExpandFilter: true, GroupBy: &funcapi.GroupByOptions{IsDefault: true}}, DBField: "ns"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "operation", Tooltip: "Operation", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}, DBField: "op"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, FullWidth: true, Wrap: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "command"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "execution_time", Tooltip: "Execution Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformDuration, DecimalPoints: 3, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time", IsDefault: true}}, DBField: "millis", IsSortOption: true, IsDefaultSort: true, SortLabel: "Execution Time"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_examined", Tooltip: "Docs Examined", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "docsExamined", IsSortOption: true, SortLabel: "Docs Examined"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "keys_examined", Tooltip: "Keys Examined", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "keysExamined", IsSortOption: true, SortLabel: "Keys Examined"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_returned", Tooltip: "Docs Returned", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "nreturned", IsSortOption: true, SortLabel: "Docs Returned"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "execution_time", Tooltip: "Execution Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformDuration, DecimalPoints: 3, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time", IsDefault: true}}, DBField: "millis", sortOpt: true, defaultSort: true, sortLbl: "Execution Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_examined", Tooltip: "Docs Examined", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "docsExamined", sortOpt: true, sortLbl: "Docs Examined"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "keys_examined", Tooltip: "Keys Examined", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "keysExamined", sortOpt: true, sortLbl: "Keys Examined"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_returned", Tooltip: "Docs Returned", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "nreturned", sortOpt: true, sortLbl: "Docs Returned"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "plan_summary", Tooltip: "Plan Summary", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "planSummary"},
 
 	// Secondary fields
 	{ColumnMeta: funcapi.ColumnMeta{Name: "client", Tooltip: "Client", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}, DBField: "client"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "user", Tooltip: "User", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}, DBField: "user"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_deleted", Tooltip: "Docs Deleted", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "ndeleted", IsSortOption: true, SortLabel: "Docs Deleted"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_inserted", Tooltip: "Docs Inserted", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "ninserted", IsSortOption: true, SortLabel: "Docs Inserted"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_modified", Tooltip: "Docs Modified", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "nModified", IsSortOption: true, SortLabel: "Docs Modified"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "response_length", Tooltip: "Response Length", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Response", Title: "Response Size"}}, DBField: "responseLength", IsSortOption: true, SortLabel: "Response Length"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "num_yield", Tooltip: "Num Yield", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Yield", Title: "Yield"}}, DBField: "numYield", IsSortOption: true, SortLabel: "Num Yield"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_deleted", Tooltip: "Docs Deleted", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "ndeleted", sortOpt: true, sortLbl: "Docs Deleted"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_inserted", Tooltip: "Docs Inserted", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "ninserted", sortOpt: true, sortLbl: "Docs Inserted"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_modified", Tooltip: "Docs Modified", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "nModified", sortOpt: true, sortLbl: "Docs Modified"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "response_length", Tooltip: "Response Length", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Response", Title: "Response Size"}}, DBField: "responseLength", sortOpt: true, sortLbl: "Response Length"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "num_yield", Tooltip: "Num Yield", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Yield", Title: "Yield"}}, DBField: "numYield", sortOpt: true, sortLbl: "Num Yield"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "app_name", Tooltip: "App Name", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}, DBField: "appName"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "cursor_exhausted", Tooltip: "Cursor Exhausted", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "cursorExhausted"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "has_sort_stage", Tooltip: "Has Sort Stage", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "hasSortStage"},
@@ -75,8 +93,8 @@ var topQueriesColumns = []topQueriesColumn{
 	// Version-specific fields (hidden by default)
 	{ColumnMeta: funcapi.ColumnMeta{Name: "query_hash", Tooltip: "Query Hash", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "queryHash"},            // 4.2+
 	{ColumnMeta: funcapi.ColumnMeta{Name: "plan_cache_key", Tooltip: "Plan Cache Key", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "planCacheKey"}, // 4.2+
-	{ColumnMeta: funcapi.ColumnMeta{Name: "planning_time", Tooltip: "Planning Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformDuration, DecimalPoints: 3, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, DBField: "planningTimeMicros", IsSortOption: true, SortLabel: "Planning Time"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "cpu_time", Tooltip: "CPU Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformDuration, DecimalPoints: 3, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, DBField: "cpuNanos", IsSortOption: true, SortLabel: "CPU Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "planning_time", Tooltip: "Planning Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformDuration, DecimalPoints: 3, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, DBField: "planningTimeMicros", sortOpt: true, sortLbl: "Planning Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "cpu_time", Tooltip: "CPU Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformDuration, DecimalPoints: 3, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, DBField: "cpuNanos", sortOpt: true, sortLbl: "CPU Time"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "query_framework", Tooltip: "Query Framework", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "queryFramework"},   // 7.0+
 	{ColumnMeta: funcapi.ColumnMeta{Name: "query_shape_hash", Tooltip: "Query Shape Hash", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "queryShapeHash"}, // 8.0+
 }
@@ -141,7 +159,7 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 		return nil, fmt.Errorf("collector is still initializing")
 	}
 	switch method {
-	case "top-queries":
+	case topQueriesMethodID:
 		return f.methodParams(ctx)
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
@@ -155,7 +173,7 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 	}
 
 	switch method {
-	case "top-queries":
+	case topQueriesMethodID:
 		if !f.router.collector.Config.GetTopQueriesFunctionEnabled() {
 			return funcapi.ErrorResponse(403, "Top Queries function has been disabled in configuration. Set 'top_queries_function_enabled: true' to enable.")
 		}
@@ -194,7 +212,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *mo
 	// Build valid sort columns map from metadata
 	validSortCols := make(map[string]bool)
 	for _, col := range topQueriesColumns {
-		if col.IsSortOption {
+		if col.IsSortOption() {
 			validSortCols[col.DBField] = true
 		}
 	}
@@ -603,18 +621,20 @@ func optionalBool(v *bool) any {
 }
 
 // buildTopQueriesSortOptions builds sort parameter from available columns.
+// Unlike funcapi.BuildSortParam, this uses DBField for the Column value
+// because MongoDB queries use the raw BSON field names.
 func buildTopQueriesSortOptions(cols []topQueriesColumn) funcapi.ParamConfig {
 	var sortOptions []funcapi.ParamOption
 	sortDir := funcapi.FieldSortDescending
 	for _, col := range cols {
-		if !col.IsSortOption {
+		if !col.IsSortOption() {
 			continue
 		}
 		sortOptions = append(sortOptions, funcapi.ParamOption{
-			ID:      col.Name,
+			ID:      col.ColumnName(),
 			Column:  col.DBField,
-			Name:    fmt.Sprintf("Top queries by %s", col.SortLabel),
-			Default: col.IsDefaultSort,
+			Name:    fmt.Sprintf("Top queries by %s", col.SortLabel()),
+			Default: col.IsDefaultSort(),
 			Sort:    &sortDir,
 		})
 	}

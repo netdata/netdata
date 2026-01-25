@@ -23,8 +23,8 @@ func newFuncRouter(c *Collector) *funcRouter {
 		collector: c,
 		handlers:  make(map[string]funcapi.MethodHandler),
 	}
-	r.handlers["top-queries"] = newFuncTopQueries(r)
-	r.handlers["running-queries"] = newFuncRunningQueries(r)
+	r.handlers[topQueriesMethodID] = newFuncTopQueries(r)
+	r.handlers[runningQueriesMethodID] = newFuncRunningQueries(r)
 	return r
 }
 
@@ -60,26 +60,8 @@ func (r *funcRouter) topQueriesLimit() int {
 
 func oracledbMethods() []module.MethodConfig {
 	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Top SQL statements from V$SQLSTATS. WARNING: Query text may contain unmasked literals (potential PII).",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{
-				funcapi.BuildSortParam(topQueriesColumns),
-			},
-		},
-		{
-			UpdateEvery:  10,
-			ID:           "running-queries",
-			Name:         "Running Queries",
-			Help:         "Currently running SQL statements from V$SESSION. WARNING: Query text may contain unmasked literals (potential PII).",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{
-				funcapi.BuildSortParam(runningQueriesColumns),
-			},
-		},
+		topQueriesMethodConfig(),
+		runningQueriesMethodConfig(),
 	}
 }
 

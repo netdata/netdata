@@ -51,21 +51,7 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 
 func proxysqlMethods() []module.MethodConfig {
 	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           topQueriesMethodID,
-			Name:         "Top Queries",
-			Help:         "Top SQL queries from ProxySQL query digest stats",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:         paramSort,
-				Name:       "Filter By",
-				Help:       "Select the primary sort column",
-				Selection:  funcapi.ParamSelect,
-				Options:    buildProxySQLSortOptions(proxysqlAllColumns),
-				UniqueView: true,
-			}},
-		},
+		topQueriesMethodConfig(),
 	}
 }
 

@@ -21,7 +21,7 @@ func newFuncRouter(c *Collector) *funcRouter {
 		collector: c,
 		handlers:  make(map[string]funcapi.MethodHandler),
 	}
-	r.handlers["top-queries"] = newFuncTopQueries(r)
+	r.handlers[topQueriesMethodID] = newFuncTopQueries(r)
 	return r
 }
 
@@ -50,16 +50,7 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 
 func couchbaseMethods() []module.MethodConfig {
 	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Top N1QL requests from system:completed_requests",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{
-				buildTopQueriesSortOptions(topQueriesColumns),
-			},
-		},
+		topQueriesMethodConfig(),
 	}
 }
 

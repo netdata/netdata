@@ -28,7 +28,7 @@ func init() {
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         mysqlMethods,
-		MethodHandler: mysqlFunctionHandler,
+		MethodHandler:   mysqlFunctionHandler,
 	})
 }
 

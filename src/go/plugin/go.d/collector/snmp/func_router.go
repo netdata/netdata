@@ -22,7 +22,7 @@ func newFuncRouter(cache *ifaceCache) *funcRouter {
 		ifaceCache: cache,
 		handlers:   make(map[string]funcapi.MethodHandler),
 	}
-	r.handlers["interfaces"] = newFuncInterfaces(r)
+	r.handlers[ifacesMethodID] = newFuncInterfaces(r)
 	return r
 }
 
@@ -51,24 +51,7 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 
 func snmpMethods() []module.MethodConfig {
 	return []module.MethodConfig{
-		{
-			ID:          "interfaces",
-			Name:        "Network Interfaces",
-			Help:        "Network interface traffic and status metrics",
-			UpdateEvery: 10,
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:        "if_type_group",
-				Name:      "Type Group",
-				Help:      "Filter by interface type group",
-				Selection: funcapi.ParamSelect,
-				Options: []funcapi.ParamOption{
-					{ID: "ethernet", Name: "Ethernet", Default: true},
-					{ID: "aggregation", Name: "Aggregation"},
-					{ID: "virtual", Name: "Virtual"},
-					{ID: "other", Name: "Other"},
-				},
-			}},
-		},
+		ifacesMethodConfig(),
 	}
 }
 

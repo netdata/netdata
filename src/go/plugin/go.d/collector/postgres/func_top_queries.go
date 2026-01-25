@@ -9,12 +9,15 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
-const maxQueryTextLength = 4096
-
-const paramSort = "__sort"
+const (
+	topQueriesMethodID = "top-queries"
+	maxQueryTextLength = 4096
+	paramSort          = "__sort"
+)
 
 // pgColumn defines metadata for a pg_stat_statements column.
 // Embeds funcapi.ColumnMeta for UI rendering and adds PG-specific fields.
@@ -138,6 +141,26 @@ var pgLabelColumnIDs = map[string]bool{
 }
 
 const pgPrimaryLabelID = "database"
+
+func topQueriesMethodConfig() module.MethodConfig {
+	return module.MethodConfig{
+		ID:           topQueriesMethodID,
+		Name:         "Top Queries",
+		UpdateEvery:  10,
+		Help:         "Top SQL queries from pg_stat_statements",
+		RequireCloud: true,
+		RequiredParams: []funcapi.ParamConfig{
+			{
+				ID:         paramSort,
+				Name:       "Filter By",
+				Help:       "Select the primary sort column",
+				Selection:  funcapi.ParamSelect,
+				Options:    buildPgSortOptions(),
+				UniqueView: true,
+			},
+		},
+	}
+}
 
 // Compile-time interface check.
 var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
