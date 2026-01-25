@@ -205,7 +205,7 @@ func sortRedisSlowLogs(entries []redis.SlowLog, sortColumn string) {
 			if len(entries[j].Args) > 0 {
 				b = entries[j].Args[0]
 			}
-			return a > b
+			return a < b
 		})
 	default:
 		sort.Slice(entries, func(i, j int) bool {
