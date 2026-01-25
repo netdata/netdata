@@ -394,6 +394,7 @@ IMPORTANT: All your responses must have this `support_request_metadata_json_obje
     "what_the_user_needs_from_netdata_in_english",
     "categories",
     "search_terms",
+    "stopped_before_completion",
     "response_accuracy",
     "response_completeness",
     "user_frustration",
@@ -444,6 +445,10 @@ IMPORTANT: All your responses must have this `support_request_metadata_json_obje
         "type": "string"
       },
       "description": "Related search terms and phrases (do not add 'Netdata' to them)"
+    },
+    "stopped_before_completion": {
+      "type": "boolean",
+      "description": "Set to true if you were stopped before completing the test, set it to false if the task was completed."
     },
     "response_accuracy": {
       "type": "object",
