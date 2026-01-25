@@ -102,6 +102,12 @@ const TASK_COMPLETE_REPORT = 'Task complete';
 const ROUTER_HANDOFF_TOOL = 'router__handoff-to';
 const ROUTER_ROUTE_MESSAGE = 'Route to child';
 const ROUTER_CHILD_REPORT_CONTENT = 'Child final report.';
+const STOPREF_STOP_FINAL_CONTENT = 'Completed after stop signal.';
+const STOPREF_UNREACHABLE_CONTENT = 'Should not execute';
+const RATELIMIT_STOP_FINAL_CONTENT = 'Final report after rate limit stop.';
+const RETRY_BACKOFF_STOP_FINAL_CONTENT = 'Final report after retry backoff stop.';
+const SIMULATED_NETWORK_ERROR_MSG = 'Simulated network error';
+const STOPREF_FINAL_CALL_ID = 'final-call';
 const ROUTER_PARENT_REPORT_CONTENT = 'Parent final report.';
 const parseDumpList = (raw?: string): string[] => {
   if (typeof raw !== 'string') return [];
@@ -9699,6 +9705,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   },
   {
     id: 'run-test-44',
+    description: 'Legacy stopRef (no reason) triggers graceful stop.',
     configure: (_configuration, sessionConfig) => {
       const stopRef = { stopping: false };
       sessionConfig.stopRef = stopRef;
@@ -9716,6 +9723,627 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.finalReport === undefined, 'No final report expected for run-test-44.');
       const finLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:fin');
       invariant(finLog !== undefined, 'Finalization log expected for run-test-44.');
+    },
+  },
+  // === Coverage: Explicit stopRef.reason paths (session-turn-runner.ts:318-332) ===
+  // These tests verify the 3 distinct branches for stopRef.reason:
+  // 1. reason='stop' -> set forced final turn, continue to produce final report
+  // 2. reason='abort' -> immediate exit via finalizeCanceledSession
+  // 3. reason='shutdown' -> immediate exit via finalizeCanceledSession
+  {
+    id: 'run-test-stopref-reason-stop',
+    description: 'Explicit reason=stop triggers forced final turn instead of immediate exit.',
+    configure: (_configuration, sessionConfig) => {
+      const stopRef: { stopping: boolean; reason: 'stop' } = { stopping: false, reason: 'stop' };
+      sessionConfig.stopRef = stopRef;
+      sessionConfig.maxTurns = 3;
+      sessionConfig.maxRetries = 1;
+    },
+    execute: async (_configuration, sessionConfig) => {
+      const stopRef = sessionConfig.stopRef as { stopping: boolean; reason: 'stop' };
+      let turnCount = 0;
+      return await runWithExecuteTurnOverride(sessionConfig, () => {
+        turnCount += 1;
+        // Turn 1: complete with tool, then set stop for turn 2 check
+        if (turnCount === 1) {
+          // Set stop SYNCHRONOUSLY after turn 1 completes, so turn 2 sees it
+          stopRef.stopping = true;
+          return Promise.resolve({
+            status: { type: 'success' as const, hasToolCalls: true, finalAnswer: false },
+            latencyMs: 5,
+            response: 'First turn with tool',
+            messages: [
+              {
+                role: 'assistant' as const,
+                content: 'Working on it',
+                toolCalls: [{ id: 'call-1', name: 'test__test', parameters: { text: 'work' } }],
+              },
+            ],
+            tokens: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+            executionStats: { executedTools: 1, executedNonProgressBatchTools: 1, executedProgressBatchTools: 0, unknownToolEncountered: false },
+          });
+        }
+        // Turn 2 (forced final turn due to reason=stop): provide final report
+        return Promise.resolve({
+          status: { type: 'success' as const, hasToolCalls: true, finalAnswer: true },
+          latencyMs: 5,
+          response: '',
+          messages: [
+            {
+              role: 'assistant' as const,
+              content: '',
+              toolCalls: [{
+                id: STOPREF_FINAL_CALL_ID,
+                name: 'agent__final_report',
+                parameters: { report_format: 'markdown', report_content: STOPREF_STOP_FINAL_CONTENT },
+              }],
+            },
+            {
+              role: 'tool' as const,
+              toolCallId: STOPREF_FINAL_CALL_ID,
+              content: STOPREF_STOP_FINAL_CONTENT,
+            },
+          ],
+          tokens: { inputTokens: 15, outputTokens: 8, totalTokens: 23 },
+        });
+      });
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-stopref-reason-stop should succeed with forced final turn.');
+      invariant(result.finalReport !== undefined, 'Final report expected for run-test-stopref-reason-stop.');
+      invariant(result.finalReport.content === STOPREF_STOP_FINAL_CONTENT, 'Final report content mismatch for run-test-stopref-reason-stop.');
+      // Verify forced final turn was triggered by user_stop
+      const finalTurnLog = result.logs.find((entry) =>
+        entry.remoteIdentifier === 'agent:final-turn' &&
+        typeof entry.details === 'object' &&
+        entry.details !== null &&
+        (entry.details as Record<string, unknown>).final_turn_reason === 'user_stop'
+      );
+      invariant(finalTurnLog !== undefined, 'Final turn log with user_stop reason expected for run-test-stopref-reason-stop.');
+    },
+  },
+  {
+    id: 'run-test-stopref-reason-abort',
+    description: 'Explicit reason=abort triggers immediate canceled session.',
+    configure: (_configuration, sessionConfig) => {
+      // Start with stopping=true and reason=abort to trigger immediate exit
+      const stopRef: { stopping: boolean; reason: 'abort' } = { stopping: true, reason: 'abort' };
+      sessionConfig.stopRef = stopRef;
+      sessionConfig.maxTurns = 3;
+      sessionConfig.maxRetries = 1;
+    },
+    execute: async (_configuration, sessionConfig) => {
+      // stopRef already has stopping=true before session starts
+      return await runWithExecuteTurnOverride(sessionConfig, () => {
+        // Should not reach here - abort should exit at turn loop start
+        return Promise.resolve({
+          status: { type: 'success' as const, hasToolCalls: false, finalAnswer: false },
+          latencyMs: 5,
+          response: STOPREF_UNREACHABLE_CONTENT,
+          messages: [{ role: 'assistant' as const, content: STOPREF_UNREACHABLE_CONTENT }],
+          tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+        });
+      });
+    },
+    expect: (result) => {
+      // Abort triggers finalizeCanceledSession which returns success=false, error='canceled'
+      invariant(!result.success, 'Scenario run-test-stopref-reason-abort should return success=false.');
+      invariant(result.error === 'canceled', 'Error should be "canceled" for run-test-stopref-reason-abort.');
+      invariant(result.finalReport === undefined, 'No final report expected for run-test-stopref-reason-abort.');
+      // Verify no LLM requests were made (immediate exit before first turn)
+      const llmAccounting = result.accounting.filter((e) => e.type === 'llm');
+      invariant(llmAccounting.length === 0, 'No LLM requests should occur for run-test-stopref-reason-abort.');
+    },
+  },
+  {
+    id: 'run-test-stopref-reason-shutdown',
+    description: 'Explicit reason=shutdown triggers immediate canceled session.',
+    configure: (_configuration, sessionConfig) => {
+      // Start with stopping=true and reason=shutdown to trigger immediate exit
+      const stopRef: { stopping: boolean; reason: 'shutdown' } = { stopping: true, reason: 'shutdown' };
+      sessionConfig.stopRef = stopRef;
+      sessionConfig.maxTurns = 3;
+      sessionConfig.maxRetries = 1;
+    },
+    execute: async (_configuration, sessionConfig) => {
+      // stopRef already has stopping=true before session starts
+      return await runWithExecuteTurnOverride(sessionConfig, () => {
+        // Should not reach here - shutdown should exit at turn loop start
+        return Promise.resolve({
+          status: { type: 'success' as const, hasToolCalls: false, finalAnswer: false },
+          latencyMs: 5,
+          response: STOPREF_UNREACHABLE_CONTENT,
+          messages: [{ role: 'assistant' as const, content: STOPREF_UNREACHABLE_CONTENT }],
+          tokens: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+        });
+      });
+    },
+    expect: (result) => {
+      // Shutdown triggers finalizeCanceledSession which returns success=false, error='canceled'
+      invariant(!result.success, 'Scenario run-test-stopref-reason-shutdown should return success=false.');
+      invariant(result.error === 'canceled', 'Error should be "canceled" for run-test-stopref-reason-shutdown.');
+      invariant(result.finalReport === undefined, 'No final report expected for run-test-stopref-reason-shutdown.');
+      // Verify no LLM requests were made (immediate exit before first turn)
+      const llmAccounting = result.accounting.filter((e) => e.type === 'llm');
+      invariant(llmAccounting.length === 0, 'No LLM requests should occur for run-test-stopref-reason-shutdown.');
+    },
+  },
+  // === Coverage: Rate limit sleep abort paths (session-turn-runner.ts:1826-1843) ===
+  // These tests verify abort handling DURING rate limit backoff sleep
+  {
+    id: 'run-test-ratelimit-sleep-abort-cancel',
+    description: 'Rate limit sleep aborted by cancel signal triggers finalizeCanceledSession.',
+    sequential: true,
+    configure: (configuration, sessionConfig) => {
+      configuration.providers[SECONDARY_PROVIDER] = { type: 'test-llm' };
+      sessionConfig.targets = [
+        { provider: PRIMARY_PROVIDER, model: MODEL_NAME },
+        { provider: SECONDARY_PROVIDER, model: MODEL_NAME },
+      ];
+      sessionConfig.maxTurns = 3;
+      sessionConfig.maxRetries = 4; // Allow cycling through providers
+    },
+    execute: async (configuration, sessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture for restoration
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      const abortController = new AbortController();
+      sessionConfig.abortSignal = abortController.signal;
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        // All providers return rate_limit to trigger sleep
+        if (invocation <= 2) {
+          // After second rate limit, trigger cancel during sleep
+          if (invocation === 2) {
+            setTimeout(() => { abortController.abort(); }, 50);
+          }
+          return {
+            status: { type: 'rate_limit', retryAfterMs: 500 },
+            latencyMs: 5,
+            messages: [],
+            tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+        return await AIAgent.run(AIAgentSession.create(sessionConfig));
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result) => {
+      // Cancel during rate limit sleep should return success=false, error='canceled'
+      invariant(!result.success, 'Rate limit sleep cancel should fail session.');
+      invariant(result.error === 'canceled', 'Error should be "canceled" for rate limit sleep cancel.');
+      // Verify rate limit was encountered
+      const rateLimitLog = result.logs.find((entry) => logHasEvent(entry, LOG_EVENTS.LLM_RATE_LIMIT));
+      invariant(rateLimitLog !== undefined, 'Rate limit log should exist.');
+    },
+  },
+  {
+    id: 'run-test-ratelimit-sleep-abort-stop',
+    description: 'Rate limit sleep aborted by stop with reason=stop triggers forced final turn.',
+    sequential: true,
+    configure: (configuration, sessionConfig) => {
+      configuration.providers[SECONDARY_PROVIDER] = { type: 'test-llm' };
+      const stopRef: { stopping: boolean; reason: 'stop' } = { stopping: false, reason: 'stop' };
+      sessionConfig.stopRef = stopRef;
+      sessionConfig.targets = [
+        { provider: PRIMARY_PROVIDER, model: MODEL_NAME },
+        { provider: SECONDARY_PROVIDER, model: MODEL_NAME },
+      ];
+      sessionConfig.maxTurns = 3;
+      sessionConfig.maxRetries = 4;
+    },
+    execute: async (configuration, sessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture for restoration
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      const stopRef = sessionConfig.stopRef as { stopping: boolean; reason: 'stop' };
+      // eslint-disable-next-line @typescript-eslint/require-await -- mock returns synchronously
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        // First 2 calls: rate limit to trigger sleep
+        if (invocation <= 2) {
+          if (invocation === 2) {
+            // Trigger stop during sleep
+            setTimeout(() => { stopRef.stopping = true; }, 50);
+          }
+          return {
+            status: { type: 'rate_limit', retryAfterMs: 500 },
+            latencyMs: 5,
+            messages: [],
+            tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          };
+        }
+        // After stop, should get final turn - provide final report
+        const finalContent = RATELIMIT_STOP_FINAL_CONTENT;
+        return {
+          status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+          latencyMs: 5,
+          messages: [
+            {
+              role: 'assistant',
+              content: '',
+              toolCalls: [{
+                id: STOPREF_FINAL_CALL_ID,
+                name: 'agent__final_report',
+                parameters: { report_format: 'markdown', report_content: finalContent },
+              }],
+            },
+            { role: 'tool', toolCallId: STOPREF_FINAL_CALL_ID, content: finalContent },
+          ],
+          tokens: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+        };
+      };
+      try {
+        return await AIAgent.run(AIAgentSession.create(sessionConfig));
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result) => {
+      // Stop during rate limit sleep with reason=stop should force final turn and succeed
+      invariant(result.success, 'Rate limit sleep stop should succeed with final report.');
+      invariant(result.finalReport !== undefined, 'Final report expected after rate limit stop.');
+      invariant(result.finalReport.content === RATELIMIT_STOP_FINAL_CONTENT, 'Final report content mismatch.');
+    },
+  },
+  {
+    id: 'run-test-ratelimit-sleep-abort-abort',
+    description: 'Rate limit sleep aborted by stop with reason=abort triggers finalizeCanceledSession.',
+    sequential: true,
+    configure: (configuration, sessionConfig) => {
+      configuration.providers[SECONDARY_PROVIDER] = { type: 'test-llm' };
+      const stopRef: { stopping: boolean; reason: 'abort' } = { stopping: false, reason: 'abort' };
+      sessionConfig.stopRef = stopRef;
+      sessionConfig.targets = [
+        { provider: PRIMARY_PROVIDER, model: MODEL_NAME },
+        { provider: SECONDARY_PROVIDER, model: MODEL_NAME },
+      ];
+      sessionConfig.maxTurns = 3;
+      sessionConfig.maxRetries = 4;
+    },
+    execute: async (configuration, sessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture for restoration
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      const stopRef = sessionConfig.stopRef as { stopping: boolean; reason: 'abort' };
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation <= 2) {
+          if (invocation === 2) {
+            setTimeout(() => { stopRef.stopping = true; }, 50);
+          }
+          return {
+            status: { type: 'rate_limit', retryAfterMs: 500 },
+            latencyMs: 5,
+            messages: [],
+            tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+        return await AIAgent.run(AIAgentSession.create(sessionConfig));
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result) => {
+      invariant(!result.success, 'Rate limit sleep abort should fail session.');
+      invariant(result.error === 'canceled', 'Error should be "canceled" for rate limit sleep abort.');
+    },
+  },
+  {
+    id: 'run-test-ratelimit-sleep-abort-shutdown',
+    description: 'Rate limit sleep aborted by stop with reason=shutdown triggers finalizeCanceledSession.',
+    sequential: true,
+    configure: (configuration, sessionConfig) => {
+      configuration.providers[SECONDARY_PROVIDER] = { type: 'test-llm' };
+      const stopRef: { stopping: boolean; reason: 'shutdown' } = { stopping: false, reason: 'shutdown' };
+      sessionConfig.stopRef = stopRef;
+      sessionConfig.targets = [
+        { provider: PRIMARY_PROVIDER, model: MODEL_NAME },
+        { provider: SECONDARY_PROVIDER, model: MODEL_NAME },
+      ];
+      sessionConfig.maxTurns = 3;
+      sessionConfig.maxRetries = 4;
+    },
+    execute: async (configuration, sessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture for restoration
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      const stopRef = sessionConfig.stopRef as { stopping: boolean; reason: 'shutdown' };
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation <= 2) {
+          if (invocation === 2) {
+            setTimeout(() => { stopRef.stopping = true; }, 50);
+          }
+          return {
+            status: { type: 'rate_limit', retryAfterMs: 500 },
+            latencyMs: 5,
+            messages: [],
+            tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+        return await AIAgent.run(AIAgentSession.create(sessionConfig));
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result) => {
+      invariant(!result.success, 'Rate limit sleep shutdown should fail session.');
+      invariant(result.error === 'canceled', 'Error should be "canceled" for rate limit sleep shutdown.');
+    },
+  },
+  {
+    id: 'run-test-ratelimit-sleep-abort-legacy',
+    description: 'Rate limit sleep aborted by stop with reason=undefined triggers finalizeGracefulStopSession.',
+    sequential: true,
+    configure: (configuration, sessionConfig) => {
+      configuration.providers[SECONDARY_PROVIDER] = { type: 'test-llm' };
+      const stopRef: { stopping: boolean } = { stopping: false };
+      sessionConfig.stopRef = stopRef;
+      sessionConfig.targets = [
+        { provider: PRIMARY_PROVIDER, model: MODEL_NAME },
+        { provider: SECONDARY_PROVIDER, model: MODEL_NAME },
+      ];
+      sessionConfig.maxTurns = 3;
+      sessionConfig.maxRetries = 4;
+    },
+    execute: async (configuration, sessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture for restoration
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      const stopRef = sessionConfig.stopRef as { stopping: boolean };
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation <= 2) {
+          if (invocation === 2) {
+            setTimeout(() => { stopRef.stopping = true; }, 50);
+          }
+          return {
+            status: { type: 'rate_limit', retryAfterMs: 500 },
+            latencyMs: 5,
+            messages: [],
+            tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+        return await AIAgent.run(AIAgentSession.create(sessionConfig));
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result) => {
+      // Legacy stop (no reason) during rate limit sleep should succeed via finalizeGracefulStopSession
+      invariant(result.success, 'Rate limit sleep legacy stop should succeed gracefully.');
+      invariant(result.finalReport === undefined, 'No final report expected for legacy stop.');
+    },
+  },
+  // === Coverage: Non-rate-limit retry backoff abort paths (session-turn-runner.ts:1864-1882) ===
+  // These tests verify abort handling DURING retry backoff sleep (non-rate-limit errors)
+  {
+    id: 'run-test-retry-backoff-abort-cancel',
+    description: 'Retry backoff sleep aborted by cancel signal triggers finalizeCanceledSession.',
+    sequential: true,
+    configure: (_configuration, sessionConfig) => {
+      sessionConfig.maxTurns = 3;
+      sessionConfig.maxRetries = 3;
+    },
+    execute: async (_configuration, sessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture for restoration
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      const abortController = new AbortController();
+      sessionConfig.abortSignal = abortController.signal;
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        // Return network_error with backoff to trigger retry sleep
+        if (invocation === 1) {
+          setTimeout(() => { abortController.abort(); }, 50);
+          return {
+            status: { type: 'network_error', message: SIMULATED_NETWORK_ERROR_MSG, retryable: true },
+            latencyMs: 5,
+            messages: [],
+            tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+        return await AIAgent.run(AIAgentSession.create(sessionConfig));
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result) => {
+      invariant(!result.success, 'Retry backoff cancel should fail session.');
+      invariant(result.error === 'canceled', 'Error should be "canceled" for retry backoff cancel.');
+    },
+  },
+  {
+    id: 'run-test-retry-backoff-abort-stop',
+    description: 'Retry backoff sleep aborted by stop with reason=stop triggers forced final turn.',
+    sequential: true,
+    configure: (_configuration, sessionConfig) => {
+      const stopRef: { stopping: boolean; reason: 'stop' } = { stopping: false, reason: 'stop' };
+      sessionConfig.stopRef = stopRef;
+      sessionConfig.maxTurns = 3;
+      sessionConfig.maxRetries = 3;
+    },
+    execute: async (_configuration, sessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture for restoration
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      const stopRef = sessionConfig.stopRef as { stopping: boolean; reason: 'stop' };
+      // eslint-disable-next-line @typescript-eslint/require-await -- mock returns synchronously
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation === 1) {
+          setTimeout(() => { stopRef.stopping = true; }, 50);
+          return {
+            status: { type: 'network_error', message: SIMULATED_NETWORK_ERROR_MSG, retryable: true },
+            latencyMs: 5,
+            messages: [],
+            tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          };
+        }
+        // After stop, provide final report
+        const finalContent = RETRY_BACKOFF_STOP_FINAL_CONTENT;
+        return {
+          status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+          latencyMs: 5,
+          messages: [
+            {
+              role: 'assistant',
+              content: '',
+              toolCalls: [{
+                id: STOPREF_FINAL_CALL_ID,
+                name: 'agent__final_report',
+                parameters: { report_format: 'markdown', report_content: finalContent },
+              }],
+            },
+            { role: 'tool', toolCallId: STOPREF_FINAL_CALL_ID, content: finalContent },
+          ],
+          tokens: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+        };
+      };
+      try {
+        return await AIAgent.run(AIAgentSession.create(sessionConfig));
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result) => {
+      invariant(result.success, 'Retry backoff stop should succeed with final report.');
+      invariant(result.finalReport !== undefined, 'Final report expected after retry backoff stop.');
+      invariant(result.finalReport.content === RETRY_BACKOFF_STOP_FINAL_CONTENT, 'Final report content mismatch.');
+    },
+  },
+  {
+    id: 'run-test-retry-backoff-abort-abort',
+    description: 'Retry backoff sleep aborted by stop with reason=abort triggers finalizeCanceledSession.',
+    sequential: true,
+    configure: (_configuration, sessionConfig) => {
+      const stopRef: { stopping: boolean; reason: 'abort' } = { stopping: false, reason: 'abort' };
+      sessionConfig.stopRef = stopRef;
+      sessionConfig.maxTurns = 3;
+      sessionConfig.maxRetries = 3;
+    },
+    execute: async (_configuration, sessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture for restoration
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      const stopRef = sessionConfig.stopRef as { stopping: boolean; reason: 'abort' };
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation === 1) {
+          setTimeout(() => { stopRef.stopping = true; }, 50);
+          return {
+            status: { type: 'network_error', message: SIMULATED_NETWORK_ERROR_MSG, retryable: true },
+            latencyMs: 5,
+            messages: [],
+            tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+        return await AIAgent.run(AIAgentSession.create(sessionConfig));
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result) => {
+      invariant(!result.success, 'Retry backoff abort should fail session.');
+      invariant(result.error === 'canceled', 'Error should be "canceled" for retry backoff abort.');
+    },
+  },
+  {
+    id: 'run-test-retry-backoff-abort-shutdown',
+    description: 'Retry backoff sleep aborted by stop with reason=shutdown triggers finalizeCanceledSession.',
+    sequential: true,
+    configure: (_configuration, sessionConfig) => {
+      const stopRef: { stopping: boolean; reason: 'shutdown' } = { stopping: false, reason: 'shutdown' };
+      sessionConfig.stopRef = stopRef;
+      sessionConfig.maxTurns = 3;
+      sessionConfig.maxRetries = 3;
+    },
+    execute: async (_configuration, sessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture for restoration
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      const stopRef = sessionConfig.stopRef as { stopping: boolean; reason: 'shutdown' };
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation === 1) {
+          setTimeout(() => { stopRef.stopping = true; }, 50);
+          return {
+            status: { type: 'network_error', message: SIMULATED_NETWORK_ERROR_MSG, retryable: true },
+            latencyMs: 5,
+            messages: [],
+            tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+        return await AIAgent.run(AIAgentSession.create(sessionConfig));
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result) => {
+      invariant(!result.success, 'Retry backoff shutdown should fail session.');
+      invariant(result.error === 'canceled', 'Error should be "canceled" for retry backoff shutdown.');
+    },
+  },
+  {
+    id: 'run-test-retry-backoff-abort-legacy',
+    description: 'Retry backoff sleep aborted by stop with reason=undefined triggers finalizeGracefulStopSession.',
+    sequential: true,
+    configure: (_configuration, sessionConfig) => {
+      const stopRef: { stopping: boolean } = { stopping: false };
+      sessionConfig.stopRef = stopRef;
+      sessionConfig.maxTurns = 3;
+      sessionConfig.maxRetries = 3;
+    },
+    execute: async (_configuration, sessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture for restoration
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      const stopRef = sessionConfig.stopRef as { stopping: boolean };
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation === 1) {
+          setTimeout(() => { stopRef.stopping = true; }, 50);
+          return {
+            status: { type: 'network_error', message: SIMULATED_NETWORK_ERROR_MSG, retryable: true },
+            latencyMs: 5,
+            messages: [],
+            tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+        return await AIAgent.run(AIAgentSession.create(sessionConfig));
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result) => {
+      invariant(result.success, 'Retry backoff legacy stop should succeed gracefully.');
+      invariant(result.finalReport === undefined, 'No final report expected for legacy stop.');
     },
   },
   {

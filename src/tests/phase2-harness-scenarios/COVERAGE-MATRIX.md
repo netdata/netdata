@@ -23,9 +23,9 @@ This document maps core loop branches in `TurnRunner.execute()` to existing test
 | Branch | Description | Test(s) |
 |--------|-------------|---------|
 | `isCanceled()` check | Early exit on cancel signal | `run-test-49`, `run-test-44` |
-| Stop reason: `stop` | Set forced final turn | `run-test-49` |
-| Stop reason: `abort`/`shutdown` | Immediate canceled session | `run-test-44` |
-| Stop reason: undefined | Legacy graceful stop | `run-test-1` (default path) |
+| Stop reason: `stop` | Set forced final turn | `run-test-stopref-reason-stop` |
+| Stop reason: `abort`/`shutdown` | Immediate canceled session | `run-test-stopref-reason-abort`, `run-test-stopref-reason-shutdown` |
+| Stop reason: undefined | Legacy graceful stop | `run-test-44`, `run-test-43` |
 
 ### Context Guard
 
@@ -40,7 +40,7 @@ This document maps core loop branches in `TurnRunner.execute()` to existing test
 
 | Branch | Description | Test(s) |
 |--------|-------------|---------|
-| Abort/shutdown during retry | Immediate exit on abort | `run-test-44`, `run-test-49` |
+| Abort/shutdown during retry | Immediate exit on abort | `run-test-stopref-reason-abort`, `run-test-stopref-reason-shutdown` |
 | Empty response without tools | Retry - `empty_without_tools` | `run-test-37`, `suite-error-retry-success` |
 | Reasoning only response | Log reasoning_only failure | `suite-reasoning-content-no-tools-retries` |
 | Tool message fallback | Adopt final report from tool result | `run-test-final-report-tool-message-fallback` |
@@ -55,7 +55,7 @@ This document maps core loop branches in `TurnRunner.execute()` to existing test
 
 | Branch | Description | Test(s) |
 |--------|-------------|---------|
-| User stop during retry | Continue to final turn | `run-test-49` |
+| User stop during retry | Continue to final turn | `run-test-stopref-reason-stop` |
 | Already in final turn | Fail session | `run-test-max-turn-limit` |
 | Not final turn | Set retry exhaustion reason | `suite-task-status-exhausts-turns` |
 
@@ -83,7 +83,7 @@ This document maps core loop branches in `TurnRunner.execute()` to existing test
 
 ## Test Suite Distribution
 
-### Suite Tests (34 new tests)
+### Suite Tests (34 tests)
 
 | Suite | Tests | Coverage Area |
 |-------|-------|---------------|
@@ -98,7 +98,7 @@ This document maps core loop branches in `TurnRunner.execute()` to existing test
 | format-specific.test.ts | 4 | Output formats |
 | coverage.test.ts | 4 | Edge cases |
 
-### Base Tests (244 tests)
+### Base Tests (257 tests)
 
 Located in `phase2-runner.ts`:
 - Core orchestration: ~30 tests
@@ -110,17 +110,60 @@ Located in `phase2-runner.ts`:
 - Error handling: ~20 tests
 - Reasoning: ~10 tests
 - Coverage/misc: ~100+ tests
+- **stopRef reason coverage: 3 tests**
+- **Sleep abort path coverage: 10 tests** (rate limit + retry backoff × cancel/stop/abort/shutdown/legacy)
 
 ---
 
-## Gaps Identified
+## stopRef.reason Branch Coverage (session-turn-runner.ts:318-332)
 
-**No critical gaps found.** All major branches in the core loops are covered by existing tests.
+The turn loop checks `stopRef.reason` to determine behavior:
 
-Minor observations:
-1. Some edge cases have multiple tests for redundancy
-2. Suite tests provide category-focused coverage
-3. Base tests provide comprehensive edge case coverage
+```typescript
+if (this.ctx.stopRef?.stopping === true) {
+    const reason = this.ctx.stopRef.reason;
+    if (reason === 'stop') {           // → run-test-stopref-reason-stop
+        // Force final turn, continue execution
+    } else if (reason === 'abort' || reason === 'shutdown') {  // → run-test-stopref-reason-abort, run-test-stopref-reason-shutdown
+        return this.finalizeCanceledSession(...);  // success=false, error='canceled'
+    } else {  // undefined (legacy)    // → run-test-44, run-test-43
+        return this.finalizeGracefulStopSession(...);  // success=true
+    }
+}
+```
+
+| Test | Reason | Expected Behavior |
+|------|--------|-------------------|
+| `run-test-stopref-reason-stop` | `'stop'` | Forces final turn, allows final report |
+| `run-test-stopref-reason-abort` | `'abort'` | Immediate exit, `success=false, error='canceled'` |
+| `run-test-stopref-reason-shutdown` | `'shutdown'` | Immediate exit, `success=false, error='canceled'` |
+| `run-test-44`, `run-test-43` | `undefined` | Legacy graceful stop, `success=true` |
+
+---
+
+## Sleep Abort Path Coverage (session-turn-runner.ts:1826-1882)
+
+During rate limit and retry backoff sleeps, the system checks for abort/stop signals. These paths are exercised by dedicated tests:
+
+### Rate Limit Sleep Abort (lines 1826-1843)
+
+| Test | Signal | Expected Behavior |
+|------|--------|-------------------|
+| `run-test-ratelimit-sleep-abort-cancel` | AbortController.abort() | `finalizeCanceledSession`, `success=false, error='canceled'` |
+| `run-test-ratelimit-sleep-abort-stop` | `reason: 'stop'` | Forces final turn, allows final report |
+| `run-test-ratelimit-sleep-abort-abort` | `reason: 'abort'` | `finalizeCanceledSession`, `success=false, error='canceled'` |
+| `run-test-ratelimit-sleep-abort-shutdown` | `reason: 'shutdown'` | `finalizeCanceledSession`, `success=false, error='canceled'` |
+| `run-test-ratelimit-sleep-abort-legacy` | `reason: undefined` | `finalizeGracefulStopSession`, `success=true` |
+
+### Retry Backoff Sleep Abort (lines 1864-1882)
+
+| Test | Signal | Expected Behavior |
+|------|--------|-------------------|
+| `run-test-retry-backoff-abort-cancel` | AbortController.abort() | `finalizeCanceledSession`, `success=false, error='canceled'` |
+| `run-test-retry-backoff-abort-stop` | `reason: 'stop'` | Forces final turn, allows final report |
+| `run-test-retry-backoff-abort-abort` | `reason: 'abort'` | `finalizeCanceledSession`, `success=false, error='canceled'` |
+| `run-test-retry-backoff-abort-shutdown` | `reason: 'shutdown'` | `finalizeCanceledSession`, `success=false, error='canceled'` |
+| `run-test-retry-backoff-abort-legacy` | `reason: undefined` | `finalizeGracefulStopSession`, `success=true` |
 
 ---
 
@@ -128,4 +171,4 @@ Minor observations:
 
 - Build: PASS
 - Lint: PASS
-- Tests: 278/278 PASS (246 parallel, 32 sequential)
+- Tests: 291/291 PASS (249 parallel, 42 sequential)
