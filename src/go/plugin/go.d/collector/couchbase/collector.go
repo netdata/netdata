@@ -64,6 +64,8 @@ type Collector struct {
 	charts     *module.Charts
 
 	collectedBuckets map[string]bool
+
+	funcTopQueries *funcTopQueries
 }
 
 func (c *Collector) Configuration() any {
@@ -87,6 +89,8 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("init charts: %v", err)
 	}
 	c.charts = charts
+
+	c.funcTopQueries = newFuncTopQueries(c)
 
 	return nil
 }

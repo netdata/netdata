@@ -13,10 +13,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
-const oracleMaxQueryTextLength = 4096
+const queriesMaxTextLength = 4096
 
-// oracleColumn embeds funcapi.ColumnMeta and adds Oracle-specific fields.
-type oracleColumn struct {
+const queriesParamSort = "__sort"
+
+// queriesColumn defines a column for OracleDB queries functions.
+// Embeds funcapi.ColumnMeta for UI display and adds collector-specific fields.
+type queriesColumn struct {
 	funcapi.ColumnMeta
 	SelectExpr     string // SQL expression for SELECT clause
 	IsSortOption   bool   // whether this column appears as a sort option
@@ -25,16 +28,16 @@ type oracleColumn struct {
 	RequiresColumn string // only include if this column exists in the view
 }
 
-func oracleColumnSet(cols []oracleColumn) funcapi.ColumnSet[oracleColumn] {
-	return funcapi.Columns(cols, func(c oracleColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+func queriesColumnSet(cols []queriesColumn) funcapi.ColumnSet[queriesColumn] {
+	return funcapi.Columns(cols, func(c queriesColumn) funcapi.ColumnMeta { return c.ColumnMeta })
 }
 
-type oracleTopLayout struct {
-	cols []oracleColumn
+type queriesTopLayout struct {
+	cols []queriesColumn
 	join string
 }
 
-var oracleTopColumns = []oracleColumn{
+var queriesTopColumns = []queriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "sqlId", Tooltip: "SQL ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.sql_id"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sticky: true, FullWidth: true, Wrap: true}, SelectExpr: "s.sql_text"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "schema", Tooltip: "Schema", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, GroupBy: &funcapi.GroupByOptions{IsDefault: true}}, SelectExpr: "s.parsing_schema_name"},
@@ -54,7 +57,7 @@ var oracleTopColumns = []oracleColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "lastActiveTime", Tooltip: "Last Active", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformText}, SelectExpr: "TO_CHAR(CAST(s.last_active_time AS TIMESTAMP), 'YYYY-MM-DD\"T\"HH24:MI:SS.FF3')", RequiresColumn: "LAST_ACTIVE_TIME"},
 }
 
-var oracleRunningColumns = []oracleColumn{
+var queriesRunningColumns = []queriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "sessionId", Tooltip: "Session", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.sid || ',' || s.serial#"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "username", Tooltip: "User", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.username"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "status", Tooltip: "Status", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.status"},
@@ -69,57 +72,37 @@ var oracleRunningColumns = []oracleColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "machine", Tooltip: "Machine", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.machine"},
 }
 
-func oracleMethods() []module.MethodConfig {
-	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Top SQL statements from V$SQLSTATS. WARNING: Query text may contain unmasked literals (potential PII).",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{
-				buildOracleSortParam(oracleTopColumns),
-			},
-		},
-		{
-			UpdateEvery:  10,
-			ID:           "running-queries",
-			Name:         "Running Queries",
-			Help:         "Currently running SQL statements from V$SESSION. WARNING: Query text may contain unmasked literals (potential PII).",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{
-				buildOracleSortParam(oracleRunningColumns),
-			},
-		},
-	}
-}
-
-// funcOracle implements funcapi.MethodHandler for OracleDB.
-type funcOracle struct {
+// funcQueries implements funcapi.MethodHandler for OracleDB query functions.
+// Handles both top-queries and running-queries methods.
+type funcQueries struct {
 	collector *Collector
 }
 
+func newFuncQueries(c *Collector) *funcQueries {
+	return &funcQueries{collector: c}
+}
+
 // Compile-time interface check.
-var _ funcapi.MethodHandler = (*funcOracle)(nil)
+var _ funcapi.MethodHandler = (*funcQueries)(nil)
 
 // MethodParams implements funcapi.MethodHandler.
-func (f *funcOracle) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+func (f *funcQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
 	switch method {
 	case "top-queries":
-		cols := oracleTopColumns
+		cols := queriesTopColumns
 		if f.collector.db != nil {
-			cols = f.collector.oracleTopLayout(ctx).cols
+			cols = f.topLayout(ctx).cols
 		}
-		return []funcapi.ParamConfig{buildOracleSortParam(cols)}, nil
+		return []funcapi.ParamConfig{buildQueriesSortParam(cols)}, nil
 	case "running-queries":
-		return []funcapi.ParamConfig{buildOracleSortParam(oracleRunningColumns)}, nil
+		return []funcapi.ParamConfig{buildQueriesSortParam(queriesRunningColumns)}, nil
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
 }
 
 // Handle implements funcapi.MethodHandler.
-func (f *funcOracle) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+func (f *funcQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	if f.collector.db == nil {
 		if err := f.collector.openConnection(); err != nil {
 			return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
@@ -128,138 +111,24 @@ func (f *funcOracle) Handle(ctx context.Context, method string, params funcapi.R
 
 	switch method {
 	case "top-queries":
-		return f.collector.collectTopQueries(ctx, params.Column("__sort"))
+		return f.collectTopQueries(ctx, params.Column(queriesParamSort))
 	case "running-queries":
-		return f.collector.collectRunningQueries(ctx, params.Column("__sort"))
+		return f.collectRunningQueries(ctx, params.Column(queriesParamSort))
 	default:
 		return funcapi.NotFoundResponse(method)
 	}
 }
 
-func oracleFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return nil
-	}
-	return &funcOracle{collector: c}
-}
-
-func buildOracleSortParam(cols []oracleColumn) funcapi.ParamConfig {
-	var options []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range cols {
-		if !col.IsSortOption {
-			continue
-		}
-		opt := funcapi.ParamOption{
-			ID:     col.Name,
-			Column: col.Name,
-			Name:   col.SortLabel,
-			Sort:   &sortDir,
-		}
-		if col.IsDefaultSort {
-			opt.Default = true
-		}
-		options = append(options, opt)
-	}
-	return funcapi.ParamConfig{
-		ID:         "__sort",
-		Name:       "Filter By",
-		Help:       "Select the primary sort column",
-		Selection:  funcapi.ParamSelect,
-		Options:    options,
-		UniqueView: true,
-	}
-}
-
-func buildOracleSelect(cols []oracleColumn) string {
-	parts := make([]string, 0, len(cols))
-	for _, col := range cols {
-		expr := col.SelectExpr
-		if expr == "" {
-			expr = col.Name
-		}
-		parts = append(parts, fmt.Sprintf("%s AS %s", expr, col.Name))
-	}
-	return strings.Join(parts, ", ")
-}
-
-func mapOracleSortColumn(input string, cols []oracleColumn) string {
-	for _, col := range cols {
-		if col.IsSortOption && col.Name == input {
-			return col.Name
-		}
-	}
-	for _, col := range cols {
-		if col.IsDefaultSort {
-			return col.Name
-		}
-	}
-	for _, col := range cols {
-		if col.IsSortOption {
-			return col.Name
-		}
-	}
-	return ""
-}
-
-func (c *Collector) oracleTopLayout(ctx context.Context) oracleTopLayout {
-	available, err := c.fetchSQLStatsColumns(ctx)
+func (f *funcQueries) topLayout(ctx context.Context) queriesTopLayout {
+	available, err := f.fetchSQLStatsColumns(ctx)
 	if err != nil {
-		return oracleTopLayout{cols: filterOracleColumns(oracleTopColumns, nil)}
+		return queriesTopLayout{cols: filterQueriesColumns(queriesTopColumns, nil)}
 	}
-	return buildOracleTopLayout(available)
+	return buildQueriesTopLayout(available)
 }
 
-func filterOracleColumns(cols []oracleColumn, available map[string]bool) []oracleColumn {
-	filtered := make([]oracleColumn, 0, len(cols))
-	for _, col := range cols {
-		if col.RequiresColumn != "" {
-			if available == nil {
-				continue
-			}
-			if !available[strings.ToUpper(col.RequiresColumn)] {
-				continue
-			}
-		}
-		filtered = append(filtered, col)
-	}
-	return filtered
-}
-
-func buildOracleTopLayout(available map[string]bool) oracleTopLayout {
-	schemaExpr, schemaJoin := resolveOracleSchemaExpr(available)
-	filtered := make([]oracleColumn, 0, len(oracleTopColumns))
-	for _, col := range oracleTopColumns {
-		if col.Name == "schema" {
-			if schemaExpr == "" {
-				continue
-			}
-			col.SelectExpr = schemaExpr
-		}
-		if col.RequiresColumn != "" && !available[strings.ToUpper(col.RequiresColumn)] {
-			continue
-		}
-		filtered = append(filtered, col)
-	}
-	return oracleTopLayout{cols: filtered, join: schemaJoin}
-}
-
-func resolveOracleSchemaExpr(available map[string]bool) (string, string) {
-	switch {
-	case available["PARSING_SCHEMA_NAME"]:
-		return "s.parsing_schema_name", ""
-	case available["PARSING_SCHEMA_ID"]:
-		return "COALESCE(u.username, TO_CHAR(s.parsing_schema_id))", "LEFT JOIN all_users u ON u.user_id = s.parsing_schema_id"
-	case available["LAST_EXEC_USER_ID"]:
-		return "COALESCE(u.username, TO_CHAR(s.last_exec_user_id))", "LEFT JOIN all_users u ON u.user_id = s.last_exec_user_id"
-	default:
-		return "", ""
-	}
-}
-
-func (c *Collector) fetchSQLStatsColumns(ctx context.Context) (map[string]bool, error) {
-	rows, err := c.db.QueryContext(ctx, "SELECT * FROM v$sqlstats WHERE 1=0")
+func (f *funcQueries) fetchSQLStatsColumns(ctx context.Context) (map[string]bool, error) {
+	rows, err := f.collector.db.QueryContext(ctx, "SELECT * FROM v$sqlstats WHERE 1=0")
 	if err != nil {
 		return nil, err
 	}
@@ -278,15 +147,15 @@ func (c *Collector) fetchSQLStatsColumns(ctx context.Context) (map[string]bool, 
 	return cols, nil
 }
 
-func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
-	layout := c.oracleTopLayout(ctx)
+func (f *funcQueries) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
+	layout := f.topLayout(ctx)
 	topCols := layout.cols
-	limit := c.TopQueriesLimit
+	limit := f.collector.TopQueriesLimit
 	if limit <= 0 {
 		limit = 500
 	}
 
-	sortColumn = mapOracleSortColumn(sortColumn, topCols)
+	sortColumn = mapQueriesSortColumn(sortColumn, topCols)
 	if sortColumn == "" {
 		return &module.FunctionResponse{Status: 500, Message: "no sortable columns available"}
 	}
@@ -302,9 +171,9 @@ FROM v$sqlstats s
 WHERE NVL(s.executions, 0) > 0
 ORDER BY %s DESC NULLS LAST
 FETCH FIRST %d ROWS ONLY
-`, buildOracleSelect(topCols), joinClause, sortColumn, limit)
+`, buildQueriesSelect(topCols), joinClause, sortColumn, limit)
 
-	rows, err := c.db.QueryContext(ctx, query)
+	rows, err := f.collector.db.QueryContext(ctx, query)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
@@ -313,12 +182,12 @@ FETCH FIRST %d ROWS ONLY
 	}
 	defer func() { _ = rows.Close() }()
 
-	data, err := scanOracleRows(rows, topCols)
+	data, err := scanQueriesRows(rows, topCols)
 	if err != nil {
 		return &module.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
-	cs := oracleColumnSet(topCols)
+	cs := queriesColumnSet(topCols)
 	if len(data) == 0 {
 		return &module.FunctionResponse{
 			Status:            200,
@@ -327,7 +196,7 @@ FETCH FIRST %d ROWS ONLY
 			Columns:           cs.BuildColumns(),
 			Data:              [][]any{},
 			DefaultSortColumn: sortColumn,
-			RequiredParams:    []funcapi.ParamConfig{buildOracleSortParam(topCols)},
+			RequiredParams:    []funcapi.ParamConfig{buildQueriesSortParam(topCols)},
 			Charts:            cs.BuildCharts(),
 			DefaultCharts:     cs.BuildDefaultCharts(),
 			GroupBy:           cs.BuildGroupBy(),
@@ -340,20 +209,20 @@ FETCH FIRST %d ROWS ONLY
 		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: sortColumn,
-		RequiredParams:    []funcapi.ParamConfig{buildOracleSortParam(topCols)},
+		RequiredParams:    []funcapi.ParamConfig{buildQueriesSortParam(topCols)},
 		Charts:            cs.BuildCharts(),
 		DefaultCharts:     cs.BuildDefaultCharts(),
 		GroupBy:           cs.BuildGroupBy(),
 	}
 }
 
-func (c *Collector) collectRunningQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
-	limit := c.TopQueriesLimit
+func (f *funcQueries) collectRunningQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
+	limit := f.collector.TopQueriesLimit
 	if limit <= 0 {
 		limit = 500
 	}
 
-	sortColumn = mapOracleSortColumn(sortColumn, oracleRunningColumns)
+	sortColumn = mapQueriesSortColumn(sortColumn, queriesRunningColumns)
 	if sortColumn == "" {
 		return &module.FunctionResponse{Status: 500, Message: "no sortable columns available"}
 	}
@@ -368,9 +237,9 @@ WHERE s.type = 'USER'
   AND s.sql_id IS NOT NULL
 ORDER BY %s DESC NULLS LAST
 FETCH FIRST %d ROWS ONLY
-`, buildOracleSelect(oracleRunningColumns), sortColumn, limit)
+`, buildQueriesSelect(queriesRunningColumns), sortColumn, limit)
 
-	rows, err := c.db.QueryContext(ctx, query)
+	rows, err := f.collector.db.QueryContext(ctx, query)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
@@ -379,12 +248,12 @@ FETCH FIRST %d ROWS ONLY
 	}
 	defer func() { _ = rows.Close() }()
 
-	data, err := scanOracleRows(rows, oracleRunningColumns)
+	data, err := scanQueriesRows(rows, queriesRunningColumns)
 	if err != nil {
 		return &module.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
-	cs := oracleColumnSet(oracleRunningColumns)
+	cs := queriesColumnSet(queriesRunningColumns)
 	if len(data) == 0 {
 		return &module.FunctionResponse{
 			Status:            200,
@@ -393,7 +262,7 @@ FETCH FIRST %d ROWS ONLY
 			Columns:           cs.BuildColumns(),
 			Data:              [][]any{},
 			DefaultSortColumn: sortColumn,
-			RequiredParams:    []funcapi.ParamConfig{buildOracleSortParam(oracleRunningColumns)},
+			RequiredParams:    []funcapi.ParamConfig{buildQueriesSortParam(queriesRunningColumns)},
 		}
 	}
 
@@ -403,11 +272,153 @@ FETCH FIRST %d ROWS ONLY
 		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: sortColumn,
-		RequiredParams:    []funcapi.ParamConfig{buildOracleSortParam(oracleRunningColumns)},
+		RequiredParams:    []funcapi.ParamConfig{buildQueriesSortParam(queriesRunningColumns)},
 	}
 }
 
-func scanOracleRows(rows *sql.Rows, cols []oracleColumn) ([][]any, error) {
+// oracledbMethods returns the method configurations for registration.
+func oracledbMethods() []module.MethodConfig {
+	return []module.MethodConfig{
+		{
+			UpdateEvery:  10,
+			ID:           "top-queries",
+			Name:         "Top Queries",
+			Help:         "Top SQL statements from V$SQLSTATS. WARNING: Query text may contain unmasked literals (potential PII).",
+			RequireCloud: true,
+			RequiredParams: []funcapi.ParamConfig{
+				buildQueriesSortParam(queriesTopColumns),
+			},
+		},
+		{
+			UpdateEvery:  10,
+			ID:           "running-queries",
+			Name:         "Running Queries",
+			Help:         "Currently running SQL statements from V$SESSION. WARNING: Query text may contain unmasked literals (potential PII).",
+			RequireCloud: true,
+			RequiredParams: []funcapi.ParamConfig{
+				buildQueriesSortParam(queriesRunningColumns),
+			},
+		},
+	}
+}
+
+// oracledbFunctionHandler returns the MethodHandler for an OracleDB job.
+func oracledbFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
+	}
+	return c.funcQueries
+}
+
+// buildQueriesSortParam builds the sort parameter for method registration.
+func buildQueriesSortParam(cols []queriesColumn) funcapi.ParamConfig {
+	var options []funcapi.ParamOption
+	sortDir := funcapi.FieldSortDescending
+	for _, col := range cols {
+		if !col.IsSortOption {
+			continue
+		}
+		opt := funcapi.ParamOption{
+			ID:     col.Name,
+			Column: col.Name,
+			Name:   col.SortLabel,
+			Sort:   &sortDir,
+		}
+		if col.IsDefaultSort {
+			opt.Default = true
+		}
+		options = append(options, opt)
+	}
+	return funcapi.ParamConfig{
+		ID:         queriesParamSort,
+		Name:       "Filter By",
+		Help:       "Select the primary sort column",
+		Selection:  funcapi.ParamSelect,
+		Options:    options,
+		UniqueView: true,
+	}
+}
+
+func buildQueriesSelect(cols []queriesColumn) string {
+	parts := make([]string, 0, len(cols))
+	for _, col := range cols {
+		expr := col.SelectExpr
+		if expr == "" {
+			expr = col.Name
+		}
+		parts = append(parts, fmt.Sprintf("%s AS %s", expr, col.Name))
+	}
+	return strings.Join(parts, ", ")
+}
+
+func mapQueriesSortColumn(input string, cols []queriesColumn) string {
+	for _, col := range cols {
+		if col.IsSortOption && col.Name == input {
+			return col.Name
+		}
+	}
+	for _, col := range cols {
+		if col.IsDefaultSort {
+			return col.Name
+		}
+	}
+	for _, col := range cols {
+		if col.IsSortOption {
+			return col.Name
+		}
+	}
+	return ""
+}
+
+func filterQueriesColumns(cols []queriesColumn, available map[string]bool) []queriesColumn {
+	filtered := make([]queriesColumn, 0, len(cols))
+	for _, col := range cols {
+		if col.RequiresColumn != "" {
+			if available == nil {
+				continue
+			}
+			if !available[strings.ToUpper(col.RequiresColumn)] {
+				continue
+			}
+		}
+		filtered = append(filtered, col)
+	}
+	return filtered
+}
+
+func buildQueriesTopLayout(available map[string]bool) queriesTopLayout {
+	schemaExpr, schemaJoin := resolveQueriesSchemaExpr(available)
+	filtered := make([]queriesColumn, 0, len(queriesTopColumns))
+	for _, col := range queriesTopColumns {
+		if col.Name == "schema" {
+			if schemaExpr == "" {
+				continue
+			}
+			col.SelectExpr = schemaExpr
+		}
+		if col.RequiresColumn != "" && !available[strings.ToUpper(col.RequiresColumn)] {
+			continue
+		}
+		filtered = append(filtered, col)
+	}
+	return queriesTopLayout{cols: filtered, join: schemaJoin}
+}
+
+func resolveQueriesSchemaExpr(available map[string]bool) (string, string) {
+	switch {
+	case available["PARSING_SCHEMA_NAME"]:
+		return "s.parsing_schema_name", ""
+	case available["PARSING_SCHEMA_ID"]:
+		return "COALESCE(u.username, TO_CHAR(s.parsing_schema_id))", "LEFT JOIN all_users u ON u.user_id = s.parsing_schema_id"
+	case available["LAST_EXEC_USER_ID"]:
+		return "COALESCE(u.username, TO_CHAR(s.last_exec_user_id))", "LEFT JOIN all_users u ON u.user_id = s.last_exec_user_id"
+	default:
+		return "", ""
+	}
+}
+
+func scanQueriesRows(rows *sql.Rows, cols []queriesColumn) ([][]any, error) {
 	data := make([][]any, 0, 500)
 
 	for rows.Next() {
@@ -443,7 +454,7 @@ func scanOracleRows(rows *sql.Rows, cols []oracleColumn) ([][]any, error) {
 				if v.Valid {
 					s := v.String
 					if col.Name == "query" {
-						s = strmutil.TruncateText(s, oracleMaxQueryTextLength)
+						s = strmutil.TruncateText(s, queriesMaxTextLength)
 					}
 					row[i] = s
 				} else {
@@ -475,4 +486,3 @@ func scanOracleRows(rows *sql.Rows, cols []oracleColumn) ([][]any, error) {
 
 	return data, nil
 }
-

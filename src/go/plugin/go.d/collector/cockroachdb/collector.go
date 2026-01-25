@@ -72,6 +72,8 @@ type Collector struct {
 	prom prometheus.Prometheus
 
 	db *sql.DB
+
+	funcQueries *funcQueries
 }
 
 func (c *Collector) Configuration() any {
@@ -88,6 +90,8 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("error on initializing prometheus client: %v", err)
 	}
 	c.prom = prom
+
+	c.funcQueries = newFuncQueries(c)
 
 	if c.UpdateEvery < dbSamplingInterval {
 		c.Warningf("'update_every'(%d) is lower then CockroachDB default sampling interval (%d)",

@@ -85,6 +85,8 @@ type Collector struct {
 	clusterName string
 	nodes       map[string]bool
 	indices     map[string]bool
+
+	funcTopQueries *funcTopQueries
 }
 
 func (c *Collector) Configuration() any {
@@ -102,6 +104,8 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	c.httpClient = httpClient
+
+	c.funcTopQueries = newFuncTopQueries(c)
 
 	return nil
 }

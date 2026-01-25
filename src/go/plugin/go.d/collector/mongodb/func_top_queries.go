@@ -19,53 +19,52 @@ import (
 )
 
 const (
-	maxQueryTextLength     = 4096
-	defaultTopQueriesLimit = 500
-	topQueriesHelpText     = "Top queries from MongoDB Profiler (system.profile). " +
+	topQueriesMaxTextLength    = 4096
+	topQueriesDefaultLimit     = 500
+	topQueriesHelpText         = "Top queries from MongoDB Profiler (system.profile). " +
 		"WARNING: Query text may contain unmasked literals (potential PII). " +
 		"Requires profiling enabled on target databases (db.setProfilingLevel)."
 )
 
-const paramSort = "__sort"
+const topQueriesParamSort = "__sort"
 
-// mongoColumn defines metadata for a MongoDB profile column.
+// topQueriesColumn defines metadata for a MongoDB profile column.
 // Embeds funcapi.ColumnMeta for UI rendering and adds MongoDB-specific fields.
-type mongoColumn struct {
+type topQueriesColumn struct {
 	funcapi.ColumnMeta
 
 	// DBField is the MongoDB document field name (e.g., "millis")
 	DBField string
 	// IsSortOption indicates whether this column can be used for sorting in params
 	IsSortOption bool
+	// SortLabel is the label for the sort option dropdown
+	SortLabel string
+	// IsDefaultSort indicates whether this is the default sort column
+	IsDefaultSort bool
 }
 
-// mongoColumnSet creates a ColumnSet from a slice of mongoColumn.
-func mongoColumnSet(cols []mongoColumn) funcapi.ColumnSet[mongoColumn] {
-	return funcapi.Columns(cols, func(c mongoColumn) funcapi.ColumnMeta { return c.ColumnMeta })
-}
-
-// mongoAllColumns defines all available columns from system.profile.
+// topQueriesColumns defines all available columns from system.profile.
 // Ordered by display priority (index).
-var mongoAllColumns = []mongoColumn{
+var topQueriesColumns = []topQueriesColumn{
 	// Core fields (visible by default)
-	{ColumnMeta: funcapi.ColumnMeta{Name: "timestamp", Tooltip: "Timestamp", Type: funcapi.FieldTypeTimestamp, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummaryMax, Transform: funcapi.FieldTransformDatetime, UniqueKey: true}, DBField: "ts", IsSortOption: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "timestamp", Tooltip: "Timestamp", Type: funcapi.FieldTypeTimestamp, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummaryMax, Transform: funcapi.FieldTransformDatetime, UniqueKey: true}, DBField: "ts", IsSortOption: true, SortLabel: "Timestamp"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "namespace", Tooltip: "Namespace", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Sticky: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, ExpandFilter: true, GroupBy: &funcapi.GroupByOptions{IsDefault: true}}, DBField: "ns"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "operation", Tooltip: "Operation", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}, DBField: "op"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, FullWidth: true, Wrap: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "command"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "execution_time", Tooltip: "Execution Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformDuration, DecimalPoints: 3, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time", IsDefault: true}}, DBField: "millis", IsSortOption: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_examined", Tooltip: "Docs Examined", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "docsExamined", IsSortOption: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "keys_examined", Tooltip: "Keys Examined", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "keysExamined", IsSortOption: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_returned", Tooltip: "Docs Returned", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "nreturned", IsSortOption: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "execution_time", Tooltip: "Execution Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformDuration, DecimalPoints: 3, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time", IsDefault: true}}, DBField: "millis", IsSortOption: true, IsDefaultSort: true, SortLabel: "Execution Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_examined", Tooltip: "Docs Examined", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "docsExamined", IsSortOption: true, SortLabel: "Docs Examined"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "keys_examined", Tooltip: "Keys Examined", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "keysExamined", IsSortOption: true, SortLabel: "Keys Examined"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_returned", Tooltip: "Docs Returned", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "nreturned", IsSortOption: true, SortLabel: "Docs Returned"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "plan_summary", Tooltip: "Plan Summary", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "planSummary"},
 
 	// Secondary fields
 	{ColumnMeta: funcapi.ColumnMeta{Name: "client", Tooltip: "Client", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}, DBField: "client"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "user", Tooltip: "User", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}, DBField: "user"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_deleted", Tooltip: "Docs Deleted", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "ndeleted", IsSortOption: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_inserted", Tooltip: "Docs Inserted", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "ninserted", IsSortOption: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_modified", Tooltip: "Docs Modified", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "nModified", IsSortOption: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "response_length", Tooltip: "Response Length", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Response", Title: "Response Size"}}, DBField: "responseLength", IsSortOption: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "num_yield", Tooltip: "Num Yield", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Yield", Title: "Yield"}}, DBField: "numYield", IsSortOption: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_deleted", Tooltip: "Docs Deleted", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "ndeleted", IsSortOption: true, SortLabel: "Docs Deleted"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_inserted", Tooltip: "Docs Inserted", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "ninserted", IsSortOption: true, SortLabel: "Docs Inserted"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "docs_modified", Tooltip: "Docs Modified", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Docs", Title: "Documents"}}, DBField: "nModified", IsSortOption: true, SortLabel: "Docs Modified"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "response_length", Tooltip: "Response Length", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Response", Title: "Response Size"}}, DBField: "responseLength", IsSortOption: true, SortLabel: "Response Length"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "num_yield", Tooltip: "Num Yield", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformNumber, Chart: &funcapi.ChartOptions{Group: "Yield", Title: "Yield"}}, DBField: "numYield", IsSortOption: true, SortLabel: "Num Yield"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "app_name", Tooltip: "App Name", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}, DBField: "appName"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "cursor_exhausted", Tooltip: "Cursor Exhausted", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "cursorExhausted"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "has_sort_stage", Tooltip: "Has Sort Stage", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "hasSortStage"},
@@ -76,125 +75,14 @@ var mongoAllColumns = []mongoColumn{
 	// Version-specific fields (hidden by default)
 	{ColumnMeta: funcapi.ColumnMeta{Name: "query_hash", Tooltip: "Query Hash", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "queryHash"},            // 4.2+
 	{ColumnMeta: funcapi.ColumnMeta{Name: "plan_cache_key", Tooltip: "Plan Cache Key", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "planCacheKey"}, // 4.2+
-	{ColumnMeta: funcapi.ColumnMeta{Name: "planning_time", Tooltip: "Planning Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformDuration, DecimalPoints: 3, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, DBField: "planningTimeMicros", IsSortOption: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "cpu_time", Tooltip: "CPU Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformDuration, DecimalPoints: 3, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, DBField: "cpuNanos", IsSortOption: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "planning_time", Tooltip: "Planning Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformDuration, DecimalPoints: 3, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, DBField: "planningTimeMicros", IsSortOption: true, SortLabel: "Planning Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "cpu_time", Tooltip: "CPU Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Summary: funcapi.FieldSummarySum, Transform: funcapi.FieldTransformDuration, DecimalPoints: 3, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, DBField: "cpuNanos", IsSortOption: true, SortLabel: "CPU Time"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "query_framework", Tooltip: "Query Framework", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "queryFramework"},   // 7.0+
 	{ColumnMeta: funcapi.ColumnMeta{Name: "query_shape_hash", Tooltip: "Query Shape Hash", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}, DBField: "queryShapeHash"}, // 8.0+
 }
 
-// optionalDuration converts an optional int64 pointer to float64 seconds, returning nil if nil.
-func optionalDuration(v *int64, divisor float64) any {
-	if v == nil {
-		return nil
-	}
-	return float64(*v) / divisor
-}
-
-// optionalBool converts a bool pointer to a display value.
-func optionalBool(v *bool) any {
-	if v == nil {
-		return nil
-	}
-	if *v {
-		return "Yes"
-	}
-	return "No"
-}
-
-// buildMongoSortParam builds sort parameter from available columns.
-func buildMongoSortParam(cols []mongoColumn) funcapi.ParamConfig {
-	var sortOptions []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range cols {
-		if !col.IsSortOption {
-			continue
-		}
-		opt := funcapi.ParamOption{
-			ID:     col.Name,
-			Column: col.DBField,
-			Name:   fmt.Sprintf("Top queries by %s", col.Name),
-			Sort:   &sortDir,
-		}
-		if col.Name == "execution_time" {
-			opt.Default = true
-		}
-		sortOptions = append(sortOptions, opt)
-	}
-
-	return funcapi.ParamConfig{
-		ID:         paramSort,
-		Name:       "Filter By",
-		Help:       "Select the primary sort column",
-		Selection:  funcapi.ParamSelect,
-		Options:    sortOptions,
-		UniqueView: true,
-	}
-}
-
-// mongoMethods returns the available function methods for MongoDB.
-func mongoMethods() []module.MethodConfig {
-	return []module.MethodConfig{{
-		UpdateEvery:  10,
-		ID:           "top-queries",
-		Name:         "Top Queries",
-		Help:         topQueriesHelpText,
-		RequireCloud: true,
-		RequiredParams: []funcapi.ParamConfig{
-			buildMongoSortParam(mongoAllColumns),
-		},
-	}}
-}
-
-// funcMongo implements funcapi.MethodHandler for MongoDB.
-type funcMongo struct {
-	collector *Collector
-}
-
-// Compile-time interface check.
-var _ funcapi.MethodHandler = (*funcMongo)(nil)
-
-// MethodParams implements funcapi.MethodHandler.
-func (f *funcMongo) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if f.collector.conn == nil {
-		return nil, fmt.Errorf("collector is still initializing")
-	}
-	switch method {
-	case "top-queries":
-		return f.collector.topQueriesParams(ctx)
-	default:
-		return nil, fmt.Errorf("unknown method: %s", method)
-	}
-}
-
-// Handle implements funcapi.MethodHandler.
-func (f *funcMongo) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	// Check if collector is initialized
-	if f.collector.conn == nil {
-		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
-	}
-
-	switch method {
-	case "top-queries":
-		// Check if function is enabled
-		if !f.collector.Config.GetTopQueriesFunctionEnabled() {
-			return funcapi.ErrorResponse(403, "Top Queries function has been disabled in configuration. Set 'top_queries_function_enabled: true' to enable.")
-		}
-		return f.collector.collectTopQueries(ctx, params.Column(paramSort))
-	default:
-		return funcapi.NotFoundResponse(method)
-	}
-}
-
-func mongoFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return nil
-	}
-	return &funcMongo{collector: c}
-}
-
-// profileDocument represents a document from system.profile
-type profileDocument struct {
+// topQueriesProfileDocument represents a document from system.profile
+type topQueriesProfileDocument struct {
 	// Core fields (always present)
 	Timestamp   time.Time `bson:"ts"`
 	Op          string    `bson:"op"`
@@ -232,87 +120,78 @@ type profileDocument struct {
 	QueryShapeHash     string `bson:"queryShapeHash"`     // 8.0+
 }
 
-// detectMongoProfileFields detects available fields in system.profile using double-checked locking
-func (c *Collector) detectMongoProfileFields(ctx context.Context, databases []string) (map[string]bool, error) {
-	// Fast path: return cached
-	c.topQueriesColsMu.RLock()
-	if c.topQueriesCols != nil {
-		cols := c.topQueriesCols
-		c.topQueriesColsMu.RUnlock()
-		return cols, nil
-	}
-	c.topQueriesColsMu.RUnlock()
-
-	// Slow path: detect and cache
-	c.topQueriesColsMu.Lock()
-	defer c.topQueriesColsMu.Unlock()
-
-	// Double-check after acquiring write lock
-	if c.topQueriesCols != nil {
-		return c.topQueriesCols, nil
-	}
-
-	client, ok := c.conn.(*mongoClient)
-	if !ok || client == nil || client.client == nil {
-		return nil, fmt.Errorf("client not initialized")
-	}
-
-	available := make(map[string]bool)
-
-	// Always include core fields that are guaranteed to exist
-	coreFields := []string{"ts", "op", "ns", "command", "millis"}
-	for _, f := range coreFields {
-		available[f] = true
-	}
-
-	// Sample documents from system.profile to detect available fields
-	for _, dbName := range databases {
-		queryCtx, cancel := context.WithTimeout(ctx, client.timeout)
-
-		collection := client.client.Database(dbName).Collection("system.profile")
-		opts := options.FindOne().SetSort(bson.D{{Key: "$natural", Value: -1}})
-
-		var doc bson.M
-		err := collection.FindOne(queryCtx, bson.M{}, opts).Decode(&doc)
-		cancel()
-
-		if err != nil {
-			continue // No documents or profiling disabled
-		}
-
-		// Add all fields found in this document
-		for field := range doc {
-			available[field] = true
-		}
-	}
-
-	c.topQueriesCols = available
-	return available, nil
+// funcTopQueries implements funcapi.MethodHandler for MongoDB top-queries.
+// All function-related logic is encapsulated here, keeping Collector focused on metrics collection.
+type funcTopQueries struct {
+	collector *Collector
 }
 
-// buildAvailableMongoColumns returns columns that are available based on detected fields.
-func buildAvailableMongoColumns(available map[string]bool) []mongoColumn {
-	var result []mongoColumn
-	for _, col := range mongoAllColumns {
-		// command field maps to query column, always include
-		if col.DBField == "command" || available[col.DBField] {
-			result = append(result, col)
-		}
-	}
-	return result
+func newFuncTopQueries(c *Collector) *funcTopQueries {
+	return &funcTopQueries{collector: c}
 }
 
-// collectTopQueries queries system.profile for top queries across all databases.
-func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
-	// Get limit from config
-	limit := c.Config.TopQueriesLimit
+// Compile-time interface check.
+var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
+
+// MethodParams implements funcapi.MethodHandler.
+func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if f.collector.conn == nil {
+		return nil, fmt.Errorf("collector is still initializing")
+	}
+	switch method {
+	case "top-queries":
+		return f.methodParams(ctx)
+	default:
+		return nil, fmt.Errorf("unknown method: %s", method)
+	}
+}
+
+// Handle implements funcapi.MethodHandler.
+func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if f.collector.conn == nil {
+		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
+	}
+
+	switch method {
+	case "top-queries":
+		if !f.collector.Config.GetTopQueriesFunctionEnabled() {
+			return funcapi.ErrorResponse(403, "Top Queries function has been disabled in configuration. Set 'top_queries_function_enabled: true' to enable.")
+		}
+		return f.collectData(ctx, params.Column(topQueriesParamSort))
+	default:
+		return funcapi.NotFoundResponse(method)
+	}
+}
+
+func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
+	if !f.collector.Config.GetTopQueriesFunctionEnabled() {
+		return nil, fmt.Errorf("top queries function disabled")
+	}
+
+	databases, err := f.getDatabases()
+	if err != nil {
+		return nil, err
+	}
+
+	availableFields, err := f.detectProfileFields(ctx, databases)
+	if err != nil {
+		return nil, err
+	}
+
+	availableCols := f.buildAvailableColumns(availableFields)
+	sortParam := buildTopQueriesSortOptions(availableCols)
+	return []funcapi.ParamConfig{sortParam}, nil
+}
+
+func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *module.FunctionResponse {
+	limit := f.collector.Config.TopQueriesLimit
 	if limit <= 0 {
-		limit = defaultTopQueriesLimit
+		limit = topQueriesDefaultLimit
 	}
 
 	// Build valid sort columns map from metadata
 	validSortCols := make(map[string]bool)
-	for _, col := range mongoAllColumns {
+	for _, col := range topQueriesColumns {
 		if col.IsSortOption {
 			validSortCols[col.DBField] = true
 		}
@@ -321,39 +200,37 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		sortColumn = "millis" // safe default
 	}
 
-	// Get list of databases to query
-	databases, err := c.topQueriesDatabases()
+	databases, err := f.getDatabases()
 	if err != nil {
 		return &module.FunctionResponse{
 			Status:  500,
 			Message: fmt.Sprintf("failed to list databases: %v", err),
 		}
 	}
-	filteredDBs := databases
 
 	// Detect available fields (with caching)
-	availableFields, err := c.detectMongoProfileFields(ctx, filteredDBs)
+	availableFields, err := f.detectProfileFields(ctx, databases)
 	if err != nil {
-		c.Debugf("failed to detect profile fields: %v", err)
+		f.collector.Debugf("failed to detect profile fields: %v", err)
 	}
-	availableCols := buildAvailableMongoColumns(availableFields)
-	cs := mongoColumnSet(availableCols)
-	sortParam := buildMongoSortParam(availableCols)
+	availableCols := f.buildAvailableColumns(availableFields)
+	cs := f.columnSet(availableCols)
+	sortParam := buildTopQueriesSortOptions(availableCols)
 
 	// Query system.profile from each database
-	var allDocs []profileDocument
+	var allDocs []topQueriesProfileDocument
 	var profilingDisabledDBs []string
 	var failedDBs []string
 	var successfulDBs int
 
-	for _, dbName := range filteredDBs {
-		docs, enabled, err := c.querySystemProfile(ctx, dbName, sortColumn, limit)
+	for _, dbName := range databases {
+		docs, enabled, err := f.querySystemProfile(ctx, dbName, sortColumn, limit)
 		if err != nil {
 			// Check for timeout (parent or child context)
 			if ctx.Err() == context.DeadlineExceeded || errors.Is(err, context.DeadlineExceeded) {
 				return &module.FunctionResponse{Status: 504, Message: "query timed out"}
 			}
-			c.Debugf("failed to query system.profile in %s: %v", dbName, err)
+			f.collector.Debugf("failed to query system.profile in %s: %v", dbName, err)
 			failedDBs = append(failedDBs, dbName)
 			continue
 		}
@@ -419,7 +296,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	}
 
 	// Sort all documents by the requested column
-	sortProfileDocuments(allDocs, sortColumn)
+	f.sortDocuments(allDocs, sortColumn)
 
 	// Apply limit
 	if len(allDocs) > limit {
@@ -445,7 +322,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 				if err != nil {
 					cmdJSON = []byte("{}")
 				}
-				row[i] = strmutil.TruncateText(string(cmdJSON), maxQueryTextLength)
+				row[i] = strmutil.TruncateText(string(cmdJSON), topQueriesMaxTextLength)
 			case "execution_time":
 				row[i] = float64(doc.Millis) / 1000.0 // ms to seconds
 			case "docs_examined":
@@ -515,8 +392,12 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	}
 }
 
-func (c *Collector) topQueriesDatabases() ([]string, error) {
-	databases, err := c.conn.listDatabaseNames()
+func (f *funcTopQueries) columnSet(cols []topQueriesColumn) funcapi.ColumnSet[topQueriesColumn] {
+	return funcapi.Columns(cols, func(c topQueriesColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+}
+
+func (f *funcTopQueries) getDatabases() ([]string, error) {
+	databases, err := f.collector.conn.listDatabaseNames()
 	if err != nil {
 		return nil, err
 	}
@@ -526,7 +407,7 @@ func (c *Collector) topQueriesDatabases() ([]string, error) {
 		if dbName == "admin" || dbName == "local" || dbName == "config" {
 			continue
 		}
-		if c.dbSelector != nil && !c.dbSelector.MatchString(dbName) {
+		if f.collector.dbSelector != nil && !f.collector.dbSelector.MatchString(dbName) {
 			continue
 		}
 		filteredDBs = append(filteredDBs, dbName)
@@ -535,29 +416,79 @@ func (c *Collector) topQueriesDatabases() ([]string, error) {
 	return filteredDBs, nil
 }
 
-func (c *Collector) topQueriesParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
-	if !c.Config.GetTopQueriesFunctionEnabled() {
-		return nil, fmt.Errorf("top queries function disabled")
+// detectProfileFields detects available fields in system.profile using double-checked locking
+func (f *funcTopQueries) detectProfileFields(ctx context.Context, databases []string) (map[string]bool, error) {
+	// Fast path: return cached
+	f.collector.topQueriesColsMu.RLock()
+	if f.collector.topQueriesCols != nil {
+		cols := f.collector.topQueriesCols
+		f.collector.topQueriesColsMu.RUnlock()
+		return cols, nil
+	}
+	f.collector.topQueriesColsMu.RUnlock()
+
+	// Slow path: detect and cache
+	f.collector.topQueriesColsMu.Lock()
+	defer f.collector.topQueriesColsMu.Unlock()
+
+	// Double-check after acquiring write lock
+	if f.collector.topQueriesCols != nil {
+		return f.collector.topQueriesCols, nil
 	}
 
-	databases, err := c.topQueriesDatabases()
-	if err != nil {
-		return nil, err
+	client, ok := f.collector.conn.(*mongoClient)
+	if !ok || client == nil || client.client == nil {
+		return nil, fmt.Errorf("client not initialized")
 	}
 
-	availableFields, err := c.detectMongoProfileFields(ctx, databases)
-	if err != nil {
-		return nil, err
+	available := make(map[string]bool)
+
+	// Always include core fields that are guaranteed to exist
+	coreFields := []string{"ts", "op", "ns", "command", "millis"}
+	for _, fld := range coreFields {
+		available[fld] = true
 	}
 
-	availableCols := buildAvailableMongoColumns(availableFields)
-	sortParam := buildMongoSortParam(availableCols)
-	return []funcapi.ParamConfig{sortParam}, nil
+	// Sample documents from system.profile to detect available fields
+	for _, dbName := range databases {
+		queryCtx, cancel := context.WithTimeout(ctx, client.timeout)
+
+		collection := client.client.Database(dbName).Collection("system.profile")
+		opts := options.FindOne().SetSort(bson.D{{Key: "$natural", Value: -1}})
+
+		var doc bson.M
+		err := collection.FindOne(queryCtx, bson.M{}, opts).Decode(&doc)
+		cancel()
+
+		if err != nil {
+			continue // No documents or profiling disabled
+		}
+
+		// Add all fields found in this document
+		for field := range doc {
+			available[field] = true
+		}
+	}
+
+	f.collector.topQueriesCols = available
+	return available, nil
+}
+
+// buildAvailableColumns returns columns that are available based on detected fields.
+func (f *funcTopQueries) buildAvailableColumns(available map[string]bool) []topQueriesColumn {
+	var result []topQueriesColumn
+	for _, col := range topQueriesColumns {
+		// command field maps to query column, always include
+		if col.DBField == "command" || available[col.DBField] {
+			result = append(result, col)
+		}
+	}
+	return result
 }
 
 // querySystemProfile queries the system.profile collection for a specific database
-func (c *Collector) querySystemProfile(ctx context.Context, dbName, sortColumn string, limit int) ([]profileDocument, bool, error) {
-	client, ok := c.conn.(*mongoClient)
+func (f *funcTopQueries) querySystemProfile(ctx context.Context, dbName, sortColumn string, limit int) ([]topQueriesProfileDocument, bool, error) {
+	client, ok := f.collector.conn.(*mongoClient)
 	if !ok || client == nil || client.client == nil {
 		return nil, false, fmt.Errorf("client not initialized")
 	}
@@ -596,7 +527,7 @@ func (c *Collector) querySystemProfile(ctx context.Context, dbName, sortColumn s
 	}
 	defer cursor.Close(queryCtx)
 
-	var docs []profileDocument
+	var docs []topQueriesProfileDocument
 	if err := cursor.All(queryCtx, &docs); err != nil {
 		return nil, true, fmt.Errorf("cursor.All failed: %w", err)
 	}
@@ -604,8 +535,8 @@ func (c *Collector) querySystemProfile(ctx context.Context, dbName, sortColumn s
 	return docs, true, nil
 }
 
-// sortProfileDocuments sorts documents in place by the specified column (descending)
-func sortProfileDocuments(docs []profileDocument, sortColumn string) {
+// sortDocuments sorts documents in place by the specified column (descending)
+func (f *funcTopQueries) sortDocuments(docs []topQueriesProfileDocument, sortColumn string) {
 	sort.Slice(docs, func(i, j int) bool {
 		switch sortColumn {
 		case "millis":
@@ -652,4 +583,73 @@ func sortProfileDocuments(docs []profileDocument, sortColumn string) {
 			return docs[i].Millis > docs[j].Millis
 		}
 	})
+}
+
+// optionalDuration converts an optional int64 pointer to float64 seconds, returning nil if nil.
+func optionalDuration(v *int64, divisor float64) any {
+	if v == nil {
+		return nil
+	}
+	return float64(*v) / divisor
+}
+
+// optionalBool converts a bool pointer to a display value.
+func optionalBool(v *bool) any {
+	if v == nil {
+		return nil
+	}
+	if *v {
+		return "Yes"
+	}
+	return "No"
+}
+
+// mongoMethods returns the method configurations for registration.
+func mongoMethods() []module.MethodConfig {
+	return []module.MethodConfig{{
+		UpdateEvery:  10,
+		ID:           "top-queries",
+		Name:         "Top Queries",
+		Help:         topQueriesHelpText,
+		RequireCloud: true,
+		RequiredParams: []funcapi.ParamConfig{
+			buildTopQueriesSortOptions(topQueriesColumns),
+		},
+	}}
+}
+
+// mongoFunctionHandler returns the MethodHandler for a MongoDB job.
+func mongoFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
+	}
+	return c.funcTopQueries
+}
+
+// buildTopQueriesSortOptions builds sort parameter from available columns.
+func buildTopQueriesSortOptions(cols []topQueriesColumn) funcapi.ParamConfig {
+	var sortOptions []funcapi.ParamOption
+	sortDir := funcapi.FieldSortDescending
+	for _, col := range cols {
+		if !col.IsSortOption {
+			continue
+		}
+		sortOptions = append(sortOptions, funcapi.ParamOption{
+			ID:      col.Name,
+			Column:  col.DBField,
+			Name:    fmt.Sprintf("Top queries by %s", col.SortLabel),
+			Default: col.IsDefaultSort,
+			Sort:    &sortDir,
+		})
+	}
+
+	return funcapi.ParamConfig{
+		ID:         topQueriesParamSort,
+		Name:       "Filter By",
+		Help:       "Select the primary sort column",
+		Selection:  funcapi.ParamSelect,
+		Options:    sortOptions,
+		UniqueView: true,
+	}
 }

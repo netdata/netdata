@@ -27,11 +27,7 @@ type crdbColumn struct {
 	IsDefaultSort bool   // default sort column
 }
 
-func crdbColumnSet(cols []crdbColumn) funcapi.ColumnSet[crdbColumn] {
-	return funcapi.Columns(cols, func(c crdbColumn) funcapi.ColumnMeta { return c.ColumnMeta })
-}
-
-var crdbTopColumns = []crdbColumn{
+var topQueriesColumns = []crdbColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "fingerprintId", Tooltip: "Fingerprint ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.fingerprint_id::STRING"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sticky: true, FullWidth: true, Wrap: true}, SelectExpr: "s.metadata->>'query'"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "database", Tooltip: "Database", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, GroupBy: &funcapi.GroupByOptions{IsDefault: true}}, SelectExpr: "s.metadata->>'db'"},
@@ -56,7 +52,7 @@ var crdbTopColumns = []crdbColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "maxRetries", Tooltip: "Max Retries", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Chart: &funcapi.ChartOptions{Group: "Retries", Title: "Retries"}}, SelectExpr: "COALESCE((s.statistics->'statistics'->>'maxRetries')::INT8, 0)"},
 }
 
-var crdbRunningColumns = []crdbColumn{
+var runningQueriesColumns = []crdbColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "queryId", Tooltip: "Query ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.query_id::STRING"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sticky: true, FullWidth: true, Wrap: true}, SelectExpr: "s.query"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "user", Tooltip: "User", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.user_name"},
@@ -70,29 +66,33 @@ var crdbRunningColumns = []crdbColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "elapsedMs", Tooltip: "Elapsed", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, SelectExpr: "EXTRACT(EPOCH FROM (clock_timestamp() - s.start)) * 1000", IsSortOption: true, IsDefaultSort: true, SortLabel: "Running queries by Elapsed Time"},
 }
 
-// funcCockroach implements funcapi.MethodHandler for CockroachDB.
-type funcCockroach struct {
+// funcQueries implements funcapi.MethodHandler for CockroachDB query functions.
+type funcQueries struct {
 	collector *Collector
 }
 
+func newFuncQueries(c *Collector) *funcQueries {
+	return &funcQueries{collector: c}
+}
+
 // Compile-time interface check.
-var _ funcapi.MethodHandler = (*funcCockroach)(nil)
+var _ funcapi.MethodHandler = (*funcQueries)(nil)
 
 // MethodParams implements funcapi.MethodHandler.
-func (f *funcCockroach) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
+func (f *funcQueries) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
 	switch method {
 	case "top-queries":
-		return []funcapi.ParamConfig{buildCrdbSortParam(crdbTopColumns)}, nil
+		return []funcapi.ParamConfig{buildCrdbSortOptions(topQueriesColumns)}, nil
 	case "running-queries":
-		return []funcapi.ParamConfig{buildCrdbSortParam(crdbRunningColumns)}, nil
+		return []funcapi.ParamConfig{buildCrdbSortOptions(runningQueriesColumns)}, nil
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
 }
 
 // Handle implements funcapi.MethodHandler.
-func (f *funcCockroach) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if err := f.collector.ensureSQL(ctx); err != nil {
+func (f *funcQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if err := f.ensureSQL(ctx); err != nil {
 		status := 503
 		if errors.Is(err, errSQLDSNNotSet) {
 			status = 400
@@ -102,56 +102,23 @@ func (f *funcCockroach) Handle(ctx context.Context, method string, params funcap
 
 	switch method {
 	case "top-queries":
-		return f.collector.collectTopQueries(ctx, params.Column("__sort"))
+		return f.collectTopQueries(ctx, params.Column("__sort"))
 	case "running-queries":
-		return f.collector.collectRunningQueries(ctx, params.Column("__sort"))
+		return f.collectRunningQueries(ctx, params.Column("__sort"))
 	default:
 		return funcapi.NotFoundResponse(method)
 	}
 }
 
-func cockroachMethods() []module.MethodConfig {
-	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Top SQL statements from crdb_internal.cluster_statement_statistics. WARNING: Query text may contain unmasked literals (potential PII).",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{
-				buildCrdbSortParam(crdbTopColumns),
-			},
-		},
-		{
-			UpdateEvery:  10,
-			ID:           "running-queries",
-			Name:         "Running Queries",
-			Help:         "Currently running SQL statements from SHOW CLUSTER STATEMENTS. WARNING: Query text may contain unmasked literals (potential PII).",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{
-				buildCrdbSortParam(crdbRunningColumns),
-			},
-		},
-	}
-}
-
-func cockroachFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
-	if !ok {
+func (f *funcQueries) ensureSQL(ctx context.Context) error {
+	if f.collector.db != nil {
 		return nil
 	}
-	return &funcCockroach{collector: c}
-}
-
-func (c *Collector) ensureSQL(ctx context.Context) error {
-	if c.db != nil {
-		return nil
-	}
-	if c.DSN == "" {
+	if f.collector.DSN == "" {
 		return errSQLDSNNotSet
 	}
 
-	db, err := sql.Open("pgx", c.DSN)
+	db, err := sql.Open("pgx", f.collector.DSN)
 	if err != nil {
 		return fmt.Errorf("error opening SQL connection: %w", err)
 	}
@@ -159,7 +126,7 @@ func (c *Collector) ensureSQL(ctx context.Context) error {
 	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(10 * time.Minute)
 
-	timeout := c.sqlTimeout()
+	timeout := f.sqlTimeout()
 	pingCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	if err := db.PingContext(pingCtx); err != nil {
@@ -169,32 +136,32 @@ func (c *Collector) ensureSQL(ctx context.Context) error {
 
 	setCtx, cancel := context.WithTimeout(ctx, timeout)
 	if _, err := db.ExecContext(setCtx, "SET allow_unsafe_internals = on"); err != nil {
-		c.Debugf("unable to set allow_unsafe_internals: %v", err)
+		f.collector.Debugf("unable to set allow_unsafe_internals: %v", err)
 	}
 	cancel()
 
-	c.db = db
+	f.collector.db = db
 	return nil
 }
 
-func (c *Collector) sqlTimeout() time.Duration {
-	if c.SQLTimeout.Duration() > 0 {
-		return c.SQLTimeout.Duration()
+func (f *funcQueries) sqlTimeout() time.Duration {
+	if f.collector.SQLTimeout.Duration() > 0 {
+		return f.collector.SQLTimeout.Duration()
 	}
 	return time.Second
 }
 
-func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
-	sortColumn = resolveCrdbSortColumn(crdbTopColumns, sortColumn)
-	limit := c.TopQueriesLimit
+func (f *funcQueries) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
+	sortColumn = f.resolveSortColumn(topQueriesColumns, sortColumn)
+	limit := f.collector.TopQueriesLimit
 	if limit <= 0 {
 		limit = 500
 	}
 
-	query := buildCrdbTopQueriesSQL(sortColumn, limit)
-	queryCtx, cancel := context.WithTimeout(ctx, c.sqlTimeout())
+	query := f.buildTopQueriesSQL(sortColumn, limit)
+	queryCtx, cancel := context.WithTimeout(ctx, f.sqlTimeout())
 	defer cancel()
-	rows, err := c.db.QueryContext(queryCtx, query, limit)
+	rows, err := f.collector.db.QueryContext(queryCtx, query, limit)
 	if err != nil {
 		if errors.Is(queryCtx.Err(), context.DeadlineExceeded) {
 			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
@@ -203,36 +170,36 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	}
 	defer rows.Close()
 
-	data, err := scanCrdbRows(rows, crdbTopColumns)
+	data, err := f.scanRows(rows, topQueriesColumns)
 	if err != nil {
 		return &module.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
-	cs := crdbColumnSet(crdbTopColumns)
+	cs := f.columnSet(topQueriesColumns)
 	return &module.FunctionResponse{
 		Status:            200,
 		Help:              "Top SQL statements from crdb_internal.cluster_statement_statistics. WARNING: Query text may contain unmasked literals (potential PII).",
 		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: sortColumn,
-		RequiredParams:    []funcapi.ParamConfig{buildCrdbSortParam(crdbTopColumns)},
+		RequiredParams:    []funcapi.ParamConfig{buildCrdbSortOptions(topQueriesColumns)},
 		Charts:            cs.BuildCharts(),
 		DefaultCharts:     cs.BuildDefaultCharts(),
 		GroupBy:           cs.BuildGroupBy(),
 	}
 }
 
-func (c *Collector) collectRunningQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
-	sortColumn = resolveCrdbSortColumn(crdbRunningColumns, sortColumn)
-	limit := c.TopQueriesLimit
+func (f *funcQueries) collectRunningQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
+	sortColumn = f.resolveSortColumn(runningQueriesColumns, sortColumn)
+	limit := f.collector.TopQueriesLimit
 	if limit <= 0 {
 		limit = 500
 	}
 
-	query := buildCrdbRunningQueriesSQL(sortColumn, limit)
-	queryCtx, cancel := context.WithTimeout(ctx, c.sqlTimeout())
+	query := f.buildRunningQueriesSQL(sortColumn, limit)
+	queryCtx, cancel := context.WithTimeout(ctx, f.sqlTimeout())
 	defer cancel()
-	rows, err := c.db.QueryContext(queryCtx, query, limit)
+	rows, err := f.collector.db.QueryContext(queryCtx, query, limit)
 	if err != nil {
 		if errors.Is(queryCtx.Err(), context.DeadlineExceeded) {
 			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
@@ -241,48 +208,27 @@ func (c *Collector) collectRunningQueries(ctx context.Context, sortColumn string
 	}
 	defer rows.Close()
 
-	data, err := scanCrdbRows(rows, crdbRunningColumns)
+	data, err := f.scanRows(rows, runningQueriesColumns)
 	if err != nil {
 		return &module.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
-	cs := crdbColumnSet(crdbRunningColumns)
+	cs := f.columnSet(runningQueriesColumns)
 	return &module.FunctionResponse{
 		Status:            200,
 		Help:              "Currently running SQL statements from SHOW CLUSTER STATEMENTS. WARNING: Query text may contain unmasked literals (potential PII).",
 		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: sortColumn,
-		RequiredParams:    []funcapi.ParamConfig{buildCrdbSortParam(crdbRunningColumns)},
+		RequiredParams:    []funcapi.ParamConfig{buildCrdbSortOptions(runningQueriesColumns)},
 	}
 }
 
-func buildCrdbSortParam(cols []crdbColumn) funcapi.ParamConfig {
-	var sortOptions []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range cols {
-		if !col.IsSortOption {
-			continue
-		}
-		sortOptions = append(sortOptions, funcapi.ParamOption{
-			ID:      col.Name,
-			Column:  col.Name,
-			Name:    col.SortLabel,
-			Sort:    &sortDir,
-			Default: col.IsDefaultSort,
-		})
-	}
-	return funcapi.ParamConfig{
-		ID:         "__sort",
-		Name:       "Filter By",
-		Help:       "Select the primary sort column",
-		Selection:  funcapi.ParamSelect,
-		Options:    sortOptions,
-		UniqueView: true,
-	}
+func (f *funcQueries) columnSet(cols []crdbColumn) funcapi.ColumnSet[crdbColumn] {
+	return funcapi.Columns(cols, func(c crdbColumn) funcapi.ColumnMeta { return c.ColumnMeta })
 }
 
-func resolveCrdbSortColumn(cols []crdbColumn, requested string) string {
+func (f *funcQueries) resolveSortColumn(cols []crdbColumn, requested string) string {
 	if requested != "" {
 		for _, col := range cols {
 			if col.Name == requested && col.IsSortOption {
@@ -303,9 +249,9 @@ func resolveCrdbSortColumn(cols []crdbColumn, requested string) string {
 	return ""
 }
 
-func buildCrdbTopQueriesSQL(sortColumn string, limit int) string {
-	selectCols := make([]string, 0, len(crdbTopColumns))
-	for _, col := range crdbTopColumns {
+func (f *funcQueries) buildTopQueriesSQL(sortColumn string, limit int) string {
+	selectCols := make([]string, 0, len(topQueriesColumns))
+	for _, col := range topQueriesColumns {
 		selectCols = append(selectCols, fmt.Sprintf("%s AS %s", col.SelectExpr, col.Name))
 	}
 	return fmt.Sprintf(`
@@ -316,9 +262,9 @@ ORDER BY %s DESC NULLS LAST
 LIMIT $1`, strings.Join(selectCols, ", "), sortColumn)
 }
 
-func buildCrdbRunningQueriesSQL(sortColumn string, limit int) string {
-	selectCols := make([]string, 0, len(crdbRunningColumns))
-	for _, col := range crdbRunningColumns {
+func (f *funcQueries) buildRunningQueriesSQL(sortColumn string, limit int) string {
+	selectCols := make([]string, 0, len(runningQueriesColumns))
+	for _, col := range runningQueriesColumns {
 		selectCols = append(selectCols, fmt.Sprintf("%s AS %s", col.SelectExpr, col.Name))
 	}
 	return fmt.Sprintf(`
@@ -328,7 +274,7 @@ ORDER BY %s DESC NULLS LAST
 LIMIT $1`, strings.Join(selectCols, ", "), sortColumn)
 }
 
-func scanCrdbRows(rows *sql.Rows, cols []crdbColumn) ([][]any, error) {
+func (f *funcQueries) scanRows(rows *sql.Rows, cols []crdbColumn) ([][]any, error) {
 	data := make([][]any, 0, 500)
 
 	for rows.Next() {
@@ -395,4 +341,62 @@ func scanCrdbRows(rows *sql.Rows, cols []crdbColumn) ([][]any, error) {
 	}
 
 	return data, nil
+}
+
+func cockroachMethods() []module.MethodConfig {
+	return []module.MethodConfig{
+		{
+			UpdateEvery:  10,
+			ID:           "top-queries",
+			Name:         "Top Queries",
+			Help:         "Top SQL statements from crdb_internal.cluster_statement_statistics. WARNING: Query text may contain unmasked literals (potential PII).",
+			RequireCloud: true,
+			RequiredParams: []funcapi.ParamConfig{
+				buildCrdbSortOptions(topQueriesColumns),
+			},
+		},
+		{
+			UpdateEvery:  10,
+			ID:           "running-queries",
+			Name:         "Running Queries",
+			Help:         "Currently running SQL statements from SHOW CLUSTER STATEMENTS. WARNING: Query text may contain unmasked literals (potential PII).",
+			RequireCloud: true,
+			RequiredParams: []funcapi.ParamConfig{
+				buildCrdbSortOptions(runningQueriesColumns),
+			},
+		},
+	}
+}
+
+func cockroachFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
+	}
+	return c.funcQueries
+}
+
+func buildCrdbSortOptions(cols []crdbColumn) funcapi.ParamConfig {
+	var sortOptions []funcapi.ParamOption
+	sortDir := funcapi.FieldSortDescending
+	for _, col := range cols {
+		if !col.IsSortOption {
+			continue
+		}
+		sortOptions = append(sortOptions, funcapi.ParamOption{
+			ID:      col.Name,
+			Column:  col.Name,
+			Name:    col.SortLabel,
+			Sort:    &sortDir,
+			Default: col.IsDefaultSort,
+		})
+	}
+	return funcapi.ParamConfig{
+		ID:         "__sort",
+		Name:       "Filter By",
+		Help:       "Select the primary sort column",
+		Selection:  funcapi.ParamSelect,
+		Options:    sortOptions,
+		UniqueView: true,
+	}
 }

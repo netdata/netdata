@@ -22,8 +22,8 @@ func init() {
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
-		Methods:         oracleMethods,
-		MethodHandler:   oracleFunctionHandler,
+		Methods:         oracledbMethods,
+		MethodHandler:   oracledbFunctionHandler,
 	})
 }
 
@@ -59,6 +59,8 @@ type Collector struct {
 	Config `yaml:",inline" json:""`
 
 	db *sql.DB
+
+	funcQueries *funcQueries
 }
 
 func (c *Collector) Configuration() any {
@@ -72,6 +74,8 @@ func (c *Collector) Init(context.Context) error {
 	}
 
 	c.publicDSN = dsn
+
+	c.funcQueries = newFuncQueries(c)
 
 	return nil
 }

@@ -89,6 +89,8 @@ type Collector struct {
 	// Top queries column cache with double-checked locking
 	topQueriesColsMu sync.RWMutex
 	topQueriesCols   map[string]bool
+
+	funcTopQueries *funcTopQueries
 }
 
 func (c *Collector) Configuration() any {
@@ -103,6 +105,8 @@ func (c *Collector) Init(context.Context) error {
 	if err := c.initDatabaseSelector(); err != nil {
 		return fmt.Errorf("init database selector: %v", err)
 	}
+
+	c.funcTopQueries = newFuncTopQueries(c)
 
 	return nil
 }

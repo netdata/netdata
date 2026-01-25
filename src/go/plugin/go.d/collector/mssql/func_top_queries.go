@@ -13,13 +13,15 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
-const maxQueryTextLength = 4096
+const topQueriesMaxTextLength = 4096
 
-// mssqlColumn embeds funcapi.ColumnMeta and adds MSSQL-specific fields.
-type mssqlColumn struct {
+const topQueriesParamSort = "__sort"
+
+// topQueriesColumn embeds funcapi.ColumnMeta and adds MSSQL-specific fields.
+type topQueriesColumn struct {
 	funcapi.ColumnMeta
 	DBColumn       string // Column name in sys.query_store_runtime_stats
-	IsMicroseconds bool   // Needs μs to milliseconds conversion
+	IsMicroseconds bool   // Needs microseconds to milliseconds conversion
 	IsSortOption   bool   // Show in sort dropdown
 	SortLabel      string // Label for sort option
 	IsDefaultSort  bool   // Is this the default sort option
@@ -27,13 +29,9 @@ type mssqlColumn struct {
 	NeedsAvg       bool   // Needs weighted average calculation (avg_* columns)
 }
 
-func mssqlColumnSet(cols []mssqlColumn) funcapi.ColumnSet[mssqlColumn] {
-	return funcapi.Columns(cols, func(c mssqlColumn) funcapi.ColumnMeta { return c.ColumnMeta })
-}
-
-// mssqlAllColumns defines ALL possible columns from Query Store
-// Columns that don't exist in certain SQL Server versions will be filtered at runtime
-var mssqlAllColumns = []mssqlColumn{
+// topQueriesColumns defines ALL possible columns from Query Store.
+// Columns that don't exist in certain SQL Server versions will be filtered at runtime.
+var topQueriesColumns = []topQueriesColumn{
 	// Identity columns - always available
 	{ColumnMeta: funcapi.ColumnMeta{Name: "queryHash", Tooltip: "Query Hash", Type: funcapi.FieldTypeString, Visible: false, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, UniqueKey: true}, DBColumn: "query_hash", IsIdentity: true},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sticky: true, FullWidth: true}, DBColumn: "query_sql_text", IsIdentity: true},
@@ -121,14 +119,14 @@ var mssqlAllColumns = []mssqlColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "stdevTempdb", Tooltip: "StdDev TempDB", Type: funcapi.FieldTypeFloat, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "stdev_tempdb_space_used"},
 }
 
-type mssqlChartGroupDef struct {
+type topQueriesChartGroupDef struct {
 	key          string
 	title        string
 	columns      []string
 	defaultChart bool
 }
 
-var mssqlChartGroupDefs = []mssqlChartGroupDef{
+var topQueriesChartGroupDefs = []topQueriesChartGroupDef{
 	{key: "Calls", title: "Number of Calls", columns: []string{"calls"}, defaultChart: true},
 	{key: "Time", title: "Execution Time", columns: []string{"totalTime", "avgTime", "lastTime", "minTime", "maxTime", "stdevTime"}, defaultChart: true},
 	{key: "CPU", title: "CPU Time", columns: []string{"avgCpu", "lastCpu", "minCpu", "maxCpu", "stdevCpu"}},
@@ -142,119 +140,187 @@ var mssqlChartGroupDefs = []mssqlChartGroupDef{
 	{key: "TempDB", title: "TempDB Usage", columns: []string{"avgTempdb", "lastTempdb", "minTempdb", "maxTempdb", "stdevTempdb"}},
 }
 
-var mssqlLabelColumnIDs = map[string]bool{
+var topQueriesLabelColumnIDs = map[string]bool{
 	"database": true,
 }
 
-const mssqlPrimaryLabelID = "database"
+const topQueriesPrimaryLabelID = "database"
 
-// mssqlMethods returns the available function methods for MSSQL
-func mssqlMethods() []module.MethodConfig {
-	// Build sort options from column metadata
-	var sortOptions []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	seen := make(map[string]bool) // Avoid duplicates from totalTime/avgTime using same DBColumn
-	for _, col := range mssqlAllColumns {
-		if col.IsSortOption && !seen[col.Name] {
-			seen[col.Name] = true
-			sortOptions = append(sortOptions, funcapi.ParamOption{
-				ID:      col.Name,
-				Column:  col.Name,
-				Name:    col.SortLabel,
-				Default: col.IsDefaultSort,
-				Sort:    &sortDir,
-			})
-		}
-	}
-
-	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Top SQL queries from Query Store",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{
-				{
-					ID:         "__sort",
-					Name:       "Filter By",
-					Help:       "Select the primary sort column",
-					Selection:  funcapi.ParamSelect,
-					Options:    sortOptions,
-					UniqueView: true,
-				},
-			},
-		},
-	}
+// topQueriesRowScanner interface for testing.
+type topQueriesRowScanner interface {
+	Next() bool
+	Scan(dest ...any) error
+	Err() error
 }
 
-// funcMssql implements funcapi.MethodHandler for MSSQL.
-type funcMssql struct {
+// funcTopQueries implements funcapi.MethodHandler for MSSQL top-queries.
+// All function-related logic is encapsulated here, keeping Collector focused on metrics collection.
+type funcTopQueries struct {
 	collector *Collector
 }
 
+func newFuncTopQueries(c *Collector) *funcTopQueries {
+	return &funcTopQueries{collector: c}
+}
+
 // Compile-time interface check.
-var _ funcapi.MethodHandler = (*funcMssql)(nil)
+var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
 
 // MethodParams implements funcapi.MethodHandler.
-func (f *funcMssql) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
 	if f.collector.db == nil {
 		return nil, fmt.Errorf("collector is still initializing")
 	}
 	switch method {
 	case "top-queries":
-		return f.collector.topQueriesParams(ctx)
+		return f.methodParams(ctx)
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
 }
 
 // Handle implements funcapi.MethodHandler.
-func (f *funcMssql) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	// Check if collector is initialized (first collect() may not have run yet)
+func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	if f.collector.db == nil {
 		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
-
 	switch method {
 	case "top-queries":
-		return f.collector.collectTopQueries(ctx, params.Column("__sort"))
+		return f.collectData(ctx, params.Column(topQueriesParamSort))
 	default:
 		return funcapi.NotFoundResponse(method)
 	}
 }
 
-func mssqlFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return nil
+func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
+	if !f.collector.Config.GetQueryStoreFunctionEnabled() {
+		return nil, fmt.Errorf("query store function disabled")
 	}
-	return &funcMssql{collector: c}
+
+	availableCols, err := f.detectQueryStoreColumns(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	cols := f.buildAvailableColumns(availableCols)
+	if len(cols) == 0 {
+		return nil, fmt.Errorf("no columns available in Query Store")
+	}
+
+	sortParam, _ := f.buildSortParam(cols)
+	return []funcapi.ParamConfig{sortParam}, nil
 }
 
-// detectMSSQLQueryStoreColumns queries any database with Query Store enabled to discover available columns
-func (c *Collector) detectMSSQLQueryStoreColumns(ctx context.Context) (map[string]bool, error) {
+func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *module.FunctionResponse {
+	if !f.collector.Config.GetQueryStoreFunctionEnabled() {
+		return &module.FunctionResponse{
+			Status: 403,
+			Message: "Query Store function has been disabled in configuration. " +
+				"To enable, set query_store_function_enabled: true in the MSSQL collector config.",
+		}
+	}
+
+	availableCols, err := f.detectQueryStoreColumns(ctx)
+	if err != nil {
+		return &module.FunctionResponse{
+			Status:  500,
+			Message: fmt.Sprintf("failed to detect available columns: %v", err),
+		}
+	}
+
+	cols := f.buildAvailableColumns(availableCols)
+	if len(cols) == 0 {
+		return &module.FunctionResponse{
+			Status:  500,
+			Message: "no columns available in Query Store",
+		}
+	}
+
+	validatedSortColumn := f.mapAndValidateSortColumn(sortColumn, cols)
+
+	timeWindowDays := f.collector.Config.GetQueryStoreTimeWindowDays()
+	limit := f.collector.TopQueriesLimit
+	if limit <= 0 {
+		limit = 500
+	}
+	query := f.buildDynamicSQL(cols, validatedSortColumn, timeWindowDays, limit)
+
+	rows, err := f.collector.db.QueryContext(ctx, query)
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
+		}
+		colIDs := make([]string, len(cols))
+		for i, col := range cols {
+			colIDs[i] = col.Name
+		}
+		return &module.FunctionResponse{
+			Status:  500,
+			Message: fmt.Sprintf("query failed: %v (sort: %s, detected cols: %v)", err, validatedSortColumn, colIDs),
+		}
+	}
+	defer rows.Close()
+
+	data, err := f.scanDynamicRows(rows, cols)
+	if err != nil {
+		return &module.FunctionResponse{Status: 500, Message: err.Error()}
+	}
+
+	sortParam, sortOptions := f.buildSortParam(cols)
+
+	defaultSort := ""
+	for _, col := range cols {
+		if col.IsDefaultSort && col.IsSortOption {
+			defaultSort = col.Name
+			break
+		}
+	}
+	if defaultSort == "" && len(sortOptions) > 0 {
+		defaultSort = sortOptions[0].ID
+	}
+
+	annotatedCols := f.decorateColumns(cols)
+	cs := f.columnSet(annotatedCols)
+
+	return &module.FunctionResponse{
+		Status:            200,
+		Help:              "Top SQL queries from Query Store. WARNING: Query text may contain unmasked literals (potential PII).",
+		Columns:           cs.BuildColumns(),
+		Data:              data,
+		DefaultSortColumn: defaultSort,
+		RequiredParams:    []funcapi.ParamConfig{sortParam},
+		Charts:            cs.BuildCharts(),
+		DefaultCharts:     cs.BuildDefaultCharts(),
+		GroupBy:           cs.BuildGroupBy(),
+	}
+}
+
+func (f *funcTopQueries) columnSet(cols []topQueriesColumn) funcapi.ColumnSet[topQueriesColumn] {
+	return funcapi.Columns(cols, func(c topQueriesColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+}
+
+func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[string]bool, error) {
 	// Fast path: return cached result
-	c.queryStoreColsMu.RLock()
-	if c.queryStoreCols != nil {
-		cols := c.queryStoreCols
-		c.queryStoreColsMu.RUnlock()
+	f.collector.queryStoreColsMu.RLock()
+	if f.collector.queryStoreCols != nil {
+		cols := f.collector.queryStoreCols
+		f.collector.queryStoreColsMu.RUnlock()
 		return cols, nil
 	}
-	c.queryStoreColsMu.RUnlock()
+	f.collector.queryStoreColsMu.RUnlock()
 
 	// Slow path: query and cache
-	c.queryStoreColsMu.Lock()
-	defer c.queryStoreColsMu.Unlock()
+	f.collector.queryStoreColsMu.Lock()
+	defer f.collector.queryStoreColsMu.Unlock()
 
 	// Double-check after acquiring write lock
-	if c.queryStoreCols != nil {
-		return c.queryStoreCols, nil
+	if f.collector.queryStoreCols != nil {
+		return f.collector.queryStoreCols, nil
 	}
 
 	// Find any database with Query Store enabled (excluding system databases)
 	var sampleDB string
-	err := c.db.QueryRowContext(ctx, `
+	err := f.collector.db.QueryRowContext(ctx, `
 		SELECT TOP 1 name
 		FROM sys.databases
 		WHERE is_query_store_on = 1
@@ -268,15 +334,13 @@ func (c *Collector) detectMSSQLQueryStoreColumns(ctx context.Context) (map[strin
 	}
 
 	// Use dynamic SQL to get column metadata from that database's Query Store view
-	// Three-part naming works: [DatabaseName].sys.query_store_runtime_stats
 	query := fmt.Sprintf(`SELECT TOP 0 * FROM [%s].sys.query_store_runtime_stats`, sampleDB)
-	rows, err := c.db.QueryContext(ctx, query)
+	rows, err := f.collector.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query Query Store columns from %s: %w", sampleDB, err)
 	}
 	defer rows.Close()
 
-	// Get column names from result set metadata
 	columnNames, err := rows.Columns()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get column names: %w", err)
@@ -284,11 +348,9 @@ func (c *Collector) detectMSSQLQueryStoreColumns(ctx context.Context) (map[strin
 
 	cols := make(map[string]bool)
 	for _, colName := range columnNames {
-		// Normalize to lowercase for case-insensitive comparison
 		cols[strings.ToLower(colName)] = true
 	}
 
-	// If we found no columns, something is wrong
 	if len(cols) == 0 {
 		return nil, fmt.Errorf("no columns found in sys.query_store_runtime_stats")
 	}
@@ -298,29 +360,24 @@ func (c *Collector) detectMSSQLQueryStoreColumns(ctx context.Context) (map[strin
 	cols["query_sql_text"] = true
 	cols["database_name"] = true
 
-	// Cache the result
-	c.queryStoreCols = cols
+	f.collector.queryStoreCols = cols
 
 	return cols, nil
 }
 
-// buildAvailableMSSQLColumns filters columns based on what's available in the database
-func (c *Collector) buildAvailableMSSQLColumns(availableCols map[string]bool) []mssqlColumn {
-	var cols []mssqlColumn
+func (f *funcTopQueries) buildAvailableColumns(availableCols map[string]bool) []topQueriesColumn {
+	var cols []topQueriesColumn
 	seen := make(map[string]bool)
 
-	for _, col := range mssqlAllColumns {
-		// Skip duplicates (e.g., totalTime and avgTime both use avg_duration)
+	for _, col := range topQueriesColumns {
 		if seen[col.Name] {
 			continue
 		}
-		// Identity columns are always available
 		if col.IsIdentity {
 			cols = append(cols, col)
 			seen[col.Name] = true
 			continue
 		}
-		// Check if the DBColumn exists
 		if availableCols[col.DBColumn] {
 			cols = append(cols, col)
 			seen[col.Name] = true
@@ -329,40 +386,33 @@ func (c *Collector) buildAvailableMSSQLColumns(availableCols map[string]bool) []
 	return cols
 }
 
-// mapAndValidateMSSQLSortColumn maps UI sort key to the appropriate sort expression
-// Uses the filtered cols list to ensure the sort column is actually in the SELECT
-func (c *Collector) mapAndValidateMSSQLSortColumn(sortKey string, cols []mssqlColumn) string {
-	// First, check if the requested sort key is in the available columns
+func (f *funcTopQueries) mapAndValidateSortColumn(sortKey string, cols []topQueriesColumn) string {
 	for _, col := range cols {
 		if col.Name == sortKey && col.IsSortOption {
 			return col.Name
 		}
 	}
 
-	// Fall back to the first available sort column
 	for _, col := range cols {
 		if col.IsSortOption {
 			return col.Name
 		}
 	}
 
-	// Last resort: use first non-identity column
 	for _, col := range cols {
 		if !col.IsIdentity {
 			return col.Name
 		}
 	}
 
-	// Absolute fallback: use first column in the list (must exist in SELECT)
 	if len(cols) > 0 {
 		return cols[0].Name
 	}
 
-	return "" // empty - will be handled by caller
+	return ""
 }
 
-// buildMSSQLSelectExpressions builds the SELECT expressions for a single database query
-func (c *Collector) buildMSSQLSelectExpressions(cols []mssqlColumn, dbNameExpr string) []string {
+func (f *funcTopQueries) buildSelectExpressions(cols []topQueriesColumn, dbNameExpr string) []string {
 	var selectParts []string
 
 	for _, col := range cols {
@@ -380,29 +430,24 @@ func (c *Collector) buildMSSQLSelectExpressions(cols []mssqlColumn, dbNameExpr s
 		case col.Name == "calls":
 			expr = fmt.Sprintf("SUM(rs.count_executions) AS [%s]", col.Name)
 		case col.Name == "totalTime":
-			// Total time = sum of (avg_duration * executions) converted to milliseconds
 			expr = fmt.Sprintf("SUM(rs.avg_duration * rs.count_executions) / 1000.0 AS [%s]", col.Name)
 		case col.NeedsAvg && col.IsMicroseconds:
-			// Weighted average with μs to milliseconds conversion
 			expr = fmt.Sprintf("CASE WHEN SUM(rs.count_executions) > 0 THEN SUM(rs.%s * rs.count_executions) / SUM(rs.count_executions) / 1000.0 ELSE 0 END AS [%s]", col.DBColumn, col.Name)
 		case col.NeedsAvg:
-			// Weighted average without time conversion
 			expr = fmt.Sprintf("CASE WHEN SUM(rs.count_executions) > 0 THEN SUM(rs.%s * rs.count_executions) / SUM(rs.count_executions) ELSE 0 END AS [%s]", col.DBColumn, col.Name)
 		case col.IsMicroseconds:
-			// Aggregate with μs to milliseconds conversion
 			aggFunc := "MAX"
 			if strings.HasPrefix(col.DBColumn, "min_") {
 				aggFunc = "MIN"
 			}
 			expr = fmt.Sprintf("%s(rs.%s) / 1000.0 AS [%s]", aggFunc, col.DBColumn, col.Name)
 		default:
-			// Simple aggregate
 			aggFunc := "MAX"
 			if strings.HasPrefix(col.DBColumn, "min_") {
 				aggFunc = "MIN"
 			}
 			if strings.HasPrefix(col.DBColumn, "stdev_") {
-				aggFunc = "MAX" // Use MAX for stddev aggregation
+				aggFunc = "MAX"
 			}
 			expr = fmt.Sprintf("%s(rs.%s) AS [%s]", aggFunc, col.DBColumn, col.Name)
 		}
@@ -413,22 +458,15 @@ func (c *Collector) buildMSSQLSelectExpressions(cols []mssqlColumn, dbNameExpr s
 	return selectParts
 }
 
-// buildMSSQLDynamicSQL builds dynamic SQL that aggregates across all databases with Query Store enabled
-// Uses sp_executesql to execute the built query
-func (c *Collector) buildMSSQLDynamicSQL(cols []mssqlColumn, sortColumn string, timeWindowDays int, limit int) string {
-	// Build the SELECT expressions template (with placeholder for database name)
-	// We use ''' + name + N''' to close the outer string, concatenate the db name, and reopen
-	// This produces a properly quoted string literal like 'DatabaseName' in the final SQL
-	selectParts := c.buildMSSQLSelectExpressions(cols, "''' + name + N'''")
+func (f *funcTopQueries) buildDynamicSQL(cols []topQueriesColumn, sortColumn string, timeWindowDays int, limit int) string {
+	selectParts := f.buildSelectExpressions(cols, "''' + name + N'''")
 	selectExpr := strings.Join(selectParts, ",\n        ")
 
-	// Time window filter
 	timeFilter := ""
 	if timeWindowDays > 0 {
 		timeFilter = fmt.Sprintf("WHERE rsi.start_time >= DATEADD(day, -%d, GETUTCDATE())", timeWindowDays)
 	}
 
-	// Validate sort column
 	orderByExpr := sortColumn
 	if orderByExpr == "" {
 		for _, col := range cols {
@@ -442,8 +480,6 @@ func (c *Collector) buildMSSQLDynamicSQL(cols []mssqlColumn, sortColumn string, 
 		}
 	}
 
-	// Build the dynamic SQL that creates UNION ALL across all databases
-	// The database names come from sys.databases, ensuring safety (no user input)
 	return fmt.Sprintf(`
 DECLARE @sql NVARCHAR(MAX) = N'';
 
@@ -473,18 +509,9 @@ EXEC sp_executesql @sql;
 `, selectExpr, timeFilter, limit, orderByExpr)
 }
 
-// mssqlRowScanner interface for testing
-type mssqlRowScanner interface {
-	Next() bool
-	Scan(dest ...any) error
-	Err() error
-}
-
-// scanMSSQLDynamicRows scans rows dynamically based on column types
-func (c *Collector) scanMSSQLDynamicRows(rows mssqlRowScanner, cols []mssqlColumn) ([][]any, error) {
+func (f *funcTopQueries) scanDynamicRows(rows topQueriesRowScanner, cols []topQueriesColumn) ([][]any, error) {
 	data := make([][]any, 0, 500)
 
-	// Create value holders for scanning
 	for rows.Next() {
 		values := make([]any, len(cols))
 		valuePtrs := make([]any, len(cols))
@@ -511,16 +538,14 @@ func (c *Collector) scanMSSQLDynamicRows(rows mssqlRowScanner, cols []mssqlColum
 			return nil, fmt.Errorf("row scan failed: %w", err)
 		}
 
-		// Convert scanned values to output format
 		row := make([]any, len(cols))
 		for i, col := range cols {
 			switch v := values[i].(type) {
 			case *sql.NullString:
 				if v.Valid {
 					s := v.String
-					// Truncate query text
 					if col.Name == "query" {
-						s = strmutil.TruncateText(s, maxQueryTextLength)
+						s = strmutil.TruncateText(s, topQueriesMaxTextLength)
 					}
 					row[i] = s
 				} else {
@@ -552,32 +577,10 @@ func (c *Collector) scanMSSQLDynamicRows(rows mssqlRowScanner, cols []mssqlColum
 	return data, nil
 }
 
-// buildMSSQLDynamicSortOptions builds sort options from available columns
-// Returns only sort options for columns that actually exist in the database
-func (c *Collector) buildMSSQLDynamicSortOptions(cols []mssqlColumn) []funcapi.ParamOption {
-	var sortOpts []funcapi.ParamOption
-	seen := make(map[string]bool)
-	sortDir := funcapi.FieldSortDescending
-
-	for _, col := range cols {
-		if col.IsSortOption && !seen[col.Name] {
-			seen[col.Name] = true
-			sortOpts = append(sortOpts, funcapi.ParamOption{
-				ID:      col.Name,
-				Column:  col.Name,
-				Name:    col.SortLabel,
-				Default: col.IsDefaultSort,
-				Sort:    &sortDir,
-			})
-		}
-	}
-	return sortOpts
-}
-
-func (c *Collector) topQueriesSortParam(cols []mssqlColumn) (funcapi.ParamConfig, []funcapi.ParamOption) {
-	sortOptions := c.buildMSSQLDynamicSortOptions(cols)
+func (f *funcTopQueries) buildSortParam(cols []topQueriesColumn) (funcapi.ParamConfig, []funcapi.ParamOption) {
+	sortOptions := buildTopQueriesSortOptions(cols)
 	sortParam := funcapi.ParamConfig{
-		ID:         "__sort",
+		ID:         topQueriesParamSort,
 		Name:       "Filter By",
 		Help:       "Select the primary sort column",
 		Selection:  funcapi.ParamSelect,
@@ -587,124 +590,8 @@ func (c *Collector) topQueriesSortParam(cols []mssqlColumn) (funcapi.ParamConfig
 	return sortParam, sortOptions
 }
 
-func (c *Collector) topQueriesParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
-	if !c.Config.GetQueryStoreFunctionEnabled() {
-		return nil, fmt.Errorf("query store function disabled")
-	}
-
-	availableCols, err := c.detectMSSQLQueryStoreColumns(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	cols := c.buildAvailableMSSQLColumns(availableCols)
-	if len(cols) == 0 {
-		return nil, fmt.Errorf("no columns available in Query Store")
-	}
-
-	sortParam, _ := c.topQueriesSortParam(cols)
-	return []funcapi.ParamConfig{sortParam}, nil
-}
-
-// collectTopQueries queries Query Store for top queries using dynamic columns
-func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
-	// Check if function is enabled
-	if !c.Config.GetQueryStoreFunctionEnabled() {
-		return &module.FunctionResponse{
-			Status: 403,
-			Message: "Query Store function has been disabled in configuration. " +
-				"To enable, set query_store_function_enabled: true in the MSSQL collector config.",
-		}
-	}
-
-	// Detect available columns
-	availableCols, err := c.detectMSSQLQueryStoreColumns(ctx)
-	if err != nil {
-		return &module.FunctionResponse{
-			Status:  500,
-			Message: fmt.Sprintf("failed to detect available columns: %v", err),
-		}
-	}
-
-	// Build list of available columns
-	cols := c.buildAvailableMSSQLColumns(availableCols)
-	if len(cols) == 0 {
-		return &module.FunctionResponse{
-			Status:  500,
-			Message: "no columns available in Query Store",
-		}
-	}
-
-	// Validate and map sort column (use filtered cols to ensure sort column is in SELECT)
-	validatedSortColumn := c.mapAndValidateMSSQLSortColumn(sortColumn, cols)
-
-	// Build and execute query
-	timeWindowDays := c.Config.GetQueryStoreTimeWindowDays()
-	limit := c.TopQueriesLimit
-	if limit <= 0 {
-		limit = 500
-	}
-	query := c.buildMSSQLDynamicSQL(cols, validatedSortColumn, timeWindowDays, limit)
-
-	rows, err := c.db.QueryContext(ctx, query)
-	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
-		}
-		// Include diagnostic info: which columns were detected and used
-		colIDs := make([]string, len(cols))
-		for i, col := range cols {
-			colIDs[i] = col.Name
-		}
-		return &module.FunctionResponse{
-			Status:  500,
-			Message: fmt.Sprintf("query failed: %v (sort: %s, detected cols: %v)", err, validatedSortColumn, colIDs),
-		}
-	}
-	defer rows.Close()
-
-	// Scan rows dynamically
-	data, err := c.scanMSSQLDynamicRows(rows, cols)
-	if err != nil {
-		return &module.FunctionResponse{Status: 500, Message: err.Error()}
-	}
-
-	// Build dynamic sort options from available columns (only those actually detected)
-	sortParam, sortOptions := c.topQueriesSortParam(cols)
-
-	// Find default sort column ID
-	defaultSort := ""
-	for _, col := range cols {
-		if col.IsDefaultSort && col.IsSortOption {
-			defaultSort = col.Name
-			break
-		}
-	}
-	// Fallback to first sort option if no default
-	if defaultSort == "" && len(sortOptions) > 0 {
-		defaultSort = sortOptions[0].ID
-	}
-
-	annotatedCols := decorateMSSQLColumns(cols)
-	cs := mssqlColumnSet(annotatedCols)
-
-	return &module.FunctionResponse{
-		Status:            200,
-		Help:              "Top SQL queries from Query Store. WARNING: Query text may contain unmasked literals (potential PII).",
-		Columns:           cs.BuildColumns(),
-		Data:              data,
-		DefaultSortColumn: defaultSort,
-		RequiredParams:    []funcapi.ParamConfig{sortParam},
-
-		// Charts for aggregated visualization
-		Charts:        cs.BuildCharts(),
-		DefaultCharts: cs.BuildDefaultCharts(),
-		GroupBy:       cs.BuildGroupBy(),
-	}
-}
-
-func decorateMSSQLColumns(cols []mssqlColumn) []mssqlColumn {
-	out := make([]mssqlColumn, len(cols))
+func (f *funcTopQueries) decorateColumns(cols []topQueriesColumn) []topQueriesColumn {
+	out := make([]topQueriesColumn, len(cols))
 	index := make(map[string]int, len(cols))
 	for i, col := range cols {
 		out[i] = col
@@ -712,14 +599,14 @@ func decorateMSSQLColumns(cols []mssqlColumn) []mssqlColumn {
 	}
 
 	for i := range out {
-		if mssqlLabelColumnIDs[out[i].Name] {
+		if topQueriesLabelColumnIDs[out[i].Name] {
 			out[i].GroupBy = &funcapi.GroupByOptions{
-				IsDefault: out[i].Name == mssqlPrimaryLabelID,
+				IsDefault: out[i].Name == topQueriesPrimaryLabelID,
 			}
 		}
 	}
 
-	for _, group := range mssqlChartGroupDefs {
+	for _, group := range topQueriesChartGroupDefs {
 		for _, key := range group.columns {
 			idx, ok := index[key]
 			if !ok {
@@ -734,4 +621,57 @@ func decorateMSSQLColumns(cols []mssqlColumn) []mssqlColumn {
 	}
 
 	return out
+}
+
+// mssqlMethods returns the method configurations for registration.
+func mssqlMethods() []module.MethodConfig {
+	sortOptions := buildTopQueriesSortOptions(topQueriesColumns)
+	return []module.MethodConfig{
+		{
+			UpdateEvery:  10,
+			ID:           "top-queries",
+			Name:         "Top Queries",
+			Help:         "Top SQL queries from Query Store",
+			RequireCloud: true,
+			RequiredParams: []funcapi.ParamConfig{
+				{
+					ID:         topQueriesParamSort,
+					Name:       "Filter By",
+					Help:       "Select the primary sort column",
+					Selection:  funcapi.ParamSelect,
+					Options:    sortOptions,
+					UniqueView: true,
+				},
+			},
+		},
+	}
+}
+
+// mssqlFunctionHandler returns the MethodHandler for a MSSQL job.
+func mssqlFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
+	}
+	return c.funcTopQueries
+}
+
+// buildTopQueriesSortOptions builds sort options for method registration (before handler exists).
+func buildTopQueriesSortOptions(cols []topQueriesColumn) []funcapi.ParamOption {
+	var sortOptions []funcapi.ParamOption
+	sortDir := funcapi.FieldSortDescending
+	seen := make(map[string]bool)
+	for _, col := range cols {
+		if col.IsSortOption && !seen[col.Name] {
+			seen[col.Name] = true
+			sortOptions = append(sortOptions, funcapi.ParamOption{
+				ID:      col.Name,
+				Column:  col.Name,
+				Name:    col.SortLabel,
+				Default: col.IsDefaultSort,
+				Sort:    &sortDir,
+			})
+		}
+	}
+	return sortOptions
 }

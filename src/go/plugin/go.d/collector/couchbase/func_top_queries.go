@@ -20,20 +20,16 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
-const couchbaseMaxQueryTextLength = 4096
+const topQueriesMaxTextLength = 4096
 
-type cbColumn struct {
+type topQueriesColumn struct {
 	funcapi.ColumnMeta
 	IsSortOption  bool   // whether this column appears as a sort option
 	SortLabel     string // label for sort option dropdown
 	IsDefaultSort bool   // default sort column
 }
 
-func cbColumnSet(cols []cbColumn) funcapi.ColumnSet[cbColumn] {
-	return funcapi.Columns(cols, func(c cbColumn) funcapi.ColumnMeta { return c.ColumnMeta })
-}
-
-var couchbaseAllColumns = []cbColumn{
+var topQueriesColumns = []topQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "requestId", Tooltip: "Request ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryCount}, IsSortOption: true, SortLabel: "Top queries by Request ID"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "requestTime", Tooltip: "Request Time", Type: funcapi.FieldTypeTimestamp, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformDatetime, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, IsSortOption: true, SortLabel: "Top queries by Request Time"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "statement", Tooltip: "Statement", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, Sticky: true, FullWidth: true, Wrap: true}},
@@ -47,17 +43,17 @@ var couchbaseAllColumns = []cbColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "clientContextID", Tooltip: "Client Context ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText}},
 }
 
-type cbQueryResponse struct {
-	Status  string               `json:"status"`
-	Results []cbCompletedRequest `json:"results"`
-	Errors  []cbQueryError       `json:"errors"`
+type topQueriesResponse struct {
+	Status  string                  `json:"status"`
+	Results []topQueriesRequestData `json:"results"`
+	Errors  []topQueriesError       `json:"errors"`
 }
 
-type cbQueryError struct {
+type topQueriesError struct {
 	Message string `json:"msg"`
 }
 
-type cbCompletedRequest struct {
+type topQueriesRequestData struct {
 	RequestID       string      `json:"requestId"`
 	RequestTime     string      `json:"requestTime"`
 	Statement       string      `json:"statement"`
@@ -71,7 +67,7 @@ type cbCompletedRequest struct {
 	ClientContextID string      `json:"clientContextID"`
 }
 
-type cbRow struct {
+type topQueriesRow struct {
 	RequestID       string
 	RequestTime     time.Time
 	RequestTimeRaw  string
@@ -86,153 +82,44 @@ type cbRow struct {
 	ClientContextID string
 }
 
-func couchbaseMethods() []module.MethodConfig {
-	var sortOptions []funcapi.ParamOption
-	for _, col := range couchbaseAllColumns {
-		if !col.IsSortOption {
-			continue
-		}
-		sortDir := funcapi.FieldSortDescending
-		sortOptions = append(sortOptions, funcapi.ParamOption{
-			ID:      col.Name,
-			Column:  col.Name,
-			Name:    col.SortLabel,
-			Sort:    &sortDir,
-			Default: col.IsDefaultSort,
-		})
-	}
-	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Top N1QL requests from system:completed_requests",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:         "__sort",
-				Name:       "Filter By",
-				Help:       "Select the primary sort column",
-				Selection:  funcapi.ParamSelect,
-				Options:    sortOptions,
-				UniqueView: true,
-			}},
-		},
-	}
-}
-
-// funcCouchbase implements funcapi.MethodHandler for Couchbase.
-type funcCouchbase struct {
+// funcTopQueries implements funcapi.MethodHandler for Couchbase top-queries.
+type funcTopQueries struct {
 	collector *Collector
 }
 
+func newFuncTopQueries(c *Collector) *funcTopQueries {
+	return &funcTopQueries{collector: c}
+}
+
 // Compile-time interface check.
-var _ funcapi.MethodHandler = (*funcCouchbase)(nil)
+var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
 
 // MethodParams implements funcapi.MethodHandler.
-func (f *funcCouchbase) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
+func (f *funcTopQueries) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
 	switch method {
 	case "top-queries":
-		var sortOptions []funcapi.ParamOption
-		for _, col := range couchbaseAllColumns {
-			if !col.IsSortOption {
-				continue
-			}
-			sortDir := funcapi.FieldSortDescending
-			sortOptions = append(sortOptions, funcapi.ParamOption{
-				ID:      col.Name,
-				Column:  col.Name,
-				Name:    col.SortLabel,
-				Sort:    &sortDir,
-				Default: col.IsDefaultSort,
-			})
-		}
-		return []funcapi.ParamConfig{{
-			ID:         "__sort",
-			Name:       "Filter By",
-			Help:       "Select the primary sort column",
-			Selection:  funcapi.ParamSelect,
-			Options:    sortOptions,
-			UniqueView: true,
-		}}, nil
+		return []funcapi.ParamConfig{buildTopQueriesSortOptions(topQueriesColumns)}, nil
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
 }
 
 // Handle implements funcapi.MethodHandler.
-func (f *funcCouchbase) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	if f.collector.httpClient == nil {
 		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 
 	switch method {
 	case "top-queries":
-		return f.collector.collectTopQueries(ctx, params.Column("__sort"))
+		return f.collectData(ctx, params.Column("__sort"))
 	default:
 		return funcapi.NotFoundResponse(method)
 	}
 }
 
-func couchbaseFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return nil
-	}
-	return &funcCouchbase{collector: c}
-}
-
-func (c *Collector) queryServiceURL() (string, error) {
-	if c.QueryURL != "" {
-		return c.QueryURL, nil
-	}
-	parsed, err := url.Parse(c.URL)
-	if err != nil {
-		return "", err
-	}
-	host := parsed.Hostname()
-	port := parsed.Port()
-	if port == "" || port == "8091" {
-		port = "8093"
-	}
-	if port != "" {
-		parsed.Host = net.JoinHostPort(host, port)
-	} else {
-		parsed.Host = host
-	}
-	parsed.Path = ""
-	return parsed.String(), nil
-}
-
-func (c *Collector) buildQueryRequest(ctx context.Context, statement string) (*http.Request, error) {
-	queryURL, err := c.queryServiceURL()
-	if err != nil {
-		return nil, err
-	}
-
-	u, err := url.Parse(queryURL)
-	if err != nil {
-		return nil, err
-	}
-	u.Path = path.Join(u.Path, "/query/service")
-
-	reqCfg := c.RequestConfig
-	reqCfg.URL = u.String()
-	reqCfg.Method = http.MethodPost
-	reqCfg.Body = url.Values{"statement": {statement}}.Encode()
-	if reqCfg.Headers == nil {
-		reqCfg.Headers = map[string]string{}
-	}
-	reqCfg.Headers["Content-Type"] = "application/x-www-form-urlencoded"
-
-	req, err := web.NewHTTPRequest(reqCfg)
-	if err != nil {
-		return nil, err
-	}
-	return req.WithContext(ctx), nil
-}
-
-func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
-	limit := c.TopQueriesLimit
+func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *module.FunctionResponse {
+	limit := f.collector.TopQueriesLimit
 	if limit <= 0 {
 		limit = 500
 	}
@@ -241,13 +128,13 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		"cr.resultCount, cr.resultSize, cr.errorCount, cr.warningCount, cr.users AS `user`, cr.clientContextID " +
 		"FROM system:completed_requests AS cr"
 
-	req, err := c.buildQueryRequest(ctx, statement)
+	req, err := f.buildQueryRequest(ctx, statement)
 	if err != nil {
 		return &module.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
-	var resp cbQueryResponse
-	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &resp); err != nil {
+	var resp topQueriesResponse
+	if err := web.DoHTTP(f.collector.httpClient).RequestJSON(req, &resp); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
 		}
@@ -262,26 +149,13 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		return &module.FunctionResponse{Status: 500, Message: msg}
 	}
 
-	rows := make([]cbRow, 0, len(resp.Results))
+	rows := make([]topQueriesRow, 0, len(resp.Results))
 	for _, r := range resp.Results {
-		rows = append(rows, buildCouchbaseRow(r))
+		rows = append(rows, f.buildRow(r))
 	}
 
-	cs := cbColumnSet(couchbaseAllColumns)
-	var sortOptions []funcapi.ParamOption
-	for _, col := range couchbaseAllColumns {
-		if !col.IsSortOption {
-			continue
-		}
-		sortDir := funcapi.FieldSortDescending
-		sortOptions = append(sortOptions, funcapi.ParamOption{
-			ID:      col.Name,
-			Column:  col.Name,
-			Name:    col.SortLabel,
-			Sort:    &sortDir,
-			Default: col.IsDefaultSort,
-		})
-	}
+	cs := f.columnSet(topQueriesColumns)
+	sortParam := buildTopQueriesSortOptions(topQueriesColumns)
 
 	if len(rows) == 0 {
 		return &module.FunctionResponse{
@@ -291,22 +165,15 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 			Columns:           cs.BuildColumns(),
 			Data:              [][]any{},
 			DefaultSortColumn: "elapsedTime",
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:         "__sort",
-				Name:       "Filter By",
-				Help:       "Select the primary sort column",
-				Selection:  funcapi.ParamSelect,
-				Options:    sortOptions,
-				UniqueView: true,
-			}},
-			Charts:        cs.BuildCharts(),
-			DefaultCharts: cs.BuildDefaultCharts(),
-			GroupBy:       cs.BuildGroupBy(),
+			RequiredParams:    []funcapi.ParamConfig{sortParam},
+			Charts:            cs.BuildCharts(),
+			DefaultCharts:     cs.BuildDefaultCharts(),
+			GroupBy:           cs.BuildGroupBy(),
 		}
 	}
 
-	sortColumn = mapCouchbaseSortColumn(sortColumn)
-	sortCouchbaseRows(rows, sortColumn)
+	sortColumn = f.mapSortColumn(sortColumn)
+	f.sortRows(rows, sortColumn)
 
 	if len(rows) > limit {
 		rows = rows[:limit]
@@ -314,8 +181,8 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 
 	data := make([][]any, 0, len(rows))
 	for _, row := range rows {
-		out := make([]any, len(couchbaseAllColumns))
-		for i, col := range couchbaseAllColumns {
+		out := make([]any, len(topQueriesColumns))
+		for i, col := range topQueriesColumns {
 			switch col.Name {
 			case "requestId":
 				out[i] = row.RequestID
@@ -326,7 +193,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 					out[i] = row.RequestTime.Format(time.RFC3339Nano)
 				}
 			case "statement":
-				out[i] = strmutil.TruncateText(row.Statement, couchbaseMaxQueryTextLength)
+				out[i] = strmutil.TruncateText(row.Statement, topQueriesMaxTextLength)
 			case "elapsedTime":
 				out[i] = row.ElapsedMs
 			case "serviceTime":
@@ -356,22 +223,69 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: "elapsedTime",
-		RequiredParams: []funcapi.ParamConfig{{
-			ID:         "__sort",
-			Name:       "Filter By",
-			Help:       "Select the primary sort column",
-			Selection:  funcapi.ParamSelect,
-			Options:    sortOptions,
-			UniqueView: true,
-		}},
-		Charts:        cs.BuildCharts(),
-		DefaultCharts: cs.BuildDefaultCharts(),
-		GroupBy:       cs.BuildGroupBy(),
+		RequiredParams:    []funcapi.ParamConfig{sortParam},
+		Charts:            cs.BuildCharts(),
+		DefaultCharts:     cs.BuildDefaultCharts(),
+		GroupBy:           cs.BuildGroupBy(),
 	}
 }
 
-func buildCouchbaseRow(r cbCompletedRequest) cbRow {
-	row := cbRow{
+func (f *funcTopQueries) columnSet(cols []topQueriesColumn) funcapi.ColumnSet[topQueriesColumn] {
+	return funcapi.Columns(cols, func(c topQueriesColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+}
+
+func (f *funcTopQueries) queryServiceURL() (string, error) {
+	if f.collector.QueryURL != "" {
+		return f.collector.QueryURL, nil
+	}
+	parsed, err := url.Parse(f.collector.URL)
+	if err != nil {
+		return "", err
+	}
+	host := parsed.Hostname()
+	port := parsed.Port()
+	if port == "" || port == "8091" {
+		port = "8093"
+	}
+	if port != "" {
+		parsed.Host = net.JoinHostPort(host, port)
+	} else {
+		parsed.Host = host
+	}
+	parsed.Path = ""
+	return parsed.String(), nil
+}
+
+func (f *funcTopQueries) buildQueryRequest(ctx context.Context, statement string) (*http.Request, error) {
+	queryURL, err := f.queryServiceURL()
+	if err != nil {
+		return nil, err
+	}
+
+	u, err := url.Parse(queryURL)
+	if err != nil {
+		return nil, err
+	}
+	u.Path = path.Join(u.Path, "/query/service")
+
+	reqCfg := f.collector.RequestConfig
+	reqCfg.URL = u.String()
+	reqCfg.Method = http.MethodPost
+	reqCfg.Body = url.Values{"statement": {statement}}.Encode()
+	if reqCfg.Headers == nil {
+		reqCfg.Headers = map[string]string{}
+	}
+	reqCfg.Headers["Content-Type"] = "application/x-www-form-urlencoded"
+
+	req, err := web.NewHTTPRequest(reqCfg)
+	if err != nil {
+		return nil, err
+	}
+	return req.WithContext(ctx), nil
+}
+
+func (f *funcTopQueries) buildRow(r topQueriesRequestData) topQueriesRow {
+	row := topQueriesRow{
 		RequestID:       r.RequestID,
 		RequestTimeRaw:  r.RequestTime,
 		Statement:       r.Statement,
@@ -385,17 +299,17 @@ func buildCouchbaseRow(r cbCompletedRequest) cbRow {
 		row.RequestTime = t
 	}
 
-	row.ElapsedMs = parseDurationMs(r.ElapsedTime)
-	row.ServiceMs = parseDurationMs(r.ServiceTime)
-	row.ResultCount = parseNumber(r.ResultCount)
-	row.ResultSize = parseNumber(r.ResultSize)
-	row.ErrorCount = parseNumber(r.ErrorCount)
-	row.WarningCount = parseNumber(r.WarningCount)
+	row.ElapsedMs = f.parseDurationMs(r.ElapsedTime)
+	row.ServiceMs = f.parseDurationMs(r.ServiceTime)
+	row.ResultCount = f.parseNumber(r.ResultCount)
+	row.ResultSize = f.parseNumber(r.ResultSize)
+	row.ErrorCount = f.parseNumber(r.ErrorCount)
+	row.WarningCount = f.parseNumber(r.WarningCount)
 
 	return row
 }
 
-func parseDurationMs(raw string) float64 {
+func (f *funcTopQueries) parseDurationMs(raw string) float64 {
 	if raw == "" {
 		return 0
 	}
@@ -405,20 +319,20 @@ func parseDurationMs(raw string) float64 {
 	return 0
 }
 
-func parseNumber(n json.Number) int64 {
+func (f *funcTopQueries) parseNumber(n json.Number) int64 {
 	if n == "" {
 		return 0
 	}
 	if i, err := n.Int64(); err == nil {
 		return i
 	}
-	if f, err := n.Float64(); err == nil {
-		return int64(f)
+	if fv, err := n.Float64(); err == nil {
+		return int64(fv)
 	}
 	return 0
 }
 
-func mapCouchbaseSortColumn(col string) string {
+func (f *funcTopQueries) mapSortColumn(col string) string {
 	switch col {
 	case "elapsedTime", "serviceTime", "requestTime", "resultCount":
 		return col
@@ -427,7 +341,7 @@ func mapCouchbaseSortColumn(col string) string {
 	}
 }
 
-func sortCouchbaseRows(rows []cbRow, sortColumn string) {
+func (f *funcTopQueries) sortRows(rows []topQueriesRow, sortColumn string) {
 	switch sortColumn {
 	case "serviceTime":
 		sort.Slice(rows, func(i, j int) bool {
@@ -445,5 +359,53 @@ func sortCouchbaseRows(rows []cbRow, sortColumn string) {
 		sort.Slice(rows, func(i, j int) bool {
 			return rows[i].ElapsedMs > rows[j].ElapsedMs
 		})
+	}
+}
+
+func couchbaseMethods() []module.MethodConfig {
+	return []module.MethodConfig{
+		{
+			UpdateEvery:  10,
+			ID:           "top-queries",
+			Name:         "Top Queries",
+			Help:         "Top N1QL requests from system:completed_requests",
+			RequireCloud: true,
+			RequiredParams: []funcapi.ParamConfig{
+				buildTopQueriesSortOptions(topQueriesColumns),
+			},
+		},
+	}
+}
+
+func couchbaseFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
+	}
+	return c.funcTopQueries
+}
+
+func buildTopQueriesSortOptions(cols []topQueriesColumn) funcapi.ParamConfig {
+	var sortOptions []funcapi.ParamOption
+	sortDir := funcapi.FieldSortDescending
+	for _, col := range cols {
+		if !col.IsSortOption {
+			continue
+		}
+		sortOptions = append(sortOptions, funcapi.ParamOption{
+			ID:      col.Name,
+			Column:  col.Name,
+			Name:    col.SortLabel,
+			Sort:    &sortDir,
+			Default: col.IsDefaultSort,
+		})
+	}
+	return funcapi.ParamConfig{
+		ID:         "__sort",
+		Name:       "Filter By",
+		Help:       "Select the primary sort column",
+		Selection:  funcapi.ParamSelect,
+		Options:    sortOptions,
+		UniqueView: true,
 	}
 }

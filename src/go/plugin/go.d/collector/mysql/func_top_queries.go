@@ -13,13 +13,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
-const maxQueryTextLength = 4096
+const topQueriesMaxTextLength = 4096
 
-const paramSort = "__sort"
+const topQueriesParamSort = "__sort"
 
-// mysqlColumn defines a column for MySQL top-queries function.
+// topQueriesColumn defines a column for MySQL top-queries function.
 // Embeds funcapi.ColumnMeta for UI display and adds collector-specific fields.
-type mysqlColumn struct {
+type topQueriesColumn struct {
 	funcapi.ColumnMeta
 
 	// Data access
@@ -32,14 +32,9 @@ type mysqlColumn struct {
 	IsDefaultSort bool   // Is this the default sort option
 }
 
-// mysqlColumnSet creates a ColumnSet for the given columns.
-func mysqlColumnSet(cols []mysqlColumn) funcapi.ColumnSet[mysqlColumn] {
-	return funcapi.Columns(cols, func(c mysqlColumn) funcapi.ColumnMeta { return c.ColumnMeta })
-}
-
-// mysqlAllColumns defines ALL possible columns from events_statements_summary_by_digest
+// topQueriesColumns defines ALL possible columns from events_statements_summary_by_digest
 // Columns that don't exist in certain MySQL/MariaDB versions will be filtered at runtime
-var mysqlAllColumns = []mysqlColumn{
+var topQueriesColumns = []topQueriesColumn{
 	// Identity columns - always available
 	{ColumnMeta: funcapi.ColumnMeta{Name: "digest", Tooltip: "Digest", Type: funcapi.FieldTypeString, Visible: false, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, UniqueKey: true, Sortable: true}, DBColumn: "DIGEST"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sticky: true, FullWidth: true, Sortable: true}, DBColumn: "DIGEST_TEXT"},
@@ -109,14 +104,14 @@ var mysqlAllColumns = []mysqlColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "maxTotalMemory", Tooltip: "Max Total Memory", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "MAX_TOTAL_MEMORY", IsSortOption: true, SortLabel: "Top queries by Max Total Memory"},
 }
 
-type mysqlChartGroup struct {
+type topQueriesChartGroup struct {
 	key          string
 	title        string
 	columns      []string
 	defaultChart bool
 }
 
-var mysqlChartGroups = []mysqlChartGroup{
+var topQueriesChartGroups = []topQueriesChartGroup{
 	{key: "Calls", title: "Number of Calls", columns: []string{"calls"}, defaultChart: true},
 	{key: "Time", title: "Execution Time", columns: []string{"totalTime", "avgTime", "minTime", "maxTime"}, defaultChart: true},
 	{key: "Percentiles", title: "Execution Time Percentiles", columns: []string{"p95Time", "p99Time", "p999Time"}},
@@ -132,116 +127,233 @@ var mysqlChartGroups = []mysqlChartGroup{
 	{key: "Sample", title: "Sample Time", columns: []string{"sampleTime"}},
 }
 
-var mysqlLabelColumns = map[string]bool{
+var topQueriesLabelColumns = map[string]bool{
 	"schema": true,
 }
 
-const mysqlPrimaryLabel = "schema"
+const topQueriesPrimaryLabel = "schema"
 
-// mysqlMethods returns the available function methods for MySQL
-func mysqlMethods() []module.MethodConfig {
-	sortOptions := buildMySQLSortOptions(mysqlAllColumns)
-
-	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Top SQL queries from performance_schema",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{
-				{
-					ID:         paramSort,
-					Name:       "Filter By",
-					Help:       "Select the primary sort column",
-					Selection:  funcapi.ParamSelect,
-					Options:    sortOptions,
-					UniqueView: true,
-				},
-			},
-		},
-	}
+// topQueriesRowScanner interface for testing
+type topQueriesRowScanner interface {
+	Next() bool
+	Scan(dest ...any) error
+	Err() error
 }
 
-// funcMysql implements funcapi.MethodHandler for MySQL.
-type funcMysql struct {
+// funcTopQueries implements funcapi.MethodHandler for MySQL top-queries.
+// All function-related logic is encapsulated here, keeping Collector focused on metrics collection.
+type funcTopQueries struct {
 	collector *Collector
 }
 
+func newFuncTopQueries(c *Collector) *funcTopQueries {
+	return &funcTopQueries{collector: c}
+}
+
 // Compile-time interface check.
-var _ funcapi.MethodHandler = (*funcMysql)(nil)
+var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
 
 // MethodParams implements funcapi.MethodHandler.
-func (f *funcMysql) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
 	if f.collector.db == nil {
 		return nil, fmt.Errorf("collector is still initializing")
 	}
 	switch method {
 	case "top-queries":
-		return f.collector.topQueriesParams(ctx)
+		return f.methodParams(ctx)
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
 }
 
 // Handle implements funcapi.MethodHandler.
-func (f *funcMysql) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	if f.collector.db == nil {
 		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 
 	switch method {
 	case "top-queries":
-		return f.collector.collectTopQueries(ctx, params.Column(paramSort))
+		return f.collectData(ctx, params.Column(topQueriesParamSort))
 	default:
 		return funcapi.NotFoundResponse(method)
 	}
 }
 
-func mysqlFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return nil
+func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
+	available, err := f.checkPerformanceSchema(ctx)
+	if err != nil {
+		return nil, err
 	}
-	return &funcMysql{collector: c}
+	if !available {
+		return nil, fmt.Errorf("performance_schema is not enabled")
+	}
+
+	availableCols, err := f.detectStatementsColumns(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cols := f.buildAvailableColumns(availableCols)
+	if len(cols) == 0 {
+		return nil, fmt.Errorf("no columns available in events_statements_summary_by_digest")
+	}
+
+	sortParam := f.buildSortParam(cols)
+	return []funcapi.ParamConfig{sortParam}, nil
 }
 
-func buildMySQLSortOptions(cols []mysqlColumn) []funcapi.ParamOption {
-	var sortOptions []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range cols {
-		if col.IsSortOption {
-			sortOptions = append(sortOptions, funcapi.ParamOption{
-				ID:      col.Name,
-				Column:  col.DBColumn,
-				Name:    col.SortLabel,
-				Default: col.IsDefaultSort,
-				Sort:    &sortDir,
-			})
+// collectData queries performance_schema for top queries using dynamic columns
+func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *module.FunctionResponse {
+	// Check if performance_schema is enabled
+	available, err := f.checkPerformanceSchema(ctx)
+	if err != nil {
+		return &module.FunctionResponse{
+			Status:  500,
+			Message: fmt.Sprintf("failed to check performance_schema availability: %v", err),
 		}
 	}
-	return sortOptions
+	if !available {
+		return &module.FunctionResponse{
+			Status:  503,
+			Message: "performance_schema is not enabled",
+		}
+	}
+
+	// Detect available columns
+	availableCols, err := f.detectStatementsColumns(ctx)
+	if err != nil {
+		return &module.FunctionResponse{
+			Status:  500,
+			Message: fmt.Sprintf("failed to detect available columns: %v", err),
+		}
+	}
+
+	// Build list of available columns
+	cols := f.buildAvailableColumns(availableCols)
+	if len(cols) == 0 {
+		return &module.FunctionResponse{
+			Status:  500,
+			Message: "no columns available in events_statements_summary_by_digest",
+		}
+	}
+
+	// Validate and map sort column
+	dbSortColumn := f.mapAndValidateSortColumn(sortColumn, availableCols)
+
+	// Get query limit (default 500)
+	limit := f.collector.TopQueriesLimit
+	if limit <= 0 {
+		limit = 500
+	}
+
+	// Build and execute query
+	query := f.buildDynamicSQL(cols, dbSortColumn, limit)
+
+	rows, err := f.collector.db.QueryContext(ctx, query)
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
+		}
+		return &module.FunctionResponse{Status: 500, Message: fmt.Sprintf("query failed: %v", err)}
+	}
+	defer rows.Close()
+
+	// Scan rows dynamically
+	data, err := f.scanDynamicRows(rows, cols)
+	if err != nil {
+		return &module.FunctionResponse{Status: 500, Message: err.Error()}
+	}
+
+	// Build dynamic sort options from available columns (only those actually detected)
+	sortParam := f.buildSortParam(cols)
+	sortOptions := sortParam.Options
+
+	// Find default sort column ID
+	defaultSort := ""
+	for _, col := range cols {
+		if col.IsDefaultSort && col.IsSortOption {
+			defaultSort = col.Name
+			break
+		}
+	}
+	// Fallback to first sort option if no default
+	if defaultSort == "" && len(sortOptions) > 0 {
+		defaultSort = sortOptions[0].ID
+	}
+
+	// Decorate columns with chart/label metadata and create ColumnSet
+	annotatedCols := f.decorateColumns(cols)
+	cs := f.columnSet(annotatedCols)
+
+	return &module.FunctionResponse{
+		Status:            200,
+		Help:              "Top SQL queries from performance_schema.events_statements_summary_by_digest",
+		Columns:           cs.BuildColumns(),
+		Data:              data,
+		DefaultSortColumn: defaultSort,
+		RequiredParams:    []funcapi.ParamConfig{sortParam},
+
+		// Charts for aggregated visualization
+		Charts:        cs.BuildCharts(),
+		DefaultCharts: cs.BuildDefaultCharts(),
+		GroupBy:       cs.BuildGroupBy(),
+	}
 }
 
+func (f *funcTopQueries) columnSet(cols []topQueriesColumn) funcapi.ColumnSet[topQueriesColumn] {
+	return funcapi.Columns(cols, func(c topQueriesColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+}
 
-// detectMySQLStatementsColumns queries the database to discover available columns
-func (c *Collector) detectMySQLStatementsColumns(ctx context.Context) (map[string]bool, error) {
+// checkPerformanceSchema checks if performance_schema is enabled (cached)
+func (f *funcTopQueries) checkPerformanceSchema(ctx context.Context) (bool, error) {
+	// Fast path: return cached result if already checked
+	f.collector.varPerfSchemaMu.RLock()
+	cached := f.collector.varPerformanceSchema
+	f.collector.varPerfSchemaMu.RUnlock()
+	if cached != "" {
+		return cached == "ON" || cached == "1", nil
+	}
+
+	// Slow path: query and cache the result
+	// Use write lock for the entire operation to prevent duplicate queries
+	f.collector.varPerfSchemaMu.Lock()
+	defer f.collector.varPerfSchemaMu.Unlock()
+
+	// Double-check after acquiring write lock (another goroutine may have set it)
+	if f.collector.varPerformanceSchema != "" {
+		return f.collector.varPerformanceSchema == "ON" || f.collector.varPerformanceSchema == "1", nil
+	}
+
+	var value string
+	query := "SELECT @@performance_schema"
+	err := f.collector.db.QueryRowContext(ctx, query).Scan(&value)
+	if err != nil {
+		return false, err
+	}
+
+	// Cache the result
+	f.collector.varPerformanceSchema = value
+	return value == "ON" || value == "1", nil
+}
+
+// detectStatementsColumns queries the database to discover available columns
+func (f *funcTopQueries) detectStatementsColumns(ctx context.Context) (map[string]bool, error) {
 	// Fast path: return cached result
-	c.stmtSummaryColsMu.RLock()
-	if c.stmtSummaryCols != nil {
-		cols := c.stmtSummaryCols
-		c.stmtSummaryColsMu.RUnlock()
+	f.collector.stmtSummaryColsMu.RLock()
+	if f.collector.stmtSummaryCols != nil {
+		cols := f.collector.stmtSummaryCols
+		f.collector.stmtSummaryColsMu.RUnlock()
 		return cols, nil
 	}
-	c.stmtSummaryColsMu.RUnlock()
+	f.collector.stmtSummaryColsMu.RUnlock()
 
 	// Slow path: query and cache
-	c.stmtSummaryColsMu.Lock()
-	defer c.stmtSummaryColsMu.Unlock()
+	f.collector.stmtSummaryColsMu.Lock()
+	defer f.collector.stmtSummaryColsMu.Unlock()
 
 	// Double-check after acquiring write lock
-	if c.stmtSummaryCols != nil {
-		return c.stmtSummaryCols, nil
+	if f.collector.stmtSummaryCols != nil {
+		return f.collector.stmtSummaryCols, nil
 	}
 
 	// Query information_schema to get available columns
@@ -251,7 +363,7 @@ func (c *Collector) detectMySQLStatementsColumns(ctx context.Context) (map[strin
 		WHERE TABLE_SCHEMA = 'performance_schema'
 		AND TABLE_NAME = 'events_statements_summary_by_digest'
 	`
-	rows, err := c.db.QueryContext(ctx, query)
+	rows, err := f.collector.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query column information: %w", err)
 	}
@@ -271,15 +383,15 @@ func (c *Collector) detectMySQLStatementsColumns(ctx context.Context) (map[strin
 	}
 
 	// Cache the result
-	c.stmtSummaryCols = cols
+	f.collector.stmtSummaryCols = cols
 
 	return cols, nil
 }
 
 // buildAvailableColumns filters columns based on what's available in the database
-func (c *Collector) buildAvailableMySQLColumns(availableCols map[string]bool) []mysqlColumn {
-	var cols []mysqlColumn
-	for _, col := range mysqlAllColumns {
+func (f *funcTopQueries) buildAvailableColumns(availableCols map[string]bool) []topQueriesColumn {
+	var cols []topQueriesColumn
+	for _, col := range topQueriesColumns {
 		if availableCols[col.DBColumn] {
 			cols = append(cols, col)
 		}
@@ -287,10 +399,10 @@ func (c *Collector) buildAvailableMySQLColumns(availableCols map[string]bool) []
 	return cols
 }
 
-// mapAndValidateMySQLSortColumn validates sort key and returns the ID to use
-func (c *Collector) mapAndValidateMySQLSortColumn(sortKey string, availableCols map[string]bool) string {
+// mapAndValidateSortColumn validates sort key and returns the ID to use
+func (f *funcTopQueries) mapAndValidateSortColumn(sortKey string, availableCols map[string]bool) string {
 	// Find the column by ID or DBColumn
-	for _, col := range mysqlAllColumns {
+	for _, col := range topQueriesColumns {
 		if (col.Name == sortKey || col.DBColumn == sortKey) && availableCols[col.DBColumn] {
 			return col.Name
 		}
@@ -302,8 +414,8 @@ func (c *Collector) mapAndValidateMySQLSortColumn(sortKey string, availableCols 
 	return "calls" // Ultimate fallback
 }
 
-// buildMySQLDynamicSQL builds the SQL query with only available columns
-func (c *Collector) buildMySQLDynamicSQL(cols []mysqlColumn, sortColumn string, limit int) string {
+// buildDynamicSQL builds the SQL query with only available columns
+func (f *funcTopQueries) buildDynamicSQL(cols []topQueriesColumn, sortColumn string, limit int) string {
 	var selectParts []string
 	for _, col := range cols {
 		// Use backticks to handle reserved keywords
@@ -326,8 +438,8 @@ LIMIT %d
 `, strings.Join(selectParts, ", "), sortColumn, limit)
 }
 
-// scanMySQLDynamicRows scans rows dynamically based on column types
-func (c *Collector) scanMySQLDynamicRows(rows mysqlRowScanner, cols []mysqlColumn) ([][]any, error) {
+// scanDynamicRows scans rows dynamically based on column types
+func (f *funcTopQueries) scanDynamicRows(rows topQueriesRowScanner, cols []topQueriesColumn) ([][]any, error) {
 	data := make([][]any, 0, 500)
 
 	// Create value holders for scanning
@@ -367,7 +479,7 @@ func (c *Collector) scanMySQLDynamicRows(rows mysqlRowScanner, cols []mysqlColum
 					s := v.String
 					// Truncate query text
 					if col.Name == "query" || col.Name == "sampleQuery" {
-						s = strmutil.TruncateText(s, maxQueryTextLength)
+						s = strmutil.TruncateText(s, topQueriesMaxTextLength)
 					}
 					row[i] = s
 				} else {
@@ -399,147 +511,20 @@ func (c *Collector) scanMySQLDynamicRows(rows mysqlRowScanner, cols []mysqlColum
 	return data, nil
 }
 
-func (c *Collector) topQueriesSortParam(cols []mysqlColumn) (funcapi.ParamConfig, []funcapi.ParamOption) {
-	sortOptions := buildMySQLSortOptions(cols)
-	sortParam := funcapi.ParamConfig{
-		ID:         paramSort,
+func (f *funcTopQueries) buildSortParam(cols []topQueriesColumn) funcapi.ParamConfig {
+	sortOptions := buildTopQueriesSortOptions(cols)
+	return funcapi.ParamConfig{
+		ID:         topQueriesParamSort,
 		Name:       "Filter By",
 		Help:       "Select the primary sort column",
 		Selection:  funcapi.ParamSelect,
 		Options:    sortOptions,
 		UniqueView: true,
 	}
-	return sortParam, sortOptions
 }
 
-func (c *Collector) topQueriesParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
-	available, err := c.checkPerformanceSchema(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if !available {
-		return nil, fmt.Errorf("performance_schema is not enabled")
-	}
-
-	availableCols, err := c.detectMySQLStatementsColumns(ctx)
-	if err != nil {
-		return nil, err
-	}
-	cols := c.buildAvailableMySQLColumns(availableCols)
-	if len(cols) == 0 {
-		return nil, fmt.Errorf("no columns available in events_statements_summary_by_digest")
-	}
-
-	sortParam, _ := c.topQueriesSortParam(cols)
-	return []funcapi.ParamConfig{sortParam}, nil
-}
-
-// mysqlRowScanner interface for testing
-type mysqlRowScanner interface {
-	Next() bool
-	Scan(dest ...any) error
-	Err() error
-}
-
-// collectTopQueries queries performance_schema for top queries using dynamic columns
-func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
-	// Check if performance_schema is enabled
-	available, err := c.checkPerformanceSchema(ctx)
-	if err != nil {
-		return &module.FunctionResponse{
-			Status:  500,
-			Message: fmt.Sprintf("failed to check performance_schema availability: %v", err),
-		}
-	}
-	if !available {
-		return &module.FunctionResponse{
-			Status:  503,
-			Message: "performance_schema is not enabled",
-		}
-	}
-
-	// Detect available columns
-	availableCols, err := c.detectMySQLStatementsColumns(ctx)
-	if err != nil {
-		return &module.FunctionResponse{
-			Status:  500,
-			Message: fmt.Sprintf("failed to detect available columns: %v", err),
-		}
-	}
-
-	// Build list of available columns
-	cols := c.buildAvailableMySQLColumns(availableCols)
-	if len(cols) == 0 {
-		return &module.FunctionResponse{
-			Status:  500,
-			Message: "no columns available in events_statements_summary_by_digest",
-		}
-	}
-
-	// Validate and map sort column
-	dbSortColumn := c.mapAndValidateMySQLSortColumn(sortColumn, availableCols)
-
-	// Get query limit (default 500)
-	limit := c.TopQueriesLimit
-	if limit <= 0 {
-		limit = 500
-	}
-
-	// Build and execute query
-	query := c.buildMySQLDynamicSQL(cols, dbSortColumn, limit)
-
-	rows, err := c.db.QueryContext(ctx, query)
-	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
-		}
-		return &module.FunctionResponse{Status: 500, Message: fmt.Sprintf("query failed: %v", err)}
-	}
-	defer rows.Close()
-
-	// Scan rows dynamically
-	data, err := c.scanMySQLDynamicRows(rows, cols)
-	if err != nil {
-		return &module.FunctionResponse{Status: 500, Message: err.Error()}
-	}
-
-	// Build dynamic sort options from available columns (only those actually detected)
-	sortParam, sortOptions := c.topQueriesSortParam(cols)
-
-	// Find default sort column ID
-	defaultSort := ""
-	for _, col := range cols {
-		if col.IsDefaultSort && col.IsSortOption {
-			defaultSort = col.Name
-			break
-		}
-	}
-	// Fallback to first sort option if no default
-	if defaultSort == "" && len(sortOptions) > 0 {
-		defaultSort = sortOptions[0].ID
-	}
-
-	// Decorate columns with chart/label metadata and create ColumnSet
-	annotatedCols := decorateMySQLColumns(cols)
-	cs := mysqlColumnSet(annotatedCols)
-
-	return &module.FunctionResponse{
-		Status:            200,
-		Help:              "Top SQL queries from performance_schema.events_statements_summary_by_digest",
-		Columns:           cs.BuildColumns(),
-		Data:              data,
-		DefaultSortColumn: defaultSort,
-		RequiredParams:    []funcapi.ParamConfig{sortParam},
-
-		// Charts for aggregated visualization
-		Charts:        cs.BuildCharts(),
-		DefaultCharts: cs.BuildDefaultCharts(),
-		GroupBy:       cs.BuildGroupBy(),
-	}
-}
-
-func decorateMySQLColumns(cols []mysqlColumn) []mysqlColumn {
-	out := make([]mysqlColumn, len(cols))
+func (f *funcTopQueries) decorateColumns(cols []topQueriesColumn) []topQueriesColumn {
+	out := make([]topQueriesColumn, len(cols))
 	index := make(map[string]int, len(cols))
 	for i, col := range cols {
 		out[i] = col
@@ -547,14 +532,14 @@ func decorateMySQLColumns(cols []mysqlColumn) []mysqlColumn {
 	}
 
 	for i := range out {
-		if mysqlLabelColumns[out[i].Name] {
+		if topQueriesLabelColumns[out[i].Name] {
 			out[i].GroupBy = &funcapi.GroupByOptions{
-				IsDefault: out[i].Name == mysqlPrimaryLabel,
+				IsDefault: out[i].Name == topQueriesPrimaryLabel,
 			}
 		}
 	}
 
-	for _, group := range mysqlChartGroups {
+	for _, group := range topQueriesChartGroups {
 		for _, key := range group.columns {
 			idx, ok := index[key]
 			if !ok {
@@ -571,34 +556,54 @@ func decorateMySQLColumns(cols []mysqlColumn) []mysqlColumn {
 	return out
 }
 
-// checkPerformanceSchema checks if performance_schema is enabled (cached)
-func (c *Collector) checkPerformanceSchema(ctx context.Context) (bool, error) {
-	// Fast path: return cached result if already checked
-	c.varPerfSchemaMu.RLock()
-	cached := c.varPerformanceSchema
-	c.varPerfSchemaMu.RUnlock()
-	if cached != "" {
-		return cached == "ON" || cached == "1", nil
+// mysqlMethods returns the available function methods for MySQL
+func mysqlMethods() []module.MethodConfig {
+	sortOptions := buildTopQueriesSortOptions(topQueriesColumns)
+
+	return []module.MethodConfig{
+		{
+			UpdateEvery:  10,
+			ID:           "top-queries",
+			Name:         "Top Queries",
+			Help:         "Top SQL queries from performance_schema",
+			RequireCloud: true,
+			RequiredParams: []funcapi.ParamConfig{
+				{
+					ID:         topQueriesParamSort,
+					Name:       "Filter By",
+					Help:       "Select the primary sort column",
+					Selection:  funcapi.ParamSelect,
+					Options:    sortOptions,
+					UniqueView: true,
+				},
+			},
+		},
 	}
+}
 
-	// Slow path: query and cache the result
-	// Use write lock for the entire operation to prevent duplicate queries
-	c.varPerfSchemaMu.Lock()
-	defer c.varPerfSchemaMu.Unlock()
-
-	// Double-check after acquiring write lock (another goroutine may have set it)
-	if c.varPerformanceSchema != "" {
-		return c.varPerformanceSchema == "ON" || c.varPerformanceSchema == "1", nil
+// mysqlFunctionHandler returns the MethodHandler for a MySQL job.
+func mysqlFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
 	}
+	return c.funcTopQueries
+}
 
-	var value string
-	query := "SELECT @@performance_schema"
-	err := c.db.QueryRowContext(ctx, query).Scan(&value)
-	if err != nil {
-		return false, err
+// buildTopQueriesSortOptions builds sort options for method registration (before handler exists).
+func buildTopQueriesSortOptions(cols []topQueriesColumn) []funcapi.ParamOption {
+	var sortOptions []funcapi.ParamOption
+	sortDir := funcapi.FieldSortDescending
+	for _, col := range cols {
+		if col.IsSortOption {
+			sortOptions = append(sortOptions, funcapi.ParamOption{
+				ID:      col.Name,
+				Column:  col.DBColumn,
+				Name:    col.SortLabel,
+				Default: col.IsDefaultSort,
+				Sort:    &sortDir,
+			})
+		}
 	}
-
-	// Cache the result
-	c.varPerformanceSchema = value
-	return value == "ON" || value == "1", nil
+	return sortOptions
 }

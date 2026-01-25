@@ -17,20 +17,16 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
-const elasticMaxQueryTextLength = 4096
+const topQueriesMaxTextLength = 4096
 
-type esColumn struct {
+type topQueriesColumn struct {
 	funcapi.ColumnMeta
 	IsSortOption  bool   // whether this column appears as a sort option
 	SortLabel     string // label for sort option dropdown
 	IsDefaultSort bool   // default sort column
 }
 
-func esColumnSet(cols []esColumn) funcapi.ColumnSet[esColumn] {
-	return funcapi.Columns(cols, func(c esColumn) funcapi.ColumnMeta { return c.ColumnMeta })
-}
-
-var esAllColumns = []esColumn{
+var topQueriesColumns = []topQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "taskId", Tooltip: "Task ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryCount}, IsSortOption: true, SortLabel: "Top queries by Task ID"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "node", Tooltip: "Node ID", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{}}},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "nodeName", Tooltip: "Node Name", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText, GroupBy: &funcapi.GroupByOptions{IsDefault: true}}},
@@ -43,14 +39,14 @@ var esAllColumns = []esColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "cancelled", Tooltip: "Cancelled", Type: funcapi.FieldTypeBoolean, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformNone}},
 }
 
-type esTasksResponse struct {
+type topQueriesResponse struct {
 	Nodes map[string]struct {
-		Name  string            `json:"name"`
-		Tasks map[string]esTask `json:"tasks"`
+		Name  string                    `json:"name"`
+		Tasks map[string]topQueriesTask `json:"tasks"`
 	} `json:"nodes"`
 }
 
-type esTask struct {
+type topQueriesTask struct {
 	ID                 int64  `json:"id"`
 	Action             string `json:"action"`
 	Type               string `json:"type"`
@@ -61,7 +57,7 @@ type esTask struct {
 	Cancelled          bool   `json:"cancelled"`
 }
 
-type esTaskRow struct {
+type topQueriesRow struct {
 	TaskID      string
 	NodeID      string
 	NodeName    string
@@ -74,108 +70,49 @@ type esTaskRow struct {
 	Cancelled   bool
 }
 
-func elasticsearchMethods() []module.MethodConfig {
-	var sortOptions []funcapi.ParamOption
-	for _, col := range esAllColumns {
-		if !col.IsSortOption {
-			continue
-		}
-		sortDir := funcapi.FieldSortDescending
-		sortOptions = append(sortOptions, funcapi.ParamOption{
-			ID:      col.Name,
-			Column:  col.Name,
-			Name:    col.SortLabel,
-			Sort:    &sortDir,
-			Default: col.IsDefaultSort,
-		})
-	}
-	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Running queries from Elasticsearch Tasks API",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:         "__sort",
-				Name:       "Filter By",
-				Help:       "Select the primary sort column",
-				Selection:  funcapi.ParamSelect,
-				Options:    sortOptions,
-				UniqueView: true,
-			}},
-		},
-	}
-}
-
-// funcElasticsearch implements funcapi.MethodHandler for Elasticsearch.
-type funcElasticsearch struct {
+// funcTopQueries implements funcapi.MethodHandler for Elasticsearch top-queries.
+type funcTopQueries struct {
 	collector *Collector
 }
 
+func newFuncTopQueries(c *Collector) *funcTopQueries {
+	return &funcTopQueries{collector: c}
+}
+
 // Compile-time interface check.
-var _ funcapi.MethodHandler = (*funcElasticsearch)(nil)
+var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
 
 // MethodParams implements funcapi.MethodHandler.
-func (f *funcElasticsearch) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
+func (f *funcTopQueries) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
 	switch method {
 	case "top-queries":
-		var sortOptions []funcapi.ParamOption
-		for _, col := range esAllColumns {
-			if !col.IsSortOption {
-				continue
-			}
-			sortDir := funcapi.FieldSortDescending
-			sortOptions = append(sortOptions, funcapi.ParamOption{
-				ID:      col.Name,
-				Column:  col.Name,
-				Name:    col.SortLabel,
-				Sort:    &sortDir,
-				Default: col.IsDefaultSort,
-			})
-		}
-		return []funcapi.ParamConfig{{
-			ID:         "__sort",
-			Name:       "Filter By",
-			Help:       "Select the primary sort column",
-			Selection:  funcapi.ParamSelect,
-			Options:    sortOptions,
-			UniqueView: true,
-		}}, nil
+		return []funcapi.ParamConfig{buildTopQueriesSortOptions(topQueriesColumns)}, nil
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
 }
 
 // Handle implements funcapi.MethodHandler.
-func (f *funcElasticsearch) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	if f.collector.httpClient == nil {
 		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 
 	switch method {
 	case "top-queries":
-		return f.collector.collectTopQueries(ctx, params.Column("__sort"))
+		return f.collectData(ctx, params.Column("__sort"))
 	default:
 		return funcapi.NotFoundResponse(method)
 	}
 }
 
-func elasticsearchFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return nil
-	}
-	return &funcElasticsearch{collector: c}
-}
-
-func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
-	limit := c.TopQueriesLimit
+func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *module.FunctionResponse {
+	limit := f.collector.TopQueriesLimit
 	if limit <= 0 {
 		limit = 500
 	}
 
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, "/_tasks")
+	req, err := web.NewHTTPRequestWithPath(f.collector.RequestConfig, "/_tasks")
 	if err != nil {
 		return &module.FunctionResponse{Status: 500, Message: err.Error()}
 	}
@@ -185,18 +122,18 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 	q.Set("detailed", "true")
 	req.URL.RawQuery = q.Encode()
 
-	var resp esTasksResponse
-	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &resp); err != nil {
+	var resp topQueriesResponse
+	if err := web.DoHTTP(f.collector.httpClient).RequestJSON(req, &resp); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return &module.FunctionResponse{Status: 504, Message: "query timed out"}
 		}
 		return &module.FunctionResponse{Status: 500, Message: fmt.Sprintf("tasks query failed: %v", err)}
 	}
 
-	rows := make([]esTaskRow, 0, 100)
+	rows := make([]topQueriesRow, 0, 100)
 	for nodeID, node := range resp.Nodes {
 		for taskID, task := range node.Tasks {
-			rows = append(rows, esTaskRow{
+			rows = append(rows, topQueriesRow{
 				TaskID:      taskID,
 				NodeID:      nodeID,
 				NodeName:    node.Name,
@@ -211,21 +148,8 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		}
 	}
 
-	cs := esColumnSet(esAllColumns)
-	var sortOptions []funcapi.ParamOption
-	for _, col := range esAllColumns {
-		if !col.IsSortOption {
-			continue
-		}
-		sortDir := funcapi.FieldSortDescending
-		sortOptions = append(sortOptions, funcapi.ParamOption{
-			ID:      col.Name,
-			Column:  col.Name,
-			Name:    col.SortLabel,
-			Sort:    &sortDir,
-			Default: col.IsDefaultSort,
-		})
-	}
+	cs := f.columnSet(topQueriesColumns)
+	sortParam := buildTopQueriesSortOptions(topQueriesColumns)
 
 	if len(rows) == 0 {
 		return &module.FunctionResponse{
@@ -235,22 +159,15 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 			Columns:           cs.BuildColumns(),
 			Data:              [][]any{},
 			DefaultSortColumn: "runningTime",
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:         "__sort",
-				Name:       "Filter By",
-				Help:       "Select the primary sort column",
-				Selection:  funcapi.ParamSelect,
-				Options:    sortOptions,
-				UniqueView: true,
-			}},
-			Charts:        cs.BuildCharts(),
-			DefaultCharts: cs.BuildDefaultCharts(),
-			GroupBy:       cs.BuildGroupBy(),
+			RequiredParams:    []funcapi.ParamConfig{sortParam},
+			Charts:            cs.BuildCharts(),
+			DefaultCharts:     cs.BuildDefaultCharts(),
+			GroupBy:           cs.BuildGroupBy(),
 		}
 	}
 
-	sortColumn = mapElasticsearchSortColumn(sortColumn)
-	sortElasticsearchRows(rows, sortColumn)
+	sortColumn = f.mapSortColumn(sortColumn)
+	f.sortRows(rows, sortColumn)
 
 	if len(rows) > limit {
 		rows = rows[:limit]
@@ -258,8 +175,8 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 
 	data := make([][]any, 0, len(rows))
 	for _, row := range rows {
-		out := make([]any, len(esAllColumns))
-		for i, col := range esAllColumns {
+		out := make([]any, len(topQueriesColumns))
+		for i, col := range topQueriesColumns {
 			switch col.Name {
 			case "taskId":
 				out[i] = row.TaskID
@@ -272,7 +189,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 			case "type":
 				out[i] = row.Type
 			case "description":
-				out[i] = strmutil.TruncateText(row.Description, elasticMaxQueryTextLength)
+				out[i] = strmutil.TruncateText(row.Description, topQueriesMaxTextLength)
 			case "startTime":
 				out[i] = row.StartTime.Format(time.RFC3339Nano)
 			case "runningTime":
@@ -294,21 +211,18 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *m
 		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: "runningTime",
-		RequiredParams: []funcapi.ParamConfig{{
-			ID:         "__sort",
-			Name:       "Filter By",
-			Help:       "Select the primary sort column",
-			Selection:  funcapi.ParamSelect,
-			Options:    sortOptions,
-			UniqueView: true,
-		}},
-		Charts:        cs.BuildCharts(),
-		DefaultCharts: cs.BuildDefaultCharts(),
-		GroupBy:       cs.BuildGroupBy(),
+		RequiredParams:    []funcapi.ParamConfig{sortParam},
+		Charts:            cs.BuildCharts(),
+		DefaultCharts:     cs.BuildDefaultCharts(),
+		GroupBy:           cs.BuildGroupBy(),
 	}
 }
 
-func mapElasticsearchSortColumn(col string) string {
+func (f *funcTopQueries) columnSet(cols []topQueriesColumn) funcapi.ColumnSet[topQueriesColumn] {
+	return funcapi.Columns(cols, func(c topQueriesColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+}
+
+func (f *funcTopQueries) mapSortColumn(col string) string {
 	switch col {
 	case "runningTime", "startTime", "taskId":
 		return col
@@ -317,7 +231,7 @@ func mapElasticsearchSortColumn(col string) string {
 	}
 }
 
-func sortElasticsearchRows(rows []esTaskRow, sortColumn string) {
+func (f *funcTopQueries) sortRows(rows []topQueriesRow, sortColumn string) {
 	switch sortColumn {
 	case "startTime":
 		sort.Slice(rows, func(i, j int) bool {
@@ -325,8 +239,8 @@ func sortElasticsearchRows(rows []esTaskRow, sortColumn string) {
 		})
 	case "taskId":
 		sort.Slice(rows, func(i, j int) bool {
-			left, lok := parseElasticsearchTaskID(rows[i].TaskID)
-			right, rok := parseElasticsearchTaskID(rows[j].TaskID)
+			left, lok := f.parseTaskID(rows[i].TaskID)
+			right, rok := f.parseTaskID(rows[j].TaskID)
 			if lok && rok {
 				return left > right
 			}
@@ -339,7 +253,7 @@ func sortElasticsearchRows(rows []esTaskRow, sortColumn string) {
 	}
 }
 
-func parseElasticsearchTaskID(taskID string) (int64, bool) {
+func (f *funcTopQueries) parseTaskID(taskID string) (int64, bool) {
 	id := taskID
 	if idx := strings.LastIndex(id, ":"); idx != -1 {
 		id = id[idx+1:]
@@ -349,4 +263,52 @@ func parseElasticsearchTaskID(taskID string) (int64, bool) {
 		return 0, false
 	}
 	return val, true
+}
+
+func elasticsearchMethods() []module.MethodConfig {
+	return []module.MethodConfig{
+		{
+			UpdateEvery:  10,
+			ID:           "top-queries",
+			Name:         "Top Queries",
+			Help:         "Running queries from Elasticsearch Tasks API",
+			RequireCloud: true,
+			RequiredParams: []funcapi.ParamConfig{
+				buildTopQueriesSortOptions(topQueriesColumns),
+			},
+		},
+	}
+}
+
+func elasticsearchFunctionHandler(job *module.Job) funcapi.MethodHandler {
+	c, ok := job.Module().(*Collector)
+	if !ok {
+		return nil
+	}
+	return c.funcTopQueries
+}
+
+func buildTopQueriesSortOptions(cols []topQueriesColumn) funcapi.ParamConfig {
+	var sortOptions []funcapi.ParamOption
+	sortDir := funcapi.FieldSortDescending
+	for _, col := range cols {
+		if !col.IsSortOption {
+			continue
+		}
+		sortOptions = append(sortOptions, funcapi.ParamOption{
+			ID:      col.Name,
+			Column:  col.Name,
+			Name:    col.SortLabel,
+			Sort:    &sortDir,
+			Default: col.IsDefaultSort,
+		})
+	}
+	return funcapi.ParamConfig{
+		ID:         "__sort",
+		Name:       "Filter By",
+		Help:       "Select the primary sort column",
+		Selection:  funcapi.ParamSelect,
+		Options:    sortOptions,
+		UniqueView: true,
+	}
 }

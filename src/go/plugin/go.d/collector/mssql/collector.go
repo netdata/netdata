@@ -111,6 +111,8 @@ type Collector struct {
 	// Query Store column cache (per-instance to handle different SQL Server versions)
 	queryStoreColsMu sync.RWMutex // protects queryStoreCols for concurrent access
 	queryStoreCols   map[string]bool
+
+	funcTopQueries *funcTopQueries
 }
 
 func (c *Collector) Configuration() any {
@@ -122,6 +124,9 @@ func (c *Collector) Init(context.Context) error {
 		return errors.New("config: dsn not set")
 	}
 	c.Debugf("using DSN [%s]", c.DSN)
+
+	c.funcTopQueries = newFuncTopQueries(c)
+
 	return nil
 }
 

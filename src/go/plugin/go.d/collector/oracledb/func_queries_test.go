@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package cockroachdb
+package oracledb
 
 import (
 	"testing"
@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCockroachDBMethods(t *testing.T) {
-	methods := cockroachMethods()
+func TestOracleDBMethods(t *testing.T) {
+	methods := oracledbMethods()
 
 	require := assert.New(t)
 	require.Len(methods, 2)
@@ -32,20 +32,32 @@ func TestCockroachDBMethods(t *testing.T) {
 	}
 }
 
-func TestCockroachDBTopColumns_HasRequiredColumns(t *testing.T) {
-	required := []string{"fingerprintId", "query", "executions", "totalTime"}
+func TestQueriesTopColumns_HasRequiredColumns(t *testing.T) {
+	required := []string{"sqlId", "query", "totalTime", "executions"}
 
-	cs := crdbColumnSet(crdbTopColumns)
 	for _, id := range required {
-		assert.True(t, cs.ContainsColumn(id), "column %s should be defined", id)
+		found := false
+		for _, col := range queriesTopColumns {
+			if col.Name == id {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "column %s should be defined", id)
 	}
 }
 
-func TestCockroachDBRunningColumns_HasRequiredColumns(t *testing.T) {
-	required := []string{"queryId", "query", "elapsedMs"}
+func TestQueriesRunningColumns_HasRequiredColumns(t *testing.T) {
+	required := []string{"sessionId", "query", "lastCallMs"}
 
-	cs := crdbColumnSet(crdbRunningColumns)
 	for _, id := range required {
-		assert.True(t, cs.ContainsColumn(id), "column %s should be defined", id)
+		found := false
+		for _, col := range queriesRunningColumns {
+			if col.Name == id {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "column %s should be defined", id)
 	}
 }
