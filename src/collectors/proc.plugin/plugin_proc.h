@@ -46,6 +46,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt);
 int do_proc_pagetypeinfo(int update_every, usec_t dt);
 int do_sys_class_infiniband(int update_every, usec_t dt);
 int do_sys_class_drm(int update_every, usec_t dt);
+bool is_lxcfs_proc_mounted(void);
 int get_numa_node_count(void);
 int do_run_reboot_required(int update_every, usec_t dt);
 

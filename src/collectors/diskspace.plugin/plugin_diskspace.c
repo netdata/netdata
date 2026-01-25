@@ -183,6 +183,7 @@ static void calculate_values_and_show_charts(
 {
     const char *family = mi->mount_point;
     const char *disk = mi->persistent_id;
+    static bool is_inside_lxc = false;
 
     // logic found at get_fs_usage() in coreutils
     unsigned long bsize = (buff_statvfs->f_frsize) ? buff_statvfs->f_frsize : buff_statvfs->f_bsize;
@@ -358,11 +359,14 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
         dict_mountpoints = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(struct mount_point_metadata));
         dictionary_register_delete_callback(dict_mountpoints, mountpoint_delete_cb, NULL);
+
+        is_inside_lxc = is_lxcfs_proc_mounted();
+        inside_lxc_container = is_inside_lxc;
     }
 
     // Skip ZFS datasets, only monitor ZFS pools
     // This prevents alert floods when a pool fills up
-    if (!inside_lxc_container && is_zfs_dataset(mi) && simple_pattern_matches(excluded_zfs_datasets, mi->mount_point)) {
+    if (!is_inside_lxc && is_zfs_dataset(mi) && simple_pattern_matches(excluded_zfs_datasets, mi->mount_point)) {
         return;
     }
 

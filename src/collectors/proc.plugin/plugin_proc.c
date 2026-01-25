@@ -113,7 +113,7 @@ bool is_mem_swap_enabled = false;
 bool is_mem_zswap_enabled = false;
 bool is_mem_ksm_enabled = false;
 
-static bool is_lxcfs_proc_mounted() {
+bool is_lxcfs_proc_mounted() {
     procfile *ff = NULL;
 
     if (unlikely(!ff)) {
