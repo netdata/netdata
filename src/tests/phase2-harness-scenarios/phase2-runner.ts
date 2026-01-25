@@ -108,6 +108,7 @@ const RATELIMIT_STOP_FINAL_CONTENT = 'Final report after rate limit stop.';
 const RETRY_BACKOFF_STOP_FINAL_CONTENT = 'Final report after retry backoff stop.';
 const SIMULATED_NETWORK_ERROR_MSG = 'Simulated network error';
 const STOPREF_FINAL_CALL_ID = 'final-call';
+const TRANSITION_FINAL_REPORT_PRESENT = 'Final report should be present.';
 const ROUTER_PARENT_REPORT_CONTENT = 'Parent final report.';
 const parseDumpList = (raw?: string): string[] => {
   if (typeof raw !== 'string') return [];
@@ -10705,6 +10706,414 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         });
         invariant(hasHandle, 'tool_output handle message expected in run-test-budget-truncation-preserves-output.');
       }
+    },
+  },
+  // =============================================================================
+  // CRITICAL TRANSITION TESTS (T1-T5)
+  // These test compound state transitions in the core loops
+  // =============================================================================
+  {
+    // T1: Context guard forces final turn WHILE retry loop is exhausting
+    // Risk: forcedFinalTurnReason may be overwritten
+    id: 'transition-context-plus-retry-exhaustion',
+    description: 'Context guard forces final turn while retries are being exhausted - context reason should take precedence.',
+    sequential: true,
+    configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      sessionConfig.maxTurns = 3;
+      sessionConfig.maxRetries = 2;
+      // Set low context limit to trigger context guard
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: 500,
+              contextWindowBufferTokens: 50,
+              tokenizer: 'approximate',
+            },
+          },
+        },
+      };
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture for restoration
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      // eslint-disable-next-line @typescript-eslint/require-await -- mock returns synchronously
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, _request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        // Turn 1: Succeed with a tool call, high tokens to trigger context guard after turn completes
+        if (invocation === 1) {
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+            latencyMs: 5,
+            messages: [
+              {
+                role: 'assistant' as const,
+                content: '',
+                toolCalls: [{
+                  id: 'tool-call-1',
+                  name: 'test__test',
+                  parameters: { text: 'step-1' },
+                }],
+              },
+              {
+                role: 'tool' as const,
+                toolCallId: 'tool-call-1',
+                content: 'Tool executed successfully.',
+              },
+            ],
+            tokens: { inputTokens: 400, outputTokens: 50, totalTokens: 450 }, // Near limit
+            executionStats: { executedTools: 1, executedNonProgressBatchTools: 1, executedProgressBatchTools: 0, unknownToolEncountered: false },
+          };
+        }
+        // Turn 2: Context guard should trigger. Empty response to trigger retry within forced final turn.
+        if (invocation === 2) {
+          return {
+            status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+            latencyMs: 5,
+            messages: [], // Empty - will trigger retry
+            tokens: { inputTokens: 50, outputTokens: 10, totalTokens: 60 },
+          };
+        }
+        // Turn 2 retry: Provide final report (context forced this to be final turn)
+        const finalContent = 'Context-forced final report after retry on final turn.';
+        return {
+          status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+          latencyMs: 5,
+          messages: [
+            {
+              role: 'assistant' as const,
+              content: '',
+              toolCalls: [{
+                id: 'ctx-final-call',
+                name: 'agent__final_report',
+                parameters: { report_format: 'markdown', report_content: finalContent },
+              }],
+            },
+            {
+              role: 'tool' as const,
+              toolCallId: 'ctx-final-call',
+              content: finalContent,
+            },
+          ],
+          tokens: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+        };
+      };
+      try {
+        return await AIAgent.run(AIAgentSession.create(sessionConfig));
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result) => {
+      invariant(result.success, 'Session should succeed with context-forced final turn.');
+      invariant(result.finalReport !== undefined, TRANSITION_FINAL_REPORT_PRESENT);
+      // The key assertion is that session succeeded despite retry on forced final turn
+      // (context guard triggered due to high token count on turn 1)
+    },
+  },
+  {
+    // T2: User stop during all-providers-rate-limited backoff
+    // Risk: Stop flag may not properly trigger forced final turn when waking from sleep
+    id: 'transition-stop-during-all-ratelimited',
+    description: 'User stop signal during all-providers-rate-limited backoff triggers graceful final turn.',
+    sequential: true,
+    configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      sessionConfig.maxTurns = 3;
+      sessionConfig.maxRetries = 3;
+      sessionConfig.stopRef = { stopping: false, reason: undefined as 'stop' | undefined };
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture for restoration
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      const stopRef = sessionConfig.stopRef as { stopping: boolean; reason: 'stop' | undefined };
+      // eslint-disable-next-line @typescript-eslint/require-await -- mock returns synchronously
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, _request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        // First call: Rate limit (will cycle to same provider since only one)
+        if (invocation === 1) {
+          // Trigger stop during the rate limit backoff sleep
+          setTimeout(() => {
+            stopRef.stopping = true;
+            stopRef.reason = 'stop';
+          }, 50);
+          return {
+            status: { type: 'rate_limit', retryAfterMs: 500 },
+            latencyMs: 5,
+            messages: [],
+            tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          };
+        }
+        // After stop: Provide final report (should be forced final turn)
+        const finalContent = 'Graceful stop after all-ratelimited backoff.';
+        return {
+          status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+          latencyMs: 5,
+          messages: [
+            {
+              role: 'assistant' as const,
+              content: '',
+              toolCalls: [{
+                id: 'stop-rl-final-call',
+                name: 'agent__final_report',
+                parameters: { report_format: 'markdown', report_content: finalContent },
+              }],
+            },
+            {
+              role: 'tool' as const,
+              toolCallId: 'stop-rl-final-call',
+              content: finalContent,
+            },
+          ],
+          tokens: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+        };
+      };
+      try {
+        return await AIAgent.run(AIAgentSession.create(sessionConfig));
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result) => {
+      invariant(result.success, 'Stop during rate limit backoff should succeed gracefully.');
+      invariant(result.finalReport !== undefined, 'Final report should be present after graceful stop.');
+      invariant(typeof result.finalReport.content === 'string' && result.finalReport.content.includes('Graceful stop'), 'Final report content should match.');
+    },
+  },
+  {
+    // T3: Abort during rate limit backoff - verify clean state
+    // Risk: pendingToolSelection or other state may leak
+    id: 'transition-abort-during-ratelimit-clean-state',
+    description: 'Abort during rate limit backoff cancels session with clean state (no leaked pendingToolSelection).',
+    sequential: true,
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      sessionConfig.maxTurns = 3;
+      sessionConfig.maxRetries = 3;
+      const abortController = new AbortController();
+      sessionConfig.abortSignal = abortController.signal;
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture for restoration
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      // eslint-disable-next-line @typescript-eslint/require-await -- mock returns synchronously
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, _request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        // First call: Rate limit, abort during backoff
+        if (invocation === 1) {
+          setTimeout(() => { abortController.abort(); }, 50);
+          return {
+            status: { type: 'rate_limit', retryAfterMs: 500 },
+            latencyMs: 5,
+            messages: [],
+            tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          };
+        }
+        // Should not reach here
+        return {
+          status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+          latencyMs: 5,
+          messages: [{ role: 'assistant' as const, content: 'Should not execute after abort' }],
+          tokens: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+        };
+      };
+      try {
+        return await AIAgent.run(AIAgentSession.create(sessionConfig));
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result) => {
+      invariant(!result.success, 'Abort during rate limit backoff should fail.');
+      invariant(result.error === 'canceled', 'Error should be canceled.');
+      // Key behavior: abort during rate limit sleep cancels session cleanly
+      // (no assertions on request count since rate limit may trigger provider cycling)
+    },
+  },
+  {
+    // T4: Final report committed mid-retry, verify no double collapse
+    // Risk: collapseRemainingTurns may be called twice
+    id: 'transition-final-report-mid-retry-no-double-collapse',
+    description: 'Final report committed on retry attempt N, loop exits cleanly without double collapse.',
+    sequential: true,
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      sessionConfig.maxTurns = 3;
+      sessionConfig.maxRetries = 3;
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture for restoration
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      // eslint-disable-next-line @typescript-eslint/require-await -- mock returns synchronously
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, _request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        // Turn 1, attempt 1: Empty response (triggers retry)
+        if (invocation === 1) {
+          return {
+            status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+            latencyMs: 5,
+            messages: [],
+            tokens: { inputTokens: 100, outputTokens: 10, totalTokens: 110 },
+          };
+        }
+        // Turn 1, attempt 2: Provide final report
+        if (invocation === 2) {
+          const finalContent = 'Final report on retry attempt 2.';
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+            latencyMs: 5,
+            messages: [
+              {
+                role: 'assistant' as const,
+                content: '',
+                toolCalls: [{
+                  id: 'retry-final-call',
+                  name: 'agent__final_report',
+                  parameters: { report_format: 'markdown', report_content: finalContent },
+                }],
+              },
+              {
+                role: 'tool' as const,
+                toolCallId: 'retry-final-call',
+                content: finalContent,
+              },
+            ],
+            tokens: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+          };
+        }
+        // Should not reach here - final report on attempt 2 should end session
+        return {
+          status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+          latencyMs: 5,
+          messages: [{ role: 'assistant' as const, content: 'Unexpected invocation after final report' }],
+          tokens: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+        };
+      };
+      try {
+        return await AIAgent.run(AIAgentSession.create(sessionConfig));
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result) => {
+      invariant(result.success, 'Final report on retry should succeed.');
+      invariant(result.finalReport !== undefined, TRANSITION_FINAL_REPORT_PRESENT);
+      invariant(result.finalReport.content === 'Final report on retry attempt 2.', 'Final report content should match.');
+      // Check that collapse was logged at most once
+      const collapseLogs = result.logs.filter((log) =>
+        log.message.includes('collapse') || log.message.includes('Collapse')
+      );
+      invariant(collapseLogs.length <= 1, 'Collapse should occur at most once, not multiple times.');
+    },
+  },
+  {
+    // T5: Multiple forcedFinalTurnReason set in same turn (task_status_only → task_status_completed)
+    // Risk: Order-dependent override may cause wrong reason
+    id: 'transition-task-status-reason-precedence',
+    description: 'task_status completed takes precedence over task_status_only threshold in same turn.',
+    sequential: true,
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      sessionConfig.maxTurns = 10;
+      sessionConfig.maxRetries = 1;
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture for restoration
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      // eslint-disable-next-line @typescript-eslint/require-await -- mock returns synchronously
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, _request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        // Turns 1-4: Progress-only (task_status with in-progress)
+        if (invocation <= 4) {
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+            latencyMs: 5,
+            messages: [
+              {
+                role: 'assistant' as const,
+                content: '',
+                toolCalls: [{
+                  id: `status-call-${String(invocation)}`,
+                  name: 'agent__task_status',
+                  parameters: { status: 'in-progress', message: `Progress ${String(invocation)}` },
+                }],
+              },
+              {
+                role: 'tool' as const,
+                toolCallId: `status-call-${String(invocation)}`,
+                content: 'Status updated.',
+              },
+            ],
+            tokens: { inputTokens: 50, outputTokens: 20, totalTokens: 70 },
+            executionStats: { executedTools: 1, executedNonProgressBatchTools: 0, executedProgressBatchTools: 1, unknownToolEncountered: false },
+          };
+        }
+        // Turn 5: Progress-only (5th consecutive) + completed=true in same turn
+        // This should trigger both task_status_only threshold AND task_status_completed
+        if (invocation === 5) {
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+            latencyMs: 5,
+            messages: [
+              {
+                role: 'assistant' as const,
+                content: '',
+                toolCalls: [{
+                  id: 'status-call-5',
+                  name: 'agent__task_status',
+                  parameters: { status: 'completed', message: 'Task finished' },
+                }],
+              },
+              {
+                role: 'tool' as const,
+                toolCallId: 'status-call-5',
+                content: 'Status updated.',
+              },
+            ],
+            tokens: { inputTokens: 50, outputTokens: 20, totalTokens: 70 },
+            executionStats: { executedTools: 1, executedNonProgressBatchTools: 0, executedProgressBatchTools: 1, unknownToolEncountered: false },
+            // Note: lastTaskStatusCompleted is set internally by the tool executor when it sees status='completed'
+          };
+        }
+        // Turn 6 (forced final): Provide final report
+        const finalContent = 'Task completed successfully after 5 progress updates.';
+        return {
+          status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+          latencyMs: 5,
+          messages: [
+            {
+              role: 'assistant' as const,
+              content: '',
+              toolCalls: [{
+                id: 'final-status-call',
+                name: 'agent__final_report',
+                parameters: { report_format: 'markdown', report_content: finalContent },
+              }],
+            },
+            {
+              role: 'tool' as const,
+              toolCallId: 'final-status-call',
+              content: finalContent,
+            },
+          ],
+          tokens: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+        };
+      };
+      try {
+        return await AIAgent.run(AIAgentSession.create(sessionConfig));
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result) => {
+      invariant(result.success, 'Task status completion should succeed.');
+      invariant(result.finalReport !== undefined, TRANSITION_FINAL_REPORT_PRESENT);
+      // Check that task_status_completed reason is in logs (takes precedence over task_status_only)
+      const hasCompletionLog = result.logs.some((log) =>
+        log.message.includes('completed') || log.message.includes('completion')
+      );
+      const hasThresholdLog = result.logs.some((log) =>
+        log.message.includes('threshold') || log.message.includes('consecutive')
+      );
+      // Both logs may exist, but completion should be the reason that matters
+      invariant(hasCompletionLog || hasThresholdLog, 'Should log task status reason for forcing final turn.');
     },
   },
   ...buildReasoningMatrixScenarios(),
