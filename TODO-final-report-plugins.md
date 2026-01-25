@@ -871,6 +871,16 @@ Pre-implementation test actions:
 5. [DONE] Add a deterministic harness scenario that covers multiple final-report emissions BEFORE we change the replacement policy.
    Evidence: `src/tests/phase2-harness-scenarios/suites/final-report.test.ts:73`
 6. [DONE] Run `npm run lint`, `npm run build`, `npm run test:phase1`, and `npm run test:phase2` after the pre-implementation test additions (verified on 2026-01-25).
+7. [DONE] Add unit coverage for `xml_slot_mismatch` before transport changes.
+   Evidence: `src/tests/unit/xml-transport.spec.ts:183`
+8. [DONE] Extend prompt loader tests for format-specific branches and schema block insertion.
+   Evidence: `src/tests/unit/prompts-loader.spec.ts:37` and `src/tests/unit/prompts-loader.spec.ts:48`
+9. [DONE] Extend FinalReportManager unit tests for lifecycle and empty-state accessors.
+   Evidence: `src/tests/unit/final-report-manager.spec.ts:34`, `src/tests/unit/final-report-manager.spec.ts:70`, and `src/tests/unit/final-report-manager.spec.ts:115`
+10. [DONE] Add a harness assertion that XML-NEXT continues to expose the FINAL wrapper pattern used for nonce extraction.
+   Evidence: `src/tests/unit/harness-helpers.spec.ts:17`
+11. [TODO] META gating scenarios (final-report present but required META missing) will require new Phase 2 coverage during implementation, because current semantics finalize immediately on the first valid final report.
+   Evidence: early finalize occurs at `src/session-turn-runner.ts:1666` and the `final_report` event is emitted during finalize at `src/session-turn-runner.ts:2741`.
 
 ## Documentation Updates
 

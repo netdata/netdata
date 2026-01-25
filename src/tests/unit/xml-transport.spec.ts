@@ -180,6 +180,47 @@ describe('XmlToolTransport', () => {
       expect(logWarning).toHaveBeenCalled();
     });
 
+    it('records xml_slot_mismatch when the final slot open tag is malformed but a closing tag is present', () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue(MOCK_UUID);
+      const transport = new XmlToolTransport();
+      const build = transport.buildMessages({
+        turn: 1,
+        maxTurns: 2,
+        tools: baseTools,
+        maxToolCallsPerTurn: 1,
+        taskStatusToolEnabled: false,
+        finalReportToolName: 'agent__final_report',
+        resolvedFormat: 'markdown',
+        expectedJsonSchema: undefined,
+        attempt: 1,
+        maxRetries: 3,
+        contextPercentUsed: 8,
+      });
+
+      const slotId = build.slotTemplates[0].slotId;
+      const recordFailure = vi.fn<(slug: string, reason?: string) => void>();
+      const logCalls: XmlWarningEntry[] = [];
+      const logWarning = vi.fn((entry: XmlWarningEntry) => { logCalls.push(entry); });
+
+      const malformedOpenTag =
+        `<ai-agent-${slotId} tool="agent__final_report" {"ok":true}</ai-agent-${slotId}>`;
+      const parse = transport.parseAssistantMessage(
+        malformedOpenTag,
+        { turn: 1, resolvedFormat: 'markdown' },
+        { recordTurnFailure: recordFailure, logWarning }
+      );
+
+      expect(parse.toolCalls).toBeUndefined();
+      expect(parse.errors.length).toBeGreaterThan(0);
+      const failureSlugs = recordFailure.mock.calls.map((call) => call[0]);
+      expect(failureSlugs).toContain('xml_slot_mismatch');
+
+      const warningSlugs = logCalls
+        .map((entry) => entry.details?.slug)
+        .filter((slug): slug is string => typeof slug === 'string');
+      expect(warningSlugs).toContain('xml_slot_mismatch');
+    });
+
     it('records xml_missing_closing_tag for a non-final slot without a closing tag', () => {
       vi.spyOn(crypto, 'randomUUID').mockReturnValue(MOCK_UUID);
       const transport = new XmlToolTransport();
