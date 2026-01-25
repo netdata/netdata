@@ -1,49 +1,101 @@
-# Expected Sidebar Structure on learn.netdata.cloud
+# Expected Sidebar Structure (ALREADY FLATTENED - No "The Book")
 
-## CURRENT STATE (based on folders in learn/)
-
-There are TWO separate sections in learn/ folder:
-
-### 1. Root level "Notifications" section
-Located at: `learn/docs/alerts-&-notifications/notifications/`
-- Agent Dispatched Notifications (28 integration files)
-- Centralized Cloud Notifications (15 integration files)
-
-### 2. "The Book" chapters (12 total)
-Located at: `learn/docs/alerts-&-notifications/the-book/`
-- Understanding Alerts
-- Creating and Managing Alerts
-- Alert Configuration Syntax
-- Controlling Alerts and Noise
-- **Receiving Notifications**
-- Alert Examples and Common Patterns
-- Troubleshooting Alert Behavior
-- Essential Alert Patterns
-- APIs for Alerts and Events
-- Netdata Cloud Alert and Events Features
-- Best Practices for Alerting
-- Alerts and Notifications Architecture
+```
+Alerts & Notifications
+├── Notifications
+│   ├── README (line 159)
+│   ├── Agent Notifications Reference (line 160)
+│   ├── Agent Dispatched Notifications
+│   │   ├── alerta (ADD ENTRY)
+│   │   ├── aws-sns (ADD ENTRY)
+│   │   ├── custom (ADD ENTRY)
+│   │   ├── discord (ADD ENTRY)
+│   │   ├── dynatrace (ADD ENTRY)
+│   │   ├── email (ADD ENTRY)
+│   │   ├── flock (ADD ENTRY)
+│   │   ├── gotify (ADD ENTRY)
+│   │   ├── ilert (ADD ENTRY)
+│   │   ├── irc (ADD ENTRY)
+│   │   ├── kavenegar (ADD ENTRY)
+│   │   ├── matrix (ADD ENTRY)
+│   │   ├── microsoft-teams (ADD ENTRY)
+│   │   ├── messagebird (ADD ENTRY)
+│   │   ├── ntfy (ADD ENTRY)
+│   │   ├── opsgenie (ADD ENTRY)
+│   │   ├── pagerduty (ADD ENTRY)
+│   │   ├── prowl (ADD ENTRY)
+│   │   ├── pushbullet (ADD ENTRY)
+│   │   ├── pushover (ADD ENTRY)
+│   │   ├── rocketchat (ADD ENTRY)
+│   │   ├── signal4 (ADD ENTRY)
+│   │   ├── slack (ADD ENTRY)
+│   │   ├── smseagle (ADD ENTRY)
+│   │   ├── sms (ADD ENTRY)
+│   │   ├── syslog (ADD ENTRY)
+│   │   ├── telegram (ADD ENTRY)
+│   │   └── twilio (ADD ENTRY)
+│   │
+│   ├── Centralized Cloud Notifications Reference (line 162)
+│   ├── Manage notification methods (line 163)
+│   ├── Manage alert notification silencing rules (line 164)
+│   ├── Centralized Cloud Notifications
+│   │   ├── amazon-sns (ADD ENTRY)
+│   │   ├── discord (ADD ENTRY)
+│   │   ├── ilert (ADD ENTRY)
+│   │   ├── mattermost (ADD ENTRY)
+│   │   ├── microsoft-teams (ADD ENTRY)
+│   │   ├── netdata-mobile-app (ADD ENTRY)
+│   │   ├── opsgenie (ADD ENTRY)
+│   │   ├── pagerduty (ADD ENTRY)
+│   │   ├── rocketchat (ADD ENTRY)
+│   │   ├── servicenow (ADD ENTRY)
+│   │   ├── slack (ADD ENTRY)
+│   │   ├── splunk (ADD ENTRY)
+│   │   ├── splunk-victorops (ADD ENTRY)
+│   │   ├── telegram (ADD ENTRY)
+│   │   └── webhook (ADD ENTRY)
+│
+├── Understanding Alerts
+├── Creating and Managing Alerts
+├── Alert Configuration Syntax
+├── Controlling Alerts and Noise
+├── Receiving Notifications
+├── Alert Examples and Common Patterns
+├── Troubleshooting Alert Behaviour
+├── Essential Alert Patterns
+├── APIs for Alerts and Events
+├── Netdata Cloud Alert and Events Features
+├── Best Practices for Alerting
+└── Alerts and Notifications Architecture
+```
 
 ---
 
-## MAP.CSVSECTIONS TO EDIT
+## Lines to Edit in map.csv
 
-### Placeholder 1: Line 161
-Replace `agent_notifications_integrations,,,,,` with 28 entries for Agent integrations.
+| Line | Content | Action |
+|------|---------|--------|
+| 161 | `agent_notifications_integrations,,,,,` | REPLACE with 28 entries |
+| 165 | `cloud_notifications_integrations,,,,,` | REPLACE with 15 entries |
 
-**All Agent integrations (28):**
+---
+
+## Integration Names (Copy-Paste)
+
+**Agent (28):**
+```
 alerta, aws-sns, custom, discord, dynatrace, email, flock, gotify, ilert, irc, kavenegar, matrix, microsoft-teams, messagebird, ntfy, opsgenie, pagerduty, prowl, pushbullet, pushover, rocketchat, signal4, slack, smseagle, sms, syslog, telegram, twilio
+```
 
-### Placeholder 2: Line 165
-Replace `cloud_notifications_integrations,,,,,` with 15 entries for Cloud integrations.
-
-**All Cloud integrations (15):**
+**Cloud (15):**
+```
 amazon-sns, discord, ilert, mattermost, microsoft-teams, netdata-mobile-app, opsgenie, pagerduty, rocketchat, servicenow, slack, splunk, splunk-victorops, telegram, webhook
+```
 
 ---
 
-## NOTHING ELSE
+## That's It
 
-- Folder structure in learn/ is already correct
-- "The Book" chapters are already mapped
-- Only add the 28+15 entries at lines 161 and 165
+- Folder structure in learn/ already correct
+- 12 chapters already mapped
+- JUST add entries at lines 161 and 165
