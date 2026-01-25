@@ -362,7 +362,7 @@ void ebpf_set_load_mode(netdata_ebpf_load_mode_t load, netdata_ebpf_load_mode_t 
     }
 }
 
-void epbf_update_load_mode(const char *str, netdata_ebpf_load_mode_t origin)
+void ebpf_update_load_mode(const char *str, netdata_ebpf_load_mode_t origin)
 {
     netdata_ebpf_load_mode_t load = epbf_convert_string_to_load_mode(str);
 
@@ -414,7 +414,7 @@ void ebpf_set_thread_mode(netdata_run_mode_t lmode)
     }
 }
 
-void ebpf_enable_specific_chart(struct ebpf_module *em, int disable_cgroup)
+void ebpf_enable_specific_chart(ebpf_module_t *em, int disable_cgroup)
 {
     em->enabled = NETDATA_THREAD_EBPF_RUNNING;
 
@@ -483,7 +483,7 @@ void read_collector_values(int *disable_cgroups, int update_every, netdata_ebpf_
 
     value = inicfg_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, EBPF_CFG_DEFAULT_PROGRAM);
 
-    epbf_update_load_mode(value, origin);
+    ebpf_update_load_mode(value, origin);
 
     ebpf_update_interval(update_every);
 
