@@ -97,6 +97,9 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 	return f.collectTopQueries(ctx, params.Column("__sort"))
 }
 
+// Cleanup implements funcapi.MethodHandler.
+func (f *funcTopQueries) Cleanup(ctx context.Context) {}
+
 func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn string) *module.FunctionResponse {
 	c := f.router.collector
 

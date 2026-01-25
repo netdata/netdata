@@ -32,6 +32,10 @@ type MethodHandler interface {
 	// Handle processes a method request and returns the response.
 	// The context should be used for timeout/cancellation of database queries.
 	Handle(ctx context.Context, method string, params ResolvedParams) *FunctionResponse
+
+	// Cleanup releases any resources held by the handler.
+	// Called when the collector is being stopped.
+	Cleanup(ctx context.Context)
 }
 
 // ErrorResponse creates an error FunctionResponse.

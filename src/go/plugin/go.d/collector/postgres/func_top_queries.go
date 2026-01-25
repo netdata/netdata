@@ -589,6 +589,9 @@ func (f *funcTopQueries) topQueriesParams(ctx context.Context) ([]funcapi.ParamC
 	return []funcapi.ParamConfig{sortParam}, nil
 }
 
+// Cleanup implements funcapi.MethodHandler.
+func (f *funcTopQueries) Cleanup(ctx context.Context) {}
+
 // dbRows interface for testing
 type dbRows interface {
 	Next() bool

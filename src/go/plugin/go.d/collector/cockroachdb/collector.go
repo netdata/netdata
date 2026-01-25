@@ -126,11 +126,11 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
 	if c.prom != nil && c.prom.HTTPClient() != nil {
 		c.prom.HTTPClient().CloseIdleConnections()
 	}
 	if c.funcRouter != nil {
-		c.funcRouter.cleanup()
+		c.funcRouter.Cleanup(ctx)
 	}
 }

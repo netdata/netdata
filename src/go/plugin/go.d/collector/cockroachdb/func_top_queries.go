@@ -65,6 +65,8 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 	return []funcapi.ParamConfig{buildSortParam(topQueriesColumns)}, nil
 }
 
+func (f *funcTopQueries) Cleanup(ctx context.Context) {}
+
 func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	if err := f.router.ensureDB(ctx); err != nil {
 		status := 503

@@ -98,6 +98,9 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 	}
 }
 
+// Cleanup implements funcapi.MethodHandler.
+func (f *funcTopQueries) Cleanup(ctx context.Context) {}
+
 func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
 	available, err := f.detectQueryLogColumns(ctx)
 	if err != nil {

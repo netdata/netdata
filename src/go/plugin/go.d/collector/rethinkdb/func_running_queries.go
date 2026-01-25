@@ -30,6 +30,8 @@ func newFuncRunningQueries(r *funcRouter) *funcRunningQueries {
 }
 
 // MethodParams implements funcapi.MethodHandler.
+func (f *funcRunningQueries) Cleanup(ctx context.Context) {}
+
 func (f *funcRunningQueries) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
 	if method != runningQueriesMethodID {
 		return nil, fmt.Errorf("unknown method: %s", method)

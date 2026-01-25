@@ -4,6 +4,7 @@ package rethinkdb
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -13,12 +14,15 @@ import (
 type funcRouter struct {
 	collector *Collector
 
-	runningQueries *funcRunningQueries
+	handlers map[string]funcapi.MethodHandler
 }
 
 func newFuncRouter(c *Collector) *funcRouter {
-	r := &funcRouter{collector: c}
-	r.runningQueries = newFuncRunningQueries(r)
+	r := &funcRouter{
+		collector: c,
+		handlers:  make(map[string]funcapi.MethodHandler),
+	}
+	r.handlers[runningQueriesMethodID] = newFuncRunningQueries(r)
 	return r
 }
 
@@ -26,12 +30,10 @@ func newFuncRouter(c *Collector) *funcRouter {
 var _ funcapi.MethodHandler = (*funcRouter)(nil)
 
 func (r *funcRouter) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	switch method {
-	case runningQueriesMethodID:
-		return r.runningQueries.MethodParams(ctx, method)
-	default:
-		return nil, nil
+	if h, ok := r.handlers[method]; ok {
+		return h.MethodParams(ctx, method)
 	}
+	return nil, fmt.Errorf("unknown method: %s", method)
 }
 
 func (r *funcRouter) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
@@ -43,11 +45,15 @@ func (r *funcRouter) Handle(ctx context.Context, method string, params funcapi.R
 		r.collector.rdb = conn
 	}
 
-	switch method {
-	case runningQueriesMethodID:
-		return r.runningQueries.Handle(ctx, method, params)
-	default:
-		return funcapi.NotFoundResponse(method)
+	if h, ok := r.handlers[method]; ok {
+		return h.Handle(ctx, method, params)
+	}
+	return funcapi.NotFoundResponse(method)
+}
+
+func (r *funcRouter) Cleanup(ctx context.Context) {
+	for _, h := range r.handlers {
+		h.Cleanup(ctx)
 	}
 }
 

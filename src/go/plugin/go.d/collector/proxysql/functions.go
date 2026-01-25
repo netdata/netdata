@@ -109,6 +109,8 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 	return c.collectTopQueries(ctx, params.Column(paramSort))
 }
 
+func (f *funcTopQueries) Cleanup(ctx context.Context) {}
+
 func buildProxySQLSortOptions(cols []proxysqlColumn) []funcapi.ParamOption {
 	var sortOptions []funcapi.ParamOption
 	sortDir := funcapi.FieldSortDescending

@@ -82,6 +82,8 @@ func newFuncTopQueries(r *funcRouter) *funcTopQueries {
 // Compile-time interface check.
 var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
 
+func (f *funcTopQueries) Cleanup(ctx context.Context) {}
+
 // MethodParams implements funcapi.MethodHandler.
 func (f *funcTopQueries) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
 	switch method {

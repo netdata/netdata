@@ -28,6 +28,8 @@ func (m *mockHandler) Handle(ctx context.Context, method string, params Resolved
 	return m.response
 }
 
+func (m *mockHandler) Cleanup(ctx context.Context) {}
+
 func TestMethodHandler_Interface(t *testing.T) {
 	// Verify mockHandler implements MethodHandler
 	var _ MethodHandler = &mockHandler{}

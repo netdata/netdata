@@ -47,6 +47,9 @@ func (f *funcInterfaces) MethodParams(_ context.Context, method string) ([]funca
 	}}, nil
 }
 
+// Cleanup implements funcapi.MethodHandler.
+func (f *funcInterfaces) Cleanup(_ context.Context) {}
+
 // Handle implements funcapi.MethodHandler.
 func (f *funcInterfaces) Handle(_ context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	if method != ifacesMethodID {

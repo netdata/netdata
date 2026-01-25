@@ -192,6 +192,9 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 	}
 }
 
+// Cleanup implements funcapi.MethodHandler.
+func (f *funcTopQueries) Cleanup(ctx context.Context) {}
+
 func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
 	if !f.router.collector.Config.GetQueryStoreFunctionEnabled() {
 		return nil, fmt.Errorf("query store function disabled")

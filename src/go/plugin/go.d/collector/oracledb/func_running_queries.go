@@ -54,6 +54,8 @@ func (f *funcRunningQueries) MethodParams(ctx context.Context, method string) ([
 	return []funcapi.ParamConfig{buildSortParam(runningQueriesColumns)}, nil
 }
 
+func (f *funcRunningQueries) Cleanup(ctx context.Context) {}
+
 func (f *funcRunningQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	if f.router.collector.db == nil {
 		if err := f.router.collector.openConnection(); err != nil {

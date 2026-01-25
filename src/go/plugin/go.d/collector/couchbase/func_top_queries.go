@@ -118,6 +118,9 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 	}
 }
 
+// Cleanup implements funcapi.MethodHandler.
+func (f *funcTopQueries) Cleanup(ctx context.Context) {}
+
 func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *module.FunctionResponse {
 	limit := f.router.collector.TopQueriesLimit
 	if limit <= 0 {
