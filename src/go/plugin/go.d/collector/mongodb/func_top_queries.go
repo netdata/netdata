@@ -620,4 +620,3 @@ func optionalBool(v *bool) any {
 	}
 	return "No"
 }
-

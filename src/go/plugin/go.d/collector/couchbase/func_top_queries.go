@@ -381,4 +381,3 @@ func (f *funcTopQueries) sortRows(rows []topQueriesRow, sortColumn string) {
 		})
 	}
 }
-
