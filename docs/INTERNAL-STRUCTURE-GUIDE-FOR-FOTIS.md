@@ -1,99 +1,49 @@
-# Internal Guide for Fotis: Map CSV - Where Integrations Go
+# Expected Sidebar Structure on learn.netdata.cloud
 
-This document shows how content will APPEAR on learn.netdata.cloud sidebar.
+## CURRENT STATE (based on folders in learn/)
 
----
+There are TWO separate sections in learn/ folder:
 
-## EXPECTED SIDEBAR STRUCTURE
+### 1. Root level "Notifications" section
+Located at: `learn/docs/alerts-&-notifications/notifications/`
+- Agent Dispatched Notifications (28 integration files)
+- Centralized Cloud Notifications (15 integration files)
 
-```
-Alerts & Notifications
-├── Notifications
-│   ├── Agent Dispatched Notifications
-│   │   ├── alerta
-│   │   ├── aws-sns
-│   │   ├── custom
-│   │   ├── discord
-│   │   ├── dynatrace
-│   │   ├── email
-│   │   ├── flock
-│   │   ├── gotify
-│   │   ├── ilert
-│   │   ├── irc
-│   │   ├── kavenegar
-│   │   ├── matrix
-│   │   ├── microsoft-teams
-│   │   ├── messagebird
-│   │   ├── ntfy
-│   │   ├── opsgenie
-│   │   ├── pagerduty
-│   │   ├── prowl
-│   │   ├── pushbullet
-│   │   ├── pushover
-│   │   ├── rocketchat
-│   │   ├── signal4
-│   │   ├── slack
-│   │   ├── smseagle
-│   │   ├── sms
-│   │   ├── syslog
-│   │   ├── telegram
-│   │   └── twilio
-│   │
-│   └── Centralized Cloud Notifications
-│       ├── amazon-sns
-│       ├── discord
-│       ├── ilert
-│       ├── mattermost
-│       ├── microsoft-teams
-│       ├── netdata-mobile-app
-│       ├── opsgenie
-│       ├── pagerduty
-│       ├── rocketchat
-│       ├── servicenow
-│       ├── slack
-│       ├── splunk
-│       ├── splunk-victorops
-│       ├── telegram
-│       └── webhook
-│
-├── Understanding Alerts
-├── Creating and Managing Alerts
-├── Alert Configuration Syntax
-├── Controlling Alerts and Noise
-├── Receiving Notifications
-├── Alert Examples and Common Patterns
-├── Troubleshooting Alert Behavior
-├── Essential Alert Patterns
-├── APIs for Alerts and Events
-├── Netdata Cloud Alert and Events Features
-├── Best Practices for Alerting
-└── Alerts and Notifications Architecture
-```
+### 2. "The Book" chapters (12 total)
+Located at: `learn/docs/alerts-&-notifications/the-book/`
+- Understanding Alerts
+- Creating and Managing Alerts
+- Alert Configuration Syntax
+- Controlling Alerts and Noise
+- **Receiving Notifications**
+- Alert Examples and Common Patterns
+- Troubleshooting Alert Behavior
+- Essential Alert Patterns
+- APIs for Alerts and Events
+- Netdata Cloud Alert and Events Features
+- Best Practices for Alerting
+- Alerts and Notifications Architecture
 
 ---
 
-## WHERE TO ADD ENTRIES IN map.csv
+## MAP.CSVSECTIONS TO EDIT
 
-### Line 161: After "Agent Notifications Reference" (line 160)
+### Placeholder 1: Line 161
+Replace `agent_notifications_integrations,,,,,` with 28 entries for Agent integrations.
 
-Add 28 entries for Agent integrations BELOW line 160.
-
-### Line 165: After "Manage alert notification silencing rules" (line 164)
-
-Add 15 entries for Cloud integrations BELOW line 164.
-
----
-
-## INTEGRATIONS LIST (COPY-PASTE REFERENCE)
-
-### Agent-Dispatched (28)
+**All Agent integrations (28):**
 alerta, aws-sns, custom, discord, dynatrace, email, flock, gotify, ilert, irc, kavenegar, matrix, microsoft-teams, messagebird, ntfy, opsgenie, pagerduty, prowl, pushbullet, pushover, rocketchat, signal4, slack, smseagle, sms, syslog, telegram, twilio
 
-### Cloud-Dispatched (15)
+### Placeholder 2: Line 165
+Replace `cloud_notifications_integrations,,,,,` with 15 entries for Cloud integrations.
+
+**All Cloud integrations (15):**
 amazon-sns, discord, ilert, mattermost, microsoft-teams, netdata-mobile-app, opsgenie, pagerduty, rocketchat, servicenow, slack, splunk, splunk-victorops, telegram, webhook
 
 ---
 
-## NOTHING ELSE TO DO
+## NOTHING ELSE
 
-Just add the entries at the two specified lines. Do not worry about folder structure - it's already correct in learn/.
+- Folder structure in learn/ is already correct
+- "The Book" chapters are already mapped
+- Only add the 28+15 entries at lines 161 and 165
