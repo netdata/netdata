@@ -4,7 +4,6 @@ package cockroachdb
 
 import (
 	"context"
-	"database/sql"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -71,9 +70,7 @@ type Collector struct {
 
 	prom prometheus.Prometheus
 
-	db *sql.DB
-
-	funcQueries *funcQueries
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -91,7 +88,7 @@ func (c *Collector) Init(context.Context) error {
 	}
 	c.prom = prom
 
-	c.funcQueries = newFuncQueries(c)
+	c.funcRouter = newFuncRouter(c)
 
 	if c.UpdateEvery < dbSamplingInterval {
 		c.Warningf("'update_every'(%d) is lower then CockroachDB default sampling interval (%d)",
@@ -133,7 +130,7 @@ func (c *Collector) Cleanup(context.Context) {
 	if c.prom != nil && c.prom.HTTPClient() != nil {
 		c.prom.HTTPClient().CloseIdleConnections()
 	}
-	if c.db != nil {
-		_ = c.db.Close()
+	if c.funcRouter != nil {
+		c.funcRouter.cleanup()
 	}
 }
