@@ -257,13 +257,13 @@ void ebpf_statistic_obsolete_aral_chart(ebpf_module_t *em, int prio)
 {
     ebpf_write_chart_obsolete(
         NETDATA_MONITORING_FAMILY,
-        em->memory_allocations,
+        em->memory_usage,
         "",
-        "Calls to allocate memory.",
-        "calls",
+        "Bytes allocated for ARAL.",
+        "bytes",
         NETDATA_EBPF_FAMILY,
         NETDATA_EBPF_CHART_TYPE_STACKED,
-        "netdata.ebpf_aral_stat_alloc",
+        "netdata.ebpf_aral_stat_size",
         prio++,
         em->update_every);
 
@@ -282,6 +282,9 @@ void ebpf_statistic_obsolete_aral_chart(ebpf_module_t *em, int prio)
 
 void ebpf_send_data_aral_chart(ARAL *memory, ebpf_module_t *em)
 {
+    if (!memory)
+        return;
+
     char *mem = {NETDATA_EBPF_STAT_DIMENSION_MEMORY};
     char *aral = {NETDATA_EBPF_STAT_DIMENSION_ARAL};
 
@@ -490,8 +493,7 @@ void read_collector_values(int *disable_cgroups, int update_every, netdata_ebpf_
 
     uint32_t enabled = inicfg_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, "disable apps", CONFIG_BOOLEAN_NO);
     if (!enabled) {
-        enabled = inicfg_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION, CONFIG_BOOLEAN_YES);
-        enabled = (enabled == CONFIG_BOOLEAN_NO) ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
+        enabled = inicfg_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION, CONFIG_BOOLEAN_NO);
     }
 
     ebpf_set_apps_mode(!enabled);
@@ -923,8 +925,7 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
         goto storethisip;
     }
 
-    char *enddup = strdupz(ip);
-    char *end = enddup;
+    char *end = strdupz(ip);
     // Move while I cannot find a separator
     while (*end && *end != '/' && *end != '-')
         end++;
@@ -977,7 +978,7 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
                 goto cleanipdup;
         }
 
-        if (htonl(first.addr32[0]) > htonl(last.addr32[0])) {
+        if (first.addr32[0] > last.addr32[0]) {
             netdata_log_info(
                 "The specified range %s is invalid, the second address is smallest than the first, it will be ignored.",
                 ipdup);
@@ -1042,7 +1043,7 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
         }
 
         if ((be64toh(*(uint64_t *)&first.addr64[1]) > be64toh(*(uint64_t *)&last.addr64[1]) &&
-             !memcmp(first.addr64, last.addr64, sizeof(uint64_t))) ||
+             memcmp(first.addr64, last.addr64, sizeof(uint64_t)) == 0) ||
             (be64toh(*(uint64_t *)&first.addr64) > be64toh(*(uint64_t *)&last.addr64))) {
             netdata_log_info(
                 "The specified range %s is invalid, the second address is smallest than the first, it will be ignored.",
@@ -1072,7 +1073,7 @@ storethisip:
 
 cleanipdup:
     freez(ipdup);
-    freez(enddup);
+    freez(end);
 }
 
 /**
@@ -1859,7 +1860,7 @@ void ebpf_read_local_addresses_unsafe()
             w->first.addr32[0] = in->sin_addr.s_addr;
             w->last.addr32[0] = in->sin_addr.s_addr;
 
-            if (inet_ntop(AF_INET, w->first.addr8, text, INET_ADDRSTRLEN)) {
+            if (inet_ntop(AF_INET, w->first.addr8, text, INET6_ADDRSTRLEN)) {
                 w->value = strdupz(text);
                 w->hash = simple_hash(text);
             } else {
@@ -1872,7 +1873,7 @@ void ebpf_read_local_addresses_unsafe()
             memcpy(w->first.addr8, (void *)&in6->sin6_addr, sizeof(struct in6_addr));
             memcpy(w->last.addr8, (void *)&in6->sin6_addr, sizeof(struct in6_addr));
 
-            if (inet_ntop(AF_INET6, w->first.addr8, text, INET_ADDRSTRLEN)) {
+            if (inet_ntop(AF_INET6, w->first.addr8, text, INET6_ADDRSTRLEN)) {
                 w->value = strdupz(text);
                 w->hash = simple_hash(text);
             } else {
