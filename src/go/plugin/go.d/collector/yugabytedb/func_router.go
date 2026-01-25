@@ -37,8 +37,8 @@ func newFuncRouter(c *Collector) *funcRouter {
 		collector: c,
 		handlers:  make(map[string]funcapi.MethodHandler),
 	}
-	r.handlers["top-queries"] = newFuncTopQueries(r)
-	r.handlers["running-queries"] = newFuncRunningQueries(r)
+	r.handlers[topQueriesMethodID] = newFuncTopQueries(r)
+	r.handlers[runningQueriesMethodID] = newFuncRunningQueries(r)
 	return r
 }
 
@@ -119,26 +119,8 @@ func (r *funcRouter) topQueriesLimit() int {
 
 func yugabyteMethods() []module.MethodConfig {
 	return []module.MethodConfig{
-		{
-			UpdateEvery:  10,
-			ID:           "top-queries",
-			Name:         "Top Queries",
-			Help:         "Top SQL queries from pg_stat_statements. WARNING: Query text may contain unmasked literals (potential PII).",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{
-				buildSortParam(topQueriesColumns),
-			},
-		},
-		{
-			UpdateEvery:  10,
-			ID:           "running-queries",
-			Name:         "Running Queries",
-			Help:         "Currently running SQL statements from pg_stat_activity. WARNING: Query text may contain unmasked literals (potential PII).",
-			RequireCloud: true,
-			RequiredParams: []funcapi.ParamConfig{
-				buildSortParam(runningQueriesColumns),
-			},
-		},
+		topQueriesMethodConfig(),
+		runningQueriesMethodConfig(),
 	}
 }
 
@@ -150,48 +132,3 @@ func yugabyteFunctionHandler(job *module.Job) funcapi.MethodHandler {
 	return c.funcRouter
 }
 
-// sortableColumn is an interface for columns that can be used in sort options.
-type sortableColumn interface {
-	isSortOption() bool
-	sortLabel() string
-	isDefaultSort() bool
-	name() string
-}
-
-func (c topQueriesColumn) isSortOption() bool  { return c.IsSortOption }
-func (c topQueriesColumn) sortLabel() string   { return c.SortLabel }
-func (c topQueriesColumn) isDefaultSort() bool { return c.IsDefaultSort }
-func (c topQueriesColumn) name() string        { return c.Name }
-
-func (c runningQueriesColumn) isSortOption() bool  { return c.IsSortOption }
-func (c runningQueriesColumn) sortLabel() string   { return c.SortLabel }
-func (c runningQueriesColumn) isDefaultSort() bool { return c.IsDefaultSort }
-func (c runningQueriesColumn) name() string        { return c.Name }
-
-func buildSortParam[T sortableColumn](cols []T) funcapi.ParamConfig {
-	var options []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range cols {
-		if !col.isSortOption() {
-			continue
-		}
-		opt := funcapi.ParamOption{
-			ID:     col.name(),
-			Column: col.name(),
-			Name:   col.sortLabel(),
-			Sort:   &sortDir,
-		}
-		if col.isDefaultSort() {
-			opt.Default = true
-		}
-		options = append(options, opt)
-	}
-	return funcapi.ParamConfig{
-		ID:         "__sort",
-		Name:       "Filter By",
-		Help:       "Select the primary sort column",
-		Selection:  funcapi.ParamSelect,
-		Options:    options,
-		UniqueView: true,
-	}
-}

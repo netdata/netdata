@@ -18,11 +18,17 @@ const topQueriesMaxTextLength = 4096
 // topQueriesColumn embeds funcapi.ColumnMeta and adds CockroachDB-specific fields.
 type topQueriesColumn struct {
 	funcapi.ColumnMeta
-	SelectExpr    string // SQL expression for SELECT clause
-	IsSortOption  bool   // whether this column appears as a sort option
-	SortLabel     string // label for sort option dropdown
-	IsDefaultSort bool   // default sort column
+	SelectExpr  string // SQL expression for SELECT clause
+	sortOpt     bool   // whether this column appears as a sort option
+	sortLbl     string // label for sort option dropdown
+	defaultSort bool   // default sort column
 }
+
+// funcapi.SortableColumn interface implementation for topQueriesColumn.
+func (c topQueriesColumn) IsSortOption() bool  { return c.sortOpt }
+func (c topQueriesColumn) SortLabel() string   { return c.sortLbl }
+func (c topQueriesColumn) IsDefaultSort() bool { return c.defaultSort }
+func (c topQueriesColumn) ColumnName() string  { return c.Name }
 
 var topQueriesColumns = []topQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "fingerprintId", Tooltip: "Fingerprint ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.fingerprint_id::STRING"},
@@ -35,17 +41,17 @@ var topQueriesColumns = []topQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "implicitTxn", Tooltip: "Implicit Txn", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.metadata->>'implicitTxn'"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "vectorized", Tooltip: "Vectorized", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.metadata->>'vec'"},
 
-	{ColumnMeta: funcapi.ColumnMeta{Name: "executions", Tooltip: "Executions", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Calls", Title: "Executions", IsDefault: true}}, SelectExpr: "COALESCE((s.statistics->'statistics'->>'cnt')::INT8, 0)", IsSortOption: true, SortLabel: "Top queries by Executions"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time", IsDefault: true}}, SelectExpr: "COALESCE((s.statistics->'statistics'->'svcLat'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0) * 1000", IsSortOption: true, IsDefaultSort: true, SortLabel: "Top queries by Total Time"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "meanTime", Tooltip: "Mean Time", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, SelectExpr: "COALESCE((s.statistics->'statistics'->'svcLat'->>'mean')::FLOAT8, 0) * 1000", IsSortOption: true, SortLabel: "Top queries by Mean Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "executions", Tooltip: "Executions", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Calls", Title: "Executions", IsDefault: true}}, SelectExpr: "COALESCE((s.statistics->'statistics'->>'cnt')::INT8, 0)", sortOpt: true, sortLbl: "Top queries by Executions"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time", IsDefault: true}}, SelectExpr: "COALESCE((s.statistics->'statistics'->'svcLat'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0) * 1000", sortOpt: true, defaultSort: true, sortLbl: "Top queries by Total Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "meanTime", Tooltip: "Mean Time", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, SelectExpr: "COALESCE((s.statistics->'statistics'->'svcLat'->>'mean')::FLOAT8, 0) * 1000", sortOpt: true, sortLbl: "Top queries by Mean Time"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "runTime", Tooltip: "Run Time", Type: funcapi.FieldTypeDuration, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, SelectExpr: "COALESCE((s.statistics->'statistics'->'runLat'->>'mean')::FLOAT8, 0) * 1000"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "planTime", Tooltip: "Plan Time", Type: funcapi.FieldTypeDuration, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, SelectExpr: "COALESCE((s.statistics->'statistics'->'planLat'->>'mean')::FLOAT8, 0) * 1000"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "parseTime", Tooltip: "Parse Time", Type: funcapi.FieldTypeDuration, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, SelectExpr: "COALESCE((s.statistics->'statistics'->'parseLat'->>'mean')::FLOAT8, 0) * 1000"},
 
-	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsRead", Tooltip: "Rows Read", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}}, SelectExpr: "CAST(ROUND(COALESCE((s.statistics->'statistics'->'rowsRead'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0)) AS INT8)", IsSortOption: true, SortLabel: "Top queries by Rows Read"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsWritten", Tooltip: "Rows Written", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}}, SelectExpr: "CAST(ROUND(COALESCE((s.statistics->'statistics'->'rowsWritten'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0)) AS INT8)", IsSortOption: true, SortLabel: "Top queries by Rows Written"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsReturned", Tooltip: "Rows Returned", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}}, SelectExpr: "CAST(ROUND(COALESCE((s.statistics->'statistics'->'numRows'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0)) AS INT8)", IsSortOption: true, SortLabel: "Top queries by Rows Returned"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "bytesRead", Tooltip: "Bytes Read", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Bytes", Title: "Bytes"}}, SelectExpr: "CAST(ROUND(COALESCE((s.statistics->'statistics'->'bytesRead'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0)) AS INT8)", IsSortOption: true, SortLabel: "Top queries by Bytes Read"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsRead", Tooltip: "Rows Read", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}}, SelectExpr: "CAST(ROUND(COALESCE((s.statistics->'statistics'->'rowsRead'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0)) AS INT8)", sortOpt: true, sortLbl: "Top queries by Rows Read"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsWritten", Tooltip: "Rows Written", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}}, SelectExpr: "CAST(ROUND(COALESCE((s.statistics->'statistics'->'rowsWritten'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0)) AS INT8)", sortOpt: true, sortLbl: "Top queries by Rows Written"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsReturned", Tooltip: "Rows Returned", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}}, SelectExpr: "CAST(ROUND(COALESCE((s.statistics->'statistics'->'numRows'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0)) AS INT8)", sortOpt: true, sortLbl: "Top queries by Rows Returned"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "bytesRead", Tooltip: "Bytes Read", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Bytes", Title: "Bytes"}}, SelectExpr: "CAST(ROUND(COALESCE((s.statistics->'statistics'->'bytesRead'->>'mean')::FLOAT8, 0) * COALESCE((s.statistics->'statistics'->>'cnt')::FLOAT8, 0)) AS INT8)", sortOpt: true, sortLbl: "Top queries by Bytes Read"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "maxRetries", Tooltip: "Max Retries", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Chart: &funcapi.ChartOptions{Group: "Retries", Title: "Retries"}}, SelectExpr: "COALESCE((s.statistics->'statistics'->>'maxRetries')::INT8, 0)"},
 }
 
@@ -62,7 +68,7 @@ func newFuncTopQueries(r *funcRouter) *funcTopQueries {
 var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
 
 func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	return []funcapi.ParamConfig{buildSortParam(topQueriesColumns)}, nil
+	return []funcapi.ParamConfig{funcapi.BuildSortParam(topQueriesColumns)}, nil
 }
 
 func (f *funcTopQueries) Cleanup(ctx context.Context) {}
@@ -104,7 +110,7 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: sortColumn,
-		RequiredParams:    []funcapi.ParamConfig{buildSortParam(topQueriesColumns)},
+		RequiredParams:    []funcapi.ParamConfig{funcapi.BuildSortParam(topQueriesColumns)},
 		ChartingConfig:    cs.BuildCharting(),
 	}
 }
@@ -116,18 +122,18 @@ func (f *funcTopQueries) columnSet() funcapi.ColumnSet[topQueriesColumn] {
 func (f *funcTopQueries) resolveSortColumn(requested string) string {
 	if requested != "" {
 		for _, col := range topQueriesColumns {
-			if col.Name == requested && col.IsSortOption {
+			if col.Name == requested && col.IsSortOption() {
 				return col.Name
 			}
 		}
 	}
 	for _, col := range topQueriesColumns {
-		if col.IsDefaultSort && col.IsSortOption {
+		if col.IsDefaultSort() && col.IsSortOption() {
 			return col.Name
 		}
 	}
 	for _, col := range topQueriesColumns {
-		if col.IsSortOption {
+		if col.IsSortOption() {
 			return col.Name
 		}
 	}

@@ -18,11 +18,17 @@ const runningQueriesMaxTextLength = 4096
 // runningQueriesColumn embeds funcapi.ColumnMeta and adds CockroachDB-specific fields.
 type runningQueriesColumn struct {
 	funcapi.ColumnMeta
-	SelectExpr    string // SQL expression for SELECT clause
-	IsSortOption  bool   // whether this column appears as a sort option
-	SortLabel     string // label for sort option dropdown
-	IsDefaultSort bool   // default sort column
+	SelectExpr  string // SQL expression for SELECT clause
+	sortOpt     bool   // whether this column appears as a sort option
+	sortLbl     string // label for sort option dropdown
+	defaultSort bool   // default sort column
 }
+
+// funcapi.SortableColumn interface implementation for runningQueriesColumn.
+func (c runningQueriesColumn) IsSortOption() bool  { return c.sortOpt }
+func (c runningQueriesColumn) SortLabel() string   { return c.sortLbl }
+func (c runningQueriesColumn) IsDefaultSort() bool { return c.defaultSort }
+func (c runningQueriesColumn) ColumnName() string  { return c.Name }
 
 var runningQueriesColumns = []runningQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "queryId", Tooltip: "Query ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.query_id::STRING"},
@@ -35,7 +41,7 @@ var runningQueriesColumns = []runningQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "phase", Tooltip: "Phase", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.phase"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "distributed", Tooltip: "Distributed", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.distributed::STRING"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "startTime", Tooltip: "Start Time", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, SelectExpr: "TO_CHAR(s.start, 'YYYY-MM-DD\"T\"HH24:MI:SS.FF3')"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "elapsedMs", Tooltip: "Elapsed", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, SelectExpr: "EXTRACT(EPOCH FROM (clock_timestamp() - s.start)) * 1000", IsSortOption: true, IsDefaultSort: true, SortLabel: "Running queries by Elapsed Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "elapsedMs", Tooltip: "Elapsed", Type: funcapi.FieldTypeDuration, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Visualization: funcapi.FieldVisualBar, Transform: funcapi.FieldTransformDuration, Units: "milliseconds", DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, SelectExpr: "EXTRACT(EPOCH FROM (clock_timestamp() - s.start)) * 1000", sortOpt: true, defaultSort: true, sortLbl: "Running queries by Elapsed Time"},
 }
 
 // funcRunningQueries handles the running-queries function.
@@ -51,7 +57,7 @@ func newFuncRunningQueries(r *funcRouter) *funcRunningQueries {
 var _ funcapi.MethodHandler = (*funcRunningQueries)(nil)
 
 func (f *funcRunningQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	return []funcapi.ParamConfig{buildSortParam(runningQueriesColumns)}, nil
+	return []funcapi.ParamConfig{funcapi.BuildSortParam(runningQueriesColumns)}, nil
 }
 
 func (f *funcRunningQueries) Cleanup(ctx context.Context) {}
@@ -93,7 +99,7 @@ func (f *funcRunningQueries) Handle(ctx context.Context, method string, params f
 		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: sortColumn,
-		RequiredParams:    []funcapi.ParamConfig{buildSortParam(runningQueriesColumns)},
+		RequiredParams:    []funcapi.ParamConfig{funcapi.BuildSortParam(runningQueriesColumns)},
 	}
 }
 
@@ -104,18 +110,18 @@ func (f *funcRunningQueries) columnSet() funcapi.ColumnSet[runningQueriesColumn]
 func (f *funcRunningQueries) resolveSortColumn(requested string) string {
 	if requested != "" {
 		for _, col := range runningQueriesColumns {
-			if col.Name == requested && col.IsSortOption {
+			if col.Name == requested && col.IsSortOption() {
 				return col.Name
 			}
 		}
 	}
 	for _, col := range runningQueriesColumns {
-		if col.IsDefaultSort && col.IsSortOption {
+		if col.IsDefaultSort() && col.IsSortOption() {
 			return col.Name
 		}
 	}
 	for _, col := range runningQueriesColumns {
-		if col.IsSortOption {
+		if col.IsSortOption() {
 			return col.Name
 		}
 	}

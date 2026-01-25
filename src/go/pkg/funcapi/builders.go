@@ -209,3 +209,42 @@ func (cs ColumnSet[T]) Names() []string {
 	}
 	return names
 }
+
+// SortableColumn is an interface for columns that can provide sort options.
+// Collectors implement this on their column types to use BuildSortParam.
+type SortableColumn interface {
+	IsSortOption() bool
+	SortLabel() string
+	IsDefaultSort() bool
+	ColumnName() string
+}
+
+// BuildSortParam builds a sort parameter configuration from sortable columns.
+// Only columns where IsSortOption() returns true are included as options.
+func BuildSortParam[T SortableColumn](cols []T) ParamConfig {
+	var options []ParamOption
+	sortDir := FieldSortDescending
+	for _, col := range cols {
+		if !col.IsSortOption() {
+			continue
+		}
+		opt := ParamOption{
+			ID:     col.ColumnName(),
+			Column: col.ColumnName(),
+			Name:   col.SortLabel(),
+			Sort:   &sortDir,
+		}
+		if col.IsDefaultSort() {
+			opt.Default = true
+		}
+		options = append(options, opt)
+	}
+	return ParamConfig{
+		ID:         "__sort",
+		Name:       "Filter By",
+		Help:       "Select the primary sort column",
+		Selection:  ParamSelect,
+		Options:    options,
+		UniqueView: true,
+	}
+}

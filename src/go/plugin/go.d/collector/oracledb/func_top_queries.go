@@ -18,26 +18,32 @@ const topQueriesMaxTextLength = 4096
 type topQueriesColumn struct {
 	funcapi.ColumnMeta
 	SelectExpr     string // SQL expression for SELECT clause
-	IsSortOption   bool   // whether this column appears as a sort option
-	SortLabel      string // label for sort option dropdown
-	IsDefaultSort  bool   // default sort column
+	sortOpt        bool   // whether this column appears as a sort option
+	sortLbl        string // label for sort option dropdown
+	defaultSort    bool   // default sort column
 	RequiresColumn string // only include if this column exists in the view
 }
+
+// funcapi.SortableColumn interface implementation for topQueriesColumn.
+func (c topQueriesColumn) IsSortOption() bool  { return c.sortOpt }
+func (c topQueriesColumn) SortLabel() string   { return c.sortLbl }
+func (c topQueriesColumn) IsDefaultSort() bool { return c.defaultSort }
+func (c topQueriesColumn) ColumnName() string  { return c.Name }
 
 var topQueriesColumns = []topQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "sqlId", Tooltip: "SQL ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.sql_id"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sticky: true, FullWidth: true, Wrap: true}, SelectExpr: "s.sql_text"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "schema", Tooltip: "Schema", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, GroupBy: &funcapi.GroupByOptions{IsDefault: true}}, SelectExpr: "s.parsing_schema_name"},
 
-	{ColumnMeta: funcapi.ColumnMeta{Name: "executions", Tooltip: "Executions", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Calls", Title: "Executions", IsDefault: true}}, SelectExpr: "NVL(s.executions, 0)", IsSortOption: true, SortLabel: "Top queries by Executions"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time", IsDefault: true}}, SelectExpr: "NVL(s.elapsed_time, 0) / 1000", IsSortOption: true, IsDefaultSort: true, SortLabel: "Top queries by Total Time"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "avgTime", Tooltip: "Avg Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, SelectExpr: "CASE WHEN NVL(s.executions,0) = 0 THEN 0 ELSE (s.elapsed_time / s.executions) / 1000 END", IsSortOption: true, SortLabel: "Top queries by Avg Time"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "cpuTime", Tooltip: "CPU Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "CPU", Title: "CPU Time"}}, SelectExpr: "NVL(s.cpu_time, 0) / 1000", IsSortOption: true, SortLabel: "Top queries by CPU Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "executions", Tooltip: "Executions", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Calls", Title: "Executions", IsDefault: true}}, SelectExpr: "NVL(s.executions, 0)", sortOpt: true, sortLbl: "Top queries by Executions"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time", IsDefault: true}}, SelectExpr: "NVL(s.elapsed_time, 0) / 1000", sortOpt: true, defaultSort: true, sortLbl: "Top queries by Total Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "avgTime", Tooltip: "Avg Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Chart: &funcapi.ChartOptions{Group: "Time", Title: "Execution Time"}}, SelectExpr: "CASE WHEN NVL(s.executions,0) = 0 THEN 0 ELSE (s.elapsed_time / s.executions) / 1000 END", sortOpt: true, sortLbl: "Top queries by Avg Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "cpuTime", Tooltip: "CPU Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "CPU", Title: "CPU Time"}}, SelectExpr: "NVL(s.cpu_time, 0) / 1000", sortOpt: true, sortLbl: "Top queries by CPU Time"},
 
-	{ColumnMeta: funcapi.ColumnMeta{Name: "bufferGets", Tooltip: "Buffer Gets", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "IO", Title: "I/O"}}, SelectExpr: "NVL(s.buffer_gets, 0)", IsSortOption: true, SortLabel: "Top queries by Buffer Gets"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "diskReads", Tooltip: "Disk Reads", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "IO", Title: "I/O"}}, SelectExpr: "NVL(s.disk_reads, 0)", IsSortOption: true, SortLabel: "Top queries by Disk Reads"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsProcessed", Tooltip: "Rows Processed", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}}, SelectExpr: "NVL(s.rows_processed, 0)", IsSortOption: true, SortLabel: "Top queries by Rows Processed"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "parseCalls", Tooltip: "Parse Calls", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Parse", Title: "Parse Calls"}}, SelectExpr: "NVL(s.parse_calls, 0)", IsSortOption: true, SortLabel: "Top queries by Parse Calls"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "bufferGets", Tooltip: "Buffer Gets", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "IO", Title: "I/O"}}, SelectExpr: "NVL(s.buffer_gets, 0)", sortOpt: true, sortLbl: "Top queries by Buffer Gets"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "diskReads", Tooltip: "Disk Reads", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "IO", Title: "I/O"}}, SelectExpr: "NVL(s.disk_reads, 0)", sortOpt: true, sortLbl: "Top queries by Disk Reads"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "rowsProcessed", Tooltip: "Rows Processed", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Rows", Title: "Rows"}}, SelectExpr: "NVL(s.rows_processed, 0)", sortOpt: true, sortLbl: "Top queries by Rows Processed"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "parseCalls", Tooltip: "Parse Calls", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Chart: &funcapi.ChartOptions{Group: "Parse", Title: "Parse Calls"}}, SelectExpr: "NVL(s.parse_calls, 0)", sortOpt: true, sortLbl: "Top queries by Parse Calls"},
 
 	{ColumnMeta: funcapi.ColumnMeta{Name: "module", Tooltip: "Module", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, GroupBy: &funcapi.GroupByOptions{}}, SelectExpr: "s.module", RequiresColumn: "MODULE"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "action", Tooltip: "Action", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, GroupBy: &funcapi.GroupByOptions{}}, SelectExpr: "s.action", RequiresColumn: "ACTION"},
@@ -66,7 +72,7 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 	if f.router.collector.db != nil {
 		cols = f.layout(ctx).cols
 	}
-	return []funcapi.ParamConfig{buildSortParam(cols)}, nil
+	return []funcapi.ParamConfig{funcapi.BuildSortParam(cols)}, nil
 }
 
 func (f *funcTopQueries) Cleanup(ctx context.Context) {}
@@ -123,7 +129,7 @@ FETCH FIRST %d ROWS ONLY
 			Columns:           cs.BuildColumns(),
 			Data:              [][]any{},
 			DefaultSortColumn: sortColumn,
-			RequiredParams:    []funcapi.ParamConfig{buildSortParam(cols)},
+			RequiredParams:    []funcapi.ParamConfig{funcapi.BuildSortParam(cols)},
 			ChartingConfig:    cs.BuildCharting(),
 		}
 	}
@@ -134,7 +140,7 @@ FETCH FIRST %d ROWS ONLY
 		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: sortColumn,
-		RequiredParams:    []funcapi.ParamConfig{buildSortParam(cols)},
+		RequiredParams:    []funcapi.ParamConfig{funcapi.BuildSortParam(cols)},
 		ChartingConfig:    cs.BuildCharting(),
 	}
 }
@@ -220,17 +226,17 @@ func (f *funcTopQueries) filterColumns(cols []topQueriesColumn, available map[st
 
 func (f *funcTopQueries) resolveSortColumn(cols []topQueriesColumn, requested string) string {
 	for _, col := range cols {
-		if col.IsSortOption && col.Name == requested {
+		if col.IsSortOption() && col.Name == requested {
 			return col.Name
 		}
 	}
 	for _, col := range cols {
-		if col.IsDefaultSort {
+		if col.IsDefaultSort() {
 			return col.Name
 		}
 	}
 	for _, col := range cols {
-		if col.IsSortOption {
+		if col.IsSortOption() {
 			return col.Name
 		}
 	}

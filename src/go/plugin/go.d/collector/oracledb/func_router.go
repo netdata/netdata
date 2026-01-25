@@ -67,7 +67,7 @@ func oracledbMethods() []module.MethodConfig {
 			Help:         "Top SQL statements from V$SQLSTATS. WARNING: Query text may contain unmasked literals (potential PII).",
 			RequireCloud: true,
 			RequiredParams: []funcapi.ParamConfig{
-				buildSortParam(topQueriesColumns),
+				funcapi.BuildSortParam(topQueriesColumns),
 			},
 		},
 		{
@@ -77,7 +77,7 @@ func oracledbMethods() []module.MethodConfig {
 			Help:         "Currently running SQL statements from V$SESSION. WARNING: Query text may contain unmasked literals (potential PII).",
 			RequireCloud: true,
 			RequiredParams: []funcapi.ParamConfig{
-				buildSortParam(runningQueriesColumns),
+				funcapi.BuildSortParam(runningQueriesColumns),
 			},
 		},
 	}
@@ -89,50 +89,4 @@ func oracledbFunctionHandler(job *module.Job) funcapi.MethodHandler {
 		return nil
 	}
 	return c.funcRouter
-}
-
-// sortableColumn is an interface for columns that can be used in sort options.
-type sortableColumn interface {
-	isSortOption() bool
-	sortLabel() string
-	isDefaultSort() bool
-	name() string
-}
-
-func (c topQueriesColumn) isSortOption() bool  { return c.IsSortOption }
-func (c topQueriesColumn) sortLabel() string   { return c.SortLabel }
-func (c topQueriesColumn) isDefaultSort() bool { return c.IsDefaultSort }
-func (c topQueriesColumn) name() string        { return c.Name }
-
-func (c runningQueriesColumn) isSortOption() bool  { return c.IsSortOption }
-func (c runningQueriesColumn) sortLabel() string   { return c.SortLabel }
-func (c runningQueriesColumn) isDefaultSort() bool { return c.IsDefaultSort }
-func (c runningQueriesColumn) name() string        { return c.Name }
-
-func buildSortParam[T sortableColumn](cols []T) funcapi.ParamConfig {
-	var options []funcapi.ParamOption
-	sortDir := funcapi.FieldSortDescending
-	for _, col := range cols {
-		if !col.isSortOption() {
-			continue
-		}
-		opt := funcapi.ParamOption{
-			ID:     col.name(),
-			Column: col.name(),
-			Name:   col.sortLabel(),
-			Sort:   &sortDir,
-		}
-		if col.isDefaultSort() {
-			opt.Default = true
-		}
-		options = append(options, opt)
-	}
-	return funcapi.ParamConfig{
-		ID:         "__sort",
-		Name:       "Filter By",
-		Help:       "Select the primary sort column",
-		Selection:  funcapi.ParamSelect,
-		Options:    options,
-		UniqueView: true,
-	}
 }

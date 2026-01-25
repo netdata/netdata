@@ -10,18 +10,33 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
-const runningQueriesMaxTextLength = 4096
+const (
+	runningQueriesMethodID      = "running-queries"
+	runningQueriesMaxTextLength = 4096
+)
+
+func runningQueriesMethodConfig() module.MethodConfig {
+	return module.MethodConfig{
+		ID:             runningQueriesMethodID,
+		Name:           "Running Queries",
+		UpdateEvery:    10,
+		Help:           "Currently running SQL statements from pg_stat_activity. WARNING: Query text may contain unmasked literals (potential PII).",
+		RequireCloud:   true,
+		RequiredParams: []funcapi.ParamConfig{funcapi.BuildSortParam(runningQueriesColumns)},
+	}
+}
 
 // runningQueriesColumn embeds funcapi.ColumnMeta and adds YugabyteDB-specific fields.
 type runningQueriesColumn struct {
 	funcapi.ColumnMeta
-	SelectExpr    string // SQL expression for SELECT clause
-	IsSortOption  bool   // whether this column appears as a sort option
-	SortLabel     string // label for sort option dropdown
-	IsDefaultSort bool   // default sort column
+	SelectExpr  string // SQL expression for SELECT clause
+	sortOpt     bool   // whether this column appears as a sort option
+	sortLbl     string // label for sort option dropdown
+	defaultSort bool   // default sort column
 }
 
 var runningQueriesColumns = []runningQueriesColumn{
@@ -35,8 +50,14 @@ var runningQueriesColumns = []runningQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "application", Tooltip: "Application", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.application_name"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "clientAddress", Tooltip: "Client Address", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.client_addr::text"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "queryStart", Tooltip: "Query Start", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, SelectExpr: "TO_CHAR(s.query_start, 'YYYY-MM-DD\"T\"HH24:MI:SS.FF3')"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "elapsedMs", Tooltip: "Elapsed", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, SelectExpr: "CASE WHEN s.query_start IS NULL THEN 0 ELSE EXTRACT(EPOCH FROM (clock_timestamp() - s.query_start)) * 1000 END", IsSortOption: true, IsDefaultSort: true, SortLabel: "Running queries by Elapsed Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "elapsedMs", Tooltip: "Elapsed", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, SelectExpr: "CASE WHEN s.query_start IS NULL THEN 0 ELSE EXTRACT(EPOCH FROM (clock_timestamp() - s.query_start)) * 1000 END", sortOpt: true, defaultSort: true, sortLbl: "Running queries by Elapsed Time"},
 }
+
+// funcapi.SortableColumn interface implementation for runningQueriesColumn.
+func (c runningQueriesColumn) IsSortOption() bool  { return c.sortOpt }
+func (c runningQueriesColumn) SortLabel() string   { return c.sortLbl }
+func (c runningQueriesColumn) IsDefaultSort() bool { return c.defaultSort }
+func (c runningQueriesColumn) ColumnName() string  { return c.Name }
 
 // funcRunningQueries handles the running-queries function.
 type funcRunningQueries struct {
@@ -51,7 +72,7 @@ func newFuncRunningQueries(r *funcRouter) *funcRunningQueries {
 var _ funcapi.MethodHandler = (*funcRunningQueries)(nil)
 
 func (f *funcRunningQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	return []funcapi.ParamConfig{buildSortParam(runningQueriesColumns)}, nil
+	return []funcapi.ParamConfig{funcapi.BuildSortParam(runningQueriesColumns)}, nil
 }
 
 func (f *funcRunningQueries) Cleanup(ctx context.Context) {}
@@ -93,7 +114,7 @@ func (f *funcRunningQueries) Handle(ctx context.Context, method string, params f
 		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: sortColumn,
-		RequiredParams:    []funcapi.ParamConfig{buildSortParam(runningQueriesColumns)},
+		RequiredParams:    []funcapi.ParamConfig{funcapi.BuildSortParam(runningQueriesColumns)},
 	}
 }
 
@@ -104,18 +125,18 @@ func (f *funcRunningQueries) columnSet() funcapi.ColumnSet[runningQueriesColumn]
 func (f *funcRunningQueries) resolveSortColumn(requested string) string {
 	if requested != "" {
 		for _, col := range runningQueriesColumns {
-			if col.Name == requested && col.IsSortOption {
+			if col.Name == requested && col.IsSortOption() {
 				return col.Name
 			}
 		}
 	}
 	for _, col := range runningQueriesColumns {
-		if col.IsDefaultSort && col.IsSortOption {
+		if col.IsDefaultSort() && col.IsSortOption() {
 			return col.Name
 		}
 	}
 	for _, col := range runningQueriesColumns {
-		if col.IsSortOption {
+		if col.IsSortOption() {
 			return col.Name
 		}
 	}

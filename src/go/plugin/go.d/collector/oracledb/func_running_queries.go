@@ -17,11 +17,17 @@ const runningQueriesMaxTextLength = 4096
 // runningQueriesColumn embeds funcapi.ColumnMeta and adds OracleDB-specific fields.
 type runningQueriesColumn struct {
 	funcapi.ColumnMeta
-	SelectExpr    string // SQL expression for SELECT clause
-	IsSortOption  bool   // whether this column appears as a sort option
-	SortLabel     string // label for sort option dropdown
-	IsDefaultSort bool   // default sort column
+	SelectExpr  string // SQL expression for SELECT clause
+	sortOpt     bool   // whether this column appears as a sort option
+	sortLbl     string // label for sort option dropdown
+	defaultSort bool   // default sort column
 }
+
+// funcapi.SortableColumn interface implementation for runningQueriesColumn.
+func (c runningQueriesColumn) IsSortOption() bool  { return c.sortOpt }
+func (c runningQueriesColumn) SortLabel() string   { return c.sortLbl }
+func (c runningQueriesColumn) IsDefaultSort() bool { return c.defaultSort }
+func (c runningQueriesColumn) ColumnName() string  { return c.Name }
 
 var runningQueriesColumns = []runningQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "sessionId", Tooltip: "Session", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.sid || ',' || s.serial#"},
@@ -30,7 +36,7 @@ var runningQueriesColumns = []runningQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "type", Tooltip: "Type", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.type"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "sqlId", Tooltip: "SQL ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.sql_id"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sticky: true, FullWidth: true, Wrap: true}, SelectExpr: "q.sql_text"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "lastCallMs", Tooltip: "Elapsed", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, SelectExpr: "NVL(s.last_call_et, 0) * 1000", IsSortOption: true, IsDefaultSort: true, SortLabel: "Running queries by Elapsed Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "lastCallMs", Tooltip: "Elapsed", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, SelectExpr: "NVL(s.last_call_et, 0) * 1000", sortOpt: true, defaultSort: true, sortLbl: "Running queries by Elapsed Time"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "sqlExecStart", Tooltip: "SQL Exec Start", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, SelectExpr: "TO_CHAR(CAST(s.sql_exec_start AS TIMESTAMP), 'YYYY-MM-DD\"T\"HH24:MI:SS.FF3')"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "module", Tooltip: "Module", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.module"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "action", Tooltip: "Action", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformText, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, SelectExpr: "s.action"},
@@ -51,7 +57,7 @@ func newFuncRunningQueries(r *funcRouter) *funcRunningQueries {
 var _ funcapi.MethodHandler = (*funcRunningQueries)(nil)
 
 func (f *funcRunningQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	return []funcapi.ParamConfig{buildSortParam(runningQueriesColumns)}, nil
+	return []funcapi.ParamConfig{funcapi.BuildSortParam(runningQueriesColumns)}, nil
 }
 
 func (f *funcRunningQueries) Cleanup(ctx context.Context) {}
@@ -105,7 +111,7 @@ FETCH FIRST %d ROWS ONLY
 			Columns:           cs.BuildColumns(),
 			Data:              [][]any{},
 			DefaultSortColumn: sortColumn,
-			RequiredParams:    []funcapi.ParamConfig{buildSortParam(runningQueriesColumns)},
+			RequiredParams:    []funcapi.ParamConfig{funcapi.BuildSortParam(runningQueriesColumns)},
 		}
 	}
 
@@ -115,7 +121,7 @@ FETCH FIRST %d ROWS ONLY
 		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: sortColumn,
-		RequiredParams:    []funcapi.ParamConfig{buildSortParam(runningQueriesColumns)},
+		RequiredParams:    []funcapi.ParamConfig{funcapi.BuildSortParam(runningQueriesColumns)},
 	}
 }
 
@@ -125,17 +131,17 @@ func (f *funcRunningQueries) columnSet() funcapi.ColumnSet[runningQueriesColumn]
 
 func (f *funcRunningQueries) resolveSortColumn(requested string) string {
 	for _, col := range runningQueriesColumns {
-		if col.IsSortOption && col.Name == requested {
+		if col.IsSortOption() && col.Name == requested {
 			return col.Name
 		}
 	}
 	for _, col := range runningQueriesColumns {
-		if col.IsDefaultSort {
+		if col.IsDefaultSort() {
 			return col.Name
 		}
 	}
 	for _, col := range runningQueriesColumns {
-		if col.IsSortOption {
+		if col.IsSortOption() {
 			return col.Name
 		}
 	}
