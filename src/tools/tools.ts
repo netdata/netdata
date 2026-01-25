@@ -982,7 +982,7 @@ export class ToolsOrchestrator {
         toolKind: kind,
         remoteIdentifier,
         fatal: false,
-        message: `Tool '${logToolName}' output stored for tool_output (${stored.reason}).`,
+          message: `Tool '${logToolName}' output stored for tool_output (${stored.reason}, ${stored.stats.bytes} bytes).`,
         details: warnDetails,
       };
       this.log(warnLog, { opId });
@@ -1056,7 +1056,7 @@ export class ToolsOrchestrator {
           toolKind: kind,
           remoteIdentifier,
           fatal: false,
-          message: `Tool '${logToolName}' output truncated to toolResponseMaxBytes (${String(limit)} bytes).`,
+          message: `Tool '${logToolName}' output of ${String(originalBytes)} bytes truncated to toolResponseMaxBytes (${String(limit)} bytes).`,
           details: warnDetails,
         };
         this.log(warnLog, { opId });
