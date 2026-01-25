@@ -35,7 +35,7 @@ func TestYugabyteDBMethods(t *testing.T) {
 func TestYugabyteDBTopColumns_HasRequiredColumns(t *testing.T) {
 	required := []string{"queryId", "query", "calls", "totalTime"}
 
-	cs := ybColumnSet(ybTopColumns)
+	cs := funcapi.Columns(topQueriesColumns, func(c topQueriesColumn) funcapi.ColumnMeta { return c.ColumnMeta })
 	for _, id := range required {
 		assert.True(t, cs.ContainsColumn(id), "column %s should be defined", id)
 	}
@@ -44,7 +44,7 @@ func TestYugabyteDBTopColumns_HasRequiredColumns(t *testing.T) {
 func TestYugabyteDBRunningColumns_HasRequiredColumns(t *testing.T) {
 	required := []string{"pid", "query", "elapsedMs"}
 
-	cs := ybColumnSet(ybRunningColumns)
+	cs := funcapi.Columns(runningQueriesColumns, func(c runningQueriesColumn) funcapi.ColumnMeta { return c.ColumnMeta })
 	for _, id := range required {
 		assert.True(t, cs.ContainsColumn(id), "column %s should be defined", id)
 	}

@@ -4,12 +4,10 @@ package yugabytedb
 
 import (
 	"context"
-	"database/sql"
 	_ "embed"
 	"errors"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
@@ -76,10 +74,7 @@ type Collector struct {
 
 	cache map[string]map[string]bool
 
-	db *sql.DB
-
-	pgStatStatementsMu      sync.RWMutex
-	pgStatStatementsColumns map[string]bool
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -102,6 +97,8 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("init Prometheus client: %v", err)
 	}
 	c.prom = prom
+
+	c.funcRouter = newFuncRouter(c)
 
 	return nil
 }
@@ -138,7 +135,7 @@ func (c *Collector) Cleanup(context.Context) {
 	if c.httpClient != nil {
 		c.httpClient.CloseIdleConnections()
 	}
-	if c.db != nil {
-		_ = c.db.Close()
+	if c.funcRouter != nil {
+		c.funcRouter.cleanup()
 	}
 }
