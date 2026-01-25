@@ -84,6 +84,10 @@ export const TOOL_OUTPUT_HANDLE_PREFIX = 'Tool output is too large (';
 export const TOOL_OUTPUT_HANDLE_PATTERN = /tool_output\(handle = "[^"]+"/;
 export const TOOL_OUTPUT_STORE_LOG_FRAGMENT = 'output stored for tool_output';
 
+// Log identifiers
+export const LOG_FAILURE_REPORT = 'agent:failure-report';
+export const LOG_ORCHESTRATOR = 'agent:orchestrator';
+
 // Snapshot markers
 export const SNAPSHOT_FULL_MARKER = 'SNAPSHOT-FULL-PAYLOAD-END';
 
