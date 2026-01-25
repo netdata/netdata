@@ -155,6 +155,7 @@ https://github.com/netdata/netdata/edit/master/docs/top-monitoring-netdata-funct
 https://github.com/netdata/netdata/edit/master/docs/functions/processes.md,Processes,Published,Top Consumers,,
 ,,,,,
 
+https://github.com/netdata/netdata/edit/master/docs/alerts/understanding-alerts/README.md,Understanding Alerts,Published,Alerts & Notifications/Understanding Alerts,
 https://github.com/netdata/netdata/edit/master/docs/alerts/understanding-alerts/1-what-is-a-netdata-alert.md,What is a Netdata Alert,Published,Alerts & Notifications/Understanding Alerts,
 https://github.com/netdata/netdata/edit/master/docs/alerts/understanding-alerts/2-alert-types-alarm-vs-template.md,Alert Types: alarm versus template,Published,Alerts & Notifications/Understanding Alerts,
 https://github.com/netdata/netdata/edit/master/docs/alerts/understanding-alerts/3-where-alerts-live.md,"Where Alerts Live (Files, Agent, Cloud)",Published,Alerts & Notifications/Understanding Alerts,

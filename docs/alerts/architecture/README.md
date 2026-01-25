@@ -1,4 +1,4 @@
-# 12: Alerts and Notifications Architecture
+# 12. Alerts and Notifications Architecture
 
 Understanding how alerts work under the hood helps with troubleshooting, optimization, and designing effective notification strategies. This chapter covers the evaluation pipeline, state machine, and how alerts interact with the broader Netdata ecosystem.
 

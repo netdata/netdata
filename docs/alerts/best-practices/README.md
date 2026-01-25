@@ -1,4 +1,4 @@
-# 11: Best Practices for Alerting
+# 11. Best Practices for Alerting
 
 Effective alerting balances detection speed against noise. This chapter provides guidance derived from operational experience across thousands of Netdata deployments, helping you create alerts that drive meaningful action without alert fatigue.
 

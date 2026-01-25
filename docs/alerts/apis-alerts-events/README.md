@@ -134,7 +134,36 @@ sudo netdatacli reload-health
 
 This triggers the health subsystem to reload configuration files.
 
-## 9.6 Cloud Events API
+## 9.6 V2 Alert Endpoints (Enhanced)
+
+Netdata v2 APIs provide enhanced endpoints for alert configuration, transitions, and context-based queries.
+
+### 9.6.1 Enhanced Alerts Endpoint
+
+The `/api/v2/alerts` endpoint returns active alerts with enriched context information, supporting filtering and pagination.
+
+```bash
+curl -s "http://localhost:19999/api/v2/alerts" | jq '.'
+```
+
+### 9.6.2 Alert Configuration Management
+
+The `/api/v2/alert_config` endpoint allows programmatic management of alert configurations, enabling CRUD operations on health.d files.
+
+```bash
+# List available configurations
+curl -s "http://localhost:19999/api/v2/alert_config" | jq '.'
+```
+
+### 9.6.3 Alert Transitions Stream
+
+The `/api/v2/alert_transitions` endpoint provides real-time streaming of alert state transitions, ideal for building responsive monitoring systems.
+
+```bash
+curl -s "http://localhost:19999/api/v2/alert_transitions?after=-3600" | jq '.'
+```
+
+## 9.7 Cloud Events API
 
 The Cloud Events API (`/api/v2/events`) queries alert and event history stored in Netdata Cloud, providing aggregated, multi-node event data that requires authentication.
 
