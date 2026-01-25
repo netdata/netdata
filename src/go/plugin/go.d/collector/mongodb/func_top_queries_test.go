@@ -7,12 +7,13 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMongoMethods(t *testing.T) {
 	methods := mongoMethods()
 
-	require := assert.New(t)
+	require := require.New(t)
 	require.Len(methods, 1)
 	require.Equal("top-queries", methods[0].ID)
 	require.Equal("Top Queries", methods[0].Name)

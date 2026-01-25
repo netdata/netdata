@@ -353,7 +353,7 @@ func (f *funcTopQueries) parseNumber(n json.Number) int64 {
 
 func (f *funcTopQueries) mapSortColumn(col string) string {
 	switch col {
-	case "elapsedTime", "serviceTime", "requestTime", "resultCount":
+	case "elapsedTime", "serviceTime", "requestTime", "resultCount", "requestId":
 		return col
 	default:
 		return "elapsedTime"
@@ -373,6 +373,10 @@ func (f *funcTopQueries) sortRows(rows []topQueriesRow, sortColumn string) {
 	case "resultCount":
 		sort.Slice(rows, func(i, j int) bool {
 			return rows[i].ResultCount > rows[j].ResultCount
+		})
+	case "requestId":
+		sort.Slice(rows, func(i, j int) bool {
+			return rows[i].RequestID > rows[j].RequestID
 		})
 	default:
 		sort.Slice(rows, func(i, j int) bool {

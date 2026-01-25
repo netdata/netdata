@@ -61,10 +61,10 @@ func TestPgAllColumns_HasRequiredColumns(t *testing.T) {
 func TestPgAllColumns_HasValidMetadata(t *testing.T) {
 	for _, col := range pgAllColumns {
 		// Every column must have an ID
-		assert.NotEmpty(t, col.Name, "column %s must have ID", col.DBColumn)
+		assert.NotEmpty(t, col.Name, "column %s must have Name", col.DBColumn)
 
-		// Every column must have a display name
-		assert.NotEmpty(t, col.Name, "column %s must have Name", col.Name)
+		// Every column must have a display name (tooltip)
+		assert.NotEmpty(t, col.Tooltip, "column %s must have Tooltip", col.Name)
 
 		// Every column must have a data type
 		assert.NotEqual(t, funcapi.FieldTypeNone, col.Type, "column %s must have Type", col.Name)
