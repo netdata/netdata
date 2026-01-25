@@ -99,6 +99,8 @@ type (
 		doSlowEvery             time.Duration
 
 		mx *pgMetrics
+
+		funcRouter *funcRouter
 	}
 	dbConn struct {
 		db         *sql.DB
@@ -125,6 +127,8 @@ func (c *Collector) Init(context.Context) error {
 
 	c.mx.xactTimeHist = metrix.NewHistogramWithRangeBuckets(c.XactTimeHistogram)
 	c.mx.queryTimeHist = metrix.NewHistogramWithRangeBuckets(c.QueryTimeHistogram)
+
+	c.funcRouter = newFuncRouter(c)
 
 	return nil
 }
@@ -156,7 +160,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.db == nil {
 		return
 	}

@@ -60,5 +60,5 @@ func pgFunctionHandler(job *module.Job) funcapi.MethodHandler {
 	if !ok {
 		return nil
 	}
-	return newFuncRouter(c)
+	return c.funcRouter
 }
