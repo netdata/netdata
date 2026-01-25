@@ -366,11 +366,12 @@ async function toolFind(args) {
 }
 
 async function toolRead(args) {
-  const { file, start, lines, headOrTail } = args;
+  const { file, start = 0, lines = undefined, headOrTail } = args;
   validateFile(file);
-  if (!Number.isInteger(start) || start < 0)
+  const startVal = start;
+  if (!Number.isInteger(startVal) || startVal < 0)
     throw new Error("start must be a non-negative integer");
-  if (!Number.isInteger(lines) || lines < 1)
+  if (lines !== undefined && (!Number.isInteger(lines) || lines < 1))
     throw new Error("lines must be an integer >= 1");
   const mode = headOrTail === undefined ? "head" : headOrTail;
   if (mode !== "head" && mode !== "tail")
@@ -390,22 +391,43 @@ async function toolRead(args) {
   const buf = await fsp.readFile(abs);
   const text = decodeUtf8WithHexEscapes(buf);
   const arr = splitLinesPreserve(text);
-  const total = arr.length;
-  let begin = 0;
-  let end = 0;
-  if (mode === "head") {
-    begin = Math.min(start, total);
-    end = Math.min(start + lines, total);
+  const totalLines = arr.length;
+  const totalBytes = buf.length;
+
+  const modeIsHead = mode === "head";
+  let begin, end;
+  if (lines === undefined) {
+    if (modeIsHead) {
+      begin = Math.min(startVal, totalLines);
+      end = totalLines;
+    } else {
+      const skipFromEnd = Math.min(startVal, totalLines);
+      end = totalLines;
+      begin = Math.max(0, totalLines - skipFromEnd);
+    }
+  } else if (modeIsHead) {
+    begin = Math.min(startVal, totalLines);
+    end = Math.min(startVal + lines, totalLines);
   } else {
-    const skipFromEnd = Math.min(start, total);
-    end = total - skipFromEnd;
+    const skipFromEnd = Math.min(startVal, totalLines);
+    end = totalLines - skipFromEnd;
     begin = Math.max(0, end - lines);
   }
+
   const numbered = [];
   for (let i = begin; i < end; i++)
     numbered.push(formatLineNumber(i + 1) + arr[i]);
 
-  const header = `${file.replace(/\\/g, "/")} [${mode} ${begin + 1}-${end}/${total}]`;
+  const linesRead = end - begin;
+  const isPartial =
+    (startVal > 0 || (lines !== undefined && linesRead < totalLines)) &&
+    totalLines > 0;
+  const fileHeader = `${file.replace(/\\/g, "/")}`;
+  const rangeHeader = `[${mode} ${begin + 1}-${end}/${totalLines}]`;
+  const sizeHeader = `(${totalBytes}B, ${totalLines} lines)`;
+  const header =
+    `${fileHeader} ${rangeHeader} ${sizeHeader}` +
+    (isPartial ? " partial" : "");
   return header + "\n" + numbered.join("\n");
 }
 
@@ -585,7 +607,7 @@ const tools = [
   {
     name: "Read",
     description:
-      "Read file by lines with numbering. Lines are multi-byte aware; invalid UTF-8 bytes are hex-escaped as \\u00NN. Each line is prefixed with a 4-char right-aligned line number and a space.",
+      "Read file by lines with numbering. Lines are multi-byte aware; invalid UTF-8 bytes are hex-escaped as \\u00NN. Each line is prefixed with a 4-char right-aligned line number and a space. If lines is omitted, reads to end of file.",
     inputSchema: {
       type: "object",
       properties: {
@@ -593,13 +615,14 @@ const tools = [
         start: {
           type: "integer",
           minimum: 0,
+          default: 0,
           description:
             "Starting line (0-based for head, offset from end for tail)",
         },
         lines: {
           type: "integer",
           minimum: 1,
-          description: "Number of lines to read",
+          description: "Number of lines to read (omit to read entire file)",
         },
         headOrTail: {
           type: "string",
@@ -608,7 +631,7 @@ const tools = [
           description: "'head' reads from start, 'tail' reads from end",
         },
       },
-      required: ["file", "start", "lines"],
+      required: ["file"],
     },
     handler: toolRead,
   },

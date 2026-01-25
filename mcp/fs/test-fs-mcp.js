@@ -79,6 +79,11 @@ async function setupTestEnvironment() {
     path.join(TEST_DIR, "special.txt"),
     "File with spaces in name",
   );
+  await fs.promises.writeFile(path.join(TEST_DIR, "empty.txt"), "");
+  await fs.promises.writeFile(
+    path.join(TEST_DIR, "twenty.txt"),
+    Array.from({ length: 20 }, (_, i) => `Line ${i + 1}`).join("\n"),
+  );
 
   // Setup external directory with symlink pointing to it (for isolated env tests)
   await fs.promises.mkdir(path.join(EXTERNAL_DIR, "docs"), { recursive: true });
@@ -91,11 +96,14 @@ async function setupTestEnvironment() {
     "console.log('external code');",
   );
   // Create symlink inside TEST_DIR pointing to EXTERNAL_DIR
-  await fs.promises.symlink(EXTERNAL_DIR, path.join(TEST_DIR, "linked-project"));
+  await fs.promises.symlink(
+    EXTERNAL_DIR,
+    path.join(TEST_DIR, "linked-project"),
+  );
   // Create symlink to a single file
   await fs.promises.symlink(
     path.join(EXTERNAL_DIR, "docs", "external.md"),
-    path.join(TEST_DIR, "linked-file.md")
+    path.join(TEST_DIR, "linked-file.md"),
   );
 }
 
@@ -471,14 +479,19 @@ const tests = [
         console.log("Output:", result);
       }
       // Paths should be relative like "dir1/nested.js", not absolute like "/tmp/.../dir1/nested.js"
-      const lines = result.split("\n").filter((l) => l.trim() && !l.includes("matched"));
+      const lines = result
+        .split("\n")
+        .filter((l) => l.trim() && !l.includes("matched"));
       for (const line of lines) {
         if (line.startsWith("/")) {
           throw new Error(`Find returned absolute path: ${line}`);
         }
       }
       // Should contain the relative path
-      if (!result.includes("dir1/nested.js") && !result.includes("dir1\\nested.js")) {
+      if (
+        !result.includes("dir1/nested.js") &&
+        !result.includes("dir1\\nested.js")
+      ) {
         throw new Error("Find should return relative path dir1/nested.js");
       }
     },
@@ -757,7 +770,10 @@ const tests = [
         }
       }
       // Should contain the relative path
-      if (!result.includes("dir1/nested.js") && !result.includes("dir1\\nested.js")) {
+      if (
+        !result.includes("dir1/nested.js") &&
+        !result.includes("dir1\\nested.js")
+      ) {
         throw new Error("RGrep should return relative path dir1/nested.js");
       }
     },
@@ -1025,6 +1041,200 @@ const tests = [
   },
 
   {
+    name: "Read with negative start rejects",
+    fn: async (client) => {
+      try {
+        await client.callTool("Read", {
+          file: "file1.txt",
+          start: -1,
+        });
+        throw new Error("Should reject negative start");
+      } catch (e) {
+        if (verbose)
+          console.log(`${GRAY}Correctly rejected: ${e.message}${NC}`);
+        if (!String(e.message).includes("non-negative"))
+          throw new Error("Error should mention non-negative");
+      }
+    },
+  },
+
+  {
+    name: "Read with zero lines rejects",
+    fn: async (client) => {
+      try {
+        await client.callTool("Read", {
+          file: "file1.txt",
+          start: 0,
+          lines: 0,
+        });
+        throw new Error("Should reject zero lines");
+      } catch (e) {
+        if (verbose)
+          console.log(`${GRAY}Correctly rejected: ${e.message}${NC}`);
+        if (!String(e.message).includes(">= 1"))
+          throw new Error("Error should mention lines >= 1");
+      }
+    },
+  },
+
+  {
+    name: "Read file only (no start/lines) reads entire file",
+    fn: async (client) => {
+      const result = await client.callTool("Read", {
+        file: "file1.txt",
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: Read entire file${NC}`);
+        console.log("Output:", result);
+      }
+      if (!result.includes("Hello World"))
+        throw new Error("Should include first line");
+      if (!result.includes("Line 3"))
+        throw new Error("Should include last line");
+      if (!result.includes("B,")) throw new Error("Should include file size");
+      if (!result.includes("lines)"))
+        throw new Error("Should include line count");
+    },
+  },
+
+  {
+    name: "Read entire file shows no partial",
+    fn: async (client) => {
+      const result = await client.callTool("Read", {
+        file: "file1.txt",
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: Read entire no partial${NC}`);
+        console.log("Output:", result);
+      }
+      if (result.includes("partial"))
+        throw new Error("Full read should not say partial");
+    },
+  },
+
+  {
+    name: "Read with start > 0 without lines shows partial",
+    fn: async (client) => {
+      const result = await client.callTool("Read", {
+        file: "hundred.txt",
+        start: 5,
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: Read start without lines partial${NC}`);
+        console.log("Output:", result);
+      }
+      if (!result.includes("partial"))
+        throw new Error("Should mark as partial when start > 0");
+      if (!result.includes("6-")) throw new Error("Should show correct range");
+    },
+  },
+
+  {
+    name: "Read tail with start > 0 without lines shows partial",
+    fn: async (client) => {
+      const result = await client.callTool("Read", {
+        file: "hundred.txt",
+        start: 5,
+        headOrTail: "tail",
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: Read tail start without lines partial${NC}`);
+        console.log("Output:", result);
+      }
+      if (!result.includes("partial"))
+        throw new Error("Should mark as partial when start > 0");
+    },
+  },
+
+  {
+    name: "Read single line",
+    fn: async (client) => {
+      const result = await client.callTool("Read", {
+        file: "hundred.txt",
+        start: 0,
+        lines: 1,
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: Read single line${NC}`);
+        console.log("Output:", result);
+      }
+      if (!result.includes("Line 1"))
+        throw new Error("Should show only line 1");
+      if (!result.includes("partial"))
+        throw new Error("Single line should be partial");
+    },
+  },
+
+  {
+    name: "Read last line only",
+    fn: async (client) => {
+      const result = await client.callTool("Read", {
+        file: "twenty.txt",
+        start: 0,
+        lines: 1,
+        headOrTail: "tail",
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: Read last line${NC}`);
+        console.log("Output:", result);
+      }
+      if (!result.includes("Line 20") || !result.includes("partial"))
+        throw new Error("Should show last line and mark as partial");
+    },
+  },
+
+  {
+    name: "Read start beyond file shows empty",
+    fn: async (client) => {
+      const result = await client.callTool("Read", {
+        file: "hundred.txt",
+        start: 200,
+        lines: 10,
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: Read start beyond file${NC}`);
+        console.log("Output:", result);
+      }
+      if (result.includes("Line")) throw new Error("Should have no lines");
+    },
+  },
+
+  {
+    name: "Read empty file",
+    fn: async (client) => {
+      const result = await client.callTool("Read", {
+        file: "empty.txt",
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: Read empty file${NC}`);
+        console.log("Output:", result);
+      }
+      if (!result.includes("0B")) throw new Error("Should show 0 bytes");
+      if (!result.includes("1 lines"))
+        throw new Error("Should show 1 line (newline char)");
+    },
+  },
+
+  {
+    name: "Read header contains file size in bytes",
+    fn: async (client) => {
+      const result = await client.callTool("Read", {
+        file: "file1.txt",
+        start: 0,
+        lines: 1,
+      });
+      if (verbose) {
+        console.log(`${GRAY}Tool: Read header size${NC}`);
+        console.log("Output:", result);
+      }
+      if (!result.includes("B,"))
+        throw new Error("Should include file size in bytes");
+      if (!result.includes("lines)"))
+        throw new Error("Should include lines) in header");
+    },
+  },
+
+  {
     name: "Grep case sensitive explicit",
     fn: async (client) => {
       const result = await client.callTool("Grep", {
@@ -1239,8 +1449,11 @@ const tests = [
       }
 
       // Extract file paths (skip summary line)
-      const lines = findResult.split("\n").filter(l => l.trim() && !l.includes("matched"));
-      if (lines.length === 0) throw new Error("Find should return at least one file");
+      const lines = findResult
+        .split("\n")
+        .filter((l) => l.trim() && !l.includes("matched"));
+      if (lines.length === 0)
+        throw new Error("Find should return at least one file");
 
       // Each returned path should work directly with Read
       for (const filePath of lines) {
@@ -1257,7 +1470,10 @@ const tests = [
           headOrTail: "head",
         });
         if (verbose) {
-          console.log(`${GRAY}Read ${filePath}:${NC}`, readResult.substring(0, 50));
+          console.log(
+            `${GRAY}Read ${filePath}:${NC}`,
+            readResult.substring(0, 50),
+          );
         }
 
         // Should not error and should have content
@@ -1283,15 +1499,18 @@ const tests = [
 
       // Extract file paths from "Files matched under .:" section
       const lines = rgrepResult.split("\n");
-      const filesIdx = lines.findIndex(l => l.includes("Files matched"));
-      if (filesIdx === -1) throw new Error("RGrep should have Files matched section");
+      const filesIdx = lines.findIndex((l) => l.includes("Files matched"));
+      if (filesIdx === -1)
+        throw new Error("RGrep should have Files matched section");
 
       // Get file paths after the "Files matched" line
-      const filePaths = lines.slice(filesIdx + 1)
-        .map(l => l.trim())
-        .filter(l => l && !l.includes("match"));
+      const filePaths = lines
+        .slice(filesIdx + 1)
+        .map((l) => l.trim())
+        .filter((l) => l && !l.includes("match"));
 
-      if (filePaths.length === 0) throw new Error("RGrep should return at least one file");
+      if (filePaths.length === 0)
+        throw new Error("RGrep should return at least one file");
 
       // Each returned path should work directly with Read
       for (const filePath of filePaths) {
@@ -1308,7 +1527,10 @@ const tests = [
           headOrTail: "head",
         });
         if (verbose) {
-          console.log(`${GRAY}Read ${filePath}:${NC}`, readResult.substring(0, 50));
+          console.log(
+            `${GRAY}Read ${filePath}:${NC}`,
+            readResult.substring(0, 50),
+          );
         }
 
         // Should not error and should have content
@@ -1332,14 +1554,19 @@ const tests = [
       }
 
       // Extract file paths
-      const lines = findResult.split("\n").filter(l => l.trim() && !l.includes("matched"));
-      if (lines.length === 0) throw new Error("Find should return files through symlink");
+      const lines = findResult
+        .split("\n")
+        .filter((l) => l.trim() && !l.includes("matched"));
+      if (lines.length === 0)
+        throw new Error("Find should return files through symlink");
 
       // Each returned path should work directly with Read
       for (const filePath of lines) {
         // Paths must be relative (no leading /)
         if (filePath.startsWith("/")) {
-          throw new Error(`Find returned absolute path through symlink: ${filePath}`);
+          throw new Error(
+            `Find returned absolute path through symlink: ${filePath}`,
+          );
         }
 
         // Path should go through the symlink name, not external path
@@ -1355,12 +1582,17 @@ const tests = [
           headOrTail: "head",
         });
         if (verbose) {
-          console.log(`${GRAY}Read ${filePath}:${NC}`, readResult.substring(0, 50));
+          console.log(
+            `${GRAY}Read ${filePath}:${NC}`,
+            readResult.substring(0, 50),
+          );
         }
 
         // Should not error
         if (!readResult || readResult.includes("Error"))
-          throw new Error(`Read failed for symlink path from Find: ${filePath}`);
+          throw new Error(
+            `Read failed for symlink path from Find: ${filePath}`,
+          );
       }
     },
   },
