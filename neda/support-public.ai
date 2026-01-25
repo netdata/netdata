@@ -12,7 +12,7 @@ models:
 tools:
   - filesystem_repos_public
 agents: []
-toolResponseMaxBytes: 32768
+toolResponseMaxBytes: 65536
 maxOutputTokens: 16384
 maxTurns: 30
 maxToolCallsPerTurn: 7
